@@ -20,8 +20,10 @@ export interface CompanySettings {
 export const COMPANY_SETTINGS_KEY = "growthos:company-settings";
 export const ACCOUNT_MONTHLY_GOALS_KEY = "growdash:account-monthly-goals";
 export const GROWDASH_BRAND_NAME = "Growdash";
-export const GROWDASH_BRAND_LOGO = "/growdash-logo-full.png";
-export const GROWDASH_BRAND_ICON = "/growdash-logo-tv.png";
+export const GROWDASH_BRAND_LOGO = "/growdash-logo-full-dark.png";
+export const GROWDASH_BRAND_LOGO_LIGHT = "/growdash-logo-full-light.png";
+export const GROWDASH_BRAND_LOGO_DARK = "/growdash-logo-full-dark.png";
+export const GROWDASH_BRAND_ICON = "/growdash-icon.png";
 export const GROWDASH_BRAND_DESCRIPTION = "Sistema operacional de receita com IA para escalar aquisição, vendas e margem.";
 
 const routePageTitles: Record<string, string> = {
