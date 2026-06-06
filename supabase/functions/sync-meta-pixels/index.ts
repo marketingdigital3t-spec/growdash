@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
       const meta = acc.account_id.startsWith("act_") ? acc.account_id : `act_${acc.account_id}`;
       try {
         // 1) List pixels/datasets in this ad account
-        const pxUrl = `https://graph.facebook.com/v21.0/${meta}/adspixels?fields=id,name&access_token=${acc.access_token}`;
+        const pxUrl = `https://graph.facebook.com/v25.0/${meta}/adspixels?fields=id,name&access_token=${acc.access_token}`;
         const pxRes = await fetch(pxUrl);
         const pxJson = await pxRes.json();
         if (pxJson.error) {
@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
 
           // 2a) Pixel stats → which standard events have fired
           try {
-            const statsUrl = `https://graph.facebook.com/v21.0/${px.id}/stats?aggregation=event&access_token=${acc.access_token}`;
+            const statsUrl = `https://graph.facebook.com/v25.0/${px.id}/stats?aggregation=event&access_token=${acc.access_token}`;
             const statsRes = await fetch(statsUrl);
             const statsJson = await statsRes.json();
             const seen = new Set<string>();
@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
 
           // 2b) Custom conversions on this pixel
           try {
-            const ccUrl = `https://graph.facebook.com/v21.0/${meta}/customconversions?fields=id,name,custom_event_type,pixel&limit=200&access_token=${acc.access_token}`;
+            const ccUrl = `https://graph.facebook.com/v25.0/${meta}/customconversions?fields=id,name,custom_event_type,pixel&limit=200&access_token=${acc.access_token}`;
             const ccRes = await fetch(ccUrl);
             const ccJson = await ccRes.json();
             for (const cc of (ccJson.data || []) as any[]) {

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { endOfDay, format, startOfDay } from "date-fns";
 
 export interface RDDealLite {
   id: string;
@@ -29,7 +29,6 @@ export interface RDDealLite {
   first_touch_utm_campaign: string | null;
   last_touch_utm_campaign: string | null;
   rd_campaign_name: string | null;
-  custom_fields?: Record<string, string> | null;
 }
 
 interface Params {
@@ -37,12 +36,13 @@ interface Params {
   endDate: Date;
   adAccountId?: string;
   enabled?: boolean;
+  refetchIntervalMs?: number;
 }
 
 const FIELDS =
-  "id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_content, utm_term, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields";
+  "id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_content, utm_term, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, rd_campaign_name";
 
-export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled = true }: Params) {
+export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled = true, refetchIntervalMs }: Params) {
   return useQuery({
     queryKey: [
       "rd_deals_period",
@@ -51,16 +51,27 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
       adAccountId ?? "all",
     ],
     enabled,
+    refetchInterval: refetchIntervalMs,
+    staleTime: 10_000,
+    gcTime: 10 * 60_000,
+    placeholderData: (previous) => previous ?? [],
     queryFn: async () => {
       const PAGE = 1000;
       const MAX = 10;
+      const startIso = startOfDay(startDate).toISOString();
+      const endIso = endOfDay(endDate).toISOString();
       let all: RDDealLite[] = [];
       for (let p = 0; p < MAX; p++) {
         let q = supabase
           .from("rd_deals")
           .select(FIELDS)
-          .gte("lead_created_at", startDate.toISOString())
-          .lte("lead_created_at", endDate.toISOString())
+          .or(
+            [
+              `and(lead_created_at.gte.${startIso},lead_created_at.lte.${endIso})`,
+              `and(closed_at.gte.${startIso},closed_at.lte.${endIso})`,
+              `and(stage_updated_at.gte.${startIso},stage_updated_at.lte.${endIso})`,
+            ].join(","),
+          )
           .order("lead_created_at", { ascending: false });
         if (adAccountId) q = q.eq("ad_account_id", adAccountId);
         const from = p * PAGE;

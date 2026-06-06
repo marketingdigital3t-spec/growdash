@@ -9,8 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { EditableIfEmpty } from "@/components/EditableIfEmpty";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { normalizeSelectedAdAccount, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 import { toast } from "sonner";
 
 type Pendency = "all" | "state" | "city" | "utms";
@@ -31,8 +32,9 @@ function missingUtms(s: Sale): string[] {
 }
 
 export default function LeadsIncompletos() {
-  const { session } = useAuth();
-  const { data: sales = [], isLoading, refetch } = useSales();
+  const selectedAccount = useSelectedAdAccountFilter();
+  const activeAccountId = normalizeSelectedAdAccount(selectedAccount);
+  const { data: sales = [], isLoading, refetch } = useSales({ adAccountId: activeAccountId });
   const qc = useQueryClient();
   const update = useUpdateSale();
   const [funnelFilter, setFunnelFilter] = useState<string>("all");
@@ -40,15 +42,7 @@ export default function LeadsIncompletos() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [reprocessing, setReprocessing] = useState(false);
 
-  const { data: funnels = [] } = useQuery({
-    queryKey: ["rd_funnels", session?.user.id],
-    enabled: !!session?.user.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("rd_funnels").select("id, name").eq("user_id", session!.user.id);
-      if (error) throw error;
-      return data as { id: string; name: string }[];
-    },
-  });
+  const { data: funnels = [] } = useRDFunnels(activeAccountId);
 
   const incomplete = useMemo(() => {
     return sales.filter((s) => {

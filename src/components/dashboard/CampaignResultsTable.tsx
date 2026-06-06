@@ -112,7 +112,8 @@ function buildHierarchy(
   return Array.from(campaigns.values());
 }
 
-// Modo Leads — só temos atribuição em nível de campanha (rd_deals não tem utm_content/term)
+// Modo Leads — performance de mídia usa leads da Meta como métrica principal.
+// Status RD seguem como auditoria comercial, mas não substituem o total da Meta.
 interface CampaignLeadRow {
   campaign_id: string;
   campaign_name: string;
@@ -217,7 +218,7 @@ export function CampaignResultsTable() {
   const filteredLeads = useMemo(() => {
     let rows = leadHierarchy;
     const valueFor = (r: CampaignLeadRow): number => {
-      if (leadStatus === "all") return r.counts.total;
+      if (leadStatus === "all") return r.metaLeads;
       return r.counts[leadStatus] ?? 0;
     };
     if (!showZero) rows = rows.filter((r) => valueFor(r) > 0);
@@ -265,7 +266,8 @@ export function CampaignResultsTable() {
   }, [attribution, insights]);
 
   const leadTotals = leadAttribution.totals;
-  const leadConv = leadTotals.total > 0 ? (leadTotals.won / leadTotals.total) * 100 : 0;
+  const metaLeadTotal = leadHierarchy.reduce((sum, row) => sum + row.metaLeads, 0);
+  const leadConv = metaLeadTotal > 0 ? (leadTotals.won / metaLeadTotal) * 100 : 0;
 
   const exportCSV = () => {
     if (mode === "sales") {
@@ -279,14 +281,14 @@ export function CampaignResultsTable() {
       }
       downloadCSV(lines, "resultados-vendas.csv");
     } else {
-      const headers = ["Campanha", "Total Leads", "Qualificados", "Desqualificados", "Perdidos", "Ganhos", "Em aberto", "Investido", "CPL", "Taxa Conv. %"];
+      const headers = ["Campanha", "Leads Meta", "Qualificados RD", "Desqualificados RD", "Perdidos RD", "Ganhos RD", "Em aberto RD", "Investido", "CPL Meta", "Taxa Conv. RD/Meta %"];
       const lines: string[] = [headers.join(",")];
       for (const r of filteredLeads) {
-        const cpl = r.counts.total > 0 ? r.spend / r.counts.total : 0;
-        const conv = r.counts.total > 0 ? (r.counts.won / r.counts.total) * 100 : 0;
+        const cpl = r.metaLeads > 0 ? r.spend / r.metaLeads : 0;
+        const conv = r.metaLeads > 0 ? (r.counts.won / r.metaLeads) * 100 : 0;
         lines.push([
           `"${r.campaign_name.replace(/"/g, '""')}"`,
-          r.counts.total, r.counts.qualified, r.counts.disqualified, r.counts.lost, r.counts.won, r.counts.open,
+          r.metaLeads, r.counts.qualified, r.counts.disqualified, r.counts.lost, r.counts.won, r.counts.open,
           r.spend.toFixed(2), cpl.toFixed(2), conv.toFixed(2),
         ].join(","));
       }
@@ -345,11 +347,11 @@ export function CampaignResultsTable() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-          <KPI label="Total de leads" value={leadTotals.total} />
-          <KPI label="Qualificados" value={leadTotals.qualified} tone="green" />
-          <KPI label="Desqualificados" value={leadTotals.disqualified} tone="yellow" />
-          <KPI label="Perdidos" value={leadTotals.lost} tone="red" />
-          <KPI label="Taxa de conversão" value={leadConv} suffix="%" decimals={1} />
+          <KPI label="Leads Meta" value={metaLeadTotal} />
+          <KPI label="Qualificados RD" value={leadTotals.qualified} tone="green" />
+          <KPI label="Desqualificados RD" value={leadTotals.disqualified} tone="yellow" />
+          <KPI label="Perdidos RD" value={leadTotals.lost} tone="red" />
+          <KPI label="Conversão RD/Meta" value={leadConv} suffix="%" decimals={1} />
         </div>
       )}
 
@@ -618,7 +620,7 @@ function LeadsTable({ filtered, statusFilter, onOpenLeads }: { filtered: Campaig
         <thead className="bg-muted/30">
           <tr className="text-left text-xs text-muted-foreground">
             <th className="px-2 py-2 font-medium">Campanha</th>
-            <th className="px-2 py-2 font-medium text-right">Total</th>
+            <th className="px-2 py-2 font-medium text-right">Leads Meta</th>
             <th className="px-2 py-2 font-medium text-right text-green-500">Qualificados</th>
             <th className="px-2 py-2 font-medium text-right text-yellow-500">Desqualif.</th>
             <th className="px-2 py-2 font-medium text-right text-red-500">Perdidos</th>
@@ -631,21 +633,21 @@ function LeadsTable({ filtered, statusFilter, onOpenLeads }: { filtered: Campaig
         </thead>
         <tbody>
           {filtered.map((r) => {
-            const cpl = r.counts.total > 0 ? r.spend / r.counts.total : 0;
-            const conv = r.counts.total > 0 ? (r.counts.won / r.counts.total) * 100 : 0;
+            const cpl = r.metaLeads > 0 ? r.spend / r.metaLeads : 0;
+            const conv = r.metaLeads > 0 ? (r.counts.won / r.metaLeads) * 100 : 0;
             const highlight = statusFilter !== "all";
             return (
               <tr key={r.campaign_id} className="border-t hover:bg-muted/30 cursor-pointer" onClick={() => onOpenLeads(r.campaign_id, r.campaign_name)}>
                 <td className="px-2 py-2 font-medium truncate max-w-[300px]">{r.campaign_name}</td>
-                <td className="px-2 py-2 text-right">{r.counts.total}</td>
+                <td className="px-2 py-2 text-right">{r.metaLeads}</td>
                 <td className={cn("px-2 py-2 text-right text-green-500", highlight && statusFilter === "qualified" && "font-bold")}>{r.counts.qualified || "—"}</td>
                 <td className={cn("px-2 py-2 text-right text-yellow-500", highlight && statusFilter === "disqualified" && "font-bold")}>{r.counts.disqualified || "—"}</td>
                 <td className={cn("px-2 py-2 text-right text-red-500", highlight && statusFilter === "lost" && "font-bold")}>{r.counts.lost || "—"}</td>
                 <td className={cn("px-2 py-2 text-right", highlight && statusFilter === "won" && "font-bold")}>{r.counts.won || "—"}</td>
                 <td className={cn("px-2 py-2 text-right text-muted-foreground", highlight && statusFilter === "open" && "font-bold")}>{r.counts.open || "—"}</td>
                 <td className="px-2 py-2 text-right text-xs">{fmtMoney(r.spend)}</td>
-                <td className="px-2 py-2 text-right text-xs">{r.counts.total > 0 ? fmtMoney(cpl) : "—"}</td>
-                <td className={cn("px-2 py-2 text-right text-xs", conv >= 10 && "text-green-500", conv > 0 && conv < 3 && "text-red-500")}>{r.counts.total > 0 ? conv.toFixed(1) + "%" : "—"}</td>
+                <td className="px-2 py-2 text-right text-xs">{r.metaLeads > 0 ? fmtMoney(cpl) : "—"}</td>
+                <td className={cn("px-2 py-2 text-right text-xs", conv >= 10 && "text-green-500", conv > 0 && conv < 3 && "text-red-500")}>{r.metaLeads > 0 ? conv.toFixed(1) + "%" : "—"}</td>
               </tr>
             );
           })}

@@ -10,7 +10,6 @@ import { AlertsSection } from "@/components/dashboard/AlertsSection";
 import { BrazilMap } from "@/components/dashboard/BrazilMap";
 import { RDSalesList } from "@/components/dashboard/widgets/RDSalesList";
 import { AttributionWidget } from "@/components/dashboard/widgets/AttributionWidget";
-import { RDCustomFieldPieWidget } from "@/components/dashboard/widgets/RDCustomFieldPieWidget";
 
 import { BestPeriodOfDayWidget } from "@/components/dashboard/widgets/BestPeriodOfDayWidget";
 import { BestWeekdayWidget } from "@/components/dashboard/widgets/BestWeekdayWidget";
@@ -70,8 +69,6 @@ export function WidgetRenderer({ type, title, config, onEditSale }: Props) {
       return <BestWeekdayWidget />;
     case "geo_origin":
       return <GeoOriginWidget />;
-    case "rd_custom_field_pie":
-      return <RDCustomFieldPieWidget />;
     case "ask_ai":
       return <div className="h-full overflow-auto"><AskAICard /></div>;
     case "budget_bm":

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -114,59 +114,6 @@ export type Database = {
           },
         ]
       }
-      account_transactions: {
-        Row: {
-          ad_account_id: string
-          amount: number
-          billing_reason: string | null
-          currency: string | null
-          id: string
-          inserted_at: string
-          payment_method: string | null
-          raw: Json | null
-          reference: string | null
-          status: string | null
-          time: string
-          updated_at: string
-        }
-        Insert: {
-          ad_account_id: string
-          amount?: number
-          billing_reason?: string | null
-          currency?: string | null
-          id: string
-          inserted_at?: string
-          payment_method?: string | null
-          raw?: Json | null
-          reference?: string | null
-          status?: string | null
-          time: string
-          updated_at?: string
-        }
-        Update: {
-          ad_account_id?: string
-          amount?: number
-          billing_reason?: string | null
-          currency?: string | null
-          id?: string
-          inserted_at?: string
-          payment_method?: string | null
-          raw?: Json | null
-          reference?: string | null
-          status?: string | null
-          time?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_transactions_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: false
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       account_utm_mapping: {
         Row: {
           ad_account_id: string
@@ -252,7 +199,6 @@ export type Database = {
           last_sync_success_at: string | null
           min_spend_threshold: number
           name: string
-          rd_fields_last_discovered_at: string | null
           remaining_balance: number | null
           target_cpl: number | null
           updated_at: string
@@ -271,7 +217,6 @@ export type Database = {
           last_sync_success_at?: string | null
           min_spend_threshold?: number
           name: string
-          rd_fields_last_discovered_at?: string | null
           remaining_balance?: number | null
           target_cpl?: number | null
           updated_at?: string
@@ -290,7 +235,6 @@ export type Database = {
           last_sync_success_at?: string | null
           min_spend_threshold?: number
           name?: string
-          rd_fields_last_discovered_at?: string | null
           remaining_balance?: number | null
           target_cpl?: number | null
           updated_at?: string
@@ -1061,105 +1005,6 @@ export type Database = {
         }
         Relationships: []
       }
-      job_runs: {
-        Row: {
-          created_at: string
-          error_message: string | null
-          finished_at: string | null
-          id: string
-          job_name: string
-          metadata: Json | null
-          processed_count: number
-          started_at: string
-          status: string
-          trigger_source: string
-        }
-        Insert: {
-          created_at?: string
-          error_message?: string | null
-          finished_at?: string | null
-          id?: string
-          job_name: string
-          metadata?: Json | null
-          processed_count?: number
-          started_at?: string
-          status?: string
-          trigger_source?: string
-        }
-        Update: {
-          created_at?: string
-          error_message?: string | null
-          finished_at?: string | null
-          id?: string
-          job_name?: string
-          metadata?: Json | null
-          processed_count?: number
-          started_at?: string
-          status?: string
-          trigger_source?: string
-        }
-        Relationships: []
-      }
-      meta_leads: {
-        Row: {
-          ad_account_id: string
-          ad_id: string | null
-          adset_id: string | null
-          campaign_id: string | null
-          created_at: string
-          created_time: string
-          email: string | null
-          field_data: Json | null
-          form_id: string | null
-          full_name: string | null
-          id: string
-          lead_city: string | null
-          lead_state: string | null
-          lead_state_source: string | null
-          meta_lead_id: string
-          phone: string | null
-          raw: Json | null
-        }
-        Insert: {
-          ad_account_id: string
-          ad_id?: string | null
-          adset_id?: string | null
-          campaign_id?: string | null
-          created_at?: string
-          created_time: string
-          email?: string | null
-          field_data?: Json | null
-          form_id?: string | null
-          full_name?: string | null
-          id?: string
-          lead_city?: string | null
-          lead_state?: string | null
-          lead_state_source?: string | null
-          meta_lead_id: string
-          phone?: string | null
-          raw?: Json | null
-        }
-        Update: {
-          ad_account_id?: string
-          ad_id?: string | null
-          adset_id?: string | null
-          campaign_id?: string | null
-          created_at?: string
-          created_time?: string
-          email?: string | null
-          field_data?: Json | null
-          form_id?: string | null
-          full_name?: string | null
-          id?: string
-          lead_city?: string | null
-          lead_state?: string | null
-          lead_state_source?: string | null
-          meta_lead_id?: string
-          phone?: string | null
-          raw?: Json | null
-        }
-        Relationships: []
-      }
       pixel_event: {
         Row: {
           action_type: string
@@ -1194,6 +1039,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_announcements: {
+        Row: {
+          active: boolean
+          alt: string
+          created_at: string
+          created_by: string | null
+          id: string
+          image_data_url: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          alt?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_data_url: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          alt?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_data_url?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       platform_rules: {
         Row: {
@@ -1368,7 +1243,6 @@ export type Database = {
           contact_email: string | null
           contact_name: string | null
           created_at: string
-          custom_fields: Json
           deal_owner_name: string | null
           first_touch_utm_campaign: string | null
           id: string
@@ -1376,7 +1250,6 @@ export type Database = {
           lead_city: string | null
           lead_created_at: string | null
           lead_state: string | null
-          lead_state_source: string | null
           lost_reason: string | null
           raw: Json | null
           rd_deal_id: string
@@ -1404,7 +1277,6 @@ export type Database = {
           contact_email?: string | null
           contact_name?: string | null
           created_at?: string
-          custom_fields?: Json
           deal_owner_name?: string | null
           first_touch_utm_campaign?: string | null
           id?: string
@@ -1412,7 +1284,6 @@ export type Database = {
           lead_city?: string | null
           lead_created_at?: string | null
           lead_state?: string | null
-          lead_state_source?: string | null
           lost_reason?: string | null
           raw?: Json | null
           rd_deal_id: string
@@ -1440,7 +1311,6 @@ export type Database = {
           contact_email?: string | null
           contact_name?: string | null
           created_at?: string
-          custom_fields?: Json
           deal_owner_name?: string | null
           first_touch_utm_campaign?: string | null
           id?: string
@@ -1448,7 +1318,6 @@ export type Database = {
           lead_city?: string | null
           lead_created_at?: string | null
           lead_state?: string | null
-          lead_state_source?: string | null
           lost_reason?: string | null
           raw?: Json | null
           rd_deal_id?: string
@@ -1468,54 +1337,6 @@ export type Database = {
           utm_source?: string | null
           utm_term?: string | null
           win?: boolean
-        }
-        Relationships: []
-      }
-      rd_field_configs: {
-        Row: {
-          ad_account_id: string
-          created_at: string
-          field_type: string
-          id: string
-          key: string
-          label: string
-          options: Json
-          rd_field_aliases: string[]
-          rd_field_label: string
-          rd_source: string
-          show_in_dashboard: boolean
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          ad_account_id: string
-          created_at?: string
-          field_type?: string
-          id?: string
-          key: string
-          label: string
-          options?: Json
-          rd_field_aliases?: string[]
-          rd_field_label: string
-          rd_source?: string
-          show_in_dashboard?: boolean
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          ad_account_id?: string
-          created_at?: string
-          field_type?: string
-          id?: string
-          key?: string
-          label?: string
-          options?: Json
-          rd_field_aliases?: string[]
-          rd_field_label?: string
-          rd_source?: string
-          show_in_dashboard?: boolean
-          updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
@@ -1603,6 +1424,51 @@ export type Database = {
         }
         Relationships: []
       }
+      realtime_sync_state: {
+        Row: {
+          created_at: string
+          id: string
+          last_error: string | null
+          last_finished_at: string | null
+          last_started_at: string | null
+          last_success_at: string | null
+          locked_until: string | null
+          provider: string
+          scope_key: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_finished_at?: string | null
+          last_started_at?: string | null
+          last_success_at?: string | null
+          locked_until?: string | null
+          provider: string
+          scope_key: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_finished_at?: string | null
+          last_started_at?: string | null
+          last_success_at?: string | null
+          locked_until?: string | null
+          provider?: string
+          scope_key?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sales: {
         Row: {
           ad_account_id: string | null
@@ -1614,7 +1480,6 @@ export type Database = {
           contact_name: string | null
           contact_phone: string | null
           created_at: string
-          custom_fields: Json
           gross_revenue: number
           id: string
           lead_city: string | null
@@ -1631,7 +1496,6 @@ export type Database = {
           net_revenue: number
           notes: string | null
           payment_method: string
-          payment_method_source: string
           product_id: string | null
           quantity: number
           rd_campaign_name: string | null
@@ -1660,7 +1524,6 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
-          custom_fields?: Json
           gross_revenue?: number
           id?: string
           lead_city?: string | null
@@ -1677,7 +1540,6 @@ export type Database = {
           net_revenue?: number
           notes?: string | null
           payment_method?: string
-          payment_method_source?: string
           product_id?: string | null
           quantity?: number
           rd_campaign_name?: string | null
@@ -1706,7 +1568,6 @@ export type Database = {
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
-          custom_fields?: Json
           gross_revenue?: number
           id?: string
           lead_city?: string | null
@@ -1723,7 +1584,6 @@ export type Database = {
           net_revenue?: number
           notes?: string | null
           payment_method?: string
-          payment_method_source?: string
           product_id?: string | null
           quantity?: number
           rd_campaign_name?: string | null
@@ -1914,7 +1774,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _normalize_uf: { Args: { _raw: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1922,25 +1781,13 @@ export type Database = {
         }
         Returns: boolean
       }
-      infer_uf_from_phone: { Args: { _phone: string }; Returns: string }
       is_master: { Args: { _user_id: string }; Returns: boolean }
+      is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
       user_can_access_ad: {
         Args: { _ad_id: string; _user_id: string }
         Returns: boolean
       }
       user_can_access_campaign: {
-        Args: { _campaign_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_can_view_ad: {
-        Args: { _ad_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_can_view_ad_account: {
-        Args: { _ad_account_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_can_view_campaign: {
         Args: { _campaign_id: string; _user_id: string }
         Returns: boolean
       }

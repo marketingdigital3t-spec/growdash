@@ -1,13 +1,11 @@
 import { useMemo, useState } from "react";
-import { Users, CheckCircle2, Percent, MapPin, DollarSign, ShoppingCart, TrendingUp, AlertCircle, Lightbulb, ListChecks } from "lucide-react";
+import { Users, CheckCircle2, Percent, MapPin, DollarSign, ShoppingCart, TrendingUp, AlertCircle, Lightbulb } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RTooltip, Cell } from "recharts";
 import { BrazilMap } from "@/components/dashboard/BrazilMap";
-import { LeadsAuditSheet } from "@/components/dashboard/LeadsAuditSheet";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useLeadsByState, UF_TO_NAME, type StateRow } from "@/hooks/useLeadsByState";
 
@@ -43,12 +41,39 @@ function KpiCard({ icon: Icon, title, value, footer, scheme }: { icon: any; titl
 }
 
 export function GeoOriginWidget() {
-  const { startDate, endDate, adAccountId } = useDashboard();
+  const { startDate, endDate, adAccountId, rdDeals } = useDashboard();
   const [mode, setMode] = useState<Mode>("leads");
-  const [auditOpen, setAuditOpen] = useState(false);
   const { data, isLoading } = useLeadsByState({ startDate, endDate, adAccountId });
-  const rows: StateRow[] = data?.rows || [];
-  const hasRegionData = data?.hasRegionData ?? false;
+  const rdRows = useMemo((): StateRow[] => {
+    const startKey = startDate.toISOString().slice(0, 10);
+    const endKey = endDate.toISOString().slice(0, 10);
+    const map = new Map<string, { leads: number; sales: number; revenue: number }>();
+    for (const deal of rdDeals) {
+      const raw = String(deal.lead_state || "").trim().toUpperCase();
+      if (!raw || raw.length !== 2 || !UF_TO_NAME[raw]) continue;
+      const current = map.get(raw) || { leads: 0, sales: 0, revenue: 0 };
+      const leadDate = (deal.lead_created_at || "").slice(0, 10);
+      if (leadDate && leadDate >= startKey && leadDate <= endKey) current.leads += 1;
+      if (deal.win) {
+        current.sales += 1;
+        current.revenue += Number(deal.amount_total || 0);
+      }
+      map.set(raw, current);
+    }
+    return Array.from(map.entries()).map(([uf, value]) => ({
+      uf,
+      leads: value.leads,
+      spend: 0,
+      cpl: 0,
+      sales: value.sales,
+      revenue: value.revenue,
+      cpa: 0,
+      conv_rate: value.leads > 0 ? (value.sales / value.leads) * 100 : 0,
+      ticket_medio: value.sales > 0 ? value.revenue / value.sales : 0,
+    }));
+  }, [endDate, rdDeals, startDate]);
+  const rows: StateRow[] = rdRows.length > 0 ? rdRows : data?.rows || [];
+  const hasRegionData = rdRows.length > 0 || (data?.hasRegionData ?? false);
 
   const totals = useMemo(() => {
     const t = rows.reduce(
@@ -61,19 +86,15 @@ export function GeoOriginWidget() {
       },
       { leads: 0, spend: 0, sales: 0, revenue: 0 }
     );
-    // Real lead total comes from canonical coverage (meta_leads count), not from UF-grouped rows
-    const realLeads = data?.coverage?.total ?? t.leads;
     return {
       ...t,
-      leads: realLeads,
-      cpl: realLeads > 0 ? t.spend / realLeads : 0,
+      cpl: t.leads > 0 ? t.spend / t.leads : 0,
       cpa: t.sales > 0 ? t.spend / t.sales : 0,
-      conv_rate: realLeads > 0 ? (t.sales / realLeads) * 100 : 0,
+      conv_rate: t.leads > 0 ? (t.sales / t.leads) * 100 : 0,
       ticket_medio: t.sales > 0 ? t.revenue / t.sales : 0,
       activeStates: rows.filter((r) => (mode === "leads" ? r.leads > 0 : r.sales > 0)).length,
     };
-  }, [rows, mode, data?.coverage?.total]);
-
+  }, [rows, mode]);
 
   const mapData = useMemo(() => {
     const m: Record<string, number> = {};
@@ -85,6 +106,7 @@ export function GeoOriginWidget() {
     return [...rows].sort((a, b) => (mode === "leads" ? b.leads - a.leads : b.sales - a.sales));
   }, [rows, mode]);
 
+  const topRows = sortedRows.slice(0, 6);
   const barData = sortedRows.slice(0, 7).map((r) => ({
     name: UF_TO_NAME[r.uf] || r.uf,
     value: mode === "leads" ? r.sales : r.revenue,
@@ -169,7 +191,7 @@ export function GeoOriginWidget() {
                   <p className="text-sm font-medium">Sem dados por estado neste período</p>
                   <p className="text-xs text-muted-foreground max-w-md">
                     {mode === "leads"
-                      ? 'O detalhamento por estado vem do Meta (breakdown "região"). Vá em Configurações → "Backfill 2026" e rode a sincronização para popular o histórico de todas as contas.'
+                      ? "O detalhamento por estado usa o campo Estado do RD. Se estiver vazio, revise o mapeamento do contato/negociação no RD Station."
                       : "Nenhuma venda com estado preenchido foi recebida do RD Station. Verifique se o campo \"Estado\" está sendo enviado no contato."}
                   </p>
                 </CardContent>
@@ -181,30 +203,18 @@ export function GeoOriginWidget() {
                 metricLabel={mode === "leads" ? "leads" : "vendas"}
                 title={mode === "leads" ? "Leads por estado" : "Vendas por estado"}
                 subtitle={`${(mode === "leads" ? totals.leads : totals.sales).toLocaleString("pt-BR")} ${mode === "leads" ? "leads" : "vendas"} em ${totals.activeStates} estados`}
-                source={mode === "leads" ? data?.source : undefined}
-                coverage={mode === "leads" ? data?.coverage : undefined}
               />
             )}
           </motion.div>
 
           <Card>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Todos os estados ({sortedRows.filter((r) => (mode === "leads" ? r.leads > 0 : r.sales > 0)).length})
-                </CardTitle>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Ordenado por {mode === "leads" ? "leads" : "vendas"} decrescente</p>
-              </div>
-              {mode === "leads" && (
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAuditOpen(true)}>
-                  <ListChecks className="h-3 w-3 mr-1" /> Auditar leads
-                </Button>
-              )}
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Top estados</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[420px] overflow-y-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-background z-10">
+                  <thead>
                     <tr className="text-muted-foreground border-b">
                       <th className="text-left font-medium py-2 px-3">#</th>
                       <th className="text-left font-medium py-2 px-3">Estado</th>
@@ -228,12 +238,10 @@ export function GeoOriginWidget() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedRows.filter((r) => (mode === "leads" ? r.leads > 0 : r.sales > 0)).length === 0 && (
+                    {topRows.length === 0 && (
                       <tr><td colSpan={7} className="text-center text-muted-foreground py-6">Sem dados</td></tr>
                     )}
-                    {sortedRows
-                      .filter((r) => (mode === "leads" ? r.leads > 0 : r.sales > 0))
-                      .map((r, i) => (
+                    {topRows.map((r, i) => (
                       <tr key={r.uf} className="border-b last:border-0 hover:bg-muted/40">
                         <td className="py-2 px-3">
                           <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${mode === "leads" ? "bg-blue-500" : "bg-emerald-500"}`}>
@@ -244,9 +252,9 @@ export function GeoOriginWidget() {
                         {mode === "leads" ? (
                           <>
                             <td className="text-right py-2 px-3">{fmtNum(r.leads)}</td>
-                            <td className="text-right py-2 px-3">{r.leads > 0 ? fmtBRL(r.cpl) : "—"}</td>
+                            <td className="text-right py-2 px-3">{r.spend > 0 && r.leads > 0 ? fmtBRL(r.cpl) : "—"}</td>
                             <td className="text-right py-2 px-3">{fmtNum(r.sales)}</td>
-                            <td className="text-right py-2 px-3">{r.sales > 0 ? fmtBRL(r.cpa) : "—"}</td>
+                            <td className="text-right py-2 px-3">{r.spend > 0 && r.sales > 0 ? fmtBRL(r.cpa) : "—"}</td>
                             <td className="text-right py-2 px-3">{r.leads > 0 ? fmtPct(r.conv_rate) : "—"}</td>
                           </>
                         ) : (
@@ -255,7 +263,7 @@ export function GeoOriginWidget() {
                             <td className="text-right py-2 px-3">{fmtBRL(r.revenue)}</td>
                             <td className="text-right py-2 px-3">{r.sales > 0 ? fmtBRL(r.ticket_medio) : "—"}</td>
                             <td className="text-right py-2 px-3">{totals.revenue > 0 ? fmtPct((r.revenue / totals.revenue) * 100) : "—"}</td>
-                            <td className="text-right py-2 px-3">{r.sales > 0 ? fmtBRL(r.cpa) : "—"}</td>
+                            <td className="text-right py-2 px-3">{r.spend > 0 && r.sales > 0 ? fmtBRL(r.cpa) : "—"}</td>
                           </>
                         )}
                       </tr>
@@ -266,14 +274,6 @@ export function GeoOriginWidget() {
             </CardContent>
           </Card>
         </div>
-
-        <LeadsAuditSheet
-          open={auditOpen}
-          onOpenChange={setAuditOpen}
-          adAccountId={adAccountId}
-          startDate={startDate}
-          endDate={endDate}
-        />
 
         {/* Bar chart + insight */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

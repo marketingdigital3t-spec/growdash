@@ -45,7 +45,7 @@ export function FunnelKPIs({ a, cpl, cac }: Props) {
                 <Icon className={`h-4 w-4 ${c.color}`} />
               </div>
               <div className="text-2xl font-semibold">
-                {c.format === "int" && <AnimatedNumber value={c.value} />}
+                {c.format === "int" && <AnimatedNumber value={c.value} decimals={0} />}
                 {c.format === "pct" && (
                   <><AnimatedNumber value={c.value} decimals={1} />%</>
                 )}

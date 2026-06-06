@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useState } from "react";
 
 interface ChartCardProps {
   title: string;
@@ -14,6 +16,7 @@ interface ChartCardProps {
 }
 
 export function ChartCard({ title, data, type, dataKey, color = "hsl(221, 83%, 53%)", xKey = "date", formatLabel }: ChartCardProps) {
+  const [chartType, setChartType] = useState<"line" | "bar">(type);
   const formatX = (value: string) => {
     try {
       return format(parseISO(value), "dd/MM", { locale: ptBR });
@@ -29,8 +32,16 @@ export function ChartCard({ title, data, type, dataKey, color = "hsl(221, 83%, 5
 
   return (
     <Card className="transition-shadow duration-300 hover:shadow-lg">
-      <CardHeader className="pb-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <div className="rounded-md border bg-background/60 p-1">
+          <Button size="sm" variant={chartType === "line" ? "secondary" : "ghost"} className="h-7 px-2 text-xs" onClick={() => setChartType("line")}>
+            Linha
+          </Button>
+          <Button size="sm" variant={chartType === "bar" ? "secondary" : "ghost"} className="h-7 px-2 text-xs" onClick={() => setChartType("bar")}>
+            Barras
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="pb-4">
         {data.length === 0 ? (
@@ -39,7 +50,7 @@ export function ChartCard({ title, data, type, dataKey, color = "hsl(221, 83%, 5
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
-            {type === "line" ? (
+            {chartType === "line" ? (
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey={xKey} tickFormatter={xKey === "date" ? formatX : undefined} className="text-xs" tick={{ fontSize: 11 }} />

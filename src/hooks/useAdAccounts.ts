@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useAdAccounts() {
+export function useAdAccounts(options?: { refetchIntervalMs?: number }) {
   return useQuery({
     queryKey: ["ad_accounts"],
     queryFn: async () => {
@@ -12,5 +12,6 @@ export function useAdAccounts() {
       if (error) throw error;
       return data;
     },
+    refetchInterval: options?.refetchIntervalMs,
   });
 }

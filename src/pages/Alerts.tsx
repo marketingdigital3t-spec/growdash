@@ -5,6 +5,7 @@ import { useAlerts, useMarkAlertRead } from "@/hooks/useAlerts";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaignDiagnostics, type CampaignDiagnostic } from "@/hooks/useCampaignDiagnostics";
 import { useLastTopUp } from "@/hooks/useCampaignTargets";
+import { normalizeSelectedAdAccount, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,12 +31,18 @@ function LastTopUpInline({ accountId }: { accountId: string }) {
 type CampaignHealth = CampaignDiagnostic;
 
 export default function Alerts() {
+  const selectedAccount = useSelectedAdAccountFilter();
+  const activeAccountId = normalizeSelectedAdAccount(selectedAccount);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const { data: dbAlerts = [] } = useAlerts(false);
   const markRead = useMarkAlertRead();
-  const { data: adAccounts = [] } = useAdAccounts();
-  const { data: campaignHealthData = [] } = useCampaignDiagnostics();
+  const { data: allAdAccounts = [] } = useAdAccounts();
+  const adAccounts = useMemo(
+    () => (activeAccountId ? allAdAccounts.filter((account) => account.id === activeAccountId) : allAdAccounts),
+    [activeAccountId, allAdAccounts],
+  );
+  const { data: campaignHealthData = [] } = useCampaignDiagnostics(activeAccountId);
 
   const toggleExpand = (id: string) => {
     setExpandedCards((prev) => {
@@ -55,7 +62,7 @@ export default function Alerts() {
 
   // Budget analysis per BM
   const { data: dailySpendByAccount = [] } = useQuery({
-    queryKey: ["daily_spend_by_account"],
+    queryKey: ["daily_spend_by_account", activeAccountId ?? "all"],
     queryFn: async () => {
       const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
       const { data, error } = await supabase
@@ -68,6 +75,7 @@ export default function Alerts() {
       for (const row of data || []) {
         const accId = (row as any).ads?.adsets?.campaigns?.ad_account_id;
         if (!accId) continue;
+        if (activeAccountId && accId !== activeAccountId) continue;
         if (!byAccount[accId]) byAccount[accId] = { dates: {} };
         const d = (row as any).date;
         byAccount[accId].dates[d] = (byAccount[accId].dates[d] || 0) + ((row as any).spend ?? 0);
@@ -122,13 +130,13 @@ export default function Alerts() {
         }
 
         if (severity === "critical") {
-          summary = `⚠️ A conta "${acc.name}" está em situação crítica de orçamento. ${reasons[0]}. Recomenda-se reabastecer o saldo antes de segunda-feira.`;
+          summary = `⚠️ A BM "${acc.name}" está em situação crítica de orçamento. ${reasons[0]}. Recomenda-se reabastecer o saldo antes de segunda-feira.`;
         } else if (severity === "warning") {
-          summary = `A conta "${acc.name}" precisa de atenção. ${reasons[0]}.`;
+          summary = `A BM "${acc.name}" precisa de atenção. ${reasons[0]}.`;
         } else {
           if (dailyBudget != null) reasons.push(`Gasto médio diário (R$ ${avgDailySpend.toFixed(2)}) está dentro do orçamento (R$ ${dailyBudget.toFixed(2)})`);
           if (balance != null && daysBalanceLasts != null) reasons.push(`Saldo suficiente para ${daysBalanceLasts} dias`);
-          summary = `A conta "${acc.name}" está com orçamento saudável.`;
+          summary = `A BM "${acc.name}" está com orçamento saudável.`;
         }
 
         return {
@@ -221,7 +229,7 @@ export default function Alerts() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{c.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Conta: {c.accountName} · Alvo CPL: R$ {c.effectiveTargetCpl.toFixed(2)} · {ageStr}
+                      BM: {c.accountName} · Alvo CPL: R$ {c.effectiveTargetCpl.toFixed(2)} · {ageStr}
                       {since ? ` · desde ${since}` : ""}
                     </p>
                   </div>
@@ -391,7 +399,7 @@ export default function Alerts() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">Análise de Orçamento por Conta</h2>
+            <h2 className="text-lg font-semibold">Análise de Orçamento por BM</h2>
           </div>
           <div className="grid gap-2">
             {budgetAnalysis.map((b) => {
@@ -543,7 +551,7 @@ export default function Alerts() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium break-words">{alert.message}</p>
                       {alert.isGenerated && alert.accountName && (
-                        <p className="text-xs text-muted-foreground">Conta: {alert.accountName}</p>
+                        <p className="text-xs text-muted-foreground">BM: {alert.accountName}</p>
                       )}
                       <p className="text-xs opacity-70 mt-0.5">
                         {alert.alert_type}

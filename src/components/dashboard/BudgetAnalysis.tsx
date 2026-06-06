@@ -1,16 +1,14 @@
-import { useState } from "react";
 import { useBudgetAnalysis } from "@/hooks/useBudgetAnalysis";
 import { useLastTopUp, useNextTopUpEstimate } from "@/hooks/useCampaignTargets";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, AlertTriangle, CheckCircle, ArrowUpCircle, CalendarClock, History } from "lucide-react";
+import { Wallet, AlertTriangle, CheckCircle, ArrowUpCircle, CalendarClock } from "lucide-react";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionCard } from "@/components/motion/MotionCard";
 import { motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { BudgetDetailSheet } from "./BudgetDetailSheet";
 
 function LastTopUp({ accountId }: { accountId: string }) {
   const { data } = useLastTopUp(accountId);
@@ -57,8 +55,7 @@ const severityConfig = {
 
 export function BudgetAnalysis() {
   const all = useBudgetAnalysis();
-  const { adAccountId, startDate, endDate } = useDashboard();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const { adAccountId } = useDashboard();
 
   const analysis = adAccountId ? all.filter((a) => a.id === adAccountId) : all;
 
@@ -73,7 +70,7 @@ export function BudgetAnalysis() {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Wallet className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Análise de Orçamento por Conta</h2>
+        <h2 className="text-lg font-semibold">Análise de Orçamento por BM</h2>
       </div>
       <motion.div
         className={gridClass}
@@ -97,16 +94,7 @@ export function BudgetAnalysis() {
             >
               <MotionCard>
                 <Card
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setOpenId(item.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setOpenId(item.id);
-                    }
-                  }}
-                  className={`cursor-pointer ${config.borderClass} border transition-colors hover:bg-card/70 ${
+                  className={`${config.borderClass} border ${
                     isUrgent ? "animate-pulse ring-2 ring-red-500/40 shadow-[0_0_24px_-4px_hsl(var(--destructive)/0.5)]" : ""
                   }`}
                 >
@@ -116,20 +104,7 @@ export function BudgetAnalysis() {
                         <span className={isUrgent ? "animate-pulse" : ""}>{config.icon}</span>
                         <p className="font-medium text-sm truncate">{item.name}</p>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          aria-label="Ver histórico de aportes"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenId(item.id);
-                          }}
-                          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                        >
-                          <History className="h-3.5 w-3.5" />
-                        </button>
-                        <Badge variant="outline" className={`text-[10px] ${config.badgeClass} ${isUrgent ? "animate-pulse" : ""}`}>{config.badge}</Badge>
-                      </div>
+                      <Badge variant="outline" className={`text-[10px] shrink-0 ${config.badgeClass} ${isUrgent ? "animate-pulse" : ""}`}>{config.badge}</Badge>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -175,18 +150,6 @@ export function BudgetAnalysis() {
           );
         })}
       </motion.div>
-
-      {analysis.map((item) => (
-        <BudgetDetailSheet
-          key={`sheet-${item.id}`}
-          open={openId === item.id}
-          onOpenChange={(o) => setOpenId(o ? item.id : null)}
-          accountId={item.id}
-          accountName={item.name}
-          startDate={startDate}
-          endDate={endDate}
-        />
-      ))}
     </div>
   );
 }

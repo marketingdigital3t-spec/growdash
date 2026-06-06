@@ -53,7 +53,6 @@ export type WidgetType =
   | "best_period_of_day"
   | "best_weekday"
   | "geo_origin"
-  | "rd_custom_field_pie"
   | "default_block";
 
 
@@ -223,21 +222,13 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultLayout: { w: 12, h: 6, minW: 6, minH: 4 },
     defaultConfig: {},
   },
-  {
-    type: "rd_custom_field_pie",
-    title: "Campo personalizado do RD (pizza)",
-    category: "Gráfico",
-    description: "Distribuição de leads/vendas por campo personalizado configurado no RD (ex.: Faturamento)",
-    defaultLayout: { w: 8, h: 5, minW: 4, minH: 4 },
-    defaultConfig: {},
-  },
 
   // System widgets — sempre presentes
   {
     type: "budget_bm",
-    title: "Análise de Orçamento (Conta)",
+    title: "Análise de Orçamento (BM)",
     category: "Sistema",
-    description: "Sempre presente — mostra todas as contas ou só a selecionada",
+    description: "Sempre presente — mostra todas as BMs ou só a da conta",
     defaultLayout: { w: 12, h: 5, minW: 6, minH: 3 },
     defaultConfig: {},
     system: true,

@@ -10,6 +10,7 @@ interface UseInsightsParams {
   startDate: Date;
   endDate: Date;
   enabled?: boolean;
+  refetchIntervalMs?: number;
 }
 
 export interface InsightRow {
@@ -39,7 +40,7 @@ export interface InsightRow {
   ad_account_id?: string | null;
 }
 
-export function useInsights({ adAccountId, campaignId, campaignIds, objectives, startDate, endDate, enabled = true }: UseInsightsParams) {
+export function useInsights({ adAccountId, campaignId, campaignIds, objectives, startDate, endDate, enabled = true, refetchIntervalMs }: UseInsightsParams) {
   return useQuery({
     queryKey: ["insights", adAccountId, campaignId, campaignIds?.join(","), objectives?.join(","), startDate.toISOString(), endDate.toISOString()],
     queryFn: async () => {
@@ -133,5 +134,6 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
       })) as InsightRow[];
     },
     enabled,
+    refetchInterval: refetchIntervalMs,
   });
 }

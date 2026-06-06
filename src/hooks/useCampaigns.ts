@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useCampaigns(adAccountId?: string) {
+export function useCampaigns(adAccountId?: string, options?: { refetchIntervalMs?: number }) {
   return useQuery({
     queryKey: ["campaigns", adAccountId],
     queryFn: async () => {
@@ -18,5 +18,6 @@ export function useCampaigns(adAccountId?: string) {
       if (error) throw error;
       return data;
     },
+    refetchInterval: options?.refetchIntervalMs,
   });
 }
