@@ -283,27 +283,27 @@ export function RevenueTopBar() {
       </div>
 
       {/* ===== Strip de métricas: 1 col no mobile (UTMify-style), grade no desktop ===== */}
-      <div className="revenue-glass-bar grid min-h-14 grid-cols-1 items-stretch gap-2 px-2 py-1.5 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-[minmax(168px,1.35fr)_repeat(8,minmax(78px,1fr))] md:px-3">
-        <div className="revenue-glass-card flex min-w-0 items-center gap-2 px-3 py-2.5 md:gap-1.5 md:px-2 md:py-1.5">
-          <Goal className={cn("h-4 w-4 shrink-0 md:h-3.5 md:w-3.5", metricClass(metrics.progress))} />
+      <div className="revenue-glass-bar grid min-h-14 grid-cols-1 items-stretch gap-2 px-2 py-1.5 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-[minmax(180px,1.4fr)_repeat(8,minmax(96px,1fr))] md:px-3">
+        <div className="revenue-glass-card flex min-w-0 items-center gap-2 px-3 py-2.5 md:gap-2 md:px-2.5 md:py-2">
+          <Goal className={cn("h-4 w-4 shrink-0", metricClass(metrics.progress))} />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground md:text-[10px]">
+            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
               <span className="truncate">Meta mensal</span>
               <span className="shrink-0">{Math.min(metrics.progress, 999).toFixed(0)}%</span>
             </div>
             <div className="mt-1 flex items-center gap-1.5">
               <Progress value={Math.min(metrics.progress, 100)} className="h-1.5 min-w-0 flex-1 bg-muted" />
-              <span className="shrink-0 text-sm font-semibold md:text-[11px]">{money(metrics.goal)}</span>
+              <span className="shrink-0 text-xs font-semibold">{money(metrics.goal)}</span>
             </div>
           </div>
         </div>
 
         {items.map((item) => (
-          <div key={item.label} className="revenue-glass-card flex min-w-0 items-center gap-2 px-3 py-2.5 md:gap-1.5 md:px-2 md:py-1.5">
-            <item.icon className="h-4 w-4 shrink-0 text-primary md:h-3.5 md:w-3.5" />
+          <div key={item.label} className="revenue-glass-card flex min-w-0 items-center gap-2 px-3 py-2.5 md:gap-2 md:px-2.5 md:py-2">
+            <item.icon className="h-4 w-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[10px] font-medium uppercase text-muted-foreground md:text-[9px]">{item.label}</p>
-              <p className="truncate text-base font-semibold leading-tight md:text-[13px]">{item.value}</p>
+              <p className="text-[10px] font-medium uppercase leading-tight text-muted-foreground break-words">{item.label}</p>
+              <p className="truncate text-sm font-semibold leading-tight">{item.value}</p>
             </div>
           </div>
         ))}
