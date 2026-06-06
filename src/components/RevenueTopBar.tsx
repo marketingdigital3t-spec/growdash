@@ -42,9 +42,8 @@ export function RevenueTopBar() {
   const [settings, setSettings] = useState<CompanySettings>(() => readCompanySettings());
   const [accountGoals, setAccountGoals] = useState<Record<string, number>>(() => readAccountMonthlyGoals());
   const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
-  const [selectedAccount, setSelectedAccount] = useState(() => {
-    try { return localStorage.getItem(ACCOUNT_STORAGE_KEY) || "all"; } catch { return "all"; }
-  });
+  const selectedAccount = useSelectedAdAccountFilter();
+  const setSelectedAccount = (next: string) => setSelectedAdAccountFilter(next);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
