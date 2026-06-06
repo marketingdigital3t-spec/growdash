@@ -90,13 +90,11 @@ export default function UsersPage() {
       const action = editing ? "update" : "create";
       const body: Record<string, unknown> = {
         action,
-        can_dashboard: form.can_dashboard,
-        can_campaigns: form.can_campaigns,
-        can_funnels: form.can_funnels,
-        can_classes: form.can_classes,
+        ...PAGES.reduce((acc, p) => ({ ...acc, [p.key]: form[p.key] }), {}),
         ad_account_ids: form.ad_account_ids,
         rd_funnel_ids: form.rd_funnel_ids,
       };
+
       if (editing) {
         body.target_user_id = editing.user_id;
         if (form.password) body.password = form.password;
