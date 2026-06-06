@@ -1,0 +1,1 @@
+ALTER TABLE public.platform_rules ADD COLUMN IF NOT EXISTS is_fallback boolean NOT NULL DEFAULT false;
