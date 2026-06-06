@@ -131,7 +131,16 @@ Deno.serve(async (req) => {
         can_campaigns: !!can_campaigns,
         can_funnels: !!can_funnels,
         can_classes: !!can_classes,
+        can_crm: !!can_crm,
+        can_commercial: !!can_commercial,
+        can_leads: !!can_leads,
+        can_alerts: !!can_alerts,
+        can_users: !!can_users,
+        can_integrations: !!can_integrations,
+        can_announcements: !!can_announcements,
+        can_automations: !!can_automations,
       });
+
       if (pErr) {
         await admin.auth.admin.deleteUser(newId);
         return json({ error: pErr.message }, 400);
