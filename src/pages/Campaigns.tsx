@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,28 +8,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
 import { useDateFilter } from "@/hooks/useDateFilter";
-import { useSyncMeta } from "@/hooks/useSyncMeta";
-import {
-  normalizeSelectedAdAccount,
-  setSelectedAdAccountFilter,
-  useSelectedAdAccountFilter,
-} from "@/hooks/useSelectedAdAccountFilter";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, RefreshCw, X, Megaphone, BarChart3, RotateCcw, Settings2, GripVertical } from "lucide-react";
+import { Search, RefreshCw, X, Megaphone, BarChart3, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
 import { ResizableHead, StatusDot, normalizeStatus, useColWidths } from "@/components/dashboard/ResizableTableHelpers";
 import { cn } from "@/lib/utils";
-import { DASHBOARD_REFRESH_INTERVAL_MS } from "@/lib/realtime";
-import { format } from "date-fns";
 
 type CampSortKey = "name" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "cpl" | "ctr" | "impressions";
 type CampColKey = "check" | "name" | "budget" | "sales" | "cpa" | "spend" | "leads" | "profit" | "roi" | "cpl" | "ctr" | "impressions" | "actions";
@@ -47,50 +37,19 @@ const AD_DEFAULTS: Record<AdColKey, number> = {
   name: 260, adset: 200, campaign: 200, spend: 120, leads: 90, cpl: 110, clicks: 100, ctr: 100, impressions: 120,
 };
 
-const CAMP_LABELS: Record<CampColKey, string> = {
-  check: "Seleção",
-  name: "Campanha",
-  budget: "Orçamento",
-  sales: "Vendas",
-  cpa: "CPA",
-  spend: "Investimento",
-  leads: "Leads",
-  profit: "Lucro",
-  roi: "ROI",
-  cpl: "CPL",
-  ctr: "CTR",
-  impressions: "Impressões",
-  actions: "Ações",
-};
-
-const CAMP_LOCKED_COLS: CampColKey[] = ["check", "name", "actions"];
-const CAMP_METRIC_COLS = (Object.keys(CAMP_DEFAULTS) as CampColKey[]).filter((key) => !CAMP_LOCKED_COLS.includes(key));
-const CAMP_VISIBLE_KEY = "campaigns-visible-cols-v1";
-
 export default function Campaigns() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
-  const selectedAccount = useSelectedAdAccountFilter();
-  const activeAccountId = normalizeSelectedAdAccount(selectedAccount);
+  const [selectedAccount, setSelectedAccount] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("campaigns");
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
-  const [columnsOpen, setColumnsOpen] = useState(false);
-  const [visibleCampCols, setVisibleCampCols] = useState<Set<CampColKey>>(() => {
-    if (typeof window === "undefined") return new Set(Object.keys(CAMP_DEFAULTS) as CampColKey[]);
-    try {
-      const stored = localStorage.getItem(CAMP_VISIBLE_KEY);
-      if (stored) return new Set(JSON.parse(stored) as CampColKey[]);
-    } catch {}
-    return new Set(Object.keys(CAMP_DEFAULTS) as CampColKey[]);
-  });
 
   const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
-  const { data: adAccounts = [] } = useAdAccounts({ refetchIntervalMs: DASHBOARD_REFRESH_INTERVAL_MS });
-  const { data: sales = [] } = useSales({ startDate, endDate, adAccountId: activeAccountId, refetchIntervalMs: DASHBOARD_REFRESH_INTERVAL_MS });
-  const syncMeta = useSyncMeta();
+  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: sales = [] } = useSales({ startDate, endDate });
 
   const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v1");
   const adset = useColWidths<AdsetColKey>(ADSET_DEFAULTS, "campaigns-adset-cols-v1");
@@ -118,8 +77,8 @@ export default function Campaigns() {
         `)
         .order("created_at", { ascending: false });
 
-      if (activeAccountId) {
-        query = query.eq("ad_account_id", activeAccountId);
+      if (selectedAccount !== "all") {
+        query = query.eq("ad_account_id", selectedAccount);
       }
 
       const { data, error } = await query;
@@ -155,7 +114,6 @@ export default function Campaigns() {
         return { ...c, adsets, budget, spend, leads, clicks, impressions, salesCount, revenue, profit, roi, cpa, cpl, ctr };
       });
     },
-    refetchInterval: DASHBOARD_REFRESH_INTERVAL_MS,
   });
 
   const filtered = useMemo(() => {
@@ -199,15 +157,10 @@ export default function Campaigns() {
     { spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0 }
   ), [filtered]);
 
-  const scopedCampaigns = useMemo(
-    () => (selectedIds.size === 0 ? filtered : filtered.filter((c: any) => selectedIds.has(c.id))),
-    [filtered, selectedIds]
-  );
-
   const selectedAdsets = useMemo(() => {
-    const start = startDate ? format(startDate, "yyyy-MM-dd") : null;
-    const end = endDate ? format(endDate, "yyyy-MM-dd") : null;
-    return scopedCampaigns
+    if (selectedIds.size === 0) return [];
+    return filtered
+      .filter((c: any) => selectedIds.has(c.id))
       .flatMap((c: any) =>
         (c.adsets || [])
           .filter((a: any) => statusFilter === "all" || normalizeStatus(a.status) === statusFilter)
@@ -215,8 +168,6 @@ export default function Campaigns() {
             let spend = 0, leads = 0, clicks = 0, impressions = 0;
             for (const ad of adset.ads || []) {
               for (const i of ad.insights || []) {
-                if (start && i.date < start) continue;
-                if (end && i.date > end) continue;
                 spend += i.spend ?? 0; leads += i.leads ?? 0;
                 clicks += i.clicks ?? 0; impressions += i.impressions ?? 0;
               }
@@ -224,12 +175,12 @@ export default function Campaigns() {
             return { ...adset, campaignName: c.name, spend, leads, clicks, impressions };
           })
       );
-  }, [scopedCampaigns, statusFilter, startDate, endDate]);
+  }, [filtered, selectedIds, statusFilter]);
 
   const selectedAds = useMemo(() => {
-    const start = startDate ? format(startDate, "yyyy-MM-dd") : null;
-    const end = endDate ? format(endDate, "yyyy-MM-dd") : null;
-    return scopedCampaigns
+    if (selectedIds.size === 0) return [];
+    return filtered
+      .filter((c: any) => selectedIds.has(c.id))
       .flatMap((c: any) =>
         (c.adsets || []).flatMap((adset: any) =>
           (adset.ads || [])
@@ -237,8 +188,6 @@ export default function Campaigns() {
             .map((ad: any) => {
               let spend = 0, leads = 0, clicks = 0, impressions = 0;
               for (const i of ad.insights || []) {
-                if (start && i.date < start) continue;
-                if (end && i.date > end) continue;
                 spend += i.spend ?? 0; leads += i.leads ?? 0;
                 clicks += i.clicks ?? 0; impressions += i.impressions ?? 0;
               }
@@ -246,35 +195,13 @@ export default function Campaigns() {
             })
         )
       );
-  }, [scopedCampaigns, statusFilter, startDate, endDate]);
+  }, [filtered, selectedIds, statusFilter]);
 
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const cellW = (k: CampColKey) => ({ width: camp.colWidths[k], minWidth: camp.colWidths[k], maxWidth: camp.colWidths[k] });
-  const showCamp = (k: CampColKey) => visibleCampCols.has(k);
   const adsetCellW = (k: AdsetColKey) => ({ width: adset.colWidths[k], minWidth: adset.colWidths[k], maxWidth: adset.colWidths[k] });
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
-  const updateVisibleCampCols = (key: CampColKey, checked: boolean) => {
-    const next = new Set(visibleCampCols);
-    if (checked) next.add(key);
-    else next.delete(key);
-    CAMP_LOCKED_COLS.forEach((locked) => next.add(locked));
-    setVisibleCampCols(next);
-    localStorage.setItem(CAMP_VISIBLE_KEY, JSON.stringify([...next]));
-  };
-  const resetVisibleCampCols = () => {
-    const next = new Set(Object.keys(CAMP_DEFAULTS) as CampColKey[]);
-    setVisibleCampCols(next);
-    localStorage.setItem(CAMP_VISIBLE_KEY, JSON.stringify([...next]));
-  };
-  const handleRefresh = async () => {
-    await syncMeta.mutateAsync({
-      adAccountId: activeAccountId,
-      startDate: format(startDate, "yyyy-MM-dd"),
-      endDate: format(endDate, "yyyy-MM-dd"),
-    });
-    refetch();
-  };
 
   return (
     <MotionPage className="space-y-4">
@@ -283,8 +210,8 @@ export default function Campaigns() {
           <h1 className="text-2xl font-bold">Campanhas</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerenciador de campanhas</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={syncMeta.isPending || isLoading} className="gap-2">
-          <RefreshCw className={cn("h-4 w-4", (syncMeta.isPending || isLoading) && "animate-spin")} /> Atualizar
+        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Atualizar
         </Button>
       </MotionItem>
 
@@ -297,7 +224,7 @@ export default function Campaigns() {
                 <Input placeholder="Buscar campanha..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
               </div>
               {adAccounts.length > 0 && (
-                <Select value={selectedAccount} onValueChange={setSelectedAdAccountFilter}>
+                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                   <SelectTrigger className="w-[200px]"><SelectValue placeholder="Conta de Anúncio" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as contas</SelectItem>
@@ -317,9 +244,6 @@ export default function Campaigns() {
               </Select>
               <Button variant="outline" size="icon" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} title="Resetar largura das colunas">
                 <RotateCcw className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setColumnsOpen(true)} className="gap-2">
-                <Settings2 className="h-4 w-4" /> Personalizar colunas
               </Button>
               <DateFilterBar
                 preset={preset} onPresetChange={setPreset}
@@ -349,8 +273,8 @@ export default function Campaigns() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="campaigns">Campanhas</TabsTrigger>
-            <TabsTrigger value="adsets">Conjuntos ({selectedAdsets.length})</TabsTrigger>
-            <TabsTrigger value="ads">Anúncios ({selectedAds.length})</TabsTrigger>
+            <TabsTrigger value="adsets" disabled={selectedIds.size === 0}>Conjuntos {selectedIds.size > 0 && `(${selectedAdsets.length})`}</TabsTrigger>
+            <TabsTrigger value="ads" disabled={selectedIds.size === 0}>Anúncios {selectedIds.size > 0 && `(${selectedAds.length})`}</TabsTrigger>
           </TabsList>
 
           {/* Campaigns Tab */}
@@ -368,21 +292,21 @@ export default function Campaigns() {
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        {showCamp("check") && <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")}>
+                        <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")}>
                           <Checkbox checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
-                        </ResizableHead>}
-                        {showCamp("name") && <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Campanha</ResizableHead>}
-                        {showCamp("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
-                        {showCamp("sales") && <ResizableHead colKey="sales" width={camp.colWidths.sales} onResize={camp.startResize("sales")} sortable sortableKey="salesCount" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Vendas</ResizableHead>}
-                        {showCamp("cpa") && <ResizableHead colKey="cpa" width={camp.colWidths.cpa} onResize={camp.startResize("cpa")} sortable sortableKey="cpa" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPA</ResizableHead>}
-                        {showCamp("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Investimento</ResizableHead>}
-                        {showCamp("leads") && <ResizableHead colKey="leads" width={camp.colWidths.leads} onResize={camp.startResize("leads")} sortable sortableKey="leads" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Leads</ResizableHead>}
-                        {showCamp("profit") && <ResizableHead colKey="profit" width={camp.colWidths.profit} onResize={camp.startResize("profit")} sortable sortableKey="profit" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Lucro</ResizableHead>}
-                        {showCamp("roi") && <ResizableHead colKey="roi" width={camp.colWidths.roi} onResize={camp.startResize("roi")} sortable sortableKey="roi" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">ROI</ResizableHead>}
-                        {showCamp("cpl") && <ResizableHead colKey="cpl" width={camp.colWidths.cpl} onResize={camp.startResize("cpl")} sortable sortableKey="cpl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPL</ResizableHead>}
-                        {showCamp("ctr") && <ResizableHead colKey="ctr" width={camp.colWidths.ctr} onResize={camp.startResize("ctr")} sortable sortableKey="ctr" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CTR</ResizableHead>}
-                        {showCamp("impressions") && <ResizableHead colKey="impressions" width={camp.colWidths.impressions} onResize={camp.startResize("impressions")} sortable sortableKey="impressions" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Impressões</ResizableHead>}
-                        {showCamp("actions") && <ResizableHead colKey="actions" width={camp.colWidths.actions} onResize={camp.startResize("actions")}>{""}</ResizableHead>}
+                        </ResizableHead>
+                        <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Campanha</ResizableHead>
+                        <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>
+                        <ResizableHead colKey="sales" width={camp.colWidths.sales} onResize={camp.startResize("sales")} sortable sortableKey="salesCount" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Vendas</ResizableHead>
+                        <ResizableHead colKey="cpa" width={camp.colWidths.cpa} onResize={camp.startResize("cpa")} sortable sortableKey="cpa" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPA</ResizableHead>
+                        <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Gastos</ResizableHead>
+                        <ResizableHead colKey="leads" width={camp.colWidths.leads} onResize={camp.startResize("leads")} sortable sortableKey="leads" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Leads</ResizableHead>
+                        <ResizableHead colKey="profit" width={camp.colWidths.profit} onResize={camp.startResize("profit")} sortable sortableKey="profit" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Lucro</ResizableHead>
+                        <ResizableHead colKey="roi" width={camp.colWidths.roi} onResize={camp.startResize("roi")} sortable sortableKey="roi" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">ROI</ResizableHead>
+                        <ResizableHead colKey="cpl" width={camp.colWidths.cpl} onResize={camp.startResize("cpl")} sortable sortableKey="cpl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPL</ResizableHead>
+                        <ResizableHead colKey="ctr" width={camp.colWidths.ctr} onResize={camp.startResize("ctr")} sortable sortableKey="ctr" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CTR</ResizableHead>
+                        <ResizableHead colKey="impressions" width={camp.colWidths.impressions} onResize={camp.startResize("impressions")} sortable sortableKey="impressions" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Impressões</ResizableHead>
+                        <ResizableHead colKey="actions" width={camp.colWidths.actions} onResize={camp.startResize("actions")}>{""}</ResizableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -395,30 +319,30 @@ export default function Campaigns() {
                             className={`border-b transition-colors hover:bg-muted/50 cursor-pointer ${selectedIds.has(c.id) ? "bg-muted/30" : ""}`}
                             onClick={() => toggleSelect(c.id)}
                           >
-                            {showCamp("check") && <TableCell style={cellW("check")} onClick={(e) => e.stopPropagation()}>
+                            <TableCell style={cellW("check")} onClick={(e) => e.stopPropagation()}>
                               <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
-                            </TableCell>}
-                            {showCamp("name") && <TableCell style={cellW("name")} className="font-medium">
+                            </TableCell>
+                            <TableCell style={cellW("name")} className="font-medium">
                               <div className="flex items-center gap-2 min-w-0">
                                 <StatusDot status={c.status} />
                                 <span className="truncate" title={c.name}>{c.name}</span>
                               </div>
-                            </TableCell>}
-                            {showCamp("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
-                            {showCamp("sales") && <TableCell style={cellW("sales")} className={cn("text-right tabular-nums text-sm", sortBg("salesCount"))}><AnimatedNumber value={c.salesCount} decimals={0} /></TableCell>}
-                            {showCamp("cpa") && <TableCell style={cellW("cpa")} className={cn("text-right tabular-nums text-sm", sortBg("cpa"))}><AnimatedNumber value={c.cpa} prefix="R$ " decimals={2} /></TableCell>}
-                            {showCamp("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
-                            {showCamp("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))}><AnimatedNumber value={c.leads} decimals={0} /></TableCell>}
-                            {showCamp("profit") && <TableCell style={cellW("profit")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.profit), sortBg("profit"))}><AnimatedNumber value={c.profit} prefix="R$ " decimals={2} /></TableCell>}
-                            {showCamp("roi") && <TableCell style={cellW("roi")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.roi), sortBg("roi"))}><AnimatedNumber value={c.roi} suffix="%" decimals={1} /></TableCell>}
-                            {showCamp("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /></TableCell>}
-                            {showCamp("ctr") && <TableCell style={cellW("ctr")} className={cn("text-right tabular-nums text-sm", sortBg("ctr"))}><AnimatedNumber value={c.ctr} suffix="%" decimals={2} /></TableCell>}
-                            {showCamp("impressions") && <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>}
-                            {showCamp("actions") && <TableCell style={cellW("actions")} onClick={(e) => e.stopPropagation()}>
+                            </TableCell>
+                            <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>
+                            <TableCell style={cellW("sales")} className={cn("text-right tabular-nums text-sm", sortBg("salesCount"))}><AnimatedNumber value={c.salesCount} decimals={0} /></TableCell>
+                            <TableCell style={cellW("cpa")} className={cn("text-right tabular-nums text-sm", sortBg("cpa"))}><AnimatedNumber value={c.cpa} prefix="R$ " decimals={2} /></TableCell>
+                            <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>
+                            <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))}><AnimatedNumber value={c.leads} decimals={0} /></TableCell>
+                            <TableCell style={cellW("profit")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.profit), sortBg("profit"))}><AnimatedNumber value={c.profit} prefix="R$ " decimals={2} /></TableCell>
+                            <TableCell style={cellW("roi")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.roi), sortBg("roi"))}><AnimatedNumber value={c.roi} suffix="%" decimals={1} /></TableCell>
+                            <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /></TableCell>
+                            <TableCell style={cellW("ctr")} className={cn("text-right tabular-nums text-sm", sortBg("ctr"))}><AnimatedNumber value={c.ctr} suffix="%" decimals={2} /></TableCell>
+                            <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>
+                            <TableCell style={cellW("actions")} onClick={(e) => e.stopPropagation()}>
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailCampaignId(c.id)} title="Ver detalhes">
                                 <BarChart3 className="h-4 w-4" />
                               </Button>
-                            </TableCell>}
+                            </TableCell>
                           </motion.tr>
                         ))}
                       </AnimatePresence>
@@ -429,7 +353,7 @@ export default function Campaigns() {
                   <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                     <span className="font-semibold">{filtered.length} campanha{filtered.length !== 1 ? "s" : ""}</span>
                     <span>Vendas: <strong><AnimatedNumber value={totals.salesCount} decimals={0} /></strong></span>
-                    <span>Investimento: <strong><AnimatedNumber value={totals.spend} prefix="R$ " decimals={2} /></strong></span>
+                    <span>Gastos: <strong><AnimatedNumber value={totals.spend} prefix="R$ " decimals={2} /></strong></span>
                     <span>Faturamento: <strong><AnimatedNumber value={totals.revenue} prefix="R$ " decimals={2} /></strong></span>
                     <span className={colorClass(totals.profit)}>Lucro: <strong><AnimatedNumber value={totals.profit} prefix="R$ " decimals={2} /></strong></span>
                     <span>Leads: <strong><AnimatedNumber value={totals.leads} decimals={0} /></strong></span>
@@ -449,7 +373,7 @@ export default function Campaigns() {
                       <ResizableHead colKey="name" width={adset.colWidths.name} onResize={adset.startResize("name")}>Conjunto</ResizableHead>
                       <ResizableHead colKey="campaign" width={adset.colWidths.campaign} onResize={adset.startResize("campaign")}>Campanha</ResizableHead>
                       <ResizableHead colKey="budget" width={adset.colWidths.budget} onResize={adset.startResize("budget")} align="right">Orçamento Diário</ResizableHead>
-                      <ResizableHead colKey="spend" width={adset.colWidths.spend} onResize={adset.startResize("spend")} align="right">Investimento</ResizableHead>
+                      <ResizableHead colKey="spend" width={adset.colWidths.spend} onResize={adset.startResize("spend")} align="right">Gastos</ResizableHead>
                       <ResizableHead colKey="leads" width={adset.colWidths.leads} onResize={adset.startResize("leads")} align="right">Leads</ResizableHead>
                       <ResizableHead colKey="cpl" width={adset.colWidths.cpl} onResize={adset.startResize("cpl")} align="right">CPL</ResizableHead>
                       <ResizableHead colKey="clicks" width={adset.colWidths.clicks} onResize={adset.startResize("clicks")} align="right">Cliques</ResizableHead>
@@ -490,7 +414,7 @@ export default function Campaigns() {
                       <ResizableHead colKey="name" width={ad.colWidths.name} onResize={ad.startResize("name")}>Anúncio</ResizableHead>
                       <ResizableHead colKey="adset" width={ad.colWidths.adset} onResize={ad.startResize("adset")}>Conjunto</ResizableHead>
                       <ResizableHead colKey="campaign" width={ad.colWidths.campaign} onResize={ad.startResize("campaign")}>Campanha</ResizableHead>
-                      <ResizableHead colKey="spend" width={ad.colWidths.spend} onResize={ad.startResize("spend")} align="right">Investimento</ResizableHead>
+                      <ResizableHead colKey="spend" width={ad.colWidths.spend} onResize={ad.startResize("spend")} align="right">Gastos</ResizableHead>
                       <ResizableHead colKey="leads" width={ad.colWidths.leads} onResize={ad.startResize("leads")} align="right">Leads</ResizableHead>
                       <ResizableHead colKey="cpl" width={ad.colWidths.cpl} onResize={ad.startResize("cpl")} align="right">CPL</ResizableHead>
                       <ResizableHead colKey="clicks" width={ad.colWidths.clicks} onResize={ad.startResize("clicks")} align="right">Cliques</ResizableHead>
@@ -529,49 +453,6 @@ export default function Campaigns() {
           </TabsContent>
         </Tabs>
       </MotionItem>
-
-      <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Personalize as colunas</DialogTitle>
-            <DialogDescription>Escolha como visualizar as métricas na tabela de campanhas.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 md:grid-cols-[1fr_280px]">
-            <div className="space-y-2 rounded-lg border p-3">
-              <Input placeholder="Buscar por coluna" readOnly className="mb-3" />
-              {CAMP_METRIC_COLS.map((key) => (
-                <label key={key} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-muted">
-                  <Checkbox checked={visibleCampCols.has(key)} onCheckedChange={(checked) => updateVisibleCampCols(key, Boolean(checked))} />
-                  <span className="text-sm">{CAMP_LABELS[key]}</span>
-                </label>
-              ))}
-            </div>
-            <div className="space-y-2 rounded-lg border p-3">
-              <Label>Colunas ativas</Label>
-              <div className="space-y-2">
-                {(Object.keys(CAMP_DEFAULTS) as CampColKey[])
-                  .filter((key) => visibleCampCols.has(key))
-                  .map((key) => (
-                    <div key={key} className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
-                      <span className="flex items-center gap-2">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" /> {CAMP_LABELS[key]}
-                      </span>
-                      {!CAMP_LOCKED_COLS.includes(key) && (
-                        <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => updateVisibleCampCols(key, false)}>
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-              </div>
-              <div className="flex justify-end gap-2 pt-3">
-                <Button variant="outline" onClick={resetVisibleCampCols}>Restaurar padrão</Button>
-                <Button onClick={() => setColumnsOpen(false)}>Salvar</Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <CampaignDetailSheet
         open={!!detailCampaignId}

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { format, isSameDay, startOfMonth, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,8 +20,6 @@ interface Props {
   onCustomRangeChange: (range: { from: Date; to: Date }) => void;
   startDate: Date;
   endDate: Date;
-  autoApplyPresets?: boolean;
-  compact?: boolean;
 }
 
 const PRESET_ORDER: DatePreset[] = [
@@ -55,8 +54,6 @@ export function MetaDateRangePicker({
   onCustomRangeChange,
   startDate,
   endDate,
-  autoApplyPresets = false,
-  compact = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pendingPreset, setPendingPreset] = useState<DatePreset>(preset);
@@ -64,7 +61,6 @@ export function MetaDateRangePicker({
     from: startDate,
     to: endDate,
   });
-  const [rangeDraftStart, setRangeDraftStart] = useState<Date | null>(null);
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [comparePreset, setComparePreset] = useState<DatePreset>("yesterday");
 
@@ -72,7 +68,6 @@ export function MetaDateRangePicker({
     if (open) {
       setPendingPreset(preset);
       setPendingRange({ from: startDate, to: endDate });
-      setRangeDraftStart(null);
     }
   }, [open, preset, startDate, endDate]);
 
@@ -81,26 +76,14 @@ export function MetaDateRangePicker({
     if (p !== "custom") {
       const resolved = resolvePreset(p, customRange);
       setPendingRange({ from: resolved.startDate, to: resolved.endDate });
-      setRangeDraftStart(null);
-      if (autoApplyPresets) {
-        onPresetChange(p);
-        setOpen(false);
-      }
     }
   };
 
-  const handleDayClick = (day: Date) => {
-    setPendingPreset("custom");
-    if (rangeDraftStart && !isSameDay(rangeDraftStart, day)) {
-      setPendingRange({
-        from: rangeDraftStart < day ? rangeDraftStart : day,
-        to: rangeDraftStart < day ? day : rangeDraftStart,
-      });
-      setRangeDraftStart(null);
-      return;
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    if (range?.from) {
+      setPendingRange({ from: range.from, to: range.to ?? range.from });
+      setPendingPreset("custom");
     }
-    setPendingRange({ from: day, to: day });
-    setRangeDraftStart(day);
   };
 
   const handleApply = () => {
@@ -112,17 +95,13 @@ export function MetaDateRangePicker({
   };
 
   const compareRange = compareEnabled ? resolvePreset(comparePreset, customRange) : null;
-  const numberOfMonths = typeof window !== "undefined" && window.innerWidth < 768 ? 1 : 2;
-  const calendarDefaultMonth = numberOfMonths === 2
-    ? startOfMonth(subMonths(pendingRange.to || new Date(), 1))
-    : startOfMonth(pendingRange.to || pendingRange.from || new Date());
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className={cn("bg-card font-normal justify-start", compact && "h-9 w-[min(70vw,235px)] min-w-[170px] px-2.5 text-xs")}>
-          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-          <span className="truncate">{formatTrigger(preset, startDate, endDate)}</span>
+        <Button variant="outline" className="bg-card font-normal justify-start">
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {formatTrigger(preset, startDate, endDate)}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 max-w-[95vw]" align="start">
@@ -160,10 +139,9 @@ export function MetaDateRangePicker({
           <div className="flex flex-col">
             <Calendar
               mode="range"
-              numberOfMonths={numberOfMonths}
-              defaultMonth={calendarDefaultMonth}
+              numberOfMonths={typeof window !== "undefined" && window.innerWidth < 768 ? 1 : 2}
               selected={{ from: pendingRange.from, to: pendingRange.to }}
-              onDayClick={handleDayClick}
+              onSelect={handleCalendarSelect}
               locale={ptBR}
               weekStartsOn={1}
               className="p-3 pointer-events-auto"

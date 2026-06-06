@@ -15,7 +15,7 @@ export interface RDFunnel {
   updated_at: string;
 }
 
-export function useRDFunnels(adAccountId?: string, options?: { refetchIntervalMs?: number }) {
+export function useRDFunnels(adAccountId?: string) {
   return useQuery({
     queryKey: ["rd_funnels", adAccountId ?? "all"],
     queryFn: async () => {
@@ -25,7 +25,6 @@ export function useRDFunnels(adAccountId?: string, options?: { refetchIntervalMs
       if (error) throw error;
       return data as RDFunnel[];
     },
-    refetchInterval: options?.refetchIntervalMs,
   });
 }
 

@@ -45,11 +45,12 @@ export function statusLabel(s: DiagSeverity) {
   return STATUS_LABEL[s];
 }
 
-export function useCampaignDiagnostics(adAccountId?: string) {
+export function useCampaignDiagnostics() {
   return useQuery({
-    queryKey: ["campaign_diagnostics_v3", adAccountId ?? "all"],
+    queryKey: ["campaign_diagnostics_v3"],
     queryFn: async (): Promise<CampaignDiagnostic[]> => {
-      let campaignQuery = supabase
+      const [campRes, targetRes] = await Promise.all([
+        supabase
           .from("campaigns")
           .select(`
             id, name, ad_account_id, status, last_activated_at, created_at,
@@ -61,12 +62,7 @@ export function useCampaignDiagnostics(adAccountId?: string) {
                 insights(spend, leads, clicks, impressions, ctr, cpl, frequency, date)
               )
             )
-          `);
-
-      if (adAccountId) campaignQuery = campaignQuery.eq("ad_account_id", adAccountId);
-
-      const [campRes, targetRes] = await Promise.all([
-        campaignQuery,
+          `),
         supabase.from("campaign_targets").select("campaign_id, target_cpl"),
       ]);
       if (campRes.error) throw campRes.error;
@@ -76,7 +72,9 @@ export function useCampaignDiagnostics(adAccountId?: string) {
       (targetRes.data || []).forEach((t: any) => targetMap.set(t.campaign_id, Number(t.target_cpl)));
 
       const now = Date.now();
-      const todayStr = new Date().toISOString().split("T")[0];
+      const { toLocalDateString } = await import("@/lib/dateRange");
+      const todayStr = toLocalDateString(new Date());
+
 
       return (campRes.data || []).map((c: any): CampaignDiagnostic => {
         const acc = c.ad_accounts;
@@ -120,7 +118,7 @@ export function useCampaignDiagnostics(adAccountId?: string) {
           cycleStart = new Date(cycleStartStr).getTime();
         }
 
-        const cycleStartDate = cycleStart ? new Date(cycleStart).toISOString().split("T")[0] : null;
+        const cycleStartDate = cycleStart ? toLocalDateString(new Date(cycleStart)) : null;
         const hoursActive = cycleStart ? Math.max(0, (now - cycleStart) / 3600000) : 0;
         const daysActive = cycleStart ? Math.max(0, (now - cycleStart) / 86400000) : 0;
 

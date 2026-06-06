@@ -5,6 +5,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** YYYY-MM-DD no fuso America/Sao_Paulo (BRT, UTC-3). */
+function toBrtDateString(iso: string): string {
+  const d = new Date(iso);
+  const shifted = new Date(d.getTime() - 3 * 3600 * 1000);
+  return shifted.toISOString().split("T")[0];
+}
+
 /** Normalize a string for fuzzy matching: remove brackets, accents, extra spaces */
 function normalize(str: string): string {
   return str
@@ -15,93 +22,6 @@ function normalize(str: string): string {
     .replace(/[-_]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function compactNorm(value: unknown): string {
-  return String(value ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\[.*?\]/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
-
-function keyNorm(value: unknown): string {
-  return String(value ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
-
-function parseMoneyValue(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (value == null) return null;
-  let text = String(value).trim();
-  if (!text) return null;
-  text = text.replace(/\s/g, "").replace(/[^\d,.-]/g, "");
-  if (!text || text === "-" || text === "," || text === ".") return null;
-
-  const lastComma = text.lastIndexOf(",");
-  const lastDot = text.lastIndexOf(".");
-  if (lastComma >= 0 && lastDot >= 0) {
-    text = lastComma > lastDot
-      ? text.replace(/\./g, "").replace(",", ".")
-      : text.replace(/,/g, "");
-  } else if (lastComma >= 0) {
-    text = text.replace(",", ".");
-  }
-
-  const parsed = Number(text);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function findMoneyCustomField(fields: any[], aliases: string[]): number | null {
-  if (!Array.isArray(fields)) return null;
-  const wanted = aliases.map(keyNorm);
-  for (const field of fields) {
-    const label = field?.custom_field?.label || field?.custom_field_id?.label || field?.label || field?.name || "";
-    const key = keyNorm(label);
-    if (!wanted.some((wantedKey) => key === wantedKey || key.includes(wantedKey))) continue;
-    const raw = field?.value ?? field?.values ?? null;
-    const list = Array.isArray(raw) ? raw : [raw];
-    for (const value of list) {
-      const parsed = parseMoneyValue(value);
-      if (parsed != null) return parsed;
-    }
-  }
-  return null;
-}
-
-function resolveDealAmount(doc: any, customFields: any[]): number {
-  const customAmount = findMoneyCustomField(customFields, [
-    "venda realizada",
-    "valor pago",
-    "valor pago venda realizada",
-    "valor da venda",
-    "valor venda",
-    "valor do pagamento",
-    "pagamento realizado",
-    "valor da negociacao",
-    "valor negociacao",
-    "amount total",
-    "amount_total",
-  ]);
-  if (customAmount != null) return customAmount;
-
-  for (const value of [doc.amount_total, doc.amount, doc.value, doc.deal_value, doc.total]) {
-    const parsed = parseMoneyValue(value);
-    if (parsed != null) return parsed;
-  }
-
-  const products = Array.isArray(doc.deal_products) ? doc.deal_products : [];
-  return products.reduce((sum: number, product: any) => {
-    const price = parseMoneyValue(product?.total || product?.amount || product?.price || product?.value) || 0;
-    const quantity = Number(product?.quantity || product?.amount_products || 1) || 1;
-    return sum + price * quantity;
-  }, 0);
 }
 
 Deno.serve(async (req) => {
@@ -137,9 +57,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Filter by pipeline — only process "Instituto Carla Rezende"
     const pipeline = doc.deal_pipeline || doc.pipeline || {};
     const pipelineName = (pipeline.name || "").toLowerCase();
     console.log("Deal pipeline:", pipeline.name || "unknown");
+    if (!pipelineName.includes("instituto carla rezende")) {
+      console.log("Skipping deal from pipeline:", pipeline.name);
+      return new Response(JSON.stringify({ ok: true, skipped: true, reason: "wrong pipeline" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Only process won deals
     const isWon = doc.win === true;
@@ -193,21 +121,32 @@ Deno.serve(async (req) => {
 
     const userId = integration.user_id;
     const rdDealId = String(doc.id);
-    const cf = doc.cf_custom_fields || doc.custom_fields || doc.deal_custom_fields || [];
-    const amountTotal = resolveDealAmount(doc, cf);
+    const amountTotal = parseFloat(doc.amount_total || doc.amount || "0") || 0;
 
     // Contact info
     const contact = doc.contact || {};
     const rawName = contact.name || doc.name || null;
     const contactName = rawName ? rawName.replace(/\s*\[.*?\]\s*$/, "").trim() : null;
     const contactEmail = contact.emails?.length > 0 ? contact.emails[0]?.email : "";
-    const contactPhone = contact.phones?.length > 0 ? contact.phones[0]?.phone : null;
-    const contactState = contact.state || contact.address_state || null;
+    const phoneObj = contact.phones?.[0] || {};
+    const contactPhone = phoneObj.phone || phoneObj.whatsapp_full_internacional || null;
+    const phoneToUF = (p: string | null): string | null => {
+      if (!p) return null;
+      let d = String(p).replace(/\D/g, "");
+      if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
+      if (d.length < 10) return null;
+      const M: Record<string,string> = {"11":"SP","12":"SP","13":"SP","14":"SP","15":"SP","16":"SP","17":"SP","18":"SP","19":"SP","21":"RJ","22":"RJ","24":"RJ","27":"ES","28":"ES","31":"MG","32":"MG","33":"MG","34":"MG","35":"MG","37":"MG","38":"MG","41":"PR","42":"PR","43":"PR","44":"PR","45":"PR","46":"PR","47":"SC","48":"SC","49":"SC","51":"RS","53":"RS","54":"RS","55":"RS","61":"DF","62":"GO","64":"GO","63":"TO","65":"MT","66":"MT","67":"MS","68":"AC","69":"RO","71":"BA","73":"BA","74":"BA","75":"BA","77":"BA","79":"SE","81":"PE","87":"PE","82":"AL","83":"PB","84":"RN","85":"CE","88":"CE","86":"PI","89":"PI","91":"PA","93":"PA","94":"PA","92":"AM","97":"AM","95":"RR","96":"AP","98":"MA","99":"MA"};
+      return M[d.slice(0,2)] || null;
+    };
+    const contactState = contact.state || contact.address_state || phoneToUF(phoneObj.whatsapp_full_internacional) || phoneToUF(contactPhone) || null;
     const contactCity = contact.city || contact.address_city || null;
     const notes = [contactEmail].filter(Boolean).join(" | ") || null;
 
-    const saleDateSource = doc.closed_at || doc.stage_updated_at || doc.updated_at || doc.created_at || new Date().toISOString();
-    const saleDate = new Date(saleDateSource).toISOString().split("T")[0];
+    // Sale date = closed_at
+    const saleDate = doc.closed_at
+      ? toBrtDateString(doc.closed_at)
+      : toBrtDateString(new Date().toISOString());
+
 
     // === PRODUCT MATCHING (improved) ===
     let productId: string | null = null;
@@ -284,6 +223,7 @@ Deno.serve(async (req) => {
     }
 
     // === UTM extraction & campaign matching ===
+    const cf = doc.cf_custom_fields || doc.custom_fields || [];
     const cfMap: Record<string, string> = {};
     if (Array.isArray(cf)) cf.forEach((f: any) => { if (f?.custom_field_id?.label) cfMap[String(f.custom_field_id.label).toLowerCase()] = f.value; if (f?.label) cfMap[String(f.label).toLowerCase()] = f.value; });
     const utms = doc.utms || doc.utm || contact.utms || {};
@@ -297,52 +237,16 @@ Deno.serve(async (req) => {
     let matched_campaign_id: string | null = null;
     let match_method: string | null = null;
     let rd_funnel_id_resolved: string | null = null;
-    let adAccountIdResolved: string | null = null;
-
-    const { data: funnels } = await supabase
-      .from("rd_funnels")
-      .select("id, ad_account_id, rd_funnel_id, utm_campaign_pattern, is_active")
-      .eq("user_id", userId)
-      .eq("is_active", true);
-    const funnelList = funnels || [];
-
-    const rdFunnelFromPayload = doc.deal_pipeline?.id || doc.pipeline?.id || doc.funnel?.id || cfMap["funil"] || null;
-    if (rdFunnelFromPayload) {
-      const m = funnelList.find((f) => f.rd_funnel_id && String(f.rd_funnel_id) === String(rdFunnelFromPayload));
-      if (m) {
-        rd_funnel_id_resolved = m.id;
-        adAccountIdResolved = m.ad_account_id;
-        match_method = "funnel_default";
-      }
-    }
+    const adAccountIdFixed = "2e3aedf0-5934-4d13-a44b-962c8ff6587a";
 
     if (utm_campaign) {
-      let campaignQuery = supabase.from("campaigns").select("id, name, ad_account_id");
-      if (adAccountIdResolved) campaignQuery = campaignQuery.eq("ad_account_id", adAccountIdResolved);
-      const { data: campaigns } = await campaignQuery;
-      const campaignList = campaigns || [];
-      const byId = campaignList.find((c) => String(c.id) === String(utm_campaign));
-      if (byId) {
-        matched_campaign_id = byId.id;
-        adAccountIdResolved = byId.ad_account_id;
-        match_method = "utm_campaign_id";
-      }
-      if (!matched_campaign_id) {
-        const n = compactNorm(utm_campaign);
-        const byName = campaignList.find((c) => compactNorm(c.name) === n)
-          || campaignList.find((c) => {
-            const name = compactNorm(c.name);
-            return name.length > 3 && (name.includes(n) || n.includes(name));
-          });
-        if (byName) {
-          matched_campaign_id = byName.id;
-          adAccountIdResolved = byName.ad_account_id;
-          match_method = "utm_campaign_name";
-        }
-      }
+      const { data: byId } = await supabase.from("campaigns").select("id, ad_account_id").eq("id", String(utm_campaign)).maybeSingle();
+      if (byId) { matched_campaign_id = byId.id; match_method = "utm_id"; }
     }
 
     if (!matched_campaign_id) {
+      const { data: funnels } = await supabase.from("rd_funnels").select("id, ad_account_id, rd_funnel_id, utm_campaign_pattern, is_active").eq("user_id", userId).eq("is_active", true);
+      const funnelList = funnels || [];
       if (utm_campaign) {
         const m = funnelList.find((f) => {
           if (!f.utm_campaign_pattern) return false;
@@ -354,29 +258,21 @@ Deno.serve(async (req) => {
           }
           return val === pat || val.includes(pat);
         });
-        if (m) {
-          rd_funnel_id_resolved = m.id;
-          adAccountIdResolved = m.ad_account_id;
-          match_method = "utm_pattern";
+        if (m) { rd_funnel_id_resolved = m.id; match_method = "utm_pattern"; }
+      }
+      if (!rd_funnel_id_resolved) {
+        const rdFunnelFromPayload = doc.deal_pipeline?.id || doc.funnel?.id || cfMap["funil"] || null;
+        if (rdFunnelFromPayload) {
+          const m = funnelList.find((f) => f.rd_funnel_id && String(f.rd_funnel_id) === String(rdFunnelFromPayload));
+          if (m) { rd_funnel_id_resolved = m.id; match_method = "funnel_default"; }
         }
       }
-    }
-
-    if (!adAccountIdResolved) {
-      adAccountIdResolved = funnelList[0]?.ad_account_id ?? null;
-    }
-
-    if (!adAccountIdResolved) {
-      return new Response(JSON.stringify({ error: "Nenhuma conta Meta vinculada ao funil RD" }), {
-        status: 422,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     const saleData: Record<string, any> = {
       user_id: userId,
       rd_deal_id: rdDealId,
-      ad_account_id: adAccountIdResolved,
+      ad_account_id: adAccountIdFixed,
       gross_revenue: amountTotal,
       net_revenue: netRevenue,
       tax_amount: taxAmount,
@@ -455,7 +351,7 @@ Deno.serve(async (req) => {
 
           await supabase.from("rd_deal_touches").insert({
             rd_deal_id: rdDealId,
-            ad_account_id: adAccountIdResolved,
+            ad_account_id: adAccountIdFixed,
             user_id: userId,
             touch_at: touchAt,
             utm_source, utm_medium, utm_campaign, utm_content, utm_term,

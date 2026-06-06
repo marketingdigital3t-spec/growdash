@@ -26,16 +26,13 @@ export function usePermissions() {
     },
   });
 
-  const isAuthenticated = !!user;
-  const explicitPerm = data?.perm;
-
   return {
     loading: loadingMaster || isLoading,
     isMaster,
-    canDashboard: isAuthenticated,
-    canCampaigns: isMaster || !!explicitPerm?.can_campaigns,
-    canFunnels: isMaster || !!explicitPerm?.can_funnels,
-    canClasses: isMaster || !!explicitPerm?.can_classes,
+    canDashboard: isMaster || !!data?.perm?.can_dashboard,
+    canCampaigns: isMaster || !!data?.perm?.can_campaigns,
+    canFunnels: isMaster || !!data?.perm?.can_funnels,
+    canClasses: isMaster || !!data?.perm?.can_classes,
     allowedAdAccounts: data?.allowedAdAccounts ?? [],
     allowedRDFunnels: data?.allowedRDFunnels ?? [],
   };
@@ -46,5 +43,5 @@ export function firstAllowedPath(p: ReturnType<typeof usePermissions>): string {
   if (p.canCampaigns) return "/campaigns";
   if (p.canFunnels) return "/funnels";
   if (p.canClasses) return "/classes";
-  return "/";
+  return "/auth";
 }

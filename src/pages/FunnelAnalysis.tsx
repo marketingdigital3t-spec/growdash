@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDDeals, useFunnelStages, computeFunnelAnalytics } from "@/hooks/useRDDeals";
@@ -18,21 +18,16 @@ import { FunnelStateMap } from "@/components/funnel-analysis/FunnelStateMap";
 import { FunnelAutoInsights } from "@/components/funnel-analysis/FunnelAutoInsights";
 import { FunnelWeekdayChart } from "@/components/funnel-analysis/FunnelWeekdayChart";
 import { FunnelHourChart } from "@/components/funnel-analysis/FunnelHourChart";
-import { RevenueDiagnosticsSection } from "@/components/funnel-analysis/RevenueDiagnosticsSection";
 import { RefreshCw, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRDHealthCheck } from "@/hooks/useRDHealthCheck";
-import { normalizeSelectedAdAccount, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { DASHBOARD_REFRESH_INTERVAL_MS } from "@/lib/realtime";
 import { toast } from "sonner";
 
 export default function FunnelAnalysis() {
-  const selectedAccount = useSelectedAdAccountFilter();
-  const activeAccountId = normalizeSelectedAdAccount(selectedAccount);
-  const { data: adAccounts = [] } = useAdAccounts({ refetchIntervalMs: DASHBOARD_REFRESH_INTERVAL_MS });
-  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(activeAccountId, { refetchIntervalMs: DASHBOARD_REFRESH_INTERVAL_MS });
+  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels();
   const [selectedFunnel, setSelectedFunnel] = useState<string>("");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
@@ -43,7 +38,6 @@ export default function FunnelAnalysis() {
 
   const activeFunnels = funnels.filter((f) => f.is_active && f.rd_funnel_id);
   const funnelId = selectedFunnel || activeFunnels[0]?.id || "";
-  const currentFunnel = activeFunnels.find((f) => f.id === funnelId);
 
   const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
 
@@ -58,7 +52,6 @@ export default function FunnelAnalysis() {
     owner: selectedOwner,
     product: selectedProduct,
     enabled: !!funnelId,
-    refetchIntervalMs: DASHBOARD_REFRESH_INTERVAL_MS,
   });
 
   // Para popular filtros, precisamos do superset (sem filtro). Usamos os deals atuais como aproximação.
@@ -69,11 +62,6 @@ export default function FunnelAnalysis() {
   const products = useMemo(() => Array.from(new Set(deals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [deals]);
 
   const analytics = useMemo(() => computeFunnelAnalytics(deals, stages), [deals, stages]);
-
-  useEffect(() => {
-    if (!selectedFunnel) return;
-    if (!activeFunnels.some((funnel) => funnel.id === selectedFunnel)) setSelectedFunnel("");
-  }, [activeFunnels, selectedFunnel]);
 
   async function handleSync() {
     if (!funnelId) return;
@@ -151,72 +139,81 @@ export default function FunnelAnalysis() {
         </div>
       </MotionItem>
 
-      {(activeFunnels.length === 0 || noStages || deals.length === 0) && (
+      {activeFunnels.length === 0 ? (
         <MotionItem>
-          <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-3">
-            <span>
-              {activeFunnels.length === 0
-                ? "Nenhum funil RD vinculado para a conta selecionada. Configure em Integrações → RD Station."
-                : noStages
-                ? "Estágios reais do funil ainda não sincronizados. Os indicadores serão preenchidos após a sincronização."
-                : "Ainda não há deals sincronizados para este funil no período selecionado."}
-            </span>
-            {activeFunnels.length > 0 && (
-              <Button onClick={handleSync} disabled={syncing} size="sm" variant="outline">
-                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-                Sincronizar agora
-              </Button>
-            )}
+          <div className="rounded-xl border bg-card p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              Nenhum funil RD vinculado. Configure em <strong>Configurações → Funis RD</strong>.
+            </p>
           </div>
         </MotionItem>
-      )}
-
-      <MotionItem><FunnelKPIs a={analytics} /></MotionItem>
-
-      <MotionItem>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <FunnelStageDistribution a={analytics} />
-          <FunnelStageConversion a={analytics} />
-        </div>
-      </MotionItem>
-
-      <MotionItem>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <FunnelLeadsEvolution a={analytics} />
-          </div>
-          <FunnelBottlenecks a={analytics} />
-        </div>
-      </MotionItem>
-
-      <MotionItem>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <FunnelSourceTable a={analytics} />
-          <FunnelLostReasons a={analytics} />
-          <FunnelAutoInsights a={analytics} />
-        </div>
-      </MotionItem>
-
-      <MotionItem>
-        <FunnelStateMap a={analytics} />
-      </MotionItem>
-
-      <MotionItem>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <FunnelWeekdayChart a={analytics} />
-          <FunnelHourChart a={analytics} />
-        </div>
-      </MotionItem>
-
-
-      {activeFunnels.length > 0 && (
+      ) : isLoading || loadingStages ? (
         <MotionItem>
-          <RevenueDiagnosticsSection
-            startDate={startDate}
-            endDate={endDate}
-            adAccountId={currentFunnel?.ad_account_id || undefined}
-          />
+          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>
+      ) : noStages ? (
+        <MotionItem>
+          <div className="rounded-xl border bg-card p-8 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Estágios reais do funil ainda não sincronizados. Clique em <strong>Sincronizar do RD</strong> para carregar.
+            </p>
+            <Button onClick={handleSync} disabled={syncing} size="sm">
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              Sincronizar agora
+            </Button>
+          </div>
+        </MotionItem>
+      ) : deals.length === 0 ? (
+        <MotionItem>
+          <div className="rounded-xl border bg-card p-8 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Ainda não há deals sincronizados para este funil no período selecionado.
+            </p>
+            <Button onClick={handleSync} disabled={syncing} size="sm">
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              Sincronizar agora
+            </Button>
+          </div>
+        </MotionItem>
+      ) : (
+        <>
+          <MotionItem><FunnelKPIs a={analytics} /></MotionItem>
+
+          <MotionItem>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <FunnelStageDistribution a={analytics} />
+              <FunnelStageConversion a={analytics} />
+            </div>
+          </MotionItem>
+
+          <MotionItem>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                <FunnelLeadsEvolution a={analytics} />
+              </div>
+              <FunnelBottlenecks a={analytics} />
+            </div>
+          </MotionItem>
+
+          <MotionItem>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <FunnelSourceTable a={analytics} />
+              <FunnelLostReasons a={analytics} />
+              <FunnelAutoInsights a={analytics} />
+            </div>
+          </MotionItem>
+
+          <MotionItem>
+            <FunnelStateMap a={analytics} />
+          </MotionItem>
+
+          <MotionItem>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <FunnelWeekdayChart a={analytics} />
+              <FunnelHourChart a={analytics} />
+            </div>
+          </MotionItem>
+        </>
       )}
     </MotionPage>
   );

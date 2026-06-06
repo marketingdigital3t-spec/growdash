@@ -37,7 +37,7 @@ export function BestPeriodOfDayWidget() {
           <HourlyCoverageBadge coverage={coverage} />
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Descubra em qual período do dia suas campanhas geram mais conversões.
+          Conversões do Meta Ads normalizadas pelo total diário — base segura para otimização por horário.
         </p>
       </CardHeader>
       <CardContent className="flex-1 min-h-0 pb-4">
@@ -60,7 +60,7 @@ export function BestPeriodOfDayWidget() {
                   <Pie data={pieData} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={2} stroke="none">
                     {pieData.map((d, i) => <Cell key={i} fill={d.color} />)}
                   </Pie>
-                  <Tooltip formatter={(v: any) => fmt(Number(v))} />
+                  <Tooltip formatter={(v: unknown) => fmt(Number(v))} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -110,7 +110,7 @@ export function BestPeriodOfDayWidget() {
                   <ReferenceArea x1={6} x2={11} fill={COLOR_MORNING} fillOpacity={0.12} />
                   <ReferenceArea x1={12} x2={17} fill={COLOR_AFTERNOON} fillOpacity={0.1} />
                   <ReferenceArea x1={18} x2={23} fill={COLOR_NIGHT} fillOpacity={0.08} />
-                  <Tooltip formatter={(v: any) => [fmt(Number(v)), "Leads"]} labelFormatter={(h) => `${h}h`} />
+                  <Tooltip formatter={(v: unknown) => [fmt(Number(v)), "Leads"]} labelFormatter={(h) => `${h}h`} />
                   <Line type="monotone" dataKey="leads" stroke={COLOR_AFTERNOON} strokeWidth={2.5} dot={false} animationDuration={600} />
                 </LineChart>
               </ResponsiveContainer>

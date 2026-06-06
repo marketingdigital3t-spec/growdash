@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 const EMAIL_SUFFIX = "@users.local";
-const PLATFORM_OWNER_EMAIL = "marketingdigital3t@gmail.com";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -25,23 +24,16 @@ Deno.serve(async (req) => {
     });
     const { data: userData } = await userClient.auth.getUser();
     if (!userData.user) return json({ error: "Unauthorized" }, 401);
-    const isPlatformOwner = String(userData.user.email || "").trim().toLowerCase() === PLATFORM_OWNER_EMAIL;
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const { data: adminRoles, error: roleError } = await admin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userData.user.id)
-      .in("role", ["master", "admin"])
-      .limit(1);
-    if (!isPlatformOwner && (roleError || !adminRoles?.length)) return json({ error: "Forbidden" }, 403);
+    const { data: isMaster } = await admin.rpc("is_master", { _user_id: userData.user.id });
+    if (!isMaster) return json({ error: "Forbidden" }, 403);
 
     const body = await req.json();
     const {
       action,
       target_user_id,
       username,
-      email,
       password,
       can_dashboard,
       can_campaigns,
@@ -50,57 +42,6 @@ Deno.serve(async (req) => {
       ad_account_ids,
       rd_funnel_ids,
     } = body ?? {};
-
-    if (action === "ensure_owner") {
-      if (!password) return json({ error: "password obrigatório" }, 400);
-      const ownerEmail = String(email || PLATFORM_OWNER_EMAIL).trim().toLowerCase();
-      if (ownerEmail !== PLATFORM_OWNER_EMAIL) return json({ error: "email de dono inválido" }, 400);
-
-      const { data: listed, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      if (listErr) return json({ error: listErr.message }, 400);
-      const existing = listed.users.find((u) => String(u.email || "").toLowerCase() === ownerEmail);
-
-      let ownerId = existing?.id;
-      if (ownerId) {
-        const { error } = await admin.auth.admin.updateUserById(ownerId, {
-          password,
-          email_confirm: true,
-          user_metadata: { full_name: "Marketing Digital 3T", username: "marketingdigital3t", role: "owner" },
-        });
-        if (error) return json({ error: error.message }, 400);
-      } else {
-        const { data: created, error } = await admin.auth.admin.createUser({
-          email: ownerEmail,
-          password,
-          email_confirm: true,
-          user_metadata: { full_name: "Marketing Digital 3T", username: "marketingdigital3t", role: "owner" },
-        });
-        if (error) return json({ error: error.message }, 400);
-        ownerId = created.user!.id;
-      }
-
-      await admin.from("profiles").upsert({
-        user_id: ownerId,
-        email: ownerEmail,
-        full_name: "Marketing Digital 3T",
-      }, { onConflict: "user_id" });
-
-      await admin.from("user_roles").upsert({
-        user_id: ownerId,
-        role: "master",
-      }, { onConflict: "user_id,role" });
-
-      await admin.from("user_permissions").upsert({
-        user_id: ownerId,
-        username: "marketingdigital3t",
-        can_dashboard: true,
-        can_campaigns: true,
-        can_funnels: true,
-        can_classes: true,
-      }, { onConflict: "user_id" });
-
-      return json({ ok: true, user_id: ownerId, email: ownerEmail });
-    }
 
     if (action === "create") {
       if (!username || !password) return json({ error: "username e password obrigatórios" }, 400);

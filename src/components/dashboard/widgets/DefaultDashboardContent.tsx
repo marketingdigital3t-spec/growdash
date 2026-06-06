@@ -1,5 +1,5 @@
 // Default "Padrão" dashboard. Reflects the user's requested layout:
-// 1) Faturamento Líquido / Investimento / ROAS / ROI
+// 1) Faturamento Líquido / Gastos / ROAS / ROI
 // 2) Vendas por Pagamento / Vendas por Plataforma / Margem / Recebíveis / Ticket Médio
 // 3) Performance de Campanhas (3 abas: Formulário Nativo / Landing page / Mensagens)
 // 4) Funil de Conversão (passos definidos por aba)
@@ -29,14 +29,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { useDashboard } from "@/contexts/DashboardContext";
-import type { TopPlatform } from "@/lib/platformInference";
+import { usePlatformRules } from "@/hooks/usePlatformRules";
+import { inferPlatform, inferPlatformWithDealFallback, PLATFORM_LABELS, type TopPlatform } from "@/lib/platformInference";
 import { PlatformDrilldownSheet } from "@/components/dashboard/PlatformDrilldownSheet";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { useAccountAdsets } from "@/hooks/useAccountAdsets";
 import { GeoOriginWidget } from "@/components/dashboard/widgets/GeoOriginWidget";
-import { getRDLeadsInRange, getRDWonDealsInRange, sumRDRevenue } from "@/lib/rdMetrics";
-import { classifyRDSourceKey, RD_SOURCE_COLORS, RD_SOURCE_LABELS, type RDSourceKey } from "@/lib/rdSource";
 
 // Mapeamento destination_type (Meta) -> aba
 const DEST_NATIVE = new Set(["ON_AD"]);
@@ -58,6 +57,7 @@ interface Props {
 
 export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
   const { insights, sales, rdDeals, campaigns, startDate, endDate, adAccountId } = useDashboard();
+  const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
   const { data: accountAdsets = [] } = useAccountAdsets(adAccountId);
   const [drilldown, setDrilldown] = useState<TopPlatform | null>(null);
@@ -261,17 +261,20 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
   }, [scopedAdIds, actionData.totalsByAd, adAccountByAdId, campaignByAdAll, campaignClassification]);
 
   // Financial metrics
-  const rdLeadDeals = getRDLeadsInRange(rdDeals, startDate, endDate);
-  const rdWonDeals = getRDWonDealsInRange(rdDeals, startDate, endDate);
-  const rdRevenue = sumRDRevenue(rdWonDeals);
-  const consolidatedRevenue = rdRevenue;
-  const consolidatedSalesCount = rdWonDeals.length;
-  const roas = adMetrics.totalSpend > 0 ? consolidatedRevenue / adMetrics.totalSpend : 0;
-  const profit = consolidatedRevenue - adMetrics.totalSpend;
+  const roas = adMetrics.totalSpend > 0 ? salesMetrics.totalNet / adMetrics.totalSpend : 0;
+  const profit = salesMetrics.totalNet - adMetrics.totalSpend - salesMetrics.totalTax;
   const roi = adMetrics.totalSpend > 0 ? (profit / adMetrics.totalSpend) * 100 : 0;
-  const profitMargin = consolidatedRevenue > 0 ? (profit / consolidatedRevenue) * 100 : 0;
+  const profitMargin = salesMetrics.totalNet > 0 ? (profit / salesMetrics.totalNet) * 100 : 0;
 
-  const ticketMedio = consolidatedSalesCount > 0 ? consolidatedRevenue / consolidatedSalesCount : 0;
+  const confirmedCount = sales.filter((s) => s.status === "confirmed" || s.status === "pending").length;
+  const ticketMedio = confirmedCount > 0 ? salesMetrics.totalNet / confirmedCount : 0;
+
+  const PLATFORM_COLORS: Record<TopPlatform, string> = {
+    meta: "hsl(221, 83%, 53%)",
+    google: "hsl(38, 92%, 50%)",
+    organic: "hsl(142, 71%, 45%)",
+    unknown: "hsl(var(--muted-foreground))",
+  };
 
   // ============================================================
   // Per-tab metrics from raw action totals
@@ -341,36 +344,44 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
   const clickRef = linkClicks > 0 ? linkClicks : totalClicks;
 
   // Resultados por plataforma:
-  //   - leads vêm exclusivamente das negociações iniciadas no RD.
-  //   - vendas e receita vêm exclusivamente das negociações ganhas/concluídas no RD.
-  //   - Meta entra apenas como plataforma inferida via UTM, não como fonte de leads/vendas.
+  //   - leads do Meta vêm de insight_actions (mesma fonte do KPI "Leads" = tabLeads).
+  //   - leads de Google / Orgânico / Não encontrado vêm do CRM (rdDeals).
+  //   - vendas e receita vêm de `sales`.
   const platformBreakdown = useMemo(() => {
-    const acc: Record<RDSourceKey, { leads: number; sales: number; revenue: number }> = {
-      meta: { leads: 0, sales: 0, revenue: 0 },
+    const acc: Record<TopPlatform, { leads: number; sales: number; revenue: number }> = {
+      meta: { leads: tabLeads, sales: 0, revenue: 0 },
       google: { leads: 0, sales: 0, revenue: 0 },
-      link_bio: { leads: 0, sales: 0, revenue: 0 },
       organic: { leads: 0, sales: 0, revenue: 0 },
-      direct: { leads: 0, sales: 0, revenue: 0 },
       unknown: { leads: 0, sales: 0, revenue: 0 },
     };
-    rdLeadDeals.forEach((d) => {
-      const p = classifyRDSourceKey(d);
+    const dealsByRdId = new Map<string, any>();
+    rdDeals.forEach((d: any) => {
+      if (d.rd_deal_id) dealsByRdId.set(d.rd_deal_id, d);
+    });
+    rdDeals.forEach((d) => {
+      const p = inferPlatform(d, platformRules).platform;
+      // Meta já vem de tabLeads (insight_actions); deals sem plataforma identificada
+      // ("unknown") são geralmente leads do Meta sem UTM — não contar para evitar dupla contagem.
+      if (p === "meta" || p === "unknown") return;
       acc[p].leads += 1;
     });
-    rdWonDeals.forEach((d) => {
-      const p = classifyRDSourceKey(d);
+    sales.forEach((s) => {
+      if (s.status !== "confirmed" && s.status !== "pending") return;
+      const p = inferPlatformWithDealFallback(s, dealsByRdId, platformRules).platform;
       acc[p].sales += 1;
-      acc[p].revenue += Number(d.amount_total || 0);
+      acc[p].revenue += s.net_revenue;
     });
-    return (Object.keys(acc) as RDSourceKey[])
+    return (Object.keys(acc) as TopPlatform[])
       .map((k) => {
         const a = acc[k];
         const conv = a.leads > 0 ? (a.sales / a.leads) * 100 : 0;
-        return { key: k, name: RD_SOURCE_LABELS[k], ...a, conv };
+        return { key: k, name: PLATFORM_LABELS[k], ...a, conv };
       })
-      .filter((p) => p.key !== "unknown" || p.leads > 0 || p.sales > 0)
+      // Sempre esconder bucket "Não encontrado" no breakdown de leads (evita confusão com Meta sem UTM)
+      .filter((p) => p.key !== "unknown" || p.sales > 0 || p.revenue > 0)
       .sort((a, b) => (b.revenue - a.revenue) || (b.leads - a.leads));
-  }, [rdLeadDeals, rdWonDeals]);
+  }, [rdDeals, sales, platformRules, tabLeads]);
+
 
   const totalPlatformRev = platformBreakdown.reduce((s, p) => s + p.revenue, 0);
   const totalPlatformLeads = platformBreakdown.reduce((s, p) => s + p.leads, 0);
@@ -459,7 +470,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
       { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-600" },
       { key: "link_clicks", label: "Cliques no link", value: clickRef, icon: <MousePointerClick className="h-5 w-5" />, color: "from-violet-500/20 to-violet-500/5", text: "text-violet-600" },
       { key: "leads", label: "Leads", value: tabLeads, icon: <Users className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
-      { key: "sales", label: "Vendas", value: consolidatedSalesCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
+      { key: "sales", label: "Vendas", value: confirmedCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
     ];
   } else if (objective === "native_form") {
     const lpvRate = objectiveMetrics.avgCTR;
@@ -476,7 +487,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
       { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-600" },
       { key: "link_clicks", label: "Cliques no link", value: clickRef, icon: <MousePointerClick className="h-5 w-5" />, color: "from-violet-500/20 to-violet-500/5", text: "text-violet-600" },
       { key: "leads", label: "Leads", value: nativeLeads, icon: <Users className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
-      { key: "sales", label: "Vendas", value: consolidatedSalesCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
+      { key: "sales", label: "Vendas", value: confirmedCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
     ];
   } else if (objective === "landing_page") {
     const lpvRate = clickRef > 0 ? (lpViews / clickRef) * 100 : 0;
@@ -496,7 +507,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
       { key: "link_clicks", label: "Cliques no link", value: clickRef, icon: <MousePointerClick className="h-5 w-5" />, color: "from-violet-500/20 to-violet-500/5", text: "text-violet-600" },
       { key: "lp_view", label: "LP View", value: lpViews, icon: <Globe className="h-5 w-5" />, color: "from-cyan-500/20 to-cyan-500/5", text: "text-cyan-600" },
       { key: "leads", label: "Concluiu Forms", value: lpLeads, icon: <Users className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
-      { key: "sales", label: "Vendas", value: consolidatedSalesCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
+      { key: "sales", label: "Vendas", value: confirmedCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
     ];
   } else {
     // messages
@@ -529,10 +540,18 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
     <div className="space-y-6">
       {/* 1. KPIs principais */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-        <MetricCard title="Faturamento Líquido" value={consolidatedRevenue} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
-        <MetricCard title="Investimento em Anúncio" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
+        <MetricCard title="Faturamento Líquido" value={salesMetrics.totalNet} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
+        <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
-        <MetricCard title="ROI" value={roi} icon={<BarChart3 className="h-4 w-4" />} suffix="%" decimals={2} colorByValue />
+        <MetricCard
+          title="Lucro Líquido"
+          value={profit}
+          icon={<BarChart3 className="h-4 w-4" />}
+          prefix="R$ "
+          decimals={2}
+          colorByValue
+          tooltip="Faturamento líquido − gastos com anúncios − impostos. Não inclui custos de produto, equipe ou operação (não cadastrados no sistema)."
+        />
       </div>
 
       {/* 2. KPIs financeiros */}
@@ -565,12 +584,10 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
           </CardHeader>
           <CardContent>
             {(() => {
-              const PLATFORM_ICONS: Record<RDSourceKey, any> = {
+              const PLATFORM_ICONS: Record<TopPlatform, any> = {
                 meta: Facebook,
                 google: Chrome,
-                link_bio: ArrowRight,
                 organic: Globe,
-                direct: MessageCircle,
                 unknown: HelpCircle,
               };
               const isConv = platformView === "conv";
@@ -607,7 +624,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
                             stroke="none"
                           >
                             {chartData.map((d) => (
-                              <Cell key={d.key} fill={RD_SOURCE_COLORS[d.key as RDSourceKey]} />
+                              <Cell key={d.key} fill={PLATFORM_COLORS[d.key as TopPlatform]} />
                             ))}
                           </Pie>
                           <RTooltip
@@ -625,19 +642,21 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
 
                   {/* Right: list */}
                   <div className={`flex-1 w-full space-y-1.5 ${isConv ? "" : "min-w-0"}`}>
-                    {platformBreakdown.map((p) => {
+                    {platformBreakdown
+                      .filter((p) => !(isConv && p.key === "unknown"))
+                      .map((p) => {
                       const v = valueOf(p);
                       const pct = !isConv && total > 0 ? (v / total) * 100 : 0;
                       const barPct = isConv ? (p.conv / maxConv) * 100 : pct;
-                      const canDrilldown = p.key === "meta" || p.key === "google" || p.key === "organic";
-                      const color = RD_SOURCE_COLORS[p.key];
+                      const isUnknown = p.key === "unknown";
+                      const color = PLATFORM_COLORS[p.key];
                       const Icon = PLATFORM_ICONS[p.key];
-                      const Tag: any = canDrilldown ? "button" : "div";
+                      const Tag: any = isUnknown ? "div" : "button";
                       return (
                         <Tag
                           key={p.key}
-                          {...(canDrilldown ? { onClick: () => setDrilldown(p.key as TopPlatform) } : {})}
-                          className={`w-full text-left rounded-md px-2 py-1.5 transition-colors ${canDrilldown ? "hover:bg-muted/40" : ""}`}
+                          {...(isUnknown ? {} : { onClick: () => setDrilldown(p.key as TopPlatform) })}
+                          className={`w-full text-left rounded-md px-2 py-1.5 transition-colors ${isUnknown ? "" : "hover:bg-muted/40"}`}
                         >
                           <div className="flex items-center gap-2">
                             <div
@@ -665,6 +684,16 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
                         </Tag>
                       );
                     })}
+                    {(() => {
+                      const unk = platformBreakdown.find((p) => p.key === "unknown");
+                      if (!unk || (unk.sales === 0 && unk.revenue === 0)) return null;
+                      return (
+                        <div className="mt-2 text-[10px] text-muted-foreground border-t border-border/40 pt-2">
+                          {unk.sales} venda{unk.sales === 1 ? "" : "s"} sem plataforma identificada
+                          ({fmt(unk.revenue)}). Atribua manualmente em <span className="font-medium">Campanhas → Vendas</span> para refinar.
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -699,36 +728,42 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
           </div>
         </div>
 
-        {objectiveInsights.length === 0 && (
-          <div className="mb-3 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Sem campanhas sincronizadas neste período. Os indicadores serão preenchidos automaticamente após a conexão com a Meta Ads.
-          </div>
+        {objectiveInsights.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+              Nenhuma campanha de {objective === "leads" ? "Leads" : objective === "native_form" ? "Formulário Nativo" : objective === "landing_page" ? "Landing page" : "Mensagens"} encontrada no período.
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${kpiGridCols} sm:gap-3`}>
+              {kpis.map((k) => (
+                <MetricCard
+                  key={k.title}
+                  title={k.title}
+                  value={k.value}
+                  prefix={k.prefix}
+                  suffix={k.suffix}
+                  decimals={k.decimals}
+                  icon={k.icon}
+                  tooltip={k.tooltip}
+                />
+              ))}
+            </div>
+          </>
         )}
-        <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${kpiGridCols} sm:gap-3`}>
-          {kpis.map((k) => (
-            <MetricCard
-              key={k.title}
-              title={k.title}
-              value={k.value}
-              prefix={k.prefix}
-              suffix={k.suffix}
-              decimals={k.decimals}
-              icon={k.icon}
-              tooltip={k.tooltip}
-            />
-          ))}
-        </div>
       </div>
 
       {/* 4. Funil de Conversão */}
-      <CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} />
+      {objectiveInsights.length > 0 && (
+        <CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} />
+      )}
 
       {/* 4.1 Origem geográfica (mapa por estado) */}
       <GeoOriginWidget />
 
       <PlatformDrilldownSheet platform={drilldown} onClose={() => setDrilldown(null)} />
-      <PerformanceLineChart data={dailyData} />
-
+      {dailyData.length > 0 && <PerformanceLineChart data={dailyData} />}
 
       {/* 5. Gráficos diários */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

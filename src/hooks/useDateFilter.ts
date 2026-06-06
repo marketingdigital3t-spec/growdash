@@ -83,11 +83,8 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
 }
 
 const STORAGE_KEY = "dash:date";
-const EVENT_KEY = "growthos:date-filter-updated";
 
-type StoredDateFilter = { preset: DatePreset; from: string; to: string };
-
-function readStored(): StoredDateFilter | null {
+function readStored(): { preset: DatePreset; from: string; to: string } | null {
   try {
     const raw = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     return raw ? JSON.parse(raw) : null;
@@ -104,37 +101,13 @@ export function useDateFilter() {
 
   useEffect(() => {
     try {
-      const payload: StoredDateFilter = {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
         preset,
         from: customRange.from.toISOString(),
         to: customRange.to.toISOString(),
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      window.dispatchEvent(new CustomEvent(EVENT_KEY, { detail: payload }));
+      }));
     } catch { /* ignore */ }
   }, [preset, customRange]);
-
-  useEffect(() => {
-    const sync = (event?: Event) => {
-      const next = event instanceof CustomEvent ? event.detail as StoredDateFilter | null : readStored();
-      if (!next?.preset || !next.from || !next.to) return;
-      setPreset((current) => (current === next.preset ? current : next.preset));
-      setCustomRange((current) => {
-        const from = new Date(next.from);
-        const to = new Date(next.to);
-        if (current.from.getTime() === from.getTime() && current.to.getTime() === to.getTime()) {
-          return current;
-        }
-        return { from, to };
-      });
-    };
-    window.addEventListener("storage", sync);
-    window.addEventListener(EVENT_KEY, sync);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(EVENT_KEY, sync);
-    };
-  }, []);
 
   const { startDate, endDate } = useMemo(
     () => resolvePreset(preset, customRange),

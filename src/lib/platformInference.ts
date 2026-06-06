@@ -58,6 +58,54 @@ function ruleMatches(input: PlatformInferenceInput, rule: PlatformRule): boolean
   }
 }
 
+function applyRules(input: PlatformInferenceInput, rules: PlatformRule[]): PlatformResult | null {
+  const mainRules = rules.filter((r) => r.is_fallback !== true);
+  const fallbackRules = rules.filter((r) => r.is_fallback === true);
+
+  const top = mainRules
+    .filter((r) => !r.parent_platform && (r.platform === "meta" || r.platform === "google"))
+    .sort((a, b) => a.priority - b.priority);
+
+  for (const r of top) {
+    if (ruleMatches(input, r)) return { platform: r.platform as TopPlatform };
+  }
+
+  const subRules = mainRules
+    .filter((r) => r.parent_platform === "organic")
+    .sort((a, b) => a.priority - b.priority);
+
+  for (const r of subRules) {
+    if (ruleMatches(input, r)) return { platform: "organic", subOrigin: r.platform };
+  }
+
+  const fallbackTop = fallbackRules
+    .filter((r) => !r.parent_platform && (r.platform === "meta" || r.platform === "google" || r.platform === "organic"))
+    .sort((a, b) => a.priority - b.priority);
+  for (const r of fallbackTop) {
+    if (ruleMatches(input, r)) {
+      if (r.platform === "organic") return { platform: "organic", subOrigin: "outros" };
+      return { platform: r.platform as TopPlatform };
+    }
+  }
+  return null;
+}
+
+// Heuristic on rd_campaign_name when UTMs are missing or unmatched.
+function heuristicByRdCampaign(input: PlatformInferenceInput): PlatformResult | null {
+  const name = (input.rd_campaign_name ?? "").toLowerCase();
+  if (!name) return null;
+  if (/\b(meta|facebook|fb|instagram|ig|forms?\s*meta|meta\s*ads?|fbads)\b/i.test(name)) {
+    return { platform: "meta" };
+  }
+  if (/\b(google|gads|youtube|yt|search\s*ads?|gdn|pmax|performance\s*max)\b/i.test(name)) {
+    return { platform: "google" };
+  }
+  if (/\b(indica[cç][aã]o|org[aâ]nic|organic|feira|evento|whats|stories|bio|dm|direct)\b/i.test(name)) {
+    return { platform: "organic", subOrigin: "outros" };
+  }
+  return null;
+}
+
 export function inferPlatform(sale: Sale | PlatformInferenceInput, rules: PlatformRule[]): PlatformResult {
   const input = toInput(sale);
 
@@ -70,39 +118,40 @@ export function inferPlatform(sale: Sale | PlatformInferenceInput, rules: Platfo
     }
   }
 
-  const mainRules = rules.filter((r) => r.is_fallback !== true);
-  const fallbackRules = rules.filter((r) => r.is_fallback === true);
+  const direct = applyRules(input, rules);
+  if (direct) return direct;
 
-  const top = mainRules
-    .filter((r) => !r.parent_platform && (r.platform === "meta" || r.platform === "google"))
-    .sort((a, b) => a.priority - b.priority);
+  const heur = heuristicByRdCampaign(input);
+  if (heur) return heur;
 
-  for (const r of top) {
-    if (ruleMatches(input, r)) {
-      return { platform: r.platform as TopPlatform };
-    }
+  return { platform: "unknown" };
+}
+
+/**
+ * Like `inferPlatform`, but falls back to the linked RD deal's UTMs when the
+ * sale itself has no useful attribution data. Used for the dashboard
+ * "Distribuição por Plataforma" breakdown so sales without UTMs are still
+ * routed to the correct platform whenever the deal has them.
+ */
+export function inferPlatformWithDealFallback(
+  sale: Sale,
+  dealsByRdId: Map<string, PlatformInferenceInput>,
+  rules: PlatformRule[],
+): PlatformResult {
+  const first = inferPlatform(sale, rules);
+  if (first.platform !== "unknown") return first;
+
+  const rdId = (sale as any).rd_deal_id as string | null | undefined;
+  if (rdId && dealsByRdId.has(rdId)) {
+    const deal = dealsByRdId.get(rdId)!;
+    // Preserve manual override from the sale even when delegating to deal.
+    const merged: PlatformInferenceInput = {
+      ...deal,
+      manual_platform: (sale as any).manual_platform ?? null,
+    };
+    const viaDeal = inferPlatform(merged, rules);
+    if (viaDeal.platform !== "unknown") return viaDeal;
   }
-
-  const subRules = mainRules
-    .filter((r) => r.parent_platform === "organic")
-    .sort((a, b) => a.priority - b.priority);
-
-  for (const r of subRules) {
-    if (ruleMatches(input, r)) {
-      return { platform: "organic", subOrigin: r.platform };
-    }
-  }
-
-  const fallbackTop = fallbackRules
-    .filter((r) => !r.parent_platform && (r.platform === "meta" || r.platform === "google" || r.platform === "organic"))
-    .sort((a, b) => a.priority - b.priority);
-  for (const r of fallbackTop) {
-    if (ruleMatches(input, r)) {
-      if (r.platform === "organic") return { platform: "organic", subOrigin: "outros" };
-      return { platform: r.platform as TopPlatform };
-    }
-  }
-
   return { platform: "unknown" };
 }
 

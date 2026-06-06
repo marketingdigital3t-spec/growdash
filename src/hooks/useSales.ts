@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { toLocalDateString } from "@/lib/dateRange";
+
 
 export interface Sale {
   id: string;
@@ -15,6 +17,8 @@ export interface Sale {
   refund_amount: number;
   chargeback_amount: number;
   payment_method: string;
+  payment_method_source?: string | null;
+  custom_fields?: Record<string, string> | null;
   status: string;
   quantity: number;
   notes: string | null;
@@ -45,7 +49,6 @@ interface UseSalesParams {
   endDate?: Date;
   productId?: string;
   adAccountId?: string;
-  refetchIntervalMs?: number;
 }
 
 export function useSales(params?: UseSalesParams) {
@@ -55,11 +58,12 @@ export function useSales(params?: UseSalesParams) {
       let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
 
       if (params?.startDate) {
-        query = query.gte("sale_date", params.startDate.toISOString().split("T")[0]);
+        query = query.gte("sale_date", toLocalDateString(params.startDate));
       }
       if (params?.endDate) {
-        query = query.lte("sale_date", params.endDate.toISOString().split("T")[0]);
+        query = query.lte("sale_date", toLocalDateString(params.endDate));
       }
+
       if (params?.productId && params.productId !== "all") {
         query = query.eq("product_id", params.productId);
       }
@@ -85,7 +89,6 @@ export function useSales(params?: UseSalesParams) {
       }
       return all;
     },
-    refetchInterval: params?.refetchIntervalMs,
   });
 }
 
@@ -139,9 +142,13 @@ export function useUpdateSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...input }: Partial<CreateSaleInput> & { id: string }) => {
+      const payload: Record<string, any> = { ...input };
+      if (Object.prototype.hasOwnProperty.call(input, "payment_method")) {
+        payload.payment_method_source = "manual";
+      }
       const { data, error } = await supabase
         .from("sales")
-        .update(input)
+        .update(payload)
         .eq("id", id)
         .select()
         .single();

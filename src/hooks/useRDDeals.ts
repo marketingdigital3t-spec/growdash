@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { endOfDay, startOfDay } from "date-fns";
-import { classifyRDSourceLabel } from "@/lib/rdSource";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -77,14 +75,13 @@ interface Params {
   owner?: string;
   product?: string;
   enabled?: boolean;
-  refetchIntervalMs?: number;
 }
 
 const DEAL_FIELDS =
   "id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at";
 
 export function useRDDeals(params: Params) {
-  const { funnelId, startDate, endDate, source, state, campaign, owner, product, enabled = true, refetchIntervalMs } = params;
+  const { funnelId, startDate, endDate, source, state, campaign, owner, product, enabled = true } = params;
   return useQuery({
     queryKey: [
       "rd_deals",
@@ -105,8 +102,8 @@ export function useRDDeals(params: Params) {
         .eq("rd_funnel_id", funnelId!)
         .order("lead_created_at", { ascending: false });
 
-      if (startDate) query = query.gte("lead_created_at", startOfDay(startDate).toISOString());
-      if (endDate) query = query.lte("lead_created_at", endOfDay(endDate).toISOString());
+      if (startDate) query = query.gte("lead_created_at", startDate.toISOString());
+      if (endDate) query = query.lte("lead_created_at", endDate.toISOString());
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
       if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
@@ -127,10 +124,6 @@ export function useRDDeals(params: Params) {
       }
       return all;
     },
-    refetchInterval: refetchIntervalMs,
-    staleTime: 10_000,
-    gcTime: 10 * 60_000,
-    placeholderData: (previous) => previous ?? [],
   });
 }
 
@@ -398,7 +391,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
   // Source breakdown
   const srcMap = new Map<string, { leads: number; sales: number; revenue: number }>();
   for (const d of deals) {
-    const k = classifyRDSourceLabel(d);
+    const k = d.utm_source || "Não informado";
     const cur = srcMap.get(k) || { leads: 0, sales: 0, revenue: 0 };
     cur.leads += 1;
     if (d.win) {

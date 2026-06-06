@@ -1,102 +1,73 @@
-# GrowthOS AI
+# Welcome to your Lovable project
 
-SaaS de growth, performance e operacao comercial com dashboard em tempo real, integracoes de midia/CRM, configuracao de marca, IA operacional e controle de permissoes por usuario.
+## Project info
 
-## Onde Esta Cada Parte
+**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-- Front-end: `src/`
-- Telas principais: `src/pages/`
-- Componentes reutilizaveis: `src/components/`
-- Hooks de dados: `src/hooks/`
-- Cliente Supabase: `src/integrations/supabase/client.ts`
-- Tipos do banco: `src/integrations/supabase/types.ts`
-- Banco de dados e policies: `supabase/migrations/`
-- Edge Functions/back-end serverless: `supabase/functions/`
-- Configuracao Supabase local: `supabase/config.toml`
-- Variaveis de ambiente de exemplo: `.env.example`
+## How can I edit this code?
 
-## Stack
+There are several ways of editing your application.
 
-- React + TypeScript
-- Vite
-- Tailwind CSS + shadcn/ui
-- Supabase Auth, Postgres, RLS e Edge Functions
-- Integrações com Meta Ads, RD Station e canais comerciais via APIs
+**Use Lovable**
 
-## Rodar Localmente
+Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
 
-```bash
-npm install
-cp .env.example .env
+Changes made via Lovable will be committed automatically to this repo.
+
+**Use your preferred IDE**
+
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+
+The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+Follow these steps:
+
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
+
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
+
+# Step 3: Install the necessary dependencies.
+npm i
+
+# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-Preencha `.env` com as chaves reais do Supabase. Nunca envie `.env` para o GitHub.
+**Edit a file directly in GitHub**
 
-## Banco De Dados
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
 
-A base esta no Supabase. A estrutura versionada fica em `supabase/migrations/`.
+**Use GitHub Codespaces**
 
-O projeto Supabase atual aparece em `supabase/config.toml` como:
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
 
-```toml
-project_id = "tpseftxktzhwthekydac"
-```
+## What technologies are used for this project?
 
-Para producao, mantenha as migrations no GitHub e aplique no ambiente Supabase usando Supabase CLI ou pelo painel do Supabase.
+This project is built with:
 
-## Publicar No GitHub
+- Vite
+- TypeScript
+- React
+- shadcn-ui
+- Tailwind CSS
 
-O projeto ja esta em um repositorio Git local. Antes de subir:
+## How can I deploy this project?
 
-```bash
-git status
-git add .
-git commit -m "Prepare GrowthOS AI for production"
-```
+Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
-Depois crie um repositorio privado no GitHub e conecte o remoto:
+## Can I connect a custom domain to my Lovable project?
 
-```bash
-git remote add origin git@github.com:SEU_USUARIO/NOME_DO_REPO.git
-git branch -M main
-git push -u origin main
-```
+Yes, you can!
 
-Recomendacao: mantenha o repositorio privado enquanto existirem integracoes, tokens, dados de clientes e regras de negocio sensiveis.
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
-## Deploy E Dominio
-
-Opcoes recomendadas:
-
-- Vercel: melhor caminho para Vite/React, preview automatico por PR e dominio simples.
-- Netlify: bom para site estatico com CI simples.
-- Cloudflare Pages: boa opcao para performance global e protecao na borda.
-
-Deploy na Vercel:
-
-1. Conecte o repositorio GitHub.
-2. Defina o root directory como este projeto.
-3. Build command: `npm run build`
-4. Output directory: `dist`
-5. Configure as variaveis `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e `VITE_SUPABASE_PROJECT_ID`.
-6. Aponte o dominio em Vercel > Project > Domains.
-
-## Seguranca
-
-- Nunca exponha `SUPABASE_SERVICE_ROLE_KEY` no front-end.
-- Tokens da Meta, RD, WhatsApp e outros provedores devem ficar apenas no back-end/Edge Functions.
-- Use RLS em todas as tabelas com dados de usuario, contas, vendas, leads e campanhas.
-- Use permissoes por perfil e por conta vinculada.
-- Criptografe tokens de API salvos no banco ou use Supabase Vault quando possivel.
-- Edge Functions sensiveis devem validar JWT e checar permissao do usuario antes de executar.
-- Use HTTPS, dominio confiavel, CSP, logs de auditoria e rotacao periodica de tokens.
-
-## Validacao
-
-```bash
-npm run build
-npm run lint
-```
-
-Se uma integracao falhar, valide primeiro variaveis de ambiente, RLS, permissao do usuario e logs da Edge Function no Supabase.
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)

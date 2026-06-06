@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, CalendarDays, Users, Stethoscope, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useEventClasses, type EventClassStatus } from "@/hooks/useEventClasses";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
-import { normalizeSelectedAdAccount, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 import { EventClassCard } from "@/components/event-classes/EventClassCard";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
 import { motion } from "framer-motion";
@@ -40,10 +39,8 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: stri
 }
 
 export default function EventClasses() {
-  const selectedAccount = useSelectedAdAccountFilter();
-  const activeAccountId = normalizeSelectedAdAccount(selectedAccount);
-  const { data: classes, isLoading } = useEventClasses(activeAccountId);
-  const { data: funnels } = useRDFunnels(activeAccountId);
+  const { data: classes, isLoading } = useEventClasses();
+  const { data: funnels } = useRDFunnels();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [funnelFilter, setFunnelFilter] = useState<string>("all");

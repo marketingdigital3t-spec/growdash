@@ -13,11 +13,11 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
   return (
     <Card className="bg-card/60 border-border/40">
       <CardHeader>
-        <CardTitle className="text-base">7. Leads por estado</CardTitle>
+        <CardTitle className="text-base">7. Mapa por estado</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <div className="min-h-[320px] overflow-hidden rounded-lg border border-border/30 bg-background/30">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
             <BrazilMap data={leadMap} metricLabel="Leads" colorScheme="blue" />
           </div>
           <div className="space-y-3">
