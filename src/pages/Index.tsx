@@ -220,29 +220,7 @@ const Index = () => {
     };
   }, [adAccounts.length, endDate, insights, rdDeals, selectedAccount, startDate]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("dash:account", selectedAccount);
-      window.dispatchEvent(new CustomEvent("growthos:account-filter-updated", { detail: selectedAccount }));
-    } catch {}
-  }, [selectedAccount]);
-
-  useEffect(() => {
-    const syncAccount = (event?: Event) => {
-      const next = event instanceof CustomEvent
-        ? String(event.detail || "all")
-        : (() => {
-            try { return localStorage.getItem("dash:account") || "all"; } catch { return "all"; }
-          })();
-      setSelectedAccount((current) => (current === next ? current : next));
-    };
-    window.addEventListener("storage", syncAccount);
-    window.addEventListener("growthos:account-filter-updated", syncAccount);
-    return () => {
-      window.removeEventListener("storage", syncAccount);
-      window.removeEventListener("growthos:account-filter-updated", syncAccount);
-    };
-  }, []);
+  // Account selection now flows through useSelectedAdAccountFilter (single source of truth).
   useEffect(() => {
     try { localStorage.setItem("dash:campaigns", JSON.stringify(selectedCampaignIds)); } catch {}
   }, [selectedCampaignIds]);
