@@ -41,7 +41,7 @@ export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
   const hasRight = METRICS.some((m) => m.yAxisId === "right" && active.has(m.key));
 
   return (
-    <Card className="relative">
+    <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -64,12 +64,6 @@ export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {(!data || data.length === 0) && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none text-center text-xs text-muted-foreground">
-            Sem dados para o período. Os valores aparecerão após a sincronização.
-          </div>
-        )}
-
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>

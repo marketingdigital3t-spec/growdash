@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "react-simple-maps";
 import { geoCentroid } from "d3-geo";
-import { scaleQuantize } from "d3-scale";
+import { scaleQuantile, scaleQuantize } from "d3-scale";
 import { Plus, Minus, Maximize2 } from "lucide-react";
 
 interface BrazilMapProps {
@@ -12,6 +13,8 @@ interface BrazilMapProps {
   metricLabel?: string;
   title?: string;
   subtitle?: string;
+  source?: "meta_leads" | "rd" | "meta" | "mixed";
+  coverage?: { withState: number; total: number; pct: number };
 }
 
 const GEO_URL = "/geo/br-states.json";
@@ -38,6 +41,8 @@ export function BrazilMap({
   metricLabel = "leads",
   title = "Leads por estado",
   subtitle,
+  source,
+  coverage,
 }: BrazilMapProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; uf: string; value: number } | null>(null);
   const INITIAL = { coordinates: [-54, -15] as [number, number], zoom: 1 };
@@ -49,20 +54,52 @@ export function BrazilMap({
   const activeStates = Object.keys(data).filter((k) => data[k] > 0).length;
 
   const ramp = RAMPS[colorScheme];
-  const colorScale = useMemo(
-    () => scaleQuantize<string>().domain([0, maxValue]).range(ramp as unknown as string[]),
-    [maxValue, ramp]
-  );
+  // Use scaleQuantile so the gradient is distributed by the actual data distribution
+  // (avoids outliers like MG=121 making all other states look almost white).
+  // Fall back to scaleQuantize when there are too few distinct values for quantiles.
+  const colorScale = useMemo(() => {
+    const values = Object.values(data).filter((v) => v > 0);
+    if (values.length >= 3) {
+      return scaleQuantile<string>().domain(values).range(ramp as unknown as string[]);
+    }
+    return scaleQuantize<string>().domain([0, maxValue]).range(ramp as unknown as string[]);
+  }, [data, maxValue, ramp]);
 
   const accentText = colorScheme === "blue" ? "text-blue-600" : "text-emerald-600";
 
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title}</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          {subtitle ?? `${total.toLocaleString("pt-BR")} ${metricLabel} em ${activeStates} estados`}
-        </p>
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div>
+            <CardTitle className="text-base">{title}</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {subtitle ?? `${total.toLocaleString("pt-BR")} ${metricLabel} em ${activeStates} estados`}
+            </p>
+          </div>
+          {(source || coverage) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {source && (
+                <Badge variant="outline" className="text-[10px] font-normal">
+                  Fonte: {source === "meta_leads" ? "Meta Leads (real)" : source === "rd" ? "RD Station" : source === "mixed" ? "RD + Meta" : "Meta regiões"}
+                </Badge>
+              )}
+              {coverage && coverage.total > 0 && (
+                <Badge
+                  variant={coverage.pct >= 80 ? "default" : coverage.pct >= 50 ? "secondary" : "destructive"}
+                  className="text-[10px] font-normal tabular-nums"
+                >
+                  {coverage.withState}/{coverage.total} c/ estado ({coverage.pct.toFixed(0)}%)
+                </Badge>
+              )}
+              {coverage && coverage.total - coverage.withState > 0 && (
+                <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+                  Sem região: {coverage.total - coverage.withState}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div

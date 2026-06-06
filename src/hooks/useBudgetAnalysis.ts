@@ -26,7 +26,9 @@ export function useBudgetAnalysis() {
   const { data: dailySpendByAccount = [] } = useQuery({
     queryKey: ["daily_spend_by_account"],
     queryFn: async () => {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+      const { toLocalDateString } = await import("@/lib/dateRange");
+      const sevenDaysAgo = toLocalDateString(new Date(Date.now() - 7 * 86400000));
+
       const { data, error } = await supabase
         .from("insights")
         .select(`spend, date, ads!inner(adsets!inner(campaigns!inner(ad_account_id)))`)
@@ -122,15 +124,15 @@ export function useBudgetAnalysis() {
           reasons.push(`Saldo restante para apenas ${daysBalanceLasts} dias`);
         }
         if (balance != null && balance <= 0) {
-          summary = `🚨 BM "${acc.name}" SEM SALDO. Recarregue imediatamente — anúncios podem ser pausados.`;
+          summary = `🚨 Conta "${acc.name}" SEM SALDO. Recarregue imediatamente — anúncios podem ser pausados.`;
         } else if (severity === "critical") {
-          summary = `⚠️ BM "${acc.name}" em situação crítica. ${reasons[0]}.`;
+          summary = `⚠️ Conta "${acc.name}" em situação crítica. ${reasons[0]}.`;
         } else if (severity === "warning") {
-          summary = `BM "${acc.name}" precisa de atenção. ${reasons[0]}.`;
+          summary = `Conta "${acc.name}" precisa de atenção. ${reasons[0]}.`;
         } else {
           if (dailyBudget != null) reasons.push(`Gasto médio (R$ ${avgDailySpend.toFixed(2)}) dentro do orçamento (R$ ${dailyBudget.toFixed(2)})`);
           if (balance != null && daysBalanceLasts != null) reasons.push(`Saldo suficiente para ${daysBalanceLasts} dias`);
-          summary = `BM "${acc.name}" com orçamento saudável.`;
+          summary = `Conta "${acc.name}" com orçamento saudável.`;
         }
 
         return {

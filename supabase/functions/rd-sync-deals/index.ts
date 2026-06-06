@@ -15,6 +15,20 @@ function keyNorm(s: string) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+const DDD_TO_UF: Record<string, string> = {
+  "11":"SP","12":"SP","13":"SP","14":"SP","15":"SP","16":"SP","17":"SP","18":"SP","19":"SP",
+  "21":"RJ","22":"RJ","24":"RJ","27":"ES","28":"ES","31":"MG","32":"MG","33":"MG","34":"MG","35":"MG","37":"MG","38":"MG",
+  "41":"PR","42":"PR","43":"PR","44":"PR","45":"PR","46":"PR","47":"SC","48":"SC","49":"SC","51":"RS","53":"RS","54":"RS","55":"RS",
+  "61":"DF","62":"GO","64":"GO","63":"TO","65":"MT","66":"MT","67":"MS","68":"AC","69":"RO","71":"BA","73":"BA","74":"BA","75":"BA","77":"BA","79":"SE",
+  "81":"PE","87":"PE","82":"AL","83":"PB","84":"RN","85":"CE","88":"CE","86":"PI","89":"PI","91":"PA","93":"PA","94":"PA","92":"AM","97":"AM","95":"RR","96":"AP","98":"MA","99":"MA",
+};
+function phoneToUF(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  let d = String(phone).replace(/\D/g, "");
+  if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
+  return d.length >= 10 ? DDD_TO_UF[d.slice(0, 2)] || null : null;
+}
+
 function findCustomField(sources: any[], aliases: string[]): string | null {
   const wanted = aliases.map(keyNorm);
   for (const arr of sources) {
@@ -33,203 +47,50 @@ function findCustomField(sources: any[], aliases: string[]): string | null {
   return null;
 }
 
-function findCustomFields(sources: any[], aliases: string[]): string[] {
-  const wanted = aliases.map(keyNorm);
-  const values: string[] = [];
-  for (const arr of sources) {
-    if (!Array.isArray(arr)) continue;
-    for (const f of arr) {
-      const label = f?.custom_field?.label || f?.label || f?.custom_field_id?.label || f?.name || "";
-      const k = keyNorm(label);
-      if (!wanted.includes(k)) continue;
-      const raw = f?.value ?? f?.values ?? null;
-      const list = Array.isArray(raw) ? raw : [raw];
-      for (const value of list) {
-        if (value != null && String(value).trim()) values.push(String(value).trim());
-      }
-    }
-  }
-  return values;
-}
-
-function parseMoneyValue(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (value == null) return null;
-  if (typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    for (const candidate of [
-      record.amount,
-      record.value,
-      record.total,
-      record.price,
-      record.text,
-      record.label,
-      record.name,
-    ]) {
-      const parsed = parseMoneyValue(candidate);
-      if (parsed != null) return parsed;
-    }
-    return null;
-  }
-  let text = String(value).trim();
-  if (!text) return null;
-  text = text.replace(/\s/g, "").replace(/[^\d,.-]/g, "");
-  if (!text || text === "-" || text === "," || text === ".") return null;
-
-  const lastComma = text.lastIndexOf(",");
-  const lastDot = text.lastIndexOf(".");
-
-  if (lastComma >= 0 && lastDot >= 0) {
-    text = lastComma > lastDot
-      ? text.replace(/\./g, "").replace(",", ".")
-      : text.replace(/,/g, "");
-  } else if (lastComma >= 0) {
-    text = text.replace(",", ".");
-  }
-
-  const parsed = Number(text);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function findMoneyCustomField(sources: any[], aliases: string[]): number | null {
-  const wanted = aliases.map(keyNorm);
-  for (const arr of sources) {
-    if (!Array.isArray(arr)) continue;
-    for (const f of arr) {
-      const label = f?.custom_field?.label || f?.label || f?.custom_field_id?.label || f?.name || "";
-      const key = keyNorm(label);
-      if (!wanted.some((wantedKey) => key === wantedKey || key.includes(wantedKey))) continue;
-      const raw = f?.value ?? f?.values ?? null;
-      const list = Array.isArray(raw) ? raw : [raw];
-      for (const value of list) {
-        const parsed = parseMoneyValue(value);
-        if (parsed != null) return parsed;
-      }
-    }
-  }
-  return null;
-}
-
-function collectCustomFieldSources(...roots: any[]): any[] {
-  const sources: any[] = [];
-  const seen = new Set<any>();
-  const visit = (value: any, depth = 0) => {
-    if (value == null || depth > 4) return;
-    if (Array.isArray(value)) {
-      const hasCustomShape = value.some((item) =>
-        item?.custom_field || item?.custom_field_id || item?.label || item?.name,
-      );
-      if (hasCustomShape && !seen.has(value)) {
-        seen.add(value);
-        sources.push(value);
-      }
-      for (const item of value) visit(item, depth + 1);
-      return;
-    }
-    if (typeof value !== "object") return;
-    for (const key of [
-      "deal_custom_fields",
-      "custom_fields",
-      "cf_custom_fields",
-      "contact_custom_fields",
-      "fields",
-      "extra_fields",
-      "metadata",
-      "contact",
-      "deal_contact",
-      "deal_lead",
-    ]) {
-      visit(value[key], depth + 1);
-    }
-  };
-
-  for (const root of roots) visit(root);
-  return sources;
-}
-
-function productMoney(product: any): number {
-  const quantity = Number(product?.quantity || product?.amount_products || product?.qty || 1) || 1;
-  const total = parseMoneyValue(product?.total || product?.total_price || product?.amount_total || product?.amount);
-  if (total != null) return total;
-  const unit = parseMoneyValue(product?.price || product?.unit_price || product?.value || product?.deal_product?.price);
-  return unit != null ? unit * quantity : 0;
-}
-
-function resolveDealAmount(d: any, sources: any[]): number {
-  const customAmount = findMoneyCustomField(sources, [
-    "venda realizada",
-    "vendas realizadas",
-    "venda concluida",
-    "venda concluída",
-    "valor venda realizada",
-    "valor pago",
-    "valor pago venda realizada",
-    "valor da venda",
-    "valor venda",
-    "valor total",
-    "total pago",
-    "valor recebido",
-    "valor fechado",
-    "valor da venda realizada",
-    "valor do pagamento",
-    "faturamento",
-    "receita",
-    "preco",
-    "preço",
-    "pagamento realizado",
-    "pagamento aprovado",
-    "valor da negociacao",
-    "valor negociacao",
-    "valor da negociação",
-    "valor negociação",
-    "ticket",
-    "ticket medio",
-    "ticket médio",
+function extractPaymentMethod(sources: any[]): string | null {
+  const raw = findCustomField(sources, [
+    "formadepagamento",
+    "forma_pagamento",
+    "forma pagamento",
+    "formapagamento",
+    "metododepagamento",
+    "metodopagamento",
+    "metodo de pagamento",
+    "método de pagamento",
+    "pagamento",
     "payment",
-    "paid amount",
-    "deal amount",
-    "deal value",
-    "amount total",
-    "amount_total",
+    "paymentmethod",
   ]);
-  if (customAmount != null) return customAmount;
-
-  for (const value of [d.amount_total, d.amount, d.value, d.deal_value, d.total]) {
-    const parsed = parseMoneyValue(value);
-    if (parsed != null) return parsed;
-  }
-
-  const products = [
-    ...asArray(d.deal_products),
-    ...asArray(d.products),
-    ...asArray(d.items),
-    ...asArray(d.deal?.deal_products),
-  ];
-  const productTotal = products.reduce((sum, product) => sum + productMoney(product), 0);
-  return productTotal || 0;
+  if (!raw) return null;
+  const n = String(raw).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (!n) return null;
+  if (n.includes("pix")) return "pix";
+  if (n.includes("boleto")) return "boleto";
+  if (n.includes("cart") || n.includes("credit") || n.includes("debit")) return "cartao";
+  if (n.includes("transfer") || n.includes("ted") || n.includes("doc") || n.includes("dinheiro") || n.includes("cash") || n.includes("especie") || n.includes("outro")) return "outros";
+  return "outros";
 }
 
-function compactNorm(value: unknown) {
-  return String(value ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\[.*?\]/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
+interface FieldConfig {
+  key: string;
+  rd_source: string;
+  rd_field_label: string;
+  rd_field_aliases: string[];
+  field_type: string;
+  options: any;
 }
 
-function uniqueStrings(values: Array<unknown>) {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const value of values) {
-    if (value == null) continue;
-    const text = String(value).trim();
-    if (!text) continue;
-    const key = compactNorm(text);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(text);
+function extractConfiguredFields(
+  configs: FieldConfig[],
+  dealCfs: any[],
+  contactCfs: any[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const c of configs) {
+    const sources = c.rd_source === "contact" ? [contactCfs] : c.rd_source === "deal" ? [dealCfs] : [dealCfs, contactCfs];
+    const aliases = [c.rd_field_label, ...(c.rd_field_aliases || [])].filter(Boolean);
+    const v = findCustomField(sources, aliases);
+    if (v != null && String(v).trim() !== "") out[c.key] = String(v).trim();
   }
   return out;
 }
@@ -271,14 +132,17 @@ function bucketFromStage(stageName: string | null | undefined, win: boolean, los
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Converte ISO timestamp para YYYY-MM-DD no fuso America/Sao_Paulo (BRT, UTC-3).
+ *  Evita que vendas fechadas após 21h BRT sejam contadas no dia seguinte. */
+function toBrtDateString(iso: string): string {
+  const d = new Date(iso);
+  // BRT é UTC-3 (sem horário de verão atualmente). Subtrai 3h e usa UTC.
+  const shifted = new Date(d.getTime() - 3 * 3600 * 1000);
+  return shifted.toISOString().split("T")[0];
+}
+
 // Métricas globais por execução
 const metrics = { retries: 0, errors: 0, details: 0, contacts: 0 };
-
-type MetaAttribution = {
-  campaignId: string | null;
-  campaignIds: string[];
-  matchMethod: string | null;
-};
 
 async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
   const backoffs = [500, 1500, 4000];
@@ -357,15 +221,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const {
-      funnel_id,
-      only_missing_names,
-      missing_names_limit = 80,
-      realtime = false,
-      max_pages,
-      max_deals,
-      trigger_source,
-    } = body || {};
+    const { funnel_id, only_missing_names, missing_names_limit = 80, service_user_id, cron_trigger } = body || {};
     let deal_ids = body?.deal_ids;
     if (!funnel_id) {
       return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
@@ -379,18 +235,28 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: userRes } = await supabase.auth.getUser();
-    userId = userRes.user?.id || null;
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "Usuário inválido" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    // Service-role path (cron/orchestrator): trust supplied user_id when bearer matches SERVICE_ROLE_KEY
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const isServiceCall = !!(cron_trigger && service_user_id && serviceKey && authHeader === `Bearer ${serviceKey}`);
+
+    if (isServiceCall) {
+      userId = String(service_user_id);
+    } else {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: userRes } = await supabase.auth.getUser();
+      userId = userRes.user?.id || null;
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "Usuário inválido" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
+
 
     const { data: funnel } = await admin
       .from("rd_funnels")
@@ -444,108 +310,18 @@ Deno.serve(async (req) => {
       funnel_id: funnel.id,
       provider: "rd_station_crm",
       status: "running",
-      trigger_source: trigger_source || (isReprocess ? "reprocess" : realtime ? "auto_realtime" : "manual"),
+      trigger_source: isReprocess ? "reprocess" : "manual",
     }).select("id").single();
     runId = runRow?.id || null;
 
     const { data: products } = await admin.from("products").select("id, name, tax_rate").eq("user_id", userId);
     const productList = products || [];
-    const metaAttributionCache = new Map<string, Promise<{
-      campaigns: Array<{ id: string; name: string | null }>;
-      adsets: Array<{ id: string; name: string | null; campaign_id: string | null }>;
-      ads: Array<{ id: string; name: string | null; adset_id: string | null; campaign_id: string | null }>;
-    }>>();
 
-    const loadMetaAttribution = (adAccountId: string) => {
-      if (!metaAttributionCache.has(adAccountId)) {
-        metaAttributionCache.set(adAccountId, (async () => {
-          const { data: campaigns } = await admin
-            .from("campaigns")
-            .select("id,name")
-            .eq("ad_account_id", adAccountId);
-
-          const campaignIds = (campaigns || []).map((campaign: any) => campaign.id);
-          const { data: adsets } = campaignIds.length > 0
-            ? await admin.from("adsets").select("id,name,campaign_id").in("campaign_id", campaignIds)
-            : { data: [] as any[] };
-
-          const adsetIds = (adsets || []).map((adset: any) => adset.id);
-          const { data: ads } = adsetIds.length > 0
-            ? await admin.from("ads").select("id,name,adset_id").in("adset_id", adsetIds)
-            : { data: [] as any[] };
-
-          const adsetCampaign = new Map((adsets || []).map((adset: any) => [String(adset.id), adset.campaign_id]));
-
-          return {
-            campaigns: (campaigns || []) as Array<{ id: string; name: string | null }>,
-            adsets: (adsets || []) as Array<{ id: string; name: string | null; campaign_id: string | null }>,
-            ads: (ads || []).map((ad: any) => ({
-              id: ad.id,
-              name: ad.name,
-              adset_id: ad.adset_id,
-              campaign_id: adsetCampaign.get(String(ad.adset_id)) ?? null,
-            })),
-          };
-        })());
-      }
-      return metaAttributionCache.get(adAccountId)!;
-    };
-
-    async function resolveMetaAttribution(adAccountId: string, candidates: {
-      campaign: unknown[];
-      adset: unknown[];
-      ad: unknown[];
-    }): Promise<MetaAttribution> {
-      const meta = await loadMetaAttribution(adAccountId);
-      const campaignValues = uniqueStrings(candidates.campaign);
-      const adsetValues = uniqueStrings(candidates.adset);
-      const adValues = uniqueStrings(candidates.ad);
-
-      const byId = (values: string[], rows: Array<{ id: string }>) => {
-        const ids = new Set(rows.map((row) => String(row.id)));
-        return values.find((value) => ids.has(String(value)));
-      };
-      const byName = <T extends { id: string; name: string | null }>(values: string[], rows: T[]) => {
-        for (const value of values) {
-          const normalized = compactNorm(value);
-          if (!normalized) continue;
-          const exact = rows.find((row) => compactNorm(row.name) === normalized);
-          if (exact) return exact;
-          const partial = rows.find((row) => {
-            const name = compactNorm(row.name);
-            return name.length > 3 && (name.includes(normalized) || normalized.includes(name));
-          });
-          if (partial) return partial;
-        }
-        return null;
-      };
-
-      const campaignId = byId(campaignValues, meta.campaigns);
-      if (campaignId) return { campaignId, campaignIds: [campaignId], matchMethod: "utm_campaign_id" };
-
-      const adId = byId(adValues, meta.ads);
-      if (adId) {
-        const ad = meta.ads.find((row) => row.id === adId);
-        return { campaignId: ad?.campaign_id ?? null, campaignIds: ad?.campaign_id ? [ad.campaign_id] : [], matchMethod: "utm_content_ad_id" };
-      }
-
-      const adsetId = byId(adsetValues, meta.adsets);
-      if (adsetId) {
-        const adset = meta.adsets.find((row) => row.id === adsetId);
-        return { campaignId: adset?.campaign_id ?? null, campaignIds: adset?.campaign_id ? [adset.campaign_id] : [], matchMethod: "utm_term_adset_id" };
-      }
-
-      const campaignByName = byName(campaignValues, meta.campaigns);
-      if (campaignByName) return { campaignId: campaignByName.id, campaignIds: [campaignByName.id], matchMethod: "utm_campaign_name" };
-
-      const adByName = byName(adValues, meta.ads);
-      if (adByName?.campaign_id) return { campaignId: adByName.campaign_id, campaignIds: [adByName.campaign_id], matchMethod: "utm_content_ad_name" };
-
-      const adsetByName = byName(adsetValues, meta.adsets);
-      if (adsetByName?.campaign_id) return { campaignId: adsetByName.campaign_id, campaignIds: [adsetByName.campaign_id], matchMethod: "utm_term_adset_name" };
-
-      return { campaignId: null, campaignIds: [], matchMethod: null };
-    }
+    const { data: fieldConfigsRows } = await admin
+      .from("rd_field_configs")
+      .select("key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
+      .eq("ad_account_id", funnel.ad_account_id);
+    const fieldConfigs: FieldConfig[] = (fieldConfigsRows as any[]) || [];
 
     // Buscar e cachear etapas reais do funil no RD
     const stageOrderMap = new Map<string, number>();
@@ -595,82 +371,6 @@ Deno.serve(async (req) => {
     let totalCreated = 0, totalUpdated = 0, totalSkipped = 0, totalDeals = 0;
     let debugLogged = false;
 
-    async function persistTouches(input: {
-      rdDealId: string;
-      userId: string;
-      adAccountId: string;
-      leadAt: string;
-      utm_source: string | null;
-      utm_medium: string | null;
-      utm_campaign: string | null;
-      utm_content: string | null;
-      utm_term: string | null;
-      matched_campaign_id: string | null;
-      source: string;
-    }) {
-      if (!input.utm_source && !input.utm_medium && !input.utm_campaign && !input.utm_content && !input.utm_term) return;
-
-      const touchAt = new Date(input.leadAt).toISOString();
-      const { data: existing } = await admin
-        .from("rd_deal_touches")
-        .select("id")
-        .eq("rd_deal_id", input.rdDealId)
-        .eq("touch_at", touchAt)
-        .eq("utm_campaign", input.utm_campaign || "")
-        .maybeSingle();
-
-      if (existing?.id) return;
-
-      const { data: lastTouch } = await admin
-        .from("rd_deal_touches")
-        .select("touch_order")
-        .eq("rd_deal_id", input.rdDealId)
-        .order("touch_order", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const nextOrder = (lastTouch?.touch_order ?? 0) + 1;
-      if (lastTouch) {
-        await admin.from("rd_deal_touches").update({ is_last: false }).eq("rd_deal_id", input.rdDealId);
-      }
-
-      const { error } = await admin.from("rd_deal_touches").insert({
-        rd_deal_id: input.rdDealId,
-        ad_account_id: input.adAccountId,
-        user_id: input.userId,
-        touch_at: touchAt,
-        utm_source: input.utm_source,
-        utm_medium: input.utm_medium,
-        utm_campaign: input.utm_campaign,
-        utm_content: input.utm_content,
-        utm_term: input.utm_term,
-        matched_campaign_id: input.matched_campaign_id,
-        touch_order: nextOrder,
-        is_first: nextOrder === 1,
-        is_last: true,
-        source: input.source,
-      });
-
-      if (error) {
-        console.log(`[rd_deal_touches] ${input.rdDealId} failed: ${error.message}`);
-        metrics.errors++;
-        return;
-      }
-
-      const { data: firstTouch } = await admin
-        .from("rd_deal_touches")
-        .select("utm_campaign")
-        .eq("rd_deal_id", input.rdDealId)
-        .order("touch_order", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      await admin.from("rd_deals").update({
-        first_touch_utm_campaign: firstTouch?.utm_campaign ?? input.utm_campaign,
-        last_touch_utm_campaign: input.utm_campaign,
-        touch_count: nextOrder,
-      }).eq("rd_deal_id", input.rdDealId);
-    }
 
     async function processDeal(d: any) {
       const id = String(d.id || d._id);
@@ -725,16 +425,13 @@ Deno.serve(async (req) => {
 
     async function persistDeal(d: any) {
       const rdDealId = String(d.id || d._id);
+      const amountTotal = parseFloat(d.amount_total || d.amount || "0") || 0;
+      const won = isWonDeal(d);
+      const lost = d.win === false || (d.deal_lost_reason != null && !won);
       const stageName = d.deal_stage?.name || null;
       const stageId = d.deal_stage?.id ? String(d.deal_stage.id) : null;
-      const stageIsWon = stageId ? stageWonMap.get(stageId) === true : false;
-      const stageIsLost = stageId ? stageLostMap.get(stageId) === true : false;
-      const won = isWonDeal(d) || stageIsWon;
-      const lost = !won && (d.win === false || d.deal_lost_reason != null || stageIsLost);
       const bucket = bucketFromStage(stageName, won, lost);
       const lostReason = d.deal_lost_reason?.name || d.deal_lost_reason || null;
-      const stageUpdatedAt = d.stage_updated_at || d.updated_at || d.last_activity_at || null;
-      const closedAt = d.closed_at || (won ? (stageUpdatedAt || d.created_at || new Date().toISOString()) : null);
 
       const baseContact = d.contact || d.deal_contact || {};
       const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
@@ -754,16 +451,21 @@ Deno.serve(async (req) => {
 
       const contactCustomFields = firstContact?.contact_custom_fields || baseContact?.contact_custom_fields || [];
       const dealCustomFields = d.deal_custom_fields || d.custom_fields || d.cf_custom_fields || [];
-      const allCfSources = collectCustomFieldSources(d, baseContact, firstContact, nestedContact, inline, dealCustomFields, contactCustomFields);
-      const amountTotal = resolveDealAmount(d, allCfSources);
+      const allCfSources = [dealCustomFields, contactCustomFields];
 
+      const waPhone = phones?.[0]?.whatsapp_full_internacional || null;
       const contactState = contact.state || contact.address_state
-        || findCustomField(allCfSources, ["state", "estado", "uf", "lead_state", "estadouf"]) || null;
+        || findCustomField(allCfSources, ["state", "estado", "uf", "lead_state", "estadouf"])
+        || phoneToUF(waPhone)
+        || phoneToUF(contactPhone)
+        || null;
       const contactCity = contact.city || contact.address_city
         || findCustomField(allCfSources, ["city", "cidade", "lead_city", "cidadelead"]) || null;
 
-      const saleDateSource = closedAt || stageUpdatedAt || d.updated_at || d.created_at || new Date().toISOString();
-      const saleDate = new Date(saleDateSource).toISOString().split("T")[0];
+      const saleDate = d.closed_at
+        ? toBrtDateString(d.closed_at)
+        : toBrtDateString(new Date().toISOString());
+
 
       let productId: string | null = null;
       let rdProductName: string | null = null;
@@ -787,10 +489,10 @@ Deno.serve(async (req) => {
 
       const rdCampaignName = d.campaign?.name || (typeof d.campaign === "string" ? d.campaign : null) || d.deal_source?.name || null;
 
-      const cfSources = allCfSources;
-      const utms = d.utms || d.utm || baseContact?.utms || firstContact?.utms || nestedContact?.utms || d.deal_source || d.lead_origin || {};
+      const cfSources = [dealCustomFields, contactCustomFields];
+      const utms = d.utms || d.utm || baseContact?.utms || firstContact?.utms || d.deal_source || d.lead_origin || {};
       const pickUtm = (name: string, aliases: string[]) =>
-        d[`utm_${name}`] || utms?.[name] || utms?.[`utm_${name}`] || contact?.[`utm_${name}`] || nestedContact?.[`utm_${name}`] || findCustomField(cfSources, aliases);
+        d[`utm_${name}`] || utms?.[name] || utms?.[`utm_${name}`] || findCustomField(cfSources, aliases);
 
       const utm_source   = pickUtm("source",   ["utmsource",   "utm_source",   "source",   "fonte"]) || null;
       const utm_medium   = pickUtm("medium",   ["utmmedium",   "utm_medium",   "medium",   "midia", "mídia"]) || null;
@@ -798,27 +500,13 @@ Deno.serve(async (req) => {
       const utm_term     = pickUtm("term",     ["utmterm",     "utm_term",     "term",     "termo"]) || null;
       const utm_content  = pickUtm("content",  ["utmcontent",  "utm_content",  "content",  "conteudo", "conteúdo"]) || null;
 
-      const attribution = await resolveMetaAttribution(funnel!.ad_account_id, {
-        campaign: [
-          utm_campaign,
-          rdCampaignName,
-          ...findCustomFields(cfSources, ["campaignid", "campaign_id", "meta_campaign_id", "idcampanha", "campanhaid"]),
-        ],
-        adset: [
-          utm_term,
-          ...findCustomFields(cfSources, ["adsetid", "adset_id", "meta_adset_id", "conjuntodeanuncio", "conjuntoid"]),
-        ],
-        ad: [
-          utm_content,
-          ...findCustomFields(cfSources, ["adid", "ad_id", "meta_ad_id", "creative", "criativo", "anuncioid"]),
-        ],
-      });
-
       const leadEntryDate = d.created_at
         ? new Date(d.created_at).toISOString().split("T")[0]
         : null;
 
       const dealOwnerName = d.user?.name || d.deal_user?.name || d.owner?.name || null;
+
+      const customFieldsExtracted = extractConfiguredFields(fieldConfigs, dealCustomFields, contactCustomFields);
 
       // Upsert rd_deals (todos os deals, não apenas ganhos)
       try {
@@ -842,24 +530,11 @@ Deno.serve(async (req) => {
           lead_state: contactState,
           lead_city: contactCity,
           lead_created_at: d.created_at || null,
-          stage_updated_at: stageUpdatedAt,
-          closed_at: closedAt,
+          stage_updated_at: d.updated_at || d.last_activity_at || null,
+          closed_at: d.closed_at || null,
           raw: d,
+          custom_fields: customFieldsExtracted,
         }, { onConflict: "user_id,rd_deal_id" });
-
-        await persistTouches({
-          rdDealId,
-          userId: userId!,
-          adAccountId: funnel!.ad_account_id,
-          leadAt: d.created_at || stageUpdatedAt || closedAt || new Date().toISOString(),
-          utm_source,
-          utm_medium,
-          utm_campaign,
-          utm_content,
-          utm_term,
-          matched_campaign_id: attribution.campaignId,
-          source: "rd_sync",
-        });
       } catch (e) {
         console.log(`[rd_deals upsert] ${rdDealId} failed: ${(e as Error).message}`);
         metrics.errors++;
@@ -871,12 +546,14 @@ Deno.serve(async (req) => {
       if (!won) return;
 
       const { data: existing } = await admin.from("sales")
-        .select("id, payment_method, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, contact_name, contact_phone, contact_email, lead_entry_date")
+        .select("id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, contact_name, contact_phone, contact_email, lead_entry_date")
         .eq("rd_deal_id", rdDealId).maybeSingle();
+
+      const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
 
       // Constrói payload preservando valores manuais já preenchidos.
       // Regra: campos vindos do RD só são gravados quando o registro existente
-      // estiver vazio. Pagamento nunca é sobrescrito; é manual.
+      // estiver vazio. Pagamento: RD sobrescreve, exceto se usuário marcou manual.
       const preserve = <T,>(current: T | null | undefined, incoming: T | null | undefined): T | null =>
         (current != null && current !== "" ? current : (incoming ?? null)) as T | null;
 
@@ -894,13 +571,13 @@ Deno.serve(async (req) => {
         rd_product_name: rdProductName,
         rd_campaign_name: rdCampaignName,
         rd_funnel_id: funnel!.id,
-        matched_campaign_id: attribution.campaignId,
-        match_method: attribution.matchMethod ?? "rd_sync_unmatched",
-        campaign_ids: attribution.campaignIds,
+        match_method: "rd_sync",
+        campaign_ids: [],
+        custom_fields: customFieldsExtracted,
       };
 
       if (existing) {
-        const update = {
+        const update: Record<string, any> = {
           ...baseData,
           lead_entry_date: preserve(existing.lead_entry_date, leadEntryDate),
           lead_state:      preserve(existing.lead_state, contactState),
@@ -914,6 +591,10 @@ Deno.serve(async (req) => {
           utm_term:        preserve(existing.utm_term, utm_term),
           utm_content:     preserve(existing.utm_content, utm_content),
         };
+        if (rdPayment && (existing as any).payment_method_source !== "manual") {
+          update.payment_method = rdPayment;
+          update.payment_method_source = "rd";
+        }
         await admin.from("sales").update(update).eq("rd_deal_id", rdDealId);
         totalUpdated++;
       } else {
@@ -926,15 +607,16 @@ Deno.serve(async (req) => {
           contact_phone: contactPhone,
           contact_email: contactEmail,
           utm_source, utm_medium, utm_campaign, utm_term, utm_content,
-          payment_method: "pix",
+          payment_method: rdPayment ?? "pix",
+          payment_method_source: rdPayment ? "rd" : "default",
           notes: null,
         });
         totalCreated++;
       }
     }
 
-    const BATCH_SIZE = realtime ? 4 : 2;
-    const BATCH_PAUSE_MS = realtime ? 100 : 400;
+    const BATCH_SIZE = 2;
+    const BATCH_PAUSE_MS = 400;
 
     if (isReprocess) {
       // Buscar diretamente cada deal informado
@@ -947,8 +629,7 @@ Deno.serve(async (req) => {
       }
     } else {
       let page = 1;
-      const maxPages = Math.max(1, Math.min(Number(max_pages) || (realtime ? 1 : 50), realtime ? 3 : 50));
-      const maxDeals = Math.max(1, Math.min(Number(max_deals) || (realtime ? 40 : 10_000), realtime ? 100 : 10_000));
+      const maxPages = 50;
       while (page <= maxPages) {
         const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200`;
         const r = await fetchWithRetry(url);
@@ -960,11 +641,8 @@ Deno.serve(async (req) => {
           });
         }
         const payload = await r.json();
-        let deals = payload.deals || payload || [];
+        const deals = payload.deals || payload || [];
         if (!Array.isArray(deals) || deals.length === 0) break;
-        const remaining = Math.max(0, maxDeals - totalDeals);
-        if (remaining <= 0) break;
-        deals = deals.slice(0, remaining);
         totalDeals += deals.length;
 
         for (let i = 0; i < deals.length; i += BATCH_SIZE) {
@@ -974,7 +652,7 @@ Deno.serve(async (req) => {
           await sleep(BATCH_PAUSE_MS);
         }
 
-        if (deals.length < 200 || totalDeals >= maxDeals) break;
+        if (deals.length < 200) break;
         page++;
       }
     }

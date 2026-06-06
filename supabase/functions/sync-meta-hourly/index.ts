@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
         const lpAction: string | null = lpCfg?.action_type ?? null;
 
         const url =
-          `https://graph.facebook.com/v25.0/${metaAccountId}/insights` +
+          `https://graph.facebook.com/v21.0/${metaAccountId}/insights` +
           `?level=ad` +
           `&time_increment=1` +
           `&breakdowns=hourly_stats_aggregated_by_audience_time_zone` +
@@ -215,17 +215,8 @@ Deno.serve(async (req) => {
 });
 
 async function fetchMeta(url: string): Promise<any> {
-  try {
-    const res = await fetch(url);
-    const text = await res.text();
-    const json = text ? JSON.parse(text) : {};
-    if (!res.ok && !json.error) {
-      return { error: { message: `Meta HTTP ${res.status}: ${text.slice(0, 300)}` } };
-    }
-    return json;
-  } catch (error) {
-    return { error: { message: `Falha ao chamar Meta API: ${(error as Error).message}` } };
-  }
+  const res = await fetch(url);
+  return res.json();
 }
 
 async function fetchMetaPaginated(url: string, maxPages = 80): Promise<{ data: any[]; error?: string }> {
@@ -234,12 +225,7 @@ async function fetchMetaPaginated(url: string, maxPages = 80): Promise<{ data: a
   let pages = 0;
   while (next && pages < maxPages) {
     const res = await fetchMeta(next);
-    if (res.error) {
-      const code = typeof res.error.code === "number" ? res.error.code : undefined;
-      const subcode = typeof res.error.error_subcode === "number" ? res.error.error_subcode : undefined;
-      const suffix = [code ? `code ${code}` : null, subcode ? `subcode ${subcode}` : null].filter(Boolean).join(", ");
-      return { data: all, error: `${res.error.message || String(res.error)}${suffix ? ` (${suffix})` : ""}` };
-    }
+    if (res.error) return { data: all, error: res.error.message || String(res.error) };
     if (Array.isArray(res.data)) all.push(...res.data);
     next = res.paging?.next;
     pages++;

@@ -6,23 +6,17 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
-import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { usePermissions, firstAllowedPath, PagePermission } from "@/hooks/usePermissions";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Campaigns from "./pages/Campaigns";
 import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
-import Integrations from "./pages/Integrations";
 import LeadsIncompletos from "./pages/LeadsIncompletos";
 import FunnelAnalysis from "./pages/FunnelAnalysis";
 import EventClasses from "./pages/EventClasses";
 import Users from "./pages/Users";
-import CRM from "./pages/CRM";
-import Commercial from "./pages/Commercial";
-import Announcements from "./pages/Announcements";
-import Automations from "./pages/Automations";
-import Plans from "./pages/Plans";
+import DataHealth from "./pages/DataHealth";
 
 import NotFound from "./pages/NotFound";
 
@@ -61,7 +55,7 @@ function RequirePage({ page, children }: { page: PagePermission | "master"; chil
       : false;
   if (!allowed) {
     const fallback = firstAllowedPath(perms);
-    return <Navigate to={fallback} replace />;
+    return <Navigate to={fallback === "/" && page === "dashboard" ? "/auth" : fallback} replace />;
   }
   return <>{children}</>;
 }
@@ -81,28 +75,21 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <AppErrorBoundary>
-              <Routes>
-                <Route path="/auth" element={<AuthRoute />} />
-                <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                  <Route index element={<RequirePage page="dashboard"><Index /></RequirePage>} />
-                  <Route path="campaigns" element={<RequirePage page="campaigns"><Campaigns /></RequirePage>} />
-                  <Route path="funnels" element={<RequirePage page="funnels"><FunnelAnalysis /></RequirePage>} />
-                  <Route path="crm" element={<RequirePage page="funnels"><CRM /></RequirePage>} />
-                  <Route path="commercial" element={<RequirePage page="funnels"><Commercial /></RequirePage>} />
-                  <Route path="classes" element={<RequirePage page="classes"><EventClasses /></RequirePage>} />
-                  <Route path="alerts" element={<RequirePage page="master"><Alerts /></RequirePage>} />
-                  <Route path="integrations" element={<RequirePage page="master"><Integrations /></RequirePage>} />
-                  <Route path="announcements" element={<RequirePage page="master"><Announcements /></RequirePage>} />
-                  <Route path="automations" element={<RequirePage page="master"><Automations /></RequirePage>} />
-                  <Route path="plans" element={<Plans />} />
-                  <Route path="settings" element={<RequirePage page="master"><Settings /></RequirePage>} />
-                  <Route path="leads-incompletos" element={<RequirePage page="master"><LeadsIncompletos /></RequirePage>} />
-                  <Route path="users" element={<RequirePage page="master"><Users /></RequirePage>} />
-                </Route>
-                <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
-              </Routes>
-            </AppErrorBoundary>
+            <Routes>
+              <Route path="/auth" element={<AuthRoute />} />
+              <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                <Route index element={<RequirePage page="dashboard"><Index /></RequirePage>} />
+                <Route path="campaigns" element={<RequirePage page="campaigns"><Campaigns /></RequirePage>} />
+                <Route path="funnels" element={<RequirePage page="funnels"><FunnelAnalysis /></RequirePage>} />
+                <Route path="classes" element={<RequirePage page="classes"><EventClasses /></RequirePage>} />
+                <Route path="alerts" element={<RequirePage page="master"><Alerts /></RequirePage>} />
+                <Route path="settings" element={<RequirePage page="master"><Settings /></RequirePage>} />
+                <Route path="leads-incompletos" element={<RequirePage page="master"><LeadsIncompletos /></RequirePage>} />
+                <Route path="users" element={<RequirePage page="master"><Users /></RequirePage>} />
+                <Route path="data-health" element={<RequirePage page="master"><DataHealth /></RequirePage>} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

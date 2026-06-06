@@ -44,18 +44,14 @@ export interface EventClassWithCounts extends EventClass {
   rd_model_patient_funnel_name?: string;
 }
 
-export function useEventClasses(adAccountId?: string) {
+export function useEventClasses() {
   return useQuery({
-    queryKey: ["event_classes", adAccountId ?? "all"],
+    queryKey: ["event_classes"],
     queryFn: async () => {
-      let query = (supabase as any)
+      const { data: classes, error } = await (supabase as any)
         .from("event_classes")
         .select("*")
         .order("date_start", { ascending: true });
-
-      if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-
-      const { data: classes, error } = await query;
       if (error) throw error;
 
       const list = (classes || []) as EventClass[];

@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
         const accessToken = account.access_token;
 
         // Fetch account balance info from Meta API with all relevant financial fields
-        const url = `https://graph.facebook.com/v25.0/${metaAccountId}?fields=balance,spend_cap,amount_spent,funding_source_details&access_token=${accessToken}`;
+        const url = `https://graph.facebook.com/v21.0/${metaAccountId}?fields=balance,spend_cap,amount_spent,funding_source_details&access_token=${accessToken}`;
         const res = await fetch(url);
         const data = await res.json();
 

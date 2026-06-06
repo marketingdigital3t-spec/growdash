@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
                   "ADSET_PAUSED","IN_PROCESS","WITH_ISSUES","COMPLETED"],
         }]));
         const campaignsRes = await fetchMetaPaginated(
-          `https://graph.facebook.com/v25.0/${metaAccountId}/campaigns?fields=id,name,objective,effective_status&filtering=${statusFilter}&access_token=${accessToken}&limit=200`
+          `https://graph.facebook.com/v21.0/${metaAccountId}/campaigns?fields=id,name,objective,effective_status&filtering=${statusFilter}&access_token=${accessToken}&limit=200`
         );
         if (campaignsRes.error) {
           errors.push(`Conta ${account.name}: ${campaignsRes.error}`);
@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
 
         // 2. Fetch adsets (incluindo arquivadas)
         const adsetsRes = await fetchMetaPaginated(
-          `https://graph.facebook.com/v25.0/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type&filtering=${statusFilter}&access_token=${accessToken}&limit=200`
+          `https://graph.facebook.com/v21.0/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type&filtering=${statusFilter}&access_token=${accessToken}&limit=200`
         );
         const adsetsList = adsetsRes.data;
         if (adsetsList.length > 0) {
@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
 
         // 3. Fetch ads (incluindo arquivados)
         const adsRes = await fetchMetaPaginated(
-          `https://graph.facebook.com/v25.0/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${statusFilter}&access_token=${accessToken}&limit=200`
+          `https://graph.facebook.com/v21.0/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${statusFilter}&access_token=${accessToken}&limit=200`
         );
         const adsList = adsRes.data;
         if (adsList.length > 0) {
@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
         try {
           const since = Math.floor((Date.now() - 60 * 86400000) / 1000); // last 60d
           const until = Math.floor(Date.now() / 1000);
-          let activitiesUrl = `https://graph.facebook.com/v25.0/${metaAccountId}/activities?fields=event_time,event_type,translated_event_type,object_id,object_name,object_type,extra_data&since=${since}&until=${until}&access_token=${accessToken}&limit=200`;
+          let activitiesUrl = `https://graph.facebook.com/v21.0/${metaAccountId}/activities?fields=event_time,event_type,translated_event_type,object_id,object_name,object_type,extra_data&since=${since}&until=${until}&access_token=${accessToken}&limit=200`;
           let pageGuard = 0;
           const activityRows: any[] = [];
           // map adset->campaign and ad->campaign for activity attribution
@@ -294,20 +294,10 @@ Deno.serve(async (req) => {
         // 4. Buscar insights a nível de CONTA (não depende da listagem de campanhas)
         //    Captura inclusive ads de campanhas arquivadas/finalizadas
         const insightsRes = await fetchMetaPaginated(
-          `https://graph.facebook.com/v25.0/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+          `https://graph.facebook.com/v21.0/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
         );
         if (insightsRes.error) {
           errors.push(`Conta ${account.name} insights: ${insightsRes.error}`);
-          await supabaseAdmin
-            .from("ad_accounts")
-            .update({
-              connection_status: "connected",
-              last_sync_error: insightsRes.error,
-              last_sync_error_code: insightsRes.errorCode ?? null,
-              last_sync_attempt_at: attemptedAt,
-            })
-            .eq("id", account.id);
-          continue;
         }
         const allInsights = insightsRes.data;
         console.log(`Total ${allInsights.length} insight rows for account ${account.name}`);
@@ -327,7 +317,7 @@ Deno.serve(async (req) => {
             for (const adId of missingAdIds) {
               try {
                 const detail = await fetchMeta(
-                  `https://graph.facebook.com/v25.0/${adId}?fields=id,name,effective_status,creative{id,thumbnail_url,image_url},adset{id,name,campaign_id,effective_status,daily_budget},campaign{id,name,objective,effective_status}&access_token=${accessToken}`
+                  `https://graph.facebook.com/v21.0/${adId}?fields=id,name,effective_status,creative{id,thumbnail_url,image_url},adset{id,name,campaign_id,effective_status,daily_budget},campaign{id,name,objective,effective_status}&access_token=${accessToken}`
                 );
                 if (detail.error || !detail.id) continue;
                 const camp = detail.campaign;
@@ -445,10 +435,7 @@ Deno.serve(async (req) => {
             .from("insights")
             .upsert(chunk, { onConflict: "ad_id,date", ignoreDuplicates: false });
           if (!upsertError) totalSynced += chunk.length;
-          else {
-            errors.push(`Conta ${account.name} insights upsert: ${upsertError.message}`);
-            console.error("Upsert error:", upsertError.message);
-          }
+          else console.error("Upsert error:", upsertError.message);
         }
 
         // 5. Buscar breakdowns por campanha (idade, gênero, plataforma, posicionamento)
@@ -456,7 +443,7 @@ Deno.serve(async (req) => {
           const breakdownTypes = ["age", "gender", "publisher_platform", "platform_position", "region"];
           for (const bt of breakdownTypes) {
             const bRes = await fetchMetaPaginated(
-              `https://graph.facebook.com/v25.0/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+              `https://graph.facebook.com/v21.0/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
             if (bRes.error) {
               console.warn(`Breakdown ${bt} error: ${bRes.error}`);
@@ -541,17 +528,8 @@ Deno.serve(async (req) => {
 });
 
 async function fetchMeta(url: string): Promise<any> {
-  try {
-    const res = await fetch(url);
-    const text = await res.text();
-    const json = text ? JSON.parse(text) : {};
-    if (!res.ok && !json.error) {
-      return { error: { message: `Meta HTTP ${res.status}: ${text.slice(0, 300)}` } };
-    }
-    return json;
-  } catch (error) {
-    return { error: { message: `Falha ao chamar Meta API: ${(error as Error).message}` } };
-  }
+  const res = await fetch(url);
+  return res.json();
 }
 
 // Segue paging.next até o fim (ou hard-cap), retornando { data, error? }
@@ -562,13 +540,10 @@ async function fetchMetaPaginated(url: string, maxPages = 50): Promise<{ data: a
   while (next && pages < maxPages) {
     const res = await fetchMeta(next);
     if (res.error) {
-      const code = typeof res.error.code === "number" ? res.error.code : undefined;
-      const subcode = typeof res.error.error_subcode === "number" ? res.error.error_subcode : undefined;
-      const suffix = [code ? `code ${code}` : null, subcode ? `subcode ${subcode}` : null].filter(Boolean).join(", ");
       return {
         data: all,
-        error: `${res.error.message || String(res.error)}${suffix ? ` (${suffix})` : ""}`,
-        errorCode: code,
+        error: res.error.message || String(res.error),
+        errorCode: typeof res.error.code === "number" ? res.error.code : undefined,
       };
     }
     if (Array.isArray(res.data)) all.push(...res.data);
@@ -582,3 +557,4 @@ async function fetchMetaPaginated(url: string, maxPages = 50): Promise<{ data: a
 function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
 }
+

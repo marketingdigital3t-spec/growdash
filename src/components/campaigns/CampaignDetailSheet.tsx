@@ -200,7 +200,7 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign }: Props) {
         {/* KPIs */}
         <div className="grid grid-cols-3 gap-2 mt-4">
           {[
-            { label: "Investimento", value: fmt(campaign.spend, "R$ ") },
+            { label: "Gastos", value: fmt(campaign.spend, "R$ ") },
             { label: "Leads", value: fmtInt(campaign.leads) },
             { label: "CPL", value: fmt(campaign.cpl, "R$ ") },
             { label: "CTR", value: `${campaign.ctr.toFixed(2)}%` },
@@ -292,7 +292,7 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign }: Props) {
                       <div className="flex gap-3 text-xs tabular-nums flex-shrink-0">
                         <span>CPL <strong>{fmt(adset.cpl, "R$ ")}</strong></span>
                         <span>Leads <strong>{fmtInt(adset.leads)}</strong></span>
-                        <span className="hidden sm:inline">Investimento <strong>{fmt(adset.spend, "R$ ")}</strong></span>
+                        <span className="hidden sm:inline">Gasto <strong>{fmt(adset.spend, "R$ ")}</strong></span>
                       </div>
                     </div>
                     {adset.ads.length > 0 && (
@@ -444,7 +444,7 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign }: Props) {
                           </p>
                         </div>
                         <div className="rounded bg-muted/40 p-1.5">
-                          <p className="text-muted-foreground">Investimento</p>
+                          <p className="text-muted-foreground">Gasto</p>
                           <p className="tabular-nums">R$ {b.spend.toFixed(0)} → R$ {a.spend.toFixed(0)}</p>
                         </div>
                       </div>
@@ -556,7 +556,7 @@ function BreakdownTable({
                     <span>CPL <strong className="text-foreground">{s.leads > 0 ? `R$ ${s.cpl.toFixed(2)}` : "—"}</strong></span>
                     <span>Leads <strong className="text-foreground">{s.leads}</strong></span>
                     <span className="hidden sm:inline">CTR <strong className="text-foreground">{s.ctr.toFixed(2)}%</strong></span>
-                    <span className="hidden md:inline">Investimento <strong className="text-foreground">R$ {s.spend.toFixed(0)}</strong></span>
+                    <span className="hidden md:inline">Gasto <strong className="text-foreground">R$ {s.spend.toFixed(0)}</strong></span>
                   </div>
                 </div>
               );

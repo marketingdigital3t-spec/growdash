@@ -40,9 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    try {
-      sessionStorage.removeItem("growthos:dashboard-hero-dismissed");
-    } catch {}
     await supabase.auth.signOut();
   };
 
