@@ -20,8 +20,18 @@ const PAGES = [
   { key: "can_dashboard", label: "Dashboard" },
   { key: "can_campaigns", label: "Campanhas" },
   { key: "can_funnels", label: "Análise de Funis" },
+  { key: "can_crm", label: "CRM" },
+  { key: "can_commercial", label: "Comercial" },
   { key: "can_classes", label: "Datas & Turmas" },
+  { key: "can_leads", label: "Leads incompletos" },
+  { key: "can_alerts", label: "Alertas" },
+  { key: "can_users", label: "Usuários" },
+  { key: "can_integrations", label: "Integrações" },
+  { key: "can_announcements", label: "Anúncios" },
+  { key: "can_automations", label: "Automações" },
 ] as const;
+
+type PageKey = (typeof PAGES)[number]["key"];
 
 type UserRow = {
   user_id: string;
@@ -30,9 +40,20 @@ type UserRow = {
   can_campaigns: boolean;
   can_funnels: boolean;
   can_classes: boolean;
+  can_crm: boolean;
+  can_commercial: boolean;
+  can_leads: boolean;
+  can_alerts: boolean;
+  can_users: boolean;
+  can_integrations: boolean;
+  can_announcements: boolean;
+  can_automations: boolean;
   ad_account_ids: string[];
   rd_funnel_ids: string[];
 };
+
+const emptyPerms = (): Record<PageKey, boolean> =>
+  PAGES.reduce((acc, p) => ({ ...acc, [p.key]: false }), {} as Record<PageKey, boolean>);
 
 export default function UsersPage() {
   const { data: isMaster, isLoading: loadingMaster } = useIsMaster();
@@ -46,13 +67,11 @@ export default function UsersPage() {
   const [form, setForm] = useState({
     username: "",
     password: "",
-    can_dashboard: false,
-    can_campaigns: false,
-    can_funnels: false,
-    can_classes: false,
+    ...emptyPerms(),
     ad_account_ids: [] as string[],
     rd_funnel_ids: [] as string[],
   });
+
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["managed_users"],
