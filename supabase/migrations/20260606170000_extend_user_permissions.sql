@@ -1,0 +1,10 @@
+-- Extend user_permissions with all sidebar pages
+ALTER TABLE public.user_permissions
+  ADD COLUMN IF NOT EXISTS can_crm BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS can_commercial BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS can_leads BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS can_alerts BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS can_users BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS can_integrations BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS can_announcements BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS can_automations BOOLEAN NOT NULL DEFAULT false;
