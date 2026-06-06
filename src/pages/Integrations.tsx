@@ -638,6 +638,47 @@ export default function Integrations() {
                           </div>
                         </div>
 
+                        <div className="rounded-lg border bg-background/40 p-4 space-y-3">
+                          <div>
+                            <p className="font-semibold">Adicionar Nova Conta</p>
+                            <p className="text-xs text-muted-foreground">
+                              Informe um nome, o Ad Account ID e o token da Meta. Validamos com a Meta, salvamos a conta e puxamos os dados automaticamente para toda a plataforma.
+                            </p>
+                          </div>
+                          <Input
+                            value={inlineMetaName}
+                            onChange={(e) => setInlineMetaName(e.target.value)}
+                            placeholder="Nome da conta (ex: Conta Principal)"
+                          />
+                          <Input
+                            value={inlineMetaAccountId}
+                            onChange={(e) => setInlineMetaAccountId(e.target.value)}
+                            placeholder="Ad Account ID (ex: act_123456)"
+                          />
+                          <Input
+                            value={inlineMetaToken}
+                            onChange={(e) => setInlineMetaToken(e.target.value)}
+                            type="password"
+                            placeholder="Token de acesso da Meta API"
+                          />
+                          <Button
+                            className="gap-2"
+                            onClick={connectMetaAccountInline}
+                            disabled={
+                              inlineConnecting ||
+                              !inlineMetaAccountId.trim() ||
+                              !inlineMetaToken.trim()
+                            }
+                          >
+                            {inlineConnecting ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
+                            {inlineConnecting ? "Conectando..." : "Adicionar Conta"}
+                          </Button>
+                        </div>
+
                         <div className="flex flex-wrap gap-3">
                           <Button className="gap-2" onClick={() => setConnectOpen(true)}>
                             <Plus className="h-4 w-4" /> Adicionar perfil
