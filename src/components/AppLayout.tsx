@@ -1,6 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { useEffect } from "react";
 import { RevenueTopBar } from "@/components/RevenueTopBar";
@@ -14,6 +14,9 @@ import { usePageSEO } from "@/hooks/usePageSEO";
 export function AppLayout() {
   const { setTheme } = useTheme();
   usePageSEO();
+  const location = useLocation();
+  const isDashboard = location.pathname === "/" || location.pathname === "/index";
+
 
   useEffect(() => {
     const apply = () => {
@@ -34,7 +37,7 @@ export function AppLayout() {
           <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-white/10 bg-background/78 px-4 backdrop-blur-xl md:px-6">
             <SidebarTrigger className="transition-opacity duration-200 hover:opacity-70" />
           </header>
-          <RevenueTopBar />
+          {isDashboard && <RevenueTopBar />}
           <GlobalAnnouncementBanner />
           <div className="p-4 md:p-6">
             <PageTransition>
