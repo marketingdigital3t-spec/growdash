@@ -51,7 +51,7 @@ interface Props {
 export function RevenueDiagnosticsSection({ startDate, endDate, adAccountId }: Props) {
   const [chartType, setChartType] = useState<"line" | "bar">(() => {
     try {
-      return localStorage.getItem("trackvio:funnel-revenue-chart-type") === "bar" ? "bar" : "line";
+      return localStorage.getItem("growdash:funnel-revenue-chart-type") === "bar" ? "bar" : "line";
     } catch {
       return "line";
     }
@@ -153,7 +153,7 @@ export function RevenueDiagnosticsSection({ startDate, endDate, adAccountId }: P
   const updateChartType = (next: "line" | "bar") => {
     setChartType(next);
     try {
-      localStorage.setItem("trackvio:funnel-revenue-chart-type", next);
+      localStorage.setItem("growdash:funnel-revenue-chart-type", next);
     } catch {
       /* ignore */
     }

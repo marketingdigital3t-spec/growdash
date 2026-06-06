@@ -25,7 +25,6 @@ interface Props {
 const SYSTEM_TAIL = [
   { id: "__sys_budget", type: "budget_bm", title: "Análise de Orçamento", config: {}, layoutDefault: { w: 12, h: 5 } },
   { id: "__sys_campaigns", type: "campaigns_detail", title: "Detalhamento por Campanha", config: {}, layoutDefault: { w: 12, h: 6 } },
-  { id: "__sys_ask_ai", type: "ask_ai", title: "Pergunte à IA", config: {}, layoutDefault: { w: 12, h: 4 } },
 ];
 
 const DASHBOARD_EDIT_EVENT_KEY = "growthos:dashboard-edit-mode";

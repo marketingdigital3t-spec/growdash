@@ -17,10 +17,10 @@ export function GlobalAnnouncementBanner() {
       setHidden(false);
     });
     window.addEventListener("storage", refresh);
-    window.addEventListener("trackvio:announcement-updated", refresh);
+    window.addEventListener("growdash:announcement-updated", refresh);
     return () => {
       window.removeEventListener("storage", refresh);
-      window.removeEventListener("trackvio:announcement-updated", refresh);
+      window.removeEventListener("growdash:announcement-updated", refresh);
     };
   }, []);
 

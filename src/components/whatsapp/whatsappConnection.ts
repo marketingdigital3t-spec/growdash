@@ -17,11 +17,11 @@ export interface WhatsAppConnectionState {
   chats: WhatsAppChat[];
 }
 
-const STORAGE_KEY = "trackvio:whatsapp-connection";
-export const WHATSAPP_EVENT_KEY = "trackvio:whatsapp-connection-updated";
+const STORAGE_KEY = "growdash:whatsapp-connection";
+export const WHATSAPP_EVENT_KEY = "growdash:whatsapp-connection-updated";
 
 const seedChats: WhatsAppChat[] = [
-  { id: "group-growth-team", name: "Time Comercial Trackvio", type: "group", participants: 12 },
+  { id: "group-growth-team", name: "Time Comercial Growdash", type: "group", participants: 12 },
   { id: "group-leads-daily", name: "Relatorio Diario de Leads", type: "group", participants: 8 },
   { id: "group-gestores", name: "Gestores de Trafego e Vendas", type: "group", participants: 5 },
   { id: "contact-thiego", name: "Thiego Jesus", type: "contact", phone: "5511961551975" },

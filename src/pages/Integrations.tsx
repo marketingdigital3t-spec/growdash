@@ -58,8 +58,8 @@ import { format } from "date-fns";
 
 type ProviderId = "meta" | "google" | "kwai" | "tiktok";
 
-const META_APP_ID_KEY = "trackvio_meta_app_id";
-const META_ACTIVE_ACCOUNTS_KEY = "trackvio_meta_active_account_ids";
+const META_APP_ID_KEY = "growdash_meta_app_id";
+const META_ACTIVE_ACCOUNTS_KEY = "growdash_meta_active_account_ids";
 const DEFAULT_META_APP_ID = (import.meta.env.VITE_META_APP_ID as string | undefined) || "";
 
 const providers: Array<{
@@ -76,7 +76,7 @@ const providers: Array<{
 ];
 
 const webhookProviders = ["Hotmart", "Kiwify", "Monetizze", "PerfectPay", "Eduzz", "Herospark", "Make", "Zapier"];
-const MCP_STORAGE_KEY = "trackvio:mcp-connectors";
+const MCP_STORAGE_KEY = "growdash:mcp-connectors";
 const mcpConnectors = [
   { id: "github", name: "GitHub MCP", description: "Repositórios, commits, PRs, issues e automações de entrega." },
   { id: "google-drive", name: "Google Drive MCP", description: "Docs, Sheets, arquivos, relatórios e leitura de materiais da operação." },
@@ -165,7 +165,7 @@ export default function Integrations() {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== "trackvio-meta-connected") return;
+      if (event.data?.type !== "growdash-meta-connected") return;
       void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
       void refetchAccounts();
       setExpandedAccounts(true);
@@ -367,7 +367,7 @@ export default function Integrations() {
     setMetaToken("");
     setExpandedAccounts(true);
     if (fromOauth && window.opener) {
-      window.opener.postMessage({ type: "trackvio-meta-connected" }, window.location.origin);
+      window.opener.postMessage({ type: "growdash-meta-connected" }, window.location.origin);
       window.setTimeout(() => window.close(), 700);
     }
     toast({
@@ -494,7 +494,7 @@ export default function Integrations() {
       });
       return;
     }
-    const popup = window.open(buildMetaOauthUrl(appId), "trackvio_meta_oauth", "width=760,height=860");
+    const popup = window.open(buildMetaOauthUrl(appId), "growdash_meta_oauth", "width=760,height=860");
     popup?.focus();
   };
 

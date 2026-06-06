@@ -39,7 +39,7 @@ export default function Plans() {
       <div className="mx-auto max-w-3xl text-center">
         <Badge className="mb-4 gap-2 bg-primary/15 text-primary hover:bg-primary/15">
           <Sparkles className="h-3.5 w-3.5" />
-          Planos Trackvio
+          Planos Growdash
         </Badge>
         <h1 className="text-3xl font-bold md:text-4xl">Escolha o plano da sua operação</h1>
         <p className="mt-3 text-muted-foreground">

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Eye, EyeOff, Radar, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
-import { TRACKVIO_BRAND_LOGO, TRACKVIO_BRAND_NAME } from "@/lib/companySettings";
+import { GROWDASH_BRAND_LOGO, GROWDASH_BRAND_NAME } from "@/lib/companySettings";
 
 const EMAIL_SUFFIX = "@users.local";
 const OWNER_EMAIL = "marketingdigital3t@gmail.com";
@@ -50,8 +50,8 @@ export default function Auth() {
       className="relative min-h-screen overflow-hidden bg-[#05020c] p-4 text-white"
       style={
         {
-          "--trackvio-glow-x": `${glow.x}%`,
-          "--trackvio-glow-y": `${glow.y}%`,
+          "--growdash-glow-x": `${glow.x}%`,
+          "--growdash-glow-y": `${glow.y}%`,
         } as React.CSSProperties
       }
       onMouseMove={(event) => {
@@ -63,7 +63,7 @@ export default function Auth() {
       }}
     >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(168,85,247,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(168,85,247,0.1)_1px,transparent_1px)] bg-[size:72px_72px] opacity-50" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_var(--trackvio-glow-x)_var(--trackvio-glow-y),rgba(139,92,246,0.42),rgba(192,38,255,0.18)_22%,transparent_48%)] transition-[background] duration-300" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_var(--growdash-glow-x)_var(--growdash-glow-y),rgba(139,92,246,0.42),rgba(192,38,255,0.18)_22%,transparent_48%)] transition-[background] duration-300" />
       <div className="pointer-events-none absolute -left-32 top-20 h-96 w-96 rounded-full bg-violet-700/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-[32rem] w-[32rem] rounded-full bg-fuchsia-500/10 blur-3xl" />
       <motion.div
@@ -75,10 +75,10 @@ export default function Auth() {
         <section className="hidden space-y-8 lg:block">
           <div className="flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-violet-300/35 bg-black/35 shadow-[0_0_42px_rgba(139,92,246,0.42)]">
-              <img src={TRACKVIO_BRAND_LOGO} alt={TRACKVIO_BRAND_NAME} className="h-full w-full object-contain" />
+              <img src={GROWDASH_BRAND_LOGO} alt={GROWDASH_BRAND_NAME} className="h-full w-full object-contain" />
             </div>
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.26em] text-violet-100">{TRACKVIO_BRAND_NAME}</div>
+              <div className="text-sm font-semibold uppercase tracking-[0.26em] text-violet-100">{GROWDASH_BRAND_NAME}</div>
               <div className="text-xs text-violet-200/65">Revenue intelligence cockpit</div>
             </div>
           </div>
@@ -112,11 +112,11 @@ export default function Auth() {
         <Card className="w-full border-violet-200/15 bg-[#0d071b]/88 text-white shadow-2xl shadow-violet-950/40 backdrop-blur-2xl">
           <CardHeader className="space-y-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-violet-300/35 bg-black/35 shadow-[0_0_44px_rgba(139,92,246,0.38)]">
-              <img src={TRACKVIO_BRAND_LOGO} alt={TRACKVIO_BRAND_NAME} className="h-full w-full object-contain" />
+              <img src={GROWDASH_BRAND_LOGO} alt={GROWDASH_BRAND_NAME} className="h-full w-full object-contain" />
             </div>
             <div>
               <CardTitle className="text-2xl font-semibold">Acesse o cockpit</CardTitle>
-              <CardDescription className="mt-2 text-violet-100/55">Entre com o usuário liberado pelo administrador da Trackvio</CardDescription>
+              <CardDescription className="mt-2 text-violet-100/55">Entre com o usuário liberado pelo administrador da Growdash</CardDescription>
             </div>
           </CardHeader>
           <CardContent>

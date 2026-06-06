@@ -1,6 +1,6 @@
-# Trackvio - Importacao Para Lovable
+# Growdash - Importacao Para Lovable
 
-Este pacote contem o codigo fonte do SaaS Trackvio para ser importado no Lovable.
+Este pacote contem o codigo fonte do SaaS Growdash para ser importado no Lovable.
 
 ## Stack
 
@@ -73,7 +73,7 @@ Nao coloque service role key no frontend.
 6. Leads devem vir das negociacoes iniciadas no RD Station.
 7. Gasto, cliques, impressoes e metricas de midia devem vir da Meta Ads.
 8. Receita e vendas devem priorizar RD Station.
-9. Manter a identidade visual roxa/glass da Trackvio.
+9. Manter a identidade visual roxa/glass da Growdash.
 
 ## Observacao de seguranca
 

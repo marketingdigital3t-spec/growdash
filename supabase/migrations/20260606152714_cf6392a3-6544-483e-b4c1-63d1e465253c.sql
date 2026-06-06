@@ -137,7 +137,7 @@ CREATE INDEX IF NOT EXISTS idx_realtime_sync_state_user_provider
 CREATE TABLE IF NOT EXISTS public.platform_announcements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   image_data_url text NOT NULL,
-  alt text NOT NULL DEFAULT 'Anúncio Trackvio',
+  alt text NOT NULL DEFAULT 'Anúncio Growdash',
   active boolean NOT NULL DEFAULT true,
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL DEFAULT auth.uid(),
   created_at timestamptz NOT NULL DEFAULT now(),

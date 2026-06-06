@@ -19,7 +19,7 @@ const fmtMoney = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 const fmtPct = (value: number) => `${value.toFixed(1)}%`;
-const SELLER_AVATARS_KEY = "trackvio:commercial-seller-avatars";
+const SELLER_AVATARS_KEY = "growdash:commercial-seller-avatars";
 
 const dealSaleDate = (deal: { closed_at: string | null; stage_updated_at: string | null; lead_created_at: string | null }) =>
   deal.closed_at || deal.stage_updated_at || deal.lead_created_at;

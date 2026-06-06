@@ -19,7 +19,7 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { TRACKVIO_BRAND_ICON, TRACKVIO_BRAND_LOGO, TRACKVIO_BRAND_NAME } from "@/lib/companySettings";
+import { GROWDASH_BRAND_ICON, GROWDASH_BRAND_LOGO, GROWDASH_BRAND_NAME } from "@/lib/companySettings";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
@@ -99,8 +99,8 @@ export function AppSidebar() {
             )}
           >
             <img
-              src={collapsed ? TRACKVIO_BRAND_ICON : TRACKVIO_BRAND_LOGO}
-              alt={TRACKVIO_BRAND_NAME}
+              src={collapsed ? GROWDASH_BRAND_ICON : GROWDASH_BRAND_LOGO}
+              alt={GROWDASH_BRAND_NAME}
               className={cn("object-contain", collapsed ? "h-10 w-10" : "h-full w-full object-left")}
             />
           </div>

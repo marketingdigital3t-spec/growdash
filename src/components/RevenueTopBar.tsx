@@ -77,11 +77,11 @@ export function RevenueTopBar() {
     const refreshGoals = () => setAccountGoals(readAccountMonthlyGoals());
     window.addEventListener("storage", refresh);
     window.addEventListener("growthos:company-settings-updated", refresh);
-    window.addEventListener("trackvio:account-monthly-goals-updated", refreshGoals);
+    window.addEventListener("growdash:account-monthly-goals-updated", refreshGoals);
     return () => {
       window.removeEventListener("storage", refresh);
       window.removeEventListener("growthos:company-settings-updated", refresh);
-      window.removeEventListener("trackvio:account-monthly-goals-updated", refreshGoals);
+      window.removeEventListener("growdash:account-monthly-goals-updated", refreshGoals);
     };
   }, []);
 

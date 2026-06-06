@@ -70,7 +70,7 @@ export default function SettingsPage() {
           <div>
             <h1 className="text-2xl font-bold">Configurações</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ajuste metas, idioma e preferências operacionais. O branding oficial da Trackvio é fixo.
+              Ajuste metas, idioma e preferências operacionais. O branding oficial da Growdash é fixo.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
