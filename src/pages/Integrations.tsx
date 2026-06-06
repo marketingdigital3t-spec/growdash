@@ -376,17 +376,22 @@ export default function Integrations() {
     });
   }
 
-  async function connectMetaAccountById() {
+  async function connectMetaAccountByIdInternal(opts: {
+    name?: string;
+    accountId: string;
+    token: string;
+    backfill?: boolean;
+  }): Promise<boolean> {
     if (!user?.id) {
       toast({ title: "Login necessário", description: "Entre na plataforma antes de vincular contas.", variant: "destructive" });
-      return;
+      return false;
     }
 
-    const token = manualMetaToken.trim();
-    const rawAccountId = manualMetaAccountId.trim().replace(/^act_/i, "");
+    const token = opts.token.trim();
+    const rawAccountId = opts.accountId.trim().replace(/^act_/i, "");
     if (!rawAccountId || !token) {
       toast({ title: "Dados obrigatórios", description: "Informe o ID da conta de anúncio e o token da Meta.", variant: "destructive" });
-      return;
+      return false;
     }
 
     const metaAccountId = `act_${rawAccountId}`;
@@ -400,10 +405,11 @@ export default function Integrations() {
         throw new Error(json.error?.message || "A Meta rejeitou o ID/token informado.");
       }
 
+      const customName = opts.name?.trim();
       const account = {
         user_id: user.id,
         account_id: String(json.id || metaAccountId),
-        name: json.name || `Conta ${rawAccountId}`,
+        name: customName || json.name || `Conta ${rawAccountId}`,
         access_token: token,
         connection_status: "connected",
         last_sync_error: null,
@@ -416,23 +422,65 @@ export default function Integrations() {
 
       await queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
       await refetchAccounts();
-      setManualMetaAccountId("");
-      setManualMetaToken("");
-      setConnectOpen(false);
       setExpandedAccounts(true);
       toast({
         title: "Conta Meta conectada",
-        description: `${account.name} foi vinculada em modo somente leitura.`,
+        description: `${account.name} foi vinculada. Buscando dados...`,
       });
 
       const today = format(new Date(), "yyyy-MM-dd");
       void syncMeta.mutateAsync({ adAccountId: savedAccountId, startDate: today, endDate: today });
+
+      if (opts.backfill) {
+        const from = new Date(Date.now() - 30 * 86400000);
+        void backfill.mutateAsync({ adAccountId: savedAccountId, from, to: new Date() }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["insights"] });
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+        });
+      }
+
+      void syncPixels.mutateAsync({ adAccountId: savedAccountId }).catch(() => {});
+      void syncBalance.mutateAsync({ adAccountId: savedAccountId }).catch(() => {});
+
+      return true;
     } catch (error) {
       toast({
         title: "Erro ao conectar Meta",
         description: (error as Error).message,
         variant: "destructive",
       });
+      return false;
+    }
+  }
+
+  async function connectMetaAccountById() {
+    const ok = await connectMetaAccountByIdInternal({
+      name: manualMetaName,
+      accountId: manualMetaAccountId,
+      token: manualMetaToken,
+      backfill: true,
+    });
+    if (ok) {
+      setManualMetaAccountId("");
+      setManualMetaToken("");
+      setManualMetaName("");
+      setConnectOpen(false);
+    }
+  }
+
+  async function connectMetaAccountInline() {
+    setInlineConnecting(true);
+    const ok = await connectMetaAccountByIdInternal({
+      name: inlineMetaName,
+      accountId: inlineMetaAccountId,
+      token: inlineMetaToken,
+      backfill: true,
+    });
+    setInlineConnecting(false);
+    if (ok) {
+      setInlineMetaName("");
+      setInlineMetaAccountId("");
+      setInlineMetaToken("");
     }
   }
 
