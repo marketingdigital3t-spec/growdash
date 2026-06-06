@@ -3,7 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMaster } from "./useIsMaster";
 
-export type PagePermission = "dashboard" | "campaigns" | "funnels" | "classes";
+export type PagePermission =
+  | "dashboard"
+  | "campaigns"
+  | "funnels"
+  | "classes"
+  | "crm"
+  | "commercial"
+  | "leads"
+  | "alerts"
+  | "users"
+  | "integrations"
+  | "announcements"
+  | "automations";
 
 export function usePermissions() {
   const { user } = useAuth();
@@ -19,7 +31,7 @@ export function usePermissions() {
         supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id),
       ]);
       return {
-        perm: perm.data,
+        perm: perm.data as Record<string, boolean | string> | null,
         allowedAdAccounts: (accs.data ?? []).map((a) => a.ad_account_id),
         allowedRDFunnels: (funs.data ?? []).map((f) => f.rd_funnel_id),
       };
@@ -27,15 +39,24 @@ export function usePermissions() {
   });
 
   const isAuthenticated = !!user;
-  const explicitPerm = data?.perm;
+  const p = data?.perm as any;
+  const can = (key: string) => isMaster || !!p?.[key];
 
   return {
     loading: loadingMaster || isLoading,
     isMaster,
     canDashboard: isAuthenticated,
-    canCampaigns: isMaster || !!explicitPerm?.can_campaigns,
-    canFunnels: isMaster || !!explicitPerm?.can_funnels,
-    canClasses: isMaster || !!explicitPerm?.can_classes,
+    canCampaigns: can("can_campaigns"),
+    canFunnels: can("can_funnels"),
+    canClasses: can("can_classes"),
+    canCRM: can("can_crm"),
+    canCommercial: can("can_commercial"),
+    canLeads: can("can_leads"),
+    canAlerts: can("can_alerts"),
+    canUsers: can("can_users"),
+    canIntegrations: can("can_integrations"),
+    canAnnouncements: can("can_announcements"),
+    canAutomations: can("can_automations"),
     allowedAdAccounts: data?.allowedAdAccounts ?? [],
     allowedRDFunnels: data?.allowedRDFunnels ?? [],
   };
@@ -45,6 +66,8 @@ export function firstAllowedPath(p: ReturnType<typeof usePermissions>): string {
   if (p.canDashboard) return "/";
   if (p.canCampaigns) return "/campaigns";
   if (p.canFunnels) return "/funnels";
+  if (p.canCRM) return "/crm";
+  if (p.canCommercial) return "/commercial";
   if (p.canClasses) return "/classes";
   return "/";
 }
