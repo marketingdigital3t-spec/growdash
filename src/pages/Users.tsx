@@ -135,10 +135,8 @@ export default function UsersPage() {
     setForm({
       username: "",
       password: "",
+      ...emptyPerms(),
       can_dashboard: true,
-      can_campaigns: false,
-      can_funnels: false,
-      can_classes: false,
       ad_account_ids: [],
       rd_funnel_ids: [],
     });
@@ -150,15 +148,29 @@ export default function UsersPage() {
     setForm({
       username: u.username,
       password: "",
-      can_dashboard: u.can_dashboard,
-      can_campaigns: u.can_campaigns,
-      can_funnels: u.can_funnels,
-      can_classes: u.can_classes,
+      ...PAGES.reduce(
+        (acc, p) => ({ ...acc, [p.key]: !!(u as any)[p.key] }),
+        {} as Record<PageKey, boolean>,
+      ),
       ad_account_ids: u.ad_account_ids,
       rd_funnel_ids: u.rd_funnel_ids,
     });
     setDialogOpen(true);
   };
+
+  const allPagesSelected = PAGES.every((p) => (form as any)[p.key]);
+  const setAllPages = (v: boolean) => {
+    const next = { ...form };
+    PAGES.forEach((p) => ((next as any)[p.key] = v));
+    setForm(next);
+  };
+  const allAdAccountsSelected = adAccounts.length > 0 && form.ad_account_ids.length === adAccounts.length;
+  const setAllAdAccounts = (v: boolean) =>
+    setForm({ ...form, ad_account_ids: v ? adAccounts.map((a) => a.id) : [] });
+  const allRdSelected = rdFunnels.length > 0 && form.rd_funnel_ids.length === rdFunnels.length;
+  const setAllRd = (v: boolean) =>
+    setForm({ ...form, rd_funnel_ids: v ? rdFunnels.map((f) => f.id) : [] });
+
 
   const toggle = (arr: string[], id: string) =>
     arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
