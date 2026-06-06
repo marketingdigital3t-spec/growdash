@@ -1,0 +1,1 @@
+ALTER TABLE public.integrations ADD COLUMN IF NOT EXISTS api_token text;
