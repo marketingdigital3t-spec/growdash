@@ -151,83 +151,63 @@ export default function FunnelAnalysis() {
         </div>
       </MotionItem>
 
-      {activeFunnels.length === 0 ? (
+      {(activeFunnels.length === 0 || noStages || deals.length === 0) && (
         <MotionItem>
-          <div className="rounded-xl border bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Nenhum funil RD vinculado para a conta selecionada. Configure em <strong>Integrações → RD Station</strong>.
-            </p>
+          <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-3">
+            <span>
+              {activeFunnels.length === 0
+                ? "Nenhum funil RD vinculado para a conta selecionada. Configure em Integrações → RD Station."
+                : noStages
+                ? "Estágios reais do funil ainda não sincronizados. Os indicadores serão preenchidos após a sincronização."
+                : "Ainda não há deals sincronizados para este funil no período selecionado."}
+            </span>
+            {activeFunnels.length > 0 && (
+              <Button onClick={handleSync} disabled={syncing} size="sm" variant="outline">
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+                Sincronizar agora
+              </Button>
+            )}
           </div>
         </MotionItem>
-      ) : isLoading || loadingStages ? (
-        <MotionItem>
-          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
-        </MotionItem>
-      ) : noStages ? (
-        <MotionItem>
-          <div className="rounded-xl border bg-card p-8 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Estágios reais do funil ainda não sincronizados. Clique em <strong>Sincronizar do RD</strong> para carregar.
-            </p>
-            <Button onClick={handleSync} disabled={syncing} size="sm">
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-              Sincronizar agora
-            </Button>
-          </div>
-        </MotionItem>
-      ) : deals.length === 0 ? (
-        <MotionItem>
-          <div className="rounded-xl border bg-card p-8 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Ainda não há deals sincronizados para este funil no período selecionado.
-            </p>
-            <Button onClick={handleSync} disabled={syncing} size="sm">
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-              Sincronizar agora
-            </Button>
-          </div>
-        </MotionItem>
-      ) : (
-        <>
-          <MotionItem><FunnelKPIs a={analytics} /></MotionItem>
-
-          <MotionItem>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <FunnelStageDistribution a={analytics} />
-              <FunnelStageConversion a={analytics} />
-            </div>
-          </MotionItem>
-
-          <MotionItem>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2">
-                <FunnelLeadsEvolution a={analytics} />
-              </div>
-              <FunnelBottlenecks a={analytics} />
-            </div>
-          </MotionItem>
-
-          <MotionItem>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <FunnelSourceTable a={analytics} />
-              <FunnelLostReasons a={analytics} />
-              <FunnelAutoInsights a={analytics} />
-            </div>
-          </MotionItem>
-
-          <MotionItem>
-            <FunnelStateMap a={analytics} />
-          </MotionItem>
-
-          <MotionItem>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <FunnelWeekdayChart a={analytics} />
-              <FunnelHourChart a={analytics} />
-            </div>
-          </MotionItem>
-
-        </>
       )}
+
+      <MotionItem><FunnelKPIs a={analytics} /></MotionItem>
+
+      <MotionItem>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <FunnelStageDistribution a={analytics} />
+          <FunnelStageConversion a={analytics} />
+        </div>
+      </MotionItem>
+
+      <MotionItem>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <FunnelLeadsEvolution a={analytics} />
+          </div>
+          <FunnelBottlenecks a={analytics} />
+        </div>
+      </MotionItem>
+
+      <MotionItem>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <FunnelSourceTable a={analytics} />
+          <FunnelLostReasons a={analytics} />
+          <FunnelAutoInsights a={analytics} />
+        </div>
+      </MotionItem>
+
+      <MotionItem>
+        <FunnelStateMap a={analytics} />
+      </MotionItem>
+
+      <MotionItem>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <FunnelWeekdayChart a={analytics} />
+          <FunnelHourChart a={analytics} />
+        </div>
+      </MotionItem>
+
 
       {activeFunnels.length > 0 && (
         <MotionItem>
