@@ -47,9 +47,18 @@ Deno.serve(async (req) => {
       can_campaigns,
       can_funnels,
       can_classes,
+      can_crm,
+      can_commercial,
+      can_leads,
+      can_alerts,
+      can_users,
+      can_integrations,
+      can_announcements,
+      can_automations,
       ad_account_ids,
       rd_funnel_ids,
     } = body ?? {};
+
 
     if (action === "ensure_owner") {
       if (!password) return json({ error: "password obrigatório" }, 400);
