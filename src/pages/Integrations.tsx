@@ -131,6 +131,11 @@ export default function Integrations() {
   const [metaToken, setMetaToken] = useState("");
   const [manualMetaAccountId, setManualMetaAccountId] = useState("");
   const [manualMetaToken, setManualMetaToken] = useState("");
+  const [manualMetaName, setManualMetaName] = useState("");
+  const [inlineMetaName, setInlineMetaName] = useState("");
+  const [inlineMetaAccountId, setInlineMetaAccountId] = useState("");
+  const [inlineMetaToken, setInlineMetaToken] = useState("");
+  const [inlineConnecting, setInlineConnecting] = useState(false);
   const [accountSearch, setAccountSearch] = useState("");
   const [activeAccountIds, setActiveAccountIds] = useState<Set<string>>(() => readStoredSet(META_ACTIVE_ACCOUNTS_KEY));
   const [activeMcpIds, setActiveMcpIds] = useState<Set<string>>(() => readStoredSet(MCP_STORAGE_KEY));
@@ -371,17 +376,22 @@ export default function Integrations() {
     });
   }
 
-  async function connectMetaAccountById() {
+  async function connectMetaAccountByIdInternal(opts: {
+    name?: string;
+    accountId: string;
+    token: string;
+    backfill?: boolean;
+  }): Promise<boolean> {
     if (!user?.id) {
       toast({ title: "Login necessário", description: "Entre na plataforma antes de vincular contas.", variant: "destructive" });
-      return;
+      return false;
     }
 
-    const token = manualMetaToken.trim();
-    const rawAccountId = manualMetaAccountId.trim().replace(/^act_/i, "");
+    const token = opts.token.trim();
+    const rawAccountId = opts.accountId.trim().replace(/^act_/i, "");
     if (!rawAccountId || !token) {
       toast({ title: "Dados obrigatórios", description: "Informe o ID da conta de anúncio e o token da Meta.", variant: "destructive" });
-      return;
+      return false;
     }
 
     const metaAccountId = `act_${rawAccountId}`;
@@ -395,10 +405,11 @@ export default function Integrations() {
         throw new Error(json.error?.message || "A Meta rejeitou o ID/token informado.");
       }
 
+      const customName = opts.name?.trim();
       const account = {
         user_id: user.id,
         account_id: String(json.id || metaAccountId),
-        name: json.name || `Conta ${rawAccountId}`,
+        name: customName || json.name || `Conta ${rawAccountId}`,
         access_token: token,
         connection_status: "connected",
         last_sync_error: null,
@@ -411,23 +422,65 @@ export default function Integrations() {
 
       await queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
       await refetchAccounts();
-      setManualMetaAccountId("");
-      setManualMetaToken("");
-      setConnectOpen(false);
       setExpandedAccounts(true);
       toast({
         title: "Conta Meta conectada",
-        description: `${account.name} foi vinculada em modo somente leitura.`,
+        description: `${account.name} foi vinculada. Buscando dados...`,
       });
 
       const today = format(new Date(), "yyyy-MM-dd");
       void syncMeta.mutateAsync({ adAccountId: savedAccountId, startDate: today, endDate: today });
+
+      if (opts.backfill) {
+        const from = new Date(Date.now() - 30 * 86400000);
+        void backfill.mutateAsync({ adAccountId: savedAccountId, from, to: new Date() }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["insights"] });
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+        });
+      }
+
+      void syncPixels.mutateAsync(savedAccountId).catch(() => {});
+      void syncBalance.mutateAsync().catch(() => {});
+
+      return true;
     } catch (error) {
       toast({
         title: "Erro ao conectar Meta",
         description: (error as Error).message,
         variant: "destructive",
       });
+      return false;
+    }
+  }
+
+  async function connectMetaAccountById() {
+    const ok = await connectMetaAccountByIdInternal({
+      name: manualMetaName,
+      accountId: manualMetaAccountId,
+      token: manualMetaToken,
+      backfill: true,
+    });
+    if (ok) {
+      setManualMetaAccountId("");
+      setManualMetaToken("");
+      setManualMetaName("");
+      setConnectOpen(false);
+    }
+  }
+
+  async function connectMetaAccountInline() {
+    setInlineConnecting(true);
+    const ok = await connectMetaAccountByIdInternal({
+      name: inlineMetaName,
+      accountId: inlineMetaAccountId,
+      token: inlineMetaToken,
+      backfill: true,
+    });
+    setInlineConnecting(false);
+    if (ok) {
+      setInlineMetaName("");
+      setInlineMetaAccountId("");
+      setInlineMetaToken("");
     }
   }
 
@@ -583,6 +636,47 @@ export default function Integrations() {
                               <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Nenhum perfil conectado ainda.</div>
                             )}
                           </div>
+                        </div>
+
+                        <div className="rounded-lg border bg-background/40 p-4 space-y-3">
+                          <div>
+                            <p className="font-semibold">Adicionar Nova Conta</p>
+                            <p className="text-xs text-muted-foreground">
+                              Informe um nome, o Ad Account ID e o token da Meta. Validamos com a Meta, salvamos a conta e puxamos os dados automaticamente para toda a plataforma.
+                            </p>
+                          </div>
+                          <Input
+                            value={inlineMetaName}
+                            onChange={(e) => setInlineMetaName(e.target.value)}
+                            placeholder="Nome da conta (ex: Conta Principal)"
+                          />
+                          <Input
+                            value={inlineMetaAccountId}
+                            onChange={(e) => setInlineMetaAccountId(e.target.value)}
+                            placeholder="Ad Account ID (ex: act_123456)"
+                          />
+                          <Input
+                            value={inlineMetaToken}
+                            onChange={(e) => setInlineMetaToken(e.target.value)}
+                            type="password"
+                            placeholder="Token de acesso da Meta API"
+                          />
+                          <Button
+                            className="gap-2"
+                            onClick={connectMetaAccountInline}
+                            disabled={
+                              inlineConnecting ||
+                              !inlineMetaAccountId.trim() ||
+                              !inlineMetaToken.trim()
+                            }
+                          >
+                            {inlineConnecting ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
+                            {inlineConnecting ? "Conectando..." : "Adicionar Conta"}
+                          </Button>
                         </div>
 
                         <div className="flex flex-wrap gap-3">
