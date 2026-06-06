@@ -70,9 +70,8 @@ function safePercent(value: number) {
 const Index = () => {
   const { session } = useAuth();
   const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
-  const [selectedAccount, setSelectedAccount] = useState<string>(() => {
-    try { return localStorage.getItem("dash:account") || "all"; } catch { return "all"; }
-  });
+  const selectedAccount = useSelectedAdAccountFilter();
+  const setSelectedAccount = (next: string) => setSelectedAdAccountFilter(next);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem("dash:campaigns");
