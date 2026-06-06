@@ -33,6 +33,10 @@ import { readCompanySettings, type CompanySettings } from "@/lib/companySettings
 import { DASHBOARD_REFRESH_INTERVAL_MS } from "@/lib/realtime";
 import { countRDLeadsForCampaign, getRDDealSaleDate, getRDLeadsInRange, getRDWonDealsInRange, sumRDRevenue } from "@/lib/rdMetrics";
 import { setSelectedAdAccountFilter, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
+import { DEFAULT_VIEW } from "@/lib/widgetCatalog";
+import { Link2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Card } from "@/components/ui/card";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
