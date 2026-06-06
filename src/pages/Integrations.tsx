@@ -131,6 +131,11 @@ export default function Integrations() {
   const [metaToken, setMetaToken] = useState("");
   const [manualMetaAccountId, setManualMetaAccountId] = useState("");
   const [manualMetaToken, setManualMetaToken] = useState("");
+  const [manualMetaName, setManualMetaName] = useState("");
+  const [inlineMetaName, setInlineMetaName] = useState("");
+  const [inlineMetaAccountId, setInlineMetaAccountId] = useState("");
+  const [inlineMetaToken, setInlineMetaToken] = useState("");
+  const [inlineConnecting, setInlineConnecting] = useState(false);
   const [accountSearch, setAccountSearch] = useState("");
   const [activeAccountIds, setActiveAccountIds] = useState<Set<string>>(() => readStoredSet(META_ACTIVE_ACCOUNTS_KEY));
   const [activeMcpIds, setActiveMcpIds] = useState<Set<string>>(() => readStoredSet(MCP_STORAGE_KEY));
