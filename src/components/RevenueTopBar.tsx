@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { getMonthlyGoalForScope, readAccountMonthlyGoals, readCompanySettings, type CompanySettings } from "@/lib/companySettings";
 import { DASHBOARD_REFRESH_INTERVAL_MS } from "@/lib/realtime";
 import { getRDLeadsInRange, getRDWonDealsInRange, sumRDRevenue } from "@/lib/rdMetrics";
+import { setSelectedAdAccountFilter, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const ACCOUNT_STORAGE_KEY = "dash:account";
