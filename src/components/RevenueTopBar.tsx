@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { getMonthlyGoalForScope, readAccountMonthlyGoals, readCompanySettings, type CompanySettings } from "@/lib/companySettings";
 import { DASHBOARD_REFRESH_INTERVAL_MS } from "@/lib/realtime";
 import { getRDLeadsInRange, getRDWonDealsInRange, sumRDRevenue } from "@/lib/rdMetrics";
+import { setSelectedAdAccountFilter, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const ACCOUNT_STORAGE_KEY = "dash:account";
@@ -41,9 +42,8 @@ export function RevenueTopBar() {
   const [settings, setSettings] = useState<CompanySettings>(() => readCompanySettings());
   const [accountGoals, setAccountGoals] = useState<Record<string, number>>(() => readAccountMonthlyGoals());
   const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
-  const [selectedAccount, setSelectedAccount] = useState(() => {
-    try { return localStorage.getItem(ACCOUNT_STORAGE_KEY) || "all"; } catch { return "all"; }
-  });
+  const selectedAccount = useSelectedAdAccountFilter();
+  const setSelectedAccount = (next: string) => setSelectedAdAccountFilter(next);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
@@ -85,12 +85,7 @@ export function RevenueTopBar() {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(ACCOUNT_STORAGE_KEY, selectedAccount);
-      window.dispatchEvent(new CustomEvent(ACCOUNT_EVENT_KEY, { detail: selectedAccount }));
-    } catch { /* ignore */ }
-  }, [selectedAccount]);
+  // Account selection now flows through useSelectedAdAccountFilter (single source of truth).
 
   useEffect(() => {
     try {
@@ -98,23 +93,6 @@ export function RevenueTopBar() {
       window.dispatchEvent(new CustomEvent(CAMPAIGNS_EVENT_KEY, { detail: selectedCampaignIds }));
     } catch { /* ignore */ }
   }, [selectedCampaignIds]);
-
-  useEffect(() => {
-    const syncAccount = (event?: Event) => {
-      const next = event instanceof CustomEvent
-        ? String(event.detail || "all")
-        : (() => {
-            try { return localStorage.getItem(ACCOUNT_STORAGE_KEY) || "all"; } catch { return "all"; }
-          })();
-      setSelectedAccount((current) => (current === next ? current : next));
-    };
-    window.addEventListener("storage", syncAccount);
-    window.addEventListener(ACCOUNT_EVENT_KEY, syncAccount);
-    return () => {
-      window.removeEventListener("storage", syncAccount);
-      window.removeEventListener(ACCOUNT_EVENT_KEY, syncAccount);
-    };
-  }, []);
 
   useEffect(() => {
     if (selectedAccount !== "all" && adAccounts.length > 0 && !adAccounts.some((account) => account.id === selectedAccount)) {

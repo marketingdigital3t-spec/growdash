@@ -32,6 +32,7 @@ import { useIsMaster } from "@/hooks/useIsMaster";
 import { readCompanySettings, type CompanySettings } from "@/lib/companySettings";
 import { DASHBOARD_REFRESH_INTERVAL_MS } from "@/lib/realtime";
 import { countRDLeadsForCampaign, getRDDealSaleDate, getRDLeadsInRange, getRDWonDealsInRange, sumRDRevenue } from "@/lib/rdMetrics";
+import { setSelectedAdAccountFilter, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -69,9 +70,8 @@ function safePercent(value: number) {
 const Index = () => {
   const { session } = useAuth();
   const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
-  const [selectedAccount, setSelectedAccount] = useState<string>(() => {
-    try { return localStorage.getItem("dash:account") || "all"; } catch { return "all"; }
-  });
+  const selectedAccount = useSelectedAdAccountFilter();
+  const setSelectedAccount = (next: string) => setSelectedAdAccountFilter(next);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem("dash:campaigns");
@@ -220,29 +220,7 @@ const Index = () => {
     };
   }, [adAccounts.length, endDate, insights, rdDeals, selectedAccount, startDate]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("dash:account", selectedAccount);
-      window.dispatchEvent(new CustomEvent("growthos:account-filter-updated", { detail: selectedAccount }));
-    } catch {}
-  }, [selectedAccount]);
-
-  useEffect(() => {
-    const syncAccount = (event?: Event) => {
-      const next = event instanceof CustomEvent
-        ? String(event.detail || "all")
-        : (() => {
-            try { return localStorage.getItem("dash:account") || "all"; } catch { return "all"; }
-          })();
-      setSelectedAccount((current) => (current === next ? current : next));
-    };
-    window.addEventListener("storage", syncAccount);
-    window.addEventListener("growthos:account-filter-updated", syncAccount);
-    return () => {
-      window.removeEventListener("storage", syncAccount);
-      window.removeEventListener("growthos:account-filter-updated", syncAccount);
-    };
-  }, []);
+  // Account selection now flows through useSelectedAdAccountFilter (single source of truth).
   useEffect(() => {
     try { localStorage.setItem("dash:campaigns", JSON.stringify(selectedCampaignIds)); } catch {}
   }, [selectedCampaignIds]);
