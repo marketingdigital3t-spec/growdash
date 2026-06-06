@@ -32,6 +32,7 @@ import { useIsMaster } from "@/hooks/useIsMaster";
 import { readCompanySettings, type CompanySettings } from "@/lib/companySettings";
 import { DASHBOARD_REFRESH_INTERVAL_MS } from "@/lib/realtime";
 import { countRDLeadsForCampaign, getRDDealSaleDate, getRDLeadsInRange, getRDWonDealsInRange, sumRDRevenue } from "@/lib/rdMetrics";
+import { setSelectedAdAccountFilter, useSelectedAdAccountFilter } from "@/hooks/useSelectedAdAccountFilter";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
