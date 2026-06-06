@@ -252,7 +252,13 @@ export default function UsersPage() {
             </div>
 
             <div>
-              <Label className="mb-2 block">Páginas permitidas</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Páginas permitidas (barra lateral)</Label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer text-muted-foreground">
+                  <Checkbox checked={allPagesSelected} onCheckedChange={(v) => setAllPages(!!v)} />
+                  Selecionar todas
+                </label>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {PAGES.map((p) => (
                   <label key={p.key} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -267,7 +273,15 @@ export default function UsersPage() {
             </div>
 
             <div>
-              <Label className="mb-2 block">Contas de anúncio</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Contas de anúncio</Label>
+                {adAccounts.length > 0 && (
+                  <label className="flex items-center gap-2 text-xs cursor-pointer text-muted-foreground">
+                    <Checkbox checked={allAdAccountsSelected} onCheckedChange={(v) => setAllAdAccounts(!!v)} />
+                    Selecionar todas
+                  </label>
+                )}
+              </div>
               <div className="space-y-1 max-h-40 overflow-y-auto rounded-md border p-2">
                 {adAccounts.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma conta cadastrada</p>}
                 {adAccounts.map((a) => (
@@ -283,7 +297,15 @@ export default function UsersPage() {
             </div>
 
             <div>
-              <Label className="mb-2 block">Funis RD</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Funis RD Station</Label>
+                {rdFunnels.length > 0 && (
+                  <label className="flex items-center gap-2 text-xs cursor-pointer text-muted-foreground">
+                    <Checkbox checked={allRdSelected} onCheckedChange={(v) => setAllRd(!!v)} />
+                    Selecionar todos
+                  </label>
+                )}
+              </div>
               <div className="space-y-1 max-h-40 overflow-y-auto rounded-md border p-2">
                 {rdFunnels.length === 0 && <p className="text-xs text-muted-foreground">Nenhum funil cadastrado</p>}
                 {rdFunnels.map((f) => (
@@ -297,6 +319,7 @@ export default function UsersPage() {
                 ))}
               </div>
             </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
