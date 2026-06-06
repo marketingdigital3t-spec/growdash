@@ -194,7 +194,7 @@ export function RevenueTopBar() {
   };
 
   return (
-    <div className="revenue-glass-sticky sticky top-14 z-40 space-y-2 px-3 py-2 md:px-5">
+    <div className="revenue-glass-sticky relative z-40 space-y-2 px-3 py-2 md:sticky md:top-14 md:px-5">
       {/* ===== Controles superiores (filtros + ações) ===== */}
       <div className="flex w-full flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-end">
         <div className={cn(
