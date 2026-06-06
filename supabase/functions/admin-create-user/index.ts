@@ -47,9 +47,18 @@ Deno.serve(async (req) => {
       can_campaigns,
       can_funnels,
       can_classes,
+      can_crm,
+      can_commercial,
+      can_leads,
+      can_alerts,
+      can_users,
+      can_integrations,
+      can_announcements,
+      can_automations,
       ad_account_ids,
       rd_funnel_ids,
     } = body ?? {};
+
 
     if (action === "ensure_owner") {
       if (!password) return json({ error: "password obrigatório" }, 400);
@@ -122,7 +131,16 @@ Deno.serve(async (req) => {
         can_campaigns: !!can_campaigns,
         can_funnels: !!can_funnels,
         can_classes: !!can_classes,
+        can_crm: !!can_crm,
+        can_commercial: !!can_commercial,
+        can_leads: !!can_leads,
+        can_alerts: !!can_alerts,
+        can_users: !!can_users,
+        can_integrations: !!can_integrations,
+        can_announcements: !!can_announcements,
+        can_automations: !!can_automations,
       });
+
       if (pErr) {
         await admin.auth.admin.deleteUser(newId);
         return json({ error: pErr.message }, 400);
@@ -154,6 +172,15 @@ Deno.serve(async (req) => {
       if (typeof can_campaigns === "boolean") updates.can_campaigns = can_campaigns;
       if (typeof can_funnels === "boolean") updates.can_funnels = can_funnels;
       if (typeof can_classes === "boolean") updates.can_classes = can_classes;
+      if (typeof can_crm === "boolean") updates.can_crm = can_crm;
+      if (typeof can_commercial === "boolean") updates.can_commercial = can_commercial;
+      if (typeof can_leads === "boolean") updates.can_leads = can_leads;
+      if (typeof can_alerts === "boolean") updates.can_alerts = can_alerts;
+      if (typeof can_users === "boolean") updates.can_users = can_users;
+      if (typeof can_integrations === "boolean") updates.can_integrations = can_integrations;
+      if (typeof can_announcements === "boolean") updates.can_announcements = can_announcements;
+      if (typeof can_automations === "boolean") updates.can_automations = can_automations;
+
       if (Object.keys(updates).length) {
         await admin.from("user_permissions").update(updates).eq("user_id", target_user_id);
       }

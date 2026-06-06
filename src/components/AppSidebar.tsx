@@ -51,16 +51,17 @@ export function AppSidebar() {
     { title: "Dashboard", url: "/", icon: LayoutDashboard, show: perms.canDashboard },
     { title: "Campanhas", url: "/campaigns", icon: Megaphone, show: perms.canCampaigns },
     { title: "Análise de Funis", url: "/funnels", icon: GitBranch, show: perms.canFunnels },
-    { title: "CRM", url: "/crm", icon: Handshake, show: perms.canFunnels },
-    { title: "Comercial", url: "/commercial", icon: Trophy, show: perms.canFunnels },
+    { title: "CRM", url: "/crm", icon: Handshake, show: perms.canCRM },
+    { title: "Comercial", url: "/commercial", icon: Trophy, show: perms.canCommercial },
     { title: "Datas & Turmas", url: "/classes", icon: CalendarDays, show: perms.canClasses },
-    { title: "Leads incompletos", url: "/leads-incompletos", icon: AlertCircle, show: perms.isMaster },
-    { title: "Alertas", url: "/alerts", icon: Bell, show: perms.isMaster },
-    { title: "Usuários", url: "/users", icon: UsersIcon, show: perms.isMaster },
-    { title: "Integrações", url: "/integrations", icon: Link2, show: perms.isMaster },
-    { title: "Anúncios", url: "/announcements", icon: ImagePlus, show: perms.isMaster },
-    { title: "Automações", url: "/automations", icon: Bot, show: perms.isMaster },
+    { title: "Leads incompletos", url: "/leads-incompletos", icon: AlertCircle, show: perms.isMaster || perms.canLeads },
+    { title: "Alertas", url: "/alerts", icon: Bell, show: perms.isMaster || perms.canAlerts },
+    { title: "Usuários", url: "/users", icon: UsersIcon, show: perms.isMaster || perms.canUsers },
+    { title: "Integrações", url: "/integrations", icon: Link2, show: perms.isMaster || perms.canIntegrations },
+    { title: "Anúncios", url: "/announcements", icon: ImagePlus, show: perms.isMaster || perms.canAnnouncements },
+    { title: "Automações", url: "/automations", icon: Bot, show: perms.isMaster || perms.canAutomations },
   ].filter((i) => i.show);
+
 
   const handleNavClick = () => {
     if (isMobile) toggleSidebar();
