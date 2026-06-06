@@ -355,34 +355,75 @@ const Index = () => {
       </MotionItem>
       )}
 
-      {activeView && (
-        <DashboardProvider
-          value={{
-            startDate,
-            endDate,
-            adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-            insights,
-            sales,
-            rdDeals,
-            alerts,
-            campaigns,
-            adAccounts,
-            products,
-            isLoading,
-          }}
-        >
-          <DashboardGrid
-            view={activeView}
-            isEditing={isEditing && isMaster}
-            onChange={(layout, widgets) => {
-              if (!isMaster) return;
-              saveView.mutate({ id: activeView.id, layout, widgets });
-            }}
-            onAddClick={() => setAddOpen(true)}
-            onEditSale={(s) => { setEditingSale(s); setSalesDialogOpen(true); }}
-          />
-        </DashboardProvider>
-      )}
+      {(() => {
+        const hasAdAccounts = adAccounts.length > 0;
+        const hasRDData = rdDeals.length > 0;
+        const noIntegrations = !hasAdAccounts && !hasRDData;
+        const viewToRender = activeView ?? ({
+          id: "__default_fallback__",
+          user_id: "",
+          name: DEFAULT_VIEW.name,
+          is_default: true,
+          is_system: true,
+          scope: "global",
+          ad_account_id: null,
+          layout: DEFAULT_VIEW.layout,
+          widgets: DEFAULT_VIEW.widgets,
+          created_at: "",
+          updated_at: "",
+        } as any);
+
+        return (
+          <>
+            {noIntegrations && (
+              <MotionItem>
+                <Card className="border-dashed border-primary/30 bg-card/60 p-6 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Link2 className="h-6 w-6" />
+                  </div>
+                  <h2 className="text-lg font-semibold">Conecte uma conta para ver seus dados</h2>
+                  <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">
+                    Os blocos abaixo serão preenchidos automaticamente assim que você vincular uma conta de anúncios (Meta Ads) ou o RD Station.
+                  </p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    <Button asChild className="gap-2">
+                      <Link to="/integrations">
+                        <Link2 className="h-4 w-4" /> Ir para Integrações
+                      </Link>
+                    </Button>
+                  </div>
+                </Card>
+              </MotionItem>
+            )}
+            <DashboardProvider
+              value={{
+                startDate,
+                endDate,
+                adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+                insights,
+                sales,
+                rdDeals,
+                alerts,
+                campaigns,
+                adAccounts,
+                products,
+                isLoading,
+              }}
+            >
+              <DashboardGrid
+                view={viewToRender}
+                isEditing={isEditing && isMaster && !!activeView}
+                onChange={(layout, widgets) => {
+                  if (!isMaster || !activeView) return;
+                  saveView.mutate({ id: activeView.id, layout, widgets });
+                }}
+                onAddClick={() => setAddOpen(true)}
+                onEditSale={(s) => { setEditingSale(s); setSalesDialogOpen(true); }}
+              />
+            </DashboardProvider>
+          </>
+        );
+      })()}
 
       <AddWidgetDialog open={addOpen} onOpenChange={setAddOpen} onAdd={handleAddWidget} />
 
