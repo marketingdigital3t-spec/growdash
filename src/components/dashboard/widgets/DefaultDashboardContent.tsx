@@ -699,42 +699,36 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
           </div>
         </div>
 
-        {objectiveInsights.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Nenhuma campanha de {objective === "leads" ? "Leads" : objective === "native_form" ? "Formulário Nativo" : objective === "landing_page" ? "Landing page" : "Mensagens"} encontrada no período.
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${kpiGridCols} sm:gap-3`}>
-              {kpis.map((k) => (
-                <MetricCard
-                  key={k.title}
-                  title={k.title}
-                  value={k.value}
-                  prefix={k.prefix}
-                  suffix={k.suffix}
-                  decimals={k.decimals}
-                  icon={k.icon}
-                  tooltip={k.tooltip}
-                />
-              ))}
-            </div>
-          </>
+        {objectiveInsights.length === 0 && (
+          <div className="mb-3 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Sem campanhas sincronizadas neste período. Os indicadores serão preenchidos automaticamente após a conexão com a Meta Ads.
+          </div>
         )}
+        <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${kpiGridCols} sm:gap-3`}>
+          {kpis.map((k) => (
+            <MetricCard
+              key={k.title}
+              title={k.title}
+              value={k.value}
+              prefix={k.prefix}
+              suffix={k.suffix}
+              decimals={k.decimals}
+              icon={k.icon}
+              tooltip={k.tooltip}
+            />
+          ))}
+        </div>
       </div>
 
       {/* 4. Funil de Conversão */}
-      {objectiveInsights.length > 0 && (
-        <CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} />
-      )}
+      <CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} />
 
       {/* 4.1 Origem geográfica (mapa por estado) */}
       <GeoOriginWidget />
 
       <PlatformDrilldownSheet platform={drilldown} onClose={() => setDrilldown(null)} />
-      {dailyData.length > 0 && <PerformanceLineChart data={dailyData} />}
+      <PerformanceLineChart data={dailyData} />
+
 
       {/* 5. Gráficos diários */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
