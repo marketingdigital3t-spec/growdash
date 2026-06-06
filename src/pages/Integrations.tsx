@@ -439,8 +439,8 @@ export default function Integrations() {
         });
       }
 
-      void syncPixels.mutateAsync({ adAccountId: savedAccountId }).catch(() => {});
-      void syncBalance.mutateAsync({ adAccountId: savedAccountId }).catch(() => {});
+      void syncPixels.mutateAsync(savedAccountId).catch(() => {});
+      void syncBalance.mutateAsync().catch(() => {});
 
       return true;
     } catch (error) {
