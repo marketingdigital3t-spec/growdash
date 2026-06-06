@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 function firstAccessKey(userId?: string) {
-  return userId ? `trackvio:first-access-required:${userId}` : "";
+  return userId ? `growdash:first-access-required:${userId}` : "";
 }
 
 export function FirstAccessPasswordDialog() {
@@ -65,7 +65,7 @@ export function FirstAccessPasswordDialog() {
           </div>
           <DialogTitle>Defina sua nova senha</DialogTitle>
           <DialogDescription>
-            Este é o primeiro acesso. Troque a senha temporária antes de continuar usando a Trackvio.
+            Este é o primeiro acesso. Troque a senha temporária antes de continuar usando a Growdash.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

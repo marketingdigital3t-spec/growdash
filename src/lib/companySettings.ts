@@ -18,11 +18,11 @@ export interface CompanySettings {
 }
 
 export const COMPANY_SETTINGS_KEY = "growthos:company-settings";
-export const ACCOUNT_MONTHLY_GOALS_KEY = "trackvio:account-monthly-goals";
-export const TRACKVIO_BRAND_NAME = "Trackvio";
-export const TRACKVIO_BRAND_LOGO = "/trackvio-logo-full.png";
-export const TRACKVIO_BRAND_ICON = "/trackvio-logo-tv.png";
-export const TRACKVIO_BRAND_DESCRIPTION = "Sistema operacional de receita com IA para escalar aquisição, vendas e margem.";
+export const ACCOUNT_MONTHLY_GOALS_KEY = "growdash:account-monthly-goals";
+export const GROWDASH_BRAND_NAME = "Growdash";
+export const GROWDASH_BRAND_LOGO = "/growdash-logo-full.png";
+export const GROWDASH_BRAND_ICON = "/growdash-logo-tv.png";
+export const GROWDASH_BRAND_DESCRIPTION = "Sistema operacional de receita com IA para escalar aquisição, vendas e margem.";
 
 const routePageTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -43,19 +43,19 @@ const routePageTitles: Record<string, string> = {
 };
 
 export const defaultCompanySettings: CompanySettings = {
-  companyName: TRACKVIO_BRAND_NAME,
-  companyDescription: TRACKVIO_BRAND_DESCRIPTION,
-  logoDataUrl: TRACKVIO_BRAND_LOGO,
+  companyName: GROWDASH_BRAND_NAME,
+  companyDescription: GROWDASH_BRAND_DESCRIPTION,
+  logoDataUrl: GROWDASH_BRAND_LOGO,
   primaryColor: "#8f5cff",
   secondaryColor: "#c026ff",
   accentColor: "#7c3cff",
-  palette: "trackvio",
+  palette: "growdash",
   defaultTheme: "dark",
   language: "pt-BR",
   monthlyGoal: 250000,
-  seoTitle: "Trackvio | Revenue Intelligence",
+  seoTitle: "Growdash | Revenue Intelligence",
   seoDescription: "Plataforma de inteligência de receita para tráfego, vendas, CRM e operação comercial.",
-  seoLogoDataUrl: TRACKVIO_BRAND_ICON,
+  seoLogoDataUrl: GROWDASH_BRAND_ICON,
 };
 
 function normalizeHex(hex: string) {
@@ -178,7 +178,7 @@ export function readAccountMonthlyGoals(): Record<string, number> {
 
 export function saveAccountMonthlyGoals(goals: Record<string, number>) {
   localStorage.setItem(ACCOUNT_MONTHLY_GOALS_KEY, JSON.stringify(goals));
-  window.dispatchEvent(new CustomEvent("trackvio:account-monthly-goals-updated", { detail: goals }));
+  window.dispatchEvent(new CustomEvent("growdash:account-monthly-goals-updated", { detail: goals }));
 }
 
 export function getMonthlyGoalForScope(
@@ -196,7 +196,7 @@ export function getMonthlyGoalForScope(
 }
 
 export function applyPageSEO(pageTitle?: string, settings = readCompanySettings()) {
-  const brand = TRACKVIO_BRAND_NAME;
+  const brand = GROWDASH_BRAND_NAME;
   document.title = pageTitle ? `${pageTitle} | ${brand}` : defaultCompanySettings.seoTitle;
 
   const description = defaultCompanySettings.seoDescription;
@@ -208,7 +208,7 @@ export function applyPageSEO(pageTitle?: string, settings = readCompanySettings(
   }
   metaDescription.content = description;
 
-  const iconHref = TRACKVIO_BRAND_ICON;
+  const iconHref = GROWDASH_BRAND_ICON;
   if (iconHref) {
     let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!favicon) {
@@ -226,7 +226,7 @@ export function applyCompanySEO(settings = readCompanySettings()) {
 }
 
 export function getRoutePageTitle(pathname: string) {
-  return routePageTitles[pathname] || "Trackvio";
+  return routePageTitles[pathname] || "Growdash";
 }
 
 export function applyCompanyBranding(settings = readCompanySettings()) {

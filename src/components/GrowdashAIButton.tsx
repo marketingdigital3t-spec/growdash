@@ -38,19 +38,19 @@ const initialMessages: Record<Specialist, ChatMessage[]> = {
   traffic: [
     {
       role: "assistant",
-      content: "Sou a Trackvio para Tráfego Pago. Me pergunte o que pausar, escalar, corrigir ou testar em campanhas.",
+      content: "Sou a Growdash para Tráfego Pago. Me pergunte o que pausar, escalar, corrigir ou testar em campanhas.",
     },
   ],
   sales: [
     {
       role: "assistant",
-      content: "Sou a Trackvio para Vendas. Posso criar scripts, cadências, follow-ups e planos para aumentar fechamento.",
+      content: "Sou a Growdash para Vendas. Posso criar scripts, cadências, follow-ups e planos para aumentar fechamento.",
     },
   ],
   support: [
     {
       role: "assistant",
-      content: "Sou a Trackvio para Suporte. Me diga qual erro, integração ou fluxo da plataforma você quer diagnosticar.",
+      content: "Sou a Growdash para Suporte. Me diga qual erro, integração ou fluxo da plataforma você quer diagnosticar.",
     },
   ],
 };
@@ -61,7 +61,7 @@ const placeholders: Record<Specialist, string> = {
   support: "Ex: por que minha integração RD não sincroniza?",
 };
 
-const AI_MEMORY_KEY = "trackvio:ai-memory";
+const AI_MEMORY_KEY = "growdash:ai-memory";
 const AI_MEMORY_TTL_MS = 48 * 60 * 60 * 1000;
 
 function readAIMemory(): Record<Specialist, ChatMessage[]> {
@@ -109,7 +109,7 @@ function buildAnswer(mode: Specialist, question: string) {
   return `${base}\n\nPlano direto para: "${clean}"\n1. Verifique se a integração correspondente está ativa e com token válido.\n2. Rode o teste de conexão no módulo Integrações.\n3. Confira se há dados recentes chegando em campanhas, RD, vendas e UTMs.\n4. Se houver erro de API, copie a mensagem do diagnóstico para eu classificar a causa.\n5. Próxima ação: peça um checklist para corrigir a integração específica.`;
 }
 
-export function TrackvioAIButton() {
+export function GrowdashAIButton() {
   const [open, setOpen] = useState(false);
   const [inputs, setInputs] = useState<Record<Specialist, string>>({ traffic: "", sales: "", support: "" });
   const [loading, setLoading] = useState<Record<Specialist, boolean>>({ traffic: false, sales: false, support: false });
@@ -147,7 +147,7 @@ export function TrackvioAIButton() {
                 <BrainCircuit className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-semibold">Trackvio</h3>
+                <h3 className="font-semibold">Growdash</h3>
                 <p className="text-xs text-muted-foreground">Copilotos separados por área operacional</p>
               </div>
             </div>
@@ -199,7 +199,7 @@ export function TrackvioAIButton() {
                     {loading[mode] && (
                       <div className="mr-6 flex items-center gap-2 rounded-lg border border-white/10 bg-card/70 p-3 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Trackvio está pensando...
+                        Growdash está pensando...
                       </div>
                     )}
                   </div>
@@ -236,7 +236,7 @@ export function TrackvioAIButton() {
         onClick={() => setOpen((value) => !value)}
       >
         <Bot className="mr-2 h-5 w-5" />
-        Trackvio
+        Growdash
       </Button>
     </div>
   );

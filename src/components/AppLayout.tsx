@@ -4,7 +4,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { PageTransition } from "@/components/PageTransition";
 import { useEffect } from "react";
 import { RevenueTopBar } from "@/components/RevenueTopBar";
-import { TrackvioAIButton } from "@/components/TrackvioAIButton";
+import { GrowdashAIButton } from "@/components/GrowdashAIButton";
 import { GlobalAnnouncementBanner } from "@/components/GlobalAnnouncementBanner";
 import { FirstAccessPasswordDialog } from "@/components/FirstAccessPasswordDialog";
 import { applyCompanyBranding, readCompanySettings } from "@/lib/companySettings";
@@ -45,7 +45,7 @@ export function AppLayout() {
             </PageTransition>
           </div>
         </main>
-        <TrackvioAIButton />
+        <GrowdashAIButton />
         <FirstAccessPasswordDialog />
       </div>
     </SidebarProvider>

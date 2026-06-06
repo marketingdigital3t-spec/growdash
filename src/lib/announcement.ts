@@ -7,7 +7,7 @@ export interface PlatformAnnouncement {
   updatedAt: string;
 }
 
-export const ANNOUNCEMENT_KEY = "trackvio:platform-announcement";
+export const ANNOUNCEMENT_KEY = "growdash:platform-announcement";
 
 export function readAnnouncement(): PlatformAnnouncement | null {
   try {
@@ -23,12 +23,12 @@ export function readAnnouncement(): PlatformAnnouncement | null {
 
 export function saveAnnouncement(announcement: PlatformAnnouncement) {
   localStorage.setItem(ANNOUNCEMENT_KEY, JSON.stringify(announcement));
-  window.dispatchEvent(new Event("trackvio:announcement-updated"));
+  window.dispatchEvent(new Event("growdash:announcement-updated"));
 }
 
 export function removeAnnouncement() {
   localStorage.removeItem(ANNOUNCEMENT_KEY);
-  window.dispatchEvent(new Event("trackvio:announcement-updated"));
+  window.dispatchEvent(new Event("growdash:announcement-updated"));
 }
 
 function mapAnnouncement(row: any): PlatformAnnouncement | null {
@@ -36,7 +36,7 @@ function mapAnnouncement(row: any): PlatformAnnouncement | null {
   return {
     id: row.id,
     imageDataUrl: row.image_data_url,
-    alt: row.alt || "Anúncio Trackvio",
+    alt: row.alt || "Anúncio Growdash",
     updatedAt: row.updated_at || new Date().toISOString(),
   };
 }

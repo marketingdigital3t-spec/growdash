@@ -16,7 +16,7 @@ import {
 export default function Announcements() {
   const { toast } = useToast();
   const [announcement, setAnnouncement] = useState<PlatformAnnouncement | null>(() => readAnnouncement());
-  const [alt, setAlt] = useState(() => announcement?.alt || "Anúncio Trackvio");
+  const [alt, setAlt] = useState(() => announcement?.alt || "Anúncio Growdash");
   const [draftImage, setDraftImage] = useState<string>(() => announcement?.imageDataUrl || "");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -24,16 +24,16 @@ export default function Announcements() {
     const refresh = () => {
       const current = readAnnouncement();
       setAnnouncement(current);
-      setAlt(current?.alt || "Anúncio Trackvio");
+      setAlt(current?.alt || "Anúncio Growdash");
       setDraftImage(current?.imageDataUrl || "");
     };
     void fetchActiveAnnouncement().then((current) => {
       setAnnouncement(current);
-      setAlt(current?.alt || "Anúncio Trackvio");
+      setAlt(current?.alt || "Anúncio Growdash");
       setDraftImage(current?.imageDataUrl || "");
     });
-    window.addEventListener("trackvio:announcement-updated", refresh);
-    return () => window.removeEventListener("trackvio:announcement-updated", refresh);
+    window.addEventListener("growdash:announcement-updated", refresh);
+    return () => window.removeEventListener("growdash:announcement-updated", refresh);
   }, []);
 
   const handleFile = (file?: File) => {
@@ -55,7 +55,7 @@ export default function Announcements() {
 
   const hasChanges =
     Boolean(draftImage) &&
-    (draftImage !== announcement?.imageDataUrl || (alt.trim() || "Anúncio Trackvio") !== announcement?.alt);
+    (draftImage !== announcement?.imageDataUrl || (alt.trim() || "Anúncio Growdash") !== announcement?.alt);
 
   const save = async () => {
     if (!draftImage) {
@@ -65,7 +65,7 @@ export default function Announcements() {
 
     const payload = {
       imageDataUrl: draftImage,
-      alt: alt.trim() || "Anúncio Trackvio",
+      alt: alt.trim() || "Anúncio Growdash",
       updatedAt: new Date().toISOString(),
     };
 
@@ -89,7 +89,7 @@ export default function Announcements() {
     void deactivateAnnouncement().then(({ error }) => {
       setAnnouncement(null);
       setDraftImage("");
-      setAlt("Anúncio Trackvio");
+      setAlt("Anúncio Growdash");
       toast({
         title: "Anúncio removido",
         description: error
@@ -163,7 +163,7 @@ export default function Announcements() {
           <h2 className="mb-3 text-lg font-semibold">Prévia</h2>
           {draftImage ? (
             <div className="overflow-hidden rounded-lg border border-primary/25">
-              <img src={draftImage} alt={alt || "Anúncio Trackvio"} className="max-h-72 w-full object-cover" />
+              <img src={draftImage} alt={alt || "Anúncio Growdash"} className="max-h-72 w-full object-cover" />
             </div>
           ) : (
             <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed border-white/15 text-center text-muted-foreground">
