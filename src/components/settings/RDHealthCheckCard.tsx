@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 function statusIcon(s: CheckStatus, className = "h-4 w-4") {
   if (s === "ok") return <CheckCircle2 className={`${className} text-emerald-500`} />;
