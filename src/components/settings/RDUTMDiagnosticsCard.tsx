@@ -8,6 +8,7 @@ import { Stethoscope, RefreshCw, CheckCircle2, AlertTriangle, AlertCircle, Chevr
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 function severityMeta(s: DiagSeverity) {
   if (s === "critical")

@@ -18,6 +18,7 @@ import {
   type CustomMetricKind,
   type CustomMetricFormat,
 } from "@/hooks/useCustomMetrics";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 import {
   useAccountPixels,
   useAccountLpConfigs,

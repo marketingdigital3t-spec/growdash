@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformRules, useUpsertPlatformRule, useDeletePlatformRule, type PlatformRule } from "@/hooks/usePlatformRules";
 import { inferPlatform, subOriginLabel } from "@/lib/platformInference";
 import { useToast } from "@/hooks/use-toast";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 const FIELDS = [
   { v: "utm_source", l: "utm_source" },

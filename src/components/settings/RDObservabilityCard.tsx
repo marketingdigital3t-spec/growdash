@@ -18,6 +18,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
