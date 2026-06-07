@@ -238,13 +238,14 @@ export function getRoutePageTitle(pathname: string) {
 }
 
 export function applyCompanyBranding(settings = readCompanySettings()) {
-  const primary = hexToHsl(defaultCompanySettings.primaryColor);
+  const primaryHex = normalizeHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor;
+  const primary = hexToHsl(primaryHex);
   const secondary = hexToHsl(defaultCompanySettings.secondaryColor);
-  const accent = hexToHsl(defaultCompanySettings.accentColor);
-  const primaryForeground = hexToHsl(getReadableTextColor(defaultCompanySettings.primaryColor));
+  const accent = hexToHsl(primaryHex);
+  const primaryForeground = hexToHsl(getReadableTextColor(primaryHex));
   const secondaryForeground = hexToHsl(getReadableTextColor(defaultCompanySettings.secondaryColor));
-  const accentForeground = hexToHsl(getReadableTextColor(defaultCompanySettings.accentColor));
-  const accentRgb = hexToCssRgb(defaultCompanySettings.accentColor);
+  const accentForeground = hexToHsl(getReadableTextColor(primaryHex));
+  const accentRgb = hexToCssRgb(primaryHex);
   const root = document.documentElement;
 
   if (primary) {
