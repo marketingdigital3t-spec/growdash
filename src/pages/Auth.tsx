@@ -16,7 +16,6 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [glow, setGlow] = useState({ x: 50, y: 46 });
-  const [recovering, setRecovering] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
