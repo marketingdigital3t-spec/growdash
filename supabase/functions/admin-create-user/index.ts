@@ -112,13 +112,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === "create") {
-      if (!username || !password) return json({ error: "username e password obrigatórios" }, 400);
-      const email = `${String(username).toLowerCase().trim()}${EMAIL_SUFFIX}`;
+      const inputEmail = String(email || "").trim().toLowerCase();
+      if (!inputEmail || !password) return json({ error: "email e password obrigatórios" }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputEmail)) return json({ error: "e-mail inválido" }, 400);
+      const derivedUsername = inputEmail.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 64) || inputEmail;
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
-        email,
+        email: inputEmail,
         password,
         email_confirm: true,
-        user_metadata: { username },
+        user_metadata: { username: derivedUsername, email: inputEmail },
       });
       if (cErr) return json({ error: cErr.message }, 400);
       const newId = created.user!.id;
