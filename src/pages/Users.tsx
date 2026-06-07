@@ -36,6 +36,7 @@ type PageKey = (typeof PAGES)[number]["key"];
 type UserRow = {
   user_id: string;
   username: string;
+  email?: string;
   can_dashboard: boolean;
   can_campaigns: boolean;
   can_funnels: boolean;
@@ -55,6 +56,8 @@ type UserRow = {
 const emptyPerms = (): Record<PageKey, boolean> =>
   PAGES.reduce((acc, p) => ({ ...acc, [p.key]: false }), {} as Record<PageKey, boolean>);
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
 export default function UsersPage() {
   const { data: isMaster, isLoading: loadingMaster } = useIsMaster();
   const { toast } = useToast();
@@ -65,7 +68,7 @@ export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [form, setForm] = useState({
-    username: "",
+    email: "",
     password: "",
     ...emptyPerms(),
     ad_account_ids: [] as string[],
