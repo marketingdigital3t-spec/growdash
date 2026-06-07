@@ -97,6 +97,8 @@ Deno.serve(async (req) => {
       rd_funnel_ids,
     } = body ?? {};
 
+    console.log("[admin-create-user] action:", action, "email:", email, "ads:", Array.isArray(ad_account_ids) ? ad_account_ids.length : 0, "funnels:", Array.isArray(rd_funnel_ids) ? rd_funnel_ids.length : 0);
+
 
 
     if (action === "ensure_owner") {
@@ -168,14 +170,22 @@ Deno.serve(async (req) => {
         derivedUsername = `${baseUsername}${Math.floor(Math.random() * 9000 + 1000)}`;
       }
 
+      console.log("[admin-create-user] criando auth user:", inputEmail);
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email: inputEmail,
         password,
         email_confirm: true,
         user_metadata: { username: derivedUsername, email: inputEmail },
       });
-      if (cErr) return json({ error: `Falha ao criar usuário: ${cErr.message}` }, 400);
+      if (cErr) {
+        console.error("[admin-create-user] auth.createUser error:", cErr);
+        const msg = /already registered|already exists|duplicate/i.test(cErr.message)
+          ? "Este e-mail já está cadastrado."
+          : `Falha ao criar usuário: ${cErr.message}`;
+        return json({ error: msg }, 400);
+      }
       const newId = created.user!.id;
+      console.log("[admin-create-user] auth user criado:", newId);
 
       const { error: profileErr } = await admin.from("profiles").upsert({
         user_id: newId,
@@ -184,15 +194,15 @@ Deno.serve(async (req) => {
       }, { onConflict: "user_id" });
 
       if (profileErr) {
+        console.error("[admin-create-user] profile upsert error:", profileErr);
         await admin.auth.admin.deleteUser(newId);
         return json({ error: `Falha ao salvar perfil: ${profileErr.message}` }, 400);
       }
 
+      // Role insert is non-fatal: the handle_new_user trigger usually inserts it already.
       const roleErr = await upsertDefaultRole(admin, newId);
-
       if (roleErr) {
-        await admin.auth.admin.deleteUser(newId);
-        return json({ error: `Falha ao salvar papel do usuário: ${roleErr.message}` }, 400);
+        console.warn("[admin-create-user] role upsert warning (não fatal):", roleErr.message);
       }
 
       let permissionsPayload: Record<string, unknown> = {
@@ -221,20 +231,30 @@ Deno.serve(async (req) => {
       }
 
       if (pErr) {
+        console.error("[admin-create-user] user_permissions error:", pErr);
         await admin.auth.admin.deleteUser(newId);
         return json({ error: `Falha ao salvar permissões: ${pErr.message}` }, 400);
       }
 
       if (Array.isArray(ad_account_ids) && ad_account_ids.length) {
-        await admin.from("user_ad_account_access").insert(
-          ad_account_ids.map((id: string) => ({ user_id: newId, ad_account_id: id }))
-        );
+        const validIds = ad_account_ids.filter((id) => typeof id === "string" && id.length > 0);
+        if (validIds.length) {
+          const { error: adErr } = await admin.from("user_ad_account_access").insert(
+            validIds.map((id: string) => ({ user_id: newId, ad_account_id: id }))
+          );
+          if (adErr) console.warn("[admin-create-user] ad_account_access warning:", adErr.message);
+        }
       }
       if (Array.isArray(rd_funnel_ids) && rd_funnel_ids.length) {
-        await admin.from("user_rd_funnel_access").insert(
-          rd_funnel_ids.map((id: string) => ({ user_id: newId, rd_funnel_id: id }))
-        );
+        const validIds = rd_funnel_ids.filter((id) => typeof id === "string" && id.length > 0);
+        if (validIds.length) {
+          const { error: rdErr } = await admin.from("user_rd_funnel_access").insert(
+            validIds.map((id: string) => ({ user_id: newId, rd_funnel_id: id }))
+          );
+          if (rdErr) console.warn("[admin-create-user] rd_funnel_access warning:", rdErr.message);
+        }
       }
+      console.log("[admin-create-user] usuário criado com sucesso:", newId);
       return json({ ok: true, user_id: newId });
     }
 

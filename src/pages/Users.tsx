@@ -105,16 +105,30 @@ export default function UsersPage() {
         body.email = form.email.trim().toLowerCase();
         body.password = form.password;
       }
+      console.log("[admin-create-user] payload:", body);
       const { data, error } = await supabase.functions.invoke("admin-create-user", { body });
       if (error) {
         let msg = error.message;
         try {
-          const res = (error as any).context?.response;
-          if (res) {
-            const j = await res.clone().json();
-            if (j?.error) msg = j.error;
+          const ctx: any = (error as any).context;
+          // supabase-js v2 stores the Response in error.context
+          const res: Response | undefined =
+            ctx instanceof Response ? ctx : ctx?.response ?? ctx;
+          if (res && typeof res.clone === "function") {
+            const cloned = res.clone();
+            const text = await cloned.text();
+            try {
+              const j = JSON.parse(text);
+              if (j?.error) msg = j.error;
+              else if (j?.message) msg = j.message;
+            } catch {
+              if (text) msg = text;
+            }
           }
-        } catch {}
+        } catch (parseErr) {
+          console.error("[admin-create-user] failed to parse error response:", parseErr);
+        }
+        console.error("[admin-create-user] error:", msg, error);
         throw new Error(msg);
       }
       if ((data as any)?.error) throw new Error((data as any).error);
