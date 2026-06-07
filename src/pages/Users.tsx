@@ -236,11 +236,13 @@ export default function UsersPage() {
           <div className="space-y-4">
             {!editing && (
               <div>
-                <Label>Usuário</Label>
+                <Label>E-mail</Label>
                 <Input
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "") })}
-                  placeholder="ex: joao"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="ex: usuario@empresa.com"
+                  autoComplete="email"
                 />
               </div>
             )}
