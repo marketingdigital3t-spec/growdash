@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Copy, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 const UTM_STRING = "utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_term={{adset.name}}&utm_content={{ad.name}}&utm_id={{ad.id}}";
 
@@ -20,6 +21,16 @@ export function UTMConventionCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <HowToSyncSteps
+          defaultOpen
+          steps={[
+            "Clique em 'Copiar UTM padrão' abaixo",
+            { title: "Abra o Gerenciador de Anúncios da Meta", detail: "Edite cada Anúncio (ad) ativo da sua conta." },
+            { title: "Vá em 'URL do site' → 'Parâmetros de URL'", detail: "Cole a string copiada exatamente como está, sem alterar nada." },
+            { title: "Publique o anúncio", detail: "A Meta passa a aplicar as UTMs em todos os cliques a partir desse momento." },
+            { title: "Repita em TODAS as campanhas Meta", detail: "Sem a UTM padronizada, vendas do RD não conseguem casar com a campanha de origem." },
+          ]}
+        />
         <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">{UTM_STRING}</pre>
         <Button variant="outline" size="sm" onClick={copy}>
           <Copy className="h-4 w-4 mr-2" /> Copiar UTM padrão
