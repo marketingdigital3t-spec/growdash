@@ -57,6 +57,13 @@ const emptyPerms = (): Record<PageKey, boolean> =>
   PAGES.reduce((acc, p) => ({ ...acc, [p.key]: false }), {} as Record<PageKey, boolean>);
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+const deriveUsernameFromEmail = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .split("@")[0]
+    .replace(/[^a-z0-9._-]/g, "")
+    .slice(0, 48) || "user";
 
 export default function UsersPage() {
   const { data: isMaster, isLoading: loadingMaster } = useIsMaster();
@@ -103,6 +110,7 @@ export default function UsersPage() {
         if (form.password) body.password = form.password;
       } else {
         body.email = form.email.trim().toLowerCase();
+        body.username = deriveUsernameFromEmail(form.email);
         body.password = form.password;
       }
       console.log("[admin-create-user] payload:", body);

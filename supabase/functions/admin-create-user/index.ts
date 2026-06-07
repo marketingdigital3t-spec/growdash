@@ -1,10 +1,6 @@
-// admin-create-user v2 — email+password fluxo (não requer mais username)
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// admin-create-user v3 — compat com payload novo e legado + redeploy forçado
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const EMAIL_SUFFIX = "@users.local";
 const PLATFORM_OWNER_EMAIL = "marketingdigital3t@gmail.com";
@@ -38,6 +34,10 @@ async function upsertDefaultRole(admin: ReturnType<typeof createClient>, userId:
   }, { onConflict: "user_id,role" });
 
   return fallback.error ?? null;
+}
+
+function normalizeEmailLike(value: unknown) {
+  return String(value || "").trim().toLowerCase();
 }
 
 Deno.serve(async (req) => {
@@ -154,8 +154,8 @@ Deno.serve(async (req) => {
     }
 
     if (action === "create") {
-      const inputEmail = String(email || "").trim().toLowerCase();
-      if (!inputEmail || !password) return json({ error: "email e password obrigatórios" }, 400);
+      const inputEmail = normalizeEmailLike(email || username);
+      if (!inputEmail || !password) return json({ error: "email/username e password obrigatórios" }, 400);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputEmail)) return json({ error: "e-mail inválido" }, 400);
       const baseUsername = inputEmail.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 48) || "user";
 
