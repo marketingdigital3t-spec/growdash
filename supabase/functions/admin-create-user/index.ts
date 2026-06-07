@@ -229,20 +229,30 @@ Deno.serve(async (req) => {
       }
 
       if (pErr) {
+        console.error("[admin-create-user] user_permissions error:", pErr);
         await admin.auth.admin.deleteUser(newId);
         return json({ error: `Falha ao salvar permissões: ${pErr.message}` }, 400);
       }
 
       if (Array.isArray(ad_account_ids) && ad_account_ids.length) {
-        await admin.from("user_ad_account_access").insert(
-          ad_account_ids.map((id: string) => ({ user_id: newId, ad_account_id: id }))
-        );
+        const validIds = ad_account_ids.filter((id) => typeof id === "string" && id.length > 0);
+        if (validIds.length) {
+          const { error: adErr } = await admin.from("user_ad_account_access").insert(
+            validIds.map((id: string) => ({ user_id: newId, ad_account_id: id }))
+          );
+          if (adErr) console.warn("[admin-create-user] ad_account_access warning:", adErr.message);
+        }
       }
       if (Array.isArray(rd_funnel_ids) && rd_funnel_ids.length) {
-        await admin.from("user_rd_funnel_access").insert(
-          rd_funnel_ids.map((id: string) => ({ user_id: newId, rd_funnel_id: id }))
-        );
+        const validIds = rd_funnel_ids.filter((id) => typeof id === "string" && id.length > 0);
+        if (validIds.length) {
+          const { error: rdErr } = await admin.from("user_rd_funnel_access").insert(
+            validIds.map((id: string) => ({ user_id: newId, rd_funnel_id: id }))
+          );
+          if (rdErr) console.warn("[admin-create-user] rd_funnel_access warning:", rdErr.message);
+        }
       }
+      console.log("[admin-create-user] usuário criado com sucesso:", newId);
       return json({ ok: true, user_id: newId });
     }
 
