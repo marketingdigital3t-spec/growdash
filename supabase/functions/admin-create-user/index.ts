@@ -97,6 +97,8 @@ Deno.serve(async (req) => {
       rd_funnel_ids,
     } = body ?? {};
 
+    console.log("[admin-create-user] action:", action, "email:", email, "ads:", Array.isArray(ad_account_ids) ? ad_account_ids.length : 0, "funnels:", Array.isArray(rd_funnel_ids) ? rd_funnel_ids.length : 0);
+
 
 
     if (action === "ensure_owner") {
