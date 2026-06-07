@@ -146,11 +146,15 @@ export function readCompanySettings(): CompanySettings {
     const raw = localStorage.getItem(COMPANY_SETTINGS_KEY);
     if (!raw) return defaultCompanySettings;
     const parsed = JSON.parse(raw);
+    const storedPrimary = typeof parsed.primaryColor === "string" && normalizeHex(parsed.primaryColor)
+      ? parsed.primaryColor
+      : defaultCompanySettings.primaryColor;
     return {
       ...defaultCompanySettings,
       defaultTheme: parsed.defaultTheme || defaultCompanySettings.defaultTheme,
       language: parsed.language || defaultCompanySettings.language,
       monthlyGoal: Number(parsed.monthlyGoal || defaultCompanySettings.monthlyGoal),
+      primaryColor: storedPrimary,
     };
   } catch {
     return defaultCompanySettings;
@@ -158,11 +162,13 @@ export function readCompanySettings(): CompanySettings {
 }
 
 export function saveCompanySettings(settings: CompanySettings) {
+  const validPrimary = normalizeHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor;
   const next = {
     ...defaultCompanySettings,
     defaultTheme: settings.defaultTheme,
     language: settings.language,
     monthlyGoal: Number(settings.monthlyGoal || defaultCompanySettings.monthlyGoal),
+    primaryColor: validPrimary,
   };
   localStorage.setItem(COMPANY_SETTINGS_KEY, JSON.stringify(next));
   applyCompanyBranding(next);
