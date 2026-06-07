@@ -330,7 +330,7 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => save.mutate()}
-              disabled={save.isPending || (!editing && (!form.username || !form.password))}
+              disabled={save.isPending || (!editing && (!isValidEmail(form.email) || !form.password))}
             >
               {save.isPending ? "Salvando..." : "Salvar"}
             </Button>
