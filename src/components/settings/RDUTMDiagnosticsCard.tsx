@@ -59,6 +59,15 @@ export function RDUTMDiagnosticsCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <HowToSyncSteps
+          steps={[
+            { title: "Clique em 'Re-analisar' para escanear os últimos 1.000 deals", detail: "A análise compara UTMs do RD com campanhas Meta cadastradas." },
+            { title: "Deals sem UTM completo → corrija na origem", detail: "Cole o 'Padrão de UTMs' (card acima) em TODAS as campanhas Meta no Gerenciador de Anúncios." },
+            { title: "UTMs que não batem com nenhuma campanha", detail: "Significa que o nome no utm_campaign não bate com nenhum nome de campanha — padronize o naming." },
+            { title: "Etapas órfãs → sincronize os funis", detail: "Vá no card 'Funis RD por conta' e clique em Sincronizar para atualizar as etapas." },
+            { title: "Funis sem deals recentes", detail: "Funis ativos sem deals há mais de 7 dias podem estar mal configurados ou descontinuados — revise no RD." },
+          ]}
+        />
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-xs text-muted-foreground">
             {data?.checkedAt
