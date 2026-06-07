@@ -168,14 +168,22 @@ Deno.serve(async (req) => {
         derivedUsername = `${baseUsername}${Math.floor(Math.random() * 9000 + 1000)}`;
       }
 
+      console.log("[admin-create-user] criando auth user:", inputEmail);
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email: inputEmail,
         password,
         email_confirm: true,
         user_metadata: { username: derivedUsername, email: inputEmail },
       });
-      if (cErr) return json({ error: `Falha ao criar usuário: ${cErr.message}` }, 400);
+      if (cErr) {
+        console.error("[admin-create-user] auth.createUser error:", cErr);
+        const msg = /already registered|already exists|duplicate/i.test(cErr.message)
+          ? "Este e-mail já está cadastrado."
+          : `Falha ao criar usuário: ${cErr.message}`;
+        return json({ error: msg }, 400);
+      }
       const newId = created.user!.id;
+      console.log("[admin-create-user] auth user criado:", newId);
 
       const { error: profileErr } = await admin.from("profiles").upsert({
         user_id: newId,
@@ -184,15 +192,15 @@ Deno.serve(async (req) => {
       }, { onConflict: "user_id" });
 
       if (profileErr) {
+        console.error("[admin-create-user] profile upsert error:", profileErr);
         await admin.auth.admin.deleteUser(newId);
         return json({ error: `Falha ao salvar perfil: ${profileErr.message}` }, 400);
       }
 
+      // Role insert is non-fatal: the handle_new_user trigger usually inserts it already.
       const roleErr = await upsertDefaultRole(admin, newId);
-
       if (roleErr) {
-        await admin.auth.admin.deleteUser(newId);
-        return json({ error: `Falha ao salvar papel do usuário: ${roleErr.message}` }, 400);
+        console.warn("[admin-create-user] role upsert warning (não fatal):", roleErr.message);
       }
 
       let permissionsPayload: Record<string, unknown> = {
