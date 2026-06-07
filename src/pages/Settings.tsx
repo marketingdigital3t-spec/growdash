@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   defaultCompanySettings,
+  getReadableTextColor,
   readAccountMonthlyGoals,
   readCompanySettings,
   saveAccountMonthlyGoals,
@@ -25,6 +26,19 @@ import {
   type PlatformTheme,
 } from "@/lib/companySettings";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
+
+const PRESET_COLORS = [
+  "#8f5cff",
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#ec4899",
+  "#14b8a6",
+  "#0ea5e9",
+];
+
+const isValidHex = (value: string) => /^#[0-9a-fA-F]{6}$/.test(value);
 
 const languageLabels: Record<PlatformLanguage, string> = {
   "pt-BR": "Português",
