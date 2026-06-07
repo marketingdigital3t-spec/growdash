@@ -83,6 +83,14 @@ export function RDHealthCheckCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <HowToSyncSteps
+          steps={[
+            { title: "Clique em 'Verificar agora'", detail: "Roda todos os checks: token RD, funis vinculados, deals dos últimos 30 dias e match com campanhas Meta." },
+            { title: "Revise os itens com status laranja ou vermelho", detail: "Cada item mostra exatamente o que precisa ser corrigido." },
+            { title: "Use o botão 'Sincronizar' do próprio item", detail: "Quando aparecer, ele puxa os dados faltantes daquele funil específico." },
+            { title: "Confira o confronto de 30 dias", detail: "Compare Vendas RD vs. Vendas em Campanhas. Match abaixo de 80% indica problema de UTM — abra o Diagnóstico de UTMs." },
+          ]}
+        />
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-xs text-muted-foreground">
             {data?.checkedAt
