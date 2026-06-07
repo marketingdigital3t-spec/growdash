@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Goal, Languages, RotateCcw, Save } from "lucide-react";
+import { Goal, Languages, Palette, RotateCcw, Save } from "lucide-react";
 import { useTheme } from "next-themes";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
