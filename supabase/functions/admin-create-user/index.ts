@@ -8,6 +8,17 @@ const corsHeaders = {
 const EMAIL_SUFFIX = "@users.local";
 const PLATFORM_OWNER_EMAIL = "marketingdigital3t@gmail.com";
 
+const OPTIONAL_PERMISSION_COLUMNS = [
+  "can_crm",
+  "can_commercial",
+  "can_leads",
+  "can_alerts",
+  "can_users",
+  "can_integrations",
+  "can_announcements",
+  "can_automations",
+] as const;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -146,7 +157,28 @@ Deno.serve(async (req) => {
       if (cErr) return json({ error: `Falha ao criar usuário: ${cErr.message}` }, 400);
       const newId = created.user!.id;
 
-      const { error: pErr } = await admin.from("user_permissions").upsert({
+      const { error: profileErr } = await admin.from("profiles").upsert({
+        user_id: newId,
+        email: inputEmail,
+        full_name: "",
+      }, { onConflict: "user_id" });
+
+      if (profileErr) {
+        await admin.auth.admin.deleteUser(newId);
+        return json({ error: `Falha ao salvar perfil: ${profileErr.message}` }, 400);
+      }
+
+      const { error: roleErr } = await admin.from("user_roles").upsert({
+        user_id: newId,
+        role: "user",
+      }, { onConflict: "user_id,role" });
+
+      if (roleErr) {
+        await admin.auth.admin.deleteUser(newId);
+        return json({ error: `Falha ao salvar papel do usuário: ${roleErr.message}` }, 400);
+      }
+
+      let permissionsPayload: Record<string, unknown> = {
         user_id: newId,
         username: derivedUsername,
         can_dashboard: !!can_dashboard,
@@ -161,7 +193,15 @@ Deno.serve(async (req) => {
         can_integrations: !!can_integrations,
         can_announcements: !!can_announcements,
         can_automations: !!can_automations,
-      }, { onConflict: "user_id" });
+      };
+
+      let { error: pErr } = await admin.from("user_permissions").upsert(permissionsPayload, { onConflict: "user_id" });
+
+      if (pErr && /column .* does not exist|schema cache/i.test(pErr.message)) {
+        for (const column of OPTIONAL_PERMISSION_COLUMNS) delete permissionsPayload[column];
+        const retry = await admin.from("user_permissions").upsert(permissionsPayload, { onConflict: "user_id" });
+        pErr = retry.error;
+      }
 
       if (pErr) {
         await admin.auth.admin.deleteUser(newId);
