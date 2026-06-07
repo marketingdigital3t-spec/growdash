@@ -136,7 +136,7 @@ export default function UsersPage() {
   const openNew = () => {
     setEditing(null);
     setForm({
-      username: "",
+      email: "",
       password: "",
       ...emptyPerms(),
       can_dashboard: true,
@@ -149,7 +149,7 @@ export default function UsersPage() {
   const openEdit = (u: UserRow) => {
     setEditing(u);
     setForm({
-      username: u.username,
+      email: u.email || u.username || "",
       password: "",
       ...PAGES.reduce(
         (acc, p) => ({ ...acc, [p.key]: !!(u as any)[p.key] }),
