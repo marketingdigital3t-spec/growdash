@@ -95,6 +95,15 @@ export function RDObservabilityCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        <HowToSyncSteps
+          steps={[
+            { title: "Clique em 'Atualizar' no topo", detail: "Recalcula a saúde de cada funil, qualidade dos dados e webhooks recebidos." },
+            { title: "Funis com aviso laranja → clique em 'Sincronizar' na linha", detail: "Puxa os deals dos últimos 30 dias daquele funil específico." },
+            { title: "Qualidade dos dados abaixo de 80% → revise as UTMs", detail: "Use o card 'Diagnóstico de UTMs' na aba UTMs para ver exatamente quais deals estão sem source/medium/campaign." },
+            { title: "Atribuição multi-touch zerada → rode o Backfill", detail: "Vá no widget de Atribuição do dashboard e clique em Backfill para popular o histórico de toques." },
+            { title: "Webhooks fora do esperado", detail: "Confira na aba RD CRM se o webhook está apontando para a URL correta e se os eventos deal_created e deal_updated estão marcados." },
+          ]}
+        />
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-xs text-muted-foreground">
             {data?.checkedAt
