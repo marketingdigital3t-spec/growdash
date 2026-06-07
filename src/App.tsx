@@ -56,8 +56,14 @@ function RequirePage({ page, children }: { page: PagePermission | "master"; chil
       ? perms.canCampaigns
       : page === "funnels"
       ? perms.canFunnels
+      : page === "crm"
+      ? perms.canCRM
+      : page === "commercial"
+      ? perms.canCommercial
       : page === "classes"
       ? perms.canClasses
+      : page === "integrations"
+      ? perms.isMaster || perms.canIntegrations
       : false;
   if (!allowed) {
     const fallback = firstAllowedPath(perms);
@@ -88,11 +94,11 @@ const App = () => (
                   <Route index element={<RequirePage page="dashboard"><Index /></RequirePage>} />
                   <Route path="campaigns" element={<RequirePage page="campaigns"><Campaigns /></RequirePage>} />
                   <Route path="funnels" element={<RequirePage page="funnels"><FunnelAnalysis /></RequirePage>} />
-                  <Route path="crm" element={<RequirePage page="funnels"><CRM /></RequirePage>} />
-                  <Route path="commercial" element={<RequirePage page="funnels"><Commercial /></RequirePage>} />
+                  <Route path="crm" element={<RequirePage page="crm"><CRM /></RequirePage>} />
+                  <Route path="commercial" element={<RequirePage page="commercial"><Commercial /></RequirePage>} />
                   <Route path="classes" element={<RequirePage page="classes"><EventClasses /></RequirePage>} />
                   <Route path="alerts" element={<RequirePage page="master"><Alerts /></RequirePage>} />
-                  <Route path="integrations" element={<RequirePage page="master"><Integrations /></RequirePage>} />
+                  <Route path="integrations" element={<RequirePage page="integrations"><Integrations /></RequirePage>} />
                   <Route path="announcements" element={<RequirePage page="master"><Announcements /></RequirePage>} />
                   <Route path="automations" element={<RequirePage page="master"><Automations /></RequirePage>} />
                   <Route path="plans" element={<Plans />} />

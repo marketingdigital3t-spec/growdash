@@ -19,6 +19,26 @@ const OPTIONAL_PERMISSION_COLUMNS = [
   "can_automations",
 ] as const;
 
+async function upsertDefaultRole(admin: ReturnType<typeof createClient>, userId: string) {
+  const primary = await admin.from("user_roles").upsert({
+    user_id: userId,
+    role: "user",
+  }, { onConflict: "user_id,role" });
+
+  if (!primary.error) return null;
+
+  if (!/invalid input value for enum|schema cache/i.test(primary.error.message)) {
+    return primary.error;
+  }
+
+  const fallback = await admin.from("user_roles").upsert({
+    user_id: userId,
+    role: "usuario",
+  }, { onConflict: "user_id,role" });
+
+  return fallback.error ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -168,10 +188,7 @@ Deno.serve(async (req) => {
         return json({ error: `Falha ao salvar perfil: ${profileErr.message}` }, 400);
       }
 
-      const { error: roleErr } = await admin.from("user_roles").upsert({
-        user_id: newId,
-        role: "user",
-      }, { onConflict: "user_id,role" });
+      const roleErr = await upsertDefaultRole(admin, newId);
 
       if (roleErr) {
         await admin.auth.admin.deleteUser(newId);
