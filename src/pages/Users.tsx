@@ -203,7 +203,7 @@ export default function UsersPage() {
             {users.map((u) => (
               <div key={u.user_id} className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                 <div className="space-y-2">
-                  <p className="font-medium">{u.username}</p>
+                  <p className="font-medium">{u.email || u.username}</p>
                   <div className="flex flex-wrap gap-1">
                     {PAGES.filter((p) => (u as any)[p.key]).map((p) => (
                       <Badge key={p.key} variant="secondary">{p.label}</Badge>
