@@ -6,6 +6,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useAccountUtmMappings, useUpsertAccountUtmMapping, DEFAULT_MAPPING, type UtmField, type MatchStrategy } from "@/hooks/useAccountUtmMapping";
 import { Loader2, Settings2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 const UTM_OPTIONS: { value: UtmField; label: string }[] = [
   { value: "utm_campaign", label: "utm_campaign" },
@@ -55,6 +56,14 @@ export function UTMMappingCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <HowToSyncSteps
+          steps={[
+            { title: "Para cada conta, escolha qual UTM identifica Campanha/Conjunto/Criativo", detail: "Padrão Meta: utm_campaign = Campanha, utm_term = Conjunto, utm_content = Criativo." },
+            { title: "Escolha a estratégia de match", detail: "Normalizado é o mais tolerante e recomendado (ignora caixa, hífens e espaços)." },
+            { title: "O mapeamento é salvo automaticamente", detail: "Não precisa clicar em sincronizar — a próxima rodada de atribuição já usa o novo mapeamento." },
+            { title: "Quer forçar a re-atribuição imediata?", detail: "Vá em 'Plataformas e Origens' (abaixo) e clique em 'Re-atribuir agora'." },
+          ]}
+        />
         {isLoading ? (
           <div className="flex items-center justify-center py-8"><Loader2 className="h-4 w-4 animate-spin" /></div>
         ) : accounts.length === 0 ? (
