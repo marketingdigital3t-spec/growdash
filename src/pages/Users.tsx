@@ -102,7 +102,7 @@ export default function UsersPage() {
         body.target_user_id = editing.user_id;
         if (form.password) body.password = form.password;
       } else {
-        body.username = form.username;
+        body.email = form.email.trim().toLowerCase();
         body.password = form.password;
       }
       const { data, error } = await supabase.functions.invoke("admin-create-user", { body });
