@@ -106,7 +106,17 @@ export default function UsersPage() {
         body.password = form.password;
       }
       const { data, error } = await supabase.functions.invoke("admin-create-user", { body });
-      if (error) throw error;
+      if (error) {
+        let msg = error.message;
+        try {
+          const res = (error as any).context?.response;
+          if (res) {
+            const j = await res.clone().json();
+            if (j?.error) msg = j.error;
+          }
+        } catch {}
+        throw new Error(msg);
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
     },
     onSuccess: () => {
