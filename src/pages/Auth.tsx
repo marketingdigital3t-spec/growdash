@@ -194,19 +194,9 @@ export default function Auth() {
                 )}
               </Button>
             </form>
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={handleOwnerRecovery}
-                disabled={recovering}
-                className="text-xs text-violet-200/60 underline-offset-4 hover:text-violet-100 hover:underline disabled:opacity-50"
-              >
-                {recovering ? "Redefinindo senha do dono..." : "Esqueci a senha (dono da plataforma)"}
-              </button>
-              <p className="mt-2 text-[10px] leading-relaxed text-violet-100/40">
-                Digite seu e-mail de dono ({OWNER_EMAIL}) e a nova senha desejada no campo acima, depois clique no link.
-              </p>
-            </div>
+            <p className="mt-4 text-center text-[11px] leading-relaxed text-violet-100/45">
+              Primeiro acesso do dono ({OWNER_EMAIL})? Digite e-mail e a senha desejada e clique em Entrar — a conta é criada automaticamente.
+            </p>
           </CardContent>
 
         </Card>
