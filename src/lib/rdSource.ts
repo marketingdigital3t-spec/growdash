@@ -57,8 +57,9 @@ export function classifyRDSourceKey(input: RDSourceInput | RDDealLite): RDSource
   if (!raw) return "unknown";
   if (/\b(meta|facebook|fb|instagram|ig|forms meta|lead ads|trafego pago|cpc|paid|ads)\b/.test(raw)) return "meta";
   if (/\b(google|gads|adwords|youtube|performance max|pmax|search)\b/.test(raw)) return "google";
-  if (/\b(link da bio|linkbio|bio|perfil|instituto)\b/.test(raw)) return "link_bio";
-  if (/\b(direct|direto|dm|whatsapp|wpp|mensagem|stories|storys)\b/.test(raw)) return "direct";
+  // Link da bio e Direct/DM são agrupados como Orgânico
+  if (/\b(link da bio|linkbio|bio|perfil|instituto)\b/.test(raw)) return "organic";
+  if (/\b(direct|direto|dm|whatsapp|wpp|mensagem|stories|storys)\b/.test(raw)) return "organic";
   if (/\b(organico|organic|indicacao|indicacao|referral|site)\b/.test(raw)) return "organic";
   return "unknown";
 }

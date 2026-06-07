@@ -368,7 +368,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
         const conv = a.leads > 0 ? (a.sales / a.leads) * 100 : 0;
         return { key: k, name: RD_SOURCE_LABELS[k], ...a, conv };
       })
-      .filter((p) => p.key !== "unknown" || p.leads > 0 || p.sales > 0)
+      .filter((p) => p.key !== "link_bio" && p.key !== "direct" && (p.key !== "unknown" || p.leads > 0 || p.sales > 0))
       .sort((a, b) => (b.revenue - a.revenue) || (b.leads - a.leads));
   }, [rdLeadDeals, rdWonDeals]);
 
