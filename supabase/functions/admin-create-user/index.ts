@@ -12,31 +12,38 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Unauthorized" }, 401);
-
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // verify caller
-    const userClient = createClient(SUPABASE_URL, ANON, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData } = await userClient.auth.getUser();
-    if (!userData.user) return json({ error: "Unauthorized" }, 401);
-    const isPlatformOwner = String(userData.user.email || "").trim().toLowerCase() === PLATFORM_OWNER_EMAIL;
+    // Parse body early so we can allow the unauthenticated `ensure_owner` bootstrap.
+    const body = await req.json().catch(() => ({}));
+    const isOwnerBootstrap = body?.action === "ensure_owner";
 
+    const authHeader = req.headers.get("Authorization");
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const { data: adminRoles, error: roleError } = await admin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userData.user.id)
-      .in("role", ["master", "admin"])
-      .limit(1);
-    if (!isPlatformOwner && (roleError || !adminRoles?.length)) return json({ error: "Forbidden" }, 403);
 
-    const body = await req.json();
+    if (!isOwnerBootstrap) {
+      if (!authHeader) return json({ error: "Unauthorized" }, 401);
+
+      // verify caller
+      const userClient = createClient(SUPABASE_URL, ANON, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData } = await userClient.auth.getUser();
+      if (!userData.user) return json({ error: "Unauthorized" }, 401);
+      const isPlatformOwner = String(userData.user.email || "").trim().toLowerCase() === PLATFORM_OWNER_EMAIL;
+
+      const { data: adminRoles, error: roleError } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userData.user.id)
+        .in("role", ["master", "admin"])
+        .limit(1);
+      if (!isPlatformOwner && (roleError || !adminRoles?.length)) return json({ error: "Forbidden" }, 403);
+    }
+
+
     const {
       action,
       target_user_id,
@@ -58,6 +65,7 @@ Deno.serve(async (req) => {
       ad_account_ids,
       rd_funnel_ids,
     } = body ?? {};
+
 
 
     if (action === "ensure_owner") {

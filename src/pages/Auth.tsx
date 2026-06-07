@@ -8,12 +8,15 @@ import { ArrowRight, Eye, EyeOff, Radar, ShieldCheck, Sparkles, TrendingUp } fro
 import { motion } from "framer-motion";
 import { GROWDASH_BRAND_LOGO, GROWDASH_BRAND_NAME } from "@/lib/companySettings";
 
+const OWNER_EMAIL = "marketingdigital3t@gmail.com";
+
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [glow, setGlow] = useState({ x: 50, y: 46 });
+  const [recovering, setRecovering] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,6 +36,45 @@ export default function Auth() {
 
     setLoading(false);
   };
+
+  const handleOwnerRecovery = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail !== OWNER_EMAIL) {
+      toast({
+        title: "Recuperação indisponível",
+        description: `Esta recuperação é exclusiva do e-mail do dono da plataforma (${OWNER_EMAIL}).`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!password || password.length < 6) {
+      toast({
+        title: "Defina uma senha",
+        description: "Digite no campo de senha acima a nova senha desejada (mínimo 6 caracteres) e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setRecovering(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: { action: "ensure_owner", email: OWNER_EMAIL, password },
+      });
+      if (error || (data as { error?: string })?.error) {
+        throw new Error((data as { error?: string })?.error || error?.message || "Falha ao redefinir senha");
+      }
+      toast({ title: "Senha do dono atualizada", description: "Agora entre com o e-mail e a nova senha." });
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email: OWNER_EMAIL, password });
+      if (signInErr) {
+        toast({ title: "Senha redefinida", description: "Clique em Entrar para acessar.", variant: "default" });
+      }
+    } catch (err) {
+      toast({ title: "Erro ao redefinir", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setRecovering(false);
+    }
+  };
+
 
   return (
     <div
@@ -157,7 +199,21 @@ export default function Auth() {
                 )}
               </Button>
             </form>
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={handleOwnerRecovery}
+                disabled={recovering}
+                className="text-xs text-violet-200/60 underline-offset-4 hover:text-violet-100 hover:underline disabled:opacity-50"
+              >
+                {recovering ? "Redefinindo senha do dono..." : "Esqueci a senha (dono da plataforma)"}
+              </button>
+              <p className="mt-2 text-[10px] leading-relaxed text-violet-100/40">
+                Digite seu e-mail de dono ({OWNER_EMAIL}) e a nova senha desejada no campo acima, depois clique no link.
+              </p>
+            </div>
           </CardContent>
+
         </Card>
       </motion.div>
     </div>
