@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 interface RDPipeline { id: string; name: string }
 
@@ -203,6 +204,15 @@ export function RDFunnelsSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <HowToSyncSteps
+          steps={[
+            { title: "Conecte o RD Station CRM acima", detail: "Cole o token da API do RD para liberar a lista de funis reais." },
+            { title: "Clique em 'Vincular funil do RD' em cada conta Meta", detail: "Escolha o funil do RD que representa as vendas daquela conta de anúncio." },
+            { title: "Ative o funil no switch ao lado", detail: "Funis inativos não trazem vendas para o painel." },
+            { title: "Clique em 'Sincronizar' para puxar as vendas ganhas", detail: "O primeiro sync pode levar alguns minutos dependendo do volume." },
+            { title: "Confira o resultado em Diagnóstico RD ↔ Campanhas", detail: "Use o card abaixo para verificar se os números batem." },
+          ]}
+        />
         {accounts.length === 0 ? (
           <p className="text-sm text-muted-foreground">Adicione uma conta Meta acima primeiro.</p>
         ) : (

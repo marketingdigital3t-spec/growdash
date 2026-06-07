@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePlatformRules, useUpsertPlatformRule, useDeletePlatformRule, type PlatformRule } from "@/hooks/usePlatformRules";
 import { inferPlatform, subOriginLabel } from "@/lib/platformInference";
 import { useToast } from "@/hooks/use-toast";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 const FIELDS = [
   { v: "utm_source", l: "utm_source" },
@@ -213,6 +214,16 @@ export function PlatformRulesSection() {
         </div>
       </CardHeader>
       <CardContent>
+        <HowToSyncSteps
+          steps={[
+            { title: "Escolha a aba da plataforma (Meta, Google, Orgânico, Fallback)", detail: "Cada plataforma tem suas próprias regras de classificação." },
+            { title: "Crie regras pelo campo + modo (regex / contém / igual)", detail: "Exemplo: utm_source contém 'facebook' → classifica como Meta." },
+            { title: "Use 'Prio' para ordenar regras concorrentes", detail: "Quanto maior o número, maior a prioridade. Regras Fallback só rodam quando nenhuma principal casa." },
+            { title: "Clique em 'Re-atribuir agora' depois de mudar regras", detail: "Reprocessa todas as vendas/leads aplicando as novas regras — pode levar alguns minutos." },
+            { title: "'Limpar overrides manuais' apaga reclassificações feitas à mão", detail: "Use quando quiser que tudo volte a respeitar apenas as regras automáticas." },
+          ]}
+        />
+
         <Tabs defaultValue="meta">
           <TabsList>
             <TabsTrigger value="meta">Meta</TabsTrigger>

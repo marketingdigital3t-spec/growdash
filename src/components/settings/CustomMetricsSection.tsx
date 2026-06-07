@@ -18,6 +18,7 @@ import {
   type CustomMetricKind,
   type CustomMetricFormat,
 } from "@/hooks/useCustomMetrics";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 import {
   useAccountPixels,
   useAccountLpConfigs,
@@ -89,6 +90,15 @@ export function CustomMetricsSection() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <HowToSyncSteps
+          steps={[
+            { title: "Clique em 'Atualizar pixels'", detail: "Busca todos os pixels e eventos de conversão configurados em cada conta Meta." },
+            { title: "Para cada conta, configure 'Landing Page (Site / Pixel)'", detail: "Escolha o pixel e o evento de conversão exatos que você usa no Gerenciador do Meta — isso garante que os leads do site sejam contados." },
+            { title: "Formulário Instantâneo é automático", detail: "Não precisa configurar — leads de formulário Meta entram direto." },
+            { title: "Clique em 'Nova métrica' para fórmulas customizadas", detail: "Combine ações (ex.: Custo por Lead = gasto ÷ leads) para que apareçam no dashboard." },
+          ]}
+        />
+
         {adAccounts.length > 0 && (
           <div className="space-y-3">
             <div>
