@@ -42,14 +42,14 @@
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 7%;
-    --sidebar-primary: 262 83% 58%;
+    --sidebar-background: 264 58% 5%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 262 100% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 32% 91%;
-    --sidebar-accent-foreground: 222 47% 7%;
-    --sidebar-border: 214 28% 82%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-accent: 264 48% 13%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 263 42% 18%;
+    --sidebar-ring: 262 100% 68%;
     --growth-accent: 292 84% 61%;
     --growth-accent-foreground: 222 47% 7%;
     --growth-accent-rgb: 167 139 250;
