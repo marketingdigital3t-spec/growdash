@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Goal, Languages, RotateCcw, Save } from "lucide-react";
+import { Goal, Languages, Palette, RotateCcw, Save } from "lucide-react";
 import { useTheme } from "next-themes";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   defaultCompanySettings,
+  getReadableTextColor,
   readAccountMonthlyGoals,
   readCompanySettings,
   saveAccountMonthlyGoals,
@@ -25,6 +26,19 @@ import {
   type PlatformTheme,
 } from "@/lib/companySettings";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
+
+const PRESET_COLORS = [
+  "#8f5cff",
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#ec4899",
+  "#14b8a6",
+  "#0ea5e9",
+];
+
+const isValidHex = (value: string) => /^#[0-9a-fA-F]{6}$/.test(value);
 
 const languageLabels: Record<PlatformLanguage, string> = {
   "pt-BR": "Português",
@@ -138,6 +152,89 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </MotionItem>
+
+      <MotionItem>
+        <Card className="border-white/10 bg-card/80 backdrop-blur-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Cor da plataforma
+            </CardTitle>
+            <CardDescription>
+              Escolha a cor principal. O texto sobre botões é ajustado automaticamente para manter contraste e legibilidade.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-[260px_1fr] md:items-center">
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={isValidHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor}
+                  onChange={(e) => update("primaryColor", e.target.value)}
+                  className="h-12 w-16 cursor-pointer rounded-md border border-border bg-transparent"
+                  aria-label="Seletor de cor"
+                />
+                <Input
+                  value={settings.primaryColor}
+                  onChange={(e) => update("primaryColor", e.target.value)}
+                  placeholder="#8f5cff"
+                  className="font-mono uppercase"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => update("primaryColor", color)}
+                    aria-label={`Selecionar cor ${color}`}
+                    className="h-8 w-8 rounded-full border-2 border-border transition-transform hover:scale-110"
+                    style={{
+                      backgroundColor: color,
+                      borderColor: settings.primaryColor.toLowerCase() === color.toLowerCase() ? "white" : undefined,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-background/40 p-4">
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pré-visualização</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="rounded-md px-4 py-2 text-sm font-semibold shadow-sm"
+                  style={{
+                    backgroundColor: isValidHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor,
+                    color: getReadableTextColor(isValidHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor),
+                  }}
+                >
+                  Botão primário
+                </button>
+                <span
+                  className="rounded-md border px-3 py-1 text-sm"
+                  style={{
+                    borderColor: isValidHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor,
+                    color: isValidHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor,
+                  }}
+                >
+                  Tag de destaque
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Texto sobre botão: <span className="font-mono">
+                    {getReadableTextColor(isValidHex(settings.primaryColor) ? settings.primaryColor : defaultCompanySettings.primaryColor)}
+                  </span>
+                </span>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Salve as configurações para aplicar a cor em toda a plataforma.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </MotionItem>
+
+
 
       <MotionItem>
         <Card className="border-white/10 bg-card/80 backdrop-blur-xl">

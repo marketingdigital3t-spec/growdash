@@ -112,13 +112,15 @@ Deno.serve(async (req) => {
     }
 
     if (action === "create") {
-      if (!username || !password) return json({ error: "username e password obrigatórios" }, 400);
-      const email = `${String(username).toLowerCase().trim()}${EMAIL_SUFFIX}`;
+      const inputEmail = String(email || "").trim().toLowerCase();
+      if (!inputEmail || !password) return json({ error: "email e password obrigatórios" }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputEmail)) return json({ error: "e-mail inválido" }, 400);
+      const derivedUsername = inputEmail.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 64) || inputEmail;
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
-        email,
+        email: inputEmail,
         password,
         email_confirm: true,
-        user_metadata: { username },
+        user_metadata: { username: derivedUsername, email: inputEmail },
       });
       if (cErr) return json({ error: cErr.message }, 400);
       const newId = created.user!.id;
@@ -126,7 +128,7 @@ Deno.serve(async (req) => {
       // Default role usuario already inserted by handle_new_user trigger
       const { error: pErr } = await admin.from("user_permissions").insert({
         user_id: newId,
-        username: String(username).toLowerCase().trim(),
+        username: derivedUsername,
         can_dashboard: !!can_dashboard,
         can_campaigns: !!can_campaigns,
         can_funnels: !!can_funnels,
@@ -223,13 +225,19 @@ Deno.serve(async (req) => {
       if (error) return json({ error: error.message }, 400);
 
       const ids = (perms ?? []).map((p) => p.user_id);
-      const [{ data: accs }, { data: funs }] = await Promise.all([
+      const [{ data: accs }, { data: funs }, authList] = await Promise.all([
         admin.from("user_ad_account_access").select("user_id, ad_account_id").in("user_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
         admin.from("user_rd_funnel_access").select("user_id, rd_funnel_id").in("user_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+        admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       ]);
+
+      const emailMap = new Map<string, string>(
+        (authList.data?.users ?? []).map((u) => [u.id, String(u.email || "")]),
+      );
 
       const result = (perms ?? []).map((p) => ({
         ...p,
+        email: emailMap.get(p.user_id) || "",
         ad_account_ids: (accs ?? []).filter((a) => a.user_id === p.user_id).map((a) => a.ad_account_id),
         rd_funnel_ids: (funs ?? []).filter((f) => f.user_id === p.user_id).map((f) => f.rd_funnel_id),
       }));

@@ -36,6 +36,7 @@ type PageKey = (typeof PAGES)[number]["key"];
 type UserRow = {
   user_id: string;
   username: string;
+  email?: string;
   can_dashboard: boolean;
   can_campaigns: boolean;
   can_funnels: boolean;
@@ -55,6 +56,8 @@ type UserRow = {
 const emptyPerms = (): Record<PageKey, boolean> =>
   PAGES.reduce((acc, p) => ({ ...acc, [p.key]: false }), {} as Record<PageKey, boolean>);
 
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
 export default function UsersPage() {
   const { data: isMaster, isLoading: loadingMaster } = useIsMaster();
   const { toast } = useToast();
@@ -65,7 +68,7 @@ export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [form, setForm] = useState({
-    username: "",
+    email: "",
     password: "",
     ...emptyPerms(),
     ad_account_ids: [] as string[],
@@ -99,7 +102,7 @@ export default function UsersPage() {
         body.target_user_id = editing.user_id;
         if (form.password) body.password = form.password;
       } else {
-        body.username = form.username;
+        body.email = form.email.trim().toLowerCase();
         body.password = form.password;
       }
       const { data, error } = await supabase.functions.invoke("admin-create-user", { body });
@@ -133,7 +136,7 @@ export default function UsersPage() {
   const openNew = () => {
     setEditing(null);
     setForm({
-      username: "",
+      email: "",
       password: "",
       ...emptyPerms(),
       can_dashboard: true,
@@ -146,7 +149,7 @@ export default function UsersPage() {
   const openEdit = (u: UserRow) => {
     setEditing(u);
     setForm({
-      username: u.username,
+      email: u.email || u.username || "",
       password: "",
       ...PAGES.reduce(
         (acc, p) => ({ ...acc, [p.key]: !!(u as any)[p.key] }),
@@ -200,7 +203,7 @@ export default function UsersPage() {
             {users.map((u) => (
               <div key={u.user_id} className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                 <div className="space-y-2">
-                  <p className="font-medium">{u.username}</p>
+                  <p className="font-medium">{u.email || u.username}</p>
                   <div className="flex flex-wrap gap-1">
                     {PAGES.filter((p) => (u as any)[p.key]).map((p) => (
                       <Badge key={p.key} variant="secondary">{p.label}</Badge>
@@ -216,7 +219,7 @@ export default function UsersPage() {
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(u)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" className="text-destructive" onClick={() => {
-                    if (confirm(`Remover ${u.username}?`)) remove.mutate(u.user_id);
+                    if (confirm(`Remover ${u.email || u.username}?`)) remove.mutate(u.user_id);
                   }}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
@@ -233,11 +236,13 @@ export default function UsersPage() {
           <div className="space-y-4">
             {!editing && (
               <div>
-                <Label>Usuário</Label>
+                <Label>E-mail</Label>
                 <Input
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, "") })}
-                  placeholder="ex: joao"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="ex: usuario@empresa.com"
+                  autoComplete="email"
                 />
               </div>
             )}
@@ -325,7 +330,7 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => save.mutate()}
-              disabled={save.isPending || (!editing && (!form.username || !form.password))}
+              disabled={save.isPending || (!editing && (!isValidEmail(form.email) || !form.password))}
             >
               {save.isPending ? "Salvando..." : "Salvar"}
             </Button>
