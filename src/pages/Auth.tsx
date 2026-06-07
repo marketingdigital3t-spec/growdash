@@ -6,14 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Eye, EyeOff, Radar, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
-import { GROWDASH_BRAND_LOGO, GROWDASH_BRAND_NAME } from "@/lib/companySettings";
-
-const EMAIL_SUFFIX = "@users.local";
-const OWNER_EMAIL = "marketingdigital3t@gmail.com";
-const LEGACY_OWNER_EMAIL = "admin@users.local";
+import { GROWDASH_BRAND_ICON, GROWDASH_BRAND_LOGO, GROWDASH_BRAND_NAME } from "@/lib/companySettings";
 
 export default function Auth() {
-  const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -24,22 +20,15 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
 
-    const raw = identifier.trim();
-    const normalized = raw.toLowerCase();
-    const email = normalized.includes("@") ? normalized : `${normalized}${EMAIL_SUFFIX}`;
-    const fallbackEmail = normalized === OWNER_EMAIL ? LEGACY_OWNER_EMAIL : null;
+    const normalizedEmail = email.trim().toLowerCase();
 
     try {
       sessionStorage.removeItem("growthos:dashboard-hero-dismissed");
     } catch {}
 
-    const firstAttempt = await supabase.auth.signInWithPassword({ email, password });
-    const secondAttempt = firstAttempt.error && fallbackEmail
-      ? await supabase.auth.signInWithPassword({ email: fallbackEmail, password })
-      : null;
-    const error = secondAttempt?.error ?? firstAttempt.error;
-    if (error && !secondAttempt?.data.session) {
-      toast({ title: "Erro ao entrar", description: "Usuário ou senha inválidos", variant: "destructive" });
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    if (error) {
+      toast({ title: "Erro ao entrar", description: "E-mail ou senha inválidos", variant: "destructive" });
     }
 
     setLoading(false);
