@@ -1,3 +1,4 @@
+// admin-create-user v2 — email+password fluxo (não requer mais username)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
