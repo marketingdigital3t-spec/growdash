@@ -225,13 +225,19 @@ Deno.serve(async (req) => {
       if (error) return json({ error: error.message }, 400);
 
       const ids = (perms ?? []).map((p) => p.user_id);
-      const [{ data: accs }, { data: funs }] = await Promise.all([
+      const [{ data: accs }, { data: funs }, authList] = await Promise.all([
         admin.from("user_ad_account_access").select("user_id, ad_account_id").in("user_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
         admin.from("user_rd_funnel_access").select("user_id, rd_funnel_id").in("user_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+        admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       ]);
+
+      const emailMap = new Map<string, string>(
+        (authList.data?.users ?? []).map((u) => [u.id, String(u.email || "")]),
+      );
 
       const result = (perms ?? []).map((p) => ({
         ...p,
+        email: emailMap.get(p.user_id) || "",
         ad_account_ids: (accs ?? []).filter((a) => a.user_id === p.user_id).map((a) => a.ad_account_id),
         rd_funnel_ids: (funs ?? []).filter((f) => f.user_id === p.user_id).map((f) => f.rd_funnel_id),
       }));
