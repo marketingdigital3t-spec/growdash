@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Eye, EyeOff, Radar, ShieldCheck, Sparkles, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
-import { GROWDASH_BRAND_ICON, GROWDASH_BRAND_LOGO, GROWDASH_BRAND_NAME } from "@/lib/companySettings";
+import { GROWDASH_BRAND_LOGO, GROWDASH_BRAND_NAME } from "@/lib/companySettings";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
