@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { HowToSyncSteps } from "./HowToSyncSteps";
 
 interface RDPipeline { id: string; name: string }
 
