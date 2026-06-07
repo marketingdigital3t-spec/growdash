@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
       // Default role usuario already inserted by handle_new_user trigger
       const { error: pErr } = await admin.from("user_permissions").insert({
         user_id: newId,
-        username: String(username).toLowerCase().trim(),
+        username: derivedUsername,
         can_dashboard: !!can_dashboard,
         can_campaigns: !!can_campaigns,
         can_funnels: !!can_funnels,
