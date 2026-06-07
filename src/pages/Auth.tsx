@@ -16,7 +16,6 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [glow, setGlow] = useState({ x: 50, y: 46 });
-  const [recovering, setRecovering] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,50 +29,45 @@ export default function Auth() {
     } catch {}
 
     const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+
     if (error) {
+      // Auto-cadastro do dono da plataforma na primeira vez (ou recuperação)
+      if (normalizedEmail === OWNER_EMAIL) {
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/` },
+        });
+        if (!signUpErr) {
+          const { error: retryErr } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+          if (!retryErr) {
+            toast({ title: "Acesso liberado", description: "Conta de dono criada e login efetuado." });
+            setLoading(false);
+            return;
+          }
+          toast({
+            title: "Confirme seu e-mail",
+            description: "Enviamos um link de confirmação. Após confirmar, entre novamente com a mesma senha.",
+          });
+          setLoading(false);
+          return;
+        }
+        if (/registered|already/i.test(signUpErr.message)) {
+          toast({ title: "Senha incorreta", description: "O e-mail já existe. Verifique a senha digitada.", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+        toast({ title: "Erro ao cadastrar", description: signUpErr.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
       toast({ title: "Erro ao entrar", description: "E-mail ou senha inválidos", variant: "destructive" });
     }
 
     setLoading(false);
   };
 
-  const handleOwnerRecovery = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail !== OWNER_EMAIL) {
-      toast({
-        title: "Recuperação indisponível",
-        description: `Esta recuperação é exclusiva do e-mail do dono da plataforma (${OWNER_EMAIL}).`,
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!password || password.length < 6) {
-      toast({
-        title: "Defina uma senha",
-        description: "Digite no campo de senha acima a nova senha desejada (mínimo 6 caracteres) e tente novamente.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setRecovering(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("admin-create-user", {
-        body: { action: "ensure_owner", email: OWNER_EMAIL, password },
-      });
-      if (error || (data as { error?: string })?.error) {
-        throw new Error((data as { error?: string })?.error || error?.message || "Falha ao redefinir senha");
-      }
-      toast({ title: "Senha do dono atualizada", description: "Agora entre com o e-mail e a nova senha." });
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email: OWNER_EMAIL, password });
-      if (signInErr) {
-        toast({ title: "Senha redefinida", description: "Clique em Entrar para acessar.", variant: "default" });
-      }
-    } catch (err) {
-      toast({ title: "Erro ao redefinir", description: (err as Error).message, variant: "destructive" });
-    } finally {
-      setRecovering(false);
-    }
-  };
 
 
   return (
@@ -199,19 +193,9 @@ export default function Auth() {
                 )}
               </Button>
             </form>
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={handleOwnerRecovery}
-                disabled={recovering}
-                className="text-xs text-violet-200/60 underline-offset-4 hover:text-violet-100 hover:underline disabled:opacity-50"
-              >
-                {recovering ? "Redefinindo senha do dono..." : "Esqueci a senha (dono da plataforma)"}
-              </button>
-              <p className="mt-2 text-[10px] leading-relaxed text-violet-100/40">
-                Digite seu e-mail de dono ({OWNER_EMAIL}) e a nova senha desejada no campo acima, depois clique no link.
-              </p>
-            </div>
+            <p className="mt-4 text-center text-[11px] leading-relaxed text-violet-100/45">
+              Primeiro acesso do dono ({OWNER_EMAIL})? Digite e-mail e a senha desejada e clique em Entrar — a conta é criada automaticamente.
+            </p>
           </CardContent>
 
         </Card>
