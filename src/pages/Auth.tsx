@@ -100,23 +100,23 @@ export default function Auth() {
 
         <Card className="w-full border-violet-200/15 bg-[#0d071b]/88 text-white shadow-2xl shadow-violet-950/40 backdrop-blur-2xl">
           <CardHeader className="space-y-4 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-violet-300/35 bg-black/35 shadow-[0_0_44px_rgba(139,92,246,0.38)]">
-              <img src={GROWDASH_BRAND_LOGO} alt={GROWDASH_BRAND_NAME} className="h-full w-full object-contain" />
+            <div className="mx-auto flex h-24 w-full max-w-[260px] items-center justify-center">
+              <img src={GROWDASH_BRAND_LOGO} alt={GROWDASH_BRAND_NAME} className="h-full w-auto max-w-full object-contain" />
             </div>
             <div>
               <CardTitle className="text-2xl font-semibold">Acesse o cockpit</CardTitle>
-              <CardDescription className="mt-2 text-violet-100/55">Entre com o usuário liberado pelo administrador da Growdash</CardDescription>
+              <CardDescription className="mt-2 text-violet-100/55">Entre com o e-mail liberado pelo administrador da Growdash</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                type="text"
-                placeholder="Usuário ou e-mail"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
+                type="email"
+                placeholder="E-mail"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 autoCapitalize="none"
-                autoComplete="username"
+                autoComplete="email"
                 required
                 className="h-12 border-violet-200/10 bg-black/25 text-white placeholder:text-violet-100/40 focus-visible:ring-violet-400"
               />
