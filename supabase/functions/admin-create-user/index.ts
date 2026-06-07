@@ -44,7 +44,6 @@ Deno.serve(async (req) => {
     }
 
 
-    const body = await req.json();
     const {
       action,
       target_user_id,
@@ -66,6 +65,7 @@ Deno.serve(async (req) => {
       ad_account_ids,
       rd_funnel_ids,
     } = body ?? {};
+
 
 
     if (action === "ensure_owner") {
