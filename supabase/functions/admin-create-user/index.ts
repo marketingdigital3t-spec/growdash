@@ -123,18 +123,30 @@ Deno.serve(async (req) => {
       const inputEmail = String(email || "").trim().toLowerCase();
       if (!inputEmail || !password) return json({ error: "email e password obrigatórios" }, 400);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputEmail)) return json({ error: "e-mail inválido" }, 400);
-      const derivedUsername = inputEmail.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 64) || inputEmail;
+      const baseUsername = inputEmail.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 48) || "user";
+
+      // Ensure unique username
+      let derivedUsername = baseUsername;
+      for (let i = 0; i < 50; i++) {
+        const { data: existing } = await admin
+          .from("user_permissions")
+          .select("user_id")
+          .eq("username", derivedUsername)
+          .maybeSingle();
+        if (!existing) break;
+        derivedUsername = `${baseUsername}${Math.floor(Math.random() * 9000 + 1000)}`;
+      }
+
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email: inputEmail,
         password,
         email_confirm: true,
         user_metadata: { username: derivedUsername, email: inputEmail },
       });
-      if (cErr) return json({ error: cErr.message }, 400);
+      if (cErr) return json({ error: `Falha ao criar usuário: ${cErr.message}` }, 400);
       const newId = created.user!.id;
 
-      // Default role usuario already inserted by handle_new_user trigger
-      const { error: pErr } = await admin.from("user_permissions").insert({
+      const { error: pErr } = await admin.from("user_permissions").upsert({
         user_id: newId,
         username: derivedUsername,
         can_dashboard: !!can_dashboard,
@@ -149,11 +161,11 @@ Deno.serve(async (req) => {
         can_integrations: !!can_integrations,
         can_announcements: !!can_announcements,
         can_automations: !!can_automations,
-      });
+      }, { onConflict: "user_id" });
 
       if (pErr) {
         await admin.auth.admin.deleteUser(newId);
-        return json({ error: pErr.message }, 400);
+        return json({ error: `Falha ao salvar permissões: ${pErr.message}` }, 400);
       }
 
       if (Array.isArray(ad_account_ids) && ad_account_ids.length) {
