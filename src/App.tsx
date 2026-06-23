@@ -9,6 +9,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { usePermissions, firstAllowedPath, PagePermission } from "@/hooks/usePermissions";
 import Index from "./pages/Index";
+import Mordidela from "./pages/Mordidela";
 import Auth from "./pages/Auth";
 import Campaigns from "./pages/Campaigns";
 import Alerts from "./pages/Alerts";
@@ -89,8 +90,9 @@ const App = () => (
           <AuthProvider>
             <AppErrorBoundary>
               <Routes>
+                <Route path="/" element={<Mordidela />} />
                 <Route path="/auth" element={<AuthRoute />} />
-                <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                   <Route index element={<RequirePage page="dashboard"><Index /></RequirePage>} />
                   <Route path="campaigns" element={<RequirePage page="campaigns"><Campaigns /></RequirePage>} />
                   <Route path="funnels" element={<RequirePage page="funnels"><FunnelAnalysis /></RequirePage>} />
@@ -106,7 +108,7 @@ const App = () => (
                   <Route path="leads-incompletos" element={<RequirePage page="master"><LeadsIncompletos /></RequirePage>} />
                   <Route path="users" element={<RequirePage page="master"><Users /></RequirePage>} />
                 </Route>
-                <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </AppErrorBoundary>
           </AuthProvider>
