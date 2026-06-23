@@ -608,7 +608,14 @@ export default function Mordidela() {
     document.title = "Mordidela — Franquia de Fast Food";
   }, []);
   return (
-    <div className="min-h-screen bg-white text-neutral-900">
+    <div
+      className="min-h-screen bg-white text-neutral-900"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)",
+        backgroundSize: "22px 22px",
+      }}
+    >
       <Marquee />
       <Hero />
       <Diferenciais />
@@ -629,6 +636,7 @@ export default function Mordidela() {
           100% { transform: translateX(-50%); }
         }
       `}</style>
+
     </div>
   );
 }
