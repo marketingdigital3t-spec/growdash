@@ -612,8 +612,8 @@ export default function Mordidela() {
       className="min-h-screen bg-white text-neutral-900"
       style={{
         backgroundImage:
-          "linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)",
-        backgroundSize: "22px 22px",
+          "linear-gradient(rgba(0,0,0,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.07) 1px, transparent 1px)",
+        backgroundSize: "8px 8px",
       }}
     >
       <Marquee />
