@@ -33,10 +33,10 @@ export const NAV: NavItem[] = [
     icon: Calendar,
     path: "/agenda",
     submenu: [
-      { label: "Semana", path: "/agenda/semana" },
-      { label: "Sala de espera", path: "/agenda/sala-de-espera" },
-      { label: "Relatório da Agenda", path: "/agenda/relatorio" },
+      { label: "Agenda", path: "/agenda/semana" },
+      { label: "Visão geral", path: "/agenda/visao-geral" },
       { label: "Relatório de agendamentos", path: "/agenda/relatorio-agendamentos" },
+      { label: "Eventos", path: "/agenda/eventos" },
     ],
   },
   {
