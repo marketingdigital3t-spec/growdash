@@ -114,7 +114,7 @@ export function ChatWindow({ thread }: Props) {
             {rendered.map((m) => (
               <Message key={m.id} from={m.role}>
                 {m.role === "assistant" ? (
-                  <MessageContent variant="flat" className="prose prose-sm dark:prose-invert max-w-none">
+                  <MessageContent className="prose prose-sm dark:prose-invert max-w-none">
                     {m.content ? <MessageResponse>{m.content}</MessageResponse> : <Shimmer>Pensando</Shimmer>}
                   </MessageContent>
                 ) : (
@@ -124,7 +124,7 @@ export function ChatWindow({ thread }: Props) {
             ))}
             {status === "submitted" && (
               <Message from="assistant">
-                <MessageContent variant="flat">
+                <MessageContent>
                   <Shimmer>Pensando</Shimmer>
                 </MessageContent>
               </Message>
