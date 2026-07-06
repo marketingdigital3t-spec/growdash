@@ -34,21 +34,39 @@ Deno.serve(async (req) => {
     }
     // deno-lint-ignore no-explicit-any
     const conv: any = msg.conversations;
-    if (conv.patient_id !== userId && conv.professional_id !== userId) {
+    const isParticipant = conv.patient_id === userId || conv.professional_id === userId;
+
+    let isAdmin = false;
+    if (!isParticipant) {
+      const { data: adminRow } = await admin
+        .from('clinic_admins')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      isAdmin = !!adminRow;
+    }
+    if (!isParticipant && !isAdmin) {
       return json({ error: 'Forbidden' }, 403);
     }
 
     const { data: signed, error: sErr } = await admin.storage
       .from('patient-photos')
-      .createSignedUrl(msg.photo_path, 300); // 5 min
+      .createSignedUrl(msg.photo_path, 300);
     if (sErr || !signed) return json({ error: 'Sign failed' }, 500);
 
     await admin.from('audit_log').insert({
       actor_id: userId,
-      action: 'photo_view',
+      action: isAdmin ? 'admin_photo_recovery' : 'photo_view',
       target_type: 'message',
       target_id: messageId,
     });
+    if (isAdmin) {
+      await admin.from('security_events').insert({
+        user_id: userId,
+        event_type: 'admin_recovery_photo_access',
+        metadata: { message_id: messageId, conversation_id: msg.conversation_id },
+      });
+    }
     return json({ url: signed.signedUrl });
   } catch (e) {
     console.error('signed-photo-url error', e);
