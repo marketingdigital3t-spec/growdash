@@ -1,19 +1,9 @@
 import { CheckCircle2, Clock, XCircle, TrendingUp, CalendarDays, UserCheck } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/page-primitives";
 
-const topProfs = [
-  { name: "Dra. Carla Rezende", count: 48, pct: 62 },
-  { name: "Dra. Marina Antunes", count: 22, pct: 28 },
-  { name: "Enf. Paula Souza", count: 8, pct: 10 },
-];
+const topProfs: { name: string; count: number; pct: number }[] = [];
 
-const topProcs = [
-  { name: "Consulta inicial", count: 28 },
-  { name: "Radiofrequência íntima", count: 19 },
-  { name: "Peeling químico", count: 12 },
-  { name: "Laser íntimo", count: 9 },
-  { name: "Retorno pós-op", count: 8 },
-];
+const topProcs: { name: string; count: number }[] = [];
 
 export default function AgendaVisaoGeral() {
   return (
