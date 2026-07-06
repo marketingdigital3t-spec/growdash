@@ -1,14 +1,22 @@
-import { Menu, MessageCircle, Bell, HelpCircle, Sparkles, Plus } from "lucide-react";
+import { Menu, X, MessageCircle, Bell, HelpCircle, Sparkles, Plus } from "lucide-react";
+import { useSidebar } from "./sidebar-context";
 
 export default function TopBar() {
+  const { expanded, toggle } = useSidebar();
+
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-card px-4 md:px-6">
+    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-card px-3 md:px-4">
       <button
         type="button"
-        aria-label="Menu"
-        className="flex h-10 w-10 items-center justify-center rounded-lg text-[hsl(var(--sidebar-icon))] transition-colors hover:bg-muted"
+        aria-label={expanded ? "Fechar menu" : "Abrir menu"}
+        onClick={toggle}
+        className="flex h-10 w-10 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-muted"
       >
-        <Menu className="h-5 w-5" strokeWidth={1.8} />
+        {expanded ? (
+          <X className="h-5 w-5" strokeWidth={2} />
+        ) : (
+          <Menu className="h-5 w-5" strokeWidth={1.8} />
+        )}
       </button>
 
       <a href="/" className="flex items-center gap-2">
