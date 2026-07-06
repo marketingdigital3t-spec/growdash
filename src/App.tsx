@@ -5,21 +5,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
-import Mordidela from "./pages/Mordidela";
+import ChatPage from "./pages/ChatPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
           <AppErrorBoundary>
             <Routes>
-              <Route path="/" element={<Mordidela />} />
+              <Route path="/" element={<ChatPage />} />
+              <Route path="/c/:threadId" element={<ChatPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppErrorBoundary>
