@@ -13,12 +13,17 @@ type Member = {
 };
 
 export default function Usuarios() {
-  const { roles } = useAuth();
+  const { roles, refreshRoles } = useAuth();
   const isAdmin = roles.includes("admin");
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
+
+  useEffect(() => {
+    refreshRoles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = async () => {
     setLoading(true);
