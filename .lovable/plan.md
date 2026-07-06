@@ -1,87 +1,77 @@
-## O que vamos construir
+# Chat seguro de acompanhamento pós-op (LGPD)
 
-Um "cérebro local no SSD": você aponta uma pasta do SSD externo, o app lê tudo que estiver lá dentro (docs + histórico de conversas), usa isso como **única** fonte de conhecimento pra responder, e grava as novas conversas de volta na mesma pasta. Nada de busca na web, nada de banco de dados externo — o SSD é a fonte da verdade.
+Feature nova, isolada da aba WhatsApp atual. Foco: privacidade máxima, isolamento por par paciente↔profissional, trilha de auditoria.
 
-## Como o SSD é acessado (limite do navegador)
+## Fluxo do usuário
 
-Navegadores não montam disco. O jeito oficial é a **File System Access API** (Chrome, Edge, Brave, Arc, Opera — funciona no Safari só via fallback de upload). Fluxo:
+**Profissional (Dra.)**
+- Nova aba na sidebar: **"Chat seguro"**
+- Vê a lista das próprias pacientes vinculadas → abre uma conversa → troca mensagens de texto + fotos
+- Pode revogar acesso da paciente / arquivar conversa
 
-1. Você clica em **"Conectar SSD"** → escolhe a pasta no SSD (ex: `/Volumes/MeuSSD/aria/`).
-2. O navegador guarda essa permissão via IndexedDB. Nas próximas vezes o app pede só um clique de "reautorizar".
-3. O app enxerga essa pasta como um sistema de arquivos: lê, escreve, cria subpastas.
+**Paciente**
+- Faz login e vê apenas a sua conversa com a Dra. responsável
+- Envia texto e fotos de acompanhamento; vê histórico
 
-Estrutura sugerida dentro da pasta escolhida:
+## Segurança (LGPD - dado sensível de saúde, art. 11)
+
+1. **Autenticação obrigatória** (email + senha, com HIBP habilitado)
+2. **Papéis separados**: `admin`, `professional`, `patient` em tabela `user_roles` (nunca no profile)
+3. **Vínculo explícito** paciente↔profissional em `patient_links` — sem vínculo = sem acesso
+4. **RLS estrita** em todas as tabelas:
+   - Paciente só lê/escreve mensagens onde é participante
+   - Profissional só lê/escreve mensagens de pacientes vinculadas
+   - Ninguém lê conversas alheias, nem admin sem consentimento
+5. **Storage privado** (bucket `patient-photos`, `public: false`) — acesso só via URL assinada de curta duração (5 min), gerada por edge function que revalida vínculo
+6. **Consentimento**: modal de aceite LGPD no 1º acesso da paciente, gravado em `lgpd_consents` (timestamp, IP, texto da versão aceita)
+7. **Auditoria**: tabela `audit_log` registra visualizações e exclusões de fotos
+8. **Exclusão sob demanda** (direito ao esquecimento) — botão "Excluir meus dados" para a paciente
+9. **Sem retenção automática** (conforme sua escolha) — cabe à clínica gerenciar
+
+## Modelo de dados
 
 ```text
-/Volumes/MeuSSD/aria/
-├── docs/              ← seus arquivos de conhecimento (.md, .txt, .pdf, .json)
-│   ├── growdash/
-│   ├── processos/
-│   └── ...
-├── threads/           ← conversas salvas (uma por arquivo .json)
-│   ├── 2026-07-06-planejamento.json
-│   └── ...
-└── index.json         ← índice de embeddings/chunks (gerado pelo app)
+profiles(id, full_name, avatar_url, created_at)
+user_roles(user_id, role)                       -- admin|professional|patient
+patient_links(patient_id, professional_id, status, created_at)
+conversations(id, patient_id, professional_id, created_at, archived)
+messages(id, conversation_id, sender_id, kind, body, photo_path, created_at)
+lgpd_consents(id, user_id, version, accepted_at, ip)
+audit_log(id, actor_id, action, target_type, target_id, created_at)
+storage: bucket "patient-photos" (privado)
 ```
 
-## Fluxo de mensagem (RAG local)
+Grants + RLS + trigger `handle_new_user` para criar profile automático.
 
-```text
-Você digita → Client faz retrieval no índice local (top-K chunks relevantes)
-            → Envia [pergunta + chunks + histórico] pra Edge Function
-            → Edge Function chama Lovable AI Gateway (Gemini) com prompt travado:
-              "Responda APENAS com base no contexto fornecido. Sem web."
-            → Stream de volta pro chat
-            → Client grava a conversa atualizada no arquivo .json do SSD
-```
+## Edge functions
 
-O SSD guarda os dados; o modelo (LLM) roda no gateway porque um LLM não cabe no navegador. Só os **trechos relevantes** de cada pergunta trafegam — o resto do acervo nunca sai do SSD.
+- `signed-photo-url` — recebe `message_id`, revalida participação, devolve URL assinada
+- `upload-photo` — recebe imagem, valida vínculo, grava em `patient-photos/{conversation_id}/{uuid}.jpg`, cria mensagem, loga auditoria
 
-## Etapas de implementação
+## UI
 
-**1. Backend (Lovable Cloud + Edge Function)**
-- Ativar Lovable Cloud e garantir `LOVABLE_API_KEY`.
-- Criar `supabase/functions/chat/index.ts`: recebe `{ messages, contextChunks }`, monta system prompt anti-web, chama `google/gemini-3-flash-preview` via AI SDK, devolve stream.
-- Criar `supabase/functions/embed/index.ts`: recebe array de textos, devolve embeddings via `google/gemini-embedding-001` — usado só na hora de indexar arquivos novos.
+- **Sidebar** → novo item "Chat seguro" (ícone cadeado)
+- **/chat-seguro** → layout 2 colunas: lista de conversas (esq.) + thread (dir.)
+- Composer com botão de foto (drag-drop desktop, câmera no mobile), preview antes de enviar
+- Bolhas de mensagem com timestamp; fotos abrem em lightbox com marca d'água discreta "Confidencial — {nome} — {data}"
+- Empty state didático explicando o funcionamento
+- Banner LGPD no topo da conversa da paciente
 
-**2. Camada de acesso ao SSD (`src/lib/ssd/`)**
-- `handle.ts` — pede/salva o `FileSystemDirectoryHandle` no IndexedDB, reautorização automática.
-- `fs.ts` — helpers: listar recursivamente `docs/`, ler .txt/.md/.json direto, extrair texto de .pdf com `pdfjs-dist`, escrever/ler `threads/*.json` e `index.json`.
-- Toast + botão "Reconectar SSD" quando a permissão cair.
+## O que fica fora deste passo
 
-**3. Indexação (`src/lib/ssd/indexer.ts`)**
-- Ao conectar o SSD (ou clicar "Reindexar"): varre `docs/`, quebra cada arquivo em chunks de ~800 chars, chama `embed` em batches, salva `index.json` com `{ path, chunk, embedding, hash }`.
-- Detecção incremental por hash — não reembeda o que não mudou.
+- **SaaS/pagamento mensal** para liberar acesso — feature grande, faço em seguida num passo próprio (Stripe Payments da Lovable). Por enquanto, o acesso é liberado por login criado manualmente.
+- Chamada de vídeo, notificações push, apagamento automático programado
+- Cadastro em massa de pacientes (fica para o próximo passo junto do pagamento)
 
-**4. Retrieval (`src/lib/ssd/retriever.ts`)**
-- A cada pergunta: embeda a pergunta, faz similaridade coseno em memória contra `index.json`, devolve os top 6 chunks. Tudo no client.
+## Ordem de execução
 
-**5. Threads no SSD (substitui localStorage)**
-- Reescrever `src/hooks/useThreads.ts` pra ler/escrever de `threads/*.json` via handle do SSD.
-- Fallback: se o SSD não está conectado, mostra tela vazia com CTA "Conectar SSD" em vez de criar thread solto.
+1. Ativar Lovable Cloud
+2. Criar migração (tabelas + RLS + grants + trigger + bucket privado)
+3. Implementar edge functions `upload-photo` e `signed-photo-url`
+4. Auth pages (login/signup + reset) e guarda de rotas por papel
+5. Página `/chat-seguro` + componentes de lista, thread, composer, lightbox
+6. Modal de consentimento LGPD no 1º login da paciente
+7. Item de sidebar + rota
+8. Teste manual do fluxo ponta-a-ponta
 
-**6. UI**
-- Estado "SSD desconectado" no header: pill dourada "Conectar SSD".
-- Estado "conectado": mostra caminho da pasta + contador de docs indexados + botão reindexar.
-- No chat, mostrar as **fontes citadas** abaixo da resposta (arquivos que embasaram) — reforça a transparência do RAG.
-- Manter identidade Growdash preta/dourada já aplicada.
-
-**7. Streaming real**
-- Trocar o `send()` simulado do `ChatWindow.tsx` por `useChat` do AI SDK apontando pra Edge Function `chat`.
-- Persistir a conversa completa (user + assistant final) no arquivo do SSD dentro do `onFinish`.
-
-## Detalhes técnicos
-
-- **Bibliotecas novas:** `ai`, `@ai-sdk/react`, `@ai-sdk/openai-compatible`, `pdfjs-dist`, `idb-keyval` (persistir handle).
-- **Segurança:** `LOVABLE_API_KEY` só na Edge Function; client nunca vê. Fetch de web fica desligado no system prompt.
-- **Compatibilidade:** File System Access API não roda em Safari nem no iOS. Vou detectar e mostrar mensagem clara ("Use Chrome, Edge ou Brave") em vez de quebrar.
-- **Modelo:** `google/gemini-3-flash-preview` (rápido, aceita contexto grande). Embeddings: `google/gemini-embedding-001` (3072 dims, cabe fácil no `index.json`).
-- **Persistência do handle:** IndexedDB via `idb-keyval`. Chrome mantém permissão entre sessões desde que o usuário reautorize (uma tela clicada, sem re-selecionar pasta).
-- **Não vamos:** subir arquivos pro Lovable Cloud, guardar embeddings no Postgres, nem indexar imagens/áudio nessa primeira versão (só texto e PDF).
-
-## O que você vai poder fazer no fim
-
-- Apontar o SSD, jogar todos os seus `.md`, `.txt`, `.pdf` dentro de `docs/`, dar "Reindexar".
-- Conversar normalmente — o modelo responde citando SÓ o que está no SSD.
-- Ver o histórico de conversas anteriores como threads (também vindos do SSD).
-- Levar o SSD pra outro computador, conectar de novo, e retomar tudo do zero sem servidor.
+Confirma que posso seguir? Assim que aprovar, executo tudo de uma vez.
