@@ -136,3 +136,11 @@ function Shortcut({ to, title, desc }: { to: string; title: string; desc: string
     </Link>
   );
 }
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-10 text-center text-sm font-semibold text-muted-foreground">
+      {text}
+    </div>
+  );
+}
