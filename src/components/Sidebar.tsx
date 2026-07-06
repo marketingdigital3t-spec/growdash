@@ -1,113 +1,19 @@
-import { useState } from "react";
-import {
-  Home,
-  Calendar,
-  Users,
-  Stethoscope,
-  ShoppingCart,
-  DollarSign,
-  BadgePercent,
-  Package,
-  MessageSquare,
-  FileEdit,
-  Heart,
-  Flower2,
-  Settings,
-  ChevronRight,
-  type LucideIcon,
-} from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
-
-type Item = {
-  icon: LucideIcon;
-  label: string;
-  id: string;
-  badge?: "new" | "dot";
-  submenu?: string[];
-};
-
-const items: Item[] = [
-  { icon: Home, label: "Início", id: "home" },
-  {
-    icon: Calendar,
-    label: "Agenda",
-    id: "agenda",
-    submenu: ["Semana", "Sala de espera", "Relatório da Agenda", "Relatório de agendamentos"],
-  },
-  {
-    icon: Users,
-    label: "Contatos",
-    id: "contatos",
-    submenu: [
-      "Pacientes",
-      "Profissionais",
-      "Fornecedores",
-      "Leads",
-      "Todos os contatos",
-      "Aniversariantes",
-      "Frequência",
-      "Mesclar contatos",
-      "Convidar colaboradores",
-    ],
-  },
-  {
-    icon: Stethoscope,
-    label: "Atendimentos",
-    id: "atendimentos",
-    submenu: ["Listagem", "Atestados e prescrições", "Guias SP/SADT"],
-  },
-  {
-    icon: ShoppingCart,
-    label: "Vendas",
-    id: "vendas",
-    submenu: ["Vendas", "Orçamentos", "Pacotes"],
-  },
-  {
-    icon: DollarSign,
-    label: "Financeiro",
-    id: "financeiro",
-    submenu: ["Fluxo de caixa", "Contas a pagar", "Contas a receber", "Extrato"],
-  },
-  { icon: BadgePercent, label: "Comissões", id: "comissoes" },
-  {
-    icon: Package,
-    label: "Estoque",
-    id: "estoque",
-    submenu: ["Produtos", "Movimentações"],
-  },
-  {
-    icon: MessageSquare,
-    label: "Comunicação",
-    id: "comunicacao",
-    submenu: ["WhatsApp", "E-mail", "SMS"],
-  },
-  {
-    icon: FileEdit,
-    label: "CliniDocs",
-    id: "clinidocs",
-    badge: "new",
-    submenu: ["Modelos", "Documentos"],
-  },
-  {
-    icon: Heart,
-    label: "Marketing",
-    id: "marketing",
-    submenu: ["Campanhas", "Aniversariantes"],
-  },
-  { icon: Flower2, label: "Comunidade", id: "comunidade" },
-  {
-    icon: Settings,
-    label: "Configurações",
-    id: "config",
-    submenu: ["Perfil", "Clínica", "Usuários"],
-  },
-];
+import { NAV } from "@/nav/nav-config";
 
 export default function Sidebar() {
-  const [active, setActive] = useState<string>("contatos");
-  const [activeSub, setActiveSub] = useState<string>("Todos os contatos");
   const { expanded, toggle } = useSidebar();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const isItemActive = (path: string, hasSub: boolean) => {
+    if (path === "/") return pathname === "/";
+    if (hasSub) return pathname === path || pathname.startsWith(path + "/");
+    return pathname === path;
+  };
 
   return (
     <aside
@@ -120,28 +26,31 @@ export default function Sidebar() {
 
       <nav
         className={cn(
-          "flex flex-1 flex-col gap-1",
+          "flex flex-1 flex-col gap-1 overflow-y-auto",
           expanded ? "px-3" : "items-center px-0",
         )}
       >
-        {items.map((item) => {
-          const { icon: Icon, label, id, badge, submenu } = item;
-          const isActive = active === id;
+        {NAV.map((item) => {
+          const { icon: Icon, label, id, badge, submenu, path } = item;
+          const active = isItemActive(path, !!submenu?.length);
+
+          const handleClick = () => {
+            if (submenu?.length) navigate(submenu[0].path);
+            else navigate(path);
+          };
+
           return (
             <div key={id} className="group/item relative w-full">
               <button
                 type="button"
-                onClick={() => {
-                  setActive(id);
-                  if (submenu?.length) setActiveSub(submenu[0]);
-                }}
+                onClick={handleClick}
                 title={expanded ? undefined : label}
                 className={cn(
                   "relative flex items-center transition-all",
                   expanded
                     ? "h-12 w-full gap-3 rounded-2xl px-3"
                     : "mx-auto h-11 w-11 justify-center rounded-xl",
-                  isActive
+                  active
                     ? "bg-primary text-primary-foreground shadow-[0_8px_22px_-8px_hsl(var(--primary)/0.55)]"
                     : "text-[hsl(var(--sidebar-icon))] hover:bg-primary-soft hover:text-primary",
                 )}
@@ -162,7 +71,30 @@ export default function Sidebar() {
                 )}
               </button>
 
-              {/* Flyout submenu (collapsed only) */}
+              {/* Expanded: inline submenu when active */}
+              {expanded && submenu?.length && active && (
+                <ul className="mb-1 mt-1 flex flex-col gap-0.5 pl-11 pr-1">
+                  {submenu.map((s) => (
+                    <li key={s.path}>
+                      <NavLink
+                        to={s.path}
+                        className={({ isActive }) =>
+                          cn(
+                            "flex h-9 items-center rounded-lg px-3 text-[14px] font-semibold transition-colors",
+                            isActive
+                              ? "bg-primary-soft text-primary"
+                              : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                          )
+                        }
+                      >
+                        {s.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Collapsed: flyout submenu on hover */}
               {!expanded && submenu?.length && (
                 <div
                   className={cn(
@@ -174,28 +106,23 @@ export default function Sidebar() {
                     {label}
                   </div>
                   <ul className="flex flex-col">
-                    {submenu.map((s) => {
-                      const on = isActive && activeSub === s;
-                      return (
-                        <li key={s}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActive(id);
-                              setActiveSub(s);
-                            }}
-                            className={cn(
+                    {submenu.map((s) => (
+                      <li key={s.path}>
+                        <NavLink
+                          to={s.path}
+                          className={({ isActive }) =>
+                            cn(
                               "flex h-11 w-full items-center rounded-xl px-3 text-[15px] font-semibold transition-colors",
-                              on
+                              isActive
                                 ? "bg-primary text-primary-foreground"
                                 : "text-foreground/80 hover:bg-primary-soft hover:text-primary",
-                            )}
-                          >
-                            {s}
-                          </button>
-                        </li>
-                      );
-                    })}
+                            )
+                          }
+                        >
+                          {s.label}
+                        </NavLink>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
@@ -204,30 +131,19 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {expanded && (
-        <div className="flex justify-center pb-3">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label="Recolher"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-[hsl(var(--sidebar-icon))] transition-colors hover:bg-muted"
-          >
-            <ChevronRight className="h-4 w-4 rotate-180" strokeWidth={2.2} />
-          </button>
-        </div>
-      )}
-      {!expanded && (
-        <div className="flex justify-center pb-3">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label="Expandir"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-[hsl(var(--sidebar-icon))] transition-colors hover:bg-muted"
-          >
-            <ChevronRight className="h-4 w-4" strokeWidth={2.2} />
-          </button>
-        </div>
-      )}
+      <div className="flex justify-center pb-3">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={expanded ? "Recolher" : "Expandir"}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-[hsl(var(--sidebar-icon))] transition-colors hover:bg-muted"
+        >
+          <ChevronRight
+            className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")}
+            strokeWidth={2.2}
+          />
+        </button>
+      </div>
     </aside>
   );
 }
