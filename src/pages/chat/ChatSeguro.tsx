@@ -38,6 +38,7 @@ export default function ChatSeguro() {
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showNewPatient, setShowNewPatient] = useState(false);
+  const [startingWithClinic, setStartingWithClinic] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
