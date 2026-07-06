@@ -11,20 +11,9 @@ import {
 import { PageHeader, StatCard, Button, Badge } from "@/components/page-primitives";
 import { Link } from "react-router-dom";
 
-const upcoming = [
-  { time: "09:00", patient: "Amanda Ribeiro", proc: "Consulta inicial", status: "confirmado" as const },
-  { time: "10:30", patient: "Priscila Souza", proc: "Retorno pós-op", status: "aguardando" as const },
-  { time: "11:15", patient: "Beatriz Lima", proc: "Sessão radiofrequência", status: "confirmado" as const },
-  { time: "13:00", patient: "Camila Ferraz", proc: "Avaliação estética íntima", status: "novo" as const },
-  { time: "15:20", patient: "Larissa Martins", proc: "Aplicação de peeling", status: "confirmado" as const },
-];
+const upcoming: { time: string; patient: string; proc: string; status: "confirmado" | "aguardando" | "novo" }[] = [];
 
-const activities = [
-  { who: "Amanda R.", what: "assinou contrato de tratamento", when: "há 5 min" },
-  { who: "Secretária Julia", what: "agendou 3 novos horários", when: "há 20 min" },
-  { who: "Priscila S.", what: "enviou fotos de acompanhamento", when: "há 1 h" },
-  { who: "Financeiro", what: "recebeu R$ 1.850,00 via PIX", when: "há 2 h" },
-];
+const activities: { who: string; what: string; when: string }[] = [];
 
 const statusTone = {
   confirmado: "green" as const,
@@ -44,8 +33,8 @@ export default function Home() {
     <div className="p-6 md:p-8">
       <PageHeader
         breadcrumb={["Clínica", "Início"]}
-        title={`${greeting}, Dra. Carla`}
-        subtitle="Aqui está o resumo da sua clínica hoje."
+        title={`${greeting}, seja bem-vinda`}
+        subtitle="Comece criando seu primeiro agendamento ou cadastro."
         actions={
           <>
             <Button variant="secondary">
@@ -59,10 +48,10 @@ export default function Home() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Agendamentos hoje" value="14" hint="+3 vs ontem" accent="primary" icon={<Calendar className="h-5 w-5" />} />
-        <StatCard label="Faturamento do dia" value="R$ 6.420" hint="Meta R$ 8.000" accent="green" icon={<DollarSign className="h-5 w-5" />} />
-        <StatCard label="Novos pacientes" value="4" hint="Esta semana: 11" accent="pink" icon={<UserPlus className="h-5 w-5" />} />
-        <StatCard label="Pacientes ativos" value="238" hint="+12 no mês" accent="yellow" icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Agendamentos hoje" value="0" hint="Nenhum agendado" accent="primary" icon={<Calendar className="h-5 w-5" />} />
+        <StatCard label="Faturamento do dia" value="R$ 0" hint="Sem lançamentos" accent="green" icon={<DollarSign className="h-5 w-5" />} />
+        <StatCard label="Novos pacientes" value="0" hint="Cadastre para começar" accent="pink" icon={<UserPlus className="h-5 w-5" />} />
+        <StatCard label="Pacientes ativos" value="0" hint="Nenhum cadastrado" accent="yellow" icon={<Users className="h-5 w-5" />} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -74,20 +63,24 @@ export default function Home() {
               Ver todos <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <ul className="flex flex-col divide-y divide-border">
-            {upcoming.map((u) => (
-              <li key={u.time} className="flex items-center gap-4 py-3">
-                <div className="flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
-                  <span className="text-sm font-extrabold">{u.time}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-extrabold text-foreground">{u.patient}</div>
-                  <div className="truncate text-xs font-semibold text-muted-foreground">{u.proc}</div>
-                </div>
-                <Badge tone={statusTone[u.status]}>{u.status}</Badge>
-              </li>
-            ))}
-          </ul>
+          {upcoming.length === 0 ? (
+            <EmptyState text="Nenhum atendimento por aqui. Crie um novo agendamento para começar." />
+          ) : (
+            <ul className="flex flex-col divide-y divide-border">
+              {upcoming.map((u) => (
+                <li key={u.time} className="flex items-center gap-4 py-3">
+                  <div className="flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
+                    <span className="text-sm font-extrabold">{u.time}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-extrabold text-foreground">{u.patient}</div>
+                    <div className="truncate text-xs font-semibold text-muted-foreground">{u.proc}</div>
+                  </div>
+                  <Badge tone={statusTone[u.status]}>{u.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Atividade recente */}
@@ -96,20 +89,24 @@ export default function Home() {
             <h2 className="text-lg font-extrabold text-foreground">Atividade recente</h2>
             <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
           </div>
-          <ul className="flex flex-col gap-3">
-            {activities.map((a, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                <div className="min-w-0">
-                  <p className="text-sm text-foreground">
-                    <span className="font-extrabold">{a.who}</span>{" "}
-                    <span className="text-foreground/70">{a.what}</span>
-                  </p>
-                  <p className="text-xs font-semibold text-muted-foreground">{a.when}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {activities.length === 0 ? (
+            <EmptyState text="Sem atividades ainda." />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {activities.map((a, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground">
+                      <span className="font-extrabold">{a.who}</span>{" "}
+                      <span className="text-foreground/70">{a.what}</span>
+                    </p>
+                    <p className="text-xs font-semibold text-muted-foreground">{a.when}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
@@ -137,5 +134,13 @@ function Shortcut({ to, title, desc }: { to: string; title: string; desc: string
         <p className="text-xs font-semibold text-muted-foreground">{desc}</p>
       </div>
     </Link>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-10 text-center text-sm font-semibold text-muted-foreground">
+      {text}
+    </div>
   );
 }

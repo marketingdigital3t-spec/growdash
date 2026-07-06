@@ -15,16 +15,7 @@ type Row = {
   value: number;
 };
 
-const ROWS: Row[] = [
-  { id: "AG-1041", date: "12/03", time: "09:00", patient: "Amanda Ribeiro", prof: "Dra. Carla", proc: "Consulta inicial", status: "realizado", value: 450 },
-  { id: "AG-1042", date: "12/03", time: "10:30", patient: "Priscila Souza", prof: "Dra. Carla", proc: "Retorno pós-op", status: "realizado", value: 0 },
-  { id: "AG-1043", date: "13/03", time: "08:00", patient: "Beatriz Lima", prof: "Dra. Marina", proc: "Radiofrequência", status: "confirmado", value: 380 },
-  { id: "AG-1044", date: "13/03", time: "13:00", patient: "Camila Ferraz", prof: "Dra. Carla", proc: "Avaliação íntima", status: "confirmado", value: 300 },
-  { id: "AG-1045", date: "14/03", time: "14:00", patient: "Larissa Martins", prof: "Dra. Carla", proc: "Peeling químico", status: "aguardando", value: 520 },
-  { id: "AG-1046", date: "14/03", time: "16:30", patient: "Renata Alves", prof: "Dra. Marina", proc: "Ninfoplastia (ret.)", status: "cancelado", value: 0 },
-  { id: "AG-1047", date: "15/03", time: "09:00", patient: "Juliana Prado", prof: "Dra. Carla", proc: "Consulta", status: "confirmado", value: 450 },
-  { id: "AG-1048", date: "15/03", time: "11:00", patient: "Fernanda Melo", prof: "Dra. Marina", proc: "Laser íntimo", status: "aguardando", value: 680 },
-];
+const ROWS: Row[] = [];
 
 const TABS: { key: "todos" | Status; label: string }[] = [
   { key: "todos", label: "Todos" },

@@ -14,18 +14,7 @@ type Event = {
   color: "purple" | "pink" | "green" | "yellow";
 };
 
-const EVENTS: Event[] = [
-  { day: 0, start: 9, duration: 1, patient: "Amanda Ribeiro", proc: "Consulta inicial", color: "purple" },
-  { day: 0, start: 10.5, duration: 1, patient: "Priscila Souza", proc: "Retorno pós-op", color: "pink" },
-  { day: 1, start: 8, duration: 1.5, patient: "Beatriz Lima", proc: "Radiofrequência", color: "green" },
-  { day: 1, start: 13, duration: 1, patient: "Camila Ferraz", proc: "Avaliação íntima", color: "purple" },
-  { day: 2, start: 14, duration: 2, patient: "Larissa Martins", proc: "Peeling químico", color: "yellow" },
-  { day: 3, start: 9, duration: 1, patient: "Renata Alves", proc: "Ninfoplastia (retorno)", color: "pink" },
-  { day: 3, start: 15, duration: 1, patient: "Juliana Prado", proc: "Consulta", color: "purple" },
-  { day: 4, start: 11, duration: 1, patient: "Fernanda Melo", proc: "Laser íntimo", color: "green" },
-  { day: 4, start: 16, duration: 1.5, patient: "Isabela Costa", proc: "Avaliação estética", color: "yellow" },
-  { day: 5, start: 10, duration: 1, patient: "Mariana Duarte", proc: "Retorno", color: "purple" },
-];
+const EVENTS: Event[] = [];
 
 const colorStyles = {
   purple: "bg-primary-soft border-primary/30 text-primary",
