@@ -2,14 +2,9 @@ import { useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "@/nav/nav-config";
-import { usePermissions } from "@/hooks/usePermissions";
-import { moduleFromPath } from "@/lib/permissions";
-import { useAuth } from "@/hooks/useAuth";
 
 export default function Sidebar() {
   const { pathname } = useLocation();
-  const { user } = useAuth();
-  const { can, isAdmin, loading } = usePermissions();
 
   const isActive = (item: NavItem) =>
     item.path === "/"
@@ -18,11 +13,9 @@ export default function Sidebar() {
         pathname.startsWith(item.path + "/") ||
         item.submenu?.some((s) => s.path === pathname);
 
-  // Se usuária logada e não é admin, filtra pelo que ela pode ver.
-  // Se não logada, mostra tudo (é a experiência da landing/preview).
-  const visibleNav = !user || isAdmin || loading
-    ? NAV
-    : NAV.filter((item) => item.path === "/" || can(moduleFromPath(item.path), "view"));
+  // Sidebar sempre mostra todos os itens. Restrições reais ficam
+  // no nível das páginas/APIs (RLS + ProtectedRoute).
+  const visibleNav = NAV;
 
   return (
     <aside className="relative z-30 flex h-full w-[72px] shrink-0 flex-col border-r border-border bg-card py-3">
