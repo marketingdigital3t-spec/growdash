@@ -67,11 +67,11 @@ export default function TopBar() {
       </button>
 
       <a href="/" className="flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full border-[2.5px] border-primary">
-          <span className="h-2 w-2 rounded-full bg-primary" />
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[hsl(340_85%_60%)] text-[13px] font-black tracking-tight text-primary-foreground shadow-[0_8px_22px_-8px_hsl(var(--primary)/0.55)]">
+          CN
         </span>
         <span className="text-[22px] font-extrabold tracking-tight text-foreground">
-          grow<span className="font-black">dash</span>
+          clinic<span className="font-black text-primary">next</span>
         </span>
       </a>
 
