@@ -39,13 +39,16 @@ export function ThreadSidebar() {
   };
 
   return (
-    <aside className="hidden md:flex h-screen w-[260px] shrink-0 flex-col bg-sidebar text-sidebar-foreground">
+    <aside className="hidden md:flex h-screen w-[260px] shrink-0 flex-col bg-[#0a0a0a] text-neutral-200">
       {/* Brand */}
-      <div className="flex items-center gap-2 px-3 py-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[hsl(var(--growth-accent))] text-primary-foreground shadow-sm">
+      <div className="flex items-center gap-2 px-3 py-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#f4d47a] via-[#d4a94a] to-[#8a6a1f] text-black shadow-[0_0_20px_-4px_rgba(212,169,74,0.55)]">
           <Sparkles className="h-4 w-4" />
         </div>
-        <div className="text-sm font-semibold tracking-tight">Growdash AI</div>
+        <div className="text-sm font-semibold tracking-tight">
+          <span className="bg-gradient-to-r from-[#f4d47a] to-[#d4a94a] bg-clip-text text-transparent">Grow</span>
+          <span className="text-neutral-100">dash AI</span>
+        </div>
       </div>
 
       {/* Nav */}
