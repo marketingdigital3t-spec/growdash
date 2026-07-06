@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import { cn } from "@/lib/utils";
+import SearchPalette from "./SearchPalette";
 
 const PROFILE_IMG = "https://i.pravatar.cc/80?img=32";
 const PROFILE_NAME = "Carla Cristina Rezende";
@@ -22,7 +23,19 @@ const PROFILE_NAME = "Carla Cristina Rezende";
 export default function TopBar() {
   const { expanded, toggle } = useSidebar();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
