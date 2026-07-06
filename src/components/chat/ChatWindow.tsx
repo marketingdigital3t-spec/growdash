@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ChevronDown, ImagePlus, PencilLine, Globe, Plus, Mic, AudioLines, ArrowUp } from "lucide-react";
+import {
+  ChevronDown,
+  ImagePlus,
+  PencilLine,
+  Globe,
+  Plus,
+  Mic,
+  AudioLines,
+  ArrowUp,
+  FileText,
+  AlertTriangle,
+} from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -8,14 +19,15 @@ import {
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { Shimmer } from "@/components/ai-elements/shimmer";
-import { useThreads } from "@/hooks/useThreads";
-import type { ChatMessage, Thread } from "@/lib/threads";
+import { useSSD } from "@/lib/ssd/SSDContext";
+import { retrieve } from "@/lib/ssd/retriever";
+import type { ChatMessage, Thread } from "@/lib/ssd/threads";
 import { cn } from "@/lib/utils";
 
 const QUICK = [
-  { label: "Crie uma imagem", icon: ImagePlus },
-  { label: "Escreva ou edite", icon: PencilLine },
-  { label: "Consulte algo", icon: Globe },
+  { label: "Resuma o que tem no SSD", icon: PencilLine },
+  { label: "Encontre algo específico", icon: Globe },
+  { label: "Descreva uma imagem", icon: ImagePlus },
 ];
 
 interface Props {
@@ -24,7 +36,7 @@ interface Props {
 
 export function ChatWindow({ thread }: Props) {
   const { threadId } = useParams();
-  const { appendMessage, updateLastAssistant } = useThreads();
+  const { appendMessage, updateLastAssistant, index } = useSSD();
   const [status, setStatus] = useState<"ready" | "submitted" | "streaming">("ready");
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -40,31 +52,48 @@ export function ChatWindow({ thread }: Props) {
   const send = async (text: string) => {
     if (!text.trim() || !threadId) return;
     setInput("");
+
+    // 1. Local retrieval against the SSD index.
+    const hits = retrieve(index, text.trim(), 6);
+    const sources = Array.from(new Set(hits.map((h) => h.chunk.path)));
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: text.trim(),
       createdAt: Date.now(),
     };
-    appendMessage(threadId, userMsg);
+    await appendMessage(threadId, userMsg);
     setStatus("submitted");
 
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 300));
     const assistant: ChatMessage = {
       id: crypto.randomUUID(),
       role: "assistant",
       content: "",
       createdAt: Date.now(),
     };
-    appendMessage(threadId, assistant);
+    await appendMessage(threadId, assistant);
     setStatus("streaming");
 
-    const fullReply = `Esta é uma resposta simulada. Quando quiser plugar um modelo real (por exemplo via Lovable AI Gateway), é só me pedir.\n\n**Você disse:** ${text.trim()}`;
+    // 2. Simulated response (real model will be plugged when Cloud is enabled).
+    const preview = hits
+      .slice(0, 3)
+      .map(
+        (h, i) =>
+          `${i + 1}. **${h.chunk.path}** — ${h.chunk.text.slice(0, 180).trim()}…`,
+      )
+      .join("\n\n");
+
+    const fullReply = hits.length
+      ? `Encontrei ${hits.length} trechos relevantes no SSD sobre **"${text.trim()}"**:\n\n${preview}\n\n---\n*A IA generativa ainda não está plugada (sem créditos). Assim que você liberar, eu passo estes trechos + sua pergunta pro modelo e devolvo uma resposta sintetizada.*`
+      : `Não encontrei nada relacionado a **"${text.trim()}"** nos documentos indexados. Você já rodou "Indexar" no menu lateral após colocar arquivos em \`docs/\`?`;
+
     let acc = "";
     for (const chunk of fullReply.match(/.{1,4}/gs) ?? []) {
       acc += chunk;
-      updateLastAssistant(threadId, acc);
-      await new Promise((r) => setTimeout(r, 15));
+      await updateLastAssistant(threadId, acc, sources);
+      await new Promise((r) => setTimeout(r, 8));
     }
     setStatus("ready");
     window.setTimeout(() => textareaRef.current?.focus(), 30);
@@ -84,6 +113,7 @@ export function ChatWindow({ thread }: Props) {
   };
 
   const rendered = useMemo(() => messages, [messages]);
+  const noIndex = !index || index.chunkCount === 0;
 
   const Composer = (
     <form
@@ -106,7 +136,7 @@ export function ChatWindow({ thread }: Props) {
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={onKeyDown}
         rows={1}
-        placeholder="Pergunte alguma coisa"
+        placeholder="Pergunte alguma coisa sobre o conteúdo do SSD"
         className="max-h-40 flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 text-neutral-100 placeholder:text-neutral-500 focus:outline-none"
       />
       <div className="flex items-center gap-1">
@@ -141,18 +171,25 @@ export function ChatWindow({ thread }: Props) {
 
   return (
     <div className="flex h-screen min-w-0 flex-1 flex-col bg-[#050505]">
-      {/* Header */}
       <header className="flex h-14 items-center justify-between px-4 md:px-6">
         <button className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-neutral-200 hover:bg-white/5">
           <span className="bg-gradient-to-r from-[#f4d47a] to-[#d4a94a] bg-clip-text text-transparent">Grow</span>dash AI
           <ChevronDown className="h-4 w-4 opacity-70" />
         </button>
-        <div className="flex items-center gap-2">
-          <button className="rounded-full bg-gradient-to-r from-[#f4d47a] via-[#d4a94a] to-[#8a6a1f] px-3 py-1.5 text-xs font-semibold text-black shadow-[0_0_16px_-4px_rgba(212,169,74,0.55)] hover:brightness-110">
-            ✨ Fazer upgrade
-          </button>
+        <div className="flex items-center gap-2 text-[11px] text-neutral-500">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            SSD ativo
+          </span>
         </div>
       </header>
+
+      {noIndex && (
+        <div className="mx-auto mt-1 flex w-full max-w-3xl items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-[12px] text-amber-200/90">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Nenhum documento indexado ainda. Coloque arquivos em <code className="mx-1 rounded bg-black/40 px-1">docs/</code> e clique em <b>Indexar</b> no menu lateral.
+        </div>
+      )}
 
       {isEmpty ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6">
@@ -164,7 +201,7 @@ export function ChatWindow({ thread }: Props) {
             {QUICK.map(({ label, icon: Icon }) => (
               <button
                 key={label}
-                onClick={() => send(label + ": ")}
+                onClick={() => send(label)}
                 className="flex items-center gap-2 rounded-full border border-white/10 bg-[#111]/70 px-4 py-2 text-sm text-neutral-300 backdrop-blur transition hover:border-[#d4a94a]/40 hover:text-neutral-100"
               >
                 <Icon className="h-4 w-4 text-[#d4a94a]" />
@@ -180,9 +217,24 @@ export function ChatWindow({ thread }: Props) {
               {rendered.map((m) => (
                 <Message key={m.id} from={m.role}>
                   {m.role === "assistant" ? (
-                    <MessageContent className="prose prose-sm dark:prose-invert max-w-none">
-                      {m.content ? <MessageResponse>{m.content}</MessageResponse> : <Shimmer>Pensando</Shimmer>}
-                    </MessageContent>
+                    <div className="w-full max-w-full">
+                      <MessageContent className="prose prose-sm dark:prose-invert max-w-none">
+                        {m.content ? <MessageResponse>{m.content}</MessageResponse> : <Shimmer>Buscando no SSD</Shimmer>}
+                      </MessageContent>
+                      {m.sources && m.sources.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5 px-4">
+                          {m.sources.map((src) => (
+                            <span
+                              key={src}
+                              className="inline-flex items-center gap-1 rounded-full border border-[#d4a94a]/25 bg-[#d4a94a]/5 px-2 py-0.5 text-[10.5px] text-[#f4d47a]"
+                            >
+                              <FileText className="h-3 w-3" />
+                              {src}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <MessageContent>{m.content}</MessageContent>
                   )}
@@ -191,7 +243,7 @@ export function ChatWindow({ thread }: Props) {
               {status === "submitted" && (
                 <Message from="assistant">
                   <MessageContent>
-                    <Shimmer>Pensando</Shimmer>
+                    <Shimmer>Buscando no SSD</Shimmer>
                   </MessageContent>
                 </Message>
               )}
@@ -201,8 +253,8 @@ export function ChatWindow({ thread }: Props) {
 
           <div className="mx-auto w-full max-w-3xl px-4 pb-5 pt-2">
             {Composer}
-            <p className="mt-2 text-center text-[11px] text-muted-foreground">
-              Growdash AI pode cometer erros. Verifique informações importantes.
+            <p className="mt-2 text-center text-[11px] text-neutral-500">
+              Respostas geradas 100% a partir dos arquivos do seu SSD.
             </p>
           </div>
         </>
