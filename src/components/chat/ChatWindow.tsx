@@ -89,13 +89,13 @@ export function ChatWindow({ thread }: Props) {
     <form
       onSubmit={onSubmit}
       className={cn(
-        "group relative flex w-full items-end gap-2 rounded-[28px] border border-border/60 bg-card/80 px-3 py-2.5 shadow-[0_8px_40px_-12px_hsl(var(--primary)/0.35)] backdrop-blur",
-        "focus-within:border-primary/40 focus-within:shadow-[0_10px_50px_-10px_hsl(var(--primary)/0.5)]",
+        "group relative flex w-full items-end gap-2 rounded-[28px] border border-[#d4a94a]/20 bg-[#111]/80 px-3 py-2.5 shadow-[0_8px_40px_-12px_rgba(212,169,74,0.25)] backdrop-blur",
+        "focus-within:border-[#d4a94a]/50 focus-within:shadow-[0_10px_50px_-10px_rgba(212,169,74,0.4)]",
       )}
     >
       <button
         type="button"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-400 transition hover:bg-white/5 hover:text-neutral-100"
         aria-label="Adicionar"
       >
         <Plus className="h-5 w-5" />
@@ -107,12 +107,12 @@ export function ChatWindow({ thread }: Props) {
         onKeyDown={onKeyDown}
         rows={1}
         placeholder="Pergunte alguma coisa"
-        className="max-h-40 flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+        className="max-h-40 flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 text-neutral-100 placeholder:text-neutral-500 focus:outline-none"
       />
       <div className="flex items-center gap-1">
         <button
           type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition hover:bg-white/5 hover:text-neutral-100"
           aria-label="Ditar"
         >
           <Mic className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function ChatWindow({ thread }: Props) {
           <button
             type="submit"
             disabled={status !== "ready"}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[hsl(var(--growth-accent))] text-primary-foreground shadow-md transition hover:opacity-90 disabled:opacity-50"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#f4d47a] via-[#d4a94a] to-[#8a6a1f] text-black shadow-[0_0_20px_-4px_rgba(212,169,74,0.6)] transition hover:brightness-110 disabled:opacity-50"
             aria-label="Enviar"
           >
             <ArrowUp className="h-4 w-4" />
@@ -129,7 +129,7 @@ export function ChatWindow({ thread }: Props) {
         ) : (
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition hover:bg-white/5 hover:text-neutral-100"
             aria-label="Voz"
           >
             <AudioLines className="h-4 w-4" />
@@ -140,15 +140,15 @@ export function ChatWindow({ thread }: Props) {
   );
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col">
+    <div className="flex h-screen min-w-0 flex-1 flex-col bg-[#050505]">
       {/* Header */}
       <header className="flex h-14 items-center justify-between px-4 md:px-6">
-        <button className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-foreground/90 hover:bg-accent">
-          Growdash AI
+        <button className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-neutral-200 hover:bg-white/5">
+          <span className="bg-gradient-to-r from-[#f4d47a] to-[#d4a94a] bg-clip-text text-transparent">Grow</span>dash AI
           <ChevronDown className="h-4 w-4 opacity-70" />
         </button>
         <div className="flex items-center gap-2">
-          <button className="rounded-full bg-gradient-to-r from-primary to-[hsl(var(--growth-accent))] px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90">
+          <button className="rounded-full bg-gradient-to-r from-[#f4d47a] via-[#d4a94a] to-[#8a6a1f] px-3 py-1.5 text-xs font-semibold text-black shadow-[0_0_16px_-4px_rgba(212,169,74,0.55)] hover:brightness-110">
             ✨ Fazer upgrade
           </button>
         </div>
@@ -156,7 +156,7 @@ export function ChatWindow({ thread }: Props) {
 
       {isEmpty ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6">
-          <h1 className="mb-10 text-center text-3xl font-medium tracking-tight text-foreground/95 md:text-[32px]">
+          <h1 className="mb-10 text-center text-3xl font-medium tracking-tight text-neutral-100 md:text-[32px]">
             Tudo pronto? Então vamos lá!
           </h1>
           <div className="w-full max-w-3xl">{Composer}</div>
@@ -165,9 +165,9 @@ export function ChatWindow({ thread }: Props) {
               <button
                 key={label}
                 onClick={() => send(label + ": ")}
-                className="flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-2 text-sm text-foreground/85 backdrop-blur transition hover:border-primary/40 hover:text-foreground"
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-[#111]/70 px-4 py-2 text-sm text-neutral-300 backdrop-blur transition hover:border-[#d4a94a]/40 hover:text-neutral-100"
               >
-                <Icon className="h-4 w-4 text-primary" />
+                <Icon className="h-4 w-4 text-[#d4a94a]" />
                 {label}
               </button>
             ))}
