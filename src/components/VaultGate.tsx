@@ -1,17 +1,26 @@
-import { useState, ReactNode } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import { KeyRound, Lock, ShieldCheck } from "lucide-react";
 import { useCrypto } from "@/hooks/useCrypto";
 
 /**
  * Bloqueia o conteúdo até que o usuário configure ou desbloqueie o cofre E2E.
- * A senha do cofre é distinta da senha de login e nunca é enviada ao servidor.
+ * A senha do cofre é distinta da senha de login, é única por usuário e nunca
+ * é enviada ao servidor. Ao sair da área protegida, o cofre é travado
+ * automaticamente — na próxima entrada a chave deverá ser digitada de novo.
  */
 export default function VaultGate({ children }: { children: ReactNode }) {
-  const { unlocked, needsSetup, hasKeypair, loading, setup, unlock } = useCrypto();
+  const { unlocked, needsSetup, hasKeypair, loading, setup, unlock, lock } = useCrypto();
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Sempre que a área protegida for desmontada (usuário troca de rota, fecha aba),
+  // o cofre é apagado da memória. Isso força o pedido da chave a cada acesso.
+  useEffect(() => {
+    return () => lock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) return <div className="grid h-full place-items-center text-sm text-muted-foreground">Carregando cofre…</div>;
   if (unlocked) return <>{children}</>;
