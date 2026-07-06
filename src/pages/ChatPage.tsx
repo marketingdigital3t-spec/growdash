@@ -5,6 +5,14 @@ import { SSDProvider, useSSD } from "@/lib/ssd/SSDContext";
 import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 
+function isInIframe() {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 function ConnectGate() {
   const {
     status,
@@ -16,6 +24,11 @@ function ConnectGate() {
   } = useSSD();
 
   const connecting = status === "connecting" || status === "loading" || status === "indexing";
+  const inIframe = isInIframe();
+
+  const openInNewTab = () => {
+    window.open(window.location.href, "_blank", "noopener");
+  };
 
   return (
     <div className="flex flex-1 items-center justify-center p-6">
@@ -26,39 +39,53 @@ function ConnectGate() {
         <h2 className="mb-2 text-xl font-medium text-neutral-100">
           {status === "unsupported"
             ? "Navegador não suportado"
-            : status === "needs-permission"
-              ? "Reautorizar acesso ao SSD"
-              : "Conecte seu SSD externo"}
+            : inIframe
+              ? "Abra em uma aba dedicada"
+              : status === "needs-permission"
+                ? "Reautorizar acesso ao SSD"
+                : "Conecte seu SSD externo"}
         </h2>
         <p className="mx-auto mb-6 max-w-sm text-sm text-neutral-400">
           {status === "unsupported"
             ? "Este app usa a File System Access API. Abra em Chrome, Edge, Brave ou Arc."
-            : status === "needs-permission"
-              ? `A permissão para acessar “${folderName}” expirou. Reautorize para continuar.`
-              : "Escolha a pasta no SSD onde ficarão suas conversas e documentos. O app só lê e escreve dentro dela — nada sai daí sem sua ação."}
+            : inIframe
+              ? "O navegador bloqueia a seleção de pastas dentro do preview do editor. Abra o app em uma aba nova (ou publique) para escolher a pasta do SSD."
+              : status === "needs-permission"
+                ? `A permissão para acessar “${folderName}” expirou. Reautorize para continuar.`
+                : "Escolha a pasta no SSD onde ficarão suas conversas e documentos. O app só lê e escreve dentro dela — nada sai daí sem sua ação."}
         </p>
 
         {supported && status !== "unsupported" && (
-          <button
-            onClick={connect}
-            disabled={connecting}
-            className="mx-auto inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#f4d47a] via-[#d4a94a] to-[#8a6a1f] px-5 py-2.5 text-sm font-semibold text-black shadow-[0_0_18px_-4px_rgba(212,169,74,0.5)] transition hover:brightness-110 disabled:opacity-60"
-          >
-            {connecting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : status === "needs-permission" ? (
-              <RefreshCcw className="h-4 w-4" />
-            ) : (
+          inIframe ? (
+            <button
+              onClick={openInNewTab}
+              className="mx-auto inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#f4d47a] via-[#d4a94a] to-[#8a6a1f] px-5 py-2.5 text-sm font-semibold text-black shadow-[0_0_18px_-4px_rgba(212,169,74,0.5)] transition hover:brightness-110"
+            >
               <FolderOpen className="h-4 w-4" />
-            )}
-            {status === "needs-permission" ? "Reautorizar" : "Escolher pasta"}
-          </button>
+              Abrir em nova aba
+            </button>
+          ) : (
+            <button
+              onClick={connect}
+              disabled={connecting}
+              className="mx-auto inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#f4d47a] via-[#d4a94a] to-[#8a6a1f] px-5 py-2.5 text-sm font-semibold text-black shadow-[0_0_18px_-4px_rgba(212,169,74,0.5)] transition hover:brightness-110 disabled:opacity-60"
+            >
+              {connecting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : status === "needs-permission" ? (
+                <RefreshCcw className="h-4 w-4" />
+              ) : (
+                <FolderOpen className="h-4 w-4" />
+              )}
+              {status === "needs-permission" ? "Reautorizar" : "Escolher pasta"}
+            </button>
+          )
         )}
 
         {progressMessage && (
           <p className="mt-4 text-xs text-neutral-500">{progressMessage}</p>
         )}
-        {errorMessage && (
+        {errorMessage && !inIframe && (
           <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-red-400">
             <AlertTriangle className="h-3.5 w-3.5" />
             {errorMessage}
