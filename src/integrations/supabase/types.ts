@@ -270,31 +270,19 @@ export type Database = {
       user_keys: {
         Row: {
           created_at: string
-          encrypted_private_key: string
-          iterations: number
-          iv: string
           public_key: Json
-          salt: string
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          encrypted_private_key: string
-          iterations?: number
-          iv: string
           public_key: Json
-          salt: string
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
-          encrypted_private_key?: string
-          iterations?: number
-          iv?: string
           public_key?: Json
-          salt?: string
           updated_at?: string
           user_id?: string
         }
@@ -322,6 +310,36 @@ export type Database = {
           id?: string
           level?: string
           module?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_private_keys: {
+        Row: {
+          created_at: string
+          encrypted_private_key: string
+          iterations: number
+          iv: string
+          salt: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_private_key: string
+          iterations?: number
+          iv: string
+          salt: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_private_key?: string
+          iterations?: number
+          iv?: string
+          salt?: string
           updated_at?: string
           user_id?: string
         }
