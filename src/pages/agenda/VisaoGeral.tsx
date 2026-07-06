@@ -1,24 +1,55 @@
+import { useMemo } from "react";
 import { CheckCircle2, Clock, XCircle, TrendingUp, CalendarDays, UserCheck } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/page-primitives";
-
-const topProfs: { name: string; count: number; pct: number }[] = [];
-
-const topProcs: { name: string; count: number }[] = [];
+import { useClinic } from "@/store/clinic-store";
 
 export default function AgendaVisaoGeral() {
+  const { appointments } = useClinic();
+
+  const stats = useMemo(() => {
+    const total = appointments.length;
+    const confirmed = appointments.filter((a) => a.status === "confirmado").length;
+    const waiting = appointments.filter((a) => a.status === "aguardando").length;
+    const cancelled = appointments.filter((a) => a.status === "cancelado").length;
+    return { total, confirmed, waiting, cancelled };
+  }, [appointments]);
+
+  const topProfs = useMemo(() => {
+    const map = new Map<string, number>();
+    appointments.forEach((a) => {
+      if (!a.prof) return;
+      map.set(a.prof, (map.get(a.prof) || 0) + 1);
+    });
+    const arr = Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+    const max = Math.max(1, ...arr.map((p) => p.count));
+    return arr
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((p) => ({ ...p, pct: Math.round((p.count / max) * 100) }));
+  }, [appointments]);
+
+  const topProcs = useMemo(() => {
+    const map = new Map<string, number>();
+    appointments.forEach((a) => map.set(a.proc, (map.get(a.proc) || 0) + 1));
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [appointments]);
+
   return (
     <div className="p-6 md:p-8">
       <PageHeader
         breadcrumb={["Clínica", "Agenda", "Visão geral"]}
         title="Visão geral da Agenda"
-        subtitle="Os indicadores aparecem aqui conforme você cria agendamentos."
+        subtitle="Indicadores calculados a partir dos seus agendamentos."
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Agendamentos" value="0" hint="Nenhum registrado" accent="primary" icon={<CalendarDays className="h-5 w-5" />} />
-        <StatCard label="Confirmados" value="0" hint="—" accent="green" icon={<CheckCircle2 className="h-5 w-5" />} />
-        <StatCard label="Aguardando" value="0" hint="—" accent="yellow" icon={<Clock className="h-5 w-5" />} />
-        <StatCard label="Cancelados / Faltas" value="0" hint="—" accent="pink" icon={<XCircle className="h-5 w-5" />} />
+        <StatCard label="Agendamentos" value={String(stats.total)} hint="Total registrado" accent="primary" icon={<CalendarDays className="h-5 w-5" />} />
+        <StatCard label="Confirmados" value={String(stats.confirmed)} hint={stats.total ? `${Math.round((stats.confirmed / stats.total) * 100)}% da agenda` : "—"} accent="green" icon={<CheckCircle2 className="h-5 w-5" />} />
+        <StatCard label="Aguardando" value={String(stats.waiting)} hint="A confirmar" accent="yellow" icon={<Clock className="h-5 w-5" />} />
+        <StatCard label="Cancelados" value={String(stats.cancelled)} hint={stats.total ? `${Math.round((stats.cancelled / stats.total) * 100)}%` : "—"} accent="pink" icon={<XCircle className="h-5 w-5" />} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">

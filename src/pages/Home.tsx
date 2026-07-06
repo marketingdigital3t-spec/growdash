@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Calendar,
   DollarSign,
@@ -9,25 +9,47 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { PageHeader, StatCard, Button, Badge } from "@/components/page-primitives";
-import { Link } from "react-router-dom";
-
-const upcoming: { time: string; patient: string; proc: string; status: "confirmado" | "aguardando" | "novo" }[] = [];
-
-const activities: { who: string; what: string; when: string }[] = [];
-
-const statusTone = {
-  confirmado: "green" as const,
-  aguardando: "yellow" as const,
-  novo: "primary" as const,
-};
+import { Link, useNavigate } from "react-router-dom";
+import NewAppointmentDialog from "@/components/NewAppointmentDialog";
+import { useClinic, todayISO } from "@/store/clinic-store";
 
 export default function Home() {
-  const [greeting] = useState(() => {
+  const navigate = useNavigate();
+  const { appointments } = useClinic();
+  const [open, setOpen] = useState(false);
+
+  const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 12) return "Bom dia";
     if (h < 18) return "Boa tarde";
     return "Boa noite";
-  });
+  }, []);
+
+  const today = todayISO();
+  const todays = useMemo(
+    () => appointments.filter((a) => a.date === today).sort((a, b) => a.time.localeCompare(b.time)),
+    [appointments, today],
+  );
+  const upcoming = useMemo(
+    () =>
+      appointments
+        .filter((a) => a.date >= today && a.status !== "cancelado")
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+        .slice(0, 6),
+    [appointments, today],
+  );
+
+  const revenueToday = todays
+    .filter((a) => a.status !== "cancelado")
+    .reduce((sum, a) => sum + (a.value || 0), 0);
+  const patients = new Set(appointments.map((a) => a.patient.trim().toLowerCase()).filter(Boolean)).size;
+
+  const statusTone = {
+    confirmado: "green",
+    aguardando: "yellow",
+    realizado: "primary",
+    cancelado: "red",
+  } as const;
 
   return (
     <div className="p-6 md:p-8">
@@ -37,10 +59,10 @@ export default function Home() {
         subtitle="Comece criando seu primeiro agendamento ou cadastro."
         actions={
           <>
-            <Button variant="secondary">
+            <Button variant="secondary" onClick={() => navigate("/agenda/semana")}>
               <Calendar className="h-4 w-4" /> Ver agenda
             </Button>
-            <Button>
+            <Button onClick={() => setOpen(true)}>
               <Plus className="h-4 w-4" /> Novo agendamento
             </Button>
           </>
@@ -48,10 +70,34 @@ export default function Home() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Agendamentos hoje" value="0" hint="Nenhum agendado" accent="primary" icon={<Calendar className="h-5 w-5" />} />
-        <StatCard label="Faturamento do dia" value="R$ 0" hint="Sem lançamentos" accent="green" icon={<DollarSign className="h-5 w-5" />} />
-        <StatCard label="Novos pacientes" value="0" hint="Cadastre para começar" accent="pink" icon={<UserPlus className="h-5 w-5" />} />
-        <StatCard label="Pacientes ativos" value="0" hint="Nenhum cadastrado" accent="yellow" icon={<Users className="h-5 w-5" />} />
+        <StatCard
+          label="Agendamentos hoje"
+          value={String(todays.length)}
+          hint={todays.length ? "Confira a agenda" : "Nenhum agendado"}
+          accent="primary"
+          icon={<Calendar className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Faturamento do dia"
+          value={`R$ ${revenueToday.toLocaleString("pt-BR")}`}
+          hint={revenueToday ? "Somatório dos atendimentos" : "Sem lançamentos"}
+          accent="green"
+          icon={<DollarSign className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Novos pacientes"
+          value={String(patients)}
+          hint={patients ? "Únicos no total" : "Cadastre para começar"}
+          accent="pink"
+          icon={<UserPlus className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Pacientes ativos"
+          value={String(patients)}
+          hint={patients ? "Com pelo menos 1 atendimento" : "Nenhum cadastrado"}
+          accent="yellow"
+          icon={<Users className="h-5 w-5" />}
+        />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -68,7 +114,7 @@ export default function Home() {
           ) : (
             <ul className="flex flex-col divide-y divide-border">
               {upcoming.map((u) => (
-                <li key={u.time} className="flex items-center gap-4 py-3">
+                <li key={u.id} className="flex items-center gap-4 py-3">
                   <div className="flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
                     <span className="text-sm font-extrabold">{u.time}</span>
                   </div>
@@ -89,24 +135,7 @@ export default function Home() {
             <h2 className="text-lg font-extrabold text-foreground">Atividade recente</h2>
             <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
           </div>
-          {activities.length === 0 ? (
-            <EmptyState text="Sem atividades ainda." />
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {activities.map((a, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                  <div className="min-w-0">
-                    <p className="text-sm text-foreground">
-                      <span className="font-extrabold">{a.who}</span>{" "}
-                      <span className="text-foreground/70">{a.what}</span>
-                    </p>
-                    <p className="text-xs font-semibold text-muted-foreground">{a.when}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <EmptyState text="Sem atividades ainda." />
         </div>
       </div>
 
@@ -116,6 +145,16 @@ export default function Home() {
         <Shortcut to="/clinidocs/documentos" title="Anexar contrato" desc="Envie um termo ou contrato à ficha da paciente." />
         <Shortcut to="/comunicacao/whatsapp" title="Abrir chat" desc="Converse pelo canal interno seguro conforme LGPD." />
       </div>
+
+      <NewAppointmentDialog open={open} onClose={() => setOpen(false)} />
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-10 text-center text-sm font-semibold text-muted-foreground">
+      {text}
     </div>
   );
 }
@@ -134,13 +173,5 @@ function Shortcut({ to, title, desc }: { to: string; title: string; desc: string
         <p className="text-xs font-semibold text-muted-foreground">{desc}</p>
       </div>
     </Link>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-10 text-center text-sm font-semibold text-muted-foreground">
-      {text}
-    </div>
   );
 }

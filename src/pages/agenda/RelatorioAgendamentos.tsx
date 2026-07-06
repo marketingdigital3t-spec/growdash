@@ -1,23 +1,10 @@
 import { useMemo, useState } from "react";
-import { Search, Download } from "lucide-react";
+import { Search, Download, Plus, Trash2 } from "lucide-react";
 import { PageHeader, Button, Input, Badge } from "@/components/page-primitives";
+import NewAppointmentDialog from "@/components/NewAppointmentDialog";
+import { useClinic, formatDateBR, type ApptStatus } from "@/store/clinic-store";
 
-type Status = "confirmado" | "aguardando" | "realizado" | "cancelado";
-
-type Row = {
-  id: string;
-  date: string;
-  time: string;
-  patient: string;
-  prof: string;
-  proc: string;
-  status: Status;
-  value: number;
-};
-
-const ROWS: Row[] = [];
-
-const TABS: { key: "todos" | Status; label: string }[] = [
+const TABS: { key: "todos" | ApptStatus; label: string }[] = [
   { key: "todos", label: "Todos" },
   { key: "confirmado", label: "Confirmados" },
   { key: "aguardando", label: "Aguardando" },
@@ -25,7 +12,7 @@ const TABS: { key: "todos" | Status; label: string }[] = [
   { key: "cancelado", label: "Cancelados" },
 ];
 
-const statusTone: Record<Status, "green" | "yellow" | "primary" | "red"> = {
+const statusTone: Record<ApptStatus, "green" | "yellow" | "primary" | "red"> = {
   realizado: "green",
   aguardando: "yellow",
   confirmado: "primary",
@@ -33,25 +20,43 @@ const statusTone: Record<Status, "green" | "yellow" | "primary" | "red"> = {
 };
 
 export default function RelatorioAgendamentos() {
+  const { appointments, removeAppointment } = useClinic();
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("todos");
   const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
 
   const filtered = useMemo(() => {
-    return ROWS.filter((r) => (tab === "todos" ? true : r.status === tab)).filter((r) =>
-      q ? [r.patient, r.prof, r.proc, r.id].some((v) => v.toLowerCase().includes(q.toLowerCase())) : true,
-    );
-  }, [tab, q]);
+    return appointments
+      .filter((r) => (tab === "todos" ? true : r.status === tab))
+      .filter((r) =>
+        q ? [r.patient, r.prof, r.proc, r.id].some((v) => v.toLowerCase().includes(q.toLowerCase())) : true,
+      )
+      .sort((a, b) => (a.date + a.time > b.date + b.time ? -1 : 1));
+  }, [appointments, tab, q]);
 
   const counts = useMemo(
     () => ({
-      todos: ROWS.length,
-      confirmado: ROWS.filter((r) => r.status === "confirmado").length,
-      aguardando: ROWS.filter((r) => r.status === "aguardando").length,
-      realizado: ROWS.filter((r) => r.status === "realizado").length,
-      cancelado: ROWS.filter((r) => r.status === "cancelado").length,
+      todos: appointments.length,
+      confirmado: appointments.filter((r) => r.status === "confirmado").length,
+      aguardando: appointments.filter((r) => r.status === "aguardando").length,
+      realizado: appointments.filter((r) => r.status === "realizado").length,
+      cancelado: appointments.filter((r) => r.status === "cancelado").length,
     }),
-    [],
+    [appointments],
   );
+
+  const exportCsv = () => {
+    const header = ["Código", "Data", "Hora", "Paciente", "Profissional", "Procedimento", "Status", "Valor"];
+    const rows = filtered.map((r) => [r.id, r.date, r.time, r.patient, r.prof, r.proc, r.status, String(r.value)]);
+    const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `agendamentos-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="p-6 md:p-8">
@@ -60,9 +65,14 @@ export default function RelatorioAgendamentos() {
         title="Relatório de agendamentos"
         subtitle="Acompanhe cada atendimento por status."
         actions={
-          <Button variant="secondary">
-            <Download className="h-4 w-4" /> Exportar
-          </Button>
+          <>
+            <Button variant="secondary" onClick={exportCsv} disabled={!filtered.length}>
+              <Download className="h-4 w-4" /> Exportar
+            </Button>
+            <Button onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4" /> Novo agendamento
+            </Button>
+          </>
         }
       />
 
@@ -114,17 +124,18 @@ export default function RelatorioAgendamentos() {
               <th className="px-4 py-3">Procedimento</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Valor</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.map((r) => (
-              <tr key={r.id} className="transition-colors hover:bg-muted/40">
+              <tr key={r.id} className="group transition-colors hover:bg-muted/40">
                 <td className="px-4 py-3 font-bold text-foreground">{r.id}</td>
                 <td className="px-4 py-3 font-semibold text-foreground/80">
-                  {r.date} · {r.time}
+                  {formatDateBR(r.date)} · {r.time}
                 </td>
                 <td className="px-4 py-3 font-extrabold text-foreground">{r.patient}</td>
-                <td className="px-4 py-3 font-semibold text-foreground/70">{r.prof}</td>
+                <td className="px-4 py-3 font-semibold text-foreground/70">{r.prof || "—"}</td>
                 <td className="px-4 py-3 text-foreground/80">{r.proc}</td>
                 <td className="px-4 py-3">
                   <Badge tone={statusTone[r.status]}>{r.status}</Badge>
@@ -132,11 +143,21 @@ export default function RelatorioAgendamentos() {
                 <td className="px-4 py-3 text-right font-extrabold text-foreground">
                   {r.value ? `R$ ${r.value.toLocaleString("pt-BR")}` : "—"}
                 </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => removeAppointment(r.id)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-[hsl(0_85%_95%)] hover:text-[hsl(0_70%_50%)] group-hover:opacity-100"
+                    aria-label="Remover"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm font-semibold text-muted-foreground">
+                <td colSpan={8} className="px-4 py-12 text-center text-sm font-semibold text-muted-foreground">
                   Nenhum agendamento encontrado.
                 </td>
               </tr>
@@ -144,6 +165,8 @@ export default function RelatorioAgendamentos() {
           </tbody>
         </table>
       </div>
+
+      <NewAppointmentDialog open={open} onClose={() => setOpen(false)} />
     </div>
   );
 }
