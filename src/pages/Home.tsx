@@ -89,20 +89,24 @@ export default function Home() {
             <h2 className="text-lg font-extrabold text-foreground">Atividade recente</h2>
             <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
           </div>
-          <ul className="flex flex-col gap-3">
-            {activities.map((a, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                <div className="min-w-0">
-                  <p className="text-sm text-foreground">
-                    <span className="font-extrabold">{a.who}</span>{" "}
-                    <span className="text-foreground/70">{a.what}</span>
-                  </p>
-                  <p className="text-xs font-semibold text-muted-foreground">{a.when}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {activities.length === 0 ? (
+            <EmptyState text="Sem atividades ainda." />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {activities.map((a, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground">
+                      <span className="font-extrabold">{a.who}</span>{" "}
+                      <span className="text-foreground/70">{a.what}</span>
+                    </p>
+                    <p className="text-xs font-semibold text-muted-foreground">{a.when}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
