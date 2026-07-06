@@ -44,10 +44,11 @@ export default function Sidebar() {
               {/* Hover flyout: title + submenu (or just title if no submenu) */}
               <div
                 className={cn(
-                  "pointer-events-none absolute left-full top-0 z-40 ml-2 min-w-[260px] rounded-2xl border border-border bg-card p-4 opacity-0 shadow-[0_20px_60px_-20px_rgb(0_0_0/0.25)] transition-opacity",
+                  "pointer-events-none absolute left-full top-0 z-40 pl-2 opacity-0 transition-opacity",
                   "group-hover/item:pointer-events-auto group-hover/item:opacity-100",
                 )}
               >
+                <div className="min-w-[260px] rounded-2xl border border-border bg-card p-4 shadow-[0_20px_60px_-20px_rgb(0_0_0/0.25)]">
                 <div className={cn("px-3 text-[17px] font-extrabold text-foreground", submenu?.length && "mb-2")}>
                   {label}
                 </div>
