@@ -36,7 +36,7 @@ export async function generateKeypair(): Promise<CryptoKeyPair> {
 export async function deriveWrapKey(password: string, salt: Uint8Array, iterations: number) {
   const base = await crypto.subtle.importKey("raw", te.encode(password), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as BufferSource, iterations, hash: "SHA-256" },
     base,
     { name: "AES-GCM", length: 256 },
     false,
@@ -54,12 +54,12 @@ export async function importPublicJwk(jwk: JsonWebKey) {
 
 export async function wrapPrivateKeyWithPassword(priv: CryptoKey, wrapKey: CryptoKey, iv: Uint8Array) {
   const pkcs8 = await crypto.subtle.exportKey("pkcs8", priv);
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, wrapKey, pkcs8);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv as BufferSource }, wrapKey, pkcs8);
   return b64.encode(ct);
 }
 
 export async function unwrapPrivateKeyWithPassword(cipherB64: string, wrapKey: CryptoKey, iv: Uint8Array) {
-  const pkcs8 = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, wrapKey, b64.decode(cipherB64));
+  const pkcs8 = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, wrapKey, b64.decode(cipherB64) as BufferSource);
   return crypto.subtle.importKey("pkcs8", pkcs8, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]);
 }
 
@@ -80,22 +80,22 @@ export async function unwrapConversationKey(wrappedB64: string, priv: CryptoKey)
 
 export async function encryptText(text: string, key: CryptoKey) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, te.encode(text));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, te.encode(text));
   return { iv: b64.encode(iv), ciphertext: b64.encode(ct) };
 }
 
 export async function decryptText(iv: string, ciphertext: string, key: CryptoKey) {
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64.decode(iv) }, key, b64.decode(ciphertext));
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64.decode(iv) as BufferSource }, key, b64.decode(ciphertext) as BufferSource);
   return td.decode(pt);
 }
 
 export async function encryptBytes(bytes: Uint8Array, key: CryptoKey) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, bytes as BufferSource);
   return { iv, ciphertext: new Uint8Array(ct) };
 }
 
 export async function decryptBytes(iv: Uint8Array, ct: Uint8Array, key: CryptoKey) {
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, ct as BufferSource);
   return new Uint8Array(pt);
 }
