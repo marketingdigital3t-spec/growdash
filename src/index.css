@@ -21,13 +21,13 @@
     --primary-foreground: 350 40% 98%;
     --primary-soft: 342 80% 95%;       /* light pink blush */
 
-    --accent-pink: 342 75% 78%;        /* feminine rose */
+    --accent-pink: 340 85% 82%;        /* light rose */
     --accent-green: 90 20% 55%;        /* muted sage */
     --accent-yellow: 32 55% 72%;       /* warm sand */
-    --accent-lime: 345 55% 88%;        /* powder pink */
+    --accent-lime: 340 70% 92%;        /* powder pink */
 
-    --sidebar-icon: 345 20% 50%;
-    --sidebar-icon-active: 345 45% 42%;
+    --sidebar-icon: 340 25% 60%;
+    --sidebar-icon-active: 340 65% 62%;
 
     --ring: 15 35% 32%;
     --radius: 1rem;
