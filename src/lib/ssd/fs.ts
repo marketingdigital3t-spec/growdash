@@ -11,10 +11,11 @@ export async function* walkFiles(
   dir: FileSystemDirectoryHandle,
   path = "",
 ): AsyncGenerator<{ path: string; handle: FileSystemFileHandle }> {
-  // @ts-expect-error - entries() isn't in default lib
-  for await (const [name, handle] of dir.entries() as AsyncIterable<
-    [string, FileSystemHandle]
-  >) {
+  for await (const [name, handle] of (
+    dir as unknown as {
+      entries: () => AsyncIterable<[string, FileSystemHandle]>;
+    }
+  ).entries()) {
     const nextPath = path ? `${path}/${name}` : name;
     if (handle.kind === "file") {
       yield { path: nextPath, handle: handle as FileSystemFileHandle };
@@ -35,8 +36,8 @@ export async function readPdfText(handle: FileSystemFileHandle): Promise<string>
   const workerUrl = (
     await import("pdfjs-dist/build/pdf.worker.min.mjs?url")
   ).default as string;
-  // @ts-expect-error - GlobalWorkerOptions typing
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  (pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc =
+    workerUrl;
 
   const file = await handle.getFile();
   const buffer = await file.arrayBuffer();
@@ -93,10 +94,11 @@ export async function listFiles(
   suffix?: string,
 ): Promise<string[]> {
   const out: string[] = [];
-  // @ts-expect-error - entries() isn't in default lib
-  for await (const [name, handle] of dir.entries() as AsyncIterable<
-    [string, FileSystemHandle]
-  >) {
+  for await (const [name, handle] of (
+    dir as unknown as {
+      entries: () => AsyncIterable<[string, FileSystemHandle]>;
+    }
+  ).entries()) {
     if (handle.kind !== "file") continue;
     if (suffix && !name.endsWith(suffix)) continue;
     out.push(name);
