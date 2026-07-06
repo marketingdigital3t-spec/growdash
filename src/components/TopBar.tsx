@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import { cn } from "@/lib/utils";
+import SearchPalette from "./SearchPalette";
 
 const PROFILE_IMG = "https://i.pravatar.cc/80?img=32";
 const PROFILE_NAME = "Carla Cristina Rezende";
@@ -22,7 +23,19 @@ const PROFILE_NAME = "Carla Cristina Rezende";
 export default function TopBar() {
   const { expanded, toggle } = useSidebar();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -76,6 +89,7 @@ export default function TopBar() {
         <button
           type="button"
           aria-label="Buscar"
+          onClick={() => setSearchOpen(true)}
           className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(280_85%_70%)] via-[hsl(260_90%_72%)] to-[hsl(220_95%_72%)] text-white shadow-sm transition-transform hover:scale-105"
         >
           <div className="relative">
@@ -84,9 +98,11 @@ export default function TopBar() {
           </div>
         </button>
         <span className="pointer-events-none absolute left-1/2 top-full z-40 mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-semibold text-background opacity-0 shadow-md transition-opacity group-hover/tt:opacity-100">
-          Buscar
+          Buscar <kbd className="ml-1 rounded bg-white/20 px-1 text-[10px]">⌘K</kbd>
         </span>
       </div>
+
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <button
         type="button"
