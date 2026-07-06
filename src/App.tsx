@@ -10,6 +10,38 @@ import ChatSeguro from "@/pages/chat/ChatSeguro";
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import Usuarios from "@/pages/config/Usuarios";
+import Perfil from "@/pages/config/Perfil";
+import Clinica from "@/pages/config/Clinica";
+import Pacientes from "@/pages/contatos/Pacientes";
+import Profissionais from "@/pages/contatos/Profissionais";
+import Fornecedores from "@/pages/contatos/Fornecedores";
+import Leads from "@/pages/contatos/Leads";
+import TodosContatos from "@/pages/contatos/Todos";
+import ContatosAniversariantes from "@/pages/contatos/Aniversariantes";
+import Frequencia from "@/pages/contatos/Frequencia";
+import Mesclar from "@/pages/contatos/Mesclar";
+import Convidar from "@/pages/contatos/Convidar";
+import AtendimentosListagem from "@/pages/atendimentos/Listagem";
+import Atestados from "@/pages/atendimentos/Atestados";
+import Guias from "@/pages/atendimentos/Guias";
+import VendasLista from "@/pages/vendas/Vendas";
+import Orcamentos from "@/pages/vendas/Orcamentos";
+import Pacotes from "@/pages/vendas/Pacotes";
+import FluxoCaixa from "@/pages/financeiro/FluxoCaixa";
+import ContasPagar from "@/pages/financeiro/ContasPagar";
+import ContasReceber from "@/pages/financeiro/ContasReceber";
+import Extrato from "@/pages/financeiro/Extrato";
+import Comissoes from "@/pages/Comissoes";
+import Produtos from "@/pages/estoque/Produtos";
+import Movimentacoes from "@/pages/estoque/Movimentacoes";
+import WhatsApp from "@/pages/comunicacao/WhatsApp";
+import Email from "@/pages/comunicacao/Email";
+import SMS from "@/pages/comunicacao/SMS";
+import Modelos from "@/pages/clinidocs/Modelos";
+import Documentos from "@/pages/clinidocs/Documentos";
+import Campanhas from "@/pages/marketing/Campanhas";
+import MarketingAniversariantes from "@/pages/marketing/Aniversariantes";
+import Comunidade from "@/pages/Comunidade";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import MfaGate from "@/components/MfaGate";
 import VaultGate from "@/components/VaultGate";
@@ -25,7 +57,40 @@ const built = new Set<string>([
   "/agenda/eventos",
   "/chat-seguro",
   "/config/usuarios",
+  "/config/perfil",
+  "/config/clinica",
+  "/contatos/pacientes",
+  "/contatos/profissionais",
+  "/contatos/fornecedores",
+  "/contatos/leads",
+  "/contatos/todos",
+  "/contatos/aniversariantes",
+  "/contatos/frequencia",
+  "/contatos/mesclar",
+  "/contatos/convidar",
+  "/atendimentos/listagem",
+  "/atendimentos/atestados",
+  "/atendimentos/guias",
+  "/vendas/lista",
+  "/vendas/orcamentos",
+  "/vendas/pacotes",
+  "/financeiro/fluxo-de-caixa",
+  "/financeiro/contas-a-pagar",
+  "/financeiro/contas-a-receber",
+  "/financeiro/extrato",
+  "/comissoes",
+  "/estoque/produtos",
+  "/estoque/movimentacoes",
+  "/comunicacao/whatsapp",
+  "/comunicacao/email",
+  "/comunicacao/sms",
+  "/clinidocs/modelos",
+  "/clinidocs/documentos",
+  "/marketing/campanhas",
+  "/marketing/aniversariantes",
+  "/comunidade",
 ]);
+
 
 const placeholderRoutes = NAV.flatMap((n) => {
   const list: string[] = [];
@@ -69,6 +134,39 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/config/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
+            <Route path="/config/clinica" element={<ProtectedRoute><Clinica /></ProtectedRoute>} />
+            <Route path="/contatos/pacientes" element={<Pacientes />} />
+            <Route path="/contatos/profissionais" element={<Profissionais />} />
+            <Route path="/contatos/fornecedores" element={<Fornecedores />} />
+            <Route path="/contatos/leads" element={<Leads />} />
+            <Route path="/contatos/todos" element={<TodosContatos />} />
+            <Route path="/contatos/aniversariantes" element={<ContatosAniversariantes />} />
+            <Route path="/contatos/frequencia" element={<Frequencia />} />
+            <Route path="/contatos/mesclar" element={<Mesclar />} />
+            <Route path="/contatos/convidar" element={<Convidar />} />
+            <Route path="/atendimentos/listagem" element={<AtendimentosListagem />} />
+            <Route path="/atendimentos/atestados" element={<Atestados />} />
+            <Route path="/atendimentos/guias" element={<Guias />} />
+            <Route path="/vendas/lista" element={<VendasLista />} />
+            <Route path="/vendas/orcamentos" element={<Orcamentos />} />
+            <Route path="/vendas/pacotes" element={<Pacotes />} />
+            <Route path="/financeiro/fluxo-de-caixa" element={<FluxoCaixa />} />
+            <Route path="/financeiro/contas-a-pagar" element={<ContasPagar />} />
+            <Route path="/financeiro/contas-a-receber" element={<ContasReceber />} />
+            <Route path="/financeiro/extrato" element={<Extrato />} />
+            <Route path="/comissoes" element={<Comissoes />} />
+            <Route path="/estoque/produtos" element={<Produtos />} />
+            <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
+            <Route path="/comunicacao/whatsapp" element={<WhatsApp />} />
+            <Route path="/comunicacao/email" element={<Email />} />
+            <Route path="/comunicacao/sms" element={<SMS />} />
+            <Route path="/clinidocs/modelos" element={<Modelos />} />
+            <Route path="/clinidocs/documentos" element={<Documentos />} />
+            <Route path="/marketing/campanhas" element={<Campanhas />} />
+            <Route path="/marketing/aniversariantes" element={<MarketingAniversariantes />} />
+            <Route path="/comunidade" element={<Comunidade />} />
+
             {placeholderRoutes.map((p) => (
               <Route key={p} path={p} element={<Placeholder />} />
             ))}
