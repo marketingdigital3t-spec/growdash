@@ -11,6 +11,7 @@ import Recuperacao from "@/pages/chat/Recuperacao";
 
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
+import SetupAdmin from "@/pages/auth/SetupAdmin";
 import Usuarios from "@/pages/config/Usuarios";
 import Perfil from "@/pages/config/Perfil";
 import Clinica from "@/pages/config/Clinica";
@@ -109,6 +110,7 @@ const App = () => (
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Signup />} />
+          <Route path="/setup-admin" element={<SetupAdmin />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/agenda/semana" element={<AgendaSemana />} />
