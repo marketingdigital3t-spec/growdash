@@ -74,7 +74,7 @@ export async function wrapConversationKey(aesKey: CryptoKey, recipientPub: Crypt
 }
 
 export async function unwrapConversationKey(wrappedB64: string, priv: CryptoKey) {
-  const raw = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, priv, b64.decode(wrappedB64));
+  const raw = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, priv, b64.decode(wrappedB64) as BufferSource);
   return crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
