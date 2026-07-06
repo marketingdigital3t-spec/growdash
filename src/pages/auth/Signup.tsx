@@ -8,7 +8,6 @@ export default function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
-  const [role, setRole] = useState<"patient" | "professional">("patient");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -16,12 +15,13 @@ export default function Signup() {
     e.preventDefault();
     setErr(null);
     setLoading(true);
+    // Cadastro público é sempre paciente. Profissionais e admins só via convite.
     const { error } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password: pw,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { full_name: name, role },
+        data: { full_name: name, role: "patient" },
       },
     });
     setLoading(false);
@@ -37,29 +37,20 @@ export default function Signup() {
             <ShieldCheck className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-black">Criar conta</h1>
-            <p className="text-xs text-muted-foreground">Acesso seguro à sua Dra.</p>
+            <h1 className="text-xl font-black">Criar conta de paciente</h1>
+            <p className="text-xs text-muted-foreground">Cadastro exclusivo para pacientes assinantes.</p>
           </div>
         </div>
+        <div className="mb-4 rounded-xl border border-primary/20 bg-primary-soft/50 p-3 text-xs font-semibold text-foreground/80">
+          Profissionais e equipe da clínica não se cadastram por aqui — o acesso é criado pela administradora
+          no menu <span className="font-bold">Configurações → Usuários</span>.
+        </div>
         <form onSubmit={submit} className="flex flex-col gap-3">
-          <div className="flex gap-2 rounded-xl border border-border bg-background p-1">
-            {(["patient", "professional"] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`flex-1 rounded-lg py-2 text-xs font-bold transition ${
-                  role === r ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground"
-                }`}
-              >
-                {r === "patient" ? "Sou paciente" : "Sou profissional"}
-              </button>
-            ))}
-          </div>
           <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 focus-within:border-primary">
             <User className="h-4 w-4 text-muted-foreground" />
             <input
               required
+              maxLength={120}
               placeholder="Nome completo"
               value={name}
               onChange={(e) => setName(e.target.value)}
