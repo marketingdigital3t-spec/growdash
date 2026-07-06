@@ -1,20 +1,141 @@
+import { useState } from "react";
+import {
+  Calendar,
+  DollarSign,
+  UserPlus,
+  Users,
+  ArrowUpRight,
+  Plus,
+  ChevronRight,
+} from "lucide-react";
+import { PageHeader, StatCard, Button, Badge } from "@/components/page-primitives";
+import { Link } from "react-router-dom";
+
+const upcoming = [
+  { time: "09:00", patient: "Amanda Ribeiro", proc: "Consulta inicial", status: "confirmado" as const },
+  { time: "10:30", patient: "Priscila Souza", proc: "Retorno pós-op", status: "aguardando" as const },
+  { time: "11:15", patient: "Beatriz Lima", proc: "Sessão radiofrequência", status: "confirmado" as const },
+  { time: "13:00", patient: "Camila Ferraz", proc: "Avaliação estética íntima", status: "novo" as const },
+  { time: "15:20", patient: "Larissa Martins", proc: "Aplicação de peeling", status: "confirmado" as const },
+];
+
+const activities = [
+  { who: "Amanda R.", what: "assinou contrato de tratamento", when: "há 5 min" },
+  { who: "Secretária Julia", what: "agendou 3 novos horários", when: "há 20 min" },
+  { who: "Priscila S.", what: "enviou fotos de acompanhamento", when: "há 1 h" },
+  { who: "Financeiro", what: "recebeu R$ 1.850,00 via PIX", when: "há 2 h" },
+];
+
+const statusTone = {
+  confirmado: "green" as const,
+  aguardando: "yellow" as const,
+  novo: "primary" as const,
+};
+
 export default function Home() {
+  const [greeting] = useState(() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Bom dia";
+    if (h < 18) return "Boa tarde";
+    return "Boa noite";
+  });
+
   return (
     <div className="p-6 md:p-8">
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-        <span className="text-primary">Clínica</span>
-        <span className="text-muted-foreground">/</span>
-        <span className="text-primary">Início</span>
+      <PageHeader
+        breadcrumb={["Clínica", "Início"]}
+        title={`${greeting}, Dra. Carla`}
+        subtitle="Aqui está o resumo da sua clínica hoje."
+        actions={
+          <>
+            <Button variant="secondary">
+              <Calendar className="h-4 w-4" /> Ver agenda
+            </Button>
+            <Button>
+              <Plus className="h-4 w-4" /> Novo agendamento
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Agendamentos hoje" value="14" hint="+3 vs ontem" accent="primary" icon={<Calendar className="h-5 w-5" />} />
+        <StatCard label="Faturamento do dia" value="R$ 6.420" hint="Meta R$ 8.000" accent="green" icon={<DollarSign className="h-5 w-5" />} />
+        <StatCard label="Novos pacientes" value="4" hint="Esta semana: 11" accent="pink" icon={<UserPlus className="h-5 w-5" />} />
+        <StatCard label="Pacientes ativos" value="238" hint="+12 no mês" accent="yellow" icon={<Users className="h-5 w-5" />} />
       </div>
 
-      <div className="flex min-h-[60vh] items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 text-center">
-        <div>
-          <p className="text-lg font-bold text-foreground">Interface inicial</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sidebar de ícones + topbar prontos. Vamos adicionar os blocos da home nos próximos passos.
-          </p>
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        {/* Próximos atendimentos */}
+        <div className="rounded-2xl border border-border bg-card p-5 lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-extrabold text-foreground">Próximos atendimentos</h2>
+            <Link to="/agenda/semana" className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
+              Ver todos <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <ul className="flex flex-col divide-y divide-border">
+            {upcoming.map((u) => (
+              <li key={u.time} className="flex items-center gap-4 py-3">
+                <div className="flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
+                  <span className="text-sm font-extrabold">{u.time}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-extrabold text-foreground">{u.patient}</div>
+                  <div className="truncate text-xs font-semibold text-muted-foreground">{u.proc}</div>
+                </div>
+                <Badge tone={statusTone[u.status]}>{u.status}</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Atividade recente */}
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-extrabold text-foreground">Atividade recente</h2>
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <ul className="flex flex-col gap-3">
+            {activities.map((a, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground">
+                    <span className="font-extrabold">{a.who}</span>{" "}
+                    <span className="text-foreground/70">{a.what}</span>
+                  </p>
+                  <p className="text-xs font-semibold text-muted-foreground">{a.when}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
+
+      {/* Atalhos */}
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <Shortcut to="/contatos/pacientes" title="Cadastrar paciente" desc="Adicione uma nova paciente com anexos e histórico." />
+        <Shortcut to="/clinidocs/documentos" title="Anexar contrato" desc="Envie um termo ou contrato à ficha da paciente." />
+        <Shortcut to="/comunicacao/whatsapp" title="Abrir chat" desc="Converse pelo canal interno seguro conforme LGPD." />
+      </div>
     </div>
+  );
+}
+
+function Shortcut({ to, title, desc }: { to: string; title: string; desc: string }) {
+  return (
+    <Link
+      to={to}
+      className="group flex items-start gap-3 rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_20px_40px_-24px_hsl(var(--primary)/0.4)]"
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-soft text-primary group-hover:bg-primary group-hover:text-primary-foreground">
+        <ArrowUpRight className="h-5 w-5" />
+      </div>
+      <div>
+        <div className="text-sm font-extrabold text-foreground">{title}</div>
+        <p className="text-xs font-semibold text-muted-foreground">{desc}</p>
+      </div>
+    </Link>
   );
 }
