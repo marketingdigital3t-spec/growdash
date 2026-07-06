@@ -1,31 +1,22 @@
 import { useState } from "react";
-import { Plus, Bell, Calendar, Ban, PartyPopper } from "lucide-react";
+import { Plus, Bell, Calendar, Ban, PartyPopper, Trash2 } from "lucide-react";
 import { PageHeader, Button, Badge } from "@/components/page-primitives";
-
-type EventKind = "agendamento" | "bloqueio" | "lembrete" | "evento";
-
-type Ev = {
-  id: string;
-  kind: EventKind;
-  title: string;
-  date: string;
-  time: string;
-  who?: string;
-  note?: string;
-};
-
-const INITIAL: Ev[] = [];
+import NewEventDialog from "@/components/NewEventDialog";
+import { useClinic, formatDateBR, type EventKind } from "@/store/clinic-store";
 
 const kindMeta: Record<EventKind, { label: string; tone: "primary" | "green" | "yellow" | "red"; Icon: typeof Bell }> = {
-  agendamento: { label: "Agendamento", tone: "primary", Icon: Calendar },
+  agendamento: { label: "Compromisso", tone: "primary", Icon: Calendar },
   bloqueio: { label: "Bloqueio", tone: "red", Icon: Ban },
   lembrete: { label: "Lembrete", tone: "yellow", Icon: Bell },
   evento: { label: "Evento", tone: "green", Icon: PartyPopper },
 };
 
 export default function Eventos() {
+  const { events, removeEvent } = useClinic();
   const [filter, setFilter] = useState<"todos" | EventKind>("todos");
-  const list = INITIAL.filter((e) => filter === "todos" || e.kind === filter);
+  const [open, setOpen] = useState(false);
+
+  const list = events.filter((e) => filter === "todos" || e.kind === filter);
 
   return (
     <div className="p-6 md:p-8">
@@ -34,7 +25,7 @@ export default function Eventos() {
         title="Eventos"
         subtitle="Bloqueios, lembretes e eventos gerais da clínica."
         actions={
-          <Button>
+          <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4" /> Novo evento
           </Button>
         }
@@ -63,6 +54,9 @@ export default function Eventos() {
           <p className="mt-1 max-w-sm text-sm font-semibold text-muted-foreground">
             Clique em "Novo evento" para criar seu primeiro bloqueio, lembrete ou evento da clínica.
           </p>
+          <Button className="mt-4" onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" /> Novo evento
+          </Button>
         </div>
       ) : (
         <ul className="grid gap-3 md:grid-cols-2">
@@ -70,7 +64,7 @@ export default function Eventos() {
             const meta = kindMeta[e.kind];
             const Icon = meta.Icon;
             return (
-              <li key={e.id} className="flex gap-4 rounded-2xl border border-border bg-card p-5">
+              <li key={e.id} className="group flex gap-4 rounded-2xl border border-border bg-card p-5">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
                   <Icon className="h-5 w-5" />
                 </div>
@@ -78,18 +72,28 @@ export default function Eventos() {
                   <div className="mb-1 flex items-center gap-2">
                     <Badge tone={meta.tone}>{meta.label}</Badge>
                     <span className="text-xs font-bold text-muted-foreground">
-                      {e.date} · {e.time}
+                      {formatDateBR(e.date)} · {e.time}
                     </span>
                   </div>
                   <h3 className="truncate text-base font-extrabold text-foreground">{e.title}</h3>
                   {e.who && <p className="text-sm font-semibold text-foreground/70">{e.who}</p>}
                   {e.note && <p className="mt-1 text-xs text-muted-foreground">{e.note}</p>}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => removeEvent(e.id)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-[hsl(0_85%_95%)] hover:text-[hsl(0_70%_50%)] group-hover:opacity-100"
+                  aria-label="Remover evento"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </li>
             );
           })}
         </ul>
       )}
+
+      <NewEventDialog open={open} onClose={() => setOpen(false)} />
     </div>
   );
 }
