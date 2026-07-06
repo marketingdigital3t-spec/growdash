@@ -12,6 +12,7 @@ import {
   Heart,
   Flower2,
   Settings,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -112,6 +113,7 @@ export const NAV: NavItem[] = [
       { label: "SMS", path: "/comunicacao/sms" },
     ],
   },
+  { id: "chat-seguro", label: "Chat Seguro", icon: ShieldCheck, path: "/chat-seguro", badge: "new" },
   {
     id: "clinidocs",
     label: "CliniDocs",
