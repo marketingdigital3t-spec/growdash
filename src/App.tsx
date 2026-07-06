@@ -11,7 +11,10 @@ import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import Usuarios from "@/pages/config/Usuarios";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import MfaGate from "@/components/MfaGate";
+import VaultGate from "@/components/VaultGate";
 import { AuthProvider } from "@/hooks/useAuth";
+import { CryptoProvider } from "@/hooks/useCrypto";
 import { NAV } from "@/nav/nav-config";
 
 const built = new Set<string>([
@@ -33,39 +36,47 @@ const placeholderRoutes = NAV.flatMap((n) => {
 
 const App = () => (
   <AuthProvider>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/cadastro" element={<Signup />} />
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/agenda/semana" element={<AgendaSemana />} />
-          <Route path="/agenda/visao-geral" element={<AgendaVisaoGeral />} />
-          <Route path="/agenda/relatorio-agendamentos" element={<RelatorioAgendamentos />} />
-          <Route path="/agenda/eventos" element={<Eventos />} />
-          <Route
-            path="/chat-seguro"
-            element={
-              <ProtectedRoute>
-                <ChatSeguro />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/config/usuarios"
-            element={
-              <ProtectedRoute>
-                <Usuarios />
-              </ProtectedRoute>
-            }
-          />
-          {placeholderRoutes.map((p) => (
-            <Route key={p} path={p} element={<Placeholder />} />
-          ))}
-          <Route path="*" element={<Placeholder />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <CryptoProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/cadastro" element={<Signup />} />
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/agenda/semana" element={<AgendaSemana />} />
+            <Route path="/agenda/visao-geral" element={<AgendaVisaoGeral />} />
+            <Route path="/agenda/relatorio-agendamentos" element={<RelatorioAgendamentos />} />
+            <Route path="/agenda/eventos" element={<Eventos />} />
+            <Route
+              path="/chat-seguro"
+              element={
+                <ProtectedRoute>
+                  <MfaGate>
+                    <VaultGate>
+                      <ChatSeguro />
+                    </VaultGate>
+                  </MfaGate>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/config/usuarios"
+              element={
+                <ProtectedRoute>
+                  <MfaGate>
+                    <Usuarios />
+                  </MfaGate>
+                </ProtectedRoute>
+              }
+            />
+            {placeholderRoutes.map((p) => (
+              <Route key={p} path={p} element={<Placeholder />} />
+            ))}
+            <Route path="*" element={<Placeholder />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </CryptoProvider>
   </AuthProvider>
 );
 
