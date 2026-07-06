@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Lock, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCrypto } from "@/hooks/useCrypto";
+import { encryptText, decryptText, encryptBytes, decryptBytes, b64 } from "@/lib/crypto";
 import LgpdConsent from "@/components/LgpdConsent";
+import WatermarkedImage from "@/components/WatermarkedImage";
 
 type Conversation = {
   id: string;
@@ -19,11 +22,15 @@ type Message = {
   kind: "text" | "photo";
   body: string | null;
   photo_path: string | null;
+  iv: string | null;
+  ciphertext: string | null;
   created_at: string;
+  _decrypted?: string;
 };
 
 export default function ChatSeguro() {
   const { user, roles } = useAuth();
+  const { getConvKey, createConversationKey } = useCrypto();
   const isProfessional = roles.includes("professional") || roles.includes("admin");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -31,12 +38,11 @@ export default function ChatSeguro() {
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showNewPatient, setShowNewPatient] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load conversations
   const loadConversations = async () => {
     if (!user) return;
     const { data: convs } = await supabase
@@ -67,7 +73,23 @@ export default function ChatSeguro() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Load messages + subscribe realtime
+  // Descriptografa mensagens de texto no cliente
+  const decryptMessage = async (m: Message, conversationId: string): Promise<Message> => {
+    if (m.kind !== "text") return m;
+    if (m._decrypted) return m;
+    if (m.iv && m.ciphertext) {
+      try {
+        const key = await getConvKey(conversationId);
+        const plain = await decryptText(m.iv, m.ciphertext, key);
+        return { ...m, _decrypted: plain };
+      } catch {
+        return { ...m, _decrypted: "🔒 Não foi possível descriptografar" };
+      }
+    }
+    // Mensagem legada em texto puro
+    return { ...m, _decrypted: m.body ?? "" };
+  };
+
   useEffect(() => {
     if (!activeId) return;
     let cancelled = false;
@@ -77,14 +99,20 @@ export default function ChatSeguro() {
         .select("*")
         .eq("conversation_id", activeId)
         .order("created_at", { ascending: true });
-      if (!cancelled) setMessages((data as Message[]) ?? []);
+      if (cancelled) return;
+      const raw = (data as Message[]) ?? [];
+      const decrypted = await Promise.all(raw.map((m) => decryptMessage(m, activeId)));
+      if (!cancelled) setMessages(decrypted);
     })();
     const ch = supabase
       .channel(`msg-${activeId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${activeId}` },
-        (payload) => setMessages((m) => [...m, payload.new as Message]),
+        async (payload) => {
+          const dec = await decryptMessage(payload.new as Message, activeId);
+          setMessages((m) => (m.some((x) => x.id === dec.id) ? m : [...m, dec]));
+        },
       )
       .on(
         "postgres_changes",
@@ -96,6 +124,7 @@ export default function ChatSeguro() {
       cancelled = true;
       supabase.removeChannel(ch);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
   useEffect(() => {
@@ -108,40 +137,72 @@ export default function ChatSeguro() {
     if (!activeId || !text.trim() || !user) return;
     const body = text.trim();
     setText("");
-    await supabase.from("messages").insert({
-      conversation_id: activeId,
-      sender_id: user.id,
-      kind: "text",
-      body,
-    });
+    try {
+      const key = await getConvKey(activeId);
+      const { iv, ciphertext } = await encryptText(body, key);
+      const { error } = await supabase.from("messages").insert({
+        conversation_id: activeId,
+        sender_id: user.id,
+        kind: "text",
+        iv,
+        ciphertext,
+      });
+      if (error) throw error;
+    } catch (e) {
+      alert("Falha ao enviar: " + (e instanceof Error ? e.message : String(e)));
+    }
   };
 
   const sendPhoto = async (file: File) => {
     if (!activeId || !user) return;
+    if (file.size > 10 * 1024 * 1024) return alert("Foto acima de 10MB");
     setUploading(true);
     try {
-      const b64 = await fileToBase64(file);
+      const key = await getConvKey(activeId);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const { iv, ciphertext } = await encryptBytes(bytes, key);
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
       const { data, error } = await supabase.functions.invoke("upload-photo", {
-        body: { conversation_id: activeId, file_base64: b64, mime: file.type },
+        body: {
+          conversation_id: activeId,
+          iv_base64: b64.encode(iv),
+          ciphertext_base64: b64.encode(ciphertext),
+        },
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (error) throw error;
-      if (data?.message) setMessages((m) => [...m, data.message]);
+      if (data?.message) {
+        setMessages((m) => (m.some((x) => x.id === data.message.id) ? m : [...m, data.message]));
+      }
     } catch (e) {
-      alert("Falha ao enviar foto: " + String(e));
+      alert("Falha ao enviar foto: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setUploading(false);
     }
   };
 
-  const openPhoto = async (messageId: string) => {
-    const { data, error } = await supabase.functions.invoke("signed-photo-url", {
-      body: { message_id: messageId },
-    });
-    if (error || !data?.url) return alert("Não foi possível abrir a foto");
-    setLightboxUrl(data.url);
+  const openPhoto = async (msg: Message) => {
+    if (!msg.photo_path || !activeId) return;
+    try {
+      // Baixa o blob criptografado via URL assinada
+      const { data, error } = await supabase.functions.invoke("signed-photo-url", {
+        body: { message_id: msg.id },
+      });
+      if (error || !data?.url) throw new Error("Sem acesso à foto");
+      const res = await fetch(data.url);
+      if (!res.ok) throw new Error("Falha no download");
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const iv = buf.slice(0, 12);
+      const ct = buf.slice(12);
+      const key = await getConvKey(activeId);
+      const plain = await decryptBytes(iv, ct, key);
+      const blob = new Blob([new Uint8Array(plain)]);
+      const url = URL.createObjectURL(blob);
+      setLightbox(url);
+    } catch (e) {
+      alert("Não foi possível abrir a foto: " + (e instanceof Error ? e.message : String(e)));
+    }
   };
 
   const deleteMessage = async (id: string) => {
@@ -149,19 +210,23 @@ export default function ChatSeguro() {
     await supabase.from("messages").delete().eq("id", id);
   };
 
+  const viewer = {
+    name: (user?.user_metadata?.full_name as string) || profiles[user?.id ?? ""] || "Usuário",
+    email: user?.email ?? "",
+  };
+
   return (
     <>
       <LgpdConsent />
       <div className="flex h-full flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 border-b border-border bg-card px-6 py-4">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-primary to-[hsl(340_85%_60%)] text-white shadow">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow">
             <Lock className="h-4 w-4" />
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-black">Chat Seguro</h1>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <ShieldCheck className="h-3 w-3" /> Criptografado · acesso restrito · conforme LGPD art. 11
+              <ShieldCheck className="h-3 w-3" /> E2E · AES-256-GCM · 2FA · conforme LGPD art. 11
             </p>
           </div>
           {isProfessional && (
@@ -175,7 +240,6 @@ export default function ChatSeguro() {
         </div>
 
         <div className="flex min-h-0 flex-1">
-          {/* Sidebar */}
           <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-card/50">
             <div className="p-3">
               <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
@@ -185,9 +249,7 @@ export default function ChatSeguro() {
             </div>
             <div className="flex-1 overflow-y-auto px-2 pb-4">
               {conversations.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                  Nenhuma conversa ainda.
-                </p>
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">Nenhuma conversa ainda.</p>
               ) : (
                 conversations.map((c) => (
                   <button
@@ -216,7 +278,6 @@ export default function ChatSeguro() {
             </div>
           </aside>
 
-          {/* Thread */}
           <section className="flex min-w-0 flex-1 flex-col">
             {!active ? (
               <EmptyState isProfessional={isProfessional} />
@@ -228,7 +289,7 @@ export default function ChatSeguro() {
                   </div>
                   <div>
                     <p className="text-sm font-bold">{active.other_name}</p>
-                    <p className="text-[11px] text-muted-foreground">Conversa protegida</p>
+                    <p className="text-[11px] text-muted-foreground">Chave da conversa apenas neste dispositivo</p>
                   </div>
                 </div>
                 <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-6 py-4">
@@ -237,7 +298,7 @@ export default function ChatSeguro() {
                       key={m.id}
                       msg={m}
                       isMe={m.sender_id === user?.id}
-                      onOpenPhoto={openPhoto}
+                      onOpenPhoto={() => openPhoto(m)}
                       onDelete={deleteMessage}
                     />
                   ))}
@@ -259,7 +320,7 @@ export default function ChatSeguro() {
                       disabled={uploading}
                       onClick={() => fileRef.current?.click()}
                       className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-background text-muted-foreground hover:text-primary disabled:opacity-50"
-                      title="Enviar foto"
+                      title="Enviar foto criptografada"
                     >
                       <Camera className="h-5 w-5" />
                     </button>
@@ -284,7 +345,9 @@ export default function ChatSeguro() {
                       <Send className="h-5 w-5" />
                     </button>
                   </div>
-                  {uploading && <p className="mt-2 text-xs text-muted-foreground">Enviando foto criptografada...</p>}
+                  {uploading && (
+                    <p className="mt-2 text-xs text-muted-foreground">Criptografando e enviando foto…</p>
+                  )}
                 </div>
               </>
             )}
@@ -292,26 +355,15 @@ export default function ChatSeguro() {
         </div>
       </div>
 
-      {lightboxUrl && (
-        <div
-          onClick={() => setLightboxUrl(null)}
-          className="fixed inset-0 z-[110] grid place-items-center bg-black/90 p-6"
-        >
-          <button
-            onClick={() => setLightboxUrl(null)}
-            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <div className="relative max-h-[90vh] max-w-[90vw]">
-            <img src={lightboxUrl} className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain" alt="" />
-            <div className="pointer-events-none absolute inset-0 grid place-items-center">
-              <span className="rotate-[-15deg] rounded bg-black/40 px-4 py-1 text-xs font-bold uppercase tracking-widest text-white/70">
-                Confidencial · clinicnext
-              </span>
-            </div>
-          </div>
-        </div>
+      {lightbox && (
+        <WatermarkedImage
+          src={lightbox}
+          viewer={viewer}
+          onClose={() => {
+            URL.revokeObjectURL(lightbox);
+            setLightbox(null);
+          }}
+        />
       )}
 
       {showNewPatient && (
@@ -321,6 +373,7 @@ export default function ChatSeguro() {
             setShowNewPatient(false);
             loadConversations();
           }}
+          createKey={createConversationKey}
         />
       )}
     </>
@@ -335,7 +388,7 @@ function MessageBubble({
 }: {
   msg: Message;
   isMe: boolean;
-  onOpenPhoto: (id: string) => void;
+  onOpenPhoto: () => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -346,10 +399,10 @@ function MessageBubble({
         }`}
       >
         {msg.kind === "text" ? (
-          <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+          <p className="text-sm whitespace-pre-wrap break-words">{msg._decrypted ?? "…"}</p>
         ) : (
           <button
-            onClick={() => onOpenPhoto(msg.id)}
+            onClick={onOpenPhoto}
             className="flex items-center gap-2 text-sm font-semibold hover:underline"
           >
             <Camera className="h-4 w-4" /> Ver foto de acompanhamento
@@ -376,18 +429,18 @@ function EmptyState({ isProfessional }: { isProfessional: boolean }) {
   return (
     <div className="grid flex-1 place-items-center bg-background p-8 text-center">
       <div className="max-w-md">
-        <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-primary to-[hsl(340_85%_60%)] text-white shadow-lg">
+        <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-primary text-primary-foreground shadow-lg">
           <ShieldCheck className="h-7 w-7" />
         </div>
-        <h2 className="text-xl font-black">Ambiente 100% privado</h2>
+        <h2 className="text-xl font-black">Ambiente ponta-a-ponta</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Substitui o WhatsApp para o envio de fotos de acompanhamento pós-procedimento. Apenas você e{" "}
-          {isProfessional ? "a paciente vinculada" : "a sua profissional"} têm acesso às mensagens e imagens.
-          Armazenamento criptografado, links de foto expiram em 5 minutos.
+          As fotos são criptografadas no seu navegador antes de sair do dispositivo. Só{" "}
+          {isProfessional ? "você e a paciente vinculada" : "você e a sua profissional"} conseguem abrir. A senha do
+          cofre nunca sai daqui.
         </p>
         {isProfessional && (
           <p className="mt-4 text-xs text-muted-foreground">
-            Clique em <b>Nova conversa</b> para vincular uma paciente por e-mail.
+            Clique em <b>Nova conversa</b> para vincular uma paciente pelo ID.
           </p>
         )}
       </div>
@@ -395,9 +448,17 @@ function EmptyState({ isProfessional }: { isProfessional: boolean }) {
   );
 }
 
-function NewConversationDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NewConversationDialog({
+  onClose,
+  onCreated,
+  createKey,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+  createKey: (conversationId: string, otherUserId: string) => Promise<CryptoKey>;
+}) {
   const { user } = useAuth();
-  const [email, setEmail] = useState("");
+  const [patientId, setPatientId] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -405,29 +466,40 @@ function NewConversationDialog({ onClose, onCreated }: { onClose: () => void; on
     if (!user) return;
     setErr(null);
     setLoading(true);
-    // Busca perfil por e-mail via profiles/user_roles não possui email — buscamos via profiles join com auth via RPC?
-    // Alternativa: paciente deve informar seu id/email exato. Aqui: buscar em profiles por full_name/email não é possível.
-    // Solução: buscar por email via um filtro em profiles (não temos). Precisamos de uma RPC — usaremos service via edge? Para MVP, buscar pelo full_name/e-mail em profiles.
-    // Ajuste: pedir user_id direto? Melhor: mostrar convite manual — buscar em profiles.full_name (não ideal).
-    // MVP: aceitamos o UUID da paciente OU e-mail — para e-mail, criamos por uma edge function futura.
-    // Para agora: assumir input = UUID.
-    const patientId = email.trim();
-    if (!/^[0-9a-f-]{36}$/i.test(patientId)) {
-      setErr("Cole o ID da paciente (UUID). Em breve suportaremos busca por e-mail.");
+    const id = patientId.trim();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      setErr("Cole o ID da paciente (UUID).");
       setLoading(false);
       return;
     }
-    // Cria vínculo (se ainda não existir)
-    await supabase
-      .from("patient_links")
-      .insert({ patient_id: patientId, professional_id: user.id })
-      .then(() => {}, () => {});
-    const { error } = await supabase
-      .from("conversations")
-      .insert({ patient_id: patientId, professional_id: user.id });
-    setLoading(false);
-    if (error) return setErr(error.message);
-    onCreated();
+    try {
+      // valida se paciente tem chave pública (necessário pra E2E)
+      const { data: pubKey } = await supabase.from("user_keys").select("user_id").eq("user_id", id).maybeSingle();
+      if (!pubKey) {
+        throw new Error(
+          "Esta paciente ainda não criou o cofre de fotos. Peça pra ela entrar uma vez na plataforma antes.",
+        );
+      }
+      await supabase
+        .from("patient_links")
+        .insert({ patient_id: id, professional_id: user.id })
+        .then(
+          () => {},
+          () => {},
+        );
+      const { data: conv, error } = await supabase
+        .from("conversations")
+        .insert({ patient_id: id, professional_id: user.id })
+        .select()
+        .single();
+      if (error) throw error;
+      await createKey(conv.id, id);
+      onCreated();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -440,11 +512,11 @@ function NewConversationDialog({ onClose, onCreated }: { onClose: () => void; on
           </button>
         </div>
         <p className="mb-3 text-sm text-muted-foreground">
-          Vincule uma paciente já cadastrada informando o ID dela (visível no perfil da paciente após login).
+          Cole o ID (UUID) da paciente. Ela precisa já ter feito login e criado o cofre pelo menos uma vez.
         </p>
         <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={patientId}
+          onChange={(e) => setPatientId(e.target.value)}
           placeholder="ID da paciente"
           className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
         />
@@ -454,18 +526,9 @@ function NewConversationDialog({ onClose, onCreated }: { onClose: () => void; on
           disabled={loading}
           className="mt-4 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground shadow-lg hover:opacity-90 disabled:opacity-50"
         >
-          {loading ? "Criando..." : "Criar conversa"}
+          {loading ? "Criando..." : "Criar conversa criptografada"}
         </button>
       </div>
     </div>
   );
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(String(r.result));
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
 }
