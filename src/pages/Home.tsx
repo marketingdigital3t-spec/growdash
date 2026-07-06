@@ -63,20 +63,24 @@ export default function Home() {
               Ver todos <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <ul className="flex flex-col divide-y divide-border">
-            {upcoming.map((u) => (
-              <li key={u.time} className="flex items-center gap-4 py-3">
-                <div className="flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
-                  <span className="text-sm font-extrabold">{u.time}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-extrabold text-foreground">{u.patient}</div>
-                  <div className="truncate text-xs font-semibold text-muted-foreground">{u.proc}</div>
-                </div>
-                <Badge tone={statusTone[u.status]}>{u.status}</Badge>
-              </li>
-            ))}
-          </ul>
+          {upcoming.length === 0 ? (
+            <EmptyState text="Nenhum atendimento por aqui. Crie um novo agendamento para começar." />
+          ) : (
+            <ul className="flex flex-col divide-y divide-border">
+              {upcoming.map((u) => (
+                <li key={u.time} className="flex items-center gap-4 py-3">
+                  <div className="flex h-12 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-soft text-primary">
+                    <span className="text-sm font-extrabold">{u.time}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-extrabold text-foreground">{u.patient}</div>
+                    <div className="truncate text-xs font-semibold text-muted-foreground">{u.proc}</div>
+                  </div>
+                  <Badge tone={statusTone[u.status]}>{u.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Atividade recente */}
