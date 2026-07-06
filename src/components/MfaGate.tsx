@@ -9,7 +9,9 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export default function MfaGate({ children }: { children: ReactNode }) {
   const { user, roles } = useAuth();
-  const mustHaveMfa = roles.includes("professional") || roles.includes("admin");
+  // Dono da plataforma (admin) não é obrigado a nada — acesso irrestrito.
+  // 2FA continua obrigatório apenas para profissionais adicionadas.
+  const mustHaveMfa = roles.includes("professional") && !roles.includes("admin");
   const [status, setStatus] = useState<"checking" | "ok" | "needs_setup" | "needs_verify">("checking");
   const [factorId, setFactorId] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
