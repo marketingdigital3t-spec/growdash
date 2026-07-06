@@ -110,6 +110,7 @@ const App = () => (
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/cadastro" element={<Signup />} />
+          <Route path="/setup-admin" element={<SetupAdmin />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/agenda/semana" element={<AgendaSemana />} />
