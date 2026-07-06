@@ -11,7 +11,7 @@ export default function AgendaVisaoGeral() {
       <PageHeader
         breadcrumb={["Clínica", "Agenda", "Visão geral"]}
         title="Visão geral da Agenda"
-        subtitle="Indicadores dos últimos 30 dias."
+        subtitle="Os indicadores aparecem aqui conforme você cria agendamentos."
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
