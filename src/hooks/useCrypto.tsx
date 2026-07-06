@@ -52,7 +52,7 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
 
     const { error: e1 } = await supabase
       .from("user_keys")
-      .upsert({ user_id: user.id, public_key: publicJwk as unknown as object });
+      .upsert({ user_id: user.id, public_key: publicJwk as unknown as never });
     if (e1) throw e1;
     const { error: e2 } = await supabase.from("user_private_keys").upsert({
       user_id: user.id,
@@ -152,7 +152,7 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
       await supabase.from("security_events").insert({
         user_id: user.id,
         event_type: "conversation_key_pending",
-        metadata: { conversation_id: conversationId, missing_users: missing } as unknown as object,
+        metadata: { conversation_id: conversationId, missing_users: missing } as unknown as never,
       });
     }
     if (rows.length) {
