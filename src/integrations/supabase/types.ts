@@ -44,6 +44,56 @@ export type Database = {
         }
         Relationships: []
       }
+      clinic_admins: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      conversation_keys: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          is_admin_escrow: boolean
+          recipient_id: string
+          wrapped_key: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          is_admin_escrow?: boolean
+          recipient_id: string
+          wrapped_key: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          is_admin_escrow?: boolean
+          recipient_id?: string
+          wrapped_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_keys_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           archived: boolean
@@ -98,27 +148,33 @@ export type Database = {
       messages: {
         Row: {
           body: string | null
+          ciphertext: string | null
           conversation_id: string
           created_at: string
           id: string
+          iv: string | null
           kind: string
           photo_path: string | null
           sender_id: string
         }
         Insert: {
           body?: string | null
+          ciphertext?: string | null
           conversation_id: string
           created_at?: string
           id?: string
+          iv?: string | null
           kind: string
           photo_path?: string | null
           sender_id: string
         }
         Update: {
           body?: string | null
+          ciphertext?: string | null
           conversation_id?: string
           created_at?: string
           id?: string
+          iv?: string | null
           kind?: string
           photo_path?: string | null
           sender_id?: string
@@ -178,6 +234,69 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      security_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          ip: unknown
+          metadata: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          ip?: unknown
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip?: unknown
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_keys: {
+        Row: {
+          created_at: string
+          encrypted_private_key: string
+          iterations: number
+          iv: string
+          public_key: Json
+          salt: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_private_key: string
+          iterations?: number
+          iv: string
+          public_key: Json
+          salt: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_private_key?: string
+          iterations?: number
+          iv?: string
+          public_key?: Json
+          salt?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
