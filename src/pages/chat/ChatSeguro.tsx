@@ -311,7 +311,11 @@ export default function ChatSeguro() {
             </div>
             <div className="flex-1 overflow-y-auto px-2 pb-4">
               {conversations.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-muted-foreground">Nenhuma conversa ainda.</p>
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  {isProfessional
+                    ? "Nenhuma paciente iniciou uma conversa ainda."
+                    : "Toque em 'Falar com a clínica' para iniciar sua conversa criptografada."}
+                </p>
               ) : (
                 conversations.map((c) => (
                   <button
