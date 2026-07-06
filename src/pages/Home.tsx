@@ -11,20 +11,9 @@ import {
 import { PageHeader, StatCard, Button, Badge } from "@/components/page-primitives";
 import { Link } from "react-router-dom";
 
-const upcoming = [
-  { time: "09:00", patient: "Amanda Ribeiro", proc: "Consulta inicial", status: "confirmado" as const },
-  { time: "10:30", patient: "Priscila Souza", proc: "Retorno pós-op", status: "aguardando" as const },
-  { time: "11:15", patient: "Beatriz Lima", proc: "Sessão radiofrequência", status: "confirmado" as const },
-  { time: "13:00", patient: "Camila Ferraz", proc: "Avaliação estética íntima", status: "novo" as const },
-  { time: "15:20", patient: "Larissa Martins", proc: "Aplicação de peeling", status: "confirmado" as const },
-];
+const upcoming: { time: string; patient: string; proc: string; status: "confirmado" | "aguardando" | "novo" }[] = [];
 
-const activities = [
-  { who: "Amanda R.", what: "assinou contrato de tratamento", when: "há 5 min" },
-  { who: "Secretária Julia", what: "agendou 3 novos horários", when: "há 20 min" },
-  { who: "Priscila S.", what: "enviou fotos de acompanhamento", when: "há 1 h" },
-  { who: "Financeiro", what: "recebeu R$ 1.850,00 via PIX", when: "há 2 h" },
-];
+const activities: { who: string; what: string; when: string }[] = [];
 
 const statusTone = {
   confirmado: "green" as const,
