@@ -229,6 +229,15 @@ export default function ChatSeguro() {
               <ShieldCheck className="h-3 w-3" /> E2E · AES-256-GCM · 2FA · conforme LGPD art. 11
             </p>
           </div>
+          {roles.includes("admin") && (
+            <a
+              href="/chat-seguro/recuperacao"
+              className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground/80 hover:bg-muted md:inline-flex"
+              title="Recuperação administrativa via escrow"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> Recuperação
+            </a>
+          )}
           {isProfessional && (
             <button
               onClick={() => setShowNewPatient(true)}
@@ -237,6 +246,7 @@ export default function ChatSeguro() {
               <Plus className="h-4 w-4" /> Nova conversa
             </button>
           )}
+
         </div>
 
         <div className="flex min-h-0 flex-1">

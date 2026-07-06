@@ -7,6 +7,8 @@ import AgendaVisaoGeral from "@/pages/agenda/VisaoGeral";
 import RelatorioAgendamentos from "@/pages/agenda/RelatorioAgendamentos";
 import Eventos from "@/pages/agenda/Eventos";
 import ChatSeguro from "@/pages/chat/ChatSeguro";
+import Recuperacao from "@/pages/chat/Recuperacao";
+
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import Usuarios from "@/pages/config/Usuarios";
@@ -56,6 +58,7 @@ const built = new Set<string>([
   "/agenda/relatorio-agendamentos",
   "/agenda/eventos",
   "/chat-seguro",
+  "/chat-seguro/recuperacao",
   "/config/usuarios",
   "/config/perfil",
   "/config/clinica",
@@ -124,6 +127,19 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/chat-seguro/recuperacao"
+              element={
+                <ProtectedRoute>
+                  <MfaGate>
+                    <VaultGate>
+                      <Recuperacao />
+                    </VaultGate>
+                  </MfaGate>
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/config/usuarios"
               element={
