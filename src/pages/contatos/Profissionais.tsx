@@ -2,12 +2,6 @@ import { Plus } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/page-primitives";
 import { Toolbar, DataTable, Button, Badge } from "@/components/list-primitives";
 
-const rows = [
-  { nome: "Dra. Renata Alves", esp: "Ginecologia estética", conselho: "CRM 123.456", agenda: "Seg–Sex", status: "Ativa" },
-  { nome: "Dra. Paula Menezes", esp: "Dermatologia íntima", conselho: "CRM 234.567", agenda: "Ter e Qui", status: "Ativa" },
-  { nome: "Enf. Carla Duarte", esp: "Enfermagem estética", conselho: "COREN 45.678", agenda: "Seg–Sáb", status: "Ativa" },
-];
-
 export default function Profissionais() {
   return (
     <div className="p-6 md:p-8">
@@ -18,13 +12,14 @@ export default function Profissionais() {
         actions={<Button><Plus className="h-4 w-4" /> Novo profissional</Button>}
       />
       <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <StatCard label="Profissionais ativos" value="3" accent="primary" />
-        <StatCard label="Atendimentos no mês" value="184" accent="green" />
-        <StatCard label="Ocupação média" value="78%" accent="pink" />
+        <StatCard label="Profissionais ativos" value="0" accent="primary" />
+        <StatCard label="Atendimentos no mês" value="0" accent="green" />
+        <StatCard label="Ocupação média" value="0%" accent="pink" />
       </div>
       <Toolbar />
       <DataTable
-        rows={rows}
+        rows={[] as Array<{ nome: string; esp: string; conselho: string; agenda: string; status: string }>}
+        empty="Nenhum profissional cadastrado."
         columns={[
           { key: "nome", label: "Profissional" },
           { key: "esp", label: "Especialidade" },
