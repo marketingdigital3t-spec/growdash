@@ -14,12 +14,7 @@ type Ev = {
   note?: string;
 };
 
-const INITIAL: Ev[] = [
-  { id: "E-01", kind: "evento", title: "Workshop de estética íntima", date: "20/03", time: "19:00", who: "Auditório da clínica", note: "12 profissionais confirmadas" },
-  { id: "E-02", kind: "bloqueio", title: "Congresso em SP", date: "22/03 → 24/03", time: "Dia todo", who: "Dra. Carla", note: "Sem atendimentos" },
-  { id: "E-03", kind: "lembrete", title: "Renovar alvará sanitário", date: "28/03", time: "09:00", note: "Enviar documentos ao contador" },
-  { id: "E-04", kind: "agendamento", title: "Reunião com fornecedor Ellipsis", date: "30/03", time: "15:00", who: "Sala 2" },
-];
+const INITIAL: Ev[] = [];
 
 const kindMeta: Record<EventKind, { label: string; tone: "primary" | "green" | "yellow" | "red"; Icon: typeof Bell }> = {
   agendamento: { label: "Agendamento", tone: "primary", Icon: Calendar },
