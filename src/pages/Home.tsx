@@ -33,8 +33,8 @@ export default function Home() {
     <div className="p-6 md:p-8">
       <PageHeader
         breadcrumb={["Clínica", "Início"]}
-        title={`${greeting}, Dra. Carla`}
-        subtitle="Aqui está o resumo da sua clínica hoje."
+        title={`${greeting}, seja bem-vinda`}
+        subtitle="Comece criando seu primeiro agendamento ou cadastro."
         actions={
           <>
             <Button variant="secondary">
@@ -48,10 +48,10 @@ export default function Home() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Agendamentos hoje" value="14" hint="+3 vs ontem" accent="primary" icon={<Calendar className="h-5 w-5" />} />
-        <StatCard label="Faturamento do dia" value="R$ 6.420" hint="Meta R$ 8.000" accent="green" icon={<DollarSign className="h-5 w-5" />} />
-        <StatCard label="Novos pacientes" value="4" hint="Esta semana: 11" accent="pink" icon={<UserPlus className="h-5 w-5" />} />
-        <StatCard label="Pacientes ativos" value="238" hint="+12 no mês" accent="yellow" icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Agendamentos hoje" value="0" hint="Nenhum agendado" accent="primary" icon={<Calendar className="h-5 w-5" />} />
+        <StatCard label="Faturamento do dia" value="R$ 0" hint="Sem lançamentos" accent="green" icon={<DollarSign className="h-5 w-5" />} />
+        <StatCard label="Novos pacientes" value="0" hint="Cadastre para começar" accent="pink" icon={<UserPlus className="h-5 w-5" />} />
+        <StatCard label="Pacientes ativos" value="0" hint="Nenhum cadastrado" accent="yellow" icon={<Users className="h-5 w-5" />} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
