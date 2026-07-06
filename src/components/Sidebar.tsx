@@ -73,6 +73,7 @@ export default function Sidebar() {
                     ))}
                   </ul>
                 ) : null}
+                </div>
               </div>
             </div>
           );
