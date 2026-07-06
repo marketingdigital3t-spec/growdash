@@ -9,6 +9,7 @@ import Eventos from "@/pages/agenda/Eventos";
 import ChatSeguro from "@/pages/chat/ChatSeguro";
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
+import Usuarios from "@/pages/config/Usuarios";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AuthProvider } from "@/hooks/useAuth";
 import { NAV } from "@/nav/nav-config";
@@ -20,6 +21,7 @@ const built = new Set<string>([
   "/agenda/relatorio-agendamentos",
   "/agenda/eventos",
   "/chat-seguro",
+  "/config/usuarios",
 ]);
 
 const placeholderRoutes = NAV.flatMap((n) => {
@@ -46,6 +48,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <ChatSeguro />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/config/usuarios"
+            element={
+              <ProtectedRoute>
+                <Usuarios />
               </ProtectedRoute>
             }
           />

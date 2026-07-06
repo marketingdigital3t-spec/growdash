@@ -2,9 +2,14 @@ import { useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { NAV, type NavItem } from "@/nav/nav-config";
+import { usePermissions } from "@/hooks/usePermissions";
+import { moduleFromPath } from "@/lib/permissions";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Sidebar() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const { can, isAdmin, loading } = usePermissions();
 
   const isActive = (item: NavItem) =>
     item.path === "/"
@@ -13,11 +18,17 @@ export default function Sidebar() {
         pathname.startsWith(item.path + "/") ||
         item.submenu?.some((s) => s.path === pathname);
 
+  // Se usuária logada e não é admin, filtra pelo que ela pode ver.
+  // Se não logada, mostra tudo (é a experiência da landing/preview).
+  const visibleNav = !user || isAdmin || loading
+    ? NAV
+    : NAV.filter((item) => item.path === "/" || can(moduleFromPath(item.path), "view"));
+
   return (
     <aside className="relative z-30 flex h-full w-[72px] shrink-0 flex-col border-r border-border bg-card py-3">
       <div className="mb-2 h-14" />
       <nav className="flex flex-1 flex-col items-center gap-1 overflow-visible px-0">
-        {NAV.map((item) => (
+        {visibleNav.map((item) => (
           <SidebarItem key={item.id} item={item} active={!!isActive(item)} />
         ))}
       </nav>
