@@ -24,7 +24,7 @@ export default function TopBar() {
           <span className="h-2 w-2 rounded-full bg-primary" />
         </span>
         <span className="text-[22px] font-extrabold tracking-tight text-foreground">
-          clínica<span className="font-black">experts</span>
+          grow<span className="font-black">dash</span>
         </span>
       </a>
 
