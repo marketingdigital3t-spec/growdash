@@ -1,12 +1,6 @@
-import { Flower2, MessageSquare, Heart } from "lucide-react";
+import { Flower2 } from "lucide-react";
 import { PageHeader } from "@/components/page-primitives";
-import { Card, Button, Badge } from "@/components/list-primitives";
-
-const posts = [
-  { autor: "Dra. Renata Alves", titulo: "Cuidados pós-laser CO2 — o que sempre repito às pacientes", tags: ["Laser", "Pós-op"], hora: "há 2h", likes: 24, coments: 8 },
-  { autor: "Enf. Carla Duarte", titulo: "Rotina de higienização entre sessões: meu passo a passo", tags: ["Higiene", "Rotina"], hora: "Ontem", likes: 41, coments: 15 },
-  { autor: "Dra. Paula Menezes", titulo: "Como acolher a paciente na primeira consulta íntima", tags: ["Acolhimento"], hora: "3 dias", likes: 68, coments: 22 },
-];
+import { Card, Empty, Button } from "@/components/list-primitives";
 
 export default function Comunidade() {
   return (
@@ -17,26 +11,10 @@ export default function Comunidade() {
         subtitle="Espaço seguro para profissionais trocarem experiências e evoluírem juntas."
         actions={<Button><Flower2 className="h-4 w-4" /> Novo post</Button>}
       />
-
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          {posts.map((p) => (
-            <Card key={p.titulo}>
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                <span>{p.autor}</span><span>•</span><span>{p.hora}</span>
-              </div>
-              <p className="text-base font-extrabold text-foreground">{p.titulo}</p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {p.tags.map((t) => <Badge key={t} tone="primary">{t}</Badge>)}
-              </div>
-              <div className="mt-4 flex items-center gap-4 text-xs font-bold text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><Heart className="h-4 w-4" /> {p.likes}</span>
-                <span className="inline-flex items-center gap-1"><MessageSquare className="h-4 w-4" /> {p.coments}</span>
-              </div>
-            </Card>
-          ))}
+        <div className="lg:col-span-2">
+          <Empty title="Sem publicações ainda" hint="Seja a primeira a compartilhar uma experiência com a comunidade." />
         </div>
-
         <div className="space-y-4">
           <Card title="Regras da comunidade">
             <ul className="list-disc space-y-2 pl-5 text-sm font-semibold text-muted-foreground">
@@ -44,13 +22,6 @@ export default function Comunidade() {
               <li>Respeito acima de tudo entre colegas.</li>
               <li>Cite fontes ao trazer estudos.</li>
             </ul>
-          </Card>
-          <Card title="Tópicos populares">
-            <div className="flex flex-wrap gap-1">
-              {["Laser", "Ácido hialurônico", "LGPD", "Marketing", "Pós-op", "Financeiro", "Acolhimento"].map((t) => (
-                <Badge key={t} tone="pink">#{t.toLowerCase()}</Badge>
-              ))}
-            </div>
           </Card>
         </div>
       </div>

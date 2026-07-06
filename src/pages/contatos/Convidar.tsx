@@ -1,6 +1,6 @@
-import { Mail, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { PageHeader } from "@/components/page-primitives";
-import { Card, Button, Input, Badge } from "@/components/list-primitives";
+import { Card, Button, Input } from "@/components/list-primitives";
 
 export default function Convidar() {
   return (
@@ -10,7 +10,6 @@ export default function Convidar() {
         title="Convidar colaboradores"
         subtitle="Envie um convite por e-mail para novos membros da equipe."
       />
-
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Novo convite" subtitle="A pessoa receberá um link seguro por e-mail.">
           <div className="space-y-3">
@@ -26,20 +25,7 @@ export default function Convidar() {
         </Card>
 
         <Card title="Convites pendentes">
-          <ul className="divide-y divide-border">
-            {[
-              { nome: "Larissa Prado", email: "larissa@clinica.com", role: "Recepção" },
-              { nome: "Beatriz Souza", email: "bia@clinica.com", role: "Profissional" },
-            ].map((c) => (
-              <li key={c.email} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-sm font-bold text-foreground">{c.nome}</p>
-                  <p className="text-xs font-semibold text-muted-foreground"><Mail className="mr-1 inline h-3 w-3" />{c.email}</p>
-                </div>
-                <Badge tone="yellow">{c.role}</Badge>
-              </li>
-            ))}
-          </ul>
+          <p className="py-6 text-center text-sm font-semibold text-muted-foreground">Nenhum convite pendente.</p>
         </Card>
 
         <Card title="Como funciona">
