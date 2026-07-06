@@ -38,6 +38,7 @@ export default function ChatSeguro() {
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showNewPatient, setShowNewPatient] = useState(false);
+  const [startingWithClinic, setStartingWithClinic] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -238,12 +239,63 @@ export default function ChatSeguro() {
               <ShieldCheck className="h-3.5 w-3.5" /> Recuperação
             </a>
           )}
-          {isProfessional && (
+          {isProfessional ? (
             <button
               onClick={() => setShowNewPatient(true)}
               className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow hover:opacity-90"
             >
               <Plus className="h-4 w-4" /> Nova conversa
+            </button>
+          ) : (
+            <button
+              onClick={async () => {
+                if (!user) return;
+                setStartingWithClinic(true);
+                try {
+                  const { data: admins, error: aerr } = await supabase
+                    .from("clinic_admins")
+                    .select("user_id")
+                    .limit(1);
+                  if (aerr) throw aerr;
+                  const adminId = admins?.[0]?.user_id;
+                  if (!adminId) throw new Error("Nenhuma profissional disponível na clínica ainda.");
+                  const { data: pubKey } = await supabase
+                    .from("user_keys")
+                    .select("user_id")
+                    .eq("user_id", adminId)
+                    .maybeSingle();
+                  if (!pubKey) {
+                    throw new Error("A profissional ainda não configurou o cofre. Tente novamente em instantes.");
+                  }
+                  const { data: existing } = await supabase
+                    .from("conversations")
+                    .select("id")
+                    .eq("patient_id", user.id)
+                    .eq("professional_id", adminId)
+                    .maybeSingle();
+                  let convId = existing?.id;
+                  if (!convId) {
+                    const { data: conv, error } = await supabase
+                      .from("conversations")
+                      .insert({ patient_id: user.id, professional_id: adminId })
+                      .select()
+                      .single();
+                    if (error) throw error;
+                    convId = conv.id;
+                    await createConversationKey(convId, adminId);
+                  }
+                  await loadConversations();
+                  setActiveId(convId);
+                } catch (e) {
+                  alert(e instanceof Error ? e.message : String(e));
+                } finally {
+                  setStartingWithClinic(false);
+                }
+              }}
+              disabled={startingWithClinic}
+              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow hover:opacity-90 disabled:opacity-60"
+            >
+              <Plus className="h-4 w-4" /> {startingWithClinic ? "Abrindo..." : "Falar com a clínica"}
             </button>
           )}
 
@@ -259,7 +311,11 @@ export default function ChatSeguro() {
             </div>
             <div className="flex-1 overflow-y-auto px-2 pb-4">
               {conversations.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-muted-foreground">Nenhuma conversa ainda.</p>
+                <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+                  {isProfessional
+                    ? "Nenhuma paciente iniciou uma conversa ainda."
+                    : "Toque em 'Falar com a clínica' para iniciar sua conversa criptografada."}
+                </p>
               ) : (
                 conversations.map((c) => (
                   <button
