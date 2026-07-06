@@ -9,6 +9,16 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const { threads, createThread } = useThreads();
 
+  // Force dark theme on the chat surface for the Growdash identity
+  useEffect(() => {
+    const root = document.documentElement;
+    const had = root.classList.contains("dark");
+    root.classList.add("dark");
+    return () => {
+      if (!had) root.classList.remove("dark");
+    };
+  }, []);
+
   useEffect(() => {
     if (threadId) {
       const exists = threads.some((t) => t.id === threadId);
@@ -17,7 +27,6 @@ export default function ChatPage() {
       }
       return;
     }
-    // no thread in URL: pick most recent or create one
     if (threads.length > 0) {
       navigate(`/c/${threads[0].id}`, { replace: true });
     } else {
