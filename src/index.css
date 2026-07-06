@@ -5,29 +5,29 @@
 @layer base {
   :root {
     /* Paleta Dra. Carla Rezende — nude, rosé, espresso, cream */
-    --background: 30 30% 97%;          /* cream off-white */
-    --foreground: 20 25% 15%;          /* deep espresso */
+    --background: 350 40% 98%;         /* rosé cream */
+    --foreground: 350 25% 18%;         /* deep plum-espresso */
 
     --card: 0 0% 100%;
-    --card-foreground: 20 25% 15%;
+    --card-foreground: 350 25% 18%;
 
-    --muted: 25 25% 94%;               /* warm beige */
-    --muted-foreground: 20 12% 42%;
+    --muted: 345 40% 95%;              /* soft blush */
+    --muted-foreground: 345 15% 45%;
 
-    --border: 25 20% 88%;
-    --input: 25 20% 88%;
+    --border: 345 35% 90%;
+    --input: 345 35% 90%;
 
-    --primary: 15 35% 32%;             /* espresso brown */
-    --primary-foreground: 30 30% 97%;
-    --primary-soft: 20 40% 92%;        /* blush nude */
+    --primary: 345 45% 42%;            /* rose mauve */
+    --primary-foreground: 350 40% 98%;
+    --primary-soft: 345 60% 93%;       /* pink blush */
 
-    --accent-pink: 12 55% 78%;         /* dusty rose */
+    --accent-pink: 342 75% 78%;        /* feminine rose */
     --accent-green: 90 20% 55%;        /* muted sage */
     --accent-yellow: 32 55% 72%;       /* warm sand */
-    --accent-lime: 25 45% 82%;         /* champagne nude */
+    --accent-lime: 345 55% 88%;        /* powder pink */
 
-    --sidebar-icon: 20 15% 45%;
-    --sidebar-icon-active: 15 35% 32%;
+    --sidebar-icon: 345 20% 50%;
+    --sidebar-icon-active: 345 45% 42%;
 
     --ring: 15 35% 32%;
     --radius: 1rem;
