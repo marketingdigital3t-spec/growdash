@@ -26,15 +26,7 @@ export default function Login() {
   return (
     <div className="grid min-h-screen place-items-center bg-gradient-to-br from-primary-soft to-background p-6">
       <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-primary to-[hsl(340_85%_60%)] text-white shadow-lg">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black">Chat Seguro</h1>
-            <p className="text-xs text-muted-foreground">clinicnext · dados protegidos por LGPD</p>
-          </div>
-        </div>
+        <h1 className="mb-6 text-center text-2xl font-black">Faça seu login</h1>
         <form onSubmit={submit} className="flex flex-col gap-3">
           <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 focus-within:border-primary">
             <Mail className="h-4 w-4 text-muted-foreground" />
