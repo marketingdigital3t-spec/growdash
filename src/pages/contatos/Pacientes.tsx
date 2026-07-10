@@ -15,6 +15,9 @@ type Patient = {
   full_name: string | null;
   created_at: string;
   initial_password_pending: boolean;
+  phone: string | null;
+  instagram: string | null;
+  avatar_url: string | null;
 };
 
 type PatientRow = {
