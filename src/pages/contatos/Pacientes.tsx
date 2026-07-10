@@ -238,7 +238,7 @@ export default function Pacientes() {
         ]}
       />
 
-      {open && <AddPatientDialog onClose={() => setOpen(false)} onCreated={load} />}
+      {open && <AddPatientDialog onClose={() => setOpen(false)} onCreated={load} ensureSecureChat={ensureSecureChat} />}
       {editing && (
         <EditPatientDialog
           patient={editing}
