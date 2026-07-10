@@ -12,6 +12,7 @@ type Conversation = {
   patient_id: string;
   professional_id: string;
   updated_at: string;
+  view_password: string;
   other_name?: string;
 };
 
@@ -41,6 +42,10 @@ export default function ChatSeguro() {
   const [startingWithClinic, setStartingWithClinic] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
+  const [pwInput, setPwInput] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -48,7 +53,7 @@ export default function ChatSeguro() {
     if (!user) return;
     const { data: convs } = await supabase
       .from("conversations")
-      .select("id, patient_id, professional_id, updated_at")
+      .select("id, patient_id, professional_id, updated_at, view_password")
       .order("updated_at", { ascending: false });
     if (!convs) return;
     const ids = new Set<string>();
@@ -317,10 +322,17 @@ export default function ChatSeguro() {
                     : "Toque em 'Falar com a clínica' para iniciar sua conversa criptografada."}
                 </p>
               ) : (
-                conversations.map((c) => (
+                conversations.map((c) => {
+                  const isUnlocked = unlocked.has(c.id);
+                  const isRevealed = !!showPw[c.id];
+                  return (
                   <button
                     key={c.id}
-                    onClick={() => setActiveId(c.id)}
+                    onClick={() => {
+                      setActiveId(c.id);
+                      setPwInput("");
+                      setPwError(null);
+                    }}
                     className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                       activeId === c.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
                     }`}
@@ -333,13 +345,33 @@ export default function ChatSeguro() {
                       {(c.other_name ?? "?").charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{c.other_name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-bold">{c.other_name}</p>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPw((s) => ({ ...s, [c.id]: !s[c.id] }));
+                          }}
+                          role="button"
+                          title={isRevealed ? "Ocultar senha do chat" : "Mostrar senha do chat"}
+                          className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wider ${
+                            activeId === c.id
+                              ? "border-white/40 bg-white/15 text-white"
+                              : "border-border bg-muted text-foreground"
+                          }`}
+                        >
+                          <Lock className="h-3 w-3" />
+                          {isRevealed ? c.view_password : "••••••"}
+                        </span>
+                        {isUnlocked && <ShieldCheck className="h-3 w-3 opacity-70" />}
+                      </div>
                       <p className="truncate text-xs opacity-70">
                         {new Date(c.updated_at).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
                   </button>
-                ))
+                  );
+                })
               )}
             </div>
           </aside>
@@ -347,16 +379,77 @@ export default function ChatSeguro() {
           <section className="flex min-w-0 flex-1 flex-col">
             {!active ? (
               <EmptyState isProfessional={isProfessional} />
+            ) : !unlocked.has(active.id) ? (
+              <div className="flex flex-1 items-center justify-center bg-background p-8">
+                <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-xl">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black">Conversa bloqueada</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Digite a senha da conversa com <b>{active.other_name}</b> para ver o conteúdo.
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    autoFocus
+                    value={pwInput}
+                    onChange={(e) => { setPwInput(e.target.value); setPwError(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (pwInput.trim().toUpperCase() === active.view_password.toUpperCase()) {
+                          setUnlocked((s) => { const n = new Set(s); n.add(active.id); return n; });
+                          setPwInput("");
+                          setPwError(null);
+                        } else {
+                          setPwError("Senha incorreta");
+                        }
+                      }
+                    }}
+                    placeholder="Senha da conversa"
+                    className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm tracking-widest outline-none focus:border-primary"
+                  />
+                  {pwError && (
+                    <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{pwError}</p>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (pwInput.trim().toUpperCase() === active.view_password.toUpperCase()) {
+                        setUnlocked((s) => { const n = new Set(s); n.add(active.id); return n; });
+                        setPwInput("");
+                        setPwError(null);
+                      } else {
+                        setPwError("Senha incorreta");
+                      }
+                    }}
+                    className="mt-3 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground shadow hover:opacity-90"
+                  >
+                    Desbloquear conversa
+                  </button>
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    A senha aparece ao lado do nome da paciente na lista de conversas (clique no cadeado para revelar).
+                  </p>
+                </div>
+              </div>
             ) : (
               <>
                 <div className="flex items-center gap-3 border-b border-border bg-card px-6 py-3">
                   <div className="grid h-9 w-9 place-items-center rounded-full bg-primary-soft text-sm font-bold text-primary">
                     {(active.other_name ?? "?").charAt(0).toUpperCase()}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-bold">{active.other_name}</p>
                     <p className="text-[11px] text-muted-foreground">Chave da conversa apenas neste dispositivo</p>
                   </div>
+                  <button
+                    onClick={() => setUnlocked((s) => { const n = new Set(s); n.delete(active.id); return n; })}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-bold hover:bg-muted"
+                    title="Bloquear conversa novamente"
+                  >
+                    <Lock className="h-3 w-3" /> Bloquear
+                  </button>
                 </div>
                 <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-6 py-4">
                   {messages.map((m) => (
