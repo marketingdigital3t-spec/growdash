@@ -102,38 +102,6 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const setup = async (password: string) => {
-    if (!user) throw new Error("Sessão inválida");
-    if (password.length < 10) throw new Error("Senha do cofre precisa ter no mínimo 10 caracteres");
-    const kp = await C.generateKeypair();
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const iterations = 600_000;
-    const wrap = await C.deriveWrapKey(password, salt, iterations);
-    const encrypted_private_key = await C.wrapPrivateKeyWithPassword(kp.privateKey, wrap, iv);
-    const publicJwk = await C.exportPublicJwk(kp.publicKey);
-
-    const { error: e1 } = await supabase
-      .from("user_keys")
-      .upsert({ user_id: user.id, public_key: publicJwk as unknown as never });
-    if (e1) throw e1;
-    const { error: e2 } = await supabase.from("user_private_keys").upsert({
-      user_id: user.id,
-      encrypted_private_key,
-      salt: C.b64.encode(salt),
-      iv: C.b64.encode(iv),
-      iterations,
-    });
-    if (e2) throw e2;
-
-    await supabase.from("security_events").insert({
-      user_id: user.id,
-      event_type: "e2e_key_created",
-      user_agent: navigator.userAgent,
-    });
-    setPrivateKey(kp.privateKey);
-    setHasKeypair(true);
-  };
 
   const setup = async (password: string) => {
     await setupInternal(password);
