@@ -155,17 +155,45 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     if (!privateKey) throw new Error("Cofre bloqueado — digite sua senha do cofre");
     const cached = convCache.current.get(conversationId);
     if (cached) return cached;
-    const { data, error } = await supabase
-      .from("conversation_keys")
-      .select("wrapped_key")
-      .eq("conversation_id", conversationId)
-      .eq("recipient_id", user.id)
-      .maybeSingle();
+    const fetchWrapped = async () =>
+      supabase
+        .from("conversation_keys")
+        .select("wrapped_key")
+        .eq("conversation_id", conversationId)
+        .eq("recipient_id", user.id)
+        .maybeSingle();
+
+    const initial = await fetchWrapped();
+    let data = initial.data;
+    const error = initial.error;
+    if (!data && !error) {
+      // Auto-heal: chave da conversa não existe pra mim.
+      // Só regeneramos se NÃO houver mensagens cifradas E não houver
+      // NENHUMA linha de chave (senão outra pessoa já tem a AES original).
+      const [{ count: msgCount }, { count: keyCount }] = await Promise.all([
+        supabase.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId),
+        supabase.from("conversation_keys").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId),
+      ]);
+      if ((msgCount ?? 0) === 0 && (keyCount ?? 0) === 0) {
+        const { data: conv } = await supabase
+          .from("conversations")
+          .select("patient_id, professional_id")
+          .eq("id", conversationId)
+          .maybeSingle();
+        if (conv) {
+          const other = conv.patient_id === user.id ? conv.professional_id : conv.patient_id;
+          convCache.current.delete(conversationId);
+          const aes = await createConversationKey(conversationId, other);
+          return aes;
+        }
+      }
+    }
     if (error || !data) throw new Error("Sem chave para esta conversa");
     const key = await C.unwrapConversationKey(data.wrapped_key, privateKey);
     convCache.current.set(conversationId, key);
     return key;
   };
+
 
   const createConversationKey = async (conversationId: string, otherUserId: string) => {
     if (!user) throw new Error("Sessão inválida");
