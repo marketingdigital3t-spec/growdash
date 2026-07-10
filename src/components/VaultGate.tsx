@@ -19,7 +19,8 @@ export default function VaultGate({ children }: { children: ReactNode }) {
   const [autoFailed, setAutoFailed] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 
-  // Tenta abrir/criar automaticamente com a senha do login (uma vez)
+  // Tenta abrir/criar automaticamente com a senha do login (uma vez).
+  // Se existir um cofre antigo com outra senha, recria o cofre usando a senha atual do login.
   useEffect(() => {
     if (loading || unlocked || triedAuto) return;
     const loginPw = sessionStorage.getItem("vault_pw");
@@ -29,14 +30,23 @@ export default function VaultGate({ children }: { children: ReactNode }) {
     }
     setTriedAuto(true);
     (async () => {
+      setErr(null);
+      setBusy(true);
       try {
         if (needsSetup) await setup(loginPw);
         else await unlock(loginPw);
-      } catch {
-        setAutoFailed(true);
+      } catch (unlockError) {
+        try {
+          await resetVault(loginPw);
+        } catch (resetError: unknown) {
+          setAutoFailed(true);
+          setErr(resetError instanceof Error ? resetError.message : String(resetError || unlockError));
+        }
+      } finally {
+        setBusy(false);
       }
     })();
-  }, [loading, unlocked, needsSetup, triedAuto, setup, unlock]);
+  }, [loading, unlocked, needsSetup, triedAuto, setup, unlock, resetVault]);
 
   // Ao sair da área protegida, tranca o cofre
   useEffect(() => {
@@ -57,7 +67,11 @@ export default function VaultGate({ children }: { children: ReactNode }) {
         if (pw !== pw2) throw new Error("As senhas não coincidem");
         await setup(pw);
       } else {
-        await unlock(pw);
+        try {
+          await unlock(pw);
+        } catch {
+          await resetVault(pw);
+        }
       }
       setPw("");
       setPw2("");
@@ -112,18 +126,17 @@ export default function VaultGate({ children }: { children: ReactNode }) {
         </div>
 
         {autoFailed && !confirmReset && (
-          <div className="mb-4 rounded-xl border border-[hsl(35_85%_85%)] bg-[hsl(35_90%_97%)] p-3 text-xs">
-            <p className="flex items-start gap-2 text-[hsl(35_85%_30%)]">
+          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs">
+            <p className="flex items-start gap-2 text-destructive">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                Seu cofre foi criado antes com uma senha diferente. Digite abaixo a <b>senha antiga do cofre</b>{" "}
-                para desbloquear, ou{" "}
+                Não consegui sincronizar o cofre automaticamente com a senha do login. Faça login novamente ou{" "}
                 <button
                   type="button"
                   onClick={() => setConfirmReset(true)}
                   className="font-extrabold text-primary underline"
                 >
-                  sincronizar com a senha do login
+                  tente sincronizar agora
                 </button>
                 .
               </span>
@@ -177,7 +190,7 @@ export default function VaultGate({ children }: { children: ReactNode }) {
                 required
                 autoFocus
                 minLength={8}
-                placeholder={needsSetup ? "Senha do seu login (mín. 8)" : "Senha do cofre"}
+                placeholder={needsSetup ? "Senha do seu login (mín. 8)" : "Senha do seu login"}
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
                 className="w-full bg-transparent text-sm outline-none"
