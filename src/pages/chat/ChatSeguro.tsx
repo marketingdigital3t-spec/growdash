@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Lock, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { Camera, Lock, Plus, RefreshCw, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCrypto } from "@/hooks/useCrypto";
 import { encryptText, decryptText, encryptBytes, decryptBytes, b64 } from "@/lib/crypto";
 import LgpdConsent from "@/components/LgpdConsent";
 import WatermarkedImage from "@/components/WatermarkedImage";
+
 
 type Conversation = {
   id: string;
