@@ -42,6 +42,10 @@ export default function ChatSeguro() {
   const [startingWithClinic, setStartingWithClinic] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
+  const [pwInput, setPwInput] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
