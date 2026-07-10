@@ -430,7 +430,7 @@ export default function ChatSeguro() {
                         {isUnlocked && <ShieldCheck className="h-3 w-3 opacity-70" />}
                       </div>
                       <p className="truncate text-xs opacity-70">
-                        {new Date(c.updated_at).toLocaleDateString("pt-BR")} · senha individual
+                        {new Date(c.updated_at).toLocaleDateString("pt-BR")} · código próprio da conversa
                       </p>
                     </div>
                   </button>
