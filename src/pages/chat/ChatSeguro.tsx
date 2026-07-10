@@ -193,7 +193,9 @@ export default function ChatSeguro() {
   const unlockConversation = async () => {
     if (!active) return;
     try {
-      if (pwInput.trim().toUpperCase() === active.access_code.toUpperCase()) {
+      const norm = (s: string) => s.trim().toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1");
+      // Comparação tolerante a caracteres ambíguos (0/O, 1/I/L)
+      if (norm(pwInput) === norm(active.access_code)) {
         await prepareConversationKey(active.id);
         setUnlocked((s) => {
           const n = new Set(s);
