@@ -466,22 +466,21 @@ export default function ChatSeguro() {
                         unlockConversation();
                       }
                     }}
-                    placeholder={active.access_code ? "Senha da conversa" : "Gerando senha..."}
-                    disabled={!active.access_code}
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm tracking-widest outline-none focus:border-primary"
+                    placeholder="Código da conversa (6 caracteres)"
+                    maxLength={6}
+                    className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm tracking-widest uppercase outline-none focus:border-primary"
                   />
                   {pwError && (
                     <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{pwError}</p>
                   )}
                   <button
                     onClick={unlockConversation}
-                    disabled={!active.access_code}
                     className="mt-3 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground shadow hover:opacity-90 disabled:opacity-60"
                   >
                     Desbloquear conversa
                   </button>
                   <p className="mt-3 text-[11px] text-muted-foreground">
-                    A senha aparece ao lado do nome na lista, é diferente para cada pessoa e troca diariamente às 3h.
+                    O código é único desta conversa. Qualquer participante pode renovar a qualquer momento, o que invalida o código atual em todos os aparelhos.
                   </p>
                 </div>
               </div>
@@ -493,8 +492,25 @@ export default function ChatSeguro() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-bold">{active.other_name}</p>
-                    <p className="text-[11px] text-muted-foreground">Chave da conversa apenas neste dispositivo</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Código: <span className="font-mono font-bold">{active.access_code}</span> · válido em qualquer aparelho até ser renovado
+                    </p>
                   </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Gerar um novo código? O atual deixará de funcionar em todos os aparelhos.")) return;
+                      try {
+                        const code = await rotateAccessCode(active.id);
+                        alert(`Novo código: ${code}\n\nCompartilhe com segurança com ${active.other_name}.`);
+                      } catch (e) {
+                        alert("Falha ao renovar: " + (e instanceof Error ? e.message : String(e)));
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-bold hover:bg-muted"
+                    title="Gerar um novo código de acesso"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Renovar código
+                  </button>
                   <button
                     onClick={() => setUnlocked((s) => { const n = new Set(s); n.delete(active.id); return n; })}
                     className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-bold hover:bg-muted"
@@ -503,6 +519,7 @@ export default function ChatSeguro() {
                     <Lock className="h-3 w-3" /> Bloquear
                   </button>
                 </div>
+
                 <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-6 py-4">
                   {messages.map((m) => (
                     <MessageBubble
