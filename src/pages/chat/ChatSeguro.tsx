@@ -453,7 +453,7 @@ export default function ChatSeguro() {
                     <div>
                       <h3 className="text-base font-black">Conversa bloqueada</h3>
                       <p className="text-xs text-muted-foreground">
-                        Digite a sua senha individual desta conversa para ver o conteúdo neste aparelho.
+                        Digite o código de 6 caracteres desta conversa para abrir o conteúdo neste aparelho.
                       </p>
                     </div>
                   </div>
