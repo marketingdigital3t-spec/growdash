@@ -14,6 +14,7 @@ type CryptoCtx = {
   lock: () => void;
   getConvKey: (conversationId: string) => Promise<CryptoKey>;
   createConversationKey: (conversationId: string, otherUserId: string) => Promise<CryptoKey>;
+  shareConversationKey: (conversationId: string, aesKey?: CryptoKey) => Promise<void>;
 };
 
 const Ctx = createContext<CryptoCtx | null>(null);
@@ -154,7 +155,12 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     if (!user) throw new Error("Sessão inválida");
     if (!privateKey) throw new Error("Cofre bloqueado — digite sua senha do cofre");
     const cached = convCache.current.get(conversationId);
-    if (cached) return cached;
+    if (cached) {
+      shareConversationKey(conversationId, cached).catch(() => {
+        /* não bloqueia leitura se a sincronização de outra pessoa falhar */
+      });
+      return cached;
+    }
     const fetchWrapped = async () =>
       supabase
         .from("conversation_keys")
@@ -191,7 +197,58 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     if (error || !data) throw new Error("Sem chave para esta conversa");
     const key = await C.unwrapConversationKey(data.wrapped_key, privateKey);
     convCache.current.set(conversationId, key);
+    await shareConversationKey(conversationId, key).catch(() => {
+      /* não bloqueia leitura se a sincronização de outra pessoa falhar */
+    });
     return key;
+  };
+
+
+  const insertConversationKeyRows = async (
+    rows: Array<{
+      conversation_id: string;
+      recipient_id: string;
+      wrapped_key: string;
+      is_admin_escrow: boolean;
+    }>,
+  ) => {
+    for (const row of rows) {
+      const { error } = await supabase.from("conversation_keys").insert(row);
+      if (error && error.code !== "23505") throw error;
+    }
+  };
+
+  const shareConversationKey = async (conversationId: string, aesKey?: CryptoKey) => {
+    if (!user) throw new Error("Sessão inválida");
+    const aes = aesKey ?? convCache.current.get(conversationId) ?? (await getConvKey(conversationId));
+    const { data: conv } = await supabase
+      .from("conversations")
+      .select("patient_id, professional_id")
+      .eq("id", conversationId)
+      .maybeSingle();
+    if (!conv) return;
+    const { data: admins } = await supabase.from("clinic_admins").select("user_id");
+    const targets = Array.from(new Set<string>([conv.patient_id, conv.professional_id, ...(admins?.map((a) => a.user_id) ?? [])]));
+    const { data: keys } = await supabase
+      .from("user_keys")
+      .select("user_id, public_key")
+      .in("user_id", targets);
+    const rows: Array<{
+      conversation_id: string;
+      recipient_id: string;
+      wrapped_key: string;
+      is_admin_escrow: boolean;
+    }> = [];
+    for (const k of keys ?? []) {
+      const pub = await C.importPublicJwk(k.public_key as unknown as JsonWebKey);
+      rows.push({
+        conversation_id: conversationId,
+        recipient_id: k.user_id,
+        wrapped_key: await C.wrapConversationKey(aes, pub),
+        is_admin_escrow: k.user_id !== conv.patient_id && k.user_id !== conv.professional_id,
+      });
+    }
+    await insertConversationKeyRows(rows);
   };
 
 
@@ -227,10 +284,7 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
         metadata: { conversation_id: conversationId, missing_users: missing } as unknown as never,
       });
     }
-    if (rows.length) {
-      const { error } = await supabase.from("conversation_keys").insert(rows);
-      if (error) throw error;
-    }
+    if (rows.length) await insertConversationKeyRows(rows);
     convCache.current.set(conversationId, aes);
     return aes;
   };
@@ -248,6 +302,7 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
         lock,
         getConvKey,
         createConversationKey,
+        shareConversationKey,
       }}
     >
       {children}

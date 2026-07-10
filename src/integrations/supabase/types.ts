@@ -59,6 +59,47 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_access_codes: {
+        Row: {
+          access_code: string
+          code_day: string
+          conversation_id: string
+          created_at: string
+          generated_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_code: string
+          code_day: string
+          conversation_id: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_code?: string
+          code_day?: string
+          conversation_id?: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_access_codes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_keys: {
         Row: {
           conversation_id: string
@@ -387,6 +428,16 @@ export type Database = {
         Args: { _target: string; _viewer: string }
         Returns: boolean
       }
+      current_chat_code_day: { Args: never; Returns: string }
+      ensure_conversation_access_code: {
+        Args: { _conversation_id: string }
+        Returns: {
+          access_code: string
+          code_day: string
+          generated_at: string
+        }[]
+      }
+      generate_chat_access_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
