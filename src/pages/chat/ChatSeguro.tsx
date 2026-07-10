@@ -12,6 +12,7 @@ type Conversation = {
   patient_id: string;
   professional_id: string;
   updated_at: string;
+  view_password: string;
   other_name?: string;
 };
 
