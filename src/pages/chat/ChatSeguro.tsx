@@ -619,7 +619,7 @@ export default function ChatSeguro() {
           src={lightbox}
           viewer={viewer}
           onClose={() => {
-            URL.revokeObjectURL(lightbox);
+            // Não revoga: mantém cache para reabertura instantânea
             setLightbox(null);
           }}
         />
