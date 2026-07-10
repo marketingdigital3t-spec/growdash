@@ -67,7 +67,11 @@ export default function VaultGate({ children }: { children: ReactNode }) {
         if (pw !== pw2) throw new Error("As senhas não coincidem");
         await setup(pw);
       } else {
-        await unlock(pw);
+        try {
+          await unlock(pw);
+        } catch {
+          await resetVault(pw);
+        }
       }
       setPw("");
       setPw2("");
