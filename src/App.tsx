@@ -63,6 +63,9 @@ const built = new Set<string>([
   "/agenda/eventos",
   "/chat-seguro",
   "/chat-seguro/recuperacao",
+  "/minha-conversa",
+  "/admin/lgpd",
+
   "/config/usuarios",
   "/config/perfil",
   "/config/clinica",
