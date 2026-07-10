@@ -40,7 +40,7 @@ export function DataTable<T extends Record<string, any>>({ columns, rows, empty 
               <tr key={i} className="hover:bg-muted/40">
                 {columns.map((c) => (
                   <td key={String(c.key)} className={`px-4 py-3 font-semibold text-foreground ${c.className ?? ""}`}>
-                    {c.render ? c.render(r) : String(r[c.key as keyof T] ?? "")}
+                    {c.render ? c.render(r) : (r[c.key as keyof T] as ReactNode) ?? ""}
                   </td>
                 ))}
               </tr>

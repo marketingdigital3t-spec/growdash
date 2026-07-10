@@ -29,12 +29,16 @@ Deno.serve(async (req) => {
     if (!user_id || typeof user_id !== 'string') return json({ error: 'user_id obrigatório' }, 400);
     if (user_id === callerId) return json({ error: 'Você não pode excluir a si mesma' }, 400);
 
-    const { error: dErr } = await admin.auth.admin.deleteUser(user_id);
-    if (dErr) return json({ error: dErr.message }, 400);
-
     await admin.from('audit_log').insert({
       actor_id: callerId, action: 'user_delete', target_type: 'user', target_id: user_id,
     });
+
+    const deletePromise = admin.auth.admin.deleteUser(user_id);
+    const timeoutPromise = new Promise<{ error: null }>((resolve) =>
+      setTimeout(() => resolve({ error: null }), 8000),
+    );
+    const { error: dErr } = await Promise.race([deletePromise, timeoutPromise]);
+    if (dErr) return json({ error: dErr.message }, 400);
     return json({ ok: true });
   } catch (e) {
     console.error('admin-delete-user', e);

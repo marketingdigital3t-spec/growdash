@@ -32,7 +32,7 @@ function randomPassword(len = 12) {
 }
 
 export default function Pacientes() {
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const canAdd = roles.includes("admin") || roles.includes("professional");
   const canManage = roles.includes("admin");
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -43,9 +43,22 @@ export default function Pacientes() {
 
   const load = async () => {
     setLoading(true);
-    const { data: patientRoles } = await supabase
-      .from("user_roles").select("user_id").eq("role", "patient");
-    const ids = patientRoles?.map((r) => r.user_id) ?? [];
+    let ids: string[] = [];
+
+    if (roles.includes("admin")) {
+      const { data: patientRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "patient");
+      ids = patientRoles?.map((r) => r.user_id) ?? [];
+    } else if (user?.id) {
+      const { data: links } = await supabase
+        .from("patient_links")
+        .select("patient_id")
+        .eq("professional_id", user.id);
+      ids = links?.map((r) => r.patient_id) ?? [];
+    }
+
     if (!ids.length) {
       setPatients([]);
       setLoading(false);
@@ -60,7 +73,7 @@ export default function Pacientes() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user?.id, roles.join("|")]);
 
   const rows: PatientRow[] = patients.map((p) => ({
     id: p.id,
@@ -212,15 +225,10 @@ function DeletePatientDialog({
   const confirm = async () => {
     setErr(null);
     setBusy(true);
-    const { data: sess } = await supabase.auth.getSession();
-    const token = sess.session?.access_token;
-    const { data, error } = await supabase.functions.invoke("admin-delete-user", {
-      body: { user_id: patient.id },
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
+    const { data, error } = await callAdminFunction("admin-delete-user", { user_id: patient.id });
     setBusy(false);
     if (error || data?.error) {
-      setErr((data?.error as string) ?? error?.message ?? "Falha ao excluir");
+      setErr((data?.error as string) ?? error ?? "Falha ao excluir paciente");
       return;
     }
     onDeleted();
@@ -320,7 +328,7 @@ function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
     });
     setLoading(false);
     if (error || data?.error) {
-      setErr((data?.error as string) ?? error?.message ?? "Falha ao criar paciente");
+      setErr((data?.error as string) ?? (await functionErrorMessage(error, "Falha ao criar paciente")));
       return;
     }
     setCreated({ email: email.trim().toLowerCase(), password: pw });
@@ -458,6 +466,62 @@ function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
       </div>
     </div>
   );
+}
+
+async function functionErrorMessage(error: unknown, fallback: string) {
+  const context = (error as { context?: Response })?.context;
+  if (context) {
+    try {
+      const payload = await context.clone().json();
+      if (typeof payload?.error === "string") return payload.error;
+      if (typeof payload?.message === "string") return payload.message;
+    } catch {
+      try {
+        const text = await context.clone().text();
+        if (text) return text;
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return (error as { message?: string } | null)?.message ?? fallback;
+}
+
+async function callAdminFunction(name: string, body: unknown) {
+  const token = getStoredAccessToken();
+  if (!token) return { data: null, error: "Sessão expirada. Entre novamente para continuar." };
+
+  try {
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return { data, error: data?.error ?? `Erro ${res.status}` };
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "Falha na conexão" };
+  }
+}
+
+function getStoredAccessToken() {
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+    try {
+      const value = JSON.parse(localStorage.getItem(key) ?? "null");
+      const token = value?.access_token ?? value?.currentSession?.access_token ?? value?.session?.access_token;
+      if (typeof token === "string" && token.length > 20) return token;
+    } catch {
+      // ignore unrelated storage entries
+    }
+  }
+  return null;
 }
 
 function CredRow({
