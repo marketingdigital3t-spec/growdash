@@ -53,9 +53,19 @@ Deno.serve(async (req) => {
       return json({ error: 'Forbidden' }, 403);
     }
 
-    // Exige 2FA para o profissional (admin/professional). Paciente pode enviar sem AAL2.
+    // Exige 2FA para o profissional. Admin/owner passa sem AAL2.
     const isProf = conv.professional_id === userId;
-    if (isProf && aal !== 'aal2') {
+    let isAdmin = false;
+    if (isProf) {
+      const { data: adminRow } = await admin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle();
+      isAdmin = !!adminRow;
+    }
+    if (isProf && !isAdmin && aal !== 'aal2') {
       return json({ error: '2FA required' }, 403);
     }
 
