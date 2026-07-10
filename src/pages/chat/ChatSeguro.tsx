@@ -13,11 +13,10 @@ type Conversation = {
   patient_id: string;
   professional_id: string;
   updated_at: string;
-  access_code?: string;
-  code_day?: string;
-  generated_at?: string;
+  access_code: string;
   other_name?: string;
 };
+
 
 type Message = {
   id: string;
