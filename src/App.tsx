@@ -7,7 +7,10 @@ import AgendaVisaoGeral from "@/pages/agenda/VisaoGeral";
 import RelatorioAgendamentos from "@/pages/agenda/RelatorioAgendamentos";
 import Eventos from "@/pages/agenda/Eventos";
 import ChatSeguro from "@/pages/chat/ChatSeguro";
+import MinhaConversa from "@/pages/chat/MinhaConversa";
 import Recuperacao from "@/pages/chat/Recuperacao";
+import SolicitacoesLgpd from "@/pages/admin/SolicitacoesLgpd";
+
 
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
