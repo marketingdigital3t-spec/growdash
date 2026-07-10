@@ -230,7 +230,9 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
       });
     }
     if (rows.length) {
-      const { error } = await supabase.from("conversation_keys").insert(rows);
+      const { error } = await supabase
+        .from("conversation_keys")
+        .upsert(rows, { onConflict: "conversation_id,recipient_id" });
       if (error) throw error;
     }
     convCache.current.set(conversationId, aes);
