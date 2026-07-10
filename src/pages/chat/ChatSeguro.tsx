@@ -49,7 +49,7 @@ export default function ChatSeguro() {
     if (!user) return;
     const { data: convs } = await supabase
       .from("conversations")
-      .select("id, patient_id, professional_id, updated_at")
+      .select("id, patient_id, professional_id, updated_at, view_password")
       .order("updated_at", { ascending: false });
     if (!convs) return;
     const ids = new Set<string>();
