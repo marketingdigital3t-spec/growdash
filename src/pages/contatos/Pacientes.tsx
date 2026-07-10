@@ -77,7 +77,7 @@ export default function Pacientes() {
     }
     const { data: profs } = await supabase
       .from("profiles")
-      .select("id, full_name, created_at, initial_password_pending")
+      .select("id, full_name, created_at, initial_password_pending, phone, instagram, avatar_url")
       .in("id", ids)
       .order("created_at", { ascending: false });
     setPatients((profs ?? []) as Patient[]);
