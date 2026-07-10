@@ -216,6 +216,7 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
         loading,
         unlock,
         setup,
+        resetVault,
         lock,
         getConvKey,
         createConversationKey,
