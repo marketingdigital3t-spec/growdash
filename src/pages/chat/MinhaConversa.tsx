@@ -52,6 +52,7 @@ export default function MinhaConversa() {
   const [pendingRequest, setPendingRequest] = useState<{ id: string; deadline_at: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const photoCache = useRef<Map<string, string>>(new Map());
 
   const viewer = useMemo(
     () => ({
@@ -107,9 +108,8 @@ export default function MinhaConversa() {
   }, [user]);
 
   const prepareKey = async (conversationId: string) => {
-    const key = await getConvKey(conversationId);
-    await shareConversationKey(conversationId, key).catch(() => null);
-    return key;
+    // getConvKey já cacheia + re-compartilha 1x em background — não bloqueia hot path
+    return getConvKey(conversationId);
   };
 
   const decryptMessage = async (m: Message, conversationId: string): Promise<Message> => {
@@ -237,18 +237,38 @@ export default function MinhaConversa() {
     if (!conv || !text.trim() || !user) return;
     const body = text.trim();
     setText("");
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: Message = {
+      id: tempId,
+      conversation_id: conv.id,
+      sender_id: user.id,
+      kind: "text",
+      body: null,
+      photo_path: null,
+      iv: null,
+      ciphertext: null,
+      created_at: new Date().toISOString(),
+      _decrypted: body,
+    };
+    setMessages((m) => [...m, optimistic]);
     try {
       const key = await prepareKey(conv.id);
       const { iv, ciphertext } = await encryptText(body, key);
-      const { error } = await supabase.from("messages").insert({
+      const { data, error } = await supabase.from("messages").insert({
         conversation_id: conv.id,
         sender_id: user.id,
         kind: "text",
         iv,
         ciphertext,
-      });
+      }).select().single();
       if (error) throw error;
+      setMessages((m) => {
+        const withoutTemp = m.filter((x) => x.id !== tempId);
+        if (withoutTemp.some((x) => x.id === data.id)) return withoutTemp;
+        return [...withoutTemp, { ...(data as Message), _decrypted: body }];
+      });
     } catch (e) {
+      setMessages((m) => m.filter((x) => x.id !== tempId));
       alert("Falha ao enviar: " + (e instanceof Error ? e.message : String(e)));
     }
   };
@@ -284,6 +304,11 @@ export default function MinhaConversa() {
 
   const openPhoto = async (msg: Message) => {
     if (!msg.photo_path || !conv) return;
+    const cached = photoCache.current.get(msg.id);
+    if (cached) {
+      setLightbox(cached);
+      return;
+    }
     try {
       const { data, error } = await supabase.functions.invoke("signed-photo-url", {
         body: { message_id: msg.id },
@@ -297,7 +322,9 @@ export default function MinhaConversa() {
       const key = await prepareKey(conv.id);
       const plain = await decryptBytes(iv, ct, key);
       const blob = new Blob([new Uint8Array(plain)]);
-      setLightbox(URL.createObjectURL(blob));
+      const url = URL.createObjectURL(blob);
+      photoCache.current.set(msg.id, url);
+      setLightbox(url);
     } catch (e) {
       alert("Não foi possível abrir a foto: " + (e instanceof Error ? e.message : String(e)));
     }
