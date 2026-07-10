@@ -137,33 +137,86 @@ export type Database = {
       }
       conversations: {
         Row: {
+          access_code: string
           archived: boolean
           created_at: string
           id: string
           patient_id: string
           professional_id: string
           updated_at: string
-          view_password: string
         }
         Insert: {
+          access_code?: string
           archived?: boolean
           created_at?: string
           id?: string
           patient_id: string
           professional_id: string
           updated_at?: string
-          view_password?: string
         }
         Update: {
+          access_code?: string
           archived?: boolean
           created_at?: string
           id?: string
           patient_id?: string
           professional_id?: string
           updated_at?: string
-          view_password?: string
         }
         Relationships: []
+      }
+      data_deletion_requests: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          deadline_at: string
+          id: string
+          notes: string | null
+          patient_id: string
+          requested_at: string
+          resolved_at: string | null
+          resolver_id: string | null
+          scope: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          deadline_at?: string
+          id?: string
+          notes?: string | null
+          patient_id: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolver_id?: string | null
+          scope?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          deadline_at?: string
+          id?: string
+          notes?: string | null
+          patient_id?: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolver_id?: string | null
+          scope?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_deletion_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lgpd_consents: {
         Row: {
@@ -448,6 +501,10 @@ export type Database = {
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
+      }
+      rotate_conversation_access_code: {
+        Args: { _conversation_id: string }
+        Returns: string
       }
     }
     Enums: {
