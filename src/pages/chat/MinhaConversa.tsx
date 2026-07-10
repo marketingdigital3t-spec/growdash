@@ -38,7 +38,7 @@ type Message = {
  */
 export default function MinhaConversa() {
   const { user } = useAuth();
-  const { getConvKey, createConversationKey, shareConversationKey } = useCrypto();
+  const { getConvKey, createConversationKey } = useCrypto();
   const [conv, setConv] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);

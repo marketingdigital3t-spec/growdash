@@ -33,7 +33,7 @@ type Message = {
 
 export default function ChatSeguro() {
   const { user, roles } = useAuth();
-  const { getConvKey, createConversationKey, shareConversationKey } = useCrypto();
+  const { getConvKey, createConversationKey } = useCrypto();
   const isProfessional = roles.includes("professional") || roles.includes("admin");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
