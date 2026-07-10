@@ -163,15 +163,18 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
         .eq("recipient_id", user.id)
         .maybeSingle();
 
-    let { data, error } = await fetchWrapped();
+    const initial = await fetchWrapped();
+    let data = initial.data;
+    const error = initial.error;
     if (!data && !error) {
-      // Auto-heal: conversa criada antes do cofre existir. Só é seguro
-      // regenerar a chave enquanto ainda não há mensagens cifradas.
-      const { count } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", conversationId);
-      if ((count ?? 0) === 0) {
+      // Auto-heal: chave da conversa não existe pra mim.
+      // Só regeneramos se NÃO houver mensagens cifradas E não houver
+      // NENHUMA linha de chave (senão outra pessoa já tem a AES original).
+      const [{ count: msgCount }, { count: keyCount }] = await Promise.all([
+        supabase.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId),
+        supabase.from("conversation_keys").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId),
+      ]);
+      if ((msgCount ?? 0) === 0 && (keyCount ?? 0) === 0) {
         const { data: conv } = await supabase
           .from("conversations")
           .select("patient_id, professional_id")
@@ -179,11 +182,6 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
           .maybeSingle();
         if (conv) {
           const other = conv.patient_id === user.id ? conv.professional_id : conv.patient_id;
-          // limpa possíveis linhas antigas parciais e cria de novo
-          await supabase
-            .from("conversation_keys")
-            .delete()
-            .eq("conversation_id", conversationId);
           convCache.current.delete(conversationId);
           const aes = await createConversationKey(conversationId, other);
           return aes;
