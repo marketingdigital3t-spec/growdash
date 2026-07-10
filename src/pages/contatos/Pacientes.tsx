@@ -270,45 +270,156 @@ function EditPatientDialog({
   patient, onClose, onSaved,
 }: { patient: Patient; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(patient.full_name ?? "");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState(patient.phone ?? "");
+  const [instagram, setInstagram] = useState(patient.instagram ?? "");
+  const [password, setPassword] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(patient.avatar_url);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Carrega email atual + signed URL do avatar
+  useEffect(() => {
+    (async () => {
+      const { data } = await callAdminFunction("admin-update-user", { user_id: patient.id, action: "get" });
+      if (data?.email) setEmail(data.email as string);
+      if (patient.avatar_url) {
+        const { data: signed } = await supabase.storage.from("avatars").createSignedUrl(patient.avatar_url, 60 * 30);
+        if (signed?.signedUrl) setAvatarPreview(signed.signedUrl);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient.id]);
+
+  const pickFile = () => fileRef.current?.click();
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { setErr("Envie uma imagem (JPG, PNG ou WEBP)."); return; }
+    if (f.size > 5 * 1024 * 1024) { setErr("Imagem muito grande (máx. 5MB)."); return; }
+    setErr(null);
+    setAvatarFile(f);
+    setAvatarPreview(URL.createObjectURL(f));
+  };
+
+  const uploadAvatar = async (): Promise<string | null> => {
+    if (!avatarFile) return null;
+    setUploading(true);
+    const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${patient.id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from("avatars")
+      .upload(path, avatarFile, { upsert: false, contentType: avatarFile.type });
+    setUploading(false);
+    if (error) { setErr(`Falha ao enviar foto: ${error.message}`); return null; }
+    return path;
+  };
 
   const save = async () => {
     setErr(null);
     if (!name.trim()) { setErr("Informe o nome."); return; }
+    if (password && password.length < 8) { setErr("Senha deve ter ao menos 8 caracteres."); return; }
     setSaving(true);
-    const { error } = await supabase
-      .from("profiles").update({ full_name: name.trim() }).eq("id", patient.id);
+    let newPath: string | null | undefined = undefined;
+    if (avatarFile) {
+      newPath = await uploadAvatar();
+      if (newPath === null) { setSaving(false); return; }
+      setAvatarUrl(newPath);
+    }
+    const payload: Record<string, unknown> = {
+      user_id: patient.id,
+      full_name: name.trim(),
+      phone: phone.trim() || null,
+      instagram: instagram.trim() || null,
+    };
+    if (email.trim()) payload.email = email.trim().toLowerCase();
+    if (password) payload.password = password;
+    if (newPath !== undefined) payload.avatar_url = newPath;
+    const { data, error } = await callAdminFunction("admin-update-user", payload);
     setSaving(false);
-    if (error) { setErr(error.message); return; }
+    if (error || data?.error) { setErr((data?.error as string) ?? error ?? "Falha ao salvar"); return; }
     onSaved();
   };
 
+  const initial = (name || "?").trim().charAt(0).toUpperCase();
+
   return (
-    <ModalShell title="Editar paciente" subtitle="Atualize os dados cadastrais." onClose={onClose} icon={<Pencil className="h-5 w-5" />}>
-      <div className="grid gap-3">
-        <label className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Nome completo</label>
-        <input
-          className="h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+    <ModalShell title="Editar paciente" subtitle="Atualize dados, foto, e-mail e senha." onClose={onClose} icon={<Pencil className="h-5 w-5" />}>
+      <div className="grid gap-4">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            {avatarPreview ? (
+              <img src={avatarPreview} alt={name} className="h-16 w-16 rounded-full object-cover ring-2 ring-border" />
+            ) : (
+              <div className="grid h-16 w-16 place-items-center rounded-full bg-primary-soft text-xl font-black text-primary ring-2 ring-border">
+                {initial}
+              </div>
+            )}
+            {uploading && (
+              <div className="absolute inset-0 grid place-items-center rounded-full bg-black/40">
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+            <button onClick={pickFile} className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-muted">
+              Trocar foto
+            </button>
+            <p className="mt-1 text-[11px] text-muted-foreground">JPG, PNG ou WEBP até 5MB.</p>
+          </div>
+        </div>
+
+        <Field label="Nome completo">
+          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="E-mail (login)">
+          <input type="email" className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="paciente@email.com" />
+        </Field>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Field label="Telefone">
+            <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 90000-0000" />
+          </Field>
+          <Field label="Instagram">
+            <input className={inputCls} value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@usuaria" />
+          </Field>
+        </div>
+        <Field label="Nova senha (opcional)">
+          <input type="text" className={`${inputCls} font-mono`} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Deixe em branco para não alterar" />
+        </Field>
       </div>
       {err && <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
       <div className="mt-5 flex justify-end gap-2">
         <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-bold hover:bg-muted">Cancelar</button>
         <button
           onClick={save}
-          disabled={saving}
+          disabled={saving || uploading}
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow disabled:opacity-50"
         >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          {(saving || uploading) && <Loader2 className="h-4 w-4 animate-spin" />}
           {saving ? "Salvando..." : "Salvar alterações"}
         </button>
       </div>
     </ModalShell>
   );
 }
+
+const inputCls = "h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary";
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-1.5">
+      <label className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+
 
 function DeletePatientDialog({
   patient, onClose, onDeleted,
