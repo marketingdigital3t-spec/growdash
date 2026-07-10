@@ -123,6 +123,28 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Recria o cofre do zero (novo par de chaves) usando a senha informada.
+  // Perde acesso a chaves de conversa antigas — usada quando o usuário esqueceu
+  // a senha antiga ou quer sincronizar o cofre com a senha de login atual.
+  const resetVault = async (password: string) => {
+    if (!user) throw new Error("Sessão inválida");
+    // Remove chaves de conversa antigas (o novo par não conseguiria abri-las)
+    await supabase.from("conversation_keys").delete().eq("recipient_id", user.id);
+    // Zera qualquer chave privada antiga antes de recriar
+    await supabase.from("user_private_keys").delete().eq("user_id", user.id);
+    await supabase.from("user_keys").delete().eq("user_id", user.id);
+    setHasKeypair(false);
+    setPrivateKey(null);
+    convCache.current.clear();
+    await setupInternal(password);
+    sessionStorage.setItem("vault_pw", password);
+    await supabase.from("security_events").insert({
+      user_id: user.id,
+      event_type: "vault_reset",
+      user_agent: navigator.userAgent,
+    });
+  };
+
   const lock = () => {
     setPrivateKey(null);
     convCache.current.clear();
