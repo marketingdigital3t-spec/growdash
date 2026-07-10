@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Download, Filter, X, UserRound } from "lucide-react";
+import { Plus, Download, Filter, X, UserRound, KeyRound, Copy, Check, Sparkles } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/page-primitives";
 import { Toolbar, DataTable, Button, Badge } from "@/components/list-primitives";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,10 +7,17 @@ import { useAuth } from "@/hooks/useAuth";
 
 type PatientRow = {
   id: string;
-  nome: string;
+  nome: React.ReactNode;
   email: string;
   criado: string;
 };
+
+function randomPassword(len = 12) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const buf = new Uint32Array(len);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (n) => alphabet[n % alphabet.length]).join("");
+}
 
 export default function Pacientes() {
   const { roles } = useAuth();
@@ -33,12 +40,24 @@ export default function Pacientes() {
     }
     const { data: profs } = await supabase
       .from("profiles")
-      .select("id, full_name, created_at")
+      .select("id, full_name, created_at, initial_password_pending")
       .in("id", ids);
     setRows(
       (profs ?? []).map((p) => ({
         id: p.id,
-        nome: p.full_name ?? "—",
+        nome: (
+          <span className="inline-flex items-center gap-2">
+            {p.initial_password_pending && (
+              <span
+                title="Cliente ainda não fez o primeiro login — está usando a senha inicial gerada pelo sistema."
+                className="inline-grid h-6 w-6 place-items-center rounded-full bg-[hsl(35_90%_92%)] text-[hsl(35_85%_35%)]"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+              </span>
+            )}
+            <span>{p.full_name ?? "—"}</span>
+          </span>
+        ),
         email: "",
         criado: new Date(p.created_at as string).toLocaleDateString("pt-BR"),
       })),
@@ -103,14 +122,24 @@ export default function Pacientes() {
 function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
+  const [pw, setPw] = useState(() => randomPassword());
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState<null | "email" | "pw" | "both">(null);
+
+  const copy = async (text: string, kind: "email" | "pw" | "both") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(kind);
+      setTimeout(() => setCopied(null), 1800);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const submit = async () => {
     setErr(null);
-    setOk(null);
     if (!name.trim() || !email.trim() || pw.length < 8) {
       setErr("Preencha nome, e-mail e senha (mín. 8 caracteres).");
       return;
@@ -119,7 +148,7 @@ function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
     const { data: sess } = await supabase.auth.getSession();
     const token = sess.session?.access_token;
     const { data, error } = await supabase.functions.invoke("admin-create-user", {
-      body: { full_name: name.trim(), email: email.trim(), password: pw, role: "patient" },
+      body: { full_name: name.trim(), email: email.trim().toLowerCase(), password: pw, role: "patient" },
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     setLoading(false);
@@ -127,7 +156,7 @@ function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
       setErr((data?.error as string) ?? error?.message ?? "Falha ao criar paciente");
       return;
     }
-    setOk(`Paciente criada. Envie por um canal seguro:\nE-mail: ${email}\nSenha inicial: ${pw}`);
+    setCreated({ email: email.trim().toLowerCase(), password: pw });
     onCreated();
   };
 
@@ -139,56 +168,163 @@ function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
             <UserRound className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-black">Nova paciente</h3>
-            <p className="text-xs text-muted-foreground">Cria o login de acesso da cliente.</p>
+            <h3 className="text-lg font-black">
+              {created ? "Paciente criada!" : "Nova paciente"}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {created
+                ? "Copie a senha inicial e entregue à cliente por um canal seguro."
+                : "Cria o login de acesso da cliente."}
+            </p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 hover:bg-muted">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="grid gap-3">
-          <input
-            className="h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            placeholder="Nome completo"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            type="email"
-            className="h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            placeholder="E-mail de acesso"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            type="text"
-            className="h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-            placeholder="Senha inicial (mín. 8)"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-          />
-        </div>
+        {!created ? (
+          <>
+            <div className="grid gap-3">
+              <input
+                className="h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                placeholder="Nome completo"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <input
+                type="email"
+                className="h-11 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                placeholder="E-mail de acesso"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  className="h-11 flex-1 rounded-xl border border-border bg-background px-3 font-mono text-sm outline-none focus:border-primary"
+                  placeholder="Senha inicial (mín. 8)"
+                  value={pw}
+                  onChange={(e) => setPw(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPw(randomPassword())}
+                  className="flex h-11 items-center gap-1.5 rounded-xl border border-border bg-background px-3 text-xs font-bold hover:bg-muted"
+                  title="Gerar senha aleatória"
+                >
+                  <Sparkles className="h-3.5 w-3.5" /> Gerar
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                A cliente usará esta senha tanto no login quanto para desbloquear o cofre E2E das suas próprias
+                conversas. Um ícone de chave 🔑 aparecerá ao lado do nome até o primeiro login dela.
+              </p>
+            </div>
 
-        {err && <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
-        {ok && (
-          <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-green-500/10 px-3 py-2 text-xs text-green-700 dark:text-green-400">
-            {ok}
-          </pre>
+            {err && (
+              <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-bold hover:bg-muted">
+                Cancelar
+              </button>
+              <button
+                onClick={submit}
+                disabled={loading}
+                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow disabled:opacity-50"
+              >
+                {loading ? "Criando..." : "Criar paciente"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rounded-2xl border border-[hsl(35_85%_88%)] bg-[hsl(35_90%_97%)] p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[hsl(35_85%_35%)]">
+                <KeyRound className="h-4 w-4" /> Credenciais de acesso — mostradas só uma vez
+              </div>
+
+              <div className="space-y-3">
+                <CredRow
+                  label="E-mail"
+                  value={created.email}
+                  copied={copied === "email"}
+                  onCopy={() => copy(created.email, "email")}
+                />
+                <CredRow
+                  label="Senha inicial"
+                  value={created.password}
+                  copied={copied === "pw"}
+                  onCopy={() => copy(created.password, "pw")}
+                  mono
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() =>
+                  copy(`E-mail: ${created.email}\nSenha: ${created.password}`, "both")
+                }
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-bold hover:bg-muted"
+              >
+                {copied === "both" ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Check className="h-4 w-4" /> Copiado!
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Copy className="h-4 w-4" /> Copiar tudo
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={onClose}
+                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow"
+              >
+                Concluir
+              </button>
+            </div>
+          </>
         )}
+      </div>
+    </div>
+  );
+}
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-bold hover:bg-muted">
-            Fechar
-          </button>
-          <button
-            onClick={submit}
-            disabled={loading}
-            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow disabled:opacity-50"
-          >
-            {loading ? "Criando..." : "Criar paciente"}
-          </button>
+function CredRow({
+  label,
+  value,
+  onCopy,
+  copied,
+  mono,
+}: {
+  label: string;
+  value: string;
+  onCopy: () => void;
+  copied: boolean;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-2">
+        <div
+          className={`flex-1 truncate rounded-lg border border-border bg-card px-3 py-2 text-sm ${
+            mono ? "font-mono" : ""
+          }`}
+        >
+          {value}
         </div>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-card hover:bg-muted"
+          title="Copiar"
+        >
+          {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+        </button>
       </div>
     </div>
   );
