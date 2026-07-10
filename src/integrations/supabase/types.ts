@@ -491,6 +491,7 @@ export type Database = {
         }[]
       }
       generate_chat_access_code: { Args: never; Returns: string }
+      generate_unambiguous_code: { Args: { _len?: number }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
