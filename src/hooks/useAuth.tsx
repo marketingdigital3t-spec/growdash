@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    sessionStorage.removeItem("vault_pw");
     await supabase.auth.signOut();
   };
   const refreshRoles = async () => {
