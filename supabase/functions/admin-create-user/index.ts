@@ -55,6 +55,9 @@ Deno.serve(async (req) => {
     // trigger cria profile + role default; garante role correto
     await admin.from('user_roles').upsert({ user_id: uid, role }, { onConflict: 'user_id,role' });
 
+    // Marca perfil como usando senha inicial (para ícone de chave até o primeiro login)
+    await admin.from('profiles').update({ initial_password_pending: true }).eq('id', uid);
+
     if (permissions.length) {
       const rows = permissions.map((p) => ({ user_id: uid, module: p.module, level: p.level }));
       await admin.from('user_permissions').upsert(rows, { onConflict: 'user_id,module' });

@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS initial_password_pending boolean NOT NULL DEFAULT false;
