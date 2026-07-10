@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Lock, Plus, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
+import { Camera, Lock, Plus, RefreshCw, Search, Send, ShieldCheck, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCrypto } from "@/hooks/useCrypto";
@@ -7,16 +7,16 @@ import { encryptText, decryptText, encryptBytes, decryptBytes, b64 } from "@/lib
 import LgpdConsent from "@/components/LgpdConsent";
 import WatermarkedImage from "@/components/WatermarkedImage";
 
+
 type Conversation = {
   id: string;
   patient_id: string;
   professional_id: string;
   updated_at: string;
-  access_code?: string;
-  code_day?: string;
-  generated_at?: string;
+  access_code: string;
   other_name?: string;
 };
+
 
 type Message = {
   id: string;
@@ -51,39 +51,11 @@ export default function ChatSeguro() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const ensureAccessCode = async (conversationId: string) => {
-    const { data, error } = await supabase.rpc("ensure_conversation_access_code", {
-      _conversation_id: conversationId,
-    });
-    if (error) throw error;
-    const next = data?.[0];
-    if (!next) throw new Error("Não foi possível gerar a senha da conversa");
-    setConversations((current) =>
-      current.map((conversation) => {
-        if (conversation.id !== conversationId) return conversation;
-        if (conversation.access_code && conversation.access_code !== next.access_code) {
-          setUnlocked((opened) => {
-            const updated = new Set(opened);
-            updated.delete(conversationId);
-            return updated;
-          });
-        }
-        return {
-          ...conversation,
-          access_code: next.access_code,
-          code_day: next.code_day,
-          generated_at: next.generated_at,
-        };
-      }),
-    );
-    return next;
-  };
-
   const loadConversations = async () => {
     if (!user) return;
     const { data: convs } = await supabase
       .from("conversations")
-      .select("id, patient_id, professional_id, updated_at")
+      .select("id, patient_id, professional_id, updated_at, access_code")
       .order("updated_at", { ascending: false });
     if (!convs) return;
     const ids = new Set<string>();
@@ -93,14 +65,14 @@ export default function ChatSeguro() {
     });
     const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", Array.from(ids));
     const map: Record<string, string> = {};
-    profs?.forEach((p) => (map[p.id] = p.full_name ?? "Usuário"));
+    profs?.forEach((p) => (map[p.id] = p.full_name ?? "Usuária"));
     setProfiles(map);
-    const mapped = convs.map((c) => ({
+    setConversations(
+      convs.map((c) => ({
         ...c,
         other_name: map[c.patient_id === user.id ? c.professional_id : c.patient_id] ?? "—",
-      }));
-    setConversations(mapped);
-    await Promise.all(mapped.map((c) => ensureAccessCode(c.id).catch(() => null)));
+      })),
+    );
     if (!activeId && convs.length) setActiveId(convs[0].id);
   };
 
@@ -109,16 +81,23 @@ export default function ChatSeguro() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  useEffect(() => {
-    if (!user || conversations.length === 0) return;
-    const timer = window.setInterval(() => {
-      conversations.forEach((conversation) => {
-        ensureAccessCode(conversation.id).catch(() => null);
-      });
-    }, 60_000);
-    return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, conversations.map((conversation) => `${conversation.id}:${conversation.code_day ?? ""}`).join("|")]);
+  const rotateAccessCode = async (conversationId: string) => {
+    const { data, error } = await supabase.rpc("rotate_conversation_access_code", {
+      _conversation_id: conversationId,
+    });
+    if (error) throw error;
+    const newCode = String(data);
+    setConversations((current) =>
+      current.map((c) => (c.id === conversationId ? { ...c, access_code: newCode } : c)),
+    );
+    setUnlocked((s) => {
+      const n = new Set(s);
+      n.delete(conversationId);
+      return n;
+    });
+    return newCode;
+  };
+
 
   // Descriptografa mensagens de texto no cliente
   const decryptMessage = async (m: Message, conversationId: string): Promise<Message> => {
@@ -214,8 +193,7 @@ export default function ChatSeguro() {
   const unlockConversation = async () => {
     if (!active) return;
     try {
-      const currentCode = active.access_code ? active : await ensureAccessCode(active.id);
-      if (pwInput.trim().toUpperCase() === currentCode.access_code.toUpperCase()) {
+      if (pwInput.trim().toUpperCase() === active.access_code.toUpperCase()) {
         await prepareConversationKey(active.id);
         setUnlocked((s) => {
           const n = new Set(s);
@@ -225,17 +203,18 @@ export default function ChatSeguro() {
         setPwInput("");
         setPwError(null);
       } else {
-        setPwError("Senha incorreta neste aparelho");
+        setPwError("Código incorreto neste aparelho");
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Não foi possível validar a senha";
+      const message = e instanceof Error ? e.message : "Não foi possível validar o código";
       setPwError(
         message.includes("Sem chave")
-          ? "Esta conversa ainda precisa ser sincronizada pela conta que enviou a foto. Abra esta conversa pela conta da doutora uma vez e depois volte aqui."
+          ? "A chave desta conversa ainda não foi sincronizada. Abra a conversa pela outra conta uma vez."
           : message,
       );
     }
   };
+
 
   const sendPhoto = async (file: File) => {
     if (!activeId || !user) return;
@@ -451,7 +430,7 @@ export default function ChatSeguro() {
                         {isUnlocked && <ShieldCheck className="h-3 w-3 opacity-70" />}
                       </div>
                       <p className="truncate text-xs opacity-70">
-                        {new Date(c.updated_at).toLocaleDateString("pt-BR")} · senha individual
+                        {new Date(c.updated_at).toLocaleDateString("pt-BR")} · código próprio da conversa
                       </p>
                     </div>
                   </button>
@@ -474,7 +453,7 @@ export default function ChatSeguro() {
                     <div>
                       <h3 className="text-base font-black">Conversa bloqueada</h3>
                       <p className="text-xs text-muted-foreground">
-                        Digite a sua senha individual desta conversa para ver o conteúdo neste aparelho.
+                        Digite o código de 6 caracteres desta conversa para abrir o conteúdo neste aparelho.
                       </p>
                     </div>
                   </div>
@@ -487,22 +466,21 @@ export default function ChatSeguro() {
                         unlockConversation();
                       }
                     }}
-                    placeholder={active.access_code ? "Senha da conversa" : "Gerando senha..."}
-                    disabled={!active.access_code}
-                    className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm tracking-widest outline-none focus:border-primary"
+                    placeholder="Código da conversa (6 caracteres)"
+                    maxLength={6}
+                    className="h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm tracking-widest uppercase outline-none focus:border-primary"
                   />
                   {pwError && (
                     <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{pwError}</p>
                   )}
                   <button
                     onClick={unlockConversation}
-                    disabled={!active.access_code}
                     className="mt-3 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground shadow hover:opacity-90 disabled:opacity-60"
                   >
                     Desbloquear conversa
                   </button>
                   <p className="mt-3 text-[11px] text-muted-foreground">
-                    A senha aparece ao lado do nome na lista, é diferente para cada pessoa e troca diariamente às 3h.
+                    O código é único desta conversa. Qualquer participante pode renovar a qualquer momento, o que invalida o código atual em todos os aparelhos.
                   </p>
                 </div>
               </div>
@@ -514,8 +492,25 @@ export default function ChatSeguro() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-bold">{active.other_name}</p>
-                    <p className="text-[11px] text-muted-foreground">Chave da conversa apenas neste dispositivo</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Código: <span className="font-mono font-bold">{active.access_code}</span> · válido em qualquer aparelho até ser renovado
+                    </p>
                   </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Gerar um novo código? O atual deixará de funcionar em todos os aparelhos.")) return;
+                      try {
+                        const code = await rotateAccessCode(active.id);
+                        alert(`Novo código: ${code}\n\nCompartilhe com segurança com ${active.other_name}.`);
+                      } catch (e) {
+                        alert("Falha ao renovar: " + (e instanceof Error ? e.message : String(e)));
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-bold hover:bg-muted"
+                    title="Gerar um novo código de acesso"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Renovar código
+                  </button>
                   <button
                     onClick={() => setUnlocked((s) => { const n = new Set(s); n.delete(active.id); return n; })}
                     className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-bold hover:bg-muted"
@@ -524,6 +519,7 @@ export default function ChatSeguro() {
                     <Lock className="h-3 w-3" /> Bloquear
                   </button>
                 </div>
+
                 <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-6 py-4">
                   {messages.map((m) => (
                     <MessageBubble

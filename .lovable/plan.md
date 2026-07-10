@@ -1,77 +1,62 @@
-# Chat seguro de acompanhamento pós-op (LGPD)
+## Objetivo
 
-Feature nova, isolada da aba WhatsApp atual. Foco: privacidade máxima, isolamento por par paciente↔profissional, trilha de auditoria.
+Evoluir o Chat Seguro atual sem quebrar o E2E (AES-256-GCM + escrow admin) já existente. Você marcou tanto "ajustes pontuais" quanto "refazer do zero" — vou seguir pelo caminho seguro (ajustes), porque refazer do zero apagaria as chaves E2E, o histórico cifrado e o escrow admin já configurados, e as tabelas do prompt (clinics/doctors/patients) duplicariam o que já existe (`profiles` + `user_roles` + `conversations`).
 
-## Fluxo do usuário
+Se depois quiser mesmo recomeçar do zero, faço em uma etapa separada.
 
-**Profissional (Dra.)**
-- Nova aba na sidebar: **"Chat seguro"**
-- Vê a lista das próprias pacientes vinculadas → abre uma conversa → troca mensagens de texto + fotos
-- Pode revogar acesso da paciente / arquivar conversa
+## O que muda
 
-**Paciente**
-- Faz login e vê apenas a sua conversa com a Dra. responsável
-- Envia texto e fotos de acompanhamento; vê histórico
+### 1. Senha da conversa: fixa por conversa, renovável
+- Remover a rotação diária às 3h.
+- Cada `conversation` passa a ter um `access_code` fixo de 6 caracteres alfanuméricos (A–Z, 0–9), gerado na criação.
+- Botão "Renovar código" (doutora ou paciente): invalida o anterior, gera outro, desbloqueia sessões abertas no aparelho de quem renovou e força reentrada do código no aparelho da outra parte.
+- Código é exibido apenas para os dois participantes da conversa; sempre consultável no chip ao lado do nome (com botão mostrar/ocultar) como já existe hoje.
+- Desbloqueio continua sendo por aparelho (sessionStorage), não vaza para outros dispositivos.
 
-## Segurança (LGPD - dado sensível de saúde, art. 11)
+### 2. Visão isolada da paciente
+- Nova rota `/minha-conversa` só para papel `patient`.
+- Sem sidebar de conversas, sem lista de outras pacientes. Layout de tela única: cabeçalho com nome da doutora + campo de código + área de mensagens + composer.
+- Se a paciente cair em `/chat-seguro`, redireciona para `/minha-conversa`.
+- Doutora/admin continua com a visão atual (lista lateral + várias conversas).
 
-1. **Autenticação obrigatória** (email + senha, com HIBP habilitado)
-2. **Papéis separados**: `admin`, `professional`, `patient` em tabela `user_roles` (nunca no profile)
-3. **Vínculo explícito** paciente↔profissional em `patient_links` — sem vínculo = sem acesso
-4. **RLS estrita** em todas as tabelas:
-   - Paciente só lê/escreve mensagens onde é participante
-   - Profissional só lê/escreve mensagens de pacientes vinculadas
-   - Ninguém lê conversas alheias, nem admin sem consentimento
-5. **Storage privado** (bucket `patient-photos`, `public: false`) — acesso só via URL assinada de curta duração (5 min), gerada por edge function que revalida vínculo
-6. **Consentimento**: modal de aceite LGPD no 1º acesso da paciente, gravado em `lgpd_consents` (timestamp, IP, texto da versão aceita)
-7. **Auditoria**: tabela `audit_log` registra visualizações e exclusões de fotos
-8. **Exclusão sob demanda** (direito ao esquecimento) — botão "Excluir meus dados" para a paciente
-9. **Sem retenção automática** (conforme sua escolha) — cabe à clínica gerenciar
+### 3. LGPD — direitos da paciente
+- Botão "Exportar meus dados": gera um JSON com perfil + mensagens de texto descriptografadas no navegador + lista das fotos (com data e id), baixado localmente. Ação registrada em `audit_log` (`data_exported`).
+- Botão "Solicitar exclusão de todas as minhas fotos": cria um pedido em nova tabela `data_deletion_requests` (status pending/approved/rejected/done, prazo 7 dias). Admin vê a fila em uma tela simples e marca como atendido; ao aprovar, uma edge function apaga as fotos do storage e as mensagens `photo` daquela paciente.
+- Toda ação registrada em `audit_log` + `security_events` (já existentes).
 
-## Modelo de dados
+### 4. Não entra agora
+- Auto-destruição de fotos (24h/7d/após ler): você marcou "agora não".
+- "Apagar meu histórico agora" e notificações push/e-mail/SMS: fora do escopo desta rodada.
 
-```text
-profiles(id, full_name, avatar_url, created_at)
-user_roles(user_id, role)                       -- admin|professional|patient
-patient_links(patient_id, professional_id, status, created_at)
-conversations(id, patient_id, professional_id, created_at, archived)
-messages(id, conversation_id, sender_id, kind, body, photo_path, created_at)
-lgpd_consents(id, user_id, version, accepted_at, ip)
-audit_log(id, actor_id, action, target_type, target_id, created_at)
-storage: bucket "patient-photos" (privado)
-```
+## Detalhes técnicos
 
-Grants + RLS + trigger `handle_new_user` para criar profile automático.
+Banco:
+- `conversations`: renomear/reutilizar coluna `view_password` como `access_code` (fixa, 6 chars, default aleatório). Remover uso de `conversation_access_codes` diárias e a função `ensure_conversation_access_code`.
+- Nova tabela `data_deletion_requests` (paciente_id, conversation_id, scope='photos', status, requested_at, resolved_at, resolver_id, notes) com RLS: paciente lê/insere as próprias, admin lê/atualiza todas.
+- Nova função `rotate_conversation_access_code(_conversation_id)` (SECURITY INVOKER) que só participante da conversa pode chamar; retorna o novo código.
+- GRANTs completos em toda tabela nova; RLS ligado; policies scoped a `auth.uid()`.
 
-## Edge functions
+Frontend:
+- `ChatSeguro.tsx`: remover `ensureAccessCode` diário + intervalo de 60s; usar `access_code` da própria linha de `conversations`; botão "Renovar código" chamando a RPC.
+- Nova página `src/pages/chat/MinhaConversa.tsx` reutilizando `MessageBubble`, `WatermarkedImage`, `useCrypto` — sem sidebar.
+- Roteamento em `src/App.tsx` + `ProtectedRoute`: paciente → `/minha-conversa`; profissional/admin → `/chat-seguro`.
+- Novo painel admin `src/pages/admin/SolicitacoesLgpd.tsx` para aprovar/rejeitar pedidos de exclusão.
 
-- `signed-photo-url` — recebe `message_id`, revalida participação, devolve URL assinada
-- `upload-photo` — recebe imagem, valida vínculo, grava em `patient-photos/{conversation_id}/{uuid}.jpg`, cria mensagem, loga auditoria
+Edge function:
+- `lgpd-delete-photos`: recebe `request_id`, valida admin, apaga objetos do bucket `patient-photos` referentes às mensagens da paciente, apaga as linhas `messages` do tipo `photo`, marca o pedido como `done` e grava `audit_log`.
 
-## UI
+Segurança mantida:
+- E2E AES-256-GCM continua igual; o `access_code` é apenas um gate de UI local, não é a chave de descriptografia.
+- Cofre por senha (RSA-OAEP + PBKDF2 600k) permanece.
+- Escrow admin permanece.
+- Watermark dinâmico nas fotos permanece.
 
-- **Sidebar** → novo item "Chat seguro" (ícone cadeado)
-- **/chat-seguro** → layout 2 colunas: lista de conversas (esq.) + thread (dir.)
-- Composer com botão de foto (drag-drop desktop, câmera no mobile), preview antes de enviar
-- Bolhas de mensagem com timestamp; fotos abrem em lightbox com marca d'água discreta "Confidencial — {nome} — {data}"
-- Empty state didático explicando o funcionamento
-- Banner LGPD no topo da conversa da paciente
+## Fora do escopo (não vou fazer agora)
 
-## O que fica fora deste passo
+- Recriar tabelas `clinics/doctors/patients` (o app já usa `profiles` + `user_roles`).
+- Auto-destruição temporizada de fotos.
+- Push/SMS/e-mail de nova mensagem.
+- Substituir Supabase Storage por S3.
+- Contratação de DPO e redação jurídica dos termos (isso é externo ao código).
 
-- **SaaS/pagamento mensal** para liberar acesso — feature grande, faço em seguida num passo próprio (Stripe Payments da Lovable). Por enquanto, o acesso é liberado por login criado manualmente.
-- Chamada de vídeo, notificações push, apagamento automático programado
-- Cadastro em massa de pacientes (fica para o próximo passo junto do pagamento)
-
-## Ordem de execução
-
-1. Ativar Lovable Cloud
-2. Criar migração (tabelas + RLS + grants + trigger + bucket privado)
-3. Implementar edge functions `upload-photo` e `signed-photo-url`
-4. Auth pages (login/signup + reset) e guarda de rotas por papel
-5. Página `/chat-seguro` + componentes de lista, thread, composer, lightbox
-6. Modal de consentimento LGPD no 1º login da paciente
-7. Item de sidebar + rota
-8. Teste manual do fluxo ponta-a-ponta
-
-Confirma que posso seguir? Assim que aprovar, executo tudo de uma vez.
+Confirma para eu implementar?

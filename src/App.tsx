@@ -7,7 +7,10 @@ import AgendaVisaoGeral from "@/pages/agenda/VisaoGeral";
 import RelatorioAgendamentos from "@/pages/agenda/RelatorioAgendamentos";
 import Eventos from "@/pages/agenda/Eventos";
 import ChatSeguro from "@/pages/chat/ChatSeguro";
+import MinhaConversa from "@/pages/chat/MinhaConversa";
 import Recuperacao from "@/pages/chat/Recuperacao";
+import SolicitacoesLgpd from "@/pages/admin/SolicitacoesLgpd";
+
 
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
@@ -60,6 +63,9 @@ const built = new Set<string>([
   "/agenda/eventos",
   "/chat-seguro",
   "/chat-seguro/recuperacao",
+  "/minha-conversa",
+  "/admin/lgpd",
+
   "/config/usuarios",
   "/config/perfil",
   "/config/clinica",
@@ -120,7 +126,7 @@ const App = () => (
             <Route
               path="/chat-seguro"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allow={["admin", "professional"]} fallback="/minha-conversa">
                   <MfaGate>
                     <VaultGate>
                       <ChatSeguro />
@@ -130,9 +136,19 @@ const App = () => (
               }
             />
             <Route
-              path="/chat-seguro/recuperacao"
+              path="/minha-conversa"
               element={
                 <ProtectedRoute>
+                  <VaultGate>
+                    <MinhaConversa />
+                  </VaultGate>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chat-seguro/recuperacao"
+              element={
+                <ProtectedRoute allow={["admin"]}>
                   <MfaGate>
                     <VaultGate>
                       <Recuperacao />
@@ -141,6 +157,17 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/lgpd"
+              element={
+                <ProtectedRoute allow={["admin"]}>
+                  <MfaGate>
+                    <SolicitacoesLgpd />
+                  </MfaGate>
+                </ProtectedRoute>
+              }
+            />
+
 
             <Route
               path="/config/usuarios"
