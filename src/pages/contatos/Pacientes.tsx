@@ -411,11 +411,19 @@ function AddPatientDialog({ onClose, onCreated, ensureSecureChat }: { onClose: (
       body: { full_name: name.trim(), email: email.trim().toLowerCase(), password: pw, role: "patient" },
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    setLoading(false);
     if (error || data?.error) {
+      setLoading(false);
       setErr((data?.error as string) ?? (await functionErrorMessage(error, "Falha ao criar paciente")));
       return;
     }
+    const newUserId = (data as { user_id?: string } | null)?.user_id;
+    if (newUserId) {
+      const r = await ensureSecureChat(newUserId);
+      if ("error" in r) {
+        console.warn("auto secure chat:", r.error);
+      }
+    }
+    setLoading(false);
     setCreated({ email: email.trim().toLowerCase(), password: pw });
     onCreated();
   };
