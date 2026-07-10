@@ -51,39 +51,11 @@ export default function ChatSeguro() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const ensureAccessCode = async (conversationId: string) => {
-    const { data, error } = await supabase.rpc("ensure_conversation_access_code", {
-      _conversation_id: conversationId,
-    });
-    if (error) throw error;
-    const next = data?.[0];
-    if (!next) throw new Error("Não foi possível gerar a senha da conversa");
-    setConversations((current) =>
-      current.map((conversation) => {
-        if (conversation.id !== conversationId) return conversation;
-        if (conversation.access_code && conversation.access_code !== next.access_code) {
-          setUnlocked((opened) => {
-            const updated = new Set(opened);
-            updated.delete(conversationId);
-            return updated;
-          });
-        }
-        return {
-          ...conversation,
-          access_code: next.access_code,
-          code_day: next.code_day,
-          generated_at: next.generated_at,
-        };
-      }),
-    );
-    return next;
-  };
-
   const loadConversations = async () => {
     if (!user) return;
     const { data: convs } = await supabase
       .from("conversations")
-      .select("id, patient_id, professional_id, updated_at")
+      .select("id, patient_id, professional_id, updated_at, access_code")
       .order("updated_at", { ascending: false });
     if (!convs) return;
     const ids = new Set<string>();
@@ -93,14 +65,14 @@ export default function ChatSeguro() {
     });
     const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", Array.from(ids));
     const map: Record<string, string> = {};
-    profs?.forEach((p) => (map[p.id] = p.full_name ?? "Usuário"));
+    profs?.forEach((p) => (map[p.id] = p.full_name ?? "Usuária"));
     setProfiles(map);
-    const mapped = convs.map((c) => ({
+    setConversations(
+      convs.map((c) => ({
         ...c,
         other_name: map[c.patient_id === user.id ? c.professional_id : c.patient_id] ?? "—",
-      }));
-    setConversations(mapped);
-    await Promise.all(mapped.map((c) => ensureAccessCode(c.id).catch(() => null)));
+      })),
+    );
     if (!activeId && convs.length) setActiveId(convs[0].id);
   };
 
@@ -109,16 +81,23 @@ export default function ChatSeguro() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  useEffect(() => {
-    if (!user || conversations.length === 0) return;
-    const timer = window.setInterval(() => {
-      conversations.forEach((conversation) => {
-        ensureAccessCode(conversation.id).catch(() => null);
-      });
-    }, 60_000);
-    return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, conversations.map((conversation) => `${conversation.id}:${conversation.code_day ?? ""}`).join("|")]);
+  const rotateAccessCode = async (conversationId: string) => {
+    const { data, error } = await supabase.rpc("rotate_conversation_access_code", {
+      _conversation_id: conversationId,
+    });
+    if (error) throw error;
+    const newCode = String(data);
+    setConversations((current) =>
+      current.map((c) => (c.id === conversationId ? { ...c, access_code: newCode } : c)),
+    );
+    setUnlocked((s) => {
+      const n = new Set(s);
+      n.delete(conversationId);
+      return n;
+    });
+    return newCode;
+  };
+
 
   // Descriptografa mensagens de texto no cliente
   const decryptMessage = async (m: Message, conversationId: string): Promise<Message> => {
