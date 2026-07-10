@@ -102,6 +102,7 @@ export type Database = {
           patient_id: string
           professional_id: string
           updated_at: string
+          view_password: string
         }
         Insert: {
           archived?: boolean
@@ -110,6 +111,7 @@ export type Database = {
           patient_id: string
           professional_id: string
           updated_at?: string
+          view_password?: string
         }
         Update: {
           archived?: boolean
@@ -118,6 +120,7 @@ export type Database = {
           patient_id?: string
           professional_id?: string
           updated_at?: string
+          view_password?: string
         }
         Relationships: []
       }
