@@ -193,8 +193,7 @@ export default function ChatSeguro() {
   const unlockConversation = async () => {
     if (!active) return;
     try {
-      const currentCode = active.access_code ? active : await ensureAccessCode(active.id);
-      if (pwInput.trim().toUpperCase() === currentCode.access_code.toUpperCase()) {
+      if (pwInput.trim().toUpperCase() === active.access_code.toUpperCase()) {
         await prepareConversationKey(active.id);
         setUnlocked((s) => {
           const n = new Set(s);
@@ -204,17 +203,18 @@ export default function ChatSeguro() {
         setPwInput("");
         setPwError(null);
       } else {
-        setPwError("Senha incorreta neste aparelho");
+        setPwError("Código incorreto neste aparelho");
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Não foi possível validar a senha";
+      const message = e instanceof Error ? e.message : "Não foi possível validar o código";
       setPwError(
         message.includes("Sem chave")
-          ? "Esta conversa ainda precisa ser sincronizada pela conta que enviou a foto. Abra esta conversa pela conta da doutora uma vez e depois volte aqui."
+          ? "A chave desta conversa ainda não foi sincronizada. Abra a conversa pela outra conta uma vez."
           : message,
       );
     }
   };
+
 
   const sendPhoto = async (file: File) => {
     if (!activeId || !user) return;
