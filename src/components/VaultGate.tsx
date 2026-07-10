@@ -65,8 +65,8 @@ export default function VaultGate({ children }: { children: ReactNode }) {
           <p className="flex items-start gap-2">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <span>
-              A senha do cofre <b>não é a mesma do login</b> e nunca sai deste dispositivo. Nem a Lovable, nem o
-              servidor conseguem ler suas fotos.
+              Use a <b>mesma senha do seu login</b>. Ela desbloqueia o cofre E2E que criptografa as fotos —
+              o servidor nunca a recebe em texto puro.
             </span>
           </p>
         </div>
@@ -84,8 +84,8 @@ export default function VaultGate({ children }: { children: ReactNode }) {
               type="password"
               required
               autoFocus
-              minLength={10}
-              placeholder={needsSetup ? "Senha do cofre (mín. 10)" : "Senha do cofre"}
+              minLength={8}
+              placeholder={needsSetup ? "Senha do seu login (mín. 8)" : "Senha do seu login"}
               value={pw}
               onChange={(e) => setPw(e.target.value)}
               className="w-full bg-transparent text-sm outline-none"
@@ -97,7 +97,7 @@ export default function VaultGate({ children }: { children: ReactNode }) {
               <input
                 type="password"
                 required
-                minLength={10}
+                minLength={8}
                 placeholder="Confirme a senha"
                 value={pw2}
                 onChange={(e) => setPw2(e.target.value)}
