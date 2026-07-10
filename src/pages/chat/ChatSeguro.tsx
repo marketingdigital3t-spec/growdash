@@ -449,15 +449,7 @@ export default function ChatSeguro() {
                     title="Bloquear conversa novamente"
                   >
                     <Lock className="h-3 w-3" /> Bloquear
-              <>
-                <div className="flex items-center gap-3 border-b border-border bg-card px-6 py-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-primary-soft text-sm font-bold text-primary">
-                    {(active.other_name ?? "?").charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{active.other_name}</p>
-                    <p className="text-[11px] text-muted-foreground">Chave da conversa apenas neste dispositivo</p>
-                  </div>
+                  </button>
                 </div>
                 <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-6 py-4">
                   {messages.map((m) => (
