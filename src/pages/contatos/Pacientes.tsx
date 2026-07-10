@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus, Download, Filter, X, UserRound, KeyRound, Copy, Check, Sparkles,
-  Pencil, Trash2, Loader2, AlertTriangle,
+  Pencil, Trash2, Loader2, AlertTriangle, MessageSquareLock, ShieldCheck,
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/page-primitives";
 import { Toolbar, DataTable, Button, Badge } from "@/components/list-primitives";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCrypto } from "@/hooks/useCrypto";
 
 type Patient = {
   id: string;
@@ -33,9 +35,14 @@ function randomPassword(len = 12) {
 
 export default function Pacientes() {
   const { roles, user } = useAuth();
+  const { createConversationKey } = useCrypto();
+  const navigate = useNavigate();
   const canAdd = roles.includes("admin") || roles.includes("professional");
   const canManage = roles.includes("admin");
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [chatMap, setChatMap] = useState<Record<string, string>>({});
+  const [chatBusy, setChatBusy] = useState<string | null>(null);
+  const [chatMsg, setChatMsg] = useState<{ id: string; text: string; ok: boolean } | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Patient | null>(null);
@@ -61,6 +68,7 @@ export default function Pacientes() {
 
     if (!ids.length) {
       setPatients([]);
+      setChatMap({});
       setLoading(false);
       return;
     }
@@ -70,50 +78,127 @@ export default function Pacientes() {
       .in("id", ids)
       .order("created_at", { ascending: false });
     setPatients((profs ?? []) as Patient[]);
+
+    if (user?.id) {
+      const { data: convs } = await supabase
+        .from("conversations")
+        .select("id, patient_id, professional_id")
+        .eq("professional_id", user.id)
+        .in("patient_id", ids);
+      const map: Record<string, string> = {};
+      convs?.forEach((c) => { map[c.patient_id] = c.id; });
+      setChatMap(map);
+    }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [user?.id, roles.join("|")]);
 
-  const rows: PatientRow[] = patients.map((p) => ({
-    id: p.id,
-    nome: (
-      <span className="inline-flex items-center gap-2">
-        {p.initial_password_pending && (
-          <span
-            title="Cliente ainda não fez o primeiro login — está usando a senha inicial gerada pelo sistema."
-            className="inline-grid h-6 w-6 place-items-center rounded-full bg-[hsl(35_90%_92%)] text-[hsl(35_85%_35%)]"
-          >
-            <KeyRound className="h-3.5 w-3.5" />
-          </span>
-        )}
-        <span>{p.full_name ?? "—"}</span>
-      </span>
-    ),
-    email: "",
-    criado: new Date(p.created_at).toLocaleDateString("pt-BR"),
-    status: <Badge tone="green">Ativa</Badge>,
-    acoes: (
-      <div className="flex items-center justify-end gap-1">
-        <button
-          onClick={() => setEditing(p)}
-          className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-card hover:bg-muted"
-          title="Editar paciente"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        {canManage && (
+  const ensureSecureChat = async (patientId: string): Promise<{ id: string } | { error: string }> => {
+    if (!user?.id) return { error: "Sessão inválida" };
+    const { data: existing } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("patient_id", patientId)
+      .eq("professional_id", user.id)
+      .maybeSingle();
+    if (existing?.id) return { id: existing.id };
+    const { data: conv, error } = await supabase
+      .from("conversations")
+      .insert({ patient_id: patientId, professional_id: user.id })
+      .select("id")
+      .single();
+    if (error || !conv) return { error: error?.message ?? "Falha ao criar conversa" };
+    try {
+      await createConversationKey(conv.id, patientId);
+    } catch (e) {
+      // Chaves da paciente ainda não existem — a conversa fica criada e será
+      // finalizada assim que ela fizer o primeiro login e gerar o cofre.
+      console.warn("createConversationKey pending:", e);
+    }
+    return { id: conv.id };
+  };
+
+  const handleStartChat = async (p: Patient) => {
+    setChatBusy(p.id);
+    setChatMsg(null);
+    const r = await ensureSecureChat(p.id);
+    setChatBusy(null);
+    if ("error" in r) {
+      setChatMsg({ id: p.id, text: r.error, ok: false });
+      return;
+    }
+    setChatMap((m) => ({ ...m, [p.id]: r.id }));
+    navigate("/chat-seguro");
+  };
+
+  const rows: PatientRow[] = patients.map((p) => {
+    const hasChat = !!chatMap[p.id];
+    const busy = chatBusy === p.id;
+    return {
+      id: p.id,
+      nome: (
+        <span className="inline-flex items-center gap-2">
+          {p.initial_password_pending && (
+            <span
+              title="Cliente ainda não fez o primeiro login — está usando a senha inicial gerada pelo sistema."
+              className="inline-grid h-6 w-6 place-items-center rounded-full bg-[hsl(35_90%_92%)] text-[hsl(35_85%_35%)]"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+            </span>
+          )}
+          <span>{p.full_name ?? "—"}</span>
           <button
-            onClick={() => setDeleting(p)}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
-            title="Excluir paciente"
+            onClick={() => handleStartChat(p)}
+            disabled={busy}
+            title={hasChat ? "Abrir chat seguro" : "Criar chat seguro para esta paciente"}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition ${
+              hasChat
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
+            } disabled:opacity-60`}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            {busy ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : hasChat ? (
+              <ShieldCheck className="h-3 w-3" />
+            ) : (
+              <MessageSquareLock className="h-3 w-3" />
+            )}
+            {hasChat ? "Chat E2E" : "Criar chat E2E"}
           </button>
-        )}
-      </div>
-    ),
-  }));
+          {chatMsg?.id === p.id && (
+            <span className={`text-[10px] font-semibold ${chatMsg.ok ? "text-emerald-600" : "text-destructive"}`}>
+              {chatMsg.text}
+            </span>
+          )}
+        </span>
+      ),
+      email: "",
+      criado: new Date(p.created_at).toLocaleDateString("pt-BR"),
+      status: <Badge tone="green">Ativa</Badge>,
+      acoes: (
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={() => setEditing(p)}
+            className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-card hover:bg-muted"
+            title="Editar paciente"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          {canManage && (
+            <button
+              onClick={() => setDeleting(p)}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
+              title="Excluir paciente"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      ),
+    };
+  });
 
   return (
     <div className="p-6 md:p-8">
@@ -153,7 +238,7 @@ export default function Pacientes() {
         ]}
       />
 
-      {open && <AddPatientDialog onClose={() => setOpen(false)} onCreated={load} />}
+      {open && <AddPatientDialog onClose={() => setOpen(false)} onCreated={load} ensureSecureChat={ensureSecureChat} />}
       {editing && (
         <EditPatientDialog
           patient={editing}
@@ -296,7 +381,7 @@ function ModalShell({
   );
 }
 
-function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function AddPatientDialog({ onClose, onCreated, ensureSecureChat }: { onClose: () => void; onCreated: () => void; ensureSecureChat: (patientId: string) => Promise<{ id: string } | { error: string }> }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState(() => randomPassword());
@@ -326,11 +411,19 @@ function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
       body: { full_name: name.trim(), email: email.trim().toLowerCase(), password: pw, role: "patient" },
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    setLoading(false);
     if (error || data?.error) {
+      setLoading(false);
       setErr((data?.error as string) ?? (await functionErrorMessage(error, "Falha ao criar paciente")));
       return;
     }
+    const newUserId = (data as { user_id?: string } | null)?.user_id;
+    if (newUserId) {
+      const r = await ensureSecureChat(newUserId);
+      if ("error" in r) {
+        console.warn("auto secure chat:", r.error);
+      }
+    }
+    setLoading(false);
     setCreated({ email: email.trim().toLowerCase(), password: pw });
     onCreated();
   };
