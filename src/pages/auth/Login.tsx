@@ -17,9 +17,15 @@ export default function Login() {
     e.preventDefault();
     setErr(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
     setLoading(false);
     if (error) return setErr(error.message);
+    // Guarda a senha em memória de sessão para desbloquear o cofre E2E automaticamente
+    sessionStorage.setItem("vault_pw", pw);
+    // Primeiro login? Marca o perfil como sem senha inicial pendente (some o ícone de chave)
+    if (data.user) {
+      await supabase.from("profiles").update({ initial_password_pending: false }).eq("id", data.user.id);
+    }
     nav(next, { replace: true });
   };
 
