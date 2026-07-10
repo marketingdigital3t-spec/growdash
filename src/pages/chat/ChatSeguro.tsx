@@ -322,10 +322,17 @@ export default function ChatSeguro() {
                     : "Toque em 'Falar com a clínica' para iniciar sua conversa criptografada."}
                 </p>
               ) : (
-                conversations.map((c) => (
+                conversations.map((c) => {
+                  const isUnlocked = unlocked.has(c.id);
+                  const isRevealed = !!showPw[c.id];
+                  return (
                   <button
                     key={c.id}
-                    onClick={() => setActiveId(c.id)}
+                    onClick={() => {
+                      setActiveId(c.id);
+                      setPwInput("");
+                      setPwError(null);
+                    }}
                     className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                       activeId === c.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
                     }`}
@@ -338,13 +345,33 @@ export default function ChatSeguro() {
                       {(c.other_name ?? "?").charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{c.other_name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-bold">{c.other_name}</p>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPw((s) => ({ ...s, [c.id]: !s[c.id] }));
+                          }}
+                          role="button"
+                          title={isRevealed ? "Ocultar senha do chat" : "Mostrar senha do chat"}
+                          className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wider ${
+                            activeId === c.id
+                              ? "border-white/40 bg-white/15 text-white"
+                              : "border-border bg-muted text-foreground"
+                          }`}
+                        >
+                          <Lock className="h-3 w-3" />
+                          {isRevealed ? c.view_password : "••••••"}
+                        </span>
+                        {isUnlocked && <ShieldCheck className="h-3 w-3 opacity-70" />}
+                      </div>
                       <p className="truncate text-xs opacity-70">
                         {new Date(c.updated_at).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
                   </button>
-                ))
+                  );
+                })
               )}
             </div>
           </aside>
