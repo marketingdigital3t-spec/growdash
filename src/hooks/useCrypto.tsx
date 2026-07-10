@@ -10,6 +10,7 @@ type CryptoCtx = {
   loading: boolean;
   unlock: (password: string) => Promise<void>;
   setup: (password: string) => Promise<void>;
+  resetVault: (password: string) => Promise<void>;
   lock: () => void;
   getConvKey: (conversationId: string) => Promise<CryptoKey>;
   createConversationKey: (conversationId: string, otherUserId: string) => Promise<CryptoKey>;
