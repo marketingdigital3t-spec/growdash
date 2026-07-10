@@ -606,7 +606,7 @@ export default function MinhaConversa() {
           src={lightbox}
           viewer={viewer}
           onClose={() => {
-            URL.revokeObjectURL(lightbox);
+            // Mantém cache — reabertura instantânea
             setLightbox(null);
           }}
         />
