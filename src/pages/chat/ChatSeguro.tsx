@@ -126,7 +126,7 @@ export default function ChatSeguro() {
     if (m._decrypted) return m;
     if (m.iv && m.ciphertext) {
       try {
-        const key = await getConvKey(conversationId);
+        const key = await prepareConversationKey(conversationId);
         const plain = await decryptText(m.iv, m.ciphertext, key);
         return { ...m, _decrypted: plain };
       } catch {
@@ -185,12 +185,18 @@ export default function ChatSeguro() {
 
   const active = useMemo(() => conversations.find((c) => c.id === activeId) ?? null, [conversations, activeId]);
 
+  const prepareConversationKey = async (conversationId: string) => {
+    const key = await getConvKey(conversationId);
+    await shareConversationKey(conversationId, key);
+    return key;
+  };
+
   const sendText = async () => {
     if (!activeId || !text.trim() || !user) return;
     const body = text.trim();
     setText("");
     try {
-      const key = await getConvKey(activeId);
+      const key = await prepareConversationKey(activeId);
       const { iv, ciphertext } = await encryptText(body, key);
       const { error } = await supabase.from("messages").insert({
         conversation_id: activeId,
@@ -210,6 +216,7 @@ export default function ChatSeguro() {
     try {
       const currentCode = active.access_code ? active : await ensureAccessCode(active.id);
       if (pwInput.trim().toUpperCase() === currentCode.access_code.toUpperCase()) {
+        await prepareConversationKey(active.id);
         setUnlocked((s) => {
           const n = new Set(s);
           n.add(active.id);
@@ -217,14 +224,16 @@ export default function ChatSeguro() {
         });
         setPwInput("");
         setPwError(null);
-        getConvKey(active.id)
-          .then((key) => shareConversationKey(active.id, key))
-          .catch(() => null);
       } else {
         setPwError("Senha incorreta neste aparelho");
       }
     } catch (e) {
-      setPwError(e instanceof Error ? e.message : "Não foi possível validar a senha");
+      const message = e instanceof Error ? e.message : "Não foi possível validar a senha";
+      setPwError(
+        message.includes("Sem chave")
+          ? "Esta conversa ainda precisa ser sincronizada pela conta que enviou a foto. Abra esta conversa pela conta da doutora uma vez e depois volte aqui."
+          : message,
+      );
     }
   };
 
@@ -233,7 +242,7 @@ export default function ChatSeguro() {
     if (file.size > 10 * 1024 * 1024) return alert("Foto acima de 10MB");
     setUploading(true);
     try {
-      const key = await getConvKey(activeId);
+      const key = await prepareConversationKey(activeId);
       const bytes = new Uint8Array(await file.arrayBuffer());
       const { iv, ciphertext } = await encryptBytes(bytes, key);
       const { data: sess } = await supabase.auth.getSession();
@@ -270,13 +279,19 @@ export default function ChatSeguro() {
       const buf = new Uint8Array(await res.arrayBuffer());
       const iv = buf.slice(0, 12);
       const ct = buf.slice(12);
-      const key = await getConvKey(activeId);
+      const key = await prepareConversationKey(activeId);
       const plain = await decryptBytes(iv, ct, key);
       const blob = new Blob([new Uint8Array(plain)]);
       const url = URL.createObjectURL(blob);
       setLightbox(url);
     } catch (e) {
-      alert("Não foi possível abrir a foto: " + (e instanceof Error ? e.message : String(e)));
+      const message = e instanceof Error ? e.message : String(e);
+      alert(
+        "Não foi possível abrir a foto: " +
+          (message.includes("Sem chave")
+            ? "a chave desta conversa ainda não foi sincronizada para esta conta. Abra a conversa pela conta que enviou a foto uma vez e tente novamente."
+            : message),
+      );
     }
   };
 
