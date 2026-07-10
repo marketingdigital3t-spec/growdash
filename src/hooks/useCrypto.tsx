@@ -221,6 +221,9 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
   const shareConversationKey = async (conversationId: string, aesKey?: CryptoKey) => {
     if (!user) throw new Error("Sessão inválida");
     const aes = aesKey ?? convCache.current.get(conversationId) ?? (await getConvKey(conversationId));
+    // Se a AES estiver marcada como não-extraível (chaves antigas em cache), não conseguimos re-wrap.
+    // Silenciosamente aborta — a próxima abertura fresca (após unwrap) já virá extraível.
+    if (!(aes as CryptoKey & { extractable?: boolean }).extractable) return;
     const { data: conv } = await supabase
       .from("conversations")
       .select("patient_id, professional_id")
