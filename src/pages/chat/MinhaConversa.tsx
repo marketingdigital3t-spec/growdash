@@ -201,7 +201,8 @@ export default function MinhaConversa() {
 
   const unlock = async () => {
     if (!conv) return;
-    if (pwInput.trim().toUpperCase() !== conv.access_code.toUpperCase()) {
+    const norm = (s: string) => s.trim().toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1");
+    if (norm(pwInput) !== norm(conv.access_code)) {
       setPwError("Código incorreto neste aparelho.");
       return;
     }
