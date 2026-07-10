@@ -381,7 +381,7 @@ function ModalShell({
   );
 }
 
-function AddPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function AddPatientDialog({ onClose, onCreated, ensureSecureChat }: { onClose: () => void; onCreated: () => void; ensureSecureChat: (patientId: string) => Promise<{ id: string } | { error: string }> }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState(() => randomPassword());
