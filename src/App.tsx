@@ -123,7 +123,7 @@ const App = () => (
             <Route
               path="/chat-seguro"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allow={["admin", "professional"]} fallback="/minha-conversa">
                   <MfaGate>
                     <VaultGate>
                       <ChatSeguro />
@@ -133,9 +133,19 @@ const App = () => (
               }
             />
             <Route
-              path="/chat-seguro/recuperacao"
+              path="/minha-conversa"
               element={
                 <ProtectedRoute>
+                  <VaultGate>
+                    <MinhaConversa />
+                  </VaultGate>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chat-seguro/recuperacao"
+              element={
+                <ProtectedRoute allow={["admin"]}>
                   <MfaGate>
                     <VaultGate>
                       <Recuperacao />
@@ -144,6 +154,17 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/lgpd"
+              element={
+                <ProtectedRoute allow={["admin"]}>
+                  <MfaGate>
+                    <SolicitacoesLgpd />
+                  </MfaGate>
+                </ProtectedRoute>
+              }
+            />
+
 
             <Route
               path="/config/usuarios"
