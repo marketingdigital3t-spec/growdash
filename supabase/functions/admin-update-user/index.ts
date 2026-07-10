@@ -51,11 +51,15 @@ Deno.serve(async (req) => {
         .eq('patient_id', user_id)
         .maybeSingle();
       if (!link) return json({ error: 'Sem vínculo com essa paciente.' }, 403);
+    }
+
     // GET mode: return current email
     if (body?.action === 'get') {
       const { data: u } = await admin.auth.admin.getUserById(user_id);
       return json({ email: u.user?.email ?? null });
     }
+
+
 
 
 
