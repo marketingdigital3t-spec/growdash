@@ -33,7 +33,7 @@ type Message = {
 
 export default function ChatSeguro() {
   const { user, roles } = useAuth();
-  const { getConvKey, createConversationKey, shareConversationKey } = useCrypto();
+  const { getConvKey, createConversationKey } = useCrypto();
   const isProfessional = roles.includes("professional") || roles.includes("admin");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -50,6 +50,8 @@ export default function ChatSeguro() {
   const [showPw, setShowPw] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Cache local de blobs de fotos já descriptografadas (id -> objectURL)
+  const photoCache = useRef<Map<string, string>>(new Map());
 
   const loadConversations = async () => {
     if (!user) return;
@@ -165,27 +167,48 @@ export default function ChatSeguro() {
   const active = useMemo(() => conversations.find((c) => c.id === activeId) ?? null, [conversations, activeId]);
 
   const prepareConversationKey = async (conversationId: string) => {
-    const key = await getConvKey(conversationId);
-    await shareConversationKey(conversationId, key);
-    return key;
+    // getConvKey já cacheia e re-compartilha em background 1x. Não bloqueamos o hot path.
+    return getConvKey(conversationId);
   };
 
   const sendText = async () => {
     if (!activeId || !text.trim() || !user) return;
     const body = text.trim();
     setText("");
+    // Envio otimista: aparece imediato na tela
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: Message = {
+      id: tempId,
+      conversation_id: activeId,
+      sender_id: user.id,
+      kind: "text",
+      body: null,
+      photo_path: null,
+      iv: null,
+      ciphertext: null,
+      created_at: new Date().toISOString(),
+      _decrypted: body,
+    };
+    setMessages((m) => [...m, optimistic]);
     try {
       const key = await prepareConversationKey(activeId);
       const { iv, ciphertext } = await encryptText(body, key);
-      const { error } = await supabase.from("messages").insert({
+      const { data, error } = await supabase.from("messages").insert({
         conversation_id: activeId,
         sender_id: user.id,
         kind: "text",
         iv,
         ciphertext,
-      });
+      }).select().single();
       if (error) throw error;
+      // Substitui o otimista pelo real (o realtime já pode ter chegado; dedup por id)
+      setMessages((m) => {
+        const withoutTemp = m.filter((x) => x.id !== tempId);
+        if (withoutTemp.some((x) => x.id === data.id)) return withoutTemp;
+        return [...withoutTemp, { ...(data as Message), _decrypted: body }];
+      });
     } catch (e) {
+      setMessages((m) => m.filter((x) => x.id !== tempId));
       alert("Falha ao enviar: " + (e instanceof Error ? e.message : String(e)));
     }
   };
@@ -249,8 +272,13 @@ export default function ChatSeguro() {
 
   const openPhoto = async (msg: Message) => {
     if (!msg.photo_path || !activeId) return;
+    // Cache hit — abre instantâneo sem novo download/decrypt
+    const cached = photoCache.current.get(msg.id);
+    if (cached) {
+      setLightbox(cached);
+      return;
+    }
     try {
-      // Baixa o blob criptografado via URL assinada
       const { data, error } = await supabase.functions.invoke("signed-photo-url", {
         body: { message_id: msg.id },
       });
@@ -264,6 +292,7 @@ export default function ChatSeguro() {
       const plain = await decryptBytes(iv, ct, key);
       const blob = new Blob([new Uint8Array(plain)]);
       const url = URL.createObjectURL(blob);
+      photoCache.current.set(msg.id, url);
       setLightbox(url);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -590,7 +619,7 @@ export default function ChatSeguro() {
           src={lightbox}
           viewer={viewer}
           onClose={() => {
-            URL.revokeObjectURL(lightbox);
+            // Não revoga: mantém cache para reabertura instantânea
             setLightbox(null);
           }}
         />
