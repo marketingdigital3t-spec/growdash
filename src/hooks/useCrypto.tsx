@@ -135,28 +135,18 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     setHasKeypair(true);
   };
 
+  const setup = async (password: string) => {
+    await setupInternal(password);
+    sessionStorage.setItem("vault_pw", password);
+  };
+
   const unlock = async (password: string) => {
-    if (!user) throw new Error("Sessão inválida");
-    const { data, error } = await supabase
-      .from("user_private_keys")
-      .select("encrypted_private_key, salt, iv, iterations")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (error || !data) throw new Error("Cofre não encontrado");
     try {
-      const salt = C.b64.decode(data.salt);
-      const iv = C.b64.decode(data.iv);
-      const wrap = await C.deriveWrapKey(password, salt, data.iterations);
-      const priv = await C.unwrapPrivateKeyWithPassword(data.encrypted_private_key, wrap, iv);
-      setPrivateKey(priv);
-      await supabase.from("security_events").insert({
-        user_id: user.id,
-        event_type: "vault_unlocked",
-        user_agent: navigator.userAgent,
-      });
+      await unlockInternal(password);
+      sessionStorage.setItem("vault_pw", password);
     } catch {
       await supabase.from("security_events").insert({
-        user_id: user.id,
+        user_id: user!.id,
         event_type: "vault_unlock_failed",
         user_agent: navigator.userAgent,
       });
