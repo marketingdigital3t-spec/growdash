@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus, Download, Filter, X, UserRound, KeyRound, Copy, Check, Sparkles,
