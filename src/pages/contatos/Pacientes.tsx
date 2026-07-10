@@ -103,6 +103,12 @@ export default function Pacientes() {
       .eq("professional_id", user.id)
       .maybeSingle();
     if (existing?.id) return { id: existing.id };
+    // Garante o vínculo paciente↔profissional antes de criar a conversa
+    // (necessário pra passar na RLS quando o usuário é 'professional').
+    await supabase
+      .from("patient_links")
+      .insert({ patient_id: patientId, professional_id: user.id })
+      .then(() => {}, () => {});
     const { data: conv, error } = await supabase
       .from("conversations")
       .insert({ patient_id: patientId, professional_id: user.id })
