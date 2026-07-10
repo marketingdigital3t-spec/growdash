@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus, Download, Filter, X, UserRound, KeyRound, Copy, Check, Sparkles,
-  Pencil, Trash2, Loader2, AlertTriangle,
+  Pencil, Trash2, Loader2, AlertTriangle, MessageSquareLock, ShieldCheck,
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/page-primitives";
 import { Toolbar, DataTable, Button, Badge } from "@/components/list-primitives";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCrypto } from "@/hooks/useCrypto";
 
 type Patient = {
   id: string;
