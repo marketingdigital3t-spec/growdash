@@ -34,10 +34,73 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     (async () => {
       const { data } = await supabase.from("user_keys").select("user_id").eq("user_id", user.id).maybeSingle();
-      setHasKeypair(!!data);
+      const has = !!data;
+      setHasKeypair(has);
       setLoading(false);
+      // Auto-unlock/setup usando a senha de login guardada em sessionStorage
+      const pw = sessionStorage.getItem("vault_pw");
+      if (pw) {
+        try {
+          if (has) await unlockInternal(pw);
+          else await setupInternal(pw);
+        } catch {
+          /* usuário poderá digitar manualmente no VaultGate */
+        }
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const setupInternal = async (password: string) => {
+    if (!user) throw new Error("Sessão inválida");
+    if (password.length < 8) throw new Error("Senha precisa ter no mínimo 8 caracteres");
+    const kp = await C.generateKeypair();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const iterations = 600_000;
+    const wrap = await C.deriveWrapKey(password, salt, iterations);
+    const encrypted_private_key = await C.wrapPrivateKeyWithPassword(kp.privateKey, wrap, iv);
+    const publicJwk = await C.exportPublicJwk(kp.publicKey);
+    const { error: e1 } = await supabase
+      .from("user_keys")
+      .upsert({ user_id: user.id, public_key: publicJwk as unknown as never });
+    if (e1) throw e1;
+    const { error: e2 } = await supabase.from("user_private_keys").upsert({
+      user_id: user.id,
+      encrypted_private_key,
+      salt: C.b64.encode(salt),
+      iv: C.b64.encode(iv),
+      iterations,
+    });
+    if (e2) throw e2;
+    await supabase.from("security_events").insert({
+      user_id: user.id,
+      event_type: "e2e_key_created",
+      user_agent: navigator.userAgent,
+    });
+    setPrivateKey(kp.privateKey);
+    setHasKeypair(true);
+  };
+
+  const unlockInternal = async (password: string) => {
+    if (!user) throw new Error("Sessão inválida");
+    const { data, error } = await supabase
+      .from("user_private_keys")
+      .select("encrypted_private_key, salt, iv, iterations")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (error || !data) throw new Error("Cofre não encontrado");
+    const salt = C.b64.decode(data.salt);
+    const iv = C.b64.decode(data.iv);
+    const wrap = await C.deriveWrapKey(password, salt, data.iterations);
+    const priv = await C.unwrapPrivateKeyWithPassword(data.encrypted_private_key, wrap, iv);
+    setPrivateKey(priv);
+    await supabase.from("security_events").insert({
+      user_id: user.id,
+      event_type: "vault_unlocked",
+      user_agent: navigator.userAgent,
+    });
+  };
 
   const setup = async (password: string) => {
     if (!user) throw new Error("Sessão inválida");
