@@ -15,20 +15,36 @@ import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, RefreshCw, X, Megaphone, BarChart3, Pencil, RotateCcw, ShieldCheck } from "lucide-react";
+import {
+  Search,
+  RefreshCw,
+  X,
+  Megaphone,
+  BarChart3,
+  Pencil,
+  RotateCcw,
+  ShieldCheck,
+  FolderKanban,
+  Layers3,
+  RectangleHorizontal,
+  SlidersHorizontal,
+  Eye,
+  CheckCircle2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
 import { EditableMetaEntity, MetaEntityEditor } from "@/components/campaigns/MetaEntityEditor";
 import { ResizableHead, StatusDot, normalizeStatus, useColWidths } from "@/components/dashboard/ResizableTableHelpers";
 import { cn } from "@/lib/utils";
+import { getStatusBadge } from "@/lib/status";
 
 type CampSortKey = "name" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "cpl" | "ctr" | "impressions";
-type CampColKey = "check" | "name" | "budget" | "sales" | "cpa" | "spend" | "leads" | "profit" | "roi" | "cpl" | "ctr" | "impressions" | "actions";
+type CampColKey = "check" | "name" | "delivery" | "budget" | "sales" | "cpa" | "spend" | "leads" | "profit" | "roi" | "cpl" | "ctr" | "impressions" | "actions";
 type AdsetColKey = "name" | "campaign" | "budget" | "spend" | "leads" | "cpl" | "clicks" | "impressions";
 type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "impressions";
 
 const CAMP_DEFAULTS: Record<CampColKey, number> = {
-  check: 40, name: 280, budget: 120, sales: 90, cpa: 110, spend: 120, leads: 90,
+  check: 44, name: 300, delivery: 156, budget: 120, sales: 90, cpa: 110, spend: 120, leads: 90,
   profit: 130, roi: 100, cpl: 110, ctr: 100, impressions: 120, actions: 86,
 };
 const ADSET_DEFAULTS: Record<AdsetColKey, number> = {
@@ -62,7 +78,7 @@ export default function Campaigns() {
     else { setSortKey(key); setSortAsc(false); }
   };
 
-  const { data: campaigns = [], isLoading, refetch } = useQuery({
+  const { data: campaigns = [], isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["campaigns_full", selectedAccount, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async () => {
       let query = supabase
@@ -159,6 +175,17 @@ export default function Campaigns() {
     { spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0 }
   ), [filtered]);
 
+  const activeCampaigns = useMemo(() => campaigns.filter((campaign: any) => {
+    const matchesSearch = !search || campaign.name.toLowerCase().includes(search.toLowerCase());
+    return matchesSearch && normalizeStatus(campaign.status) === "ACTIVE";
+  }).length, [campaigns, search]);
+
+  const selectedCampaign = useMemo(() => {
+    if (selectedIds.size !== 1) return null;
+    const id = Array.from(selectedIds)[0];
+    return filtered.find((campaign: any) => campaign.id === id) ?? null;
+  }, [filtered, selectedIds]);
+
   const selectedAdsets = useMemo(() => {
     if (selectedIds.size === 0) return [];
     return filtered
@@ -206,88 +233,154 @@ export default function Campaigns() {
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
 
   return (
-    <MotionPage className="space-y-4">
-      <MotionItem className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Campanhas</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gerenciador de campanhas</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
-          <RefreshCw className="h-4 w-4" /> Atualizar
-        </Button>
-      </MotionItem>
-
-      <MotionItem>
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-          <span><strong className="text-foreground">Gerenciador conectado à Meta Ads.</strong> Use o lápis para editar nome e status. Em conjuntos, também é possível alterar o orçamento diário. Toda alteração exige confirmação e gera histórico.</span>
-        </div>
-      </MotionItem>
-
-      <MotionItem>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar campanha..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+    <MotionPage className="overflow-hidden rounded-xl border border-[#d9d3c9] bg-white shadow-sm">
+      <MotionItem className="border-b border-[#ded8ce] bg-gradient-to-r from-[#fffdf7] via-white to-[#f5efe0] px-3 py-3 sm:px-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#1d1b17] text-[#f2c94c] shadow-sm">
+              <Megaphone className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl font-black tracking-tight">Campanhas</h1>
+                <Badge className="border-[#dfc36f] bg-[#fff4cc] text-[#72530b] hover:bg-[#fff4cc]">
+                  {filtered.length} campanhas
+                </Badge>
               </div>
-              {adAccounts.length > 0 && (
-                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                  <SelectTrigger className="w-[200px]"><SelectValue placeholder="Conta de Anúncio" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as contas</SelectItem>
-                    {adAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[170px]"><SelectValue placeholder="Todos status" /></SelectTrigger>
+              <p className="truncate text-xs text-muted-foreground">Gerenciador integrado à Meta Ads</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {adAccounts.length > 0 && (
+              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                <SelectTrigger className="h-9 w-full border-[#d7d0c4] bg-white sm:w-[260px]">
+                  <SelectValue placeholder="Conta de anúncio" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos status</SelectItem>
+                  <SelectItem value="all">Todas as contas de anúncio</SelectItem>
+                  {adAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+              {dataUpdatedAt ? `Atualizado às ${new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Aguardando dados"}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-9 gap-2 bg-white">
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} /> Atualizar
+            </Button>
+          </div>
+        </div>
+      </MotionItem>
+
+      <MotionItem className="border-b border-[#e2ddd5] bg-[#faf8f4] px-3 py-2 sm:px-4">
+        <div className="growdash-scrollbar flex gap-2 overflow-x-auto pb-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setStatusFilter("all")}
+            className={cn("h-9 shrink-0 gap-2 bg-white", statusFilter === "all" && "border-[#c99b23] bg-[#fff7dc] text-[#6c4b06]")}
+          >
+            <FolderKanban className="h-4 w-4" /> Todos os anúncios
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setStatusFilter("ACTIVE")}
+            className={cn("h-9 shrink-0 gap-2 bg-white", statusFilter === "ACTIVE" && "border-[#c99b23] bg-[#fff7dc] text-[#6c4b06]")}
+          >
+            <CheckCircle2 className="h-4 w-4" /> Ativos ({activeCampaigns})
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setSortKey("roi"); setSortAsc(false); }} className="h-9 shrink-0 gap-2 bg-white">
+            <BarChart3 className="h-4 w-4" /> Desempenho e ROAS
+          </Button>
+          <div className="ml-auto hidden items-center gap-2 text-[11px] text-muted-foreground lg:flex">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" /> Alterações exigem confirmação e são enviadas pelo backend seguro.
+          </div>
+        </div>
+      </MotionItem>
+
+      <MotionItem className="border-b border-[#e2ddd5] bg-[#f1eee8] p-2 sm:p-3">
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Pesquise por nome da campanha"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 border-[#ded8ce] bg-white pl-9"
+            />
+          </div>
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 w-full bg-white sm:w-[180px]"><SelectValue placeholder="Todos os status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
                   <SelectItem value="ACTIVE"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Ativa</span></SelectItem>
                   <SelectItem value="PAUSED"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-muted-foreground/60" /> Pausada</span></SelectItem>
                   <SelectItem value="ARCHIVED"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" /> Arquivada</span></SelectItem>
                   <SelectItem value="IN_PROCESS"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-blue-500" /> Em análise</span></SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} title="Resetar largura das colunas">
-                <RotateCcw className="h-4 w-4" />
+              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="h-9 gap-2 bg-white" title="Restaurar largura das colunas">
+                <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Redefinir colunas</span>
               </Button>
-              <DateFilterBar
-                preset={preset} onPresetChange={setPreset}
-                customRange={customRange} onCustomRangeChange={setCustomRange}
-                startDate={startDate} endDate={endDate}
-                adAccounts={[]} selectedAccount="" onAccountChange={() => {}}
-              />
             </div>
-          </CardContent>
-        </Card>
+            <DateFilterBar
+              preset={preset} onPresetChange={setPreset}
+              customRange={customRange} onCustomRangeChange={setCustomRange}
+              startDate={startDate} endDate={endDate}
+              adAccounts={[]} selectedAccount="" onAccountChange={() => {}}
+            />
+          </div>
+        </div>
       </MotionItem>
-
-      <AnimatePresence>
-        {selectedIds.size > 0 && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1">{selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}</Badge>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-7 gap-1 text-xs">
-                <X className="h-3 w-3" /> Limpar
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <MotionItem>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="campaigns">Campanhas</TabsTrigger>
-            <TabsTrigger value="adsets" disabled={selectedIds.size === 0}>Conjuntos {selectedIds.size > 0 && `(${selectedAdsets.length})`}</TabsTrigger>
-            <TabsTrigger value="ads" disabled={selectedIds.size === 0}>Anúncios {selectedIds.size > 0 && `(${selectedAds.length})`}</TabsTrigger>
+          <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-[#d8d2c8] bg-[#f7f4ed] p-0">
+            <TabsTrigger value="campaigns" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none border-r border-[#ddd7cd] px-4 data-[state=active]:bg-white data-[state=active]:text-[#75540a] data-[state=active]:shadow-[inset_0_-3px_0_#d2a52d]">
+              <FolderKanban className="h-4 w-4" /> Campanhas
+              {selectedIds.size > 0 && <Badge className="ml-auto bg-[#d7aa30] text-[#2d2107]">{selectedIds.size}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="adsets" disabled={selectedIds.size === 0} className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-[#ddd7cd] px-4 data-[state=active]:bg-white data-[state=active]:text-[#75540a] data-[state=active]:shadow-[inset_0_-3px_0_#d2a52d]">
+              <Layers3 className="h-4 w-4" /> Conjuntos de anúncios {selectedIds.size > 0 && `(${selectedAdsets.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="ads" disabled={selectedIds.size === 0} className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none px-4 data-[state=active]:bg-white data-[state=active]:text-[#75540a] data-[state=active]:shadow-[inset_0_-3px_0_#d2a52d]">
+              <RectangleHorizontal className="h-4 w-4" /> Anúncios {selectedIds.size > 0 && `(${selectedAds.length})`}
+            </TabsTrigger>
           </TabsList>
 
+          <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-[#ddd7cd] bg-white px-3 py-2">
+            <Button
+              size="sm"
+              disabled={!selectedCampaign}
+              onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })}
+              className="h-8 gap-2 bg-[#c99519] text-[#2d2107] hover:bg-[#d7aa30]"
+            >
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
+            <Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-8 gap-2">
+              <Eye className="h-4 w-4" /> Ver desempenho
+            </Button>
+            <AnimatePresence>
+              {selectedIds.size > 0 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                  <Badge variant="secondary">{selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}</Badge>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-8 gap-1 text-xs">
+                    <X className="h-3 w-3" /> Limpar
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+              <SlidersHorizontal className="h-4 w-4" /> Colunas redimensionáveis
+            </div>
+          </div>
+
           {/* Campaigns Tab */}
-          <TabsContent value="campaigns">
+          <TabsContent value="campaigns" className="m-0">
             {filtered.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -296,15 +389,16 @@ export default function Campaigns() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
+              <Card className="overflow-hidden rounded-none border-0 shadow-none">
+                <div className="growdash-scrollbar overflow-x-auto">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader>
-                      <TableRow className="bg-muted/50">
+                      <TableRow className="h-11 border-b border-[#d7d1c7] bg-[#f3f0ea] hover:bg-[#f3f0ea]">
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")}>
                           <Checkbox checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
                         </ResizableHead>
                         <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Campanha</ResizableHead>
+                        <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")}>Veiculação</ResizableHead>
                         <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>
                         <ResizableHead colKey="sales" width={camp.colWidths.sales} onResize={camp.startResize("sales")} sortable sortableKey="salesCount" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Vendas</ResizableHead>
                         <ResizableHead colKey="cpa" width={camp.colWidths.cpa} onResize={camp.startResize("cpa")} sortable sortableKey="cpa" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPA</ResizableHead>
@@ -325,7 +419,7 @@ export default function Campaigns() {
                             key={c.id}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className={`border-b transition-colors hover:bg-muted/50 cursor-pointer ${selectedIds.has(c.id) ? "bg-muted/30" : ""}`}
+                            className={`h-12 border-b border-[#e8e3db] transition-colors hover:bg-[#fff9e8] cursor-pointer ${selectedIds.has(c.id) ? "bg-[#fff4cf]" : "odd:bg-white even:bg-[#fbfaf8]"}`}
                             onClick={() => toggleSelect(c.id)}
                           >
                             <TableCell style={cellW("check")} onClick={(e) => e.stopPropagation()}>
@@ -333,8 +427,28 @@ export default function Campaigns() {
                             </TableCell>
                             <TableCell style={cellW("name")} className="font-medium">
                               <div className="flex items-center gap-2 min-w-0">
-                                <StatusDot status={c.status} />
-                                <span className="truncate" title={c.name}>{c.name}</span>
+                                <span className="truncate font-semibold text-[#6f5311]" title={c.name}>{c.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell style={cellW("delivery")} onClick={(event) => event.stopPropagation()}>
+                              <div className={cn("flex items-center gap-2 text-xs font-semibold", getStatusBadge(c.status).textColor)}>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status })}
+                                  className={cn(
+                                    "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
+                                    normalizeStatus(c.status) === "ACTIVE"
+                                      ? "border-[#b98914] bg-[#d8aa2d]"
+                                      : "border-[#c8c2b8] bg-[#e7e3dc]",
+                                  )}
+                                  title="Editar status na Meta Ads"
+                                >
+                                  <span className={cn(
+                                    "absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-all",
+                                    normalizeStatus(c.status) === "ACTIVE" ? "left-[17px]" : "left-0.5",
+                                  )} />
+                                </button>
+                                <span>{getStatusBadge(c.status).label}</span>
                               </div>
                             </TableCell>
                             <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>
@@ -363,7 +477,7 @@ export default function Campaigns() {
                     </TableBody>
                   </Table>
                 </div>
-                <div className="border-t bg-muted/30 px-4 py-3">
+                <div className="border-t border-[#d7d1c7] bg-[#f7f4ed] px-4 py-3">
                   <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                     <span className="font-semibold">{filtered.length} campanha{filtered.length !== 1 ? "s" : ""}</span>
                     <span>Vendas: <strong><AnimatedNumber value={totals.salesCount} decimals={0} /></strong></span>
@@ -378,12 +492,12 @@ export default function Campaigns() {
           </TabsContent>
 
           {/* Adsets Tab */}
-          <TabsContent value="adsets">
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
+          <TabsContent value="adsets" className="m-0">
+            <Card className="overflow-hidden rounded-none border-0 shadow-none">
+              <div className="growdash-scrollbar overflow-x-auto">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
+                    <TableRow className="h-11 bg-[#f3f0ea] hover:bg-[#f3f0ea]">
                       <ResizableHead colKey="name" width={adset.colWidths.name} onResize={adset.startResize("name")}>Conjunto</ResizableHead>
                       <ResizableHead colKey="campaign" width={adset.colWidths.campaign} onResize={adset.startResize("campaign")}>Campanha</ResizableHead>
                       <ResizableHead colKey="budget" width={adset.colWidths.budget} onResize={adset.startResize("budget")} align="right">Orçamento Diário</ResizableHead>
@@ -396,7 +510,7 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAdsets.map((a: any) => (
-                      <TableRow key={a.id}>
+                      <TableRow key={a.id} className="h-12 odd:bg-white even:bg-[#fbfaf8] hover:bg-[#fff9e8]">
                         <TableCell style={adsetCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             <StatusDot status={a.status} />
@@ -422,12 +536,12 @@ export default function Campaigns() {
           </TabsContent>
 
           {/* Ads Tab */}
-          <TabsContent value="ads">
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
+          <TabsContent value="ads" className="m-0">
+            <Card className="overflow-hidden rounded-none border-0 shadow-none">
+              <div className="growdash-scrollbar overflow-x-auto">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
+                    <TableRow className="h-11 bg-[#f3f0ea] hover:bg-[#f3f0ea]">
                       <ResizableHead colKey="name" width={ad.colWidths.name} onResize={ad.startResize("name")}>Anúncio</ResizableHead>
                       <ResizableHead colKey="adset" width={ad.colWidths.adset} onResize={ad.startResize("adset")}>Conjunto</ResizableHead>
                       <ResizableHead colKey="campaign" width={ad.colWidths.campaign} onResize={ad.startResize("campaign")}>Campanha</ResizableHead>
@@ -441,7 +555,7 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAds.map((a: any) => (
-                      <TableRow key={a.id}>
+                      <TableRow key={a.id} className="h-12 odd:bg-white even:bg-[#fbfaf8] hover:bg-[#fff9e8]">
                         <TableCell style={adCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             {a.thumbnail_url ? (
