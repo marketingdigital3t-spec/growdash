@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDDeals, useFunnelStages, computeFunnelAnalytics } from "@/hooks/useRDDeals";
-import { useDateFilter } from "@/hooks/useDateFilter";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function FunnelAnalysis() {
+  const { adAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
-  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels();
+  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(adAccountId === "all" ? undefined : adAccountId);
   const [selectedFunnel, setSelectedFunnel] = useState<string>("");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
@@ -38,8 +39,6 @@ export default function FunnelAnalysis() {
 
   const activeFunnels = funnels.filter((f) => f.is_active && f.rd_funnel_id);
   const funnelId = selectedFunnel || activeFunnels[0]?.id || "";
-
-  const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
 
   const { data: stages = [], isLoading: loadingStages } = useFunnelStages(funnelId);
   const { data: deals = [], isLoading, refetch } = useRDDeals({

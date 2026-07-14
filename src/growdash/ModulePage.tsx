@@ -1,44 +1,33 @@
-import { CheckCircle2, ChevronRight, Clock3 } from "lucide-react";
-import { Navigate, useLocation } from "react-router-dom";
+import { ArrowRight, Construction, DatabaseZap, ShieldCheck } from "lucide-react";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { findModule } from "./navigation";
-import { MetricCard, MiniBars, PageHeading } from "./shared";
+import { PageHeading } from "./shared";
 
 export default function ModulePage() {
   const { pathname } = useLocation();
   const module = findModule(pathname);
   if (!module) return <Navigate to="/" replace />;
-  const Icon = module.icon;
 
   return (
-    <div className="mx-auto max-w-[1500px]">
+    <div className="mx-auto max-w-[1100px]">
       <PageHeading eyebrow="Growdash" title={module.label} description={module.description} />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {module.metrics.map((metric, index) => <MetricCard key={metric.label} {...metric} emphasis={index === 0} />)}
-      </div>
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_.8fr]">
-        <section className="gd-panel p-5">
-          <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#f9ecc2] text-[#906b13]"><Icon className="h-5 w-5" /></span>
-            <div><h2 className="font-black">Evolução de {module.label.toLowerCase()}</h2><p className="text-xs text-[#817b74]">Visão demonstrativa do período selecionado</p></div>
-          </div>
-          <MiniBars values={[38, 52, 46, 65, 58, 74, 62, 84, 76, 94, 88, 100]} />
-        </section>
-        <section className="gd-panel overflow-hidden">
-          <div className="border-b border-[#e9e4dd] p-5"><h2 className="font-black">Destaques</h2><p className="text-xs text-[#817b74]">Itens que pedem sua atenção</p></div>
-          <div className="divide-y divide-[#eeeae4]">
-            {module.highlights.map((highlight, index) => (
-              <button key={highlight} className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-[#fbf8f1]">
-                {index === 0 ? <Clock3 className="h-4 w-4 text-[#d19b15]" /> : <CheckCircle2 className="h-4 w-4 text-[#4e8d63]" />}
-                <span className="grow text-xs font-bold">{highlight}</span>
-                <ChevronRight className="h-4 w-4 text-[#aaa39a]" />
-              </button>
-            ))}
-          </div>
-          <div className="m-4 rounded-xl border border-dashed border-[#d9c894] bg-[#fffaf0] p-4 text-[11px] leading-relaxed text-[#796835]">
-            Dados demonstrativos. Na próxima etapa, conectaremos esta área às fontes reais do seu negócio.
-          </div>
-        </section>
-      </div>
+      <section className="gd-panel overflow-hidden">
+        <div className="border-b border-border bg-gradient-to-r from-[#fff8e4] to-transparent p-6 dark:from-[#211b0e]">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-[#f4c94d] text-[#332407]"><Construction className="h-6 w-6" /></span>
+          <h2 className="mt-5 text-xl font-black">Módulo em implementação segura</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Esta área ainda não possui uma fonte de dados real finalizada. Os números demonstrativos foram removidos para impedir decisões baseadas em informações fictícias.
+          </p>
+        </div>
+        <div className="grid gap-3 p-6 md:grid-cols-2">
+          <article className="rounded-xl border border-border p-4"><div className="flex items-center gap-3"><DatabaseZap className="h-5 w-5 text-[#a17817]" /><b className="text-sm">Dados verificáveis</b></div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">O módulo será liberado quando consultas, estados vazios, sincronização e tratamento de erro estiverem conectados ao Supabase.</p></article>
+          <article className="rounded-xl border border-border p-4"><div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-[#43845a]" /><b className="text-sm">Sem dados falsos</b></div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">Nenhum KPI, gráfico ou alerta é inventado para preencher a tela.</p></article>
+        </div>
+        <div className="flex flex-wrap gap-2 border-t border-border p-6">
+          <Link to="/integracoes" className="gd-button">Verificar integrações <ArrowRight className="h-4 w-4" /></Link>
+          <Link to="/saude-dos-dados" className="gd-button">Saúde dos dados <ArrowRight className="h-4 w-4" /></Link>
+        </div>
+      </section>
     </div>
   );
 }

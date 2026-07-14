@@ -45,6 +45,27 @@
     --sidebar-ring: 43 87% 55%;
   }
 
+  .dark {
+    --background: 225 20% 5%;
+    --foreground: 42 24% 94%;
+    --card: 222 18% 8%;
+    --card-foreground: 42 24% 94%;
+    --popover: 222 18% 8%;
+    --popover-foreground: 42 24% 94%;
+    --secondary: 222 14% 13%;
+    --secondary-foreground: 42 15% 90%;
+    --muted: 222 14% 13%;
+    --muted-foreground: 35 8% 62%;
+    --accent: 42 30% 16%;
+    --accent-foreground: 43 90% 72%;
+    --border: 40 10% 17%;
+    --input: 40 10% 17%;
+    --primary: 43 87% 55%;
+    --primary-foreground: 35 50% 12%;
+    --ring: 43 87% 55%;
+    color-scheme: dark;
+  }
+
   /* Analytics modules share the same Growdash palette as the rest of the SaaS.
      Keeping the scope lets charts/components use tokens without creating a
      second blue/dark theme inside the platform. */
@@ -81,8 +102,30 @@
     font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
   }
 
+  .dark .analytics-module {
+    --background: 225 20% 5%;
+    --foreground: 42 24% 94%;
+    --card: 222 18% 8%;
+    --card-foreground: 42 24% 94%;
+    --popover: 222 18% 8%;
+    --popover-foreground: 42 24% 94%;
+    --secondary: 222 14% 13%;
+    --secondary-foreground: 42 15% 90%;
+    --muted: 222 14% 13%;
+    --muted-foreground: 35 8% 62%;
+    --accent: 42 30% 16%;
+    --accent-foreground: 43 90% 72%;
+    --border: 40 10% 17%;
+    --input: 40 10% 17%;
+    color-scheme: dark;
+  }
+
   .analytics-module :is(input, select, textarea) {
     color-scheme: light;
+  }
+
+  .dark .analytics-module :is(input, select, textarea) {
+    color-scheme: dark;
   }
 
   * {
@@ -118,11 +161,11 @@
 
 @layer components {
   .gd-panel {
-    @apply rounded-xl border border-[#ded9d2] bg-white shadow-[0_1px_2px_rgba(20,16,10,.035)];
+    @apply rounded-xl border border-[#ded9d2] bg-white shadow-[0_1px_2px_rgba(20,16,10,.035)] dark:border-[#292720] dark:bg-[#111216] dark:shadow-none;
   }
 
   .gd-button {
-    @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d8d2ca] bg-white px-3 text-[10px] font-bold text-[#4e4943] shadow-sm transition hover:border-[#c4ad6a] hover:bg-[#fffaf0];
+    @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d8d2ca] bg-white px-3 text-[10px] font-bold text-[#4e4943] shadow-sm transition hover:border-[#c4ad6a] hover:bg-[#fffaf0] dark:border-[#343127] dark:bg-[#17181d] dark:text-[#e7e1d7] dark:hover:bg-[#242117];
   }
 
   .gold-action {

@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
-import { useDateFilter } from "@/hooks/useDateFilter";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -57,7 +57,6 @@ const AD_DEFAULTS: Record<AdColKey, number> = {
 export default function Campaigns() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
-  const [selectedAccount, setSelectedAccount] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("campaigns");
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
@@ -65,9 +64,18 @@ export default function Campaigns() {
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
 
-  const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
+  const {
+    preset,
+    setPreset,
+    customRange,
+    setCustomRange,
+    startDate,
+    endDate,
+    adAccountId: selectedAccount,
+    setAdAccountId: setSelectedAccount,
+  } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
-  const { data: sales = [] } = useSales({ startDate, endDate });
+  const { data: sales = [] } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount });
 
   const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v1");
   const adset = useColWidths<AdsetColKey>(ADSET_DEFAULTS, "campaigns-adset-cols-v1");

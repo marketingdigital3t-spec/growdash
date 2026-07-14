@@ -6,12 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
 import GrowdashLayout from "@/growdash/GrowdashLayout";
-import CrmPage from "@/growdash/CrmPage";
-import FinancePage from "@/growdash/FinancePage";
-import IntegrationsPage from "@/growdash/IntegrationsPage";
-import ManagementPage from "@/growdash/ManagementPage";
-import ModulePage from "@/growdash/ModulePage";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 
 const FullDashboard = lazy(() => import("@/pages/Index"));
@@ -25,6 +21,11 @@ const FullSettings = lazy(() => import("@/pages/Settings"));
 const FullUsers = lazy(() => import("@/pages/Users"));
 const Products = lazy(() => import("@/pages/Products"));
 const Funnelytics = lazy(() => import("@/pages/Funnelytics"));
+const CrmPage = lazy(() => import("@/growdash/CrmPage"));
+const CommercialPage = lazy(() => import("@/growdash/CommercialPage"));
+const FinancePage = lazy(() => import("@/growdash/FinancePage"));
+const IntegrationsPage = lazy(() => import("@/growdash/IntegrationsPage"));
+const ModulePage = lazy(() => import("@/growdash/ModulePage"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 
@@ -71,20 +72,22 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
         <TooltipProvider>
           <Toaster />
           <Sonner />
           <Router>
             <AuthProvider>
-              <Suspense fallback={<LoadingModule />}>
-                <Routes>
+              <GlobalFiltersProvider>
+                <Suspense fallback={<LoadingModule />}>
+                  <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route element={<AuthenticatedLayout />}>
                     <Route index element={<RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage>} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
                     <Route path="crm" element={<CrmPage />} />
+                    <Route path="comercial" element={<CommercialPage />} />
                     <Route path="campanhas" element={<RequirePage page="campaigns">{analytics(<FullCampaigns />)}</RequirePage>} />
                     <Route path="trafego-pago" element={<Navigate to="/campanhas" replace />} />
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
@@ -106,14 +109,16 @@ export default function App() {
                     <Route path="users" element={<Navigate to="/usuarios" replace />} />
                     <Route path="financeiro" element={<FinancePage />} />
                     <Route path="integracoes" element={<IntegrationsPage />} />
-                    <Route path="marcas" element={<ManagementPage />} />
-                    <Route path="agentes" element={<ManagementPage />} />
-                    <Route path="anuncios" element={<ManagementPage />} />
+                    <Route path="kanban" element={<Navigate to="/crm" replace />} />
+                    <Route path="anuncios" element={<Navigate to="/campanhas" replace />} />
+                    <Route path="marcas" element={<ModulePage />} />
+                    <Route path="agentes" element={<ModulePage />} />
                     <Route path=":module" element={<ModulePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
-                </Routes>
-              </Suspense>
+                  </Routes>
+                </Suspense>
+              </GlobalFiltersProvider>
             </AuthProvider>
           </Router>
         </TooltipProvider>

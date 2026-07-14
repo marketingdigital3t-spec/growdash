@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { SalesDialog } from "@/components/dashboard/SalesDialog";
-import { useDateFilter } from "@/hooks/useDateFilter";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
@@ -22,10 +22,16 @@ import { useIsMaster } from "@/hooks/useIsMaster";
 import { Pencil, Check } from "lucide-react";
 
 const Index = () => {
-  const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
-  const [selectedAccount, setSelectedAccount] = useState<string>(() => {
-    try { return localStorage.getItem("dash:account") || "all"; } catch { return "all"; }
-  });
+  const {
+    preset,
+    setPreset,
+    customRange,
+    setCustomRange,
+    startDate,
+    endDate,
+    adAccountId: selectedAccount,
+    setAdAccountId: setSelectedAccount,
+  } = useGlobalFilters();
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem("dash:campaigns");
@@ -76,9 +82,6 @@ const Index = () => {
   );
 
   useEffect(() => {
-    try { localStorage.setItem("dash:account", selectedAccount); } catch {}
-  }, [selectedAccount]);
-  useEffect(() => {
     try { localStorage.setItem("dash:campaigns", JSON.stringify(selectedCampaignIds)); } catch {}
   }, [selectedCampaignIds]);
 
@@ -86,7 +89,7 @@ const Index = () => {
     if (selectedAccount !== "all" && adAccounts.length > 0 && !adAccounts.some((a) => a.id === selectedAccount)) {
       setSelectedAccount("all");
     }
-  }, [adAccounts, selectedAccount]);
+  }, [adAccounts, selectedAccount, setSelectedAccount]);
 
   const handleSync = async () => {
     refetch();

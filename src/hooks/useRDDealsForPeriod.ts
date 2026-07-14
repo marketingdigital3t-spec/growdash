@@ -4,6 +4,7 @@ import { format } from "date-fns";
 
 export interface RDDealLite {
   id: string;
+  rd_deal_id: string;
   ad_account_id: string | null;
   rd_funnel_id: string | null;
   rd_stage_id: string | null;
@@ -40,7 +41,7 @@ interface Params {
 }
 
 const FIELDS =
-  "id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_content, utm_term, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields";
+  "id, rd_deal_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_content, utm_term, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields";
 
 export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled = true }: Params) {
   return useQuery({

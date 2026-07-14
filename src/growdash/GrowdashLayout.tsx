@@ -1,26 +1,53 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  CalendarRange,
   ChevronDown,
   ChevronRight,
+  LogOut,
   Menu,
   Moon,
   PanelLeftClose,
   Sparkles,
+  Sun,
   X,
 } from "lucide-react";
+import { useTheme } from "next-themes";
+import { format } from "date-fns";
 import { NAV_SECTIONS } from "./navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { PRESET_LABELS, type DatePreset } from "@/hooks/useDateFilter";
+import { useIsMaster } from "@/hooks/useIsMaster";
 
 export default function GrowdashLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { pathname } = useLocation();
+  const { theme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
+  const { data: isMaster = false } = useIsMaster();
+  const { data: adAccounts = [] } = useAdAccounts();
+  const {
+    adAccountId,
+    setAdAccountId,
+    preset,
+    setPreset,
+    startDate,
+    endDate,
+    segment,
+    setSegment,
+  } = useGlobalFilters();
+
+  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
+  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
 
   useEffect(() => setMobileOpen(false), [pathname]);
 
   return (
-    <div className="min-h-screen bg-[#f3f1ef] text-[#1b1917]">
+    <div className="min-h-screen bg-[#f3f1ef] text-[#1b1917] transition-colors dark:bg-[#090a0d] dark:text-[#f4f1e9]">
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-[#11110f] text-white transition-all duration-300",
@@ -91,26 +118,36 @@ export default function GrowdashLayout() {
         <div className="shrink-0 border-t border-white/10 p-2">
           <button
             type="button"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className={cn(
               "flex h-10 w-full items-center rounded-lg text-[12px] text-white/60 hover:bg-white/[.06] hover:text-white",
               collapsed ? "justify-center" : "gap-3 px-3",
             )}
           >
-            <Moon className="h-4 w-4" />
-            {!collapsed && <span>Modo Escuro</span>}
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {!collapsed && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
           </button>
           <div className={cn("mt-1 flex items-center rounded-lg px-2 py-2", collapsed ? "justify-center" : "gap-3")}>
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#f7e6bf] to-[#a37c43] text-[11px] font-extrabold text-[#21190e]">
-              TJ
+              {initials || "GD"}
             </span>
             {!collapsed && (
               <div className="min-w-0 grow">
-                <div className="truncate text-[12px] font-semibold">Thiego Jesus</div>
-                <div className="truncate text-[10px] text-white/45">Proprietário</div>
+                <div className="truncate text-[12px] font-semibold">{displayName}</div>
+                <div className="truncate text-[10px] text-white/45">{isMaster ? "Proprietário" : "Membro"}</div>
               </div>
             )}
             {!collapsed && <ChevronRight className="h-4 w-4 text-white/40" />}
           </div>
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="mt-1 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[11px] text-white/50 hover:bg-white/[.06] hover:text-white"
+            >
+              <LogOut className="h-4 w-4" /> Sair
+            </button>
+          )}
         </div>
       </aside>
 
@@ -124,7 +161,7 @@ export default function GrowdashLayout() {
       )}
 
       <div className={cn("min-h-screen transition-[padding] duration-300", collapsed ? "lg:pl-[78px]" : "lg:pl-[220px]")}>
-        <header className="sticky top-0 z-30 flex h-12 items-center border-b border-[#332817] bg-[#11110f] px-3 text-white shadow-sm sm:px-5">
+        <header className="sticky top-0 z-30 flex min-h-12 flex-wrap items-center gap-2 border-b border-[#332817] bg-[#11110f] px-3 py-2 text-white shadow-sm sm:px-5">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -141,19 +178,50 @@ export default function GrowdashLayout() {
           >
             <PanelLeftClose className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
           </button>
-          <div className="flex min-w-0 items-center gap-2 text-[11px] text-white/66">
-            <span className="grid h-5 w-5 place-items-center rounded-full border border-white/15">◎</span>
-            <span className="truncate">Meta ainda não iniciada · meta R$ 250.000</span>
-          </div>
-          <div className="mx-5 hidden h-1 min-w-24 grow overflow-hidden rounded-full bg-white/10 sm:block">
-            <div className="h-full w-[2%] rounded-full bg-gradient-to-r from-[#9d6f11] to-[#f3c747]" />
-          </div>
-          <div className="ml-auto flex shrink-0 items-center gap-3 text-[10px]">
-            <span className="hidden text-white/45 md:inline">R$ 0 · <b className="text-[#e06a60]">0%</b></span>
-            <span className="rounded-full border border-[#f2c548]/50 bg-[#f2c548] px-3 py-1 font-bold text-[#382707] shadow-[0_0_18px_rgba(242,197,72,.25)]">
-              Infoprodutor
+          <div className="flex min-w-0 grow flex-wrap items-center gap-2 text-[10px]">
+            <label className="relative min-w-0">
+              <span className="sr-only">Conta de anúncio global</span>
+              <select
+                value={adAccountId}
+                onChange={(event) => setAdAccountId(event.target.value)}
+                className="h-8 max-w-[220px] rounded-md border border-white/15 bg-white/[.07] px-2 pr-7 text-white outline-none focus:border-[#f2c548]/70"
+              >
+                <option value="all" className="text-black">Todas as contas Meta</option>
+                {adAccounts.map((account) => <option key={account.id} value={account.id} className="text-black">{account.name}</option>)}
+              </select>
+            </label>
+            <label className="relative">
+              <span className="sr-only">Período global</span>
+              <CalendarRange className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-[#f2c548]" />
+              <select
+                value={preset}
+                onChange={(event) => setPreset(event.target.value as DatePreset)}
+                className="h-8 max-w-[165px] rounded-md border border-white/15 bg-white/[.07] pl-8 pr-7 text-white outline-none focus:border-[#f2c548]/70 sm:max-w-none"
+              >
+                {Object.entries(PRESET_LABELS).map(([key, label]) => (
+                  <option key={key} value={key} className="text-black">{label}</option>
+                ))}
+              </select>
+            </label>
+            <span className="hidden text-white/45 xl:inline">
+              {format(startDate, "dd/MM/yyyy")} – {format(endDate, "dd/MM/yyyy")}
             </span>
-            <span className="hidden text-white/55 sm:inline">SaaS</span>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px]">
+            <button
+              type="button"
+              onClick={() => setSegment("infoproduto")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "bg-[#f2c548] text-[#382707] shadow-[0_0_18px_rgba(242,197,72,.25)]" : "text-white/55")}
+            >
+              Infoproduto
+            </button>
+            <button
+              type="button"
+              onClick={() => setSegment("saas")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "bg-[#f2c548] text-[#382707] shadow-[0_0_18px_rgba(242,197,72,.25)]" : "text-white/55")}
+            >
+              SaaS
+            </button>
           </div>
         </header>
         <main className="min-h-[calc(100vh-48px)] p-3 sm:p-5">
