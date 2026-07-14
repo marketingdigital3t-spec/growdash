@@ -40,8 +40,8 @@ export function usePermissions() {
 
 export function firstAllowedPath(p: ReturnType<typeof usePermissions>): string {
   if (p.canDashboard) return "/";
-  if (p.canCampaigns) return "/campaigns";
-  if (p.canFunnels) return "/funnels";
-  if (p.canClasses) return "/classes";
+  if (p.canCampaigns) return "/campanhas";
+  if (p.canFunnels) return "/analise-de-funis";
+  if (p.canClasses) return "/agenda-turmas";
   return "/auth";
 }

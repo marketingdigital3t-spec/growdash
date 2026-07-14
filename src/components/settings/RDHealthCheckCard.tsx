@@ -61,7 +61,7 @@ export function RDHealthCheckCard() {
       return;
     }
     if (kind === "review-utm") {
-      navigate("/campaigns");
+      navigate("/campanhas");
     }
   }
 

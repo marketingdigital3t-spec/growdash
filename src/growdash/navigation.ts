@@ -83,8 +83,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Inteligência",
     items: [
       {
-        label: "Tráfego Pago",
-        path: "/trafego-pago",
+        label: "Campanhas",
+        path: "/campanhas",
         icon: Megaphone,
         description: "Gerencie campanhas, mídia e performance de aquisição.",
         metrics: [],

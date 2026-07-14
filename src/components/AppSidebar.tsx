@@ -28,14 +28,14 @@ export function AppSidebar() {
 
   const navItems = [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, show: perms.canDashboard },
-    { title: "Campanhas", url: "/campaigns", icon: Megaphone, show: perms.canCampaigns },
-    { title: "Análise de Funis", url: "/funnels", icon: GitBranch, show: perms.canFunnels },
-    { title: "Datas & Turmas", url: "/classes", icon: CalendarDays, show: perms.canClasses },
+    { title: "Campanhas", url: "/campanhas", icon: Megaphone, show: perms.canCampaigns },
+    { title: "Análise de Funis", url: "/analise-de-funis", icon: GitBranch, show: perms.canFunnels },
+    { title: "Datas & Turmas", url: "/agenda-turmas", icon: CalendarDays, show: perms.canClasses },
     { title: "Leads incompletos", url: "/leads-incompletos", icon: AlertCircle, show: perms.isMaster },
     { title: "Alertas", url: "/alerts", icon: Bell, show: perms.isMaster },
-    { title: "Usuários", url: "/users", icon: UsersIcon, show: perms.isMaster },
-    { title: "Saúde dos Dados", url: "/data-health", icon: HeartPulse, show: perms.isMaster },
-    { title: "Configurações", url: "/settings", icon: Settings, show: perms.isMaster },
+    { title: "Usuários", url: "/usuarios", icon: UsersIcon, show: perms.isMaster },
+    { title: "Saúde dos Dados", url: "/saude-dos-dados", icon: HeartPulse, show: perms.isMaster },
+    { title: "Configurações", url: "/configuracoes", icon: Settings, show: perms.isMaster },
   ].filter((i) => i.show);
 
   const handleNavClick = () => {

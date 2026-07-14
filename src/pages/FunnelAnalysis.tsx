@@ -251,7 +251,7 @@ function HealthBadge() {
     <Badge
       variant="outline"
       className={`${cls} cursor-pointer gap-1.5 px-2.5 py-1`}
-      onClick={() => navigate("/settings#rd-health")}
+      onClick={() => navigate("/configuracoes#rd-health")}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}
