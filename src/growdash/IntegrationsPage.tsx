@@ -16,7 +16,6 @@ import { useNavigate } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useMetaOAuth } from "@/hooks/useMetaOAuth";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
@@ -24,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RDIntegrationCard } from "@/components/settings/RDIntegrationCard";
+import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
 
 type StatusTone = "connected" | "warning" | "available";
 
@@ -63,11 +63,11 @@ export default function IntegrationsPage() {
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
   const [rdDialogOpen, setRDDialogOpen] = useState(false);
+  const [metaDialogOpen, setMetaDialogOpen] = useState(false);
 
   const { data: adAccounts = [], isLoading: loadingMeta } = useAdAccounts();
   const { data: rdIntegration, isLoading: loadingRD } = useRDIntegration();
   const { data: rdFunnels = [] } = useRDFunnels();
-  const connectMeta = useMetaOAuth();
   const syncMeta = useSyncMeta();
 
   const { data: latestRDDeal } = useQuery({
@@ -184,7 +184,7 @@ export default function IntegrationsPage() {
 
   const openIntegration = (id: IntegrationCardData["id"]) => {
     if (id === "meta") {
-      connectMeta.mutate();
+      setMetaDialogOpen(true);
       return;
     }
     if (id === "rd") {
@@ -265,12 +265,12 @@ export default function IntegrationsPage() {
               <div className="flex flex-wrap items-center gap-2 p-3">
                 <button
                   onClick={() => openIntegration(integration.id)}
-                  disabled={(integration.id === "meta" && connectMeta.isPending) || loadingMeta || loadingRD}
+                  disabled={loadingMeta || loadingRD}
                   className={integration.tone === "connected" ? "gd-button" : "gold-action"}
                 >
                   {integration.id === "meta" ? <Facebook className="h-3.5 w-3.5" /> : integration.tone === "connected" ? <Settings2 className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
                   {integration.id === "meta"
-                    ? connectMeta.isPending ? "Abrindo Meta..." : metaConnected ? "Adicionar conta Meta" : "Conectar Meta"
+                    ? metaConnected ? "Adicionar conta Meta" : "Conectar Meta"
                     : integration.id === "rd" && rdConnected ? "Gerenciar RD" : integration.id === "rd" ? "Conectar RD" : "Saiba mais"}
                 </button>
 
@@ -312,6 +312,15 @@ export default function IntegrationsPage() {
             <DialogTitle>Conectar RD Station CRM</DialogTitle>
           </DialogHeader>
           <RDIntegrationCard />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={metaDialogOpen} onOpenChange={setMetaDialogOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Conectar conta Meta Ads</DialogTitle>
+          </DialogHeader>
+          <MetaManualConnectionCard onConnected={() => setMetaDialogOpen(false)} />
         </DialogContent>
       </Dialog>
     </div>

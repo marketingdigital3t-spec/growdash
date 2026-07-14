@@ -6,5 +6,8 @@ verify_jwt = true
 [functions.meta-oauth-callback]
 verify_jwt = false
 
+[functions.meta-connect-token]
+verify_jwt = true
+
 [functions.rd-test-connection]
 verify_jwt = true

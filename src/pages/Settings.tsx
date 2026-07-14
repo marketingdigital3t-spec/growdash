@@ -21,6 +21,7 @@ import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { motion, AnimatePresence } from "framer-motion";
 import { RDFunnelsSection } from "@/components/settings/RDFunnelsSection";
 import { RDIntegrationCard } from "@/components/settings/RDIntegrationCard";
+import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
 import { UTMConventionCard } from "@/components/settings/UTMConventionCard";
 import { UTMMappingCard } from "@/components/settings/UTMMappingCard";
 import { PlatformRulesSection } from "@/components/settings/PlatformRulesSection";
@@ -207,6 +208,10 @@ export default function SettingsPage() {
                 <Facebook className="h-4 w-4 mr-2" />
                 {connectMeta.isPending ? "Abrindo a Meta…" : "Continuar com Facebook/Meta"}
               </Button>
+            </div>
+
+            <div className="border-t pt-4">
+              <MetaManualConnectionCard />
             </div>
           </CardContent>
         </Card>
