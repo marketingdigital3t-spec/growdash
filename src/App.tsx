@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -43,13 +43,15 @@ const historical = (title: string, source: string, element: ReactNode) => (
 );
 
 export default function App() {
+  const Router = import.meta.env.VITE_STATIC_HTML === "true" ? HashRouter : BrowserRouter;
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <Router>
             <AuthProvider>
               <Suspense fallback={<LoadingModule />}>
                 <Routes>
@@ -82,7 +84,7 @@ export default function App() {
                 </Routes>
               </Suspense>
             </AuthProvider>
-          </BrowserRouter>
+          </Router>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
