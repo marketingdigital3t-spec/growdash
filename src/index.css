@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 36 14% 95%;
+    --foreground: 30 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 30 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 10% 10%;
+    --secondary: 35 12% 92%;
+    --secondary-foreground: 30 10% 14%;
+    --muted: 35 12% 92%;
+    --muted-foreground: 30 6% 42%;
+    --accent: 43 76% 91%;
+    --accent-foreground: 35 50% 15%;
+    --destructive: 4 68% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 48% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 40 88% 50%;
+    --warning-foreground: 35 50% 12%;
+    --border: 32 12% 87%;
+    --input: 32 12% 87%;
+    --primary: 43 87% 55%;
+    --primary-foreground: 35 50% 12%;
+    --primary-soft: 43 80% 92%;
+    --accent-pink: 5 70% 60%;
+    --accent-green: 145 35% 46%;
+    --accent-yellow: 43 87% 55%;
+    --accent-lime: 79 55% 62%;
+    --sidebar-icon: 30 5% 52%;
+    --sidebar-icon-active: 43 87% 55%;
+    --ring: 43 87% 55%;
+    --radius: 0.65rem;
+    --sidebar-background: 45 6% 7%;
+    --sidebar-foreground: 40 20% 92%;
+    --sidebar-primary: 43 87% 55%;
+    --sidebar-primary-foreground: 35 50% 12%;
+    --sidebar-accent: 42 24% 16%;
+    --sidebar-accent-foreground: 43 90% 72%;
+    --sidebar-border: 40 10% 17%;
+    --sidebar-ring: 43 87% 55%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    background: #11110f;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply m-0 bg-background text-foreground;
+    font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .gd-panel {
+    @apply rounded-xl border border-[#ded9d2] bg-white shadow-[0_1px_2px_rgba(20,16,10,.035)];
+  }
+
+  .gd-button {
+    @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d8d2ca] bg-white px-3 text-[10px] font-bold text-[#4e4943] shadow-sm transition hover:border-[#c4ad6a] hover:bg-[#fffaf0];
+  }
+
+  .gold-action {
+    @apply relative inline-flex h-9 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-md border border-[#a66c08] bg-gradient-to-r from-[#a66706] via-[#ffd96a] to-[#b67808] bg-[length:200%_100%] px-4 text-[10px] font-black text-[#392706] shadow-[0_4px_16px_rgba(181,123,12,.25)] transition hover:brightness-105;
+    animation: gold-pulse 2.8s ease-in-out infinite;
+  }
+
+  .gold-flash {
+    position: relative;
+    overflow: hidden;
+    animation: gold-pulse 2.8s ease-in-out infinite;
+  }
+
+  .gold-flash::after,
+  .gold-action::after {
+    content: "";
+    position: absolute;
+    top: -120%;
+    left: -35%;
+    width: 22%;
+    height: 340%;
+    transform: rotate(24deg);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .78), transparent);
+    animation: gold-sweep 3.1s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .gold-meter {
+    background: linear-gradient(90deg, #9c6206, #ffd765 54%, #b97708);
+    background-size: 180% 100%;
+    animation: gold-flow 3s linear infinite;
+    box-shadow: 0 0 16px rgba(216, 166, 37, .4);
+  }
+
+  .growdash-scrollbar {
+    scrollbar-color: rgba(236, 190, 61, 0.35) transparent;
+    scrollbar-width: thin;
+  }
+
+  .growdash-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .growdash-scrollbar::-webkit-scrollbar-thumb {
+    border-radius: 99px;
+    background: rgba(236, 190, 61, 0.35);
+  }
+}
+
+@keyframes gold-sweep {
+  0%, 45% { left: -35%; opacity: 0; }
+  55% { opacity: .9; }
+  78%, 100% { left: 120%; opacity: 0; }
+}
+
+@keyframes gold-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(233, 185, 58, 0); }
+  50% { box-shadow: 0 0 18px rgba(233, 185, 58, .42); }
+}
+
+@keyframes gold-flow {
+  from { background-position: 0% 50%; }
+  to { background-position: 180% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-flash,
+  .gold-flash::after,
+  .gold-action,
+  .gold-action::after,
+  .gold-meter {
+    animation: none;
+  }
+}
