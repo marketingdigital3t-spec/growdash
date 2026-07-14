@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import {
   BarChart3,
   Bot,
@@ -22,6 +22,8 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { adAccounts, attributionRows, campaigns, rdStages } from "./data";
 
+const CampaignsManager = lazy(() => import("@/pages/Campaigns"));
+
 const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
   { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
@@ -35,7 +37,6 @@ const number = new Intl.NumberFormat("pt-BR");
 export default function TrafficPage() {
   const [activeTab, setActiveTab] = useState("campaigns");
   const [accountId, setAccountId] = useState(adAccounts[0].id);
-  const [search, setSearch] = useState("");
   const account = adAccounts.find((item) => item.id === accountId) ?? adAccounts[0];
 
   return (
@@ -57,7 +58,7 @@ export default function TrafficPage() {
         ))}
       </div>
 
-      <div className="mb-3 flex flex-col gap-2 rounded-lg border border-[#ddd7ce] bg-white p-2 sm:flex-row sm:items-center">
+      {activeTab !== "campaigns" && <div className="mb-3 flex flex-col gap-2 rounded-lg border border-[#ddd7ce] bg-white p-2 sm:flex-row sm:items-center">
         <div className="px-2 text-[10px] font-extrabold uppercase tracking-[.16em] text-[#8f6b16]">Conta selecionada</div>
         <select value={accountId} onChange={(event) => setAccountId(event.target.value)} className="h-9 min-w-0 grow rounded-md border border-[#d8d2ca] bg-white px-3 text-xs font-bold outline-none focus:border-[#d5a72a] sm:max-w-md">
           {adAccounts.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.platform}</option>)}
@@ -67,9 +68,13 @@ export default function TrafficPage() {
           <PanelTop className="h-3.5 w-3.5" /> Gerenciador avançado
         </Link>
         <button className="gd-button"><RefreshCw className="h-3.5 w-3.5" /> Sincronizar</button>
-      </div>
+      </div>}
 
-      {activeTab === "campaigns" && <CampaignsView accountId={accountId} search={search} setSearch={setSearch} />}
+      {activeTab === "campaigns" && (
+        <Suspense fallback={<div className="grid min-h-[320px] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-[#d5a62a] border-t-transparent" /></div>}>
+          <CampaignsManager />
+        </Suspense>
+      )}
       {activeTab === "budget" && <BudgetView account={account} />}
       {activeTab === "ai" && <AiReportsView accountName={account.name} />}
       {activeTab === "funnels" && <FunnelsView />}

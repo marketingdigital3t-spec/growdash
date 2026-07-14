@@ -15,9 +15,10 @@ import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, RefreshCw, X, Megaphone, BarChart3, RotateCcw } from "lucide-react";
+import { Search, RefreshCw, X, Megaphone, BarChart3, Pencil, RotateCcw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
+import { EditableMetaEntity, MetaEntityEditor } from "@/components/campaigns/MetaEntityEditor";
 import { ResizableHead, StatusDot, normalizeStatus, useColWidths } from "@/components/dashboard/ResizableTableHelpers";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +29,7 @@ type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "cli
 
 const CAMP_DEFAULTS: Record<CampColKey, number> = {
   check: 40, name: 280, budget: 120, sales: 90, cpa: 110, spend: 120, leads: 90,
-  profit: 130, roi: 100, cpl: 110, ctr: 100, impressions: 120, actions: 50,
+  profit: 130, roi: 100, cpl: 110, ctr: 100, impressions: 120, actions: 86,
 };
 const ADSET_DEFAULTS: Record<AdsetColKey, number> = {
   name: 240, campaign: 220, budget: 130, spend: 120, leads: 90, cpl: 110, clicks: 100, impressions: 120,
@@ -44,6 +45,7 @@ export default function Campaigns() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("campaigns");
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
+  const [editingEntity, setEditingEntity] = useState<EditableMetaEntity | null>(null);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -216,6 +218,13 @@ export default function Campaigns() {
       </MotionItem>
 
       <MotionItem>
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+          <span><strong className="text-foreground">Gerenciador conectado à Meta Ads.</strong> Use o lápis para editar nome e status. Em conjuntos, também é possível alterar o orçamento diário. Toda alteração exige confirmação e gera histórico.</span>
+        </div>
+      </MotionItem>
+
+      <MotionItem>
         <Card>
           <CardContent className="p-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -339,9 +348,14 @@ export default function Campaigns() {
                             <TableCell style={cellW("ctr")} className={cn("text-right tabular-nums text-sm", sortBg("ctr"))}><AnimatedNumber value={c.ctr} suffix="%" decimals={2} /></TableCell>
                             <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>
                             <TableCell style={cellW("actions")} onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailCampaignId(c.id)} title="Ver detalhes">
-                                <BarChart3 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailCampaignId(c.id)} title="Ver detalhes">
+                                  <BarChart3 className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status })} title="Editar na Meta Ads">
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </motion.tr>
                         ))}
@@ -387,6 +401,9 @@ export default function Campaigns() {
                           <div className="flex items-center gap-2 min-w-0">
                             <StatusDot status={a.status} />
                             <span className="truncate" title={a.name}>{a.name}</span>
+                            <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0" onClick={() => setEditingEntity({ type: "adset", id: a.id, name: a.name, status: a.status, dailyBudget: a.daily_budget })} title="Editar conjunto na Meta Ads">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </TableCell>
                         <TableCell style={adsetCellW("campaign")} className="text-muted-foreground text-sm truncate" title={a.campaignName}>{a.campaignName}</TableCell>
@@ -434,6 +451,9 @@ export default function Campaigns() {
                             )}
                             <StatusDot status={a.status} />
                             <span className="truncate" title={a.name}>{a.name}</span>
+                            <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0" onClick={() => setEditingEntity({ type: "ad", id: a.id, name: a.name, status: a.status })} title="Editar anúncio na Meta Ads">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </TableCell>
                         <TableCell style={adCellW("adset")} className="text-muted-foreground text-sm truncate" title={a.adsetName}>{a.adsetName}</TableCell>
@@ -458,6 +478,11 @@ export default function Campaigns() {
         open={!!detailCampaignId}
         onOpenChange={(v) => !v && setDetailCampaignId(null)}
         campaign={detailCampaignId ? (campaigns.find((c: any) => c.id === detailCampaignId) || null) : null}
+      />
+      <MetaEntityEditor
+        entity={editingEntity}
+        onOpenChange={(open) => !open && setEditingEntity(null)}
+        onSaved={async () => { await refetch(); }}
       />
     </MotionPage>
   );

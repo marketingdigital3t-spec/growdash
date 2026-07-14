@@ -16,7 +16,7 @@ O pacote preserva:
 - módulos históricos reais de Dashboard, campanhas, funis, alertas, turmas,
   leads incompletos, saúde dos dados, produtos, configurações e usuários;
 - hooks de Meta Ads, RD Station, atribuição, vendas, métricas e reconciliação;
-- migrations do Supabase e funções serverless recuperadas;
+- migrations do Supabase, funções serverless recuperadas e o gerenciador seguro Meta Ads;
 - o último build local disponível em `dist/`.
 
 ## Limitação importante
@@ -41,4 +41,3 @@ npm run build
 npm run test
 npm run dev
 ```
-

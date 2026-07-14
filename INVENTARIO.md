@@ -54,8 +54,8 @@
 
 ## Backend recuperado
 
-- 74 migrations do Supabase
-- 22 Edge Functions
+- 75 migrations do Supabase
+- 23 Edge Functions
 - sincronização Meta: insights, leads, pixels, saldo, hourly e transações
 - sincronização RD: CRM, deals, funis, campos, estados e reconciliação
 - diagnóstico: duplicidades, divergência de receita e validação de totais
@@ -66,4 +66,3 @@
 Os módulos históricos usam os hooks e o cliente Supabase recuperados. Algumas
 áreas novas da navegação possuem conteúdo demonstrativo e precisam ser ligadas
 às consultas reais antes de uma publicação.
-
