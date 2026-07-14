@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { subDays } from "date-fns";
 import { resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
+import { useWorkspace } from "@/hooks/useWorkspace";
 
 export type BusinessSegment = "infoproduto" | "saas";
 
@@ -15,6 +16,8 @@ interface GlobalFiltersValue {
   endDate: Date;
   segment: BusinessSegment;
   setSegment: (value: BusinessSegment) => void;
+  workspaceId?: string;
+  businessUnitId?: string;
 }
 
 const STORAGE_KEY = "growdash:global-filters";
@@ -40,6 +43,7 @@ function readStored() {
 }
 
 export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
+  const { data: workspace } = useWorkspace();
   const stored = typeof window === "undefined" ? null : readStored();
   const [adAccountId, setAdAccountId] = useState(stored?.adAccountId ?? "all");
   const [preset, setPreset] = useState<DatePreset>(stored?.preset ?? "today_yesterday");
@@ -65,6 +69,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   }, [adAccountId, preset, customRange, segment]);
 
   const dates = useMemo(() => resolvePreset(preset, customRange), [preset, customRange]);
+  const businessUnitId = workspace?.units.find((unit) => unit.kind === segment)?.id;
   const value = useMemo<GlobalFiltersValue>(() => ({
     adAccountId,
     setAdAccountId,
@@ -76,7 +81,9 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
     endDate: dates.endDate,
     segment,
     setSegment,
-  }), [adAccountId, preset, customRange, dates.startDate, dates.endDate, segment]);
+    workspaceId: workspace?.id,
+    businessUnitId,
+  }), [adAccountId, preset, customRange, dates.startDate, dates.endDate, segment, workspace?.id, businessUnitId]);
 
   return <GlobalFiltersContext.Provider value={value}>{children}</GlobalFiltersContext.Provider>;
 }

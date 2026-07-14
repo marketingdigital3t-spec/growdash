@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   CalendarRange,
@@ -39,12 +39,24 @@ export default function GrowdashLayout() {
     endDate,
     segment,
     setSegment,
+    businessUnitId,
   } = useGlobalFilters();
+  const visibleAccounts = useMemo(
+    () => businessUnitId
+      ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+      : adAccounts,
+    [adAccounts, businessUnitId, segment],
+  );
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
 
   useEffect(() => setMobileOpen(false), [pathname]);
+  useEffect(() => {
+    if (adAccountId !== "all" && businessUnitId && !visibleAccounts.some((account) => account.id === adAccountId)) {
+      setAdAccountId("all");
+    }
+  }, [adAccountId, businessUnitId, setAdAccountId, visibleAccounts]);
 
   return (
     <div className="min-h-screen bg-[#f3f1ef] text-[#1b1917] transition-colors dark:bg-[#090a0d] dark:text-[#f4f1e9]">
@@ -127,7 +139,7 @@ export default function GrowdashLayout() {
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {!collapsed && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
           </button>
-          <div className={cn("mt-1 flex items-center rounded-lg px-2 py-2", collapsed ? "justify-center" : "gap-3")}>
+          <NavLink to="/perfil" className={cn("mt-1 flex items-center rounded-lg px-2 py-2 hover:bg-white/[.06]", collapsed ? "justify-center" : "gap-3")}>
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#f7e6bf] to-[#a37c43] text-[11px] font-extrabold text-[#21190e]">
               {initials || "GD"}
             </span>
@@ -138,7 +150,7 @@ export default function GrowdashLayout() {
               </div>
             )}
             {!collapsed && <ChevronRight className="h-4 w-4 text-white/40" />}
-          </div>
+          </NavLink>
           {!collapsed && (
             <button
               type="button"
@@ -187,7 +199,7 @@ export default function GrowdashLayout() {
                 className="h-8 max-w-[220px] rounded-md border border-white/15 bg-white/[.07] px-2 pr-7 text-white outline-none focus:border-[#f2c548]/70"
               >
                 <option value="all" className="text-black">Todas as contas Meta</option>
-                {adAccounts.map((account) => <option key={account.id} value={account.id} className="text-black">{account.name}</option>)}
+                {visibleAccounts.map((account) => <option key={account.id} value={account.id} className="text-black">{account.name}</option>)}
               </select>
             </label>
             <label className="relative">

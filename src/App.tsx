@@ -25,6 +25,7 @@ const CrmPage = lazy(() => import("@/growdash/CrmPage"));
 const CommercialPage = lazy(() => import("@/growdash/CommercialPage"));
 const FinancePage = lazy(() => import("@/growdash/FinancePage"));
 const IntegrationsPage = lazy(() => import("@/growdash/IntegrationsPage"));
+const ProfilePage = lazy(() => import("@/growdash/ProfilePage"));
 const ModulePage = lazy(() => import("@/growdash/ModulePage"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
@@ -109,6 +110,7 @@ export default function App() {
                     <Route path="users" element={<Navigate to="/usuarios" replace />} />
                     <Route path="financeiro" element={<FinancePage />} />
                     <Route path="integracoes" element={<IntegrationsPage />} />
+                    <Route path="perfil" element={<ProfilePage />} />
                     <Route path="kanban" element={<Navigate to="/crm" replace />} />
                     <Route path="anuncios" element={<Navigate to="/campanhas" replace />} />
                     <Route path="marcas" element={<ModulePage />} />

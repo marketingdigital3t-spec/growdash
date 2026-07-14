@@ -2,327 +2,122 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import {
-  CheckCircle2,
-  ChevronRight,
-  Cloud,
-  DatabaseZap,
-  Facebook,
-  RefreshCw,
-  Settings2,
-  TriangleAlert,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, MessageCircle, RefreshCw, Search, TriangleAlert, Webhook } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useMetaOAuth } from "@/hooks/useMetaOAuth";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { RDIntegrationCard } from "@/components/settings/RDIntegrationCard";
+import { RDFunnelsSection } from "@/components/settings/RDFunnelsSection";
+import { RDCustomFieldsCard } from "@/components/settings/RDCustomFieldsCard";
+import { RDHealthCheckCard } from "@/components/settings/RDHealthCheckCard";
+import { RDReconcileCard } from "@/components/settings/RDReconcileCard";
+import { RDUTMDiagnosticsCard } from "@/components/settings/RDUTMDiagnosticsCard";
+import { RDObservabilityCard } from "@/components/settings/RDObservabilityCard";
 import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
+import { UTMConventionCard } from "@/components/settings/UTMConventionCard";
+import { UTMMappingCard } from "@/components/settings/UTMMappingCard";
+import { PlatformRulesSection } from "@/components/settings/PlatformRulesSection";
+import { CustomMetricsSection } from "@/components/settings/CustomMetricsSection";
+import { AccountConnectionStatus } from "@/components/settings/AccountConnectionStatus";
 
-type StatusTone = "connected" | "warning" | "available";
-
-interface IntegrationCardData {
-  id: "meta" | "rd" | "google-ads" | "drive";
-  name: string;
-  description: string;
-  status: string;
-  tone: StatusTone;
-  resources: string;
-  synced: string;
-}
-
-const logos: Record<IntegrationCardData["id"], { label: string; className: string }> = {
-  meta: { label: "f", className: "bg-[#eaf1ff] text-[#2469da]" },
-  rd: { label: "RD", className: "bg-[#f7eed5] text-[#8b6815]" },
-  "google-ads": { label: "G", className: "bg-[#e9f6ee] text-[#287847]" },
-  drive: { label: "△", className: "bg-[#fff4d8] text-[#9b7416]" },
-};
+const tabs = [
+  ["paid", "Tráfego pago"], ["crm", "CRM & Vendas"], ["ai", "IA"], ["messaging", "Mensageria"],
+  ["payments", "Pagamentos"], ["files", "Arquivos"], ["developers", "API & Webhooks"], ["health", "Saúde & Logs"],
+] as const;
 
 function relativeDate(value?: string | null) {
-  if (!value) return "ainda não sincronizado";
+  if (!value) return "Nunca sincronizado";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "data indisponível";
-  return formatDistanceToNow(date, { locale: ptBR, addSuffix: true });
-}
-
-function statusIcon(tone: StatusTone) {
-  if (tone === "connected") return <CheckCircle2 className="h-5 w-5 text-[#43845a]" />;
-  if (tone === "warning") return <TriangleAlert className="h-5 w-5 text-[#c49118]" />;
-  return <Cloud className="h-5 w-5 text-[#9a938b]" />;
+  return Number.isNaN(date.getTime()) ? "Data indisponível" : formatDistanceToNow(date, { locale: ptBR, addSuffix: true });
 }
 
 export default function IntegrationsPage() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [notice, setNotice] = useState<string | null>(null);
-  const [rdDialogOpen, setRDDialogOpen] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
+  const [search, setSearch] = useState("");
   const [metaDialogOpen, setMetaDialogOpen] = useState(false);
-
   const { data: adAccounts = [], isLoading: loadingMeta } = useAdAccounts();
   const { data: rdIntegration, isLoading: loadingRD } = useRDIntegration();
   const { data: rdFunnels = [] } = useRDFunnels();
+  const connectMeta = useMetaOAuth();
   const syncMeta = useSyncMeta();
 
   const { data: latestRDDeal } = useQuery({
-    queryKey: ["rd_latest_sync"],
-    enabled: !!rdIntegration?.is_active,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("rd_deals")
-        .select("updated_at")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["rd_latest_sync"], enabled: !!rdIntegration?.is_active,
+    queryFn: async () => { const { data, error } = await supabase.from("rd_deals").select("updated_at").order("updated_at", { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data; },
   });
 
   const metaConnected = adAccounts.length > 0;
-  const metaHasWarning = adAccounts.some((account) =>
-    account.connection_status === "error" || account.connection_status === "expired" || !!account.last_sync_error,
-  );
   const rdConnected = !!rdIntegration?.is_active;
   const activeRDFunnels = rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id);
-
-  const latestMetaSync = useMemo(() => {
-    const dates = adAccounts
-      .map((account) => account.last_sync_success_at)
-      .filter((value): value is string => !!value)
-      .sort();
-    return dates.at(-1) ?? null;
-  }, [adAccounts]);
-
-  const cards: IntegrationCardData[] = [
-    {
-      id: "meta",
-      name: "Meta Ads",
-      description: "Conecte o Facebook com OAuth oficial e importe todas as contas de anúncio disponíveis para campanhas, métricas e saldo.",
-      status: loadingMeta ? "Verificando" : metaHasWarning ? "Atenção" : metaConnected ? "Conectado" : "Disponível",
-      tone: metaHasWarning ? "warning" : metaConnected ? "connected" : "available",
-      resources: loadingMeta ? "—" : `${adAccounts.length} conta${adAccounts.length === 1 ? "" : "s"}`,
-      synced: relativeDate(latestMetaSync),
-    },
-    {
-      id: "rd",
-      name: "RD Station CRM",
-      description: "Conecte a API do RD CRM para importar funis, etapas, negociações, vendas, receita e origem dos leads.",
-      status: loadingRD ? "Verificando" : rdConnected ? "Conectado" : "Disponível",
-      tone: rdConnected ? "connected" : "available",
-      resources: loadingRD ? "—" : `${activeRDFunnels.length} ${activeRDFunnels.length === 1 ? "funil vinculado" : "funis vinculados"}`,
-      synced: relativeDate(latestRDDeal?.updated_at ?? rdIntegration?.updated_at),
-    },
-    {
-      id: "google-ads",
-      name: "Google Ads",
-      description: "Campanhas de pesquisa, display, vídeo, conversões e orçamento.",
-      status: "Em breve",
-      tone: "available",
-      resources: "—",
-      synced: "não conectado",
-    },
-    {
-      id: "drive",
-      name: "Google Drive",
-      description: "Arquivos, relatórios exportados e materiais compartilhados por marca.",
-      status: "Em breve",
-      tone: "available",
-      resources: "—",
-      synced: "não conectado",
-    },
-  ];
+  const latestMetaSync = useMemo(() => adAccounts.map((account) => account.last_sync_success_at).filter(Boolean).sort().at(-1) ?? null, [adAccounts]);
 
   const syncAll = useMutation({
     mutationFn: async () => {
-      if (!metaConnected && !rdConnected) throw new Error("Conecte pelo menos uma integração antes de sincronizar.");
-
-      let rdSynced = 0;
-      if (metaConnected) {
-        await syncMeta.mutateAsync({
-          startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"),
-          endDate: format(new Date(), "yyyy-MM-dd"),
-        });
-      }
-
-      if (rdConnected) {
-        for (const funnel of activeRDFunnels) {
-          const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
-            body: { funnel_id: funnel.id },
-          });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-          rdSynced += Number(data?.created ?? 0) + Number(data?.updated ?? 0);
-        }
-      }
-
-      return { rdSynced };
+      if (!metaConnected && !rdConnected) throw new Error("Conecte ao menos uma fonte antes de sincronizar.");
+      if (metaConnected) await syncMeta.mutateAsync({ startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd") });
+      if (rdConnected) for (const funnel of activeRDFunnels) { const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: { funnel_id: funnel.id } }); if (error) throw error; if (data?.error) throw new Error(data.error); }
     },
-    onSuccess: ({ rdSynced }) => {
-      queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["rd_latest_sync"] });
-      queryClient.invalidateQueries({ queryKey: ["rd_deals"] });
-      toast({
-        title: "Integrações sincronizadas",
-        description: rdConnected
-          ? `${rdSynced} registros do RD atualizados, além dos dados disponíveis da Meta.`
-          : "Os dados disponíveis da Meta foram atualizados.",
-      });
-    },
-    onError: (error: Error) => toast({
-      title: "Não foi possível sincronizar tudo",
-      description: error.message,
-      variant: "destructive",
-    }),
+    onSuccess: () => { queryClient.invalidateQueries(); toast({ title: "Sincronização concluída", description: "As fontes conectadas foram atualizadas." }); },
+    onError: (error: Error) => toast({ title: "Falha na sincronização", description: error.message, variant: "destructive" }),
   });
 
-  const openIntegration = (id: IntegrationCardData["id"]) => {
-    if (id === "meta") {
-      setMetaDialogOpen(true);
-      return;
-    }
-    if (id === "rd") {
-      setRDDialogOpen(true);
-      return;
-    }
-    setNotice("Esta integração está no roadmap e ainda não está disponível nesta versão.");
-  };
-
-  const openData = (id: IntegrationCardData["id"]) => {
-    if (id === "meta") navigate("/campanhas");
-    else if (id === "rd") navigate("/analise-de-funis");
-  };
+  const providerFilter = (name: string) => name.toLowerCase().includes(search.toLowerCase().trim());
 
   return (
     <div className="mx-auto max-w-[1500px]">
-      <PageHeading
-        eyebrow="Administração"
-        title="Integrações"
-        description="Conecte suas fontes para transformar mídia, CRM e arquivos em uma visão única da operação."
-        actions={(
-          <button
-            className="gd-button"
-            onClick={() => syncAll.mutate()}
-            disabled={syncAll.isPending || syncMeta.isPending || (!metaConnected && !rdConnected)}
-          >
-            <RefreshCw className={cn("h-4 w-4", syncAll.isPending && "animate-spin")} />
-            {syncAll.isPending ? "Sincronizando..." : "Sincronizar tudo"}
-          </button>
-        )}
-      />
+      <PageHeading eyebrow="Administração" title="Central de integrações" description="Conecte mídia, CRM, IA, mensageria e dados com credenciais protegidas e saúde monitorada." actions={<Button onClick={() => syncAll.mutate()} disabled={syncAll.isPending || (!metaConnected && !rdConnected)}><RefreshCw className={cn("mr-2 h-4 w-4", syncAll.isPending && "animate-spin")} />{syncAll.isPending ? "Sincronizando…" : "Sincronizar tudo"}</Button>} />
 
-      {notice && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#dfc068] bg-[#fff8df] p-4 text-xs text-[#6c5920]">
-          <DatabaseZap className="h-4 w-4" />
-          <span className="grow">{notice}</span>
-          <button onClick={() => setNotice(null)} className="font-black">Fechar</button>
-        </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {cards.map((integration) => {
-          const logo = logos[integration.id];
-          return (
-            <article key={integration.id} className="gd-panel overflow-hidden">
-              <div className="flex items-start gap-4 p-5">
-                <span className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-xl text-lg font-black", logo.className)}>
-                  {logo.label}
-                </span>
-                <div className="min-w-0 grow">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-black">{integration.name}</h2>
-                    <span className={cn(
-                      "rounded-full px-2 py-1 text-[8px] font-black uppercase",
-                      integration.tone === "connected" && "bg-[#e7f4eb] text-[#39764d]",
-                      integration.tone === "warning" && "bg-[#fff0cd] text-[#946a0f]",
-                      integration.tone === "available" && "bg-[#efedeb] text-[#736c65]",
-                    )}>
-                      {integration.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-[#77716a]">{integration.description}</p>
-                </div>
-                {statusIcon(integration.tone)}
-              </div>
-
-              <div className="grid grid-cols-2 border-y border-[#ebe7e1] bg-[#faf9f7] text-[10px]">
-                <div className="border-r border-[#ebe7e1] p-3">
-                  <span className="block text-[#8b847c]">Recursos</span>
-                  <b>{integration.resources}</b>
-                </div>
-                <div className="p-3">
-                  <span className="block text-[#8b847c]">Última sincronização</span>
-                  <b>{integration.synced}</b>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 p-3">
-                <button
-                  onClick={() => openIntegration(integration.id)}
-                  disabled={loadingMeta || loadingRD}
-                  className={integration.tone === "connected" ? "gd-button" : "gold-action"}
-                >
-                  {integration.id === "meta" ? <Facebook className="h-3.5 w-3.5" /> : integration.tone === "connected" ? <Settings2 className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
-                  {integration.id === "meta"
-                    ? metaConnected ? "Adicionar conta Meta" : "Conectar Meta"
-                    : integration.id === "rd" && rdConnected ? "Gerenciar RD" : integration.id === "rd" ? "Conectar RD" : "Saiba mais"}
-                </button>
-
-                {(integration.id === "meta" || integration.id === "rd") && (
-                  <button onClick={() => navigate(`/configuracoes?integration=${integration.id}`)} className="gd-button">
-                    Configurações
-                  </button>
-                )}
-
-                <button
-                  className="gd-button ml-auto"
-                  onClick={() => openData(integration.id)}
-                  disabled={integration.id === "google-ads" || integration.id === "drive"}
-                >
-                  Ver dados <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </article>
-          );
-        })}
+      <div className="gd-panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <div className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Buscar provedor ou recurso…" /></div>
+        <div className="flex gap-3 text-[10px] text-muted-foreground"><StatusDot tone="connected" label={`${adAccounts.length} conta(s) Meta`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /></div>
       </div>
 
-      <section className="gd-panel mt-4 p-5">
-        <h2 className="font-black">Como os dados se encontram</h2>
-        <p className="mt-1 text-xs text-[#7f7870]">UTMs, origem do lead e identificadores de conta ligam o investimento das plataformas de mídia às negociações e vendas do RD Station.</p>
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          {["Meta Ads", "UTM + conta + campanha", "Funil RD Station", "Receita e ROAS"].map((label, index) => (
-            <div key={label} className="relative rounded-xl border border-[#e2ddd6] bg-[#fcfbf8] p-4 text-center text-xs font-black">
-              {label}
-              {index < 3 && <span className="absolute -right-2.5 top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 place-items-center rounded-full border bg-white text-[#9b7416] md:grid">›</span>}
-            </div>
-          ))}
-        </div>
-      </section>
+      <Tabs value={tab} onValueChange={(value) => setParams({ tab: value })} className="space-y-4">
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-muted/70 p-1">
+          {tabs.map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}
+        </TabsList>
 
-      <Dialog open={rdDialogOpen} onOpenChange={setRDDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Conectar RD Station CRM</DialogTitle>
-          </DialogHeader>
-          <RDIntegrationCard />
-        </DialogContent>
-      </Dialog>
+        <TabsContent value="paid" className="space-y-4">
+          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="OAuth oficial, conexão manual legada, contas, métricas, saldos e sincronização." status={loadingMeta ? "Verificando" : metaConnected ? "Conectado" : "Disponível"} connected={metaConnected} /><div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => <div key={account.id} className="rounded-xl border border-border bg-muted/20 p-4"><div className="flex items-center justify-between"><div><b className="text-sm">{account.name}</b><p className="text-[10px] text-muted-foreground">{account.account_id}</p></div>{account.connection_status === "error" || account.connection_status === "expired" ? <TriangleAlert className="h-5 w-5 text-amber-500" /> : <CheckCircle2 className="h-5 w-5 text-emerald-500" />}</div><div className="mt-3"><AccountConnectionStatus status={account.connection_status} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} onReconnect={() => connectMeta.mutate()} /></div></div>)}{!loadingMeta && !adAccounts.length && <EmptyState text="Nenhuma conta Meta conectada." />}</div><div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Continuar com Facebook/Meta"}</Button><Button variant="outline" onClick={() => setMetaDialogOpen(true)}>Conectar por ID e token</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Último sucesso: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
+          <div className="grid gap-4 md:grid-cols-2">{providerFilter("Google Ads") && <ProviderCard name="Google Ads" description="Pesquisa, Performance Max, vídeo, conversões e orçamento." status="Preparar OAuth" />}{providerFilter("TikTok Ads") && <ProviderCard name="TikTok Ads" description="Campanhas, criativos, conversões e custo por resultado." status="Preparar OAuth" />}</div>
+          <details className="gd-panel p-5"><summary className="cursor-pointer font-black">Atribuição, UTMs e métricas avançadas</summary><div className="mt-5 space-y-4"><UTMConventionCard /><UTMMappingCard /><PlatformRulesSection /><CustomMetricsSection /></div></details>
+        </TabsContent>
 
-      <Dialog open={metaDialogOpen} onOpenChange={setMetaDialogOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Conectar conta Meta Ads</DialogTitle>
-          </DialogHeader>
-          <MetaManualConnectionCard onConnected={() => setMetaDialogOpen(false)} />
-        </DialogContent>
-      </Dialog>
+        <TabsContent value="crm" className="space-y-4">
+          {providerFilter("RD Station") && <><section className="gd-panel overflow-hidden"><SectionHeader icon={<DatabaseZap />} title="RD Station CRM" description="OAuth, funis, etapas, negócios, campos personalizados e reconciliação." status={loadingRD ? "Verificando" : rdConnected ? "Conectado" : "Disponível"} connected={rdConnected} /><div className="p-5"><RDIntegrationCard /></div><div className="border-t border-border px-5 py-3 text-[10px] text-muted-foreground">Última atualização: {relativeDate(latestRDDeal?.updated_at ?? rdIntegration?.updated_at)}</div></section><RDFunnelsSection /><RDCustomFieldsCard /></>}
+          <div className="grid gap-4 md:grid-cols-2">{providerFilter("HubSpot") && <ProviderCard name="HubSpot" description="Contatos, negócios, pipelines e propriedades via OAuth." status="Planejado" />}{providerFilter("Pipedrive") && <ProviderCard name="Pipedrive" description="Negócios, etapas, atividades e receita via OAuth." status="Planejado" />}</div>
+        </TabsContent>
+
+        <TabsContent value="ai"><ProviderGrid search={search} providers={[['OpenAI', 'Análises, chat e agentes com franquia de tokens.'], ['Claude', 'Análises extensas e síntese operacional.'], ['Gemini', 'Modelos Google para texto e multimodalidade.']]} icon={<Bot />} /></TabsContent>
+        <TabsContent value="messaging"><ProviderGrid search={search} providers={[['WhatsApp Cloud API', 'Relatórios automáticos, alertas e mensagens transacionais.'], ['E-mail transacional', 'Recuperação, convites e alertas da operação.'], ['n8n', 'Automações via API e webhooks, respeitando licença comercial.']]} icon={<MessageCircle />} /></TabsContent>
+        <TabsContent value="payments"><ProviderGrid search={search} providers={[['Stripe', 'Assinaturas, checkout, faturas e portal do cliente.'], ['Asaas', 'Pix, boleto, cartão e cobrança recorrente no Brasil.'], ['Mercado Pago', 'Checkout e pagamentos locais.']]} icon={<Cloud />} /></TabsContent>
+        <TabsContent value="files"><ProviderGrid search={search} providers={[['Google Drive', 'Relatórios, criativos e documentos do workspace.'], ['Google Sheets', 'Importação, exportação e fontes auxiliares.'], ['OneDrive', 'Arquivos corporativos e compartilhamento.']]} icon={<FileText />} /></TabsContent>
+        <TabsContent value="developers"><ProviderGrid search={search} providers={[['API Growdash', 'Chaves com escopo, rotação e auditoria.'], ['Webhooks', 'Eventos assinados, tentativas e fila de falhas.'], ['MCP', 'Ferramentas seguras para agentes e assistentes.']]} icon={<Code2 />} /></TabsContent>
+        <TabsContent value="health" className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><HealthCard title="Meta Ads" value={metaConnected ? relativeDate(latestMetaSync as string | null) : "Não conectado"} ok={metaConnected} /><HealthCard title="RD Station" value={rdConnected ? relativeDate(latestRDDeal?.updated_at) : "Não conectado"} ok={rdConnected} /><HealthCard title="Filas e webhooks" value="Monitoramento por execução" ok /></div>{rdConnected && <><RDHealthCheckCard /><RDReconcileCard /><RDUTMDiagnosticsCard /><RDObservabilityCard /></>}</TabsContent>
+      </Tabs>
+
+      <Dialog open={metaDialogOpen} onOpenChange={setMetaDialogOpen}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>Conectar conta Meta Ads por ID e token</DialogTitle></DialogHeader><MetaManualConnectionCard onConnected={() => setMetaDialogOpen(false)} /></DialogContent></Dialog>
     </div>
   );
 }
+
+function SectionHeader({ icon, title, description, status, connected }: { icon: React.ReactNode; title: string; description: string; status: string; connected: boolean }) { return <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</span><div className="grow"><h2 className="font-black">{title}</h2><p className="text-xs text-muted-foreground">{description}</p></div><span className={cn("w-fit rounded-full px-2 py-1 text-[9px] font-black uppercase", connected ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground")}>{status}</span></div>; }
+function ProviderCard({ name, description, status, icon }: { name: string; description: string; status: string; icon?: React.ReactNode }) { return <article className="gd-panel flex min-h-40 flex-col p-5"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">{icon ?? <Cloud className="h-5 w-5" />}</span><span className="rounded-full bg-muted px-2 py-1 text-[9px] font-black text-muted-foreground">{status}</span></div><h3 className="mt-4 font-black">{name}</h3><p className="mt-1 grow text-xs text-muted-foreground">{description}</p><Button className="mt-4" variant="outline" disabled>Configuração do provedor necessária</Button></article>; }
+function ProviderGrid({ providers, search, icon }: { providers: string[][]; search: string; icon: React.ReactNode }) { const visible = providers.filter(([name]) => name.toLowerCase().includes(search.toLowerCase().trim())); return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visible.map(([name, description]) => <ProviderCard key={name} name={name} description={description} status="Planejado" icon={icon} />)}{!visible.length && <EmptyState text="Nenhuma integração corresponde à busca." />}</div>; }
+function EmptyState({ text }: { text: string }) { return <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground">{text}</div>; }
+function StatusDot({ tone, label }: { tone: "connected" | "available"; label: string }) { return <span className="inline-flex items-center gap-1.5"><i className={cn("h-2 w-2 rounded-full", tone === "connected" ? "bg-emerald-500" : "bg-muted-foreground")} />{label}</span>; }
+function HealthCard({ title, value, ok }: { title: string; value: string; ok: boolean }) { return <div className="gd-panel p-4"><div className="flex items-center gap-2">{ok ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <TriangleAlert className="h-4 w-4 text-amber-500" />}<b className="text-sm">{title}</b></div><p className="mt-2 text-xs text-muted-foreground">{value}</p></div>; }

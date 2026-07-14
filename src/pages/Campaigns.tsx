@@ -241,8 +241,8 @@ export default function Campaigns() {
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
 
   return (
-    <MotionPage className="overflow-hidden rounded-xl border border-[#d9d3c9] bg-white shadow-sm">
-      <MotionItem className="border-b border-[#ded8ce] bg-gradient-to-r from-[#fffdf7] via-white to-[#f5efe0] px-3 py-3 sm:px-4">
+    <MotionPage className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm">
+      <MotionItem className="border-b border-border bg-gradient-to-r from-primary/5 via-card to-muted px-3 py-3 sm:px-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#1d1b17] text-[#f2c94c] shadow-sm">
@@ -262,7 +262,7 @@ export default function Campaigns() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {adAccounts.length > 0 && (
               <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                <SelectTrigger className="h-9 w-full border-[#d7d0c4] bg-white sm:w-[260px]">
+                <SelectTrigger className="h-9 w-full border-border bg-background sm:w-[260px]">
                   <SelectValue placeholder="Conta de anúncio" />
                 </SelectTrigger>
                 <SelectContent>
@@ -274,20 +274,20 @@ export default function Campaigns() {
             <span className="whitespace-nowrap text-[11px] text-muted-foreground">
               {dataUpdatedAt ? `Atualizado às ${new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Aguardando dados"}
             </span>
-            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-9 gap-2 bg-white">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-9 gap-2 bg-background">
               <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} /> Atualizar
             </Button>
           </div>
         </div>
       </MotionItem>
 
-      <MotionItem className="border-b border-[#e2ddd5] bg-[#faf8f4] px-3 py-2 sm:px-4">
+      <MotionItem className="border-b border-border bg-muted/40 px-3 py-2 sm:px-4">
         <div className="growdash-scrollbar flex gap-2 overflow-x-auto pb-1">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setStatusFilter("all")}
-            className={cn("h-9 shrink-0 gap-2 bg-white", statusFilter === "all" && "border-[#c99b23] bg-[#fff7dc] text-[#6c4b06]")}
+            className={cn("h-9 shrink-0 gap-2 bg-background", statusFilter === "all" && "border-primary bg-primary/10 text-foreground")}
           >
             <FolderKanban className="h-4 w-4" /> Todos os anúncios
           </Button>
@@ -295,11 +295,11 @@ export default function Campaigns() {
             variant="outline"
             size="sm"
             onClick={() => setStatusFilter("ACTIVE")}
-            className={cn("h-9 shrink-0 gap-2 bg-white", statusFilter === "ACTIVE" && "border-[#c99b23] bg-[#fff7dc] text-[#6c4b06]")}
+            className={cn("h-9 shrink-0 gap-2 bg-background", statusFilter === "ACTIVE" && "border-primary bg-primary/10 text-foreground")}
           >
             <CheckCircle2 className="h-4 w-4" /> Ativos ({activeCampaigns})
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setSortKey("roi"); setSortAsc(false); }} className="h-9 shrink-0 gap-2 bg-white">
+          <Button variant="outline" size="sm" onClick={() => { setSortKey("roi"); setSortAsc(false); }} className="h-9 shrink-0 gap-2 bg-background">
             <BarChart3 className="h-4 w-4" /> Desempenho e ROAS
           </Button>
           <div className="ml-auto hidden items-center gap-2 text-[11px] text-muted-foreground lg:flex">
@@ -308,7 +308,7 @@ export default function Campaigns() {
         </div>
       </MotionItem>
 
-      <MotionItem className="border-b border-[#e2ddd5] bg-[#f1eee8] p-2 sm:p-3">
+      <MotionItem className="border-b border-border bg-muted/70 p-2 sm:p-3">
         <div className="space-y-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -316,13 +316,13 @@ export default function Campaigns() {
               placeholder="Pesquise por nome da campanha"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 border-[#ded8ce] bg-white pl-9"
+              className="h-9 border-border bg-background pl-9"
             />
           </div>
           <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-full bg-white sm:w-[180px]"><SelectValue placeholder="Todos os status" /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full bg-background sm:w-[180px]"><SelectValue placeholder="Todos os status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os status</SelectItem>
                   <SelectItem value="ACTIVE"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Ativa</span></SelectItem>
@@ -331,7 +331,7 @@ export default function Campaigns() {
                   <SelectItem value="IN_PROCESS"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-blue-500" /> Em análise</span></SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="h-9 gap-2 bg-white" title="Restaurar largura das colunas">
+              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="h-9 gap-2 bg-background" title="Restaurar largura das colunas">
                 <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Redefinir colunas</span>
               </Button>
             </div>
@@ -347,20 +347,20 @@ export default function Campaigns() {
 
       <MotionItem>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-[#d8d2c8] bg-[#f7f4ed] p-0">
-            <TabsTrigger value="campaigns" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none border-r border-[#ddd7cd] px-4 data-[state=active]:bg-white data-[state=active]:text-[#75540a] data-[state=active]:shadow-[inset_0_-3px_0_#d2a52d]">
+          <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-muted/50 p-0">
+            <TabsTrigger value="campaigns" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
               <FolderKanban className="h-4 w-4" /> Campanhas
               {selectedIds.size > 0 && <Badge className="ml-auto bg-[#d7aa30] text-[#2d2107]">{selectedIds.size}</Badge>}
             </TabsTrigger>
-            <TabsTrigger value="adsets" disabled={selectedIds.size === 0} className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-[#ddd7cd] px-4 data-[state=active]:bg-white data-[state=active]:text-[#75540a] data-[state=active]:shadow-[inset_0_-3px_0_#d2a52d]">
+            <TabsTrigger value="adsets" disabled={selectedIds.size === 0} className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
               <Layers3 className="h-4 w-4" /> Conjuntos de anúncios {selectedIds.size > 0 && `(${selectedAdsets.length})`}
             </TabsTrigger>
-            <TabsTrigger value="ads" disabled={selectedIds.size === 0} className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none px-4 data-[state=active]:bg-white data-[state=active]:text-[#75540a] data-[state=active]:shadow-[inset_0_-3px_0_#d2a52d]">
+            <TabsTrigger value="ads" disabled={selectedIds.size === 0} className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
               <RectangleHorizontal className="h-4 w-4" /> Anúncios {selectedIds.size > 0 && `(${selectedAds.length})`}
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-[#ddd7cd] bg-white px-3 py-2">
+          <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
             <Button
               size="sm"
               disabled={!selectedCampaign}
@@ -401,7 +401,7 @@ export default function Campaigns() {
                 <div className="growdash-scrollbar overflow-x-auto">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader>
-                      <TableRow className="h-11 border-b border-[#d7d1c7] bg-[#f3f0ea] hover:bg-[#f3f0ea]">
+                      <TableRow className="h-11 border-b border-border bg-muted/60 hover:bg-muted/60">
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")}>
                           <Checkbox checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
                         </ResizableHead>
@@ -427,7 +427,7 @@ export default function Campaigns() {
                             key={c.id}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className={`h-12 border-b border-[#e8e3db] transition-colors hover:bg-[#fff9e8] cursor-pointer ${selectedIds.has(c.id) ? "bg-[#fff4cf]" : "odd:bg-white even:bg-[#fbfaf8]"}`}
+                            className={`h-12 cursor-pointer border-b border-border transition-colors hover:bg-primary/5 ${selectedIds.has(c.id) ? "bg-primary/10" : "odd:bg-card even:bg-muted/20"}`}
                             onClick={() => toggleSelect(c.id)}
                           >
                             <TableCell style={cellW("check")} onClick={(e) => e.stopPropagation()}>
@@ -485,7 +485,7 @@ export default function Campaigns() {
                     </TableBody>
                   </Table>
                 </div>
-                <div className="border-t border-[#d7d1c7] bg-[#f7f4ed] px-4 py-3">
+                <div className="border-t border-border bg-muted/50 px-4 py-3">
                   <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
                     <span className="font-semibold">{filtered.length} campanha{filtered.length !== 1 ? "s" : ""}</span>
                     <span>Vendas: <strong><AnimatedNumber value={totals.salesCount} decimals={0} /></strong></span>
@@ -505,7 +505,7 @@ export default function Campaigns() {
               <div className="growdash-scrollbar overflow-x-auto">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
-                    <TableRow className="h-11 bg-[#f3f0ea] hover:bg-[#f3f0ea]">
+                    <TableRow className="h-11 bg-muted/60 hover:bg-muted/60">
                       <ResizableHead colKey="name" width={adset.colWidths.name} onResize={adset.startResize("name")}>Conjunto</ResizableHead>
                       <ResizableHead colKey="campaign" width={adset.colWidths.campaign} onResize={adset.startResize("campaign")}>Campanha</ResizableHead>
                       <ResizableHead colKey="budget" width={adset.colWidths.budget} onResize={adset.startResize("budget")} align="right">Orçamento Diário</ResizableHead>
@@ -518,7 +518,7 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAdsets.map((a: any) => (
-                      <TableRow key={a.id} className="h-12 odd:bg-white even:bg-[#fbfaf8] hover:bg-[#fff9e8]">
+                      <TableRow key={a.id} className="h-12 odd:bg-card even:bg-muted/20 hover:bg-primary/5">
                         <TableCell style={adsetCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             <StatusDot status={a.status} />
@@ -549,7 +549,7 @@ export default function Campaigns() {
               <div className="growdash-scrollbar overflow-x-auto">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
-                    <TableRow className="h-11 bg-[#f3f0ea] hover:bg-[#f3f0ea]">
+                    <TableRow className="h-11 bg-muted/60 hover:bg-muted/60">
                       <ResizableHead colKey="name" width={ad.colWidths.name} onResize={ad.startResize("name")}>Anúncio</ResizableHead>
                       <ResizableHead colKey="adset" width={ad.colWidths.adset} onResize={ad.startResize("adset")}>Conjunto</ResizableHead>
                       <ResizableHead colKey="campaign" width={ad.colWidths.campaign} onResize={ad.startResize("campaign")}>Campanha</ResizableHead>
@@ -563,7 +563,7 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAds.map((a: any) => (
-                      <TableRow key={a.id} className="h-12 odd:bg-white even:bg-[#fbfaf8] hover:bg-[#fff9e8]">
+                      <TableRow key={a.id} className="h-12 odd:bg-card even:bg-muted/20 hover:bg-primary/5">
                         <TableCell style={adCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             {a.thumbnail_url ? (
