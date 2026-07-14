@@ -45,33 +45,44 @@
     --sidebar-ring: 43 87% 55%;
   }
 
-  /* Original Analytics System modules use their own dark-blue visual tokens.
-     Scoping them prevents the recovered Growdash shell from losing its gold theme. */
+  /* Analytics modules share the same Growdash palette as the rest of the SaaS.
+     Keeping the scope lets charts/components use tokens without creating a
+     second blue/dark theme inside the platform. */
   .analytics-module {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 71% 45%;
+    --background: 36 14% 95%;
+    --foreground: 30 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 30 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 10% 10%;
+    --primary: 43 87% 55%;
+    --primary-foreground: 35 50% 12%;
+    --secondary: 35 12% 92%;
+    --secondary-foreground: 30 10% 14%;
+    --muted: 35 12% 92%;
+    --muted-foreground: 30 6% 42%;
+    --accent: 43 76% 91%;
+    --accent-foreground: 35 50% 15%;
+    --destructive: 4 68% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 48% 40%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 221 83% 53%;
-    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    --warning: 40 88% 50%;
+    --warning-foreground: 35 50% 12%;
+    --border: 32 12% 87%;
+    --input: 32 12% 87%;
+    --ring: 43 87% 55%;
+    --chart-1: 43 87% 55%;
+    --chart-2: 145 35% 46%;
+    --chart-3: 30 10% 30%;
+    --chart-4: 38 74% 67%;
+    --chart-5: 4 68% 50%;
+    color-scheme: light;
+    font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .analytics-module :is(input, select, textarea) {
+    color-scheme: light;
   }
 
   * {

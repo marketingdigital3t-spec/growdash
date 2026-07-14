@@ -61,7 +61,7 @@ function RequirePage({ page, children }: { page: PagePermission | "master"; chil
 }
 
 const analytics = (element: ReactNode) => (
-  <div className="analytics-module dark -m-3 min-h-[calc(100vh-48px)] bg-background p-3 text-foreground sm:-m-5 sm:p-5">
+  <div className="analytics-module -m-3 min-h-[calc(100vh-48px)] bg-background p-3 text-foreground sm:-m-5 sm:p-5">
     {element}
   </div>
 );
