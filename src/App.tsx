@@ -5,7 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import GrowdashLayout from "@/growdash/GrowdashLayout";
 import DashboardPage from "@/growdash/DashboardPage";
 import CrmPage from "@/growdash/CrmPage";
@@ -38,6 +38,13 @@ function LoadingModule() {
   return <div className="grid min-h-[40vh] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-[#d5a62a] border-t-transparent" /></div>;
 }
 
+function AuthenticatedLayout() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingModule />;
+  if (!user) return <Navigate to="/auth" replace />;
+  return <GrowdashLayout />;
+}
+
 const historical = (title: string, source: string, element: ReactNode) => (
   <HistoricalModule title={title} source={source}>{element}</HistoricalModule>
 );
@@ -57,7 +64,7 @@ export default function App() {
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route element={<GrowdashLayout />}>
+                  <Route element={<AuthenticatedLayout />}>
                     <Route index element={<DashboardPage />} />
                     <Route path="dashboard/completo" element={historical("Dashboard completo", "Dashboard histórico + widgets editáveis", <FullDashboard />)} />
                     <Route path="crm" element={<CrmPage />} />

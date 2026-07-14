@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Trash2, RefreshCw, Key, Info, Pencil, Check, X, Link2, Copy } from "lucide-react";
+import { Trash2, RefreshCw, Key, Info, Pencil, Check, X, Link2, Copy, Facebook, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -37,39 +37,66 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [newAccountId, setNewAccountId] = useState("");
-  const [newAccountName, setNewAccountName] = useState("");
-  const [newToken, setNewToken] = useState("");
   const [emailAlerts, setEmailAlerts] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editAccountId, setEditAccountId] = useState("");
-  const [editToken, setEditToken] = useState("");
   const [editDailyBudget, setEditDailyBudget] = useState("");
   const [editRemainingBalance, setEditRemainingBalance] = useState("");
   const [editTargetCpl, setEditTargetCpl] = useState("");
   const [editMinSpend, setEditMinSpend] = useState("");
 
-  const addAccount = useMutation({
+  const oauthPopup = useRef<Window | null>(null);
+
+  const connectMeta = useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase.from("ad_accounts").insert({
-        user_id: user.id,
-        account_id: newAccountId,
-        name: newAccountName,
-        access_token: newToken,
-      });
-      if (error) throw error;
+      if (!user) throw new Error("Entre na Growdash antes de conectar a Meta.");
+
+      // Open synchronously so browsers do not classify it as an unsolicited popup.
+      const popup = window.open("about:blank", "growdash-meta-oauth", "popup,width=620,height=760");
+      if (!popup) throw new Error("O navegador bloqueou a janela da Meta. Libere pop-ups para a Growdash e tente novamente.");
+      oauthPopup.current = popup;
+      popup.document.title = "Conectando à Meta";
+      popup.document.body.innerHTML = '<p style="font:16px system-ui;padding:32px">Preparando conexão segura com a Meta…</p>';
+
+      const { data, error } = await supabase.functions.invoke("meta-oauth-start", { body: {} });
+      if (error || !data?.authUrl) {
+        popup.close();
+        oauthPopup.current = null;
+        throw new Error(data?.error || error?.message || "Não foi possível iniciar a conexão com a Meta.");
+      }
+      popup.location.replace(data.authUrl);
     },
-    onSuccess: () => {
-      toast({ title: "Conta adicionada!" });
-      setNewAccountId("");
-      setNewAccountName("");
-      setNewToken("");
-      queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
-    },
-    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+    onError: (error: Error) => toast({
+      title: "Não foi possível conectar",
+      description: error.message,
+      variant: "destructive",
+    }),
   });
+
+  useEffect(() => {
+    const expectedOrigin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
+    const receiveOAuthResult = (event: MessageEvent) => {
+      if (event.origin !== expectedOrigin || event.source !== oauthPopup.current) return;
+      if (event.data?.type !== "growdash-meta-oauth") return;
+      oauthPopup.current = null;
+      if (event.data.status === "success") {
+        toast({
+          title: "Meta Ads conectado!",
+          description: event.data.message || "As contas de anúncio foram adicionadas.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      } else {
+        toast({
+          title: "Conexão não concluída",
+          description: event.data.message || "A Meta não autorizou a conexão.",
+          variant: "destructive",
+        });
+      }
+    };
+    window.addEventListener("message", receiveOAuthResult);
+    return () => window.removeEventListener("message", receiveOAuthResult);
+  }, [queryClient, toast]);
 
   const deleteAccount = useMutation({
     mutationFn: async (id: string) => {
@@ -83,11 +110,10 @@ export default function SettingsPage() {
   });
 
   const updateAccount = useMutation({
-    mutationFn: async ({ id, name, account_id, access_token, daily_budget, remaining_balance, target_cpl, min_spend_threshold }: { id: string; name: string; account_id: string; access_token: string; daily_budget: string; remaining_balance: string; target_cpl: string; min_spend_threshold: string }) => {
+    mutationFn: async ({ id, name, account_id, daily_budget, remaining_balance, target_cpl, min_spend_threshold }: { id: string; name: string; account_id: string; daily_budget: string; remaining_balance: string; target_cpl: string; min_spend_threshold: string }) => {
       const updates: Record<string, any> = {};
       if (name) updates.name = name;
       if (account_id) updates.account_id = account_id;
-      if (access_token) updates.access_token = access_token;
       updates.daily_budget = daily_budget ? parseFloat(daily_budget) : null;
       updates.remaining_balance = remaining_balance ? parseFloat(remaining_balance) : null;
       updates.target_cpl = target_cpl ? parseFloat(target_cpl) : null;
@@ -193,13 +219,12 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       <Input placeholder="Nome" value={editName} onChange={(e) => setEditName(e.target.value)} />
                       <Input placeholder="Account ID (ex: act_123456)" value={editAccountId} onChange={(e) => setEditAccountId(e.target.value)} />
-                      <Input type="password" placeholder="Novo token (deixe vazio para manter)" value={editToken} onChange={(e) => setEditToken(e.target.value)} />
                       <Input type="number" placeholder="Orçamento diário (R$)" value={editDailyBudget} onChange={(e) => setEditDailyBudget(e.target.value)} />
                       <Input type="number" placeholder="Saldo restante (R$)" value={editRemainingBalance} onChange={(e) => setEditRemainingBalance(e.target.value)} />
                       <Input type="number" placeholder="CPL alvo padrão (R$) — usado nos alertas" value={editTargetCpl} onChange={(e) => setEditTargetCpl(e.target.value)} />
                       <Input type="number" placeholder="Gasto mínimo p/ alerta (R$, padrão 50)" value={editMinSpend} onChange={(e) => setEditMinSpend(e.target.value)} />
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => updateAccount.mutate({ id: acc.id, name: editName, account_id: editAccountId, access_token: editToken, daily_budget: editDailyBudget, remaining_balance: editRemainingBalance, target_cpl: editTargetCpl, min_spend_threshold: editMinSpend })} disabled={updateAccount.isPending}>
+                        <Button size="sm" onClick={() => updateAccount.mutate({ id: acc.id, name: editName, account_id: editAccountId, daily_budget: editDailyBudget, remaining_balance: editRemainingBalance, target_cpl: editTargetCpl, min_spend_threshold: editMinSpend })} disabled={updateAccount.isPending}>
                           <Check className="h-4 w-4 mr-1" /> Salvar
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
@@ -221,7 +246,7 @@ export default function SettingsPage() {
                           )}
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingId(acc.id); setEditName(acc.name); setEditAccountId(acc.account_id); setEditToken(""); setEditDailyBudget(acc.daily_budget != null ? String(acc.daily_budget) : ""); setEditRemainingBalance(acc.remaining_balance != null ? String(acc.remaining_balance) : ""); setEditTargetCpl((acc as any).target_cpl != null ? String((acc as any).target_cpl) : ""); setEditMinSpend((acc as any).min_spend_threshold != null ? String((acc as any).min_spend_threshold) : ""); }}>
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingId(acc.id); setEditName(acc.name); setEditAccountId(acc.account_id); setEditDailyBudget(acc.daily_budget != null ? String(acc.daily_budget) : ""); setEditRemainingBalance(acc.remaining_balance != null ? String(acc.remaining_balance) : ""); setEditTargetCpl((acc as any).target_cpl != null ? String((acc as any).target_cpl) : ""); setEditMinSpend((acc as any).min_spend_threshold != null ? String((acc as any).min_spend_threshold) : ""); }}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteAccount.mutate(acc.id)}>
@@ -235,7 +260,7 @@ export default function SettingsPage() {
                         errorCode={(acc as any).last_sync_error_code}
                         lastAttemptAt={(acc as any).last_sync_attempt_at}
                         lastSuccessAt={(acc as any).last_sync_success_at}
-                        onReconnect={() => { setEditingId(acc.id); setEditName(acc.name); setEditAccountId(acc.account_id); setEditToken(""); setEditDailyBudget(acc.daily_budget != null ? String(acc.daily_budget) : ""); setEditRemainingBalance(acc.remaining_balance != null ? String(acc.remaining_balance) : ""); setEditTargetCpl((acc as any).target_cpl != null ? String((acc as any).target_cpl) : ""); setEditMinSpend((acc as any).min_spend_threshold != null ? String((acc as any).min_spend_threshold) : ""); }}
+                        onReconnect={() => connectMeta.mutate()}
                         onRetry={syncBalanceData}
                         retrying={syncBalance.isPending}
                       />
@@ -246,14 +271,19 @@ export default function SettingsPage() {
               ))}
             </AnimatePresence>
 
-            <div className="space-y-3 pt-2 border-t">
-              <p className="text-sm font-medium">Adicionar Nova Conta</p>
-              <Input placeholder="Nome da conta (ex: Conta Principal)" value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} />
-              <Input placeholder="Ad Account ID (ex: act_123456)" value={newAccountId} onChange={(e) => setNewAccountId(e.target.value)} />
-              <Input type="password" placeholder="Token de acesso da Meta API" value={newToken} onChange={(e) => setNewToken(e.target.value)} />
-              <Button onClick={() => addAccount.mutate()} disabled={!newAccountId || !newAccountName || !newToken || addAccount.isPending}>
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Conta
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-start gap-3 rounded-lg border border-primary/25 bg-primary/5 p-4">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Conexão oficial e segura</p>
+                  <p className="text-xs text-muted-foreground">
+                    Entre na Meta, escolha as permissões e a Growdash importará automaticamente todas as contas de anúncio disponíveis. Sua senha da Meta nunca passa pela Growdash.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending} className="w-full sm:w-auto">
+                <Facebook className="h-4 w-4 mr-2" />
+                {connectMeta.isPending ? "Abrindo a Meta…" : "Continuar com Facebook/Meta"}
               </Button>
             </div>
           </CardContent>
@@ -415,14 +445,14 @@ export default function SettingsPage() {
       <MotionItem>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5" /> Como obter o Token da Meta API</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5" /> Como conectar a Meta Ads</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>1. Acesse <strong>developers.facebook.com</strong></p>
-            <p>2. Crie ou selecione um App do tipo "Business"</p>
-            <p>3. Adicione o produto "Marketing API"</p>
-            <p>4. Em Ferramentas → Explorador de APIs, gere um token com permissões: <code className="bg-muted px-1 rounded">ads_read, ads_management</code></p>
-            <p>5. Para token de longa duração, use um System User no Business Manager</p>
+            <p>1. Clique em <strong>Continuar com Facebook/Meta</strong>.</p>
+            <p>2. Entre no perfil que tem acesso às contas de anúncio desejadas.</p>
+            <p>3. Autorize as permissões solicitadas pela Growdash.</p>
+            <p>4. Todas as contas liberadas serão importadas automaticamente, sem copiar tokens manualmente.</p>
+            <p className="pt-2 text-xs">Se a janela não abrir, libere pop-ups para este endereço. Para reconectar um token expirado, use o botão Reconectar da própria conta.</p>
           </CardContent>
         </Card>
       </MotionItem>

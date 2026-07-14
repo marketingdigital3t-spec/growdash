@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronRight, Cloud, DatabaseZap, RefreshCw, Settings2, T
 import { integrations } from "./data";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 const logos: Record<string, { label: string; className: string }> = {
   meta: { label: "∞", className: "bg-[#eaf1ff] text-[#2469da]" },
@@ -13,6 +14,7 @@ const logos: Record<string, { label: string; className: string }> = {
 
 export default function IntegrationsPage() {
   const [notice, setNotice] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -34,7 +36,15 @@ export default function IntegrationsPage() {
               </div>
               <div className="grid grid-cols-2 border-y border-[#ebe7e1] bg-[#faf9f7] text-[10px]"><div className="border-r border-[#ebe7e1] p-3"><span className="block text-[#8b847c]">Recursos</span><b>{integration.accounts}</b></div><div className="p-3"><span className="block text-[#8b847c]">Última sincronização</span><b>{integration.synced}</b></div></div>
               <div className="flex items-center gap-2 p-3">
-                <button onClick={() => setNotice(`${integration.name}: o fluxo de conexão será ativado quando inserirmos as credenciais OAuth reais.`)} className={connected ? "gd-button" : "gold-action"}>{connected ? <Settings2 className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}{connected ? "Gerenciar" : "Conectar"}</button>
+                <button
+                  onClick={() => integration.id === "meta"
+                    ? navigate("/configuracoes")
+                    : setNotice(`${integration.name}: esta integração ainda precisa das credenciais oficiais para ser ativada.`)}
+                  className={connected ? "gd-button" : "gold-action"}
+                >
+                  {connected ? <Settings2 className="h-3.5 w-3.5" /> : <Cloud className="h-3.5 w-3.5" />}
+                  {integration.id === "meta" ? "Gerenciar" : connected ? "Gerenciar" : "Conectar"}
+                </button>
                 <button className="gd-button ml-auto">Ver dados <ChevronRight className="h-3.5 w-3.5" /></button>
               </div>
             </article>
