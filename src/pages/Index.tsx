@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardGrid, buildWidgetFromDef } from "@/components/dashboard/grid/DashboardGrid";
 import { AddWidgetDialog } from "@/components/dashboard/grid/AddWidgetDialog";
-import { useGlobalView, useSaveView } from "@/hooks/useDashboardViews";
+import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView } from "@/hooks/useDashboardViews";
 import { useIsMaster } from "@/hooks/useIsMaster";
 import { Pencil, Check } from "lucide-react";
 
@@ -71,6 +71,9 @@ const Index = () => {
   const { data: activeView } = useGlobalView();
   const { data: isMaster = false } = useIsMaster();
   const saveView = useSaveView();
+  const canEditDashboard = Boolean(
+    isMaster && activeView && activeView.id !== FALLBACK_DASHBOARD_VIEW_ID,
+  );
 
   useEffect(() => {
     try { localStorage.setItem("dash:account", selectedAccount); } catch {}
@@ -97,7 +100,7 @@ const Index = () => {
   };
 
   function handleAddWidget(def: any) {
-    if (!activeView || !isMaster) return;
+    if (!activeView || !canEditDashboard) return;
     const built = buildWidgetFromDef(def.type, activeView.layout || []);
     if (!built) return;
     const nextWidgets = [...(activeView.widgets || []), built.widget];
@@ -153,7 +156,7 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      {isMaster && activeView && (
+      {canEditDashboard && activeView && (
         <MotionItem>
           <div className="flex items-center justify-end">
             <Button
@@ -187,9 +190,9 @@ const Index = () => {
         >
           <DashboardGrid
             view={activeView}
-            isEditing={isEditing && isMaster}
+            isEditing={isEditing && canEditDashboard}
             onChange={(layout, widgets) => {
-              if (!isMaster) return;
+              if (!canEditDashboard) return;
               saveView.mutate({ id: activeView.id, layout, widgets });
             }}
             onAddClick={() => setAddOpen(true)}
