@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, MessageCircle, RefreshCw, Search, TriangleAlert, Webhook } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, MessageCircle, RefreshCw, Search, Sparkles, TriangleAlert } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
@@ -102,7 +102,10 @@ export default function IntegrationsPage() {
           <div className="grid gap-4 md:grid-cols-2">{providerFilter("HubSpot") && <ProviderCard name="HubSpot" description="Contatos, negócios, pipelines e propriedades via OAuth." status="Planejado" />}{providerFilter("Pipedrive") && <ProviderCard name="Pipedrive" description="Negócios, etapas, atividades e receita via OAuth." status="Planejado" />}</div>
         </TabsContent>
 
-        <TabsContent value="ai"><ProviderGrid search={search} providers={[['OpenAI', 'Análises, chat e agentes com franquia de tokens.'], ['Claude', 'Análises extensas e síntese operacional.'], ['Gemini', 'Modelos Google para texto e multimodalidade.']]} icon={<Bot />} /></TabsContent>
+        <TabsContent value="ai" className="space-y-4">
+          {providerFilter("Growdash AI") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Bot />} title="Growdash AI — Analista de Tráfego" description="Cruza Meta Ads, vendas, período anterior, campanhas, conjuntos e anúncios sem expor credenciais no navegador." status="Ativo" connected /><div className="grid gap-3 p-5 md:grid-cols-3"><Feature label="Escopo seguro" text="Exige uma conta específica e respeita o período global." /><Feature label="Dados verificáveis" text="Não inventa público, posicionamento ou métricas ausentes." /><Feature label="Saída acionável" text="Resumo, rankings, plano de ação e projeções por cenário." /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button asChild><Link to="/campanhas"><Sparkles className="mr-2 h-4 w-4" />Abrir analista</Link></Button><span className="text-[10px] text-muted-foreground">Processamento protegido pela função backend ask-ai.</span></div></section>}
+          <ProviderGrid search={search} providers={[['OpenAI', 'Provedor adicional para análises e agentes com franquia de tokens.'], ['Claude', 'Provedor adicional para síntese extensa e raciocínio operacional.'], ['Gemini', 'Gateway atual usado pelo analista; conexão direta poderá ser adicionada por workspace.']]} icon={<Bot />} />
+        </TabsContent>
         <TabsContent value="messaging"><ProviderGrid search={search} providers={[['WhatsApp Cloud API', 'Relatórios automáticos, alertas e mensagens transacionais.'], ['E-mail transacional', 'Recuperação, convites e alertas da operação.'], ['n8n', 'Automações via API e webhooks, respeitando licença comercial.']]} icon={<MessageCircle />} /></TabsContent>
         <TabsContent value="payments"><ProviderGrid search={search} providers={[['Stripe', 'Assinaturas, checkout, faturas e portal do cliente.'], ['Asaas', 'Pix, boleto, cartão e cobrança recorrente no Brasil.'], ['Mercado Pago', 'Checkout e pagamentos locais.']]} icon={<Cloud />} /></TabsContent>
         <TabsContent value="files"><ProviderGrid search={search} providers={[['Google Drive', 'Relatórios, criativos e documentos do workspace.'], ['Google Sheets', 'Importação, exportação e fontes auxiliares.'], ['OneDrive', 'Arquivos corporativos e compartilhamento.']]} icon={<FileText />} /></TabsContent>
@@ -121,3 +124,4 @@ function ProviderGrid({ providers, search, icon }: { providers: string[][]; sear
 function EmptyState({ text }: { text: string }) { return <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground">{text}</div>; }
 function StatusDot({ tone, label }: { tone: "connected" | "available"; label: string }) { return <span className="inline-flex items-center gap-1.5"><i className={cn("h-2 w-2 rounded-full", tone === "connected" ? "bg-emerald-500" : "bg-muted-foreground")} />{label}</span>; }
 function HealthCard({ title, value, ok }: { title: string; value: string; ok: boolean }) { return <div className="gd-panel p-4"><div className="flex items-center gap-2">{ok ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <TriangleAlert className="h-4 w-4 text-amber-500" />}<b className="text-sm">{title}</b></div><p className="mt-2 text-xs text-muted-foreground">{value}</p></div>; }
+function Feature({ label, text }: { label: string; text: string }) { return <div className="rounded-xl border border-border bg-muted/20 p-4"><b className="text-xs">{label}</b><p className="mt-1 text-[11px] text-muted-foreground">{text}</p></div>; }

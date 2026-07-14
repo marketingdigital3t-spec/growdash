@@ -37,6 +37,7 @@ import { EditableMetaEntity, MetaEntityEditor } from "@/components/campaigns/Met
 import { ResizableHead, StatusDot, normalizeStatus, useColWidths } from "@/components/dashboard/ResizableTableHelpers";
 import { cn } from "@/lib/utils";
 import { getStatusBadge } from "@/lib/status";
+import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 
 type CampSortKey = "name" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "cpl" | "ctr" | "impressions";
 type CampColKey = "check" | "name" | "delivery" | "budget" | "sales" | "cpa" | "spend" | "leads" | "profit" | "roi" | "cpl" | "ctr" | "impressions" | "actions";
@@ -73,9 +74,14 @@ export default function Campaigns() {
     endDate,
     adAccountId: selectedAccount,
     setAdAccountId: setSelectedAccount,
+    businessUnitId,
+    segment,
   } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
-  const { data: sales = [] } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount });
+  const visibleAdAccounts = useMemo(() => businessUnitId
+    ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccounts, businessUnitId, segment]);
+  const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount });
 
   const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v1");
   const adset = useColWidths<AdsetColKey>(ADSET_DEFAULTS, "campaigns-adset-cols-v1");
@@ -87,7 +93,7 @@ export default function Campaigns() {
   };
 
   const { data: campaigns = [], isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({
-    queryKey: ["campaigns_full", selectedAccount, startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
     queryFn: async () => {
       let query = supabase
         .from("campaigns")
@@ -105,6 +111,9 @@ export default function Campaigns() {
 
       if (selectedAccount !== "all") {
         query = query.eq("ad_account_id", selectedAccount);
+      } else {
+        const visibleIds = visibleAdAccounts.map((account) => account.id);
+        query = query.in("ad_account_id", visibleIds.length ? visibleIds : ["00000000-0000-0000-0000-000000000000"]);
       }
 
       const { data, error } = await query;
@@ -205,6 +214,8 @@ export default function Campaigns() {
             let spend = 0, leads = 0, clicks = 0, impressions = 0;
             for (const ad of adset.ads || []) {
               for (const i of ad.insights || []) {
+                if (startDate && i.date < startDate.toISOString().split("T")[0]) continue;
+                if (endDate && i.date > endDate.toISOString().split("T")[0]) continue;
                 spend += i.spend ?? 0; leads += i.leads ?? 0;
                 clicks += i.clicks ?? 0; impressions += i.impressions ?? 0;
               }
@@ -212,7 +223,7 @@ export default function Campaigns() {
             return { ...adset, campaignName: c.name, spend, leads, clicks, impressions };
           })
       );
-  }, [filtered, selectedIds, statusFilter]);
+  }, [filtered, selectedIds, statusFilter, startDate, endDate]);
 
   const selectedAds = useMemo(() => {
     if (selectedIds.size === 0) return [];
@@ -225,6 +236,8 @@ export default function Campaigns() {
             .map((ad: any) => {
               let spend = 0, leads = 0, clicks = 0, impressions = 0;
               for (const i of ad.insights || []) {
+                if (startDate && i.date < startDate.toISOString().split("T")[0]) continue;
+                if (endDate && i.date > endDate.toISOString().split("T")[0]) continue;
                 spend += i.spend ?? 0; leads += i.leads ?? 0;
                 clicks += i.clicks ?? 0; impressions += i.impressions ?? 0;
               }
@@ -232,7 +245,8 @@ export default function Campaigns() {
             })
         )
       );
-  }, [filtered, selectedIds, statusFilter]);
+  }, [filtered, selectedIds, statusFilter, startDate, endDate]);
+  const selectedAccountName = visibleAdAccounts.find((account) => account.id === selectedAccount)?.name;
 
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
@@ -260,14 +274,14 @@ export default function Campaigns() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {adAccounts.length > 0 && (
+            {visibleAdAccounts.length > 0 && (
               <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                 <SelectTrigger className="h-9 w-full border-border bg-background sm:w-[260px]">
                   <SelectValue placeholder="Conta de anúncio" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as contas de anúncio</SelectItem>
-                  {adAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                  {visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
@@ -343,6 +357,16 @@ export default function Campaigns() {
             />
           </div>
         </div>
+      </MotionItem>
+
+      <MotionItem>
+        <TrafficAIAnalysis
+          accountId={selectedAccount}
+          accountName={selectedAccountName}
+          startDate={startDate}
+          endDate={endDate}
+          selectedCampaignIds={Array.from(selectedIds)}
+        />
       </MotionItem>
 
       <MotionItem>
