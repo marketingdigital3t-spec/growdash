@@ -52,12 +52,12 @@ export function useRDHealthCheck() {
       // 1) Token RD CRM
       const { data: integration } = await supabase
         .from("integrations")
-        .select("id, is_active, api_token")
+        .select("id, is_active")
         .eq("provider", "rd_station_crm")
         .maybeSingle();
 
-      const hasToken = !!integration?.is_active && !!integration?.api_token;
-      if (!hasToken) {
+      const isConnected = !!integration?.is_active;
+      if (!isConnected) {
         checks.push({
           id: "token",
           label: "Token RD Station CRM",
@@ -69,7 +69,7 @@ export function useRDHealthCheck() {
         // ping
         try {
           const { data, error } = await supabase.functions.invoke("rd-test-connection", {
-            body: { api_token: integration!.api_token },
+            body: { check: true },
           });
           if (error || data?.error) throw new Error(data?.error || error?.message);
           checks.push({ id: "token", label: "Token RD Station CRM", status: "ok", detail: "Conexão validada." });

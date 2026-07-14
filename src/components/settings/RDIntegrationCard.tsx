@@ -1,36 +1,21 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Link2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Link2, CheckCircle2, AlertCircle, Unplug } from "lucide-react";
+import { useRDIntegration } from "@/hooks/useRDIntegration";
 
 export function RDIntegrationCard() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [token, setToken] = useState("");
 
-  const { data: integration } = useQuery({
-    queryKey: ["integration", "rd_station_crm"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("integrations")
-        .select("id, is_active, api_token")
-        .eq("provider", "rd_station_crm")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const isConnected = !!integration?.is_active && !!integration?.api_token;
-
-  useEffect(() => {
-    if (integration?.api_token && !token) setToken(integration.api_token);
-  }, [integration?.api_token]);
+  const { data: integration } = useRDIntegration();
+  const isConnected = !!integration?.is_active;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -41,12 +26,36 @@ export function RDIntegrationCard() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => {
-      toast({ title: "RD Station CRM conectado!", description: "Token validado e salvo." });
-      qc.invalidateQueries({ queryKey: ["integration", "rd_station_crm"] });
+    onSuccess: (data) => {
+      setToken("");
+      toast({
+        title: "RD Station CRM conectado!",
+        description: data?.warning || "Token validado e salvo com segurança.",
+      });
+      qc.invalidateQueries({ queryKey: ["integration"] });
+      qc.invalidateQueries({ queryKey: ["rd_health_check"] });
     },
     onError: (e: any) =>
       toast({ title: "Erro ao conectar", description: e.message, variant: "destructive" }),
+  });
+
+  const disconnect = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("rd-test-connection", {
+        body: { disconnect: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      setToken("");
+      toast({ title: "RD Station desconectado", description: "O token salvo foi removido da Growdash." });
+      qc.invalidateQueries({ queryKey: ["integration"] });
+      qc.invalidateQueries({ queryKey: ["rd_health_check"] });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Erro ao desconectar", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -83,15 +92,33 @@ export function RDIntegrationCard() {
           <Label>Token da API do RD CRM</Label>
           <Input
             type="password"
-            placeholder="Cole o token aqui"
+            autoComplete="off"
+            placeholder={isConnected ? "Cole um novo token para substituir o atual" : "Cole o token aqui"}
             value={token}
             onChange={(e) => setToken(e.target.value)}
           />
+          {isConnected && (
+            <p className="text-xs text-muted-foreground">
+              Por segurança, o token salvo nunca é enviado de volta ao navegador.
+            </p>
+          )}
         </div>
 
-        <Button onClick={() => save.mutate()} disabled={!token.trim() || save.isPending}>
-          {save.isPending ? "Testando..." : isConnected ? "Atualizar token" : "Testar e salvar"}
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button onClick={() => save.mutate()} disabled={!token.trim() || save.isPending || disconnect.isPending}>
+            {save.isPending ? "Testando..." : isConnected ? "Substituir token" : "Testar e conectar"}
+          </Button>
+          {isConnected && (
+            <Button
+              variant="outline"
+              onClick={() => disconnect.mutate()}
+              disabled={disconnect.isPending || save.isPending}
+            >
+              <Unplug className="mr-2 h-4 w-4" />
+              {disconnect.isPending ? "Desconectando..." : "Desconectar"}
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

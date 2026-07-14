@@ -12,16 +12,18 @@ GRANT SELECT (
   created_at,
   updated_at,
   daily_budget,
-  funding_display,
-  funding_type,
   last_sync_attempt_at,
   last_sync_error,
   last_sync_error_code,
   last_sync_success_at,
   min_spend_threshold,
-  rd_fields_last_discovered_at,
   remaining_balance,
-  target_cpl
+  target_cpl,
+  currency,
+  timezone_name,
+  timezone_offset_hours_utc,
+  provider_account_id,
+  metadata
 ) ON TABLE public.ad_accounts TO authenticated;
 
 GRANT ALL ON TABLE public.ad_accounts TO service_role;

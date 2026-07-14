@@ -3,109 +3,110 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...corsHeaders, "Content-Type": "application/json" },
+});
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
   try {
-    const { api_token } = await req.json();
-    if (!api_token || typeof api_token !== "string") {
-      return new Response(JSON.stringify({ error: "Token obrigatório" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Não autenticado" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const supabase = createClient(
+    if (!authHeader) return json({ error: "Não autenticado" }, 401);
+
+    const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
-    const { data: userRes } = await supabase.auth.getUser();
+    const { data: userRes } = await userClient.auth.getUser();
     const userId = userRes.user?.id;
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "Usuário inválido" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!userId) return json({ error: "Usuário inválido" }, 401);
 
-    const token = api_token.trim();
+    const body = await req.json().catch(() => ({}));
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
-    // Retry on 429 (rate limit) with exponential backoff
-    let r: Response | null = null;
-    let lastTxt = "";
-    for (let attempt = 0; attempt < 3; attempt++) {
-      r = await fetch(
-        `https://crm.rdstation.com/api/v1/deal_pipelines/?token=${encodeURIComponent(token)}&limit=1`,
-      );
-      if (r.status !== 429) break;
-      lastTxt = await r.text();
-      // wait 1.5s, 3s
-      await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
-    }
-
-    if (r && r.status === 429) {
-      // Rate-limited — don't reject the token. Save it if it looks valid and let the user retry sync later.
-      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      const { data: existing } = await admin
-        .from("integrations")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("provider", "rd_station_crm")
-        .maybeSingle();
-      if (existing) {
-        await admin.from("integrations").update({
-          api_token: token, is_active: true, updated_at: new Date().toISOString(),
-        }).eq("id", existing.id);
-      } else {
-        await admin.from("integrations").insert({
-          user_id: userId, provider: "rd_station_crm", api_token: token, is_active: true,
-        });
-      }
-      return new Response(JSON.stringify({
-        ok: true,
-        warning: "Token salvo, mas a API do RD está com limite de requisições excedido no momento (HTTP 429). Aguarde alguns minutos e tente sincronizar novamente.",
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    if (!r || !r.ok) {
-      const txt = lastTxt || (r ? await r.text() : "");
-      return new Response(JSON.stringify({
-        error: `Token inválido ou sem permissão (HTTP ${r?.status ?? "?"}). ${txt.slice(0, 200)}`,
-      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: existing } = await admin
       .from("integrations")
-      .select("id")
+      .select("id, api_token, is_active")
       .eq("user_id", userId)
       .eq("provider", "rd_station_crm")
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (existing) {
-      await admin.from("integrations").update({
-        api_token: token, is_active: true, updated_at: new Date().toISOString(),
-      }).eq("id", existing.id);
-    } else {
-      await admin.from("integrations").insert({
-        user_id: userId, provider: "rd_station_crm", api_token: token, is_active: true,
-      });
+    if (body?.disconnect === true) {
+      if (existing?.id) {
+        const { error } = await admin
+          .from("integrations")
+          .update({ api_token: null, is_active: false, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+        if (error) throw error;
+      }
+      return json({ ok: true, connected: false });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const suppliedToken = typeof body?.api_token === "string" ? body.api_token.trim() : "";
+    const token = suppliedToken || (existing?.is_active ? String(existing.api_token ?? "") : "");
+    if (!token) return json({ error: "RD Station CRM não conectado. Informe um token válido." }, 400);
+
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      response = await fetch(
+        `https://crm.rdstation.com/api/v1/deal_pipelines/?token=${encodeURIComponent(token)}&limit=1`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (response.status !== 429) break;
+      await response.text();
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+    }
+
+    const rateLimited = response?.status === 429;
+    if (!response || (!response.ok && !rateLimited)) {
+      const status = response?.status ?? 502;
+      if (!suppliedToken && existing?.id && (status === 401 || status === 403)) {
+        await admin.from("integrations").update({ is_active: false }).eq("id", existing.id);
+      }
+      return json({
+        error: `Token inválido ou sem permissão no RD Station (HTTP ${status}).`,
+        connected: false,
+      }, 400);
+    }
+
+    if (suppliedToken) {
+      const values = {
+        api_token: suppliedToken,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      };
+      const operation = existing?.id
+        ? admin.from("integrations").update(values).eq("id", existing.id)
+        : admin.from("integrations").insert({
+            user_id: userId,
+            provider: "rd_station_crm",
+            ...values,
+          });
+      const { error } = await operation;
+      if (error) throw error;
+    }
+
+    return json({
+      ok: true,
+      connected: true,
+      warning: rateLimited
+        ? "Token aceito e salvo, mas o RD Station limitou temporariamente as requisições. Tente sincronizar novamente em alguns minutos."
+        : undefined,
     });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  } catch (error) {
+    console.error("rd-test-connection", error);
+    return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500);
   }
 });

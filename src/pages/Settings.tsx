@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useSyncBalance } from "@/hooks/useSyncBalance";
 import { useBackfillMeta } from "@/hooks/useBackfillMeta";
+import { useMetaOAuth } from "@/hooks/useMetaOAuth";
+import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +18,6 @@ import { Trash2, RefreshCw, Key, Info, Pencil, Check, X, Link2, Copy, Facebook, 
 import { cn } from "@/lib/utils";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
-import { MotionCard } from "@/components/motion/MotionCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { RDFunnelsSection } from "@/components/settings/RDFunnelsSection";
 import { RDIntegrationCard } from "@/components/settings/RDIntegrationCard";
@@ -32,10 +33,12 @@ import { AccountConnectionStatus } from "@/components/settings/AccountConnection
 import { RDCustomFieldsCard } from "@/components/settings/RDCustomFieldsCard";
 
 export default function SettingsPage() {
-  const { user } = useAuth();
-  const { data: adAccounts = [], refetch } = useAdAccounts();
+  const { data: adAccounts = [] } = useAdAccounts();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const connectMeta = useMetaOAuth();
+  const { data: integration } = useRDIntegration();
+  const [searchParams] = useSearchParams();
 
   const [emailAlerts, setEmailAlerts] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -46,57 +49,13 @@ export default function SettingsPage() {
   const [editTargetCpl, setEditTargetCpl] = useState("");
   const [editMinSpend, setEditMinSpend] = useState("");
 
-  const oauthPopup = useRef<Window | null>(null);
-
-  const connectMeta = useMutation({
-    mutationFn: async () => {
-      if (!user) throw new Error("Entre na Growdash antes de conectar a Meta.");
-
-      // Open synchronously so browsers do not classify it as an unsolicited popup.
-      const popup = window.open("about:blank", "growdash-meta-oauth", "popup,width=620,height=760");
-      if (!popup) throw new Error("O navegador bloqueou a janela da Meta. Libere pop-ups para a Growdash e tente novamente.");
-      oauthPopup.current = popup;
-      popup.document.title = "Conectando à Meta";
-      popup.document.body.innerHTML = '<p style="font:16px system-ui;padding:32px">Preparando conexão segura com a Meta…</p>';
-
-      const { data, error } = await supabase.functions.invoke("meta-oauth-start", { body: {} });
-      if (error || !data?.authUrl) {
-        popup.close();
-        oauthPopup.current = null;
-        throw new Error(data?.error || error?.message || "Não foi possível iniciar a conexão com a Meta.");
-      }
-      popup.location.replace(data.authUrl);
-    },
-    onError: (error: Error) => toast({
-      title: "Não foi possível conectar",
-      description: error.message,
-      variant: "destructive",
-    }),
-  });
-
   useEffect(() => {
-    const expectedOrigin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
-    const receiveOAuthResult = (event: MessageEvent) => {
-      if (event.origin !== expectedOrigin || event.source !== oauthPopup.current) return;
-      if (event.data?.type !== "growdash-meta-oauth") return;
-      oauthPopup.current = null;
-      if (event.data.status === "success") {
-        toast({
-          title: "Meta Ads conectado!",
-          description: event.data.message || "As contas de anúncio foram adicionadas.",
-        });
-        queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
-      } else {
-        toast({
-          title: "Conexão não concluída",
-          description: event.data.message || "A Meta não autorizou a conexão.",
-          variant: "destructive",
-        });
-      }
-    };
-    window.addEventListener("message", receiveOAuthResult);
-    return () => window.removeEventListener("message", receiveOAuthResult);
-  }, [queryClient, toast]);
+    const target = searchParams.get("integration");
+    if (!target) return;
+    const id = target === "meta" ? "meta-integration" : target === "rd" ? "rd-integration" : "";
+    if (!id) return;
+    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+  }, [searchParams]);
 
   const deleteAccount = useMutation({
     mutationFn: async (id: string) => {
@@ -135,43 +94,6 @@ export default function SettingsPage() {
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-rd-crm`;
 
-  // Integration query
-  const { data: integration } = useQuery({
-    queryKey: ["integration", "rd_station_crm"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("integrations")
-        .select("*")
-        .eq("provider", "rd_station_crm")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const toggleIntegration = useMutation({
-    mutationFn: async () => {
-      if (!user) throw new Error("Not authenticated");
-      if (integration) {
-        const { error } = await supabase
-          .from("integrations")
-          .update({ is_active: !integration.is_active })
-          .eq("id", integration.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("integrations")
-          .insert({ user_id: user.id, provider: "rd_station_crm", is_active: true });
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      toast({ title: "Integração atualizada!" });
-      queryClient.invalidateQueries({ queryKey: ["integration"] });
-    },
-    onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-  });
-
   const copyWebhookUrl = () => {
     navigator.clipboard.writeText(webhookUrl);
     toast({ title: "URL copiada!" });
@@ -198,7 +120,7 @@ export default function SettingsPage() {
 
       {/* Ad Accounts */}
       <MotionItem>
-        <Card>
+        <Card id="meta-integration">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" /> Ad Accounts</CardTitle>
             <CardDescription>Adicione suas contas de anúncio da Meta</CardDescription>
@@ -351,15 +273,11 @@ export default function SettingsPage() {
             <CardDescription>Receba vendas automaticamente via webhook</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Ativar integração</span>
-              <Switch
-                checked={integration?.is_active ?? false}
-                onCheckedChange={() => toggleIntegration.mutate()}
-              />
-            </div>
-            {(integration?.is_active) && (
+            {integration?.is_active ? (
               <div className="space-y-3">
+                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700">
+                  Conexão RD ativa. Configure este webhook no RD Station para receber atualizações automáticas.
+                </div>
                 <div>
                   <p className="text-sm font-medium mb-1">URL do Webhook</p>
                   <div className="flex gap-2">
@@ -376,6 +294,13 @@ export default function SettingsPage() {
                   <p>3. Selecione os eventos: <code className="bg-muted px-1 rounded">deal_created</code>, <code className="bg-muted px-1 rounded">deal_updated</code></p>
                   <p>4. As vendas serão importadas automaticamente!</p>
                 </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="text-sm text-amber-800">Conecte primeiro o token da API do RD Station no card abaixo.</p>
+                <Button variant="outline" onClick={() => document.getElementById("rd-integration")?.scrollIntoView({ behavior: "smooth" })}>
+                  Ir para conexão RD
+                </Button>
               </div>
             )}
           </CardContent>

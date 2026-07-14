@@ -31,9 +31,12 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const appId = Deno.env.get("META_APP_ID");
+    const appSecret = Deno.env.get("META_APP_SECRET");
     const authHeader = req.headers.get("Authorization") ?? "";
 
-    if (!appId) return json({ error: "META_APP_ID não configurado no servidor" }, 503);
+    if (!appId || !appSecret) {
+      return json({ error: "As credenciais do aplicativo Meta ainda não foram configuradas no servidor." }, 503);
+    }
     if (!authHeader.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
 
     const userClient = createClient(supabaseUrl, anonKey, {

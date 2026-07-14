@@ -1,7 +1,10 @@
-project_id = "tpseftxktzhwthekydac"
+project_id = "cixnvosxqlacjbpymjha"
 
 [functions.meta-oauth-start]
 verify_jwt = true
 
 [functions.meta-oauth-callback]
 verify_jwt = false
+
+[functions.rd-test-connection]
+verify_jwt = true
