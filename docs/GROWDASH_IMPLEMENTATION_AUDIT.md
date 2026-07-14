@@ -2,6 +2,8 @@
 
 Data: 14/07/2026
 
+O plano de produto e arquitetura que passa a orientar as próximas fases está em [`GROWDASH_MASTER_PRODUCT_PLAN.md`](./GROWDASH_MASTER_PRODUCT_PLAN.md).
+
 ## Princípios aplicados
 
 - Preservar Supabase, integrações e dados existentes.
