@@ -45,6 +45,9 @@ import { getStatusBadge } from "@/lib/status";
 import { MetaTableControls } from "@/components/campaigns/MetaTableControls";
 import { getBreakdownLabel, getMetaColumnPreset, type CampaignColumnKey, type MetaColumnPresetKey } from "@/lib/metaTableConfig";
 import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
+import { MetaEntityDetailSheet, type MetaDetailEntity } from "@/components/campaigns/MetaEntityDetailSheet";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 type CampSortKey = "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
 type CampColKey = CampaignColumnKey;
@@ -61,12 +64,22 @@ const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; ac
   { id: "inactive", label: "Inativas", dot: "bg-zinc-400", active: "border-zinc-400/55 bg-zinc-400/10 text-zinc-500" },
 ];
 
-function getCampaignHealth(campaign: any, averageCpl: number): CampaignHealth {
+function getActiveDays(createdAt?: string) {
+  if (!createdAt) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (Date.now() - new Date(createdAt).getTime()) / 86_400_000);
+}
+
+function getCampaignHealth(campaign: any, averageCpl: number, targetCpl?: number | null): CampaignHealth {
   if (normalizeStatus(campaign.status) !== "ACTIVE") return "inactive";
-  if (campaign.spend <= 0 || campaign.impressions <= 0) return "initial";
-  if (campaign.leads <= 0 || (averageCpl > 0 && campaign.cpl > averageCpl * 1.45)) return "critical";
-  if (campaign.ctr < 0.8 || (averageCpl > 0 && campaign.cpl > averageCpl * 1.15)) return "warning";
-  if (campaign.frequency >= 3 || campaign.conversionRate < 3) return "observation";
+  const activeDays = getActiveDays(campaign.created_at);
+  if (activeDays < 3) return "initial";
+  if (campaign.spend <= 0 || campaign.impressions <= 0) return "inactive";
+  const referenceCpl = Number(targetCpl || 0) > 0 ? Number(targetCpl) : averageCpl;
+  const ratio = referenceCpl > 0 && campaign.leads > 0 ? campaign.cpl / referenceCpl : 0;
+  const hasRevenueSignal = campaign.salesCount > 0 || campaign.revenue > 0;
+  if ((campaign.leads <= 0 && activeDays >= 3) || ratio > 2 || (hasRevenueSignal && campaign.roas < 0.5)) return "critical";
+  if (ratio >= 1.5 || (hasRevenueSignal && campaign.roas < 1)) return "warning";
+  if (ratio >= 1 || campaign.frequency >= 3 || campaign.conversionRate < 3) return "observation";
   return "healthy";
 }
 
@@ -86,11 +99,14 @@ const AD_DEFAULTS: Record<AdColKey, number> = {
 };
 
 export default function Campaigns() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("campaigns");
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
+  const [detailEntity, setDetailEntity] = useState<MetaDetailEntity | null>(null);
   const [editingEntity, setEditingEntity] = useState<EditableMetaEntity | null>(null);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
@@ -137,7 +153,7 @@ export default function Campaigns() {
     else { setSortKey(key); setSortAsc(false); }
   };
 
-  const { data: campaigns = [], isLoading, isFetching, dataUpdatedAt, refetch } = useQuery({
+  const { data: campaigns = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
     queryFn: async () => {
       let query = supabase
@@ -202,6 +218,23 @@ export default function Campaigns() {
     },
   });
 
+  useEffect(() => {
+    if (!isError) return;
+    toast({ title: "Erro ao carregar campanhas", description: campaignError instanceof Error ? campaignError.message : "Tente novamente.", variant: "destructive" });
+  }, [campaignError, isError, toast]);
+
+  const campaignIds = useMemo(() => campaigns.map((campaign: any) => campaign.id), [campaigns]);
+  const { data: campaignTargets = [] } = useQuery({
+    queryKey: ["campaign-targets-overview", campaignIds.join(",")],
+    enabled: campaignIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("campaign_targets").select("campaign_id,target_cpl").in("campaign_id", campaignIds);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+  const targetByCampaign = useMemo(() => new Map(campaignTargets.map((target) => [target.campaign_id, Number(target.target_cpl || 0)])), [campaignTargets]);
+
   const averageCpl = useMemo(() => {
     const withLeads = campaigns.filter((campaign: any) => campaign.leads > 0 && campaign.spend > 0);
     const spend = withLeads.reduce((sum: number, campaign: any) => sum + campaign.spend, 0);
@@ -210,9 +243,9 @@ export default function Campaigns() {
   }, [campaigns]);
 
   const healthCounts = useMemo(() => campaigns.reduce((counts: Record<CampaignHealth, number>, campaign: any) => {
-    counts[getCampaignHealth(campaign, averageCpl)] += 1;
+    counts[getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))] += 1;
     return counts;
-  }, { critical: 0, warning: 0, observation: 0, initial: 0, healthy: 0, inactive: 0 }), [averageCpl, campaigns]);
+  }, { critical: 0, warning: 0, observation: 0, initial: 0, healthy: 0, inactive: 0 }), [averageCpl, campaigns, targetByCampaign]);
 
   const filtered = useMemo(() => {
     let result = campaigns;
@@ -224,7 +257,7 @@ export default function Campaigns() {
       result = result.filter((c: any) => normalizeStatus(c.status) === statusFilter);
     }
     if (healthFilter !== "all") {
-      result = result.filter((c: any) => getCampaignHealth(c, averageCpl) === healthFilter);
+      result = result.filter((c: any) => getCampaignHealth(c, averageCpl, targetByCampaign.get(c.id)) === healthFilter);
     }
     result = [...result].sort((a: any, b: any) => {
       const av = a[sortKey], bv = b[sortKey];
@@ -234,7 +267,7 @@ export default function Campaigns() {
       return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
     return result;
-  }, [averageCpl, campaigns, healthFilter, search, statusFilter, sortKey, sortAsc]);
+  }, [averageCpl, campaigns, healthFilter, search, statusFilter, sortKey, sortAsc, targetByCampaign]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedCampaigns = useMemo(() => filtered.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize), [campaignPage, filtered]);
   useEffect(() => { setCampaignPage(0); }, [search, statusFilter, healthFilter, selectedAccount, startDate, endDate]);
@@ -285,10 +318,16 @@ export default function Campaigns() {
     return filtered.find((campaign: any) => campaign.id === id) ?? null;
   }, [filtered, selectedIds]);
 
+  const levelCampaigns = useMemo(() => {
+    let scope = campaigns;
+    if (healthFilter !== "all") scope = scope.filter((campaign: any) => getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id)) === healthFilter);
+    if (selectedIds.size > 0) scope = scope.filter((campaign: any) => selectedIds.has(campaign.id));
+    return scope;
+  }, [averageCpl, campaigns, healthFilter, selectedIds, targetByCampaign]);
+
   const selectedAdsets = useMemo(() => {
-    if (selectedIds.size === 0) return [];
-    return filtered
-      .filter((c: any) => selectedIds.has(c.id))
+    const query = search.trim().toLowerCase();
+    return levelCampaigns
       .flatMap((c: any) =>
         (c.adsets || [])
           .filter((a: any) => statusFilter === "all" || normalizeStatus(a.status) === statusFilter)
@@ -303,15 +342,15 @@ export default function Campaigns() {
                 reach += i.reach ?? 0;
               }
             }
-            return { ...adset, campaignName: c.name, spend, leads, clicks, impressions, reach };
+            return { ...adset, campaignId: c.id, campaignName: c.name, spend, leads, clicks, impressions, reach };
           })
-      );
-  }, [filtered, selectedIds, statusFilter, startDate, endDate]);
+      )
+      .filter((adset: any) => !query || adset.name.toLowerCase().includes(query) || adset.campaignName.toLowerCase().includes(query));
+  }, [endDate, levelCampaigns, search, startDate, statusFilter]);
 
   const selectedAds = useMemo(() => {
-    if (selectedIds.size === 0) return [];
-    return filtered
-      .filter((c: any) => selectedIds.has(c.id))
+    const query = search.trim().toLowerCase();
+    return levelCampaigns
       .flatMap((c: any) =>
         (c.adsets || []).flatMap((adset: any) =>
           (adset.ads || [])
@@ -325,11 +364,18 @@ export default function Campaigns() {
                 clicks += i.clicks ?? 0; impressions += i.impressions ?? 0;
                 reach += i.reach ?? 0;
               }
-              return { ...ad, adsetName: adset.name, campaignName: c.name, spend, leads, clicks, impressions, reach };
+              return { ...ad, campaignId: c.id, adsetName: adset.name, campaignName: c.name, spend, leads, clicks, impressions, reach };
             })
         )
-      );
-  }, [filtered, selectedIds, statusFilter, startDate, endDate]);
+      )
+      .filter((ad: any) => !query || ad.name.toLowerCase().includes(query) || ad.adsetName.toLowerCase().includes(query) || ad.campaignName.toLowerCase().includes(query));
+  }, [endDate, levelCampaigns, search, startDate, statusFilter]);
+
+  const problemCampaigns = useMemo(() => campaigns
+    .map((campaign: any) => ({ campaign, health: getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id)) }))
+    .filter(({ health }) => health === "critical" || health === "observation")
+    .sort((a, b) => (a.health === "critical" ? -1 : 1) - (b.health === "critical" ? -1 : 1))
+    .slice(0, 6), [averageCpl, campaigns, targetByCampaign]);
 
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
@@ -445,26 +491,37 @@ export default function Campaigns() {
 
       <MotionItem className="border-b border-border bg-card px-2 py-2 sm:px-3">
         <div className="growdash-scrollbar grid grid-flow-col auto-cols-[minmax(132px,1fr)] gap-2 overflow-x-auto xl:grid-flow-row xl:grid-cols-6">
-          {HEALTH_OPTIONS.map((option) => {
+          {isLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg border border-border bg-muted/60" />) : HEALTH_OPTIONS.map((option) => {
             const count = healthCounts[option.id];
             const selected = healthFilter === option.id;
-            return <button key={option.id} type="button" onClick={() => setHealthFilter(selected ? "all" : option.id)} className={cn("flex min-h-12 items-center gap-2 rounded-lg border border-border bg-muted/25 px-3 text-left transition hover:border-primary/35 hover:bg-primary/5", selected && option.active, option.id === "critical" && count > 0 && "shadow-[0_0_18px_-10px_rgba(239,68,68,.9)]")} aria-pressed={selected}><span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", option.dot, option.id === "critical" && count > 0 && "animate-pulse")} /><span className="min-w-0 grow"><span className="block truncate text-[9px] font-black uppercase tracking-wide">{option.label}</span><span className="block text-lg font-black tabular-nums">{count}</span></span></button>;
+            return <button key={option.id} type="button" title={`${count} campanha(s) classificadas como ${option.label.toLowerCase()} no período selecionado`} onClick={() => setHealthFilter(selected ? "all" : option.id)} className={cn("flex min-h-12 items-center gap-2 rounded-lg border border-border bg-muted/25 px-3 text-left transition hover:border-primary/35 hover:bg-primary/5", selected && option.active, option.id === "critical" && count > 0 && "shadow-[0_0_18px_-10px_rgba(239,68,68,.9)]")} aria-pressed={selected}><span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", option.dot, option.id === "critical" && count > 0 && "animate-pulse")} /><span className="min-w-0 grow"><span className="block truncate text-[9px] font-black uppercase tracking-wide">{option.label}</span><span className="block text-lg font-black tabular-nums">{count}</span></span></button>;
           })}
         </div>
       </MotionItem>
+
+      {!isLoading && problemCampaigns.length > 0 && (
+        <MotionItem className="border-b border-border bg-muted/20 p-3 sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-3"><div><h2 className="text-sm font-black">Campanhas que exigem atenção</h2><p className="text-[10px] text-muted-foreground">Detalhes automáticos calculados com meta de CPL, período, veiculação e resultados reais.</p></div><Badge variant="outline">{problemCampaigns.length} exibida(s)</Badge></div>
+          <div className="grid gap-2 lg:grid-cols-2">
+            {problemCampaigns.map(({ campaign, health }) => <CampaignIssueCard key={campaign.id} campaign={campaign} health={health} targetCpl={targetByCampaign.get(campaign.id) || averageCpl} accountName={visibleAdAccounts.find((account) => account.id === campaign.ad_account_id)?.name || "Conta Meta"} onOpen={() => setDetailCampaignId(campaign.id)} />)}
+          </div>
+        </MotionItem>
+      )}
+
+      {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
 
       <MotionItem>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-muted/50 p-0">
             <TabsTrigger value="campaigns" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <FolderKanban className="h-4 w-4" /> Campanhas
+              <FolderKanban className="h-4 w-4" /> Campanhas ({filtered.length})
               {selectedIds.size > 0 && <Badge className="ml-auto bg-[#d7aa30] text-[#2d2107]">{selectedIds.size}</Badge>}
             </TabsTrigger>
-            <TabsTrigger value="adsets" disabled={selectedIds.size === 0} className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <Layers3 className="h-4 w-4" /> Conjuntos de anúncios {selectedIds.size > 0 && `(${selectedAdsets.length})`}
+            <TabsTrigger value="adsets" className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
+              <Layers3 className="h-4 w-4" /> Conjuntos de anúncios ({selectedAdsets.length})
             </TabsTrigger>
-            <TabsTrigger value="ads" disabled={selectedIds.size === 0} className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <RectangleHorizontal className="h-4 w-4" /> Anúncios {selectedIds.size > 0 && `(${selectedAds.length})`}
+            <TabsTrigger value="ads" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
+              <RectangleHorizontal className="h-4 w-4" /> Anúncios ({selectedAds.length})
             </TabsTrigger>
           </TabsList>
 
@@ -487,6 +544,7 @@ export default function Campaigns() {
               {selectedIds.size > 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
                   <Badge variant="secondary">{selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}</Badge>
+                  {selectedCampaign && <span className="max-w-[260px] truncate text-[10px] text-muted-foreground">Filtrando por: <b className="text-foreground">{selectedCampaign.name}</b></span>}
                   <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-8 gap-1 text-xs">
                     <X className="h-3 w-3" /> Limpar
                   </Button>
@@ -494,26 +552,33 @@ export default function Campaigns() {
               )}
             </AnimatePresence>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {activeTab === "campaigns" && <Button variant="outline" size="sm" onClick={() => setShowIntelligence((value) => !value)} className={cn("h-8 gap-2", showIntelligence && "border-primary bg-primary/10 text-foreground")} aria-pressed={showIntelligence}><Sparkles className="h-4 w-4 text-primary" />Meta Intelligence</Button>}
+              {activeTab === "campaigns" && <Button variant="outline" size="sm" onClick={() => setShowIntelligence((value) => !value)} className={cn("h-8 gap-2", showIntelligence && "border-primary bg-primary/10 text-foreground")} aria-pressed={showIntelligence}><Sparkles className="h-4 w-4 text-primary" />Análises</Button>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
             </div>
           </div>
 
           {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
-          {activeTab === "campaigns" && showIntelligence && <TrafficAIAnalysis accountId={selectedAccount} accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name} startDate={startDate} endDate={endDate} selectedCampaignIds={Array.from(selectedIds)} />}
+          {activeTab === "campaigns" && showIntelligence && <section className="border-b border-primary/20 bg-muted/15"><header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center"><div><h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análise inteligente</h2><p className="text-[10px] text-muted-foreground">Conta: {visibleAdAccounts.find((account) => account.id === selectedAccount)?.name || "selecione uma conta específica"} · {startDate.toLocaleDateString("pt-BR")}–{endDate.toLocaleDateString("pt-BR")}</p></div></header><div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 xl:grid-cols-6"><AnalysisMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><AnalysisMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} /><AnalysisMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} /><AnalysisMetric label="CPL" value={(totals.leads ? totals.spend / totals.leads : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="ROAS" value={`${(totals.spend ? totals.revenue / totals.spend : 0).toFixed(2)}x`} /></div><TrafficAIAnalysis accountId={selectedAccount} accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name} startDate={startDate} endDate={endDate} selectedCampaignIds={Array.from(selectedIds)} /></section>}
 
           {/* Campaigns Tab */}
           <TabsContent value="campaigns" className="m-0">
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
+            ) : filtered.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                   <Megaphone className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">{isLoading ? "Carregando..." : "Nenhuma campanha encontrada. Sincronize seus dados nas Configurações."}</p>
+                  <h3 className="font-black">Nenhuma campanha encontrada</h3>
+                  <p className="mt-1 max-w-md text-sm text-muted-foreground">Revise os filtros ou conecte e sincronize uma conta Meta Ads para carregar campanhas reais.</p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setHealthFilter("all"); }}><RotateCcw className="mr-2 h-4 w-4" />Limpar filtros</Button><Button onClick={() => navigate("/integracoes")}><Megaphone className="mr-2 h-4 w-4" />Conectar Meta Ads</Button></div>
                 </CardContent>
               </Card>
             ) : (
               <Card className="overflow-hidden rounded-none border-0 shadow-none">
-                <div className="growdash-scrollbar overflow-x-auto">
+                <div className="space-y-2 p-2 md:hidden">
+                  {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status })} />)}
+                </div>
+                <div className="growdash-scrollbar hidden overflow-x-auto md:block">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
                       <TableRow className="h-11 border-b border-border bg-muted/60 hover:bg-muted/60">
