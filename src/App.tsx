@@ -11,7 +11,7 @@ import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 
 const FullDashboard = lazy(() => import("@/pages/Index"));
-const FullCampaigns = lazy(() => import("@/pages/Campaigns"));
+const TrafficPage = lazy(() => import("@/growdash/TrafficPage"));
 const FunnelAnalysis = lazy(() => import("@/pages/FunnelAnalysis"));
 const FullAlerts = lazy(() => import("@/pages/Alerts"));
 const EventClasses = lazy(() => import("@/pages/EventClasses"));
@@ -89,7 +89,7 @@ export default function App() {
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
                     <Route path="crm" element={<CrmPage />} />
                     <Route path="comercial" element={<CommercialPage />} />
-                    <Route path="campanhas" element={<RequirePage page="campaigns">{analytics(<FullCampaigns />)}</RequirePage>} />
+                    <Route path="campanhas" element={<RequirePage page="campaigns">{analytics(<TrafficPage />)}</RequirePage>} />
                     <Route path="trafego-pago" element={<Navigate to="/campanhas" replace />} />
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />
