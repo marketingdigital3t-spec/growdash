@@ -3,10 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 const fallbackPlans = [
-  { code: "starter", name: "Starter", monthly_price: 97, description: "Operação enxuta para validar a gestão.", sort_order: 1, entitlements: { ad_accounts: 2, users: 2, ai_credits: 150, automations: 3, whatsapp_reports: 100 } },
-  { code: "growth", name: "Growth", monthly_price: 197, description: "Crescimento com mais contas, IA e histórico.", sort_order: 2, entitlements: { ad_accounts: 6, users: 5, ai_credits: 600, automations: 15, whatsapp_reports: 500 } },
-  { code: "scale", name: "Scale", monthly_price: 397, description: "Operação avançada para equipes e unidades.", sort_order: 3, entitlements: { ad_accounts: 15, users: 12, ai_credits: 2000, automations: 50, whatsapp_reports: 2000 } },
-  { code: "agency", name: "Agency", monthly_price: 797, description: "Alto volume com limites ampliados.", sort_order: 4, entitlements: { ad_accounts: 40, users: 30, ai_credits: 6000, automations: 150, whatsapp_reports: 6000 } },
+  { code: "starter", name: "Starter", monthly_price: 97, description: "Operação enxuta para validar a gestão.", sort_order: 1, entitlements: { ad_accounts: 2, users: 2, ai_credits: 150, automations: 3, whatsapp_reports: 100, storage_bytes: 5368709120 } },
+  { code: "growth", name: "Growth", monthly_price: 197, description: "Crescimento com mais contas, IA e histórico.", sort_order: 2, entitlements: { ad_accounts: 6, users: 5, ai_credits: 600, automations: 15, whatsapp_reports: 500, storage_bytes: 26843545600 } },
+  { code: "scale", name: "Scale", monthly_price: 397, description: "Operação avançada para equipes e unidades.", sort_order: 3, entitlements: { ad_accounts: 15, users: 12, ai_credits: 2000, automations: 50, whatsapp_reports: 2000, storage_bytes: 107374182400 } },
+  { code: "agency", name: "Agency", monthly_price: 797, description: "Alto volume com limites ampliados.", sort_order: 4, entitlements: { ad_accounts: 40, users: 30, ai_credits: 6000, automations: 150, whatsapp_reports: 6000, storage_bytes: 536870912000 } },
 ];
 
 function schemaIsPending(error: { code?: string; message?: string } | null) {

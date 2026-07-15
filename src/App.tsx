@@ -24,6 +24,7 @@ const Funnelytics = lazy(() => import("@/pages/Funnelytics"));
 const CrmPage = lazy(() => import("@/growdash/CrmPage"));
 const CommercialPage = lazy(() => import("@/growdash/CommercialPage"));
 const FinancePage = lazy(() => import("@/growdash/FinancePage"));
+const StoragePage = lazy(() => import("@/growdash/StoragePage"));
 const IntegrationsPage = lazy(() => import("@/growdash/IntegrationsPage"));
 const ProfilePage = lazy(() => import("@/growdash/ProfilePage"));
 const ModulePage = lazy(() => import("@/growdash/ModulePage"));
@@ -109,6 +110,7 @@ export default function App() {
                     <Route path="usuarios/avancado" element={<Navigate to="/usuarios" replace />} />
                     <Route path="users" element={<Navigate to="/usuarios" replace />} />
                     <Route path="financeiro" element={<FinancePage />} />
+                    <Route path="armazenamento" element={<StoragePage />} />
                     <Route path="integracoes" element={<IntegrationsPage />} />
                     <Route path="perfil" element={<ProfilePage />} />
                     <Route path="kanban" element={<Navigate to="/crm" replace />} />

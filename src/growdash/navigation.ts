@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Columns3,
   GitBranch,
+  HardDrive,
   Headphones,
   LayoutDashboard,
   Megaphone,
@@ -242,6 +243,14 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "Saldo disponível", value: "R$ 54,3 mil", change: "12 dias" },
         ],
         highlights: ["Investimento x faturamento", "Saldo das contas", "Receita por marca"],
+      },
+      {
+        label: "Armazenamento",
+        path: "/armazenamento",
+        icon: HardDrive,
+        description: "Controle arquivos, fontes, uso e limites do workspace.",
+        metrics: [],
+        highlights: ["Quota do plano", "Arquivos por fonte", "Referências externas"],
       },
       {
         label: "Anúncios",
