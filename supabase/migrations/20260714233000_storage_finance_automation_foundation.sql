@@ -334,13 +334,28 @@ VALUES (
 )
 ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types;
 
-CREATE POLICY "Members read workspace objects" ON storage.objects FOR SELECT TO authenticated
-  USING (bucket_id = 'workspace-files' AND public.is_workspace_member(((storage.foldername(name))[1])::uuid));
-CREATE POLICY "Members upload workspace objects" ON storage.objects FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'workspace-files' AND public.is_workspace_member(((storage.foldername(name))[1])::uuid));
-CREATE POLICY "Members update workspace objects" ON storage.objects FOR UPDATE TO authenticated
-  USING (bucket_id = 'workspace-files' AND public.is_workspace_member(((storage.foldername(name))[1])::uuid))
-  WITH CHECK (bucket_id = 'workspace-files' AND public.is_workspace_member(((storage.foldername(name))[1])::uuid));
-CREATE POLICY "Members delete workspace objects" ON storage.objects FOR DELETE TO authenticated
-  USING (bucket_id = 'workspace-files' AND public.is_workspace_member(((storage.foldername(name))[1])::uuid));
+CREATE OR REPLACE FUNCTION public.can_access_workspace_object(_name text, _user_id uuid DEFAULT auth.uid())
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN public.is_workspace_member(split_part(_name, '/', 1)::uuid, _user_id);
+EXCEPTION WHEN invalid_text_representation THEN
+  RETURN false;
+END;
+$$;
 
+GRANT EXECUTE ON FUNCTION public.can_access_workspace_object(text, uuid) TO authenticated;
+
+CREATE POLICY "Members read workspace objects" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'workspace-files' AND public.can_access_workspace_object(name));
+CREATE POLICY "Members upload workspace objects" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'workspace-files' AND public.can_access_workspace_object(name));
+CREATE POLICY "Members update workspace objects" ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'workspace-files' AND public.can_access_workspace_object(name))
+  WITH CHECK (bucket_id = 'workspace-files' AND public.can_access_workspace_object(name));
+CREATE POLICY "Members delete workspace objects" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'workspace-files' AND public.can_access_workspace_object(name));

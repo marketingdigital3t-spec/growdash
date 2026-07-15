@@ -32,6 +32,8 @@ import {
   CheckCircle2,
   TriangleAlert,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
@@ -77,6 +79,8 @@ export default function Campaigns() {
     return new Set(getMetaColumnPreset("performance").columns);
   });
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
+  const [campaignPage, setCampaignPage] = useState(0);
+  const pageSize = 50;
 
   useEffect(() => {
     localStorage.setItem("growdash:meta-columns", JSON.stringify(Array.from(visibleColumns)));
@@ -193,6 +197,10 @@ export default function Campaigns() {
     });
     return result;
   }, [campaigns, search, statusFilter, sortKey, sortAsc]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedCampaigns = useMemo(() => filtered.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize), [campaignPage, filtered]);
+  useEffect(() => { setCampaignPage(0); }, [search, statusFilter, selectedAccount, startDate, endDate]);
+  useEffect(() => { if (campaignPage >= pageCount) setCampaignPage(pageCount - 1); }, [campaignPage, pageCount]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -486,7 +494,7 @@ export default function Campaigns() {
                     </TableHeader>
                     <TableBody>
                       <AnimatePresence mode="popLayout">
-                        {filtered.map((c: any) => (
+                        {pagedCampaigns.map((c: any) => (
                           <motion.tr
                             key={c.id}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -568,6 +576,7 @@ export default function Campaigns() {
                     <span className={colorClass(totals.profit)}>Lucro: <strong><AnimatedNumber value={totals.profit} prefix="R$ " decimals={2} /></strong></span>
                     <span>Leads: <strong><AnimatedNumber value={totals.leads} decimals={0} /></strong></span>
                   </div>
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3"><span className="text-[10px] text-muted-foreground">Exibindo {filtered.length ? campaignPage * pageSize + 1 : 0}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}; 50 por página para reduzir renderização.</span><div className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-20 text-center text-[10px]">Página {campaignPage + 1} de {pageCount}</span><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>
                   {(showColumn("reach") || showColumn("frequency")) && <p className="mt-2 text-[9px] text-muted-foreground">* Alcance soma linhas diárias por anúncio e pode repetir pessoas; a frequência é direcional até a sincronização de alcance deduplicado por período.</p>}
                 </div>
               </Card>
