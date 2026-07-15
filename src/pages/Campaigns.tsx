@@ -251,7 +251,8 @@ export default function Campaigns() {
     let result = campaigns;
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter((c: any) => c.name.toLowerCase().includes(q));
+      result = result.filter((c: any) => [c.name, c.id, c.objective, c.status, c.spend, c.leads, c.cpl, c.ctr, c.roas]
+        .some((value) => String(value ?? "").toLowerCase().includes(q)));
     }
     if (statusFilter !== "all") {
       result = result.filter((c: any) => normalizeStatus(c.status) === statusFilter);
@@ -315,8 +316,8 @@ export default function Campaigns() {
   const selectedCampaign = useMemo(() => {
     if (selectedIds.size !== 1) return null;
     const id = Array.from(selectedIds)[0];
-    return filtered.find((campaign: any) => campaign.id === id) ?? null;
-  }, [filtered, selectedIds]);
+    return campaigns.find((campaign: any) => campaign.id === id) ?? null;
+  }, [campaigns, selectedIds]);
 
   const levelCampaigns = useMemo(() => {
     let scope = campaigns;
@@ -370,6 +371,21 @@ export default function Campaigns() {
       )
       .filter((ad: any) => !query || ad.name.toLowerCase().includes(query) || ad.adsetName.toLowerCase().includes(query) || ad.campaignName.toLowerCase().includes(query));
   }, [endDate, levelCampaigns, search, startDate, statusFilter]);
+
+  const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
+  const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
+  const downloadCurrentView = () => {
+    if (activeTab === "campaigns") { downloadCampaigns(); return; }
+    const source = activeTab === "adsets" ? selectedAdsets : selectedAds;
+    const label = activeTab === "adsets" ? "conjuntos" : "anuncios";
+    const header = activeTab === "adsets"
+      ? ["Conjunto", "Campanha", "Status", "Orçamento", "Investimento", "Impressões", "Alcance", "Cliques", "Leads", "CPL"]
+      : ["Anúncio", "Conjunto", "Campanha", "Status", "Investimento", "Impressões", "Alcance", "Cliques", "CTR", "CPC", "Leads", "CPL"];
+    const rows = source.map((item: any) => activeTab === "adsets"
+      ? [item.name, item.campaignName, item.status, item.daily_budget || 0, item.spend, item.impressions, item.reach, item.clicks, item.leads, item.leads > 0 ? item.spend / item.leads : 0]
+      : [item.name, item.adsetName, item.campaignName, item.status, item.spend, item.impressions, item.reach, item.clicks, item.impressions > 0 ? item.clicks / item.impressions * 100 : 0, item.clicks > 0 ? item.spend / item.clicks : 0, item.leads, item.leads > 0 ? item.spend / item.leads : 0]);
+    exportCsv(header, rows, `growdash-${label}-${new Date().toISOString().slice(0, 10)}.csv`);
+  };
 
   const problemCampaigns = useMemo(() => campaigns
     .map((campaign: any) => ({ campaign, health: getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id)) }))
@@ -430,7 +446,7 @@ export default function Campaigns() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setStatusFilter("all")}
+            onClick={() => { setStatusFilter("all"); setHealthFilter("all"); }}
             className={cn("h-9 shrink-0 gap-2 bg-background", statusFilter === "all" && "border-primary bg-primary/10 text-foreground")}
           >
             <FolderKanban className="h-4 w-4" /> Todos os anúncios
@@ -490,7 +506,7 @@ export default function Campaigns() {
       </MotionItem>
 
       <MotionItem className="border-b border-border bg-card px-2 py-2 sm:px-3">
-        <div className="growdash-scrollbar grid grid-flow-col auto-cols-[minmax(132px,1fr)] gap-2 overflow-x-auto xl:grid-flow-row xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-6">
           {isLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg border border-border bg-muted/60" />) : HEALTH_OPTIONS.map((option) => {
             const count = healthCounts[option.id];
             const selected = healthFilter === option.id;
@@ -526,6 +542,7 @@ export default function Campaigns() {
           </TabsList>
 
           <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
+            {activeTab === "campaigns" && <>
             <Button
               size="sm"
               disabled={!selectedCampaign}
@@ -537,7 +554,8 @@ export default function Campaigns() {
             <Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-8 gap-2">
               <Eye className="h-4 w-4" /> Ver desempenho
             </Button>
-            <Button size="sm" onClick={downloadCampaigns} disabled={filtered.length === 0} className="gold-action h-8 gap-2">
+            </>}
+            <Button size="sm" onClick={downloadCurrentView} disabled={(activeTab === "campaigns" ? filtered : activeTab === "adsets" ? selectedAdsets : selectedAds).length === 0} className="gold-action h-8 gap-2">
               <Download className="h-4 w-4" /> <span className="hidden sm:inline">Baixar relatório</span>
             </Button>
             <AnimatePresence>
@@ -709,7 +727,9 @@ export default function Campaigns() {
           {/* Adsets Tab */}
           <TabsContent value="adsets" className="m-0">
             <Card className="overflow-hidden rounded-none border-0 shadow-none">
-              <div className="growdash-scrollbar overflow-x-auto">
+              {selectedAdsets.length === 0 ? <LevelEmpty level="conjuntos de anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
+              <div className="space-y-2 p-2 md:hidden">{selectedAdsets.map((entity: any) => <LevelMobileCard key={entity.id} entity={{ ...entity, type: "adset" }} onOpen={() => setDetailEntity({ ...entity, type: "adset" })} />)}</div>
+              <div className="growdash-scrollbar hidden overflow-x-auto md:block">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
                     <TableRow className="h-11 bg-muted/60 hover:bg-muted/60">
@@ -730,12 +750,12 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAdsets.map((a: any) => (
-                      <TableRow key={a.id} className="h-12 odd:bg-card even:bg-muted/20 hover:bg-primary/5">
+                      <TableRow key={a.id} className="h-12 cursor-pointer odd:bg-card even:bg-muted/20 hover:bg-primary/5" onClick={() => setDetailEntity({ ...a, type: "adset" })}>
                         <TableCell style={adsetCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             <StatusDot status={a.status} />
                             <span className="truncate" title={a.name}>{a.name}</span>
-                            <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0" onClick={() => setEditingEntity({ type: "adset", id: a.id, name: a.name, status: a.status, dailyBudget: a.daily_budget })} title="Editar conjunto na Meta Ads">
+                            <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0" onClick={(event) => { event.stopPropagation(); setEditingEntity({ type: "adset", id: a.id, name: a.name, status: a.status, dailyBudget: a.daily_budget }); }} title="Editar conjunto na Meta Ads">
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -757,13 +777,17 @@ export default function Campaigns() {
                   </TableBody>
                 </Table>
               </div>
+              <LevelTotals label="conjuntos" count={selectedAdsets.length} totals={adsetTotals} />
+              </>}
             </Card>
           </TabsContent>
 
           {/* Ads Tab */}
           <TabsContent value="ads" className="m-0">
             <Card className="overflow-hidden rounded-none border-0 shadow-none">
-              <div className="growdash-scrollbar overflow-x-auto">
+              {selectedAds.length === 0 ? <LevelEmpty level="anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
+              <div className="space-y-2 p-2 md:hidden">{selectedAds.map((entity: any) => <LevelMobileCard key={entity.id} entity={{ ...entity, type: "ad" }} onOpen={() => setDetailEntity({ ...entity, type: "ad" })} />)}</div>
+              <div className="growdash-scrollbar hidden overflow-x-auto md:block">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
                     <TableRow className="h-11 bg-muted/60 hover:bg-muted/60">
@@ -784,7 +808,7 @@ export default function Campaigns() {
                   </TableHeader>
                   <TableBody>
                     {selectedAds.map((a: any) => (
-                      <TableRow key={a.id} className="h-12 odd:bg-card even:bg-muted/20 hover:bg-primary/5">
+                      <TableRow key={a.id} className="h-12 cursor-pointer odd:bg-card even:bg-muted/20 hover:bg-primary/5" onClick={() => setDetailEntity({ ...a, type: "ad" })}>
                         <TableCell style={adCellW("name")} className="font-medium">
                           <div className="flex items-center gap-2 min-w-0">
                             {a.thumbnail_url ? (
@@ -794,7 +818,7 @@ export default function Campaigns() {
                             )}
                             <StatusDot status={a.status} />
                             <span className="truncate" title={a.name}>{a.name}</span>
-                            <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0" onClick={() => setEditingEntity({ type: "ad", id: a.id, name: a.name, status: a.status })} title="Editar anúncio na Meta Ads">
+                            <Button variant="ghost" size="icon" className="ml-auto h-7 w-7 shrink-0" onClick={(event) => { event.stopPropagation(); setEditingEntity({ type: "ad", id: a.id, name: a.name, status: a.status }); }} title="Editar anúncio na Meta Ads">
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -816,6 +840,8 @@ export default function Campaigns() {
                   </TableBody>
                 </Table>
               </div>
+              <LevelTotals label="anúncios" count={selectedAds.length} totals={adTotals} />
+              </>}
             </Card>
           </TabsContent>
         </Tabs>
@@ -828,6 +854,20 @@ export default function Campaigns() {
         onEdit={(campaign) => { setDetailCampaignId(null); setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status }); }}
         onViewAds={(campaign) => { setSelectedIds(new Set([campaign.id])); setActiveTab("ads"); setDetailCampaignId(null); }}
       />
+      <MetaEntityDetailSheet
+        entity={detailEntity}
+        open={!!detailEntity}
+        onOpenChange={(open) => !open && setDetailEntity(null)}
+        onEdit={(entity) => {
+          setDetailEntity(null);
+          setEditingEntity({ type: entity.type, id: entity.id, name: entity.name, status: entity.status, dailyBudget: entity.type === "adset" ? entity.daily_budget : undefined });
+        }}
+        onViewAds={(entity) => {
+          setSelectedIds(new Set([entity.campaignId]));
+          setActiveTab("ads");
+          setDetailEntity(null);
+        }}
+      />
       <MetaEntityEditor
         entity={editingEntity}
         onOpenChange={(open) => !open && setEditingEntity(null)}
@@ -839,4 +879,52 @@ export default function Campaigns() {
 
 function TotalMetric({ label, value }: { label: string; value: string }) {
   return <div className="min-w-[118px] shrink-0 rounded-lg border border-border/70 bg-muted/35 px-3 py-2"><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-0.5 block whitespace-nowrap text-xs tabular-nums">{value}</strong></div>;
+}
+
+function AnalysisMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-border bg-card px-3 py-2"><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-1 block text-sm tabular-nums">{value}</strong></div>;
+}
+
+function CampaignIssueCard({ campaign, health, targetCpl, accountName, onOpen }: { campaign: any; health: CampaignHealth; targetCpl: number; accountName: string; onOpen: () => void }) {
+  const critical = health === "critical";
+  const days = getActiveDays(campaign.created_at);
+  return <button type="button" onClick={onOpen} className={cn("rounded-xl border bg-card p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lg", critical ? "border-red-500/35" : "border-orange-500/35")}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><span className={cn("h-2.5 w-2.5 rounded-full", critical ? "bg-red-500" : "bg-orange-500")} /><span className={cn("text-[9px] font-black uppercase tracking-wider", critical ? "text-red-500" : "text-orange-500")}>{critical ? "Crítico" : "Observação"}</span></div><h3 className="mt-2 truncate text-sm font-black">{campaign.name}</h3><p className="mt-1 truncate text-[10px] text-muted-foreground">BM: {accountName} · Alvo CPL: {targetCpl > 0 ? targetCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "não definido"}</p></div><span className="shrink-0 rounded-full bg-muted px-2 py-1 text-[9px] text-muted-foreground">{Number.isFinite(days) ? `${days.toFixed(1)}d ativa` : "idade indisponível"}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><IssueMetric label="Investido" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} /><IssueMetric label="Custo/resultado" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></div></button>;
+}
+
+function IssueMetric({ label, value }: { label: string; value: string }) {
+  return <div><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-1 block tabular-nums">{value}</strong></div>;
+}
+
+function CampaignMobileCard({ campaign, selected, health, onSelect, onOpen, onEdit }: { campaign: any; selected: boolean; health: CampaignHealth; onSelect: () => void; onOpen: () => void; onEdit: () => void }) {
+  const healthOption = HEALTH_OPTIONS.find((item) => item.id === health)!;
+  return <article className={cn("rounded-xl border bg-card p-3", selected ? "border-primary bg-primary/5" : "border-border")}><div className="flex items-start gap-3"><Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`Selecionar ${campaign.name}`} /><button type="button" onClick={onOpen} className="min-w-0 grow text-left"><span className="block truncate text-sm font-black">{campaign.name}</span><span className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase text-muted-foreground"><span className={cn("h-2 w-2 rounded-full", healthOption.dot)} />{healthOption.label} · {getStatusBadge(campaign.status).label}</span></button><Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onEdit}><Pencil className="h-4 w-4" /></Button></div><button type="button" onClick={onOpen} className="mt-3 grid w-full grid-cols-2 gap-2 text-left"><IssueMetric label="Investimento" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} /><IssueMetric label="CPL" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></button></article>;
+}
+
+function LevelMobileCard({ entity, onOpen }: { entity: MetaDetailEntity; onOpen: () => void }) {
+  const cpl = entity.leads > 0 ? entity.spend / entity.leads : 0;
+  return <button type="button" onClick={onOpen} className="w-full rounded-xl border border-border bg-card p-3 text-left transition hover:border-primary/40"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="block truncate text-sm font-black">{entity.name}</span><span className="mt-1 block truncate text-[9px] text-muted-foreground">{entity.adsetName ? `${entity.adsetName} · ` : ""}{entity.campaignName}</span></div><Badge variant="outline">{normalizeStatus(entity.status) === "ACTIVE" ? "Ativo" : "Pausado"}</Badge></div><div className="mt-3 grid grid-cols-2 gap-2"><IssueMetric label="Investimento" value={entity.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Impressões" value={entity.impressions.toLocaleString("pt-BR")} /><IssueMetric label="Resultados" value={entity.leads.toLocaleString("pt-BR")} /><IssueMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></button>;
+}
+
+function LevelEmpty({ level, selected, onClear }: { level: string; selected: boolean; onClear: () => void }) {
+  return <div className="grid min-h-52 place-items-center p-6 text-center"><div><Layers3 className="mx-auto h-10 w-10 text-muted-foreground" /><h3 className="mt-3 font-black">Nenhum {level} encontrado</h3><p className="mt-1 text-xs text-muted-foreground">{selected ? "A seleção ou os filtros atuais não possuem resultados neste nível." : "Sincronize a conta Meta ou ajuste os filtros do período."}</p>{selected && <Button variant="outline" size="sm" className="mt-4" onClick={onClear}><X className="mr-2 h-4 w-4" />Limpar filtro de campanha</Button>}</div></div>;
+}
+
+function aggregateLevelTotals(rows: Array<{ spend: number; impressions: number; reach: number; clicks: number; leads: number }>) {
+  return rows.reduce((total, row) => ({ spend: total.spend + row.spend, impressions: total.impressions + row.impressions, reach: total.reach + row.reach, clicks: total.clicks + row.clicks, leads: total.leads + row.leads }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
+}
+
+function LevelTotals({ label, count, totals }: { label: string; count: number; totals: ReturnType<typeof aggregateLevelTotals> }) {
+  const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
+  const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
+  return <div className="sticky bottom-0 z-20 border-t border-primary/20 bg-card/95 px-3 py-3 shadow-[0_-10px_28px_rgba(0,0,0,.12)] backdrop-blur-xl"><div className="growdash-scrollbar flex gap-2 overflow-x-auto"><TotalMetric label="Total" value={`${count} ${label}`} /><TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><TotalMetric label="Alcance*" value={totals.reach.toLocaleString("pt-BR")} /><TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} /><TotalMetric label="CTR" value={`${ctr.toFixed(2).replace(".", ",")}%`} /><TotalMetric label="Resultados" value={totals.leads.toLocaleString("pt-BR")} /><TotalMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>;
+}
+
+function exportCsv(header: string[], rows: Array<Array<string | number>>, filename: string) {
+  const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
+  const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }

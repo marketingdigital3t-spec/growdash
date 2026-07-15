@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+  0%, 55% { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+  70% { opacity: .7; }
+  100% { transform: translateX(520%) skewX(-18deg); opacity: 0; }
+}
+
 @layer base {
   :root {
     --background: 40 34% 96%;
