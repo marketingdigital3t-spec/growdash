@@ -9,7 +9,7 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
   const metric = (config.metric ?? "leads") as WidgetMetric;
   const k = computeKpi(metric, insights, sales);
   return (
-    <div className="h-full">
+    <div className="h-full min-w-0">
       <MetricCard
         title={title || METRIC_LABELS[metric]}
         value={k.value}
@@ -26,7 +26,7 @@ export function KPIGridWidget({ config }: { config: WidgetConfig }) {
   const { insights, sales } = useDashboard();
   const metrics = (config.metrics ?? ["spend", "leads", "cpl", "ctr"]) as WidgetMetric[];
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
+    <div className="gd-auto-grid-compact h-full gap-2">
       {metrics.map((m) => {
         const k = computeKpi(m, insights, sales);
         return (

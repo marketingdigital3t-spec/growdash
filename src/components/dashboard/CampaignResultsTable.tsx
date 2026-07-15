@@ -337,14 +337,14 @@ export function CampaignResultsTable() {
 
       {/* KPI strip */}
       {mode === "sales" ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="gd-auto-grid-compact mb-4 gap-3">
           <KPI label="Vendas atribuídas" value={salesTotals.totalSales} />
           <KPI label="Receita" value={salesTotals.totalRevenue} money />
           <KPI label="Investido (Meta)" value={salesTotals.totalSpend} money />
           <KPI label="ROAS" value={salesTotals.roas} suffix="x" />
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div className="gd-auto-grid-compact mb-4 gap-3">
           <KPI label="Total de leads" value={leadTotals.total} />
           <KPI label="Qualificados" value={leadTotals.qualified} tone="green" />
           <KPI label="Desqualificados" value={leadTotals.disqualified} tone="yellow" />

@@ -173,7 +173,7 @@ export default function ProfilePage() {
             <div><p className="text-[10px] font-black uppercase tracking-[.18em] text-primary">Plano atual</p><h2 className="mt-1 text-2xl font-black">{currentPlan?.name ?? "Carregando…"}</h2><p className="text-xs text-muted-foreground">Status: {subscription?.status ?? "—"} · Workspace: {workspace?.name ?? "—"}</p></div>
             {currentPlan && <div className="text-2xl font-black">{brl.format(Number(currentPlan.monthly_price))}<span className="text-xs font-medium text-muted-foreground">/mês</span></div>}
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="gd-auto-grid gap-4">
             {plans.map((plan: any) => {
               const current = plan.code === subscription?.plan_code;
               const limits = plan.entitlements || {};

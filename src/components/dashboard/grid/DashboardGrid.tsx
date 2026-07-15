@@ -31,7 +31,7 @@ const SYSTEM_TAIL = [
 export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSale }: Props) {
   const isMobile = useIsMobile();
   const [isCompact, setIsCompact] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches,
+    typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches,
   );
   // Local state mirrors the persisted view, with auto-debounced save via onChange.
   const [layout, setLayout] = useState<any[]>(view.layout || []);
@@ -44,7 +44,7 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
   }, [view.id]);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 1023px)");
+    const media = window.matchMedia("(max-width: 1279px)");
     const update = () => setIsCompact(media.matches);
     media.addEventListener("change", update);
     update();

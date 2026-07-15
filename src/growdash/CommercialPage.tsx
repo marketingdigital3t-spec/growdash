@@ -66,7 +66,7 @@ export default function CommercialPage() {
           </div>
         )}
       />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="gd-auto-grid gap-3">
         <MetricCard label="Receita líquida" value={isLoading ? "Carregando…" : brl.format(totals.totalNet)} change="período" emphasis />
         <MetricCard label="Vendas" value={isLoading ? "Carregando…" : String(totals.totalQuantity)} change="confirmadas + pendentes" />
         <MetricCard label="Ticket médio" value={isLoading ? "Carregando…" : brl.format(totals.arpu)} change="por item" />

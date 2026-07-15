@@ -534,12 +534,10 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
     setFunnelHidden((prev) => ({ ...prev, [objective]: removed }));
   };
 
-  const kpiGridCols = kpis.length >= 6 ? "lg:grid-cols-6" : kpis.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3";
-
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {/* 1. KPIs principais */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+      <div className="gd-auto-grid gap-2 sm:gap-3">
         <MetricCard title="Faturamento Líquido" value={salesMetrics.totalNet} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
@@ -736,7 +734,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
           </Card>
         ) : (
           <>
-            <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${kpiGridCols} sm:gap-3`}>
+            <div className="gd-auto-grid-compact gap-2 sm:gap-3">
               {kpis.map((k) => (
                 <MetricCard
                   key={k.title}

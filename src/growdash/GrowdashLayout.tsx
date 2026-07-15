@@ -236,7 +236,7 @@ export default function GrowdashLayout() {
             </button>
           </div>
         </header>
-        <main className="min-h-[calc(100vh-48px)] min-w-0 max-w-full overflow-x-clip p-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] sm:p-5">
+        <main className="growdash-main min-h-[calc(100vh-48px)] min-w-0 max-w-full overflow-x-clip p-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] sm:p-5">
           <Outlet />
         </main>
       </div>

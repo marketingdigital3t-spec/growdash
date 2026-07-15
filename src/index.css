@@ -169,8 +169,39 @@
 
 @layer components {
   .gd-panel {
-    @apply rounded-xl border border-[#ded9d2] bg-white shadow-[0_1px_2px_rgba(20,16,10,.035)] dark:border-[#292720] dark:bg-[#111216] dark:shadow-none;
+    @apply min-w-0 max-w-full rounded-xl border border-[#ded9d2] bg-white shadow-[0_1px_2px_rgba(20,16,10,.035)] dark:border-[#292720] dark:bg-[#111216] dark:shadow-none;
   }
+
+  .gd-auto-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  }
+
+  .gd-auto-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr));
+  }
+
+  .growdash-main {
+    container-type: inline-size;
+  }
+
+  .growdash-main :where(section, article, div, header, footer, nav, form, fieldset) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+.growdash-main :is(
+  [class~="sm:grid-cols-4"],
+  [class~="lg:grid-cols-4"],
+  [class~="lg:grid-cols-5"],
+  [class~="lg:grid-cols-6"],
+  [class~="xl:grid-cols-4"],
+  [class~="xl:grid-cols-5"],
+  [class~="xl:grid-cols-6"]
+  ):not(nav):not([role="tablist"]) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
 
   .gd-button {
     @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d8d2ca] bg-white px-3 text-[10px] font-bold text-[#4e4943] shadow-sm transition hover:border-[#c4ad6a] hover:bg-[#fffaf0] dark:border-[#343127] dark:bg-[#17181d] dark:text-[#e7e1d7] dark:hover:bg-[#242117];
@@ -251,6 +282,23 @@
   }
 
   .gd-panel {
+    max-width: 100%;
+  }
+
+  .growdash-main [role="tablist"] {
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .growdash-main [role="tab"] {
+    min-height: 44px;
+    flex: 0 0 auto;
+  }
+
+  .growdash-main :where(button, a, input, select, textarea) {
     max-width: 100%;
   }
 }

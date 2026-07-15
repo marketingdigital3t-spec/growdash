@@ -10,8 +10,10 @@ export function PageHeading({ eyebrow, title, description, actions }: { eyebrow?
         <h1 className="text-2xl font-black tracking-tight text-[#171512] dark:text-[#f4f1e9] sm:text-3xl">{title}</h1>
         <p className="mt-1 max-w-2xl text-sm text-[#77716a] dark:text-[#aaa398]">{description}</p>
       </div>
-      {actions ?? (
-        <div className="flex gap-2">
+      {actions ? (
+        <div className="flex w-full min-w-0 [&>*]:w-full md:w-auto md:[&>*]:w-auto">{actions}</div>
+      ) : (
+        <div className="flex w-full flex-col gap-2 min-[420px]:flex-row md:w-auto">
           <button className="gd-button"><CalendarRange className="h-4 w-4" /> Últimos 30 dias</button>
           <button className="gd-button"><RefreshCw className="h-4 w-4" /> Atualizar</button>
         </div>
@@ -23,15 +25,15 @@ export function PageHeading({ eyebrow, title, description, actions }: { eyebrow?
 export function MetricCard({ label, value, change, emphasis }: { label: string; value: string; change: string; emphasis?: boolean }) {
   const negative = change.startsWith("-") || change === "revisar" || change === "agora";
   return (
-    <div className={cn("gd-panel p-4", emphasis && "border-[#e4bc4b]/60 bg-gradient-to-br from-[#fffdf7] to-[#faf3dd] dark:from-[#211c10] dark:to-[#15140f]")}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold text-[#77716a] dark:text-[#aaa398]">{label}</span>
-        <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-bold", negative ? "text-[#b95b51]" : "text-[#43845c]")}>
+    <div className={cn("gd-panel min-w-0 overflow-hidden p-4", emphasis && "border-[#e4bc4b]/60 bg-gradient-to-br from-[#fffdf7] to-[#faf3dd] dark:from-[#211c10] dark:to-[#15140f]")}>
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <span className="min-w-0 break-words text-[11px] font-semibold leading-tight text-[#77716a] dark:text-[#aaa398]" title={label}>{label}</span>
+        <span className={cn("inline-flex shrink-0 items-center gap-0.5 text-[10px] font-bold", negative ? "text-[#b95b51]" : "text-[#43845c]")}>
           {negative ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
           {change}
         </span>
       </div>
-      <div className="mt-3 text-[22px] font-black tracking-tight text-[#211e1a] dark:text-[#f4f1e9]">{value}</div>
+      <div className="mt-3 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,2vw,1.375rem)] font-black tracking-tight text-[#211e1a] dark:text-[#f4f1e9]" title={value}>{value}</div>
     </div>
   );
 }

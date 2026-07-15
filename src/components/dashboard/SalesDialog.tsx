@@ -234,7 +234,7 @@ export function SalesDialog({ open, onOpenChange, editingSale }: SalesDialogProp
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
             <div>
               <Label>Valor Bruto (R$)</Label>
               <CurrencyInput value={grossRevenue} onChange={setGrossRevenue} />
@@ -298,7 +298,7 @@ export function SalesDialog({ open, onOpenChange, editingSale }: SalesDialogProp
               <Label>Nome do Contato</Label>
               <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome completo" />
             </div>
-            <div className="grid grid-cols-3 gap-3 mt-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
               <div>
                 <Label>Cidade</Label>
                 <Input value={leadCity} onChange={(e) => setLeadCity(e.target.value)} placeholder="Cidade" />

@@ -23,7 +23,7 @@ export default function DashboardPage() {
         )}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="gd-auto-grid gap-3">
         <MetricCard label="Receita no período" value="R$ 126.400" change="+18,2%" emphasis />
         <MetricCard label="Leads gerados" value="1.286" change="+12,4%" />
         <MetricCard label="Investimento em mídia" value="R$ 18.540" change="+6,8%" />
@@ -64,7 +64,7 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="gd-auto-grid mt-4 gap-3">
         {[
           [Target, "Conversão do funil", "18,4%", "+2,1%"],
           [UsersRound, "Oportunidades", "214", "+8%"],

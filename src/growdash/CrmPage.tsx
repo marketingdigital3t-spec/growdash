@@ -95,7 +95,7 @@ export default function CrmPage() {
           </div>
         )}
       />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="gd-auto-grid gap-3">
         <MetricCard label="Negociações ativas" value={String(stats.active)} change="período" emphasis />
         <MetricCard label="Receita em aberto" value={brl.format(stats.openRevenue)} change="período" />
         <MetricCard label="Vendas no período" value={String(stats.won)} change={brl.format(stats.wonRevenue)} />
