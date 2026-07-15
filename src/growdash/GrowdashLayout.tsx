@@ -21,10 +21,21 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { PRESET_LABELS, type DatePreset } from "@/hooks/useDateFilter";
 import { useIsMaster } from "@/hooks/useIsMaster";
 import { BrandLogo, BrandMark } from "@/components/BrandLogo";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
+
+function getInitialSidebarState() {
+  if (typeof window === "undefined") return false;
+  const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+  if (saved !== null) return saved === "true";
+  return window.innerWidth >= 768 && window.innerWidth < 1024;
+}
 
 export default function GrowdashLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(getInitialSidebarState);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const { pathname } = useLocation();
   const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
@@ -53,6 +64,19 @@ export default function GrowdashLayout() {
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+  }, [collapsed]);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+  useEffect(() => {
     if (adAccountId !== "all" && businessUnitId && !visibleAccounts.some((account) => account.id === adAccountId)) {
       setAdAccountId("all");
     }
@@ -63,14 +87,14 @@ export default function GrowdashLayout() {
       <aside
         className={cn(
           "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-white transition-all duration-300",
-          collapsed ? "w-[78px]" : "w-[220px]",
-          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          collapsed ? "w-16" : "w-[220px]",
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
-        <div className="flex h-[86px] shrink-0 items-center border-b border-white/5 px-4">
+        <div className={cn("flex h-[86px] shrink-0 items-center border-b border-white/5", collapsed ? "justify-center px-2" : "px-4")}>
           <NavLink to="/" className="flex min-w-0 items-center" aria-label="Growdash - início">
             {collapsed ? (
-              <BrandMark className="h-11 w-11 shrink-0 drop-shadow-[0_0_12px_rgba(255,193,45,.3)]" />
+              <BrandMark className="h-10 w-10 shrink-0 drop-shadow-[0_0_12px_rgba(255,193,45,.3)]" />
             ) : (
               <BrandLogo eager className="h-[66px] w-[178px] shrink-0" />
             )}
@@ -78,13 +102,14 @@ export default function GrowdashLayout() {
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 lg:hidden"
+            className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 md:hidden"
             aria-label="Fechar menu"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
+        <TooltipProvider delayDuration={180}>
         <nav className="grow overflow-y-auto px-2 py-4 growdash-scrollbar">
           {NAV_SECTIONS.map((section) => (
             <section key={section.label} className="mb-5">
@@ -97,9 +122,8 @@ export default function GrowdashLayout() {
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  return (
+                  const link = (
                     <NavLink
-                      key={item.path}
                       to={item.path}
                       end={item.path === "/"}
                       title={collapsed ? item.label : undefined}
@@ -117,11 +141,20 @@ export default function GrowdashLayout() {
                       {!collapsed && <span className="truncate">{item.label}</span>}
                     </NavLink>
                   );
+                  return collapsed ? (
+                    <Tooltip key={item.path}>
+                      <TooltipTrigger asChild>{link}</TooltipTrigger>
+                      <TooltipContent side="right" sideOffset={10} className="border-[#d3a62e]/35 bg-[#12100b] text-xs font-semibold text-[#f8df9a] shadow-xl">
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : <div key={item.path}>{link}</div>;
                 })}
               </div>
             </section>
           ))}
         </nav>
+        </TooltipProvider>
 
         <div className="shrink-0 border-t border-white/10 p-2">
           <button
@@ -163,17 +196,17 @@ export default function GrowdashLayout() {
         <button
           type="button"
           aria-label="Fechar navegação"
-          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm md:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", collapsed ? "lg:pl-[78px]" : "lg:pl-[220px]")}>
+      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", collapsed ? "md:pl-16" : "md:pl-[220px]")}>
         <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b px-2 py-2 text-white shadow-sm sm:px-5">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="mr-3 rounded-md p-1.5 text-white/75 hover:bg-white/10 lg:hidden"
+            className="mr-3 rounded-md p-1.5 text-white/75 hover:bg-white/10 md:hidden"
             aria-label="Abrir menu"
           >
             <Menu className="h-5 w-5" />
@@ -181,7 +214,7 @@ export default function GrowdashLayout() {
           <button
             type="button"
             onClick={() => setCollapsed((value) => !value)}
-            className="mr-4 hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 lg:block"
+            className="mr-4 hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 md:block"
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
           >
             <PanelLeftClose className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
@@ -236,6 +269,11 @@ export default function GrowdashLayout() {
           <Outlet />
         </main>
       </div>
+      {!isOnline && (
+        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#17130a]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
+          Você está offline. Os dados exibidos podem estar desatualizados e nenhuma alteração será enviada até a conexão voltar.
+        </div>
+      )}
     </div>
   );
 }

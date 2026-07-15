@@ -34,6 +34,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
@@ -43,11 +44,31 @@ import { cn } from "@/lib/utils";
 import { getStatusBadge } from "@/lib/status";
 import { MetaTableControls } from "@/components/campaigns/MetaTableControls";
 import { getBreakdownLabel, getMetaColumnPreset, type CampaignColumnKey, type MetaColumnPresetKey } from "@/lib/metaTableConfig";
+import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 
 type CampSortKey = "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
 type CampColKey = CampaignColumnKey;
 type AdsetColKey = "name" | "campaign" | "budget" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
 type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
+type CampaignHealth = "critical" | "warning" | "observation" | "initial" | "healthy" | "inactive";
+
+const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; active: string }> = [
+  { id: "critical", label: "Crítico", dot: "bg-red-500", active: "border-red-500/55 bg-red-500/10 text-red-500" },
+  { id: "warning", label: "Atenção", dot: "bg-amber-400", active: "border-amber-400/55 bg-amber-400/10 text-amber-500" },
+  { id: "observation", label: "Observação", dot: "bg-orange-500", active: "border-orange-500/55 bg-orange-500/10 text-orange-500" },
+  { id: "initial", label: "Estado inicial", dot: "bg-blue-500", active: "border-blue-500/55 bg-blue-500/10 text-blue-500" },
+  { id: "healthy", label: "Saudável", dot: "bg-emerald-500", active: "border-emerald-500/55 bg-emerald-500/10 text-emerald-500" },
+  { id: "inactive", label: "Inativas", dot: "bg-zinc-400", active: "border-zinc-400/55 bg-zinc-400/10 text-zinc-500" },
+];
+
+function getCampaignHealth(campaign: any, averageCpl: number): CampaignHealth {
+  if (normalizeStatus(campaign.status) !== "ACTIVE") return "inactive";
+  if (campaign.spend <= 0 || campaign.impressions <= 0) return "initial";
+  if (campaign.leads <= 0 || (averageCpl > 0 && campaign.cpl > averageCpl * 1.45)) return "critical";
+  if (campaign.ctr < 0.8 || (averageCpl > 0 && campaign.cpl > averageCpl * 1.15)) return "warning";
+  if (campaign.frequency >= 3 || campaign.conversionRate < 3) return "observation";
+  return "healthy";
+}
 
 const CAMP_DEFAULTS: Record<CampColKey, number> = {
   check: 44, name: 300, delivery: 156, objective: 130, budget: 120, spend: 120, impressions: 120,
@@ -80,6 +101,8 @@ export default function Campaigns() {
   });
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
+  const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
+  const [showIntelligence, setShowIntelligence] = useState(false);
   const pageSize = 50;
 
   useEffect(() => {
@@ -179,6 +202,18 @@ export default function Campaigns() {
     },
   });
 
+  const averageCpl = useMemo(() => {
+    const withLeads = campaigns.filter((campaign: any) => campaign.leads > 0 && campaign.spend > 0);
+    const spend = withLeads.reduce((sum: number, campaign: any) => sum + campaign.spend, 0);
+    const leads = withLeads.reduce((sum: number, campaign: any) => sum + campaign.leads, 0);
+    return leads > 0 ? spend / leads : 0;
+  }, [campaigns]);
+
+  const healthCounts = useMemo(() => campaigns.reduce((counts: Record<CampaignHealth, number>, campaign: any) => {
+    counts[getCampaignHealth(campaign, averageCpl)] += 1;
+    return counts;
+  }, { critical: 0, warning: 0, observation: 0, initial: 0, healthy: 0, inactive: 0 }), [averageCpl, campaigns]);
+
   const filtered = useMemo(() => {
     let result = campaigns;
     if (search) {
@@ -188,6 +223,9 @@ export default function Campaigns() {
     if (statusFilter !== "all") {
       result = result.filter((c: any) => normalizeStatus(c.status) === statusFilter);
     }
+    if (healthFilter !== "all") {
+      result = result.filter((c: any) => getCampaignHealth(c, averageCpl) === healthFilter);
+    }
     result = [...result].sort((a: any, b: any) => {
       const av = a[sortKey], bv = b[sortKey];
       if (typeof av === "string" && typeof bv === "string") {
@@ -196,10 +234,10 @@ export default function Campaigns() {
       return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
     return result;
-  }, [campaigns, search, statusFilter, sortKey, sortAsc]);
+  }, [averageCpl, campaigns, healthFilter, search, statusFilter, sortKey, sortAsc]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedCampaigns = useMemo(() => filtered.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize), [campaignPage, filtered]);
-  useEffect(() => { setCampaignPage(0); }, [search, statusFilter, selectedAccount, startDate, endDate]);
+  useEffect(() => { setCampaignPage(0); }, [search, statusFilter, healthFilter, selectedAccount, startDate, endDate]);
   useEffect(() => { if (campaignPage >= pageCount) setCampaignPage(pageCount - 1); }, [campaignPage, pageCount]);
 
   const toggleSelect = (id: string) => {
@@ -225,13 +263,16 @@ export default function Campaigns() {
 
   const totals = useMemo(() => filtered.reduce(
     (acc: any, c: any) => ({
-      spend: acc.spend + c.spend, leads: acc.leads + c.leads,
+      budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads,
       salesCount: acc.salesCount + c.salesCount, revenue: acc.revenue + c.revenue,
       profit: acc.profit + c.profit, impressions: acc.impressions + c.impressions, clicks: acc.clicks + c.clicks,
       reach: acc.reach + c.reach,
     }),
-    { spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0 }
+    { budget: 0, spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0 }
   ), [filtered]);
+  const totalCtr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
+  const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+  const totalCpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : 0;
 
   const activeCampaigns = useMemo(() => campaigns.filter((campaign: any) => {
     const matchesSearch = !search || campaign.name.toLowerCase().includes(search.toLowerCase());
@@ -370,7 +411,7 @@ export default function Campaigns() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Pesquise por nome da campanha"
+              placeholder="Pesquise para filtrar por: nome, identificação ou métrica"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 border-border bg-background pl-9"
@@ -402,6 +443,16 @@ export default function Campaigns() {
         </div>
       </MotionItem>
 
+      <MotionItem className="border-b border-border bg-card px-2 py-2 sm:px-3">
+        <div className="growdash-scrollbar grid grid-flow-col auto-cols-[minmax(132px,1fr)] gap-2 overflow-x-auto xl:grid-flow-row xl:grid-cols-6">
+          {HEALTH_OPTIONS.map((option) => {
+            const count = healthCounts[option.id];
+            const selected = healthFilter === option.id;
+            return <button key={option.id} type="button" onClick={() => setHealthFilter(selected ? "all" : option.id)} className={cn("flex min-h-12 items-center gap-2 rounded-lg border border-border bg-muted/25 px-3 text-left transition hover:border-primary/35 hover:bg-primary/5", selected && option.active, option.id === "critical" && count > 0 && "shadow-[0_0_18px_-10px_rgba(239,68,68,.9)]")} aria-pressed={selected}><span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", option.dot, option.id === "critical" && count > 0 && "animate-pulse")} /><span className="min-w-0 grow"><span className="block truncate text-[9px] font-black uppercase tracking-wide">{option.label}</span><span className="block text-lg font-black tabular-nums">{count}</span></span></button>;
+          })}
+        </div>
+      </MotionItem>
+
       <MotionItem>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-muted/50 p-0">
@@ -429,7 +480,7 @@ export default function Campaigns() {
             <Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-8 gap-2">
               <Eye className="h-4 w-4" /> Ver desempenho
             </Button>
-            <Button variant="outline" size="sm" onClick={downloadCampaigns} disabled={filtered.length === 0} className="h-8 gap-2">
+            <Button size="sm" onClick={downloadCampaigns} disabled={filtered.length === 0} className="gold-action h-8 gap-2">
               <Download className="h-4 w-4" /> <span className="hidden sm:inline">Baixar relatório</span>
             </Button>
             <AnimatePresence>
@@ -442,12 +493,14 @@ export default function Campaigns() {
                 </motion.div>
               )}
             </AnimatePresence>
-            <div className="ml-auto">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {activeTab === "campaigns" && <Button variant="outline" size="sm" onClick={() => setShowIntelligence((value) => !value)} className={cn("h-8 gap-2", showIntelligence && "border-primary bg-primary/10 text-foreground")} aria-pressed={showIntelligence}><Sparkles className="h-4 w-4 text-primary" />Meta Intelligence</Button>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
             </div>
           </div>
 
           {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
+          {activeTab === "campaigns" && showIntelligence && <TrafficAIAnalysis accountId={selectedAccount} accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name} startDate={startDate} endDate={endDate} selectedCampaignIds={Array.from(selectedIds)} />}
 
           {/* Campaigns Tab */}
           <TabsContent value="campaigns" className="m-0">
@@ -462,7 +515,7 @@ export default function Campaigns() {
               <Card className="overflow-hidden rounded-none border-0 shadow-none">
                 <div className="growdash-scrollbar overflow-x-auto">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
                       <TableRow className="h-11 border-b border-border bg-muted/60 hover:bg-muted/60">
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")}>
                           <Checkbox checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
@@ -500,13 +553,14 @@ export default function Campaigns() {
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
                             className={`h-12 cursor-pointer border-b border-border transition-colors hover:bg-primary/5 ${selectedIds.has(c.id) ? "bg-primary/10" : "odd:bg-card even:bg-muted/20"}`}
-                            onClick={() => toggleSelect(c.id)}
+                            onClick={() => setDetailCampaignId(c.id)}
                           >
                             <TableCell style={cellW("check")} onClick={(e) => e.stopPropagation()}>
                               <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
                             </TableCell>
                             {showColumn("name") && <TableCell style={cellW("name")} className="font-medium">
                               <div className="flex items-center gap-2 min-w-0">
+                                <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary" />
                                 <span className="truncate font-semibold text-[#6f5311]" title={c.name}>{c.name}</span>
                               </div>
                             </TableCell>}
@@ -567,14 +621,18 @@ export default function Campaigns() {
                     </TableBody>
                   </Table>
                 </div>
-                <div className="border-t border-border bg-muted/50 px-4 py-3">
-                  <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                    <span className="font-semibold">{filtered.length} campanha{filtered.length !== 1 ? "s" : ""}</span>
-                    <span>Vendas: <strong><AnimatedNumber value={totals.salesCount} decimals={0} /></strong></span>
-                    <span>Gastos: <strong><AnimatedNumber value={totals.spend} prefix="R$ " decimals={2} /></strong></span>
-                    <span>Faturamento: <strong><AnimatedNumber value={totals.revenue} prefix="R$ " decimals={2} /></strong></span>
-                    <span className={colorClass(totals.profit)}>Lucro: <strong><AnimatedNumber value={totals.profit} prefix="R$ " decimals={2} /></strong></span>
-                    <span>Leads: <strong><AnimatedNumber value={totals.leads} decimals={0} /></strong></span>
+                <div className="sticky bottom-0 z-20 border-t border-primary/20 bg-card/95 px-3 py-3 shadow-[0_-10px_28px_rgba(0,0,0,.12)] backdrop-blur-xl">
+                  <div className="growdash-scrollbar flex min-w-0 gap-2 overflow-x-auto pb-1">
+                    <TotalMetric label={`Totais (${filtered.length})`} value={`${filtered.length} campanhas`} />
+                    <TotalMetric label="Orçamento" value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+                    <TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+                    <TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} />
+                    <TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} />
+                    <TotalMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />
+                    <TotalMetric label="CPC" value={totalCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+                    <TotalMetric label="CPM" value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+                    <TotalMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} />
+                    <TotalMetric label="Vendas" value={totals.salesCount.toLocaleString("pt-BR")} />
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3"><span className="text-[10px] text-muted-foreground">Exibindo {filtered.length ? campaignPage * pageSize + 1 : 0}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}; 50 por página para reduzir renderização.</span><div className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-20 text-center text-[10px]">Página {campaignPage + 1} de {pageCount}</span><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>
                   {(showColumn("reach") || showColumn("frequency")) && <p className="mt-2 text-[9px] text-muted-foreground">* Alcance soma linhas diárias por anúncio e pode repetir pessoas; a frequência é direcional até a sincronização de alcance deduplicado por período.</p>}
@@ -702,6 +760,8 @@ export default function Campaigns() {
         open={!!detailCampaignId}
         onOpenChange={(v) => !v && setDetailCampaignId(null)}
         campaign={detailCampaignId ? (campaigns.find((c: any) => c.id === detailCampaignId) || null) : null}
+        onEdit={(campaign) => { setDetailCampaignId(null); setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status }); }}
+        onViewAds={(campaign) => { setSelectedIds(new Set([campaign.id])); setActiveTab("ads"); setDetailCampaignId(null); }}
       />
       <MetaEntityEditor
         entity={editingEntity}
@@ -710,4 +770,8 @@ export default function Campaigns() {
       />
     </MotionPage>
   );
+}
+
+function TotalMetric({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-[118px] shrink-0 rounded-lg border border-border/70 bg-muted/35 px-3 py-2"><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-0.5 block whitespace-nowrap text-xs tabular-nums">{value}</strong></div>;
 }

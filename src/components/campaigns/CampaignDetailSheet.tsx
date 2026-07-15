@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronRight, ChevronDown, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, History, Target } from "lucide-react";
+import { ChevronRight, ChevronDown, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, History, Target, Pencil, PauseCircle, PlayCircle, Layers3 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -35,6 +35,7 @@ interface Ad {
 interface CampaignDetail {
   id: string;
   name: string;
+  status: string;
   spend: number; leads: number; clicks: number; impressions: number;
   salesCount: number; revenue: number; profit: number; roi: number;
   cpa: number; cpl: number; ctr: number;
@@ -45,6 +46,8 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   campaign: CampaignDetail | null;
+  onEdit?: (campaign: CampaignDetail) => void;
+  onViewAds?: (campaign: CampaignDetail) => void;
 }
 
 function fmt(n: number, prefix = "") {
@@ -72,7 +75,7 @@ function aggregate(insights: Insight[]) {
   return { spend, leads, clicks, impressions, cpl, ctr, conv, freq };
 }
 
-export function CampaignDetailSheet({ open, onOpenChange, campaign }: Props) {
+export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onViewAds }: Props) {
   const { toast } = useToast();
   const { data: targetData } = useCampaignTarget(campaign?.id);
   const setTarget = useSetCampaignTarget();
@@ -197,8 +200,14 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign }: Props) {
           <SheetDescription>Análise de desempenho da campanha</SheetDescription>
         </SheetHeader>
 
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
+          <Button variant="outline" size="sm" onClick={() => onEdit?.(campaign)}><Pencil className="mr-2 h-4 w-4" />Editar</Button>
+          <Button variant="outline" size="sm" onClick={() => onEdit?.(campaign)}>{campaign.status === "ACTIVE" ? <PauseCircle className="mr-2 h-4 w-4" /> : <PlayCircle className="mr-2 h-4 w-4" />}{campaign.status === "ACTIVE" ? "Pausar" : "Ativar"}</Button>
+          <Button variant="outline" size="sm" onClick={() => onViewAds?.(campaign)}><Layers3 className="mr-2 h-4 w-4" />Ver anúncios</Button>
+        </div>
+
         {/* KPIs */}
-        <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {[
             { label: "Gastos", value: fmt(campaign.spend, "R$ ") },
             { label: "Leads", value: fmtInt(campaign.leads) },
