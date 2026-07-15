@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy, Suspense, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, GitBranch, Megaphone,
-  RefreshCw, Sparkles, Target, TrendingUp, WalletCards, X,
+  MessageCircle, MousePointerClick, RefreshCw, Smartphone, Sparkles, Target,
+  TrendingUp, UsersRound, Video, WalletCards, X, Zap,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -18,6 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getTrafficFunnelTemplates, trafficObjectives, type TrafficObjectiveId } from "@/lib/trafficFunnelTemplates";
 import { useToast } from "@/hooks/use-toast";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const CampaignsManager = lazy(() => import("@/pages/Campaigns"));
 const validTabs = new Set(["campaigns", "budget", "ai", "funnels"]);
@@ -102,10 +107,100 @@ function AIAndLeadReports({ accountId, accountName }: { accountId: string; accou
 
 function TrafficFunnels() {
   const [objective, setObjective] = useState<TrafficObjectiveId>("leads");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const { data: workspace } = useWorkspace();
+  const { user } = useAuth();
+  const { businessUnitId } = useGlobalFilters();
+  const { toast } = useToast();
   const current = trafficObjectives.find((item) => item.id === objective)!;
   const templates = getTrafficFunnelTemplates(objective);
-  return <div className="space-y-4"><section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/15 text-primary"><GitBranch className="h-5 w-5" /></span><div><h2 className="font-black">Biblioteca de Funis de Tráfego</h2><p className="text-xs text-muted-foreground">60 estruturas: 10 modelos para cada objetivo de campanha da Meta.</p></div></div><div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">{trafficObjectives.map((item) => <button key={item.id} onClick={() => { setObjective(item.id); setExpanded(null); }} className={cn("rounded-xl border p-3 text-left transition", objective === item.id ? "border-primary bg-primary/10" : "border-border bg-muted/15 hover:bg-muted/40")}><span className="text-[11px] font-black">{item.label}</span><span className="mt-1 block text-[9px] text-muted-foreground">10 modelos</span></button>)}</div></section><section className="rounded-xl border border-border bg-card p-4"><header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end"><div><span className="text-[9px] font-black uppercase tracking-[.14em] text-primary">Objetivo selecionado</span><h3 className="text-xl font-black">{current.label}</h3><p className="text-xs text-muted-foreground">{current.description} KPI principal: {current.primaryKpi}.</p></div><span className="rounded-full bg-primary/10 px-3 py-1.5 text-[10px] font-black text-primary sm:ml-auto">10 funis prontos</span></header><div className="grid gap-3 lg:grid-cols-2">{templates.map((template) => <article key={template.id} className="overflow-hidden rounded-xl border border-border bg-muted/10"><button className="flex w-full items-center gap-3 p-4 text-left" onClick={() => setExpanded(expanded === template.id ? null : template.id)}><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#1d1b17] text-[#f2c94c]"><Target className="h-4 w-4" /></span><span className="min-w-0 grow"><strong className="block text-sm">{template.name}</strong><span className="block truncate text-[10px] text-muted-foreground">{template.bestFor}</span></span><ChevronRight className={cn("h-4 w-4 transition", expanded === template.id && "rotate-90")} /></button>{expanded === template.id && <div className="border-t border-border p-4"><p className="text-xs text-muted-foreground">{template.strategy}</p><div className="growdash-scrollbar mt-4 flex items-center gap-1 overflow-x-auto pb-2">{template.stages.map((stage, index) => <div key={`${template.id}-${stage}`} className="flex shrink-0 items-center gap-1"><span className="rounded-lg border border-border bg-background px-3 py-2 text-[10px] font-bold">{stage}</span>{index < template.stages.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-primary" />}</div>)}</div><div className="mt-3 grid gap-2 sm:grid-cols-2"><SmallMetric label="KPI principal" value={template.primaryKpi} /><SmallMetric label="Regra de segurança" value={template.guardrail} /></div></div>}</article>)}</div></section></div>;
+
+  const prefix: Record<TrafficObjectiveId, string> = {
+    awareness: "AW", traffic: "TR", engagement: "EN", leads: "LD", app: "AP", sales: "SL",
+  };
+
+  async function selectTemplate(template: (typeof templates)[number]) {
+    if (!workspace?.id || workspace.id.startsWith("legacy-") || !user?.id) {
+      toast({ title: "Estrutura pronta para configurar", description: "Aplique as migrações do banco para salvar este playbook como rascunho." });
+      return;
+    }
+    setSaving(template.id);
+    try {
+      const payload = {
+        workspace_id: workspace.id,
+        business_unit_id: businessUnitId?.startsWith("legacy-") ? null : businessUnitId || null,
+        created_by: user.id,
+        name: template.name.replace(/^\d+\.\s*/, ""),
+        objective,
+        template_key: template.id,
+        status: "draft",
+        config: {
+          stages: template.stages,
+          strategy: template.strategy,
+          best_for: template.bestFor,
+          primary_kpi: template.primaryKpi,
+          guardrail: template.guardrail,
+        },
+      };
+      const { data: existing, error: findError } = await (supabase as any)
+        .from("traffic_playbooks")
+        .select("id")
+        .eq("workspace_id", workspace.id)
+        .eq("template_key", template.id)
+        .in("status", ["draft", "active", "paused"])
+        .maybeSingle();
+      if (findError) throw findError;
+      const request = existing?.id
+        ? (supabase as any).from("traffic_playbooks").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", existing.id)
+        : (supabase as any).from("traffic_playbooks").insert(payload);
+      const { error } = await request;
+      if (error) throw error;
+      toast({ title: "Funil salvo como rascunho", description: "Revise público, orçamento, criativos e eventos antes de executar o playbook." });
+    } catch (error: any) {
+      const pending = /does not exist|schema cache|traffic_playbooks/i.test(error?.message || "");
+      toast({ variant: "destructive", title: pending ? "Migração pendente" : "Não foi possível salvar", description: pending ? "Aplique a migração da biblioteca de playbooks no Supabase." : error?.message || "Tente novamente." });
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return <div className="space-y-4">
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <header className="border-b border-border px-4 py-5 sm:px-6">
+        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/15 text-primary"><GitBranch className="h-5 w-5" /></span><div><h2 className="text-xl font-black">Funis de tráfego</h2><p className="text-xs text-muted-foreground">10 funis prontos para cada objetivo do gerenciador de anúncios. Escolha o playbook de cada campanha.</p></div></div>
+        <div className="growdash-scrollbar mt-5 flex gap-1 overflow-x-auto rounded-xl bg-muted/55 p-1" role="tablist" aria-label="Objetivos de campanha">
+          {trafficObjectives.map((item) => <button key={item.id} role="tab" aria-selected={objective === item.id} onClick={() => setObjective(item.id)} className={cn("flex min-w-max items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition", objective === item.id ? "border border-primary/50 bg-background text-primary shadow-sm" : "text-muted-foreground hover:bg-background/70 hover:text-foreground")}><span>{item.label}</span><span className="grid h-5 min-w-5 place-items-center rounded-full border border-border bg-muted px-1 text-[9px]">10</span></button>)}
+        </div>
+      </header>
+      <div className="space-y-4 p-4 sm:p-6">
+        <div className="rounded-xl border border-primary/25 bg-primary/[0.035] px-4 py-3"><h3 className="font-black">{current.label}</h3><p className="mt-1 text-xs text-muted-foreground">{current.description} Otimização: <b className="text-foreground">{current.optimization}</b> · KPI: <b className="text-foreground">{current.primaryKpi}</b>.</p></div>
+        {templates.map((template, templateIndex) => <article key={template.id} className="grid overflow-hidden rounded-2xl border border-border bg-muted/[0.08] xl:grid-cols-[230px_minmax(0,1fr)]">
+          <aside className="flex flex-col border-b border-border p-5 xl:border-b-0 xl:border-r">
+            <span className="w-fit rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">{prefix[objective]}-{templateIndex + 1}</span>
+            <h4 className="mt-3 text-lg font-black leading-tight">{template.name.replace(/^\d+\.\s*/, "")}</h4>
+            <ul className="mt-3 space-y-1.5 text-[11px] text-muted-foreground"><li>→ {template.bestFor}</li><li>→ {template.primaryKpi}</li><li>→ Rascunho seguro</li></ul>
+            <Button variant="outline" size="sm" className="mt-5 w-full" disabled={saving === template.id} onClick={() => selectTemplate(template)}>{saving === template.id ? "Salvando…" : "Selecionar este funil"}</Button>
+          </aside>
+          <div className="growdash-scrollbar flex items-stretch gap-2 overflow-x-auto p-5">
+            {template.stages.map((stage, index) => {
+              const icons = [Video, UsersRound, Smartphone, Zap, Target, MessageCircle, MousePointerClick];
+              const StageIcon = icons[index % icons.length];
+              return <div key={`${template.id}-${stage}`} className="flex min-w-0 shrink-0 items-center gap-2">
+                <div className="flex min-h-[145px] w-[205px] flex-col rounded-xl border border-border bg-background p-4">
+                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><StageIcon className="h-4 w-4" /></span>
+                  <strong className="mt-3 text-sm leading-tight">{index + 1}. {stage}</strong>
+                  <span className="mt-1 text-[9px] font-black uppercase tracking-[.08em] text-primary">{index === 0 ? "Aquisição" : index === template.stages.length - 1 ? current.outcome : "Progressão"}</span>
+                  <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{index === 0 ? template.strategy : index === template.stages.length - 1 ? `Conclusão orientada a ${current.primaryKpi}.` : "Avance somente quem cumpriu o sinal de intenção desta etapa."}</p>
+                </div>
+                {index < template.stages.length - 1 && <ChevronRight className="h-5 w-5 shrink-0 text-primary" />}
+              </div>;
+            })}
+          </div>
+          <footer className="border-t border-border px-5 py-3 text-[10px] text-muted-foreground xl:col-span-2"><CircleAlert className="mr-1 inline h-3.5 w-3.5 text-amber-500" /><b className="text-foreground">Regra de segurança:</b> {template.guardrail}</footer>
+        </article>)}
+      </div>
+    </section>
+  </div>;
 }
 
 function Kpi({ label, value, note, emphasis }: { label: string; value: string; note: string; emphasis?: boolean }) { return <article className={cn("rounded-xl border border-border bg-card p-4", emphasis && "border-primary/60 bg-primary/5")}><p className="text-[9px] font-black uppercase tracking-[.12em] text-muted-foreground">{label}</p><p className="mt-2 text-xl font-black">{value}</p><p className="mt-1 text-[10px] text-muted-foreground">{note}</p></article>; }

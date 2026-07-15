@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, CalendarDays, Users, Stethoscope, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { useEventClasses, type EventClassStatus } from "@/hooks/useEventClasses";
+import { Plus, Search, CalendarDays, Users, Stethoscope, AlertTriangle, CheckCircle2, Clock3, MapPin } from "lucide-react";
+import { useEventClasses, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { EventClassCard } from "@/components/event-classes/EventClassCard";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
 import { motion } from "framer-motion";
-import { parseISO, isAfter, differenceInDays } from "date-fns";
+import { parseISO, isAfter, differenceInDays, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Todos os status" },
@@ -45,6 +46,7 @@ export default function EventClasses() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [funnelFilter, setFunnelFilter] = useState<string>("all");
   const [formOpen, setFormOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"classes" | "agenda">("classes");
 
   const filtered = useMemo(() => {
     const list = classes || [];
@@ -105,6 +107,12 @@ export default function EventClasses() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
+      <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas">
+        <button onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" />Datas & Turmas</button>
+        <button onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" />Agenda</button>
+      </nav>
+
+      {activeView === "classes" ? <>
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -177,8 +185,29 @@ export default function EventClasses() {
           <EventClassCard key={ec.id} ec={ec} />
         ))}
       </div>
+      </> : <AgendaPanel classes={filtered} isLoading={isLoading} onCreate={() => setFormOpen(true)} />}
 
       <EventClassFormDialog open={formOpen} onOpenChange={setFormOpen} />
     </div>
   );
+}
+
+function AgendaPanel({ classes, isLoading, onCreate }: { classes: EventClassWithCounts[]; isLoading: boolean; onCreate: () => void }) {
+  const upcoming = classes
+    .filter((eventClass) => eventClass.status !== "cancelled" && eventClass.status !== "finished")
+    .filter((eventClass) => isAfter(parseISO(eventClass.date_end || eventClass.date_start), new Date()) || differenceInDays(parseISO(eventClass.date_start), new Date()) === 0)
+    .sort((a, b) => a.date_start.localeCompare(b.date_start));
+
+  return <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="flex items-center gap-2 text-2xl font-bold"><Clock3 className="h-6 w-6 text-primary" />Agenda de turmas</h1><p className="mt-1 text-sm text-muted-foreground">Próximos encontros, capacidade e origem comercial em ordem cronológica.</p></div><Button onClick={onCreate}><Plus className="mr-2 h-4 w-4" />Nova turma</Button></header>
+    {isLoading ? <Card><CardContent className="py-16 text-center text-sm text-muted-foreground">Carregando agenda…</CardContent></Card> : upcoming.length === 0 ? <Card><CardContent className="py-16 text-center"><CalendarDays className="mx-auto h-10 w-10 text-muted-foreground/40" /><h3 className="mt-3 font-medium">Nenhum evento futuro na agenda</h3><p className="mt-1 text-sm text-muted-foreground">Cadastre uma turma com data futura para começar o planejamento.</p><Button onClick={onCreate} className="mt-5"><Plus className="mr-2 h-4 w-4" />Nova turma</Button></CardContent></Card> : <div className="space-y-3">{upcoming.map((eventClass) => {
+      const peopleCap = eventClass.max_people || eventClass.max_students || 0;
+      const vacancies = Math.max(peopleCap - eventClass.studentCount, 0);
+      return <article key={eventClass.id} className="grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-[140px_minmax(0,1fr)_auto]">
+        <div className="flex flex-row items-center gap-3 border-b border-border bg-primary/[0.04] p-4 sm:flex-col sm:items-start sm:justify-center sm:border-b-0 sm:border-r"><span className="text-2xl font-black text-primary">{format(parseISO(eventClass.date_start), "dd")}</span><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{format(parseISO(eventClass.date_start), "MMM yyyy", { locale: ptBR })}</span></div>
+        <div className="p-4"><div className="flex flex-wrap items-center gap-2"><h2 className="font-black">{eventClass.title}</h2><span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">{eventClass.status === "sold_out" ? "Esgotada" : eventClass.status === "upcoming" ? "Em breve" : "Aberta"}</span></div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span><Clock3 className="mr-1 inline h-3.5 w-3.5" />{format(parseISO(eventClass.date_start), "HH:mm")}{eventClass.date_end ? `–${format(parseISO(eventClass.date_end), "HH:mm")}` : ""}</span>{eventClass.location && <span><MapPin className="mr-1 inline h-3.5 w-3.5" />{eventClass.location}</span>}{eventClass.rd_funnel_name && <span>Funil: {eventClass.rd_funnel_name}</span>}</div></div>
+        <div className="flex items-center gap-5 border-t border-border px-4 py-3 sm:border-l sm:border-t-0"><div className="text-right"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Ocupação</span><strong className="text-sm">{eventClass.studentCount}/{peopleCap}</strong></div><div className="text-right"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Vagas</span><strong className="text-sm text-primary">{vacancies}</strong></div></div>
+      </article>;
+    })}</div>}
+  </motion.section>;
 }

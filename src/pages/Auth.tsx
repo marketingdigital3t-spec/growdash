@@ -1,172 +1,88 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { BarChart3, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const EMAIL_SUFFIX = "@users.local";
+type Mode = "login" | "register";
 
 export default function Auth() {
+  const [mode, setMode] = useState<Mode>("login");
+  const [name, setName] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotLoading, setForgotLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     const raw = identifier.trim();
     const email = raw.includes("@") ? raw : `${raw.toLowerCase()}${EMAIL_SUFFIX}`;
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      toast({ title: "Erro ao entrar", description: "Usuário ou senha inválidos", variant: "destructive" });
-    } else {
+    if (mode === "register" && password !== confirmPassword) { toast({ title: "As senhas não coincidem", variant: "destructive" }); return; }
+    setLoading(true);
+    if (mode === "login") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setLoading(false);
+      if (error) { toast({ title: "Não foi possível entrar", description: "Verifique o email e a senha ou use a recuperação de acesso.", variant: "destructive" }); return; }
       navigate("/", { replace: true });
+      return;
     }
-
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim() } } });
     setLoading(false);
-  };
+    if (error) { toast({ title: "Não foi possível criar a conta", description: error.message, variant: "destructive" }); return; }
+    if (data.session) navigate("/", { replace: true });
+    else toast({ title: "Cadastro realizado", description: "Confirme seu email para acessar a Growdash." });
+  }
 
-  const handleForgot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = forgotEmail.trim();
-    if (!email.includes("@")) {
-      toast({
-        title: "Email inválido",
-        description: "A recuperação só funciona para contas com email real (ex: gmail.com).",
-        variant: "destructive",
-      });
-      return;
-    }
-    setForgotLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setForgotLoading(false);
-    if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-      return;
-    }
-    toast({
-      title: "Email enviado",
-      description: "Verifique sua caixa de entrada para redefinir a senha.",
-    });
-    setForgotOpen(false);
-    setForgotEmail("");
-  };
+  async function recover() {
+    const email = (forgotEmail || identifier).trim();
+    if (!email.includes("@")) { toast({ title: "Informe um email válido", variant: "destructive" }); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}${window.location.pathname}#/reset-password` });
+    setLoading(false);
+    if (error) toast({ title: "Recuperação não enviada", description: error.message, variant: "destructive" });
+    else { toast({ title: "Link de recuperação enviado" }); setForgotOpen(false); }
+  }
 
+  async function social(provider: "google" | "apple") {
+    const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}${window.location.pathname}` } });
+    if (error) toast({ title: `Login ${provider === "google" ? "Google" : "Apple"} indisponível`, description: "Confira se o provedor está habilitado no Supabase.", variant: "destructive" });
+  }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-        className="w-full max-w-md"
-      >
-      <Card className="w-full shadow-xl border-0 relative">
-        <CardHeader className="text-center space-y-4">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <BarChart3 className="h-7 w-7" />
-          </div>
-          <div>
-            <CardTitle className="text-2xl font-bold">Meta Ads Analytics</CardTitle>
-            <CardDescription className="mt-2">Acesso restrito</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Input
-                type="text"
-                placeholder="Usuário"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                autoCapitalize="none"
-                autoComplete="username"
-                required
-              />
-            </div>
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="Senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-opacity duration-300"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <div>
-              <Button
-                type="submit"
-                className="w-full transition-opacity duration-200"
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                    Carregando...
-                  </span>
-                ) : "Entrar"}
-              </Button>
-            </div>
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setForgotOpen((v) => !v)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Esqueci minha senha
-              </button>
-            </div>
-          </form>
+  return <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#020202] p-4 text-white">
+    <div className="pointer-events-none absolute inset-0 opacity-90 [background:radial-gradient(circle_at_8%_18%,rgba(218,158,25,.28),transparent_25%),radial-gradient(circle_at_88%_72%,rgba(185,118,9,.2),transparent_28%),linear-gradient(125deg,transparent_0_20%,rgba(220,163,35,.08)_30%,transparent_42%_70%,rgba(220,163,35,.09)_82%,transparent_92%)]" />
+    <div className="pointer-events-none absolute inset-y-0 left-[4%] w-px bg-gradient-to-b from-transparent via-[#ad7a16]/50 to-transparent" />
+    <div className="pointer-events-none absolute inset-y-0 right-[12%] w-px bg-gradient-to-b from-transparent via-[#ad7a16]/35 to-transparent" />
+    <motion.section initial={{ opacity: 0, y: 18, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .45 }} className="relative w-full max-w-[720px] rounded-[28px] border border-[#8b691e]/45 bg-black/85 px-5 py-8 shadow-[0_25px_90px_rgba(0,0,0,.75),inset_0_0_65px_rgba(181,126,18,.05)] backdrop-blur-xl sm:px-12 sm:py-10">
+      <img src="./growdash-logo-full.png" alt="Growdash" className="mx-auto h-20 w-auto object-contain sm:h-24" />
+      <h1 className="mt-6 text-center text-3xl font-semibold sm:text-5xl">Bem-vindo(a)</h1>
+      <div className="mt-8 grid grid-cols-2 gap-2 rounded-2xl bg-[#0b0909] p-1.5">
+        <button type="button" onClick={() => setMode("login")} className={cn("rounded-xl px-4 py-4 text-lg font-bold transition", mode === "login" ? "bg-[#171313] text-white" : "text-white/65 hover:text-white")}>Entrar</button>
+        <button type="button" onClick={() => setMode("register")} className={cn("rounded-xl px-4 py-4 text-lg font-bold transition", mode === "register" ? "bg-[#171313] text-white" : "text-white/65 hover:text-white")}>Cadastrar</button>
+      </div>
+      <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+        {mode === "register" && <GoldInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />}
+        <GoldInput icon={<Mail />} type="text" value={identifier} onChange={setIdentifier} placeholder="Email" autoComplete="username" />
+        <GoldInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="Senha" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
+        {mode === "register" && <GoldInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
+        {mode === "login" && <div className="flex justify-end"><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="text-sm font-semibold text-[#d4a52b] hover:text-[#ffe175]">Esqueci minha senha</button></div>}
+        {forgotOpen && <div className="rounded-xl border border-[#7a5a18]/50 bg-[#100d08] p-4"><p className="mb-3 text-xs text-white/60">Enviaremos um link seguro para criar uma nova senha.</p><div className="flex flex-col gap-2 sm:flex-row"><input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} className="h-11 min-w-0 flex-1 rounded-lg border border-[#6f531b] bg-black px-3 outline-none focus:border-[#e5b733]" placeholder="seu@email.com" /><button type="button" onClick={recover} className="rounded-lg border border-[#c39625] px-4 text-sm font-bold text-[#e8bd42]">Enviar link</button></div></div>}
+        <button type="submit" disabled={loading} className="group flex h-16 w-full items-center justify-center gap-3 rounded-2xl border border-[#ffe781] bg-gradient-to-r from-[#ffe275] via-[#ffc12f] to-[#e88b08] text-xl font-black text-[#2f2106] shadow-[0_0_30px_rgba(241,181,42,.25)] transition hover:brightness-110 disabled:opacity-60">{loading ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}<ArrowRight className="h-6 w-6 transition group-hover:translate-x-1" /></button>
+      </form>
+      <div className="my-6 flex items-center gap-4 text-sm uppercase tracking-[.2em] text-[#a47a1d]"><span className="h-px flex-1 bg-[#6e5016]" />ou<span className="h-px flex-1 bg-[#6e5016]" /></div>
+      <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => social("google")} className="flex h-14 items-center justify-center gap-3 rounded-xl bg-white text-lg font-bold text-[#292929] transition hover:bg-white/90"><span className="text-xl font-black text-[#4285f4]">G</span>Google</button><button type="button" onClick={() => social("apple")} className="flex h-14 items-center justify-center gap-3 rounded-xl border border-[#6b521b]/70 bg-black text-lg font-bold text-white transition hover:bg-[#0d0d0d]"><span className="text-2xl" aria-hidden="true"></span>Apple</button></div>
+    </motion.section>
+  </main>;
+}
 
-          {forgotOpen && (
-            <motion.form
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              transition={{ duration: 0.25 }}
-              onSubmit={handleForgot}
-              className="mt-4 space-y-3 border-t pt-4"
-            >
-              <p className="text-xs text-muted-foreground">
-                Digite o email da sua conta. Enviaremos um link para redefinir a senha.
-              </p>
-              <Input
-                type="email"
-                placeholder="seu@email.com"
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                required
-              />
-              <Button type="submit" variant="outline" className="w-full" disabled={forgotLoading}>
-                {forgotLoading ? "Enviando..." : "Enviar link de recuperação"}
-              </Button>
-            </motion.form>
-          )}
-        </CardContent>
-      </Card>
-
-      </motion.div>
-    </div>
-  );
+function GoldInput({ icon, type, value, onChange, placeholder, autoComplete, trailing }: { icon: React.ReactNode; type: string; value: string; onChange: (value: string) => void; placeholder: string; autoComplete: string; trailing?: React.ReactNode }) {
+  return <label className="flex h-16 items-center gap-4 rounded-2xl border border-[#6d521b]/60 bg-black/80 px-5 text-[#d3a426] focus-within:border-[#e0ae29] focus-within:shadow-[0_0_18px_rgba(214,161,37,.12)] [&_svg]:h-5 [&_svg]:w-5"><span className="shrink-0">{icon}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} required className="min-w-0 flex-1 bg-transparent text-lg text-white outline-none placeholder:text-white/55" /><span className="shrink-0">{trailing}</span></label>;
 }

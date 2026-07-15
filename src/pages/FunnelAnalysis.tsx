@@ -26,8 +26,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function FunnelAnalysis() {
-  const { adAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
+  const { adAccountId, setAdAccountId, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
+  const visibleAccounts = useMemo(() => businessUnitId
+    ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccounts, businessUnitId, segment]);
   const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(adAccountId === "all" ? undefined : adAccountId);
   const [selectedFunnel, setSelectedFunnel] = useState<string>("");
   const [selectedSource, setSelectedSource] = useState<string>("all");
@@ -83,7 +86,7 @@ export default function FunnelAnalysis() {
   const noStages = !loadingStages && stages.length === 0;
 
   return (
-    <MotionPage className="space-y-6">
+    <MotionPage className="mx-auto max-w-[1700px] space-y-5">
       <MotionItem>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
@@ -103,9 +106,19 @@ export default function FunnelAnalysis() {
       </MotionItem>
 
       <MotionItem>
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-card/40 p-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
+          <Select value={adAccountId} onValueChange={(value) => { setAdAccountId(value); setSelectedFunnel(""); }}>
+            <SelectTrigger className="w-full bg-background/60 sm:w-[230px]">
+              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Conta de anúncio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as contas</SelectItem>
+              {visibleAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Select value={funnelId} onValueChange={setSelectedFunnel} disabled={loadingFunnels || activeFunnels.length === 0}>
-            <SelectTrigger className="w-[240px] bg-background/60">
+            <SelectTrigger className="w-full bg-background/60 sm:w-[260px]">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Funil" />
             </SelectTrigger>
@@ -223,7 +236,7 @@ function FilterSelect({
 }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-[160px] bg-background/60">
+      <SelectTrigger className="w-full bg-background/60 sm:w-[160px]">
         <SelectValue placeholder={label} />
       </SelectTrigger>
       <SelectContent>
