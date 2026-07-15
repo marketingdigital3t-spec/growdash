@@ -8,7 +8,6 @@ import {
   Menu,
   Moon,
   PanelLeftClose,
-  Sparkles,
   Sun,
   X,
 } from "lucide-react";
@@ -21,6 +20,7 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { PRESET_LABELS, type DatePreset } from "@/hooks/useDateFilter";
 import { useIsMaster } from "@/hooks/useIsMaster";
+import { BrandLogo, BrandMark } from "@/components/BrandLogo";
 
 export default function GrowdashLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -59,24 +59,20 @@ export default function GrowdashLayout() {
   }, [adAccountId, businessUnitId, setAdAccountId, visibleAccounts]);
 
   return (
-    <div className="min-h-screen max-w-full overflow-x-clip bg-[#f3f1ef] text-[#1b1917] transition-colors dark:bg-[#090a0d] dark:text-[#f4f1e9]">
+    <div className="brand-shell min-h-screen max-w-full overflow-x-clip text-foreground transition-colors">
       <aside
         className={cn(
-          "growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-[#11110f] text-white transition-all duration-300",
+          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-white transition-all duration-300",
           collapsed ? "w-[78px]" : "w-[220px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
         <div className="flex h-[86px] shrink-0 items-center border-b border-white/5 px-4">
-          <NavLink to="/" className="flex min-w-0 items-center gap-3" aria-label="Growdash - início">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#f4c94d]/50 bg-gradient-to-br from-[#8a6515] to-[#f4c94d] text-black shadow-[0_0_24px_rgba(244,201,77,.22)]">
-              <Sparkles className="h-5 w-5" />
-            </span>
-            {!collapsed && (
-              <span className="leading-[.82] tracking-tight">
-                <span className="block text-[13px] font-medium text-[#d8bd71]">Grow</span>
-                <span className="block text-[24px] font-black text-[#f4d266]">dash</span>
-              </span>
+          <NavLink to="/" className="flex min-w-0 items-center" aria-label="Growdash - início">
+            {collapsed ? (
+              <BrandMark className="h-11 w-11 shrink-0 drop-shadow-[0_0_12px_rgba(255,193,45,.3)]" />
+            ) : (
+              <BrandLogo eager className="h-[66px] w-[178px] shrink-0" />
             )}
           </NavLink>
           <button
@@ -173,7 +169,7 @@ export default function GrowdashLayout() {
       )}
 
       <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", collapsed ? "lg:pl-[78px]" : "lg:pl-[220px]")}>
-        <header className="growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b border-[#332817] bg-[#11110f] px-2 py-2 text-white shadow-sm sm:px-5">
+        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b px-2 py-2 text-white shadow-sm sm:px-5">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}

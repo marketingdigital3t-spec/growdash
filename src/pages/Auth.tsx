@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const EMAIL_SUFFIX = "@users.local";
 type Mode = "login" | "register";
@@ -62,7 +63,7 @@ export default function Auth() {
     <div className="pointer-events-none absolute inset-y-0 left-[4%] w-px bg-gradient-to-b from-transparent via-[#ad7a16]/50 to-transparent" />
     <div className="pointer-events-none absolute inset-y-0 right-[12%] w-px bg-gradient-to-b from-transparent via-[#ad7a16]/35 to-transparent" />
     <motion.section initial={{ opacity: 0, y: 18, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .45 }} className="relative w-full max-w-[720px] rounded-[28px] border border-[#8b691e]/45 bg-black/85 px-5 py-8 shadow-[0_25px_90px_rgba(0,0,0,.75),inset_0_0_65px_rgba(181,126,18,.05)] backdrop-blur-xl sm:px-12 sm:py-10">
-      <img src="./growdash-logo-full.png" alt="Growdash" className="mx-auto h-20 w-auto object-contain sm:h-24" />
+      <BrandLogo eager className="mx-auto h-28 w-full max-w-[390px] sm:h-36" />
       <h1 className="mt-6 text-center text-3xl font-semibold sm:text-5xl">Bem-vindo(a)</h1>
       <div className="mt-8 grid grid-cols-2 gap-2 rounded-2xl bg-[#0b0909] p-1.5">
         <button type="button" onClick={() => setMode("login")} className={cn("rounded-xl px-4 py-4 text-lg font-bold transition", mode === "login" ? "bg-[#171313] text-white" : "text-white/65 hover:text-white")}>Entrar</button>

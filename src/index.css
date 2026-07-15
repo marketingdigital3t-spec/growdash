@@ -4,65 +4,71 @@
 
 @layer base {
   :root {
-    --background: 36 14% 95%;
-    --foreground: 30 10% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 30 10% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 30 10% 10%;
-    --secondary: 35 12% 92%;
-    --secondary-foreground: 30 10% 14%;
-    --muted: 35 12% 92%;
-    --muted-foreground: 30 6% 42%;
-    --accent: 43 76% 91%;
-    --accent-foreground: 35 50% 15%;
+    --background: 40 34% 96%;
+    --foreground: 34 32% 8%;
+    --card: 42 45% 99%;
+    --card-foreground: 34 32% 8%;
+    --popover: 42 45% 99%;
+    --popover-foreground: 34 32% 8%;
+    --secondary: 40 28% 91%;
+    --secondary-foreground: 34 28% 12%;
+    --muted: 40 24% 92%;
+    --muted-foreground: 34 10% 40%;
+    --accent: 42 86% 89%;
+    --accent-foreground: 34 62% 13%;
     --destructive: 4 68% 50%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 48% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 40 88% 50%;
     --warning-foreground: 35 50% 12%;
-    --border: 32 12% 87%;
-    --input: 32 12% 87%;
-    --primary: 43 87% 55%;
-    --primary-foreground: 35 50% 12%;
-    --primary-soft: 43 80% 92%;
+    --border: 39 28% 84%;
+    --input: 39 28% 84%;
+    --primary: 42 100% 58%;
+    --primary-foreground: 34 70% 9%;
+    --primary-soft: 42 86% 90%;
     --accent-pink: 5 70% 60%;
     --accent-green: 145 35% 46%;
-    --accent-yellow: 43 87% 55%;
+    --accent-yellow: 42 100% 58%;
     --accent-lime: 79 55% 62%;
     --sidebar-icon: 30 5% 52%;
-    --sidebar-icon-active: 43 87% 55%;
-    --ring: 43 87% 55%;
+    --sidebar-icon-active: 42 100% 58%;
+    --ring: 42 100% 58%;
     --radius: 0.65rem;
-    --sidebar-background: 45 6% 7%;
-    --sidebar-foreground: 40 20% 92%;
-    --sidebar-primary: 43 87% 55%;
-    --sidebar-primary-foreground: 35 50% 12%;
-    --sidebar-accent: 42 24% 16%;
-    --sidebar-accent-foreground: 43 90% 72%;
-    --sidebar-border: 40 10% 17%;
-    --sidebar-ring: 43 87% 55%;
+    --sidebar-background: 36 45% 2%;
+    --sidebar-foreground: 40 30% 94%;
+    --sidebar-primary: 42 100% 58%;
+    --sidebar-primary-foreground: 34 70% 9%;
+    --sidebar-accent: 39 38% 13%;
+    --sidebar-accent-foreground: 43 100% 75%;
+    --sidebar-border: 39 33% 14%;
+    --sidebar-ring: 42 100% 58%;
+    --brand-black: #070503;
+    --brand-surface: #120d07;
+    --brand-gold: #ffc43d;
+    --brand-gold-light: #ffe28a;
+    --brand-bronze: #c47a08;
+    --brand-ivory: #f7f0e2;
   }
 
   .dark {
-    --background: 225 20% 5%;
-    --foreground: 42 24% 94%;
-    --card: 222 18% 8%;
-    --card-foreground: 42 24% 94%;
-    --popover: 222 18% 8%;
-    --popover-foreground: 42 24% 94%;
-    --secondary: 222 14% 13%;
-    --secondary-foreground: 42 15% 90%;
-    --muted: 222 14% 13%;
-    --muted-foreground: 35 8% 62%;
-    --accent: 42 30% 16%;
-    --accent-foreground: 43 90% 72%;
-    --border: 40 10% 17%;
-    --input: 40 10% 17%;
-    --primary: 43 87% 55%;
-    --primary-foreground: 35 50% 12%;
-    --ring: 43 87% 55%;
+    --background: 36 44% 3%;
+    --foreground: 40 34% 94%;
+    --card: 36 34% 6%;
+    --card-foreground: 40 34% 94%;
+    --popover: 36 34% 6%;
+    --popover-foreground: 40 34% 94%;
+    --secondary: 37 24% 11%;
+    --secondary-foreground: 40 24% 91%;
+    --muted: 37 21% 11%;
+    --muted-foreground: 36 13% 62%;
+    --accent: 39 38% 14%;
+    --accent-foreground: 43 100% 76%;
+    --border: 39 31% 16%;
+    --input: 39 31% 16%;
+    --primary: 42 100% 58%;
+    --primary-foreground: 34 70% 9%;
+    --ring: 42 100% 58%;
     color-scheme: dark;
   }
 
@@ -70,30 +76,30 @@
      Keeping the scope lets charts/components use tokens without creating a
      second blue/dark theme inside the platform. */
   .analytics-module {
-    --background: 36 14% 95%;
-    --foreground: 30 10% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 30 10% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 30 10% 10%;
-    --primary: 43 87% 55%;
-    --primary-foreground: 35 50% 12%;
-    --secondary: 35 12% 92%;
-    --secondary-foreground: 30 10% 14%;
-    --muted: 35 12% 92%;
-    --muted-foreground: 30 6% 42%;
-    --accent: 43 76% 91%;
-    --accent-foreground: 35 50% 15%;
+    --background: 40 34% 96%;
+    --foreground: 34 32% 8%;
+    --card: 42 45% 99%;
+    --card-foreground: 34 32% 8%;
+    --popover: 42 45% 99%;
+    --popover-foreground: 34 32% 8%;
+    --primary: 42 100% 58%;
+    --primary-foreground: 34 70% 9%;
+    --secondary: 40 28% 91%;
+    --secondary-foreground: 34 28% 12%;
+    --muted: 40 24% 92%;
+    --muted-foreground: 34 10% 40%;
+    --accent: 42 86% 89%;
+    --accent-foreground: 34 62% 13%;
     --destructive: 4 68% 50%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 48% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 40 88% 50%;
     --warning-foreground: 35 50% 12%;
-    --border: 32 12% 87%;
-    --input: 32 12% 87%;
-    --ring: 43 87% 55%;
-    --chart-1: 43 87% 55%;
+    --border: 39 28% 84%;
+    --input: 39 28% 84%;
+    --ring: 42 100% 58%;
+    --chart-1: 42 100% 58%;
     --chart-2: 145 35% 46%;
     --chart-3: 30 10% 30%;
     --chart-4: 38 74% 67%;
@@ -103,20 +109,20 @@
   }
 
   .dark .analytics-module {
-    --background: 225 20% 5%;
-    --foreground: 42 24% 94%;
-    --card: 222 18% 8%;
-    --card-foreground: 42 24% 94%;
-    --popover: 222 18% 8%;
-    --popover-foreground: 42 24% 94%;
-    --secondary: 222 14% 13%;
-    --secondary-foreground: 42 15% 90%;
-    --muted: 222 14% 13%;
-    --muted-foreground: 35 8% 62%;
-    --accent: 42 30% 16%;
-    --accent-foreground: 43 90% 72%;
-    --border: 40 10% 17%;
-    --input: 40 10% 17%;
+    --background: 36 44% 3%;
+    --foreground: 40 34% 94%;
+    --card: 36 34% 6%;
+    --card-foreground: 40 34% 94%;
+    --popover: 36 34% 6%;
+    --popover-foreground: 40 34% 94%;
+    --secondary: 37 24% 11%;
+    --secondary-foreground: 40 24% 91%;
+    --muted: 37 21% 11%;
+    --muted-foreground: 36 13% 62%;
+    --accent: 39 38% 14%;
+    --accent-foreground: 43 100% 76%;
+    --border: 39 31% 16%;
+    --input: 39 31% 16%;
     color-scheme: dark;
   }
 
@@ -133,7 +139,7 @@
   }
 
   html {
-    background: #11110f;
+    background: var(--brand-black);
   }
 
   html,
@@ -149,6 +155,11 @@
     font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: rgba(255, 196, 61, .3);
+    color: inherit;
   }
 
   button,
@@ -168,8 +179,37 @@
 }
 
 @layer components {
+  .brand-shell {
+    background:
+      radial-gradient(circle at 82% -10%, rgba(255, 196, 61, .1), transparent 30rem),
+      hsl(var(--background));
+  }
+
+  .dark .brand-shell {
+    background:
+      radial-gradient(circle at 80% -12%, rgba(255, 174, 25, .1), transparent 34rem),
+      linear-gradient(145deg, #080603, #0b0804 46%, #070503);
+  }
+
+  .brand-sidebar {
+    border-color: rgba(255, 196, 61, .14);
+    background:
+      linear-gradient(180deg, rgba(255, 196, 61, .075), transparent 16rem),
+      linear-gradient(160deg, #090603, #050403 70%);
+    box-shadow: 12px 0 40px rgba(0, 0, 0, .22);
+  }
+
+  .brand-topbar {
+    border-color: rgba(255, 196, 61, .18);
+    background:
+      linear-gradient(90deg, rgba(255, 196, 61, .06), transparent 30%),
+      rgba(7, 5, 3, .96);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .18), inset 0 -1px 0 rgba(255, 215, 106, .035);
+    backdrop-filter: blur(18px);
+  }
+
   .gd-panel {
-    @apply min-w-0 max-w-full rounded-xl border border-[#ded9d2] bg-white shadow-[0_1px_2px_rgba(20,16,10,.035)] dark:border-[#292720] dark:bg-[#111216] dark:shadow-none;
+    @apply min-w-0 max-w-full rounded-xl border border-[#ddcfb5] bg-[#fffdf8] shadow-[0_1px_2px_rgba(20,16,10,.035)] dark:border-[#352814] dark:bg-[#100c07] dark:shadow-[inset_0_1px_0_rgba(255,226,138,.025)];
   }
 
   .gd-auto-grid {
@@ -204,11 +244,11 @@
 }
 
   .gd-button {
-    @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d8d2ca] bg-white px-3 text-[10px] font-bold text-[#4e4943] shadow-sm transition hover:border-[#c4ad6a] hover:bg-[#fffaf0] dark:border-[#343127] dark:bg-[#17181d] dark:text-[#e7e1d7] dark:hover:bg-[#242117];
+    @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d9c8a8] bg-[#fffdf8] px-3 text-[10px] font-bold text-[#4e4438] shadow-sm transition hover:border-[#c99a2e] hover:bg-[#fff8e7] dark:border-[#3c2c16] dark:bg-[#130e08] dark:text-[#eee4d3] dark:hover:border-[#735017] dark:hover:bg-[#211609];
   }
 
   .gold-action {
-    @apply relative inline-flex h-9 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-md border border-[#a66c08] bg-gradient-to-r from-[#a66706] via-[#ffd96a] to-[#b67808] bg-[length:200%_100%] px-4 text-[10px] font-black text-[#392706] shadow-[0_4px_16px_rgba(181,123,12,.25)] transition hover:brightness-105;
+    @apply relative inline-flex h-9 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-md border border-[#b96d05] bg-gradient-to-r from-[#a85d02] via-[#ffe079] to-[#c87907] bg-[length:200%_100%] px-4 text-[10px] font-black text-[#2c1a03] shadow-[0_4px_18px_rgba(228,148,11,.28)] transition hover:brightness-105;
     animation: gold-pulse 2.8s ease-in-out infinite;
   }
 
@@ -233,7 +273,7 @@
   }
 
   .gold-meter {
-    background: linear-gradient(90deg, #9c6206, #ffd765 54%, #b97708);
+    background: linear-gradient(90deg, #9b5602, #ffe079 54%, #c47a08);
     background-size: 180% 100%;
     animation: gold-flow 3s linear infinite;
     box-shadow: 0 0 16px rgba(216, 166, 37, .4);

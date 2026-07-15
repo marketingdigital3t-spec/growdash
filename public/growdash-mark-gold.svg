@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Símbolo Growdash</title>
+  <desc id="desc">Seta de crescimento e losango em acabamento dourado.</desc>
+  <defs>
+    <linearGradient id="gold" x1="18" y1="20" x2="132" y2="145" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff1a8"/>
+      <stop offset=".23" stop-color="#ffc83d"/>
+      <stop offset=".5" stop-color="#a45d03"/>
+      <stop offset=".72" stop-color="#ffd55b"/>
+      <stop offset="1" stop-color="#7b4200"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="24" y1="30" x2="130" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff8cf"/>
+      <stop offset=".5" stop-color="#ffb617"/>
+      <stop offset="1" stop-color="#8a4a00"/>
+    </linearGradient>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feFlood flood-color="#f5a914" flood-opacity=".48"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <path d="M17 85 80 22l63 63-20 20-43-43-43 43Z" fill="url(#gold)" stroke="url(#edge)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="m80 80 28 28-28 28-28-28Z" fill="url(#gold)" stroke="url(#edge)" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+</svg>
