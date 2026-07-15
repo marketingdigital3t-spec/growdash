@@ -50,6 +50,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { GrowdashFlowCanvas } from "@/components/GrowdashFlow/GrowdashFlowCanvas";
+import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
 
 /* ─── Types ─── */
 interface FunnelNode {
@@ -1475,6 +1477,98 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
   );
 }
 
+function migrateToFreeCanvas(initialNodes: FunnelNode[], initialConnections: FunnelConnection[]): FlowData {
+  const alreadyModern = initialNodes.length === 0 || initialNodes.every((node) => "type" in (node as unknown as Record<string, unknown>) && "strokeColor" in (node as unknown as Record<string, unknown>));
+  const metadata = (initialConnections as unknown as Array<Record<string, any>>).find((connection) => connection.kind === "growdash-flow-view");
+
+  if (alreadyModern) {
+    return {
+      version: 1,
+      elements: initialNodes as unknown as DrawElement[],
+      zoom: Number(metadata?.zoom || 1),
+      panOffset: metadata?.panOffset || { x: 0, y: 0 },
+      showGrid: metadata?.showGrid ?? true,
+      snapToGrid: metadata?.snapToGrid ?? false,
+      updatedAt: metadata?.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  const migratedNodes: DrawElement[] = initialNodes.map((node, index) => ({
+    id: node.id,
+    type: "sticky",
+    x: node.x,
+    y: node.y,
+    width: 220,
+    height: 150,
+    rotation: 0,
+    opacity: 1,
+    fillColor: "#fbbf24",
+    strokeColor: node.color || "#F5A623",
+    strokeWidth: 2,
+    text: `${node.label}${node.description ? `\n\n${node.description}` : ""}${node.value ? `\n\nResultado: ${node.value}` : ""}`,
+    fontSize: 18,
+    fontFamily: "Nunito, Inter, system-ui, sans-serif",
+    layerIndex: index,
+    locked: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }));
+  const migratedConnections: DrawElement[] = initialConnections
+    .filter((connection) => connection.from && connection.to)
+    .map((connection, index) => {
+      const from = initialNodes.find((node) => node.id === connection.from);
+      const to = initialNodes.find((node) => node.id === connection.to);
+      return {
+        id: `migrated_arrow_${index}_${connection.from}_${connection.to}`,
+        type: "arrow",
+        x: (from?.x || 0) + 220,
+        y: (from?.y || 0) + 75,
+        width: (to?.x || 260) - (from?.x || 0) - 220,
+        height: (to?.y || 0) - (from?.y || 0),
+        rotation: 0,
+        opacity: 1,
+        fillColor: "transparent",
+        strokeColor: "#F5A623",
+        strokeWidth: 2,
+        layerIndex: initialNodes.length + index,
+        locked: false,
+        startBinding: { elementId: connection.from, anchor: "e" },
+        endBinding: { elementId: connection.to, anchor: "w" },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } satisfies DrawElement;
+    });
+
+  return { version: 1, elements: [...migratedNodes, ...migratedConnections], zoom: 1, panOffset: { x: 0, y: 0 }, showGrid: true, snapToGrid: false, updatedAt: new Date().toISOString() };
+}
+
+function FreeCanvasEditor({ funnelId, initialNodes, initialConnections, initialName, onBack }: { funnelId: string | null; initialNodes: FunnelNode[]; initialConnections: FunnelConnection[]; initialName: string; onBack: () => void }) {
+  const updateFunnel = useUpdateFunnel();
+  const createFunnel = useCreateFunnel();
+  const [savedId, setSavedId] = useState(funnelId);
+  const initialFlow = useMemo(() => migrateToFreeCanvas(initialNodes, initialConnections), [initialConnections, initialNodes]);
+
+  const handleSave = async (flow: FlowData) => {
+    const viewMetadata = [{
+      kind: "growdash-flow-view",
+      version: flow.version,
+      zoom: flow.zoom,
+      panOffset: flow.panOffset,
+      showGrid: flow.showGrid,
+      snapToGrid: flow.snapToGrid,
+      updatedAt: flow.updatedAt,
+    }];
+    if (savedId) {
+      await updateFunnel.mutateAsync({ id: savedId, name: initialName, nodes: flow.elements, connections: viewMetadata });
+    } else {
+      const created = await createFunnel.mutateAsync({ name: initialName, nodes: flow.elements, connections: viewMetadata, funnel_type: "blank" });
+      setSavedId(created.id);
+    }
+  };
+
+  return <GrowdashFlowCanvas initialFlow={initialFlow} onSave={handleSave} onBack={onBack} title={initialName} />;
+}
+
 /* ─── Main Page ─── */
 const Funnelytics = () => {
   const [view, setView] = useState<"list" | "canvas">("list");
@@ -1526,6 +1620,9 @@ const Funnelytics = () => {
   };
 
   if (view === "canvas" && canvasData) {
+    if (canvasData.funnelType === "blank") {
+      return <FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} />;
+    }
     return (
       <FunnelCanvas
         key={activeFunnelId || "new"}
