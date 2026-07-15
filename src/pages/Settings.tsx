@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { Switch } from "@/components/ui/switch";
+import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
 
 const sections = [
   { to: "/perfil", icon: UserRound, title: "Perfil e acesso", description: "Nome, foto, telefone, e-mail, senha e aparência." },
@@ -62,6 +63,8 @@ export default function SettingsPage() {
           <div className="mt-5 flex items-center justify-between rounded-xl border border-border p-4"><span className="text-sm">Alertas críticos por e-mail</span><Switch aria-label="Alertas críticos por e-mail" checked={!!preferences?.email_alerts_enabled} onCheckedChange={(checked) => updateAlerts.mutate(checked)} disabled={updateAlerts.isPending} /></div>
         </section>
       </MotionItem>
+
+      <MotionItem><SalesGoalSettingsCard /></MotionItem>
 
       <MotionItem className="flex gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5 text-sm"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-500" /><div><b>Segurança por padrão</b><p className="mt-1 text-xs text-muted-foreground">Tokens de Meta e RD permanecem restritos ao backend; o navegador recebe somente campos operacionais permitidos.</p></div></MotionItem>
     </MotionPage>

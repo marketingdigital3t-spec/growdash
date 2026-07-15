@@ -22,7 +22,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
           </div>
           <div className="space-y-3">
             <div className="overflow-x-auto max-h-64">
-              <table className="w-full text-xs">
+              <table className="w-full min-w-[360px] text-xs">
                 <thead className="text-muted-foreground sticky top-0 bg-card">
                   <tr className="border-b border-border/40">
                     <th className="text-left py-2 font-medium">UF</th>

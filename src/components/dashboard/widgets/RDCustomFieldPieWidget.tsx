@@ -240,7 +240,7 @@ export function RDCustomFieldPieWidget() {
           )}
         </div>
         <div className="min-h-[220px] overflow-auto">
-          <table className="w-full text-sm text-foreground">
+          <table className="w-full min-w-[420px] text-sm text-foreground">
             <thead className="text-muted-foreground sticky top-0 bg-card">
               <tr className="text-left">
                 <th className="py-2 font-medium">Faixa</th>

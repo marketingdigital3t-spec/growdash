@@ -422,7 +422,7 @@ export function CampaignResultsTable() {
                 <div className="p-6 text-center text-sm text-muted-foreground">Todas as vendas estão atribuídas. 🎉</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[860px] text-sm">
                     <thead className="bg-muted/30">
                       <tr className="text-left text-xs text-muted-foreground">
                         <th className="px-2 py-2 font-medium">Lead</th>
@@ -474,7 +474,7 @@ export function CampaignResultsTable() {
                   <div className="p-6 text-center text-sm text-muted-foreground">Nenhum lead {leadStatus !== "all" ? STATUS_LABEL[leadStatus].toLowerCase() : ""} não atribuído.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[920px] text-sm">
                       <thead className="bg-muted/30">
                         <tr className="text-left text-xs text-muted-foreground">
                           <th className="px-2 py-2 font-medium">Nome</th>
@@ -573,7 +573,7 @@ function SalesTable({ filtered, expanded, onToggle, expandedAdsets, onToggleAdse
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[860px] text-sm">
         <thead className="bg-muted/30">
           <tr className="text-left text-xs text-muted-foreground">
             <th className="px-2 py-2 font-medium w-6"></th>
@@ -614,7 +614,7 @@ function LeadsTable({ filtered, statusFilter, onOpenLeads }: { filtered: Campaig
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[920px] text-sm">
         <thead className="bg-muted/30">
           <tr className="text-left text-xs text-muted-foreground">
             <th className="px-2 py-2 font-medium">Campanha</th>

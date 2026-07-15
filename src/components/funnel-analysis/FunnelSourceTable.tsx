@@ -13,7 +13,7 @@ export function FunnelSourceTable({ a }: { a: FunnelAnalytics }) {
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full min-w-[480px] text-xs">
             <thead className="text-muted-foreground">
               <tr className="border-b border-border/40">
                 <th className="text-left py-2 font-medium">Origem</th>

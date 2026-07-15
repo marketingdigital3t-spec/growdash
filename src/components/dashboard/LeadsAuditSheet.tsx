@@ -95,7 +95,7 @@ export function LeadsAuditSheet({ open, onOpenChange, adAccountId, startDate, en
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
+      <SheetContent side="right" className="w-full max-w-[100vw] overflow-y-auto sm:max-w-3xl">
         <SheetHeader>
           <SheetTitle>Auditoria de leads por estado</SheetTitle>
           <SheetDescription>
@@ -145,9 +145,9 @@ export function LeadsAuditSheet({ open, onOpenChange, adAccountId, startDate, en
         </div>
 
         {/* Tabela */}
-        <div className="mt-3 border rounded-md overflow-hidden">
-          <div className="max-h-[60vh] overflow-y-auto">
-            <table className="w-full text-xs">
+        <div className="mt-3 overflow-hidden rounded-md border">
+          <div className="max-h-[60vh] overflow-auto">
+            <table className="w-full min-w-[680px] text-xs">
               <thead className="bg-muted sticky top-0">
                 <tr className="text-left text-muted-foreground">
                   <th className="py-2 px-2 font-medium">Nome</th>

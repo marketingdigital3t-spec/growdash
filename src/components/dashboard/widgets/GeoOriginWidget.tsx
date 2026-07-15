@@ -202,8 +202,8 @@ export function GeoOriginWidget() {
               )}
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[420px] overflow-y-auto">
-                <table className="w-full text-xs">
+              <div className="max-h-[420px] overflow-auto">
+                <table className="w-full min-w-[680px] text-xs">
                   <thead className="sticky top-0 bg-background z-10">
                     <tr className="text-muted-foreground border-b">
                       <th className="text-left font-medium py-2 px-3">#</th>

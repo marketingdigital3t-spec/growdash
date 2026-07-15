@@ -721,7 +721,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
                 selectedIds={perfCampaignIds}
                 onChange={setPerfCampaignIds}
                 placeholder="Todas campanhas"
-                className="h-8 text-xs min-w-[180px]"
+                className="h-11 w-full min-w-0 text-xs sm:h-8 sm:w-auto sm:min-w-[180px]"
               />
             )}
             <FunnelStepsSelect value={visibleStepKeys} onChange={handleStepsChange} options={stepOptions} />

@@ -42,7 +42,7 @@ export function DateFilterBar({
   isRefreshing,
 }: DateFilterBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
       <MetaDateRangePicker
         preset={preset}
         onPresetChange={onPresetChange}
@@ -54,7 +54,7 @@ export function DateFilterBar({
 
       {adAccounts.length > 0 && (
         <Select value={selectedAccount} onValueChange={onAccountChange}>
-          <SelectTrigger className="w-[200px] bg-card">
+          <SelectTrigger className="min-h-11 w-full min-w-0 bg-card sm:h-10 sm:min-h-0 sm:w-[200px]">
             <SelectValue placeholder="Todas as contas" />
           </SelectTrigger>
           <SelectContent>
@@ -75,12 +75,12 @@ export function DateFilterBar({
       )}
 
       {onRefresh && (
-        <Button variant="outline" size="icon" onClick={onRefresh} disabled={isRefreshing} className="bg-card">
+        <Button variant="outline" size="icon" onClick={onRefresh} disabled={isRefreshing} className="min-h-11 w-full bg-card sm:h-10 sm:min-h-0 sm:w-10">
           <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
         </Button>
       )}
 
-      <span className="text-xs text-muted-foreground ml-auto">
+      <span className="min-w-0 text-xs text-muted-foreground sm:ml-auto">
         {format(startDate, "dd MMM", { locale: ptBR })} — {format(endDate, "dd MMM yyyy", { locale: ptBR })}
       </span>
     </div>

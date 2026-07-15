@@ -99,7 +99,7 @@ export function RDSalesList() {
       </div>
 
       <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-muted/40 sticky top-0">
             <tr className="text-left text-xs text-muted-foreground">
               <th className="px-4 py-2 font-medium">Nome</th>

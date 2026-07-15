@@ -65,7 +65,7 @@ export function FunnelStageDistribution({ a }: Props) {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[620px] text-xs">
               <thead className="text-muted-foreground">
                 <tr className="border-b border-border/40">
                   <th className="text-left py-2 font-medium">Etapa</th>

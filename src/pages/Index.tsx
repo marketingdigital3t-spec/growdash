@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Plus } from "lucide-react";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { SalesDialog } from "@/components/dashboard/SalesDialog";
@@ -8,10 +8,10 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
-import { useSales, type Sale } from "@/hooks/useSales";
+import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
-import { format } from "date-fns";
+import { differenceInCalendarDays, endOfMonth, format, startOfMonth } from "date-fns";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -20,6 +20,9 @@ import { AddWidgetDialog } from "@/components/dashboard/grid/AddWidgetDialog";
 import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView } from "@/hooks/useDashboardViews";
 import { useIsMaster } from "@/hooks/useIsMaster";
 import { Pencil, Check } from "lucide-react";
+import { useSalesGoals } from "@/hooks/useSalesGoals";
+import { DashboardGoalProgress } from "@/components/dashboard/DashboardGoalProgress";
+import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip";
 
 const Index = () => {
   const {
@@ -31,6 +34,8 @@ const Index = () => {
     endDate,
     adAccountId: selectedAccount,
     setAdAccountId: setSelectedAccount,
+    businessUnitId,
+    segment,
   } = useGlobalFilters();
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(() => {
     try {
@@ -44,6 +49,10 @@ const Index = () => {
   const [addOpen, setAddOpen] = useState(false);
 
   const { data: adAccounts = [] } = useAdAccounts();
+  const visibleAccounts = useMemo(() => businessUnitId
+    ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccounts, businessUnitId, segment]);
+  const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
   const { data: insights = [], isLoading, refetch } = useInsights({
@@ -66,6 +75,14 @@ const Index = () => {
     endDate,
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
   });
+  const monthStart = startOfMonth(new Date());
+  const monthEnd = endOfMonth(new Date());
+  const { data: monthlySales = [] } = useSales({
+    startDate: monthStart,
+    endDate: monthEnd,
+    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+  });
+  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(new Date());
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
@@ -86,10 +103,31 @@ const Index = () => {
   }, [selectedCampaignIds]);
 
   useEffect(() => {
-    if (selectedAccount !== "all" && adAccounts.length > 0 && !adAccounts.some((a) => a.id === selectedAccount)) {
+    if (selectedAccount !== "all" && !visibleAccounts.some((a) => a.id === selectedAccount)) {
       setSelectedAccount("all");
     }
-  }, [adAccounts, selectedAccount, setSelectedAccount]);
+  }, [visibleAccounts, selectedAccount, setSelectedAccount]);
+
+  const dashboardInsights = useMemo(() => insights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [insights, visibleAccountIds]);
+  const visiblePickerInsights = useMemo(() => campaignPickerInsights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [campaignPickerInsights, visibleAccountIds]);
+  const visibleCampaigns = useMemo(() => campaigns.filter((campaign: any) => visibleAccountIds.has(campaign.ad_account_id)), [campaigns, visibleAccountIds]);
+  const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id)), [sales, visibleAccountIds]);
+  const dashboardSales = useMemo(() => selectedCampaignIds.length
+    ? unitSales.filter((sale) => sale.campaign_ids?.some((campaignId) => selectedCampaignIds.includes(campaignId)))
+    : unitSales, [unitSales, selectedCampaignIds]);
+  const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id && visibleAccountIds.has(deal.ad_account_id)), [rdDeals, visibleAccountIds]);
+  const goalSales = useMemo(() => monthlySales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id) && (selectedAccount === "all" || sale.ad_account_id === selectedAccount)), [monthlySales, selectedAccount, visibleAccountIds]);
+  const goalRevenue = aggregateSales(goalSales).totalNet;
+  const goalTarget = (goalData?.rows ?? []).filter((goal) => visibleAccountIds.has(goal.ad_account_id) && (selectedAccount === "all" || goal.ad_account_id === selectedAccount)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0);
+  const goalAccountLabel = selectedAccount === "all" ? `Meta mensal · ${segment === "saas" ? "SaaS" : "Infoproduto"}` : `Meta mensal · ${visibleAccounts.find((account) => account.id === selectedAccount)?.name || "Conta selecionada"}`;
+  const glassSales = aggregateSales(dashboardSales);
+  const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
+  const glassLeads = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+  const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
+  const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
+  const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
+  const forecast30 = glassSales.totalNet / periodDays * 30;
+  const openAlerts = alerts.length;
 
   const handleSync = async () => {
     refetch();
@@ -112,7 +150,8 @@ const Index = () => {
   }
 
   return (
-    <MotionPage className="space-y-6">
+    <MotionPage className="min-w-0 space-y-4 sm:space-y-6">
+      <MotionItem><DashboardGoalProgress realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} /></MotionItem>
       <MotionItem>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -134,18 +173,18 @@ const Index = () => {
             onCustomRangeChange={setCustomRange}
             startDate={startDate}
             endDate={endDate}
-            adAccounts={adAccounts.map((a) => ({ id: a.id, name: a.name }))}
+            adAccounts={visibleAccounts.map((a) => ({ id: a.id, name: a.name }))}
             selectedAccount={selectedAccount}
             onAccountChange={(id) => { setSelectedAccount(id); setSelectedCampaignIds([]); }}
             campaigns={(() => {
               const spendByCamp = new Map<string, number>();
               const imprByCamp = new Map<string, number>();
-              for (const r of campaignPickerInsights as any[]) {
+              for (const r of visiblePickerInsights as any[]) {
                 if (!r.campaign_id) continue;
                 spendByCamp.set(r.campaign_id, (spendByCamp.get(r.campaign_id) || 0) + (r.spend ?? 0));
                 imprByCamp.set(r.campaign_id, (imprByCamp.get(r.campaign_id) || 0) + (r.impressions ?? 0));
               }
-              return (campaigns || [])
+              return visibleCampaigns
                 .filter((c: any) => (spendByCamp.get(c.id) || 0) > 0 || (imprByCamp.get(c.id) || 0) > 0)
                 .map((c: any) => ({ id: c.id, name: c.name, spend: spendByCamp.get(c.id) || 0 }))
                 .sort((a, b) => b.spend - a.spend)
@@ -158,6 +197,8 @@ const Index = () => {
           />
         </div>
       </MotionItem>
+
+      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} openAlerts={openAlerts} sales={glassSales.totalQuantity} />
 
       {canEditDashboard && activeView && (
         <MotionItem>
@@ -181,12 +222,12 @@ const Index = () => {
             startDate,
             endDate,
             adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-            insights,
-            sales,
-            rdDeals,
+            insights: dashboardInsights,
+            sales: dashboardSales,
+            rdDeals: dashboardDeals,
             alerts,
-            campaigns,
-            adAccounts,
+            campaigns: visibleCampaigns,
+            adAccounts: visibleAccounts,
             products,
             isLoading,
           }}

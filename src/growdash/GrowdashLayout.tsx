@@ -59,10 +59,10 @@ export default function GrowdashLayout() {
   }, [adAccountId, businessUnitId, setAdAccountId, visibleAccounts]);
 
   return (
-    <div className="min-h-screen bg-[#f3f1ef] text-[#1b1917] transition-colors dark:bg-[#090a0d] dark:text-[#f4f1e9]">
+    <div className="min-h-screen max-w-full overflow-x-clip bg-[#f3f1ef] text-[#1b1917] transition-colors dark:bg-[#090a0d] dark:text-[#f4f1e9]">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-[#11110f] text-white transition-all duration-300",
+          "growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/10 bg-[#11110f] text-white transition-all duration-300",
           collapsed ? "w-[78px]" : "w-[220px]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
@@ -172,8 +172,8 @@ export default function GrowdashLayout() {
         />
       )}
 
-      <div className={cn("min-h-screen transition-[padding] duration-300", collapsed ? "lg:pl-[78px]" : "lg:pl-[220px]")}>
-        <header className="sticky top-0 z-30 flex min-h-12 flex-wrap items-center gap-2 border-b border-[#332817] bg-[#11110f] px-3 py-2 text-white shadow-sm sm:px-5">
+      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", collapsed ? "lg:pl-[78px]" : "lg:pl-[220px]")}>
+        <header className="growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b border-[#332817] bg-[#11110f] px-2 py-2 text-white shadow-sm sm:px-5">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -190,25 +190,25 @@ export default function GrowdashLayout() {
           >
             <PanelLeftClose className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
           </button>
-          <div className="flex min-w-0 grow flex-wrap items-center gap-2 text-[10px]">
-            <label className="relative min-w-0">
+          <div className="order-3 flex w-full min-w-0 grow items-center gap-2 overflow-hidden text-[10px] lg:order-none lg:w-auto lg:overflow-visible">
+            <label className="relative min-w-0 flex-1 lg:flex-none">
               <span className="sr-only">Conta de anúncio global</span>
               <select
                 value={adAccountId}
                 onChange={(event) => setAdAccountId(event.target.value)}
-                className="h-8 max-w-[220px] rounded-md border border-white/15 bg-white/[.07] px-2 pr-7 text-white outline-none focus:border-[#f2c548]/70"
+                className="h-8 w-full min-w-0 rounded-md border border-white/15 bg-white/[.07] px-2 pr-7 text-white outline-none focus:border-[#f2c548]/70 lg:max-w-[220px]"
               >
                 <option value="all" className="text-black">Todas as contas Meta</option>
                 {visibleAccounts.map((account) => <option key={account.id} value={account.id} className="text-black">{account.name}</option>)}
               </select>
             </label>
-            <label className="relative">
+            <label className="relative min-w-0 flex-1 lg:flex-none">
               <span className="sr-only">Período global</span>
               <CalendarRange className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-[#f2c548]" />
               <select
                 value={preset}
                 onChange={(event) => setPreset(event.target.value as DatePreset)}
-                className="h-8 max-w-[165px] rounded-md border border-white/15 bg-white/[.07] pl-8 pr-7 text-white outline-none focus:border-[#f2c548]/70 sm:max-w-none"
+                className="h-8 w-full min-w-0 rounded-md border border-white/15 bg-white/[.07] pl-8 pr-7 text-white outline-none focus:border-[#f2c548]/70 lg:w-auto"
               >
                 {Object.entries(PRESET_LABELS).map(([key, label]) => (
                   <option key={key} value={key} className="text-black">{label}</option>
@@ -219,7 +219,7 @@ export default function GrowdashLayout() {
               {format(startDate, "dd/MM/yyyy")} – {format(endDate, "dd/MM/yyyy")}
             </span>
           </div>
-          <div className="ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px]">
+          <div className="order-2 ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px] lg:order-none">
             <button
               type="button"
               onClick={() => setSegment("infoproduto")}
@@ -236,7 +236,7 @@ export default function GrowdashLayout() {
             </button>
           </div>
         </header>
-        <main className="min-h-[calc(100vh-48px)] p-3 sm:p-5">
+        <main className="min-h-[calc(100vh-48px)] min-w-0 max-w-full overflow-x-clip p-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] sm:p-5">
           <Outlet />
         </main>
       </div>

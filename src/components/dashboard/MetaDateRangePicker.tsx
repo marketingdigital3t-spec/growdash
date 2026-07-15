@@ -99,9 +99,9 @@ export function MetaDateRangePicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="bg-card font-normal justify-start">
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {formatTrigger(preset, startDate, endDate)}
+        <Button variant="outline" className="min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto">
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+          <span className="truncate">{formatTrigger(preset, startDate, endDate)}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 max-w-[95vw]" align="start">

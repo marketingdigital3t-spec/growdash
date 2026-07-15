@@ -44,7 +44,7 @@ export function CampaignLeadsSheet({ open, onClose, campaignName, deals }: Props
   return (
     <>
       <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetContent className="w-full max-w-[100vw] overflow-y-auto sm:max-w-2xl">
           <SheetHeader>
             <SheetTitle className="truncate">{campaignName}</SheetTitle>
             <SheetDescription>{deals.length} lead{deals.length === 1 ? "" : "s"} atribuído{deals.length === 1 ? "" : "s"} a esta campanha</SheetDescription>
@@ -61,7 +61,7 @@ export function CampaignLeadsSheet({ open, onClose, campaignName, deals }: Props
           </div>
 
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[560px] text-xs">
               <thead className="bg-muted/30">
                 <tr className="text-left text-muted-foreground">
                   <th className="px-2 py-2 font-medium">Nome</th>
