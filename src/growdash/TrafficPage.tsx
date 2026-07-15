@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import {
   Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, GitBranch, Megaphone,
   MessageCircle, MousePointerClick, RefreshCw, Smartphone, Sparkles, Target,
-  TrendingUp, UsersRound, Video, WalletCards, X, Zap,
+  UsersRound, Video, WalletCards, Zap,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,6 @@ const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 export default function TrafficPage() {
   const [params, setParams] = useSearchParams();
   const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
-  const [heroVisible, setHeroVisible] = useState(true);
   const { adAccountId, setAdAccountId, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
@@ -48,7 +47,6 @@ export default function TrafficPage() {
 
   return (
     <div className="mx-auto max-w-[1700px] space-y-3">
-      {heroVisible && <WelcomeHero onClose={() => setHeroVisible(false)} />}
       <nav className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/70 p-1 lg:grid-cols-4" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "bg-gradient-to-r from-[#bb8211] via-[#f1c94c] to-[#b97b08] text-[#2f2308] shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
@@ -66,10 +64,6 @@ export default function TrafficPage() {
       {activeTab === "funnels" && <TrafficFunnels />}
     </div>
   );
-}
-
-function WelcomeHero({ onClose }: { onClose: () => void }) {
-  return <section className="group relative overflow-hidden rounded-xl border border-[#80621d] bg-[#0f0d09] px-5 py-6 text-center text-[#f8db84] shadow-[inset_0_0_90px_rgba(205,148,28,.18),0_18px_50px_-34px_rgba(235,180,45,.9)] sm:px-10 sm:py-8"><div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(circle_at_16%_12%,rgba(245,203,91,.42),transparent_22%),radial-gradient(circle_at_84%_80%,rgba(236,178,48,.32),transparent_24%),linear-gradient(115deg,transparent_0_28%,rgba(197,139,31,.2)_40%,transparent_55%)] transition-transform duration-1000 group-hover:scale-105" /><div className="pointer-events-none absolute -left-1/3 top-0 h-full w-1/3 skew-x-[-18deg] bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_6s_ease-in-out_infinite]" /><div className="relative mx-auto flex max-w-5xl items-center justify-center gap-4"><TrendingUp className="hidden h-12 w-12 text-[#e2b447] sm:block" strokeWidth={1.3} /><div><h1 className="font-serif text-3xl font-semibold tracking-tight text-[#f5dc91] sm:text-5xl">Bem-Vindo à Growdash</h1><p className="mt-2 font-serif text-sm text-[#dbc48a] sm:text-xl">Sua Jornada de Crescimento Digital Começa Aqui</p></div></div><button onClick={onClose} className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-[#4b4339]" aria-label="Fechar boas-vindas"><X className="h-4 w-4" /></button></section>;
 }
 
 function BudgetWorkspace({ accountId, visibleAccountIds }: { accountId: string; visibleAccountIds: string[] }) {
