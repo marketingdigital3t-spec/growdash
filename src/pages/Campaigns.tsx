@@ -78,6 +78,42 @@ function formatApiDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function firstRelation(value: any) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date) {
+  const start = startDate ? formatApiDate(startDate) : null;
+  const end = endDate ? formatApiDate(endDate) : null;
+  const totals = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 };
+
+  for (const ad of ads || []) {
+    for (const insight of ad.insights || []) {
+      if (start && insight.date < start) continue;
+      if (end && insight.date > end) continue;
+      totals.spend += insight.spend ?? 0;
+      totals.leads += insight.leads ?? 0;
+      totals.clicks += insight.clicks ?? 0;
+      totals.impressions += insight.impressions ?? 0;
+      totals.reach += insight.reach ?? 0;
+    }
+  }
+
+  return totals;
+}
+
+async function fetchAllPages(query: any, pageSize = 1000, maxPages = 20) {
+  const rows: any[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+    if (error) throw error;
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+  return rows;
+}
+
 function getCampaignHealth(campaign: any, averageCpl: number, targetCpl?: number | null): CampaignHealth {
   if (normalizeStatus(campaign.status) !== "ACTIVE") return "inactive";
   const activeDays = getActiveDays(campaign.created_at);
@@ -229,6 +265,41 @@ export default function Campaigns() {
     },
   });
 
+  // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
+  // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
+  // de campanhas. A seleção serve exclusivamente como filtro descendente.
+  const { data: accountAdsets = [], isLoading: isLoadingAdsets } = useQuery({
+    queryKey: ["meta-adsets-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
+    queryFn: async () => {
+      let query = supabase
+        .from("adsets")
+        .select("id,name,daily_budget,status,campaign_id,campaigns!inner(id,name,ad_account_id)")
+        .order("name", { ascending: true });
+      if (selectedAccount !== "all") query = query.eq("campaigns.ad_account_id", selectedAccount);
+      else {
+        const accountIds = visibleAdAccounts.map((account) => account.id);
+        query = query.in("campaigns.ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
+      }
+      return fetchAllPages(query);
+    },
+  });
+
+  const { data: accountAds = [], isLoading: isLoadingAds } = useQuery({
+    queryKey: ["meta-ads-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
+    queryFn: async () => {
+      let query = supabase
+        .from("ads")
+        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,ad_account_id))")
+        .order("name", { ascending: true });
+      if (selectedAccount !== "all") query = query.eq("adsets.campaigns.ad_account_id", selectedAccount);
+      else {
+        const accountIds = visibleAdAccounts.map((account) => account.id);
+        query = query.in("adsets.campaigns.ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
+      }
+      return fetchAllPages(query);
+    },
+  });
+
   useEffect(() => {
     setSelectedIds(new Set());
   }, [selectedAccount]);
@@ -257,6 +328,8 @@ export default function Campaigns() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campaigns_full"] }),
         queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+        queryClient.invalidateQueries({ queryKey: ["meta-adsets-independent"] }),
+        queryClient.invalidateQueries({ queryKey: ["meta-ads-independent"] }),
         queryClient.invalidateQueries({ queryKey: ["insights"] }),
         queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }),
       ]);
@@ -372,51 +445,71 @@ export default function Campaigns() {
     return scopeCampaignHierarchy(scope, selectedIds);
   }, [averageCpl, campaigns, healthFilter, selectedIds, targetByCampaign]);
 
+  const embeddedAdsetsById = useMemo(() => {
+    const byId = new Map<string, any>();
+    for (const campaign of campaigns) {
+      for (const currentAdset of campaign.adsets || []) byId.set(currentAdset.id, currentAdset);
+    }
+    return byId;
+  }, [campaigns]);
+
+  const embeddedAdsById = useMemo(() => {
+    const byId = new Map<string, any>();
+    for (const campaign of campaigns) {
+      for (const currentAdset of campaign.adsets || []) {
+        for (const currentAd of currentAdset.ads || []) byId.set(currentAd.id, currentAd);
+      }
+    }
+    return byId;
+  }, [campaigns]);
+
+  // Sem seleção, nenhum filtro de campanha é aplicado: todos os descendentes
+  // da(s) conta(s) ativa(s) ficam visíveis. A seleção e o filtro de saúde são
+  // apenas refinamentos opcionais da lista já carregada diretamente do banco.
+  const descendantCampaignIds = useMemo(() => {
+    if (selectedIds.size > 0) return selectedIds;
+    if (healthFilter !== "all") return new Set(levelCampaigns.map((campaign: any) => campaign.id));
+    return null;
+  }, [healthFilter, levelCampaigns, selectedIds]);
+
   const selectedAdsets = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return levelCampaigns
-      .flatMap((c: any) =>
-        (c.adsets || [])
-          .filter((a: any) => statusFilter === "all" || normalizeStatus(a.status) === statusFilter)
-          .map((adset: any) => {
-            let spend = 0, leads = 0, clicks = 0, impressions = 0, reach = 0;
-            for (const ad of adset.ads || []) {
-              for (const i of ad.insights || []) {
-                if (startDate && i.date < startDate.toISOString().split("T")[0]) continue;
-                if (endDate && i.date > endDate.toISOString().split("T")[0]) continue;
-                spend += i.spend ?? 0; leads += i.leads ?? 0;
-                clicks += i.clicks ?? 0; impressions += i.impressions ?? 0;
-                reach += i.reach ?? 0;
-              }
-            }
-            return { ...adset, campaignId: c.id, campaignName: c.name, spend, leads, clicks, impressions, reach };
-          })
-      )
-      .filter((adset: any) => !query || adset.name.toLowerCase().includes(query) || adset.campaignName.toLowerCase().includes(query));
-  }, [endDate, levelCampaigns, search, startDate, statusFilter]);
+    return accountAdsets
+      .map((currentAdset: any) => {
+        const campaign = firstRelation(currentAdset.campaigns);
+        const embeddedAdset = embeddedAdsetsById.get(currentAdset.id);
+        const metrics = aggregateInsights(embeddedAdset?.ads || [], startDate, endDate);
+        return {
+          ...currentAdset,
+          ...metrics,
+          campaignId: currentAdset.campaign_id,
+          campaignName: campaign?.name || "Campanha sem nome",
+        };
+      })
+      .filter((currentAdset: any) => !descendantCampaignIds || descendantCampaignIds.has(currentAdset.campaignId))
+      .filter((currentAdset: any) => statusFilter === "all" || normalizeStatus(currentAdset.status) === statusFilter)
+      .filter((currentAdset: any) => !query || currentAdset.name.toLowerCase().includes(query) || currentAdset.campaignName.toLowerCase().includes(query));
+  }, [accountAdsets, descendantCampaignIds, embeddedAdsetsById, endDate, search, startDate, statusFilter]);
 
   const selectedAds = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return levelCampaigns
-      .flatMap((c: any) =>
-        (c.adsets || []).flatMap((adset: any) =>
-          (adset.ads || [])
-            .filter((a: any) => statusFilter === "all" || normalizeStatus(a.status) === statusFilter)
-            .map((ad: any) => {
-              let spend = 0, leads = 0, clicks = 0, impressions = 0, reach = 0;
-              for (const i of ad.insights || []) {
-                if (startDate && i.date < startDate.toISOString().split("T")[0]) continue;
-                if (endDate && i.date > endDate.toISOString().split("T")[0]) continue;
-                spend += i.spend ?? 0; leads += i.leads ?? 0;
-                clicks += i.clicks ?? 0; impressions += i.impressions ?? 0;
-                reach += i.reach ?? 0;
-              }
-              return { ...ad, campaignId: c.id, adsetName: adset.name, campaignName: c.name, spend, leads, clicks, impressions, reach };
-            })
-        )
-      )
-      .filter((ad: any) => !query || ad.name.toLowerCase().includes(query) || ad.adsetName.toLowerCase().includes(query) || ad.campaignName.toLowerCase().includes(query));
-  }, [endDate, levelCampaigns, search, startDate, statusFilter]);
+    return accountAds
+      .map((currentAd: any) => {
+        const currentAdset = firstRelation(currentAd.adsets);
+        const campaign = firstRelation(currentAdset?.campaigns);
+        const metrics = aggregateInsights([embeddedAdsById.get(currentAd.id)].filter(Boolean), startDate, endDate);
+        return {
+          ...currentAd,
+          ...metrics,
+          campaignId: currentAdset?.campaign_id,
+          adsetName: currentAdset?.name || "Conjunto sem nome",
+          campaignName: campaign?.name || "Campanha sem nome",
+        };
+      })
+      .filter((currentAd: any) => !descendantCampaignIds || descendantCampaignIds.has(currentAd.campaignId))
+      .filter((currentAd: any) => statusFilter === "all" || normalizeStatus(currentAd.status) === statusFilter)
+      .filter((currentAd: any) => !query || currentAd.name.toLowerCase().includes(query) || currentAd.adsetName.toLowerCase().includes(query) || currentAd.campaignName.toLowerCase().includes(query));
+  }, [accountAds, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
@@ -784,7 +877,7 @@ export default function Campaigns() {
           {/* Adsets Tab */}
           <TabsContent value="adsets" className="m-0">
             <Card className="overflow-hidden rounded-none border-0 shadow-none">
-              {selectedAdsets.length === 0 ? <LevelEmpty level="conjuntos de anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
+              {isLoadingAdsets ? <LevelLoading /> : selectedAdsets.length === 0 ? <LevelEmpty level="conjuntos de anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
               <div className="space-y-2 p-2 md:hidden">{selectedAdsets.map((entity: any) => <LevelMobileCard key={entity.id} entity={{ ...entity, type: "adset" }} onOpen={() => setDetailEntity({ ...entity, type: "adset" })} />)}</div>
               <div className="growdash-scrollbar hidden overflow-x-auto md:block">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
@@ -842,7 +935,7 @@ export default function Campaigns() {
           {/* Ads Tab */}
           <TabsContent value="ads" className="m-0">
             <Card className="overflow-hidden rounded-none border-0 shadow-none">
-              {selectedAds.length === 0 ? <LevelEmpty level="anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
+              {isLoadingAds ? <LevelLoading /> : selectedAds.length === 0 ? <LevelEmpty level="anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
               <div className="space-y-2 p-2 md:hidden">{selectedAds.map((entity: any) => <LevelMobileCard key={entity.id} entity={{ ...entity, type: "ad" }} onOpen={() => setDetailEntity({ ...entity, type: "ad" })} />)}</div>
               <div className="growdash-scrollbar hidden overflow-x-auto md:block">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
@@ -960,6 +1053,10 @@ function CampaignMobileCard({ campaign, selected, health, onSelect, onOpen, onEd
 function LevelMobileCard({ entity, onOpen }: { entity: MetaDetailEntity; onOpen: () => void }) {
   const cpl = entity.leads > 0 ? entity.spend / entity.leads : 0;
   return <button type="button" onClick={onOpen} className="w-full rounded-xl border border-border bg-card p-3 text-left transition hover:border-primary/40"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="block truncate text-sm font-black">{entity.name}</span><span className="mt-1 block truncate text-[9px] text-muted-foreground">{entity.adsetName ? `${entity.adsetName} · ` : ""}{entity.campaignName}</span></div><Badge variant="outline">{normalizeStatus(entity.status) === "ACTIVE" ? "Ativo" : "Pausado"}</Badge></div><div className="mt-3 grid grid-cols-2 gap-2"><IssueMetric label="Investimento" value={entity.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Impressões" value={entity.impressions.toLocaleString("pt-BR")} /><IssueMetric label="Resultados" value={entity.leads.toLocaleString("pt-BR")} /><IssueMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></button>;
+}
+
+function LevelLoading() {
+  return <div className="space-y-2 p-3" aria-label="Carregando dados da Meta Ads">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>;
 }
 
 function LevelEmpty({ level, selected, onClear }: { level: string; selected: boolean; onClear: () => void }) {
