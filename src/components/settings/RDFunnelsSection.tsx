@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 
 interface RDPipeline { id: string; name: string }
 
@@ -91,6 +92,7 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
   const { toast } = useToast();
   const update = useUpdateRDFunnel();
   const remove = useDeleteRDFunnel();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const linked = !!funnel.rd_funnel_id;
 
   const sync = useMutation({
@@ -151,10 +153,25 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
           checked={funnel.is_active}
           onCheckedChange={(v) => update.mutate({ id: funnel.id, is_active: v })}
         />
-        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => remove.mutate(funnel.id)}>
+        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteOpen(true)} title={`Excluir vínculo ${funnel.name}`} aria-label={`Excluir vínculo ${funnel.name}`}>
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
+      <DestructiveConfirmationDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Excluir vínculo do funil"
+        description="A Growdash deixará de sincronizar este funil do RD Station. O funil real dentro do RD não será apagado."
+        confirmation={funnel.name}
+        pending={remove.isPending}
+        onConfirm={() => remove.mutate(funnel.id, {
+          onSuccess: () => {
+            setDeleteOpen(false);
+            toast({ title: "Vínculo do funil removido" });
+          },
+          onError: (error: Error) => toast({ title: "Erro ao excluir vínculo", description: error.message, variant: "destructive" }),
+        })}
+      />
     </motion.div>
   );
 }

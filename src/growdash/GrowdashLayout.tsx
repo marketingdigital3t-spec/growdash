@@ -35,6 +35,7 @@ function getInitialSidebarState() {
 export default function GrowdashLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const { pathname } = useLocation();
   const { theme, setTheme } = useTheme();
@@ -61,6 +62,7 @@ export default function GrowdashLayout() {
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
+  const showSidebarLabels = !collapsed || sidebarHovered || mobileOpen;
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
@@ -85,18 +87,20 @@ export default function GrowdashLayout() {
   return (
     <div className="brand-shell min-h-screen max-w-full overflow-x-clip text-foreground transition-colors">
       <aside
+        onMouseEnter={() => collapsed && setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
         className={cn(
-          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-white transition-all duration-300",
-          collapsed ? "w-16" : "w-[220px]",
+          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-white shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-all duration-300",
+          showSidebarLabels ? "w-[220px]" : "w-16",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
-        <div className={cn("flex h-[86px] shrink-0 items-center border-b border-white/5", collapsed ? "justify-center px-2" : "px-4")}>
+        <div className={cn("flex h-[86px] shrink-0 items-center border-b border-white/5", showSidebarLabels ? "px-4" : "justify-center px-2")}>
           <NavLink to="/" className="flex min-w-0 items-center" aria-label="Growdash - início">
-            {collapsed ? (
-              <BrandMark className="h-10 w-10 shrink-0 drop-shadow-[0_0_12px_rgba(255,193,45,.3)]" />
-            ) : (
+            {showSidebarLabels ? (
               <BrandLogo eager className="h-[66px] w-[178px] shrink-0" />
+            ) : (
+              <BrandMark className="h-10 w-10 shrink-0 drop-shadow-[0_0_12px_rgba(255,193,45,.3)]" />
             )}
           </NavLink>
           <button
@@ -113,7 +117,7 @@ export default function GrowdashLayout() {
         <nav className="grow overflow-y-auto px-2 py-4 growdash-scrollbar">
           {NAV_SECTIONS.map((section) => (
             <section key={section.label} className="mb-5">
-              {!collapsed && (
+              {showSidebarLabels && (
                 <div className="mb-1 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-[.19em] text-white/55">
                   <span>{section.label}</span>
                   <ChevronDown className="h-3 w-3" />
@@ -126,11 +130,12 @@ export default function GrowdashLayout() {
                     <NavLink
                       to={item.path}
                       end={item.path === "/"}
-                      title={collapsed ? item.label : undefined}
+                      title={!showSidebarLabels ? item.label : undefined}
+                      aria-label={item.label}
                       className={({ isActive }) =>
                         cn(
                           "group flex h-10 items-center rounded-lg text-[13px] font-medium transition-colors",
-                          collapsed ? "justify-center px-0" : "gap-3 px-3",
+                          showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
                           isActive
                             ? "border border-[#f0bd35]/30 bg-gradient-to-r from-[#6a521e] to-[#3a301a] text-[#ffd868] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
                             : "border border-transparent text-white/78 hover:bg-white/[.07] hover:text-white",
@@ -138,10 +143,10 @@ export default function GrowdashLayout() {
                       }
                     >
                       <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {showSidebarLabels && <span className="truncate">{item.label}</span>}
                     </NavLink>
                   );
-                  return collapsed ? (
+                  return collapsed && !showSidebarLabels ? (
                     <Tooltip key={item.path}>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
                       <TooltipContent side="right" sideOffset={10} className="border-[#d3a62e]/35 bg-[#12100b] text-xs font-semibold text-[#f8df9a] shadow-xl">
@@ -162,25 +167,26 @@ export default function GrowdashLayout() {
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className={cn(
               "flex h-10 w-full items-center rounded-lg text-[12px] text-white/60 hover:bg-white/[.06] hover:text-white",
-              collapsed ? "justify-center" : "gap-3 px-3",
+              showSidebarLabels ? "gap-3 px-3" : "justify-center",
             )}
+            aria-label={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {!collapsed && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
+            {showSidebarLabels && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
           </button>
-          <NavLink to="/perfil" className={cn("mt-1 flex items-center rounded-lg px-2 py-2 hover:bg-white/[.06]", collapsed ? "justify-center" : "gap-3")}>
+          <NavLink to="/perfil" aria-label="Abrir meu perfil" className={cn("mt-1 flex items-center rounded-lg px-2 py-2 hover:bg-white/[.06]", showSidebarLabels ? "gap-3" : "justify-center")}>
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#f7e6bf] to-[#a37c43] text-[11px] font-extrabold text-[#21190e]">
               {initials || "GD"}
             </span>
-            {!collapsed && (
+            {showSidebarLabels && (
               <div className="min-w-0 grow">
                 <div className="truncate text-[12px] font-semibold">{displayName}</div>
                 <div className="truncate text-[10px] text-white/45">{isMaster ? "Proprietário" : "Membro"}</div>
               </div>
             )}
-            {!collapsed && <ChevronRight className="h-4 w-4 text-white/40" />}
+            {showSidebarLabels && <ChevronRight className="h-4 w-4 text-white/40" />}
           </NavLink>
-          {!collapsed && (
+          {showSidebarLabels && (
             <button
               type="button"
               onClick={() => void signOut()}

@@ -6,13 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Link2, CheckCircle2, AlertCircle, Unplug } from "lucide-react";
+import { Link2, CheckCircle2, AlertCircle, Trash2, Unplug } from "lucide-react";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
+import { useAuth } from "@/contexts/AuthContext";
+import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 
 export function RDIntegrationCard() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [token, setToken] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const { user } = useAuth();
 
   const { data: integration } = useRDIntegration();
   const isConnected = !!integration?.is_active;
@@ -56,6 +60,30 @@ export function RDIntegrationCard() {
     },
     onError: (e: Error) =>
       toast({ title: "Erro ao desconectar", description: e.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("delete-integration-account", {
+        body: {
+          provider: "rd_station_crm",
+          account_id: user?.id,
+          confirmation: "EXCLUIR RD",
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      setToken("");
+      setDeleteOpen(false);
+      toast({ title: "Integração RD excluída", description: data?.message });
+      qc.invalidateQueries({ queryKey: ["integration"] });
+      qc.invalidateQueries({ queryKey: ["rd_health_check"] });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Erro ao excluir integração", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -109,17 +137,39 @@ export function RDIntegrationCard() {
             {save.isPending ? "Testando..." : isConnected ? "Substituir token" : "Testar e conectar"}
           </Button>
           {isConnected && (
-            <Button
-              variant="outline"
-              onClick={() => disconnect.mutate()}
-              disabled={disconnect.isPending || save.isPending}
-            >
-              <Unplug className="mr-2 h-4 w-4" />
-              {disconnect.isPending ? "Desconectando..." : "Desconectar"}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => disconnect.mutate()}
+                disabled={disconnect.isPending || save.isPending || remove.isPending}
+              >
+                <Unplug className="mr-2 h-4 w-4" />
+                {disconnect.isPending ? "Desconectando..." : "Desconectar"}
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+                disabled={disconnect.isPending || save.isPending || remove.isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Excluir conexão
+              </Button>
+            </>
           )}
         </div>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Desconectar revoga o uso do token. Excluir elimina a credencial da Growdash e preserva os negócios já sincronizados para auditoria.
+        </p>
       </CardContent>
+      <DestructiveConfirmationDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Excluir integração com RD Station"
+        description="A credencial será eliminada da Growdash e novas sincronizações serão interrompidas. Os negócios já importados permanecem disponíveis como histórico."
+        confirmation="EXCLUIR RD"
+        pending={remove.isPending}
+        onConfirm={() => remove.mutate()}
+      />
     </Card>
   );
 }

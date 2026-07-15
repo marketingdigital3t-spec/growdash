@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { toPng } from "html-to-image";
@@ -9,14 +9,14 @@ import {
   Plus, ArrowLeft, Save, Trash2, Clock, GitBranch, Copy, Download,
   Eye, TrendingUp, Percent, MousePointer, Mail,
   CreditCard, Star, Megaphone, GripVertical, PanelLeftClose, PanelLeft, Layers,
-  Link2, FileText, RefreshCw, Calendar
+  Link2, FileText, RefreshCw, Calendar, Hand, MousePointer2, Redo2, Undo2, Waypoints
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useFunnels, useCreateFunnel, useUpdateFunnel, useDeleteFunnel } from "@/hooks/useFunnels";
+import { useFunnels, useCreateFunnel, useUpdateFunnel, useDeleteFunnel, type FunnelRecord } from "@/hooks/useFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
@@ -80,6 +80,9 @@ interface DragLineState {
   mouseY: number;
   snapTargetId: string | null;
 }
+
+type CanvasTool = "select" | "hand" | "connect";
+type CanvasSnapshot = { nodes: FunnelNode[]; connections: FunnelConnection[] };
 
 /* ─── Icon Map ─── */
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -224,7 +227,7 @@ function ChangeIndicator({ change }: { change: number }) {
 function CreateFunnelDialog({ open, onOpenChange, onCreated }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (funnelId: string, type: "blank" | "linked") => void;
+  onCreated: (funnel: FunnelRecord) => void;
 }) {
   const [step, setStep] = useState<"type" | "account" | "campaigns">("type");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -261,9 +264,34 @@ function CreateFunnelDialog({ open, onOpenChange, onCreated }: {
       toast({ title: "Funil criado!" });
       reset();
       onOpenChange(false);
-      onCreated(result.id, "blank");
+      onCreated(result);
     } catch {
       toast({ title: "Erro ao criar funil", variant: "destructive" });
+    }
+  };
+
+  const handleCreateTemplate = async (template: "sales" | "lead") => {
+    const labels = template === "sales"
+      ? ["Impressões", "Cliques", "Leads", "Vendas", "Receita"]
+      : ["Cadastro", "Leads", "E-mail", "Consultoria", "Vendas"];
+    const nodes = labels.map((label, index) => {
+      const block = BLOCK_TEMPLATES.find((item) => item.label === label) ?? BLOCK_TEMPLATES[0];
+      return createNodeFromTemplate(block, 80 + index * 210, 220);
+    });
+    const connections = nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id }));
+    try {
+      const result = await createFunnel.mutateAsync({
+        name: funnelName === "Novo Funil" ? (template === "sales" ? "Funil de vendas" : "Acompanhamento de leads") : funnelName,
+        nodes,
+        connections,
+        funnel_type: "blank",
+      });
+      toast({ title: "Modelo criado e pronto para editar" });
+      reset();
+      onOpenChange(false);
+      onCreated(result);
+    } catch {
+      toast({ title: "Erro ao criar o modelo", variant: "destructive" });
     }
   };
 
@@ -281,7 +309,7 @@ function CreateFunnelDialog({ open, onOpenChange, onCreated }: {
       toast({ title: "Funil vinculado criado!" });
       reset();
       onOpenChange(false);
-      onCreated(result.id, "linked");
+      onCreated(result);
     } catch {
       toast({ title: "Erro ao criar funil", variant: "destructive" });
     }
@@ -317,7 +345,7 @@ function CreateFunnelDialog({ open, onOpenChange, onCreated }: {
               <Label>Nome do funil</Label>
               <Input value={funnelName} onChange={e => setFunnelName(e.target.value)} placeholder="Nome do funil" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 onClick={handleCreateBlank}
                 disabled={createFunnel.isPending}
@@ -342,6 +370,26 @@ function CreateFunnelDialog({ open, onOpenChange, onCreated }: {
                   <p className="font-semibold text-sm">Vincular Conta</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Análise com dados reais</p>
                 </div>
+              </button>
+              <button
+                onClick={() => handleCreateTemplate("sales")}
+                disabled={createFunnel.isPending}
+                className="group flex flex-col items-center gap-3 rounded-lg border-2 border-border p-5 text-center transition-all hover:border-primary/50 hover:bg-accent/50"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10">
+                  <TrendingUp className="h-6 w-6 text-emerald-500" />
+                </div>
+                <div><p className="text-sm font-semibold">Funil de vendas</p><p className="mt-0.5 text-xs text-muted-foreground">Aquisição até receita</p></div>
+              </button>
+              <button
+                onClick={() => handleCreateTemplate("lead")}
+                disabled={createFunnel.isPending}
+                className="group flex flex-col items-center gap-3 rounded-lg border-2 border-border p-5 text-center transition-all hover:border-primary/50 hover:bg-accent/50"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
+                  <Users className="h-6 w-6 text-amber-500" />
+                </div>
+                <div><p className="text-sm font-semibold">Acompanhar leads</p><p className="mt-0.5 text-xs text-muted-foreground">Captação até fechamento</p></div>
               </button>
             </div>
           </div>
@@ -466,18 +514,19 @@ function FunnelListing({ onSelect, onCreate }: { onSelect: (id: string) => void;
   return (
     <MotionPage className="space-y-6">
       <MotionItem>
-        <h1 className="text-2xl font-bold">Funnelytics</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Selecione um funil para visualizar ou editar, ou crie um novo
-        </p>
+        <div className="gd-panel overflow-hidden p-6 sm:p-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-[.2em] text-primary">Canvas operacional</span>
+              <h1 className="mt-2 text-2xl font-black sm:text-3xl">Growdash Flow</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                Quadro visual inspirado no Excalidraw para desenhar fluxogramas, funis de vendas e jornadas de acompanhamento de leads.
+              </p>
+            </div>
+            <Button onClick={onCreate} className="gap-2"><Plus className="h-4 w-4" />Novo quadro</Button>
+          </div>
+        </div>
       </MotionItem>
-
-      <div>
-        <Button onClick={onCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Criar Novo Funil
-        </Button>
-      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -614,8 +663,67 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
   const [customIcon, setCustomIcon] = useState("Layout");
   const [customColor, setCustomColor] = useState(COLOR_OPTIONS[0].value);
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<CanvasTool>("select");
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [savedSignature, setSavedSignature] = useState(() => JSON.stringify({ nodes: initialNodes, connections: initialConnections, name: initialName }));
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const dragStart = useRef({ x: 0, y: 0, nodeX: 0, nodeY: 0 });
+  const historyRef = useRef<CanvasSnapshot[]>([{ nodes: structuredClone(initialNodes), connections: structuredClone(initialConnections) }]);
+  const historyIndexRef = useRef(0);
+  const applyingHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (applyingHistoryRef.current) {
+      applyingHistoryRef.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const next = { nodes: structuredClone(nodes), connections: structuredClone(connections) };
+      const current = historyRef.current[historyIndexRef.current];
+      if (JSON.stringify(current) === JSON.stringify(next)) return;
+      historyRef.current = [...historyRef.current.slice(0, historyIndexRef.current + 1), next].slice(-60);
+      historyIndexRef.current = historyRef.current.length - 1;
+      setHistoryVersion((value) => value + 1);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [connections, nodes]);
+
+  const undoHistory = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+    historyIndexRef.current -= 1;
+    const snapshot = historyRef.current[historyIndexRef.current];
+    applyingHistoryRef.current = true;
+    setNodes(structuredClone(snapshot.nodes));
+    setConnections(structuredClone(snapshot.connections));
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  const redoHistory = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+    historyIndexRef.current += 1;
+    const snapshot = historyRef.current[historyIndexRef.current];
+    applyingHistoryRef.current = true;
+    setNodes(structuredClone(snapshot.nodes));
+    setConnections(structuredClone(snapshot.connections));
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redoHistory(); else undoHistory();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        redoHistory();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [redoHistory, undoHistory]);
 
   // Date range for linked funnels
   const [dateRange, setDateRange] = useState({
@@ -708,6 +816,7 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
         const result = await createFunnelMut.mutateAsync({ name: funnelName, nodes: nodes as any, connections: connections as any, funnel_type: funnelType, ad_account_id: adAccountId, campaign_ids: campaignIds });
         setSavedId(result.id);
       }
+      setSavedSignature(JSON.stringify({ nodes, connections, name: funnelName }));
       toast({ title: "Funil salvo com sucesso!" });
     } catch {
       toast({ title: "Erro ao salvar", variant: "destructive" });
@@ -762,9 +871,19 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
     if ((e.target as HTMLElement).closest("[data-port]")) return;
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
+    if (activeTool === "hand") {
+      setIsPanning(true);
+      panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+      return;
+    }
+    if (activeTool === "connect") {
+      const canvasPos = clientToCanvas(e.clientX, e.clientY);
+      setDragLine({ fromNodeId: nodeId, end: "to", connectionIndex: -1, mouseX: canvasPos.x, mouseY: canvasPos.y, snapTargetId: null });
+      return;
+    }
     setDraggingNodeId(nodeId);
     dragStart.current = { x: e.clientX, y: e.clientY, nodeX: node.x, nodeY: node.y };
-  }, [nodes]);
+  }, [activeTool, clientToCanvas, nodes, pan]);
 
   const handlePortMouseDown = useCallback((e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation();
@@ -776,9 +895,10 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest("[data-funnel-node]")) return;
+    if (activeTool !== "hand") return;
     setIsPanning(true);
     panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-  }, [pan]);
+  }, [activeTool, pan]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (dragLine) {
@@ -878,6 +998,10 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
   };
 
   const renderNodes = isLinked ? displayNodes : nodes;
+  const isDirty = savedSignature !== JSON.stringify({ nodes, connections, name: funnelName });
+  const canUndo = historyIndexRef.current > 0;
+  const canRedo = historyIndexRef.current < historyRef.current.length - 1;
+  void historyVersion;
 
   return (
     <div className="space-y-4">
@@ -912,6 +1036,9 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
           </Badge>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <span className={`hidden rounded-full px-2 py-1 text-[10px] font-semibold sm:inline-flex ${isDirty ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500"}`}>
+            {isDirty ? "Alterações não salvas" : "Salvo"}
+          </span>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
             Blocos
@@ -956,10 +1083,17 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2">
+      <div className="gd-panel flex max-w-full items-center gap-2 overflow-x-auto p-2">
         <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setCustomBlockOpen(true)}>
           <Plus className="h-4 w-4" />
           Novo Bloco
+        </Button>
+        <div className="w-px h-5 bg-border mx-1" />
+        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={undoHistory} disabled={!canUndo} title="Desfazer (Ctrl/⌘ + Z)">
+          <Undo2 className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={redoHistory} disabled={!canRedo} title="Refazer (Ctrl/⌘ + Shift + Z)">
+          <Redo2 className="h-4 w-4" />
         </Button>
         <div className="w-px h-5 bg-border mx-1" />
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.min(2, z + 0.15))}>
@@ -1041,7 +1175,7 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
           className="relative overflow-hidden rounded-xl border select-none flex-1"
           style={{
             height: "calc(100vh - 260px)",
-            cursor: dragLine ? "crosshair" : isPanning ? "grabbing" : "grab",
+            cursor: dragLine || activeTool === "connect" ? "crosshair" : isPanning ? "grabbing" : activeTool === "hand" ? "grab" : "default",
             backgroundColor: "hsl(216, 80%, 97%)",
           }}
           onWheel={handleWheel}
@@ -1052,6 +1186,24 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
+          <div
+            className="absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-[#d6aa35]/25 bg-[#11100d]/92 p-1.5 text-white shadow-[0_18px_60px_-20px_rgba(0,0,0,.85)] backdrop-blur-xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <Button variant={activeTool === "select" ? "default" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setActiveTool("select")} title="Selecionar e mover blocos">
+              <MousePointer2 className="h-4 w-4" />
+            </Button>
+            <Button variant={activeTool === "hand" ? "default" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setActiveTool("hand")} title="Mover o canvas">
+              <Hand className="h-4 w-4" />
+            </Button>
+            <Button variant={activeTool === "connect" ? "default" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setActiveTool("connect")} title="Conectar etapas">
+              <Waypoints className="h-4 w-4" />
+            </Button>
+            <span className="mx-1 h-6 w-px bg-white/10" />
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setCustomBlockOpen(true)} title="Criar bloco">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
           {/* Empty state */}
           {nodes.length === 0 && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/60 pointer-events-none z-10">
@@ -1143,7 +1295,7 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
               const Icon = getIcon(node.icon);
               const isHovered = hoveredNodeId === node.id;
               const isSnapTarget = dragLine?.snapTargetId === node.id;
-              const showPorts = isConnecting || isHovered;
+              const showPorts = activeTool === "connect" || isConnecting || isHovered;
               const isAutoNode = isLinked && node.dataSource === "auto";
 
               return (
@@ -1155,7 +1307,7 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
                   }`}
                   style={{
                     left: node.x, top: node.y, width: NODE_W, height: NODE_H,
-                    cursor: draggingNodeId === node.id ? "grabbing" : dragLine ? "crosshair" : "grab",
+                    cursor: draggingNodeId === node.id ? "grabbing" : activeTool === "connect" || dragLine ? "crosshair" : activeTool === "hand" ? "grab" : "move",
                     zIndex: editingNodeId === node.id ? 20 : isSnapTarget ? 10 : 1,
                     backgroundColor: "#ffffff", border: isAutoNode ? "1.5px solid hsl(152, 60%, 75%)" : "1px solid #e5e7eb",
                   }}
@@ -1354,19 +1506,17 @@ const Funnelytics = () => {
     }
   };
 
-  const handleCreated = (funnelId: string, type: "blank" | "linked") => {
-    // Re-fetch will happen, then open the newly created funnel
-    setTimeout(() => {
-      // Open the funnel after creation
-      setActiveFunnelId(funnelId);
-      setCanvasData({
-        nodes: [],
-        connections: [],
-        name: "Novo Funil",
-        funnelType: type,
-      });
-      setView("canvas");
-    }, 500);
+  const handleCreated = (funnel: FunnelRecord) => {
+    setActiveFunnelId(funnel.id);
+    setCanvasData({
+      nodes: (funnel.nodes as FunnelNode[]) || [],
+      connections: (funnel.connections as FunnelConnection[]) || [],
+      name: funnel.name,
+      funnelType: funnel.funnel_type,
+      adAccountId: funnel.ad_account_id,
+      campaignIds: funnel.campaign_ids || [],
+    });
+    setView("canvas");
   };
 
   const handleBack = () => {

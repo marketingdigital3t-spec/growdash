@@ -215,7 +215,17 @@
   }
 
   .gd-panel {
-    @apply min-w-0 max-w-full rounded-xl border border-[#ddcfb5] bg-[#fffdf8] shadow-[0_1px_2px_rgba(20,16,10,.035)] dark:border-[#352814] dark:bg-[#100c07] dark:shadow-[inset_0_1px_0_rgba(255,226,138,.025)];
+    @apply min-w-0 max-w-full rounded-xl border border-[#ddcfb5] bg-[#fffdf8] shadow-[0_10px_35px_-30px_rgba(48,34,10,.45)] dark:border-[#352814] dark:bg-[#100c07] dark:shadow-[inset_0_1px_0_rgba(255,226,138,.035),0_18px_60px_-45px_rgba(0,0,0,.9)];
+    background-image: linear-gradient(145deg, rgba(255,255,255,.35), transparent 38%);
+  }
+
+  .dark .gd-panel {
+    background-image: linear-gradient(145deg, rgba(255,211,103,.025), transparent 42%);
+  }
+
+  .growdash-main :where(button, a, input, select, textarea):focus-visible {
+    outline: 2px solid rgba(255, 196, 61, .82);
+    outline-offset: 2px;
   }
 
   .gd-auto-grid {

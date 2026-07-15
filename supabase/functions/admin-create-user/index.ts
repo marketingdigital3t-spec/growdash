@@ -120,10 +120,43 @@ Deno.serve(async (req) => {
 
     if (action === "delete") {
       if (!target_user_id) return json({ error: "target_user_id obrigatório" }, 400);
-      await admin.from("user_ad_account_access").delete().eq("user_id", target_user_id);
-      await admin.from("user_rd_funnel_access").delete().eq("user_id", target_user_id);
-      await admin.from("user_permissions").delete().eq("user_id", target_user_id);
-      await admin.from("user_roles").delete().eq("user_id", target_user_id);
+      if (target_user_id === userData.user.id) {
+        return json({ error: "Você não pode excluir a própria conta enquanto está autenticado." }, 400);
+      }
+
+      const { data: targetResult, error: targetLookupError } = await admin.auth.admin.getUserById(target_user_id);
+      if (targetLookupError || !targetResult.user) return json({ error: "Usuário não encontrado." }, 404);
+      if (String(targetResult.user.email ?? "").toLowerCase() === "marketingdigital3t@gmail.com") {
+        return json({ error: "A conta proprietária da plataforma não pode ser excluída." }, 403);
+      }
+
+      // Tables without an auth.users foreign key must be cleaned explicitly.
+      // Child records come first so the operation remains deterministic even on
+      // projects that have not received every historical cascade constraint.
+      const cleanup: Array<[string, string]> = [
+        ["rd_deal_touches", "user_id"],
+        ["rd_funnel_stages", "user_id"],
+        ["rd_deals", "user_id"],
+        ["user_ad_account_access", "user_id"],
+        ["user_rd_funnel_access", "user_id"],
+        ["dashboard_view_state", "user_id"],
+        ["dashboard_views", "user_id"],
+        ["funnels", "user_id"],
+        ["rd_funnels", "user_id"],
+        ["integrations", "user_id"],
+        ["realtime_sync_state", "user_id"],
+        ["user_permissions", "user_id"],
+        ["user_roles", "user_id"],
+      ];
+      for (const [table, column] of cleanup) {
+        const { error: cleanupError } = await admin.from(table).delete().eq(column, target_user_id);
+        // A missing optional table should not block user management on older
+        // installations; every other database failure must be surfaced.
+        if (cleanupError && cleanupError.code !== "42P01") {
+          return json({ error: `Não foi possível limpar ${table}: ${cleanupError.message}` }, 409);
+        }
+      }
+
       const { error } = await admin.auth.admin.deleteUser(target_user_id);
       if (error) return json({ error: error.message }, 400);
       return json({ ok: true });

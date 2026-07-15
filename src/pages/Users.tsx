@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Pencil, Users as UsersIcon, KeyRound } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
+import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 
 const PAGES = [
   { key: "can_dashboard", label: "Dashboard" },
@@ -43,6 +44,7 @@ export default function UsersPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const [userToDelete, setUserToDelete] = useState<UserRow | null>(null);
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -108,6 +110,7 @@ export default function UsersPage() {
     },
     onSuccess: () => {
       toast({ title: "Usuário removido" });
+      setUserToDelete(null);
       qc.invalidateQueries({ queryKey: ["managed_users"] });
     },
     onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
@@ -185,10 +188,8 @@ export default function UsersPage() {
                   </p>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(u)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => {
-                    if (confirm(`Remover ${u.username}?`)) remove.mutate(u.user_id);
-                  }}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(u)} title={`Editar ${u.username}`} aria-label={`Editar ${u.username}`}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setUserToDelete(u)} title={`Excluir ${u.username}`} aria-label={`Excluir ${u.username}`}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
             ))}
@@ -280,6 +281,16 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DestructiveConfirmationDialog
+        open={!!userToDelete}
+        onOpenChange={(open) => !open && setUserToDelete(null)}
+        title="Excluir usuário da equipe"
+        description="O acesso será revogado, as atribuições serão removidas e o histórico de auditoria será preservado sem identificar o usuário excluído. Esta ação não pode ser desfeita."
+        confirmation={userToDelete?.username ?? ""}
+        pending={remove.isPending}
+        onConfirm={() => userToDelete && remove.mutate(userToDelete.user_id)}
+      />
     </MotionPage>
   );
 }

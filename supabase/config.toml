@@ -11,3 +11,15 @@ verify_jwt = true
 
 [functions.rd-test-connection]
 verify_jwt = true
+
+[functions.delete-integration-account]
+verify_jwt = true
+
+[functions.instagram-oauth-start]
+verify_jwt = true
+
+[functions.instagram-oauth-callback]
+verify_jwt = false
+
+[functions.social-sync-instagram]
+verify_jwt = true
