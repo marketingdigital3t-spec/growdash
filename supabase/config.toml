@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.social-sync-instagram]
 verify_jwt = true
+
+[functions.sync-meta-insights]
+verify_jwt = true
+
+[functions.sync-meta-hourly]
+verify_jwt = true

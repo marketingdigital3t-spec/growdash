@@ -45,14 +45,20 @@ Deno.serve(async (req) => {
       userId = user.id;
     }
 
-    const adAccountId: string | undefined = body.adAccountId;
+    const adAccountId: string | undefined = typeof body.adAccountId === "string" ? body.adAccountId : undefined;
+    const adAccountIds = Array.isArray(body.adAccountIds)
+      ? body.adAccountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+      : [];
     const startDate: string =
       body.startDate || new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
     const endDate: string =
       body.endDate || new Date().toISOString().split("T")[0];
+    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
+    const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
     let q = supabaseAdmin.from("ad_accounts").select("*");
     if (adAccountId) q = q.eq("id", adAccountId);
+    else if (adAccountIds.length > 0) q = q.in("id", adAccountIds);
     if (userId) q = q.eq("user_id", userId);
     const { data: accounts, error: accErr } = await q;
     if (accErr) throw accErr;
@@ -65,6 +71,8 @@ Deno.serve(async (req) => {
 
     let totalSynced = 0;
     const errors: string[] = [];
+    let needsReauth = false;
+    let failedAccounts = 0;
 
     for (const account of accounts) {
       try {
@@ -81,7 +89,7 @@ Deno.serve(async (req) => {
         const lpAction: string | null = lpCfg?.action_type ?? null;
 
         const url =
-          `https://graph.facebook.com/v21.0/${metaAccountId}/insights` +
+          `${graphBase}/${metaAccountId}/insights` +
           `?level=ad` +
           `&time_increment=1` +
           `&breakdowns=hourly_stats_aggregated_by_audience_time_zone` +
@@ -94,7 +102,9 @@ Deno.serve(async (req) => {
 
         const res = await fetchMetaPaginated(url);
         if (res.error) {
-          errors.push(`Conta ${account.name}: ${res.error}`);
+          failedAccounts++;
+          needsReauth ||= res.errorCode === 190;
+          errors.push(`Conta ${account.name}${res.errorCode ? ` [Meta ${res.errorCode}]` : ""}: ${res.error}`);
           continue;
         }
 
@@ -198,12 +208,21 @@ Deno.serve(async (req) => {
         }
         console.log(`hourly ${account.name}: ${rows.length} rows`);
       } catch (e) {
+        failedAccounts++;
         errors.push(`Conta ${account.name}: ${(e as Error).message}`);
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, synced: totalSynced, accounts: accounts.length, errors: errors.length ? errors : undefined }),
+      JSON.stringify({
+        success: failedAccounts < accounts.length,
+        synced: totalSynced,
+        accounts: accounts.length,
+        errors: errors.length ? errors : undefined,
+        error: failedAccounts >= accounts.length ? errors[0] : undefined,
+        needs_reauth: needsReauth || undefined,
+        graph_version: graphVersion,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
@@ -214,21 +233,58 @@ Deno.serve(async (req) => {
   }
 });
 
-async function fetchMeta(url: string): Promise<any> {
-  const res = await fetch(url);
-  return res.json();
+const RETRYABLE_META_CODES = new Set([1, 2, 4, 17, 32, 613, 80004]);
+
+async function fetchMeta(url: string, maxAttempts = 4): Promise<any> {
+  let lastMessage = "Falha ao consultar a Graph API";
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await fetch(url);
+      const raw = await response.text();
+      let payload: any = {};
+      try { payload = raw ? JSON.parse(raw) : {}; } catch { payload = {}; }
+      if (response.ok && !payload.error) return payload;
+
+      const metaError = payload.error || { message: `Meta retornou HTTP ${response.status}` };
+      const retryable = response.status === 429 || response.status >= 500 || metaError.is_transient === true || RETRYABLE_META_CODES.has(Number(metaError.code));
+      lastMessage = metaError.message || `Meta retornou HTTP ${response.status}`;
+      if (retryable && attempt + 1 < maxAttempts) {
+        const retryAfter = Number(response.headers.get("retry-after") || 0) * 1000;
+        const exponential = 750 * (2 ** attempt) + Math.floor(Math.random() * 250);
+        await sleep(Math.min(15_000, Math.max(retryAfter, exponential)));
+        continue;
+      }
+      return { ...payload, error: { ...metaError, message: lastMessage }, __httpStatus: response.status, __retryable: retryable };
+    } catch (error) {
+      lastMessage = error instanceof Error ? error.message : "Falha de rede ao consultar a Meta";
+      if (attempt + 1 < maxAttempts) {
+        await sleep(750 * (2 ** attempt));
+        continue;
+      }
+    }
+  }
+  return { error: { message: lastMessage, is_transient: true }, __retryable: true };
 }
 
-async function fetchMetaPaginated(url: string, maxPages = 80): Promise<{ data: any[]; error?: string }> {
+async function fetchMetaPaginated(url: string, maxPages = 80): Promise<{ data: any[]; error?: string; errorCode?: number; retryable?: boolean }> {
   const all: any[] = [];
   let next: string | undefined = url;
   let pages = 0;
   while (next && pages < maxPages) {
     const res = await fetchMeta(next);
-    if (res.error) return { data: all, error: res.error.message || String(res.error) };
+    if (res.error) return {
+      data: all,
+      error: res.error.message || String(res.error),
+      errorCode: typeof res.error.code === "number" ? res.error.code : undefined,
+      retryable: res.__retryable,
+    };
     if (Array.isArray(res.data)) all.push(...res.data);
     next = res.paging?.next;
     pages++;
   }
   return { data: all };
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

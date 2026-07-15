@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
 
 export type EditableMetaEntity = {
   type: "campaign" | "adset" | "ad";
@@ -71,7 +72,7 @@ export function MetaEntityEditor({ entity, onOpenChange, onSaved }: Props) {
       const { data, error } = await supabase.functions.invoke("meta-manage-entity", {
         body: { entityType: entity.type, entityId: entity.id, changes },
       });
-      if (error) throw error;
+      if (error) throw new Error(formatEdgeFunctionError(await edgeFunctionErrorDetails(error)));
       if (data?.error) throw new Error(data.error);
       toast.success(`${labels[entity.type]} atualizada na Meta Ads.`);
       await onSaved();

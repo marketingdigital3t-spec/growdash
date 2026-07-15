@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     const code = url.searchParams.get("code");
     if (!code) return resultPage("error", "A Meta não devolveu o código de autorização.");
 
-    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v21.0";
+    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
     const redirectUri = Deno.env.get("META_OAUTH_REDIRECT_URI")
       ?? `${supabaseUrl}/functions/v1/meta-oauth-callback`;
 

@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
       metaPayload.set("daily_budget", String(Math.round(normalizedBudget * 100)));
     }
 
-    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v21.0";
+    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
     const metaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${entityId}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },

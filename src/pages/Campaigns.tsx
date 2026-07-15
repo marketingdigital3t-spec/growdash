@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,8 @@ import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 import { MetaEntityDetailSheet, type MetaDetailEntity } from "@/components/campaigns/MetaEntityDetailSheet";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useSyncMeta } from "@/hooks/useSyncMeta";
+import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierarchy";
 
 type CampSortKey = "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
 type CampColKey = CampaignColumnKey;
@@ -67,6 +69,13 @@ const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; ac
 function getActiveDays(createdAt?: string) {
   if (!createdAt) return Number.POSITIVE_INFINITY;
   return Math.max(0, (Date.now() - new Date(createdAt).getTime()) / 86_400_000);
+}
+
+function formatApiDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getCampaignHealth(campaign: any, averageCpl: number, targetCpl?: number | null): CampaignHealth {
@@ -101,6 +110,8 @@ const AD_DEFAULTS: Record<AdColKey, number> = {
 export default function Campaigns() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const syncMeta = useSyncMeta();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -219,6 +230,42 @@ export default function Campaigns() {
   });
 
   useEffect(() => {
+    setSelectedIds(new Set());
+  }, [selectedAccount]);
+
+  useEffect(() => {
+    setSelectedIds((current) => {
+      const next = pruneCampaignSelection(current, campaigns);
+      if (next.size === current.size && Array.from(next).every((id) => current.has(id))) return current;
+      return next;
+    });
+  }, [campaigns]);
+
+  const handleSync = async () => {
+    if (visibleAdAccounts.length === 0) {
+      toast({ title: "Conecte uma conta Meta Ads", description: "Abra Integrações → Tráfego pago para conectar a primeira conta." });
+      navigate("/integracoes");
+      return;
+    }
+    try {
+      await syncMeta.mutateAsync({
+        adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+        adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : undefined,
+        startDate: formatApiDate(startDate),
+        endDate: formatApiDate(endDate),
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campaigns_full"] }),
+        queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+        queryClient.invalidateQueries({ queryKey: ["insights"] }),
+        queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }),
+      ]);
+    } catch {
+      // useSyncMeta already shows the actionable Meta/HTTP error.
+    }
+  };
+
+  useEffect(() => {
     if (!isError) return;
     toast({ title: "Erro ao carregar campanhas", description: campaignError instanceof Error ? campaignError.message : "Tente novamente.", variant: "destructive" });
   }, [campaignError, isError, toast]);
@@ -322,8 +369,7 @@ export default function Campaigns() {
   const levelCampaigns = useMemo(() => {
     let scope = campaigns;
     if (healthFilter !== "all") scope = scope.filter((campaign: any) => getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id)) === healthFilter);
-    if (selectedIds.size > 0) scope = scope.filter((campaign: any) => selectedIds.has(campaign.id));
-    return scope;
+    return scopeCampaignHierarchy(scope, selectedIds);
   }, [averageCpl, campaigns, healthFilter, selectedIds, targetByCampaign]);
 
   const selectedAdsets = useMemo(() => {
@@ -434,8 +480,8 @@ export default function Campaigns() {
             <span className="whitespace-nowrap text-[11px] text-muted-foreground">
               {dataUpdatedAt ? `Atualizado às ${new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Aguardando dados"}
             </span>
-            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-9 gap-2 bg-background">
-              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} /> Atualizar
+            <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="h-9 gap-2 bg-background">
+              <RefreshCw className={cn("h-4 w-4", (isFetching || syncMeta.isPending) && "animate-spin")} /> {syncMeta.isPending ? "Sincronizando…" : "Atualizar"}
             </Button>
           </div>
         </div>
@@ -530,14 +576,14 @@ export default function Campaigns() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-muted/50 p-0">
             <TabsTrigger value="campaigns" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <FolderKanban className="h-4 w-4" /> Campanhas ({filtered.length})
-              {selectedIds.size > 0 && <Badge className="ml-auto bg-[#d7aa30] text-[#2d2107]">{selectedIds.size}</Badge>}
+              <FolderKanban className="h-4 w-4" /> Campanhas <Badge variant="secondary" className="ml-auto tabular-nums">{filtered.length}</Badge>
+              {selectedIds.size > 0 && <Badge className="bg-[#d7aa30] text-[#2d2107]" title="Campanhas selecionadas">{selectedIds.size} sel.</Badge>}
             </TabsTrigger>
             <TabsTrigger value="adsets" className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <Layers3 className="h-4 w-4" /> Conjuntos de anúncios ({selectedAdsets.length})
+              <Layers3 className="h-4 w-4" /> Conjuntos de anúncios <Badge variant="secondary" className="ml-auto tabular-nums">{selectedAdsets.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="ads" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <RectangleHorizontal className="h-4 w-4" /> Anúncios ({selectedAds.length})
+              <RectangleHorizontal className="h-4 w-4" /> Anúncios <Badge variant="secondary" className="ml-auto tabular-nums">{selectedAds.length}</Badge>
             </TabsTrigger>
           </TabsList>
 
@@ -574,6 +620,17 @@ export default function Campaigns() {
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
             </div>
           </div>
+
+          {activeTab !== "campaigns" && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-3 py-2 text-[11px]">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+              {selectedIds.size === 0 ? (
+                <span><b>Acesso livre à hierarquia:</b> exibindo todos os {activeTab === "adsets" ? "conjuntos de anúncios" : "anúncios"} das contas e filtros atuais. Não é necessário selecionar uma campanha.</span>
+              ) : (
+                <><span><b>Escopo filtrado:</b> descendentes de {selectedIds.size} campanha{selectedIds.size > 1 ? "s" : ""} selecionada{selectedIds.size > 1 ? "s" : ""}.</span><Button variant="ghost" size="sm" className="ml-auto h-7 gap-1 text-xs" onClick={() => setSelectedIds(new Set())}><X className="h-3 w-3" />Mostrar todas</Button></>
+              )}
+            </div>
+          )}
 
           {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
           {activeTab === "campaigns" && showIntelligence && <section className="border-b border-primary/20 bg-muted/15"><header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center"><div><h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análise inteligente</h2><p className="text-[10px] text-muted-foreground">Conta: {visibleAdAccounts.find((account) => account.id === selectedAccount)?.name || "selecione uma conta específica"} · {startDate.toLocaleDateString("pt-BR")}–{endDate.toLocaleDateString("pt-BR")}</p></div></header><div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 xl:grid-cols-6"><AnalysisMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><AnalysisMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} /><AnalysisMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} /><AnalysisMetric label="CPL" value={(totals.leads ? totals.spend / totals.leads : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="ROAS" value={`${(totals.spend ? totals.revenue / totals.spend : 0).toFixed(2)}x`} /></div><TrafficAIAnalysis accountId={selectedAccount} accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name} startDate={startDate} endDate={endDate} selectedCampaignIds={Array.from(selectedIds)} /></section>}

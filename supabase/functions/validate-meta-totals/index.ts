@@ -4,6 +4,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const GRAPH_BASE = `https://graph.facebook.com/${Deno.env.get("META_GRAPH_API_VERSION") || "v25.0"}`;
 
 interface Body { adAccountId?: string; days?: number }
 
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
     for (const acc of accounts || []) {
       const rawId = acc.account_id as string;
       const metaId = rawId.startsWith("act_") ? rawId : `act_${rawId}`;
-      const url = `https://graph.facebook.com/v21.0/${metaId}/insights?fields=spend,impressions,clicks,actions&level=account&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&access_token=${acc.access_token}`;
+      const url = `${GRAPH_BASE}/${metaId}/insights?fields=spend,impressions,clicks,actions&level=account&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&access_token=${acc.access_token}`;
       const r = await fetch(url);
       const j = await r.json();
       if (j.error) {

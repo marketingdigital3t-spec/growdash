@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     });
     if (stateError) throw stateError;
 
-    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v21.0";
+    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
     const redirectUri = Deno.env.get("META_OAUTH_REDIRECT_URI")
       ?? `${supabaseUrl}/functions/v1/meta-oauth-callback`;
     const scopes = Deno.env.get("META_OAUTH_SCOPES")

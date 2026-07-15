@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     }
 
     const accountId = `act_${numericAccountId}`;
-    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v21.0";
+    const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
     const fields = "id,account_id,name,currency,timezone_name,timezone_offset_hours_utc";
     const metaResponse = await fetch(
       `https://graph.facebook.com/${graphVersion}/${accountId}?fields=${encodeURIComponent(fields)}`,

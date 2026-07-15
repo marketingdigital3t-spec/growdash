@@ -41,8 +41,9 @@ function parseAmount(amountObj: any): number {
 
 async function fetchTransactions(metaAccountId: string, token: string, sinceUnix: number) {
   const all: any[] = [];
+  const graphBase = `https://graph.facebook.com/${Deno.env.get("META_GRAPH_API_VERSION") || "v25.0"}`;
   let url: string | null =
-    `https://graph.facebook.com/v21.0/${metaAccountId}/transactions` +
+    `${graphBase}/${metaAccountId}/transactions` +
     `?fields=id,time,billing_reason,payment_option,status,amount,vat,provider_amount,billing_period,app_amount` +
     `&since=${sinceUnix}&limit=200&access_token=${token}`;
   let pages = 0;

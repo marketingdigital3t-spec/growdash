@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const graphBase = `https://graph.facebook.com/${Deno.env.get("META_GRAPH_API_VERSION") || "v25.0"}`;
 
     // Require either a valid user JWT or the service-role key (used by pg_cron).
     const authHeader = req.headers.get("Authorization") || "";
@@ -66,7 +67,7 @@ Deno.serve(async (req) => {
         const accessToken = account.access_token;
 
         // Fetch account balance info from Meta API with all relevant financial fields
-        const url = `https://graph.facebook.com/v21.0/${metaAccountId}?fields=balance,spend_cap,amount_spent,funding_source_details&access_token=${accessToken}`;
+        const url = `${graphBase}/${metaAccountId}?fields=balance,spend_cap,amount_spent,funding_source_details&access_token=${accessToken}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -85,9 +86,6 @@ Deno.serve(async (req) => {
             .eq("id", account.id);
           continue;
         }
-
-        // Log ALL fields returned by Meta for debugging
-        console.log(`${account.name}: Meta API raw response:`, JSON.stringify(data, null, 2));
 
         let remainingBalance: number | null = null;
 
