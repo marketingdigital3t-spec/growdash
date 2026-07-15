@@ -50,6 +50,8 @@ Nao coloque service role key no frontend.
 - `/auth`
 - `/`
 - `/campaigns`
+- `/growdash-flow`
+- `/trafego-pago`
 - `/funnels`
 - `/crm`
 - `/commercial`
@@ -73,7 +75,9 @@ Nao coloque service role key no frontend.
 6. Leads devem vir das negociacoes iniciadas no RD Station.
 7. Gasto, cliques, impressoes e metricas de midia devem vir da Meta Ads.
 8. Receita e vendas devem priorizar RD Station.
-9. Manter a identidade visual roxa/glass da Growdash.
+9. Manter a identidade visual premium preta e dourada da Growdash, usando os tokens e componentes existentes.
+10. Preservar o novo Growdash Flow modular em `src/components/GrowdashFlow/`.
+11. Preservar a navegação independente entre Campanhas, Conjuntos de anúncios e Anúncios.
 
 ## Observacao de seguranca
 
