@@ -50,7 +50,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierarchy";
-import { getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
+import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
 
 type CampSortKey = "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
 type CampColKey = CampaignColumnKey;
@@ -618,16 +618,6 @@ export default function Campaigns() {
         </div>
       </MotionItem>
 
-      <MotionItem className="border-b border-border bg-card px-2 py-2 sm:px-3">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-6">
-          {isLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg border border-border bg-muted/60" />) : HEALTH_OPTIONS.map((option) => {
-            const count = healthCounts[option.id];
-            const selected = healthFilter === option.id;
-            return <button key={option.id} type="button" title={`${count} campanha(s) classificadas como ${option.label.toLowerCase()} no período selecionado`} onClick={() => setHealthFilter(selected ? "all" : option.id)} className={cn("flex min-h-12 items-center gap-2 rounded-lg border border-border bg-muted/25 px-3 text-left transition hover:border-primary/35 hover:bg-primary/5", selected && option.active, option.id === "critical" && count > 0 && "shadow-[0_0_18px_-10px_rgba(239,68,68,.9)]")} aria-pressed={selected}><span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", option.dot, option.id === "critical" && count > 0 && "animate-pulse")} /><span className="min-w-0 grow"><span className="block truncate text-[9px] font-black uppercase tracking-wide">{option.label}</span><span className="block text-lg font-black tabular-nums">{count}</span></span></button>;
-          })}
-        </div>
-      </MotionItem>
-
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
 
       <MotionItem>
@@ -674,7 +664,7 @@ export default function Campaigns() {
               )}
             </AnimatePresence>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {activeTab === "campaigns" && <Button variant="outline" size="sm" onClick={() => setShowIntelligence((value) => !value)} className={cn("h-8 gap-2", showIntelligence && "border-primary bg-primary/10 text-foreground")} aria-pressed={showIntelligence}><Sparkles className="h-4 w-4 text-primary" />Análises</Button>}
+              {activeTab === "campaigns" && <Button variant="outline" size="sm" onClick={() => { if (showIntelligence) setHealthFilter("all"); setShowIntelligence(!showIntelligence); }} className={cn("h-8 gap-2", showIntelligence && "border-primary bg-primary/10 text-foreground")} aria-pressed={showIntelligence}><Sparkles className="h-4 w-4 text-primary" />Análises</Button>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
             </div>
           </div>
@@ -691,7 +681,46 @@ export default function Campaigns() {
           )}
 
           {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
-          {activeTab === "campaigns" && showIntelligence && <section className="border-b border-primary/20 bg-muted/15"><header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center"><div><h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análise inteligente</h2><p className="text-[10px] text-muted-foreground">Conta: {visibleAdAccounts.find((account) => account.id === selectedAccount)?.name || "selecione uma conta específica"} · {startDate.toLocaleDateString("pt-BR")}–{endDate.toLocaleDateString("pt-BR")}</p></div></header><div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 xl:grid-cols-6"><AnalysisMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><AnalysisMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} /><AnalysisMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} /><AnalysisMetric label="CPL" value={(totals.leads ? totals.spend / totals.leads : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="ROAS" value={`${(totals.spend ? totals.revenue / totals.spend : 0).toFixed(2)}x`} /></div><TrafficAIAnalysis accountId={selectedAccount} accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name} startDate={startDate} endDate={endDate} selectedCampaignIds={Array.from(selectedIds)} /></section>}
+          {activeTab === "campaigns" && showIntelligence && (
+            <section className="border-b border-primary/20 bg-muted/15">
+              <header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center">
+                <div>
+                  <h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análise inteligente</h2>
+                  <p className="text-[10px] text-muted-foreground">Conta: {visibleAdAccounts.find((account) => account.id === selectedAccount)?.name || "todas as contas selecionadas"} · {startDate.toLocaleDateString("pt-BR")}–{endDate.toLocaleDateString("pt-BR")}</p>
+                </div>
+              </header>
+
+              <div className="border-b border-border p-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 min-[900px]:grid-cols-6">
+                  {isLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg border border-border bg-muted/60" />) : HEALTH_OPTIONS.map((option) => {
+                    const count = healthCounts[option.id];
+                    const selected = healthFilter === option.id;
+                    return <button key={option.id} type="button" title={`${count} campanha(s) classificadas como ${option.label.toLowerCase()} no período selecionado`} onClick={() => setHealthFilter(selected ? "all" : option.id)} className={cn("flex min-h-14 min-w-0 items-center gap-2 rounded-lg border border-border bg-card px-3 text-left transition hover:border-primary/35 hover:bg-primary/5", selected && option.active, option.id === "critical" && count > 0 && "shadow-[0_0_18px_-10px_rgba(239,68,68,.9)]")} aria-pressed={selected}><span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", option.dot, option.id === "critical" && count > 0 && "animate-pulse")} /><span className="min-w-0 grow"><span className="block truncate text-[9px] font-black uppercase tracking-wide">{option.label}</span><span className="block text-lg font-black tabular-nums">{count}</span></span></button>;
+                  })}
+                </div>
+
+                {healthFilter !== "all" && (
+                  <div className="mt-3 rounded-xl border border-border bg-background/55 p-3">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-xs font-black">Campanhas em {HEALTH_OPTIONS.find((option) => option.id === healthFilter)?.label}</h3>
+                        <p className="text-[10px] text-muted-foreground">Clique em uma campanha para abrir o diagnóstico completo.</p>
+                      </div>
+                      <Badge variant="outline">{filtered.length} campanha(s)</Badge>
+                    </div>
+                    {filtered.length > 0 ? (
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        {filtered.slice(0, 12).map((campaign: any) => <AnalysisCampaignAlert key={campaign.id} campaign={campaign} health={healthFilter} targetCpl={targetByCampaign.get(campaign.id) || averageCpl} accountName={visibleAdAccounts.find((account) => account.id === campaign.ad_account_id)?.name || "Conta Meta"} onOpen={() => setDetailCampaignId(campaign.id)} />)}
+                      </div>
+                    ) : <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">Nenhuma campanha deste status nos filtros atuais.</p>}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 min-[900px]:grid-cols-6"><AnalysisMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><AnalysisMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} /><AnalysisMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} /><AnalysisMetric label="CPL" value={(totals.leads ? totals.spend / totals.leads : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="ROAS" value={`${(totals.spend ? totals.revenue / totals.spend : 0).toFixed(2)}x`} /></div>
+              <TrafficAIAnalysis accountId={selectedAccount} accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name} startDate={startDate} endDate={endDate} selectedCampaignIds={Array.from(selectedIds)} />
+            </section>
+          )}
 
           {/* Campaigns Tab */}
           <TabsContent value="campaigns" className="m-0">
@@ -998,6 +1027,29 @@ function TotalMetric({ label, value }: { label: string; value: string }) {
 
 function AnalysisMetric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg border border-border bg-card px-3 py-2"><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-1 block text-sm tabular-nums">{value}</strong></div>;
+}
+
+function AnalysisCampaignAlert({ campaign, health, targetCpl, accountName, onOpen }: { campaign: any; health: CampaignHealth; targetCpl: number; accountName: string; onOpen: () => void }) {
+  const option = HEALTH_OPTIONS.find((item) => item.id === health)!;
+  const days = getCampaignActiveDays(campaign.created_at);
+  return (
+    <button type="button" onClick={onOpen} className="rounded-xl border border-border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-primary/[0.025] hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2"><span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", option.dot)} /><span className="text-[9px] font-black uppercase tracking-wider">{option.label}</span></div>
+          <h4 className="mt-2 truncate text-sm font-black">{campaign.name}</h4>
+          <p className="mt-1 truncate text-[10px] text-muted-foreground">BM: {accountName} · Alvo CPL: {targetCpl > 0 ? targetCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "não definido"}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-[9px] text-muted-foreground">{Number.isFinite(days) ? `${days.toFixed(1)}d ativa` : "idade indisponível"}</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <IssueMetric label="Investido" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+        <IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} />
+        <IssueMetric label="Custo/resultado" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+        <IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} />
+      </div>
+    </button>
+  );
 }
 
 function IssueMetric({ label, value }: { label: string; value: string }) {
