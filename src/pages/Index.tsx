@@ -11,7 +11,7 @@ import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
-import { differenceInCalendarDays, endOfMonth, format, startOfMonth } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -20,8 +20,6 @@ import { AddWidgetDialog } from "@/components/dashboard/grid/AddWidgetDialog";
 import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView } from "@/hooks/useDashboardViews";
 import { useIsMaster } from "@/hooks/useIsMaster";
 import { Pencil, Check } from "lucide-react";
-import { useSalesGoals } from "@/hooks/useSalesGoals";
-import { DashboardGoalProgress } from "@/components/dashboard/DashboardGoalProgress";
 import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip";
 
 const Index = () => {
@@ -75,14 +73,6 @@ const Index = () => {
     endDate,
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
   });
-  const monthStart = startOfMonth(new Date());
-  const monthEnd = endOfMonth(new Date());
-  const { data: monthlySales = [] } = useSales({
-    startDate: monthStart,
-    endDate: monthEnd,
-    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-  });
-  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(new Date());
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
@@ -116,10 +106,6 @@ const Index = () => {
     ? unitSales.filter((sale) => sale.campaign_ids?.some((campaignId) => selectedCampaignIds.includes(campaignId)))
     : unitSales, [unitSales, selectedCampaignIds]);
   const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id && visibleAccountIds.has(deal.ad_account_id)), [rdDeals, visibleAccountIds]);
-  const goalSales = useMemo(() => monthlySales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id) && (selectedAccount === "all" || sale.ad_account_id === selectedAccount)), [monthlySales, selectedAccount, visibleAccountIds]);
-  const goalRevenue = aggregateSales(goalSales).totalNet;
-  const goalTarget = (goalData?.rows ?? []).filter((goal) => visibleAccountIds.has(goal.ad_account_id) && (selectedAccount === "all" || goal.ad_account_id === selectedAccount)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0);
-  const goalAccountLabel = selectedAccount === "all" ? `Meta mensal · ${segment === "saas" ? "SaaS" : "Infoproduto"}` : `Meta mensal · ${visibleAccounts.find((account) => account.id === selectedAccount)?.name || "Conta selecionada"}`;
   const glassSales = aggregateSales(dashboardSales);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const glassLeads = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
@@ -151,7 +137,6 @@ const Index = () => {
 
   return (
     <MotionPage className="min-w-0 space-y-4 sm:space-y-6">
-      <MotionItem><DashboardGoalProgress realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} /></MotionItem>
       <MotionItem>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -198,11 +183,9 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} openAlerts={openAlerts} sales={glassSales.totalQuantity} />
-
       {canEditDashboard && activeView && (
         <MotionItem>
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end border-b border-border/60 pb-2">
             <Button
               size="sm"
               variant={isEditing ? "default" : "outline"}
@@ -215,6 +198,8 @@ const Index = () => {
           </div>
         </MotionItem>
       )}
+
+      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} openAlerts={openAlerts} sales={glassSales.totalQuantity} />
 
       {activeView && (
         <DashboardProvider

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  CalendarRange,
   ChevronDown,
   ChevronRight,
   LogOut,
@@ -12,17 +11,19 @@ import {
   X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { format } from "date-fns";
+import { endOfMonth, startOfMonth } from "date-fns";
 import { NAV_SECTIONS } from "./navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { PRESET_LABELS, type DatePreset } from "@/hooks/useDateFilter";
 import { useIsMaster } from "@/hooks/useIsMaster";
 import { BrandLogo, BrandMark } from "@/components/BrandLogo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner";
+import { aggregateSales, useSales } from "@/hooks/useSales";
+import { useSalesGoals } from "@/hooks/useSalesGoals";
+import { TopbarMonthlyGoal } from "@/components/dashboard/DashboardGoalProgress";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 
@@ -46,10 +47,6 @@ export default function GrowdashLayout() {
   const {
     adAccountId,
     setAdAccountId,
-    preset,
-    setPreset,
-    startDate,
-    endDate,
     segment,
     setSegment,
     businessUnitId,
@@ -60,6 +57,18 @@ export default function GrowdashLayout() {
       : adAccounts,
     [adAccounts, businessUnitId, segment],
   );
+  const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
+  const { data: monthlySales = [] } = useSales({
+    startDate: startOfMonth(new Date()),
+    endDate: endOfMonth(new Date()),
+    adAccountId: adAccountId === "all" ? undefined : adAccountId,
+  });
+  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(new Date());
+  const goalRevenue = useMemo(() => aggregateSales(monthlySales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id) && (adAccountId === "all" || sale.ad_account_id === adAccountId))).totalNet, [adAccountId, monthlySales, visibleAccountIds]);
+  const goalTarget = useMemo(() => (goalData?.rows ?? []).filter((goal) => visibleAccountIds.has(goal.ad_account_id) && (adAccountId === "all" || goal.ad_account_id === adAccountId)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0), [adAccountId, goalData?.rows, visibleAccountIds]);
+  const goalAccountLabel = adAccountId === "all"
+    ? `Meta mensal · todas as contas · ${segment === "saas" ? "SaaS" : "Infoproduto"}`
+    : `Meta mensal · ${visibleAccounts.find((account) => account.id === adAccountId)?.name || "Conta selecionada"}`;
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
@@ -226,34 +235,8 @@ export default function GrowdashLayout() {
           >
             <PanelLeftClose className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
           </button>
-          <div className="order-3 flex w-full min-w-0 grow items-center gap-2 overflow-hidden text-[10px] lg:order-none lg:w-auto lg:overflow-visible">
-            <label className="relative min-w-0 flex-1 lg:flex-none">
-              <span className="sr-only">Conta de anúncio global</span>
-              <select
-                value={adAccountId}
-                onChange={(event) => setAdAccountId(event.target.value)}
-                className="h-8 w-full min-w-0 rounded-md border border-white/15 bg-white/[.07] px-2 pr-7 text-white outline-none focus:border-[#f2c548]/70 lg:max-w-[220px]"
-              >
-                <option value="all" className="text-black">Todas as contas Meta</option>
-                {visibleAccounts.map((account) => <option key={account.id} value={account.id} className="text-black">{account.name}</option>)}
-              </select>
-            </label>
-            <label className="relative min-w-0 flex-1 lg:flex-none">
-              <span className="sr-only">Período global</span>
-              <CalendarRange className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-[#f2c548]" />
-              <select
-                value={preset}
-                onChange={(event) => setPreset(event.target.value as DatePreset)}
-                className="h-8 w-full min-w-0 rounded-md border border-white/15 bg-white/[.07] pl-8 pr-7 text-white outline-none focus:border-[#f2c548]/70 lg:w-auto"
-              >
-                {Object.entries(PRESET_LABELS).map(([key, label]) => (
-                  <option key={key} value={key} className="text-black">{label}</option>
-                ))}
-              </select>
-            </label>
-            <span className="hidden text-white/45 xl:inline">
-              {format(startDate, "dd/MM/yyyy")} – {format(endDate, "dd/MM/yyyy")}
-            </span>
+          <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
+            <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} />
           </div>
           <div className="order-2 ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px] lg:order-none">
             <button
