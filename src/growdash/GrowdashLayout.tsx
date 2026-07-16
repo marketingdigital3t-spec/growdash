@@ -146,7 +146,9 @@ export default function GrowdashLayout() {
                         cn(
                           "group flex h-10 items-center rounded-lg text-[13px] font-medium transition-colors",
                           showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
-                          isActive
+                          !showSidebarLabels
+                            ? "border border-transparent bg-transparent text-[#ffd868] shadow-none hover:bg-transparent hover:text-[#ffe68a]"
+                            : isActive
                             ? "border border-[#f0bd35]/30 bg-gradient-to-r from-[#6a521e] to-[#3a301a] text-[#ffd868] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
                             : "border border-transparent text-white/78 hover:bg-white/[.07] hover:text-white",
                         )
