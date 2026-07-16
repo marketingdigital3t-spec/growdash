@@ -10,2095 +10,462 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      account_balance_events: {
-        Row: {
-          ad_account_id: string
-          delta: number
-          event_at: string
-          id: string
-          new_balance: number | null
-          source: string
-        }
-        Insert: {
-          ad_account_id: string
-          delta: number
-          event_at?: string
-          id?: string
-          new_balance?: number | null
-          source?: string
-        }
-        Update: {
-          ad_account_id?: string
-          delta?: number
-          event_at?: string
-          id?: string
-          new_balance?: number | null
-          source?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_balance_events_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: false
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      account_lead_action: {
-        Row: {
-          ad_account_id: string
-          lp_lead_action: string
-          scope: string
-          updated_at: string
-        }
-        Insert: {
-          ad_account_id: string
-          lp_lead_action: string
-          scope?: string
-          updated_at?: string
-        }
-        Update: {
-          ad_account_id?: string
-          lp_lead_action?: string
-          scope?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_lead_action_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: false
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      account_lp_config: {
-        Row: {
-          action_type: string | null
-          ad_account_id: string
-          pixel_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          action_type?: string | null
-          ad_account_id: string
-          pixel_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          action_type?: string | null
-          ad_account_id?: string
-          pixel_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_lp_config_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: true
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_lp_config_pixel_id_fkey"
-            columns: ["pixel_id"]
-            isOneToOne: false
-            referencedRelation: "ad_account_pixel"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      account_transactions: {
-        Row: {
-          ad_account_id: string
-          amount: number
-          billing_reason: string | null
-          currency: string | null
-          id: string
-          inserted_at: string
-          payment_method: string | null
-          raw: Json | null
-          reference: string | null
-          status: string | null
-          time: string
-          updated_at: string
-        }
-        Insert: {
-          ad_account_id: string
-          amount?: number
-          billing_reason?: string | null
-          currency?: string | null
-          id: string
-          inserted_at?: string
-          payment_method?: string | null
-          raw?: Json | null
-          reference?: string | null
-          status?: string | null
-          time: string
-          updated_at?: string
-        }
-        Update: {
-          ad_account_id?: string
-          amount?: number
-          billing_reason?: string | null
-          currency?: string | null
-          id?: string
-          inserted_at?: string
-          payment_method?: string | null
-          raw?: Json | null
-          reference?: string | null
-          status?: string | null
-          time?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_transactions_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: false
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      account_utm_mapping: {
-        Row: {
-          ad_account_id: string
-          adset_utm: string
-          campaign_utm: string
-          created_at: string
-          creative_utm: string
-          id: string
-          match_strategy: string
-          platform_utm: string
-          updated_at: string
-        }
-        Insert: {
-          ad_account_id: string
-          adset_utm?: string
-          campaign_utm?: string
-          created_at?: string
-          creative_utm?: string
-          id?: string
-          match_strategy?: string
-          platform_utm?: string
-          updated_at?: string
-        }
-        Update: {
-          ad_account_id?: string
-          adset_utm?: string
-          campaign_utm?: string
-          created_at?: string
-          creative_utm?: string
-          id?: string
-          match_strategy?: string
-          platform_utm?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      ad_account_pixel: {
-        Row: {
-          ad_account_id: string
-          created_at: string
-          id: string
-          last_synced_at: string
-          name: string
-          pixel_id: string
-        }
-        Insert: {
-          ad_account_id: string
-          created_at?: string
-          id?: string
-          last_synced_at?: string
-          name: string
-          pixel_id: string
-        }
-        Update: {
-          ad_account_id?: string
-          created_at?: string
-          id?: string
-          last_synced_at?: string
-          name?: string
-          pixel_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ad_account_pixel_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: false
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ad_accounts: {
-        Row: {
-          access_token: string
-          account_id: string
-          connection_status: string
-          created_at: string
-          daily_budget: number | null
-          funding_display: string | null
-          funding_type: string | null
-          id: string
-          last_sync_attempt_at: string | null
-          last_sync_error: string | null
-          last_sync_error_code: number | null
-          last_sync_success_at: string | null
-          min_spend_threshold: number
-          name: string
-          rd_fields_last_discovered_at: string | null
-          remaining_balance: number | null
-          target_cpl: number | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          access_token: string
-          account_id: string
-          connection_status?: string
-          created_at?: string
-          daily_budget?: number | null
-          funding_display?: string | null
-          funding_type?: string | null
-          id?: string
-          last_sync_attempt_at?: string | null
-          last_sync_error?: string | null
-          last_sync_error_code?: number | null
-          last_sync_success_at?: string | null
-          min_spend_threshold?: number
-          name: string
-          rd_fields_last_discovered_at?: string | null
-          remaining_balance?: number | null
-          target_cpl?: number | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          access_token?: string
-          account_id?: string
-          connection_status?: string
-          created_at?: string
-          daily_budget?: number | null
-          funding_display?: string | null
-          funding_type?: string | null
-          id?: string
-          last_sync_attempt_at?: string | null
-          last_sync_error?: string | null
-          last_sync_error_code?: number | null
-          last_sync_success_at?: string | null
-          min_spend_threshold?: number
-          name?: string
-          rd_fields_last_discovered_at?: string | null
-          remaining_balance?: number | null
-          target_cpl?: number | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      ads: {
-        Row: {
-          adset_id: string
-          created_at: string
-          creative_id: string | null
-          id: string
-          last_activated_at: string | null
-          name: string
-          previous_status: string | null
-          status: string | null
-          thumbnail_url: string | null
-          updated_at: string
-        }
-        Insert: {
-          adset_id: string
-          created_at?: string
-          creative_id?: string | null
-          id: string
-          last_activated_at?: string | null
-          name: string
-          previous_status?: string | null
-          status?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string
-        }
-        Update: {
-          adset_id?: string
-          created_at?: string
-          creative_id?: string | null
-          id?: string
-          last_activated_at?: string | null
-          name?: string
-          previous_status?: string | null
-          status?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ads_adset_id_fkey"
-            columns: ["adset_id"]
-            isOneToOne: false
-            referencedRelation: "adsets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      adsets: {
-        Row: {
-          campaign_id: string
-          created_at: string
-          daily_budget: number | null
-          destination_type: string | null
-          id: string
-          last_activated_at: string | null
-          name: string
-          previous_status: string | null
-          status: string | null
-          updated_at: string
-        }
-        Insert: {
-          campaign_id: string
-          created_at?: string
-          daily_budget?: number | null
-          destination_type?: string | null
-          id: string
-          last_activated_at?: string | null
-          name: string
-          previous_status?: string | null
-          status?: string | null
-          updated_at?: string
-        }
-        Update: {
-          campaign_id?: string
-          created_at?: string
-          daily_budget?: number | null
-          destination_type?: string | null
-          id?: string
-          last_activated_at?: string | null
-          name?: string
-          previous_status?: string | null
-          status?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "adsets_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaigns"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      alerts: {
-        Row: {
-          ad_id: string | null
-          alert_type: string
-          created_at: string
-          id: string
-          is_read: boolean | null
-          message: string
-          severity: string
-          user_id: string
-        }
-        Insert: {
-          ad_id?: string | null
-          alert_type: string
-          created_at?: string
-          id?: string
-          is_read?: boolean | null
-          message: string
-          severity: string
-          user_id: string
-        }
-        Update: {
-          ad_id?: string | null
-          alert_type?: string
-          created_at?: string
-          id?: string
-          is_read?: boolean | null
-          message?: string
-          severity?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "alerts_ad_id_fkey"
-            columns: ["ad_id"]
-            isOneToOne: false
-            referencedRelation: "ads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      campaign_changes: {
-        Row: {
-          campaign_id: string
-          change_type: string
-          changed_at: string
-          created_by: string | null
-          entity_id: string | null
-          entity_type: string
-          field: string | null
-          id: string
-          new_value: string | null
-          note: string | null
-          old_value: string | null
-        }
-        Insert: {
-          campaign_id: string
-          change_type: string
-          changed_at?: string
-          created_by?: string | null
-          entity_id?: string | null
-          entity_type?: string
-          field?: string | null
-          id?: string
-          new_value?: string | null
-          note?: string | null
-          old_value?: string | null
-        }
-        Update: {
-          campaign_id?: string
-          change_type?: string
-          changed_at?: string
-          created_by?: string | null
-          entity_id?: string | null
-          entity_type?: string
-          field?: string | null
-          id?: string
-          new_value?: string | null
-          note?: string | null
-          old_value?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaign_changes_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaigns"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      campaign_targets: {
-        Row: {
-          campaign_id: string
-          created_at: string
-          target_cpl: number
-          updated_at: string
-        }
-        Insert: {
-          campaign_id: string
-          created_at?: string
-          target_cpl: number
-          updated_at?: string
-        }
-        Update: {
-          campaign_id?: string
-          created_at?: string
-          target_cpl?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaign_targets_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: true
-            referencedRelation: "campaigns"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      campaigns: {
-        Row: {
-          ad_account_id: string
-          created_at: string
-          id: string
-          last_activated_at: string | null
-          name: string
-          objective: string | null
-          previous_status: string | null
-          status: string | null
-          updated_at: string
-        }
-        Insert: {
-          ad_account_id: string
-          created_at?: string
-          id: string
-          last_activated_at?: string | null
-          name: string
-          objective?: string | null
-          previous_status?: string | null
-          status?: string | null
-          updated_at?: string
-        }
-        Update: {
-          ad_account_id?: string
-          created_at?: string
-          id?: string
-          last_activated_at?: string | null
-          name?: string
-          objective?: string | null
-          previous_status?: string | null
-          status?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaigns_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: false
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      custom_metrics: {
-        Row: {
-          created_at: string
-          denominator_action: string | null
-          denominator_field: string | null
-          format: string
-          id: string
-          is_default_lead: boolean
-          kind: string
-          name: string
-          numerator_action: string | null
-          position: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          denominator_action?: string | null
-          denominator_field?: string | null
-          format?: string
-          id?: string
-          is_default_lead?: boolean
-          kind: string
-          name: string
-          numerator_action?: string | null
-          position?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          denominator_action?: string | null
-          denominator_field?: string | null
-          format?: string
-          id?: string
-          is_default_lead?: boolean
-          kind?: string
-          name?: string
-          numerator_action?: string | null
-          position?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      dashboard_view_state: {
-        Row: {
-          context_key: string
-          updated_at: string
-          user_id: string
-          view_id: string
-        }
-        Insert: {
-          context_key: string
-          updated_at?: string
-          user_id: string
-          view_id: string
-        }
-        Update: {
-          context_key?: string
-          updated_at?: string
-          user_id?: string
-          view_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dashboard_view_state_view_id_fkey"
-            columns: ["view_id"]
-            isOneToOne: false
-            referencedRelation: "dashboard_views"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      dashboard_views: {
-        Row: {
-          ad_account_id: string | null
-          created_at: string
-          id: string
-          is_default: boolean
-          is_system: boolean
-          layout: Json
-          name: string
-          scope: string
-          updated_at: string
-          user_id: string
-          widgets: Json
-        }
-        Insert: {
-          ad_account_id?: string | null
-          created_at?: string
-          id?: string
-          is_default?: boolean
-          is_system?: boolean
-          layout?: Json
-          name: string
-          scope?: string
-          updated_at?: string
-          user_id: string
-          widgets?: Json
-        }
-        Update: {
-          ad_account_id?: string | null
-          created_at?: string
-          id?: string
-          is_default?: boolean
-          is_system?: boolean
-          layout?: Json
-          name?: string
-          scope?: string
-          updated_at?: string
-          user_id?: string
-          widgets?: Json
-        }
-        Relationships: []
-      }
-      event_class_history: {
+      audit_log: {
         Row: {
           action: string
           actor_id: string | null
           created_at: string
-          description: string | null
-          event_class_id: string
           id: string
           metadata: Json | null
+          target_id: string | null
+          target_type: string | null
         }
         Insert: {
           action: string
           actor_id?: string | null
           created_at?: string
-          description?: string | null
-          event_class_id: string
           id?: string
           metadata?: Json | null
+          target_id?: string | null
+          target_type?: string | null
         }
         Update: {
           action?: string
           actor_id?: string | null
           created_at?: string
-          description?: string | null
-          event_class_id?: string
           id?: string
           metadata?: Json | null
+          target_id?: string | null
+          target_type?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "event_class_history_event_class_id_fkey"
-            columns: ["event_class_id"]
-            isOneToOne: false
-            referencedRelation: "event_classes"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
-      event_class_members: {
+      clinic_admins: {
         Row: {
-          event_class_id: string
-          id: string
-          last_synced_at: string | null
-          linked_at: string
-          linked_by: string | null
-          member_type: string
-          rd_deal_id: string
+          created_at: string
+          user_id: string
         }
         Insert: {
-          event_class_id: string
-          id?: string
-          last_synced_at?: string | null
-          linked_at?: string
-          linked_by?: string | null
-          member_type: string
-          rd_deal_id: string
+          created_at?: string
+          user_id: string
         }
         Update: {
-          event_class_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      conversation_access_codes: {
+        Row: {
+          access_code: string
+          code_day: string
+          conversation_id: string
+          created_at: string
+          generated_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_code: string
+          code_day: string
+          conversation_id: string
+          created_at?: string
+          generated_at?: string
           id?: string
-          last_synced_at?: string | null
-          linked_at?: string
-          linked_by?: string | null
-          member_type?: string
-          rd_deal_id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_code?: string
+          code_day?: string
+          conversation_id?: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "event_class_members_event_class_id_fkey"
-            columns: ["event_class_id"]
+            foreignKeyName: "conversation_access_codes_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "event_classes"
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
       }
-      event_classes: {
+      conversation_keys: {
         Row: {
-          ad_account_id: string
-          allowed_model_patient_stage_ids: string[]
-          allowed_student_stage_ids: string[]
+          conversation_id: string
           created_at: string
-          date_end: string | null
-          date_start: string
-          has_model_patients: boolean
           id: string
-          location: string | null
-          max_model_patients: number
-          max_people: number
-          max_students: number
+          is_admin_escrow: boolean
+          recipient_id: string
+          wrapped_key: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          is_admin_escrow?: boolean
+          recipient_id: string
+          wrapped_key: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          is_admin_escrow?: boolean
+          recipient_id?: string
+          wrapped_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_keys_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          access_code: string
+          archived: boolean
+          created_at: string
+          id: string
+          patient_id: string
+          professional_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_code?: string
+          archived?: boolean
+          created_at?: string
+          id?: string
+          patient_id: string
+          professional_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_code?: string
+          archived?: boolean
+          created_at?: string
+          id?: string
+          patient_id?: string
+          professional_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      data_deletion_requests: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          deadline_at: string
+          id: string
           notes: string | null
-          rd_funnel_id: string
-          rd_model_patient_funnel_id: string | null
+          patient_id: string
+          requested_at: string
+          resolved_at: string | null
+          resolver_id: string | null
+          scope: string
           status: string
-          title: string
           updated_at: string
-          user_id: string
         }
         Insert: {
-          ad_account_id: string
-          allowed_model_patient_stage_ids?: string[]
-          allowed_student_stage_ids?: string[]
+          conversation_id?: string | null
           created_at?: string
-          date_end?: string | null
-          date_start: string
-          has_model_patients?: boolean
+          deadline_at?: string
           id?: string
-          location?: string | null
-          max_model_patients?: number
-          max_people?: number
-          max_students?: number
           notes?: string | null
-          rd_funnel_id: string
-          rd_model_patient_funnel_id?: string | null
+          patient_id: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolver_id?: string | null
+          scope?: string
           status?: string
-          title: string
           updated_at?: string
-          user_id: string
         }
         Update: {
-          ad_account_id?: string
-          allowed_model_patient_stage_ids?: string[]
-          allowed_student_stage_ids?: string[]
+          conversation_id?: string | null
           created_at?: string
-          date_end?: string | null
-          date_start?: string
-          has_model_patients?: boolean
+          deadline_at?: string
           id?: string
-          location?: string | null
-          max_model_patients?: number
-          max_people?: number
-          max_students?: number
           notes?: string | null
-          rd_funnel_id?: string
-          rd_model_patient_funnel_id?: string | null
+          patient_id?: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolver_id?: string | null
+          scope?: string
           status?: string
-          title?: string
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      funnels: {
-        Row: {
-          ad_account_id: string | null
-          campaign_ids: string[] | null
-          connections: Json
-          created_at: string
-          funnel_type: string
-          id: string
-          name: string
-          nodes: Json
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          ad_account_id?: string | null
-          campaign_ids?: string[] | null
-          connections?: Json
-          created_at?: string
-          funnel_type?: string
-          id?: string
-          name?: string
-          nodes?: Json
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          ad_account_id?: string | null
-          campaign_ids?: string[] | null
-          connections?: Json
-          created_at?: string
-          funnel_type?: string
-          id?: string
-          name?: string
-          nodes?: Json
-          updated_at?: string
-          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "funnels_ad_account_id_fkey"
-            columns: ["ad_account_id"]
+            foreignKeyName: "data_deletion_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "ad_accounts"
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
       }
-      insight_actions: {
+      lgpd_consents: {
         Row: {
-          action_type: string
-          ad_id: string
-          created_at: string
-          date: string
-          value: number
-          value_amount: number | null
+          accepted_at: string
+          id: string
+          ip: string | null
+          user_id: string
+          version: string
         }
         Insert: {
-          action_type: string
-          ad_id: string
-          created_at?: string
-          date: string
-          value?: number
-          value_amount?: number | null
+          accepted_at?: string
+          id?: string
+          ip?: string | null
+          user_id: string
+          version: string
         }
         Update: {
-          action_type?: string
-          ad_id?: string
-          created_at?: string
-          date?: string
-          value?: number
-          value_amount?: number | null
+          accepted_at?: string
+          id?: string
+          ip?: string | null
+          user_id?: string
+          version?: string
         }
         Relationships: []
       }
-      insights: {
+      messages: {
         Row: {
-          ad_id: string
-          clicks: number | null
-          conversion_rate: number | null
-          cpl: number | null
-          cpm: number | null
+          body: string | null
+          ciphertext: string | null
+          conversation_id: string
           created_at: string
-          ctr: number | null
-          date: string
-          efficiency_rate: number | null
-          frequency: number | null
-          health_score: number | null
           id: string
-          impressions: number | null
-          leads: number | null
-          reach: number | null
-          spend: number | null
+          iv: string | null
+          kind: string
+          photo_path: string | null
+          sender_id: string
         }
         Insert: {
-          ad_id: string
-          clicks?: number | null
-          conversion_rate?: number | null
-          cpl?: number | null
-          cpm?: number | null
+          body?: string | null
+          ciphertext?: string | null
+          conversation_id: string
           created_at?: string
-          ctr?: number | null
-          date: string
-          efficiency_rate?: number | null
-          frequency?: number | null
-          health_score?: number | null
           id?: string
-          impressions?: number | null
-          leads?: number | null
-          reach?: number | null
-          spend?: number | null
+          iv?: string | null
+          kind: string
+          photo_path?: string | null
+          sender_id: string
         }
         Update: {
-          ad_id?: string
-          clicks?: number | null
-          conversion_rate?: number | null
-          cpl?: number | null
-          cpm?: number | null
+          body?: string | null
+          ciphertext?: string | null
+          conversation_id?: string
           created_at?: string
-          ctr?: number | null
-          date?: string
-          efficiency_rate?: number | null
-          frequency?: number | null
-          health_score?: number | null
           id?: string
-          impressions?: number | null
-          leads?: number | null
-          reach?: number | null
-          spend?: number | null
+          iv?: string | null
+          kind?: string
+          photo_path?: string | null
+          sender_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "insights_ad_id_fkey"
-            columns: ["ad_id"]
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "ads"
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
       }
-      insights_breakdowns: {
-        Row: {
-          breakdown_type: string
-          campaign_id: string
-          clicks: number | null
-          created_at: string
-          date: string
-          id: string
-          impressions: number | null
-          leads: number | null
-          segment_key: string
-          spend: number | null
-        }
-        Insert: {
-          breakdown_type: string
-          campaign_id: string
-          clicks?: number | null
-          created_at?: string
-          date: string
-          id?: string
-          impressions?: number | null
-          leads?: number | null
-          segment_key: string
-          spend?: number | null
-        }
-        Update: {
-          breakdown_type?: string
-          campaign_id?: string
-          clicks?: number | null
-          created_at?: string
-          date?: string
-          id?: string
-          impressions?: number | null
-          leads?: number | null
-          segment_key?: string
-          spend?: number | null
-        }
-        Relationships: []
-      }
-      insights_hourly: {
-        Row: {
-          ad_account_id: string
-          ad_id: string
-          campaign_id: string | null
-          clicks: number
-          date: string
-          hour: number
-          leads: number
-          spend: number
-          updated_at: string
-        }
-        Insert: {
-          ad_account_id: string
-          ad_id: string
-          campaign_id?: string | null
-          clicks?: number
-          date: string
-          hour: number
-          leads?: number
-          spend?: number
-          updated_at?: string
-        }
-        Update: {
-          ad_account_id?: string
-          ad_id?: string
-          campaign_id?: string | null
-          clicks?: number
-          date?: string
-          hour?: number
-          leads?: number
-          spend?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      integrations: {
-        Row: {
-          api_token: string | null
-          created_at: string
-          id: string
-          is_active: boolean | null
-          provider: string
-          provider_account_id: string | null
-          token_expires_at: string | null
-          updated_at: string
-          user_id: string
-          webhook_secret: string | null
-        }
-        Insert: {
-          api_token?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean | null
-          provider?: string
-          provider_account_id?: string | null
-          token_expires_at?: string | null
-          updated_at?: string
-          user_id: string
-          webhook_secret?: string | null
-        }
-        Update: {
-          api_token?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean | null
-          provider?: string
-          provider_account_id?: string | null
-          token_expires_at?: string | null
-          updated_at?: string
-          user_id?: string
-          webhook_secret?: string | null
-        }
-        Relationships: []
-      }
-      job_runs: {
+      patient_links: {
         Row: {
           created_at: string
-          error_message: string | null
-          finished_at: string | null
           id: string
-          job_name: string
-          metadata: Json | null
-          processed_count: number
-          started_at: string
+          patient_id: string
+          professional_id: string
           status: string
-          trigger_source: string
         }
         Insert: {
           created_at?: string
-          error_message?: string | null
-          finished_at?: string | null
           id?: string
-          job_name: string
-          metadata?: Json | null
-          processed_count?: number
-          started_at?: string
+          patient_id: string
+          professional_id: string
           status?: string
-          trigger_source?: string
         }
         Update: {
           created_at?: string
-          error_message?: string | null
-          finished_at?: string | null
           id?: string
-          job_name?: string
-          metadata?: Json | null
-          processed_count?: number
-          started_at?: string
+          patient_id?: string
+          professional_id?: string
           status?: string
-          trigger_source?: string
-        }
-        Relationships: []
-      }
-      meta_leads: {
-        Row: {
-          ad_account_id: string
-          ad_id: string | null
-          adset_id: string | null
-          campaign_id: string | null
-          created_at: string
-          created_time: string
-          email: string | null
-          field_data: Json | null
-          form_id: string | null
-          full_name: string | null
-          id: string
-          lead_city: string | null
-          lead_state: string | null
-          lead_state_source: string | null
-          meta_lead_id: string
-          phone: string | null
-          raw: Json | null
-        }
-        Insert: {
-          ad_account_id: string
-          ad_id?: string | null
-          adset_id?: string | null
-          campaign_id?: string | null
-          created_at?: string
-          created_time: string
-          email?: string | null
-          field_data?: Json | null
-          form_id?: string | null
-          full_name?: string | null
-          id?: string
-          lead_city?: string | null
-          lead_state?: string | null
-          lead_state_source?: string | null
-          meta_lead_id: string
-          phone?: string | null
-          raw?: Json | null
-        }
-        Update: {
-          ad_account_id?: string
-          ad_id?: string | null
-          adset_id?: string | null
-          campaign_id?: string | null
-          created_at?: string
-          created_time?: string
-          email?: string | null
-          field_data?: Json | null
-          form_id?: string | null
-          full_name?: string | null
-          id?: string
-          lead_city?: string | null
-          lead_state?: string | null
-          lead_state_source?: string | null
-          meta_lead_id?: string
-          phone?: string | null
-          raw?: Json | null
-        }
-        Relationships: []
-      }
-      pixel_event: {
-        Row: {
-          action_type: string
-          created_at: string
-          event_name: string
-          id: string
-          is_custom: boolean
-          pixel_id: string
-        }
-        Insert: {
-          action_type: string
-          created_at?: string
-          event_name: string
-          id?: string
-          is_custom?: boolean
-          pixel_id: string
-        }
-        Update: {
-          action_type?: string
-          created_at?: string
-          event_name?: string
-          id?: string
-          is_custom?: boolean
-          pixel_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pixel_event_pixel_id_fkey"
-            columns: ["pixel_id"]
-            isOneToOne: false
-            referencedRelation: "ad_account_pixel"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      platform_rules: {
-        Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          is_fallback: boolean
-          match_field: string
-          match_mode: string
-          parent_platform: string | null
-          pattern: string
-          platform: string
-          priority: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          is_fallback?: boolean
-          match_field: string
-          match_mode?: string
-          parent_platform?: string | null
-          pattern: string
-          platform: string
-          priority?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          is_fallback?: boolean
-          match_field?: string
-          match_mode?: string
-          parent_platform?: string | null
-          pattern?: string
-          platform?: string
-          priority?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      products: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          price: number
-          tax_rate: number | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          price?: number
-          tax_rate?: number | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          price?: number
-          tax_rate?: number | null
-          updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
-          email: string | null
-          email_alerts_enabled: boolean | null
           full_name: string | null
           id: string
-          lp_lead_action: string | null
+          initial_password_pending: boolean
+          instagram: string | null
+          phone: string | null
           updated_at: string
-          user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
-          email?: string | null
-          email_alerts_enabled?: boolean | null
+          full_name?: string | null
+          id: string
+          initial_password_pending?: boolean
+          instagram?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
           full_name?: string | null
           id?: string
-          lp_lead_action?: string | null
+          initial_password_pending?: boolean
+          instagram?: string | null
+          phone?: string | null
           updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          email_alerts_enabled?: boolean | null
-          full_name?: string | null
-          id?: string
-          lp_lead_action?: string | null
-          updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
-      rd_deal_touches: {
+      security_events: {
         Row: {
-          ad_account_id: string
           created_at: string
+          event_type: string
           id: string
-          is_first: boolean
-          is_last: boolean
-          matched_campaign_id: string | null
-          rd_deal_id: string
-          source: string | null
-          touch_at: string
-          touch_order: number
-          user_id: string
-          utm_campaign: string | null
-          utm_content: string | null
-          utm_medium: string | null
-          utm_source: string | null
-          utm_term: string | null
+          ip: unknown
+          metadata: Json | null
+          user_agent: string | null
+          user_id: string | null
         }
         Insert: {
-          ad_account_id: string
           created_at?: string
+          event_type: string
           id?: string
-          is_first?: boolean
-          is_last?: boolean
-          matched_campaign_id?: string | null
-          rd_deal_id: string
-          source?: string | null
-          touch_at: string
-          touch_order?: number
-          user_id: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
+          ip?: unknown
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Update: {
-          ad_account_id?: string
           created_at?: string
+          event_type?: string
           id?: string
-          is_first?: boolean
-          is_last?: boolean
-          matched_campaign_id?: string | null
-          rd_deal_id?: string
-          source?: string | null
-          touch_at?: string
-          touch_order?: number
-          user_id?: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
+          ip?: unknown
+          metadata?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
-      rd_deals: {
+      user_keys: {
         Row: {
-          ad_account_id: string
-          amount_total: number | null
-          closed_at: string | null
-          contact_email: string | null
-          contact_name: string | null
           created_at: string
-          custom_fields: Json
-          deal_owner_name: string | null
-          first_touch_utm_campaign: string | null
-          id: string
-          last_touch_utm_campaign: string | null
-          lead_city: string | null
-          lead_created_at: string | null
-          lead_state: string | null
-          lead_state_source: string | null
-          lost_reason: string | null
-          raw: Json | null
-          rd_deal_id: string
-          rd_funnel_id: string
-          rd_product_name: string | null
-          rd_stage_id: string | null
-          rd_stage_name: string | null
-          rd_stage_order: number | null
-          stage_bucket: string
-          stage_updated_at: string | null
-          touch_count: number
-          updated_at: string
-          user_id: string
-          utm_campaign: string | null
-          utm_content: string | null
-          utm_medium: string | null
-          utm_source: string | null
-          utm_term: string | null
-          win: boolean
-        }
-        Insert: {
-          ad_account_id: string
-          amount_total?: number | null
-          closed_at?: string | null
-          contact_email?: string | null
-          contact_name?: string | null
-          created_at?: string
-          custom_fields?: Json
-          deal_owner_name?: string | null
-          first_touch_utm_campaign?: string | null
-          id?: string
-          last_touch_utm_campaign?: string | null
-          lead_city?: string | null
-          lead_created_at?: string | null
-          lead_state?: string | null
-          lead_state_source?: string | null
-          lost_reason?: string | null
-          raw?: Json | null
-          rd_deal_id: string
-          rd_funnel_id: string
-          rd_product_name?: string | null
-          rd_stage_id?: string | null
-          rd_stage_name?: string | null
-          rd_stage_order?: number | null
-          stage_bucket?: string
-          stage_updated_at?: string | null
-          touch_count?: number
-          updated_at?: string
-          user_id: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
-          win?: boolean
-        }
-        Update: {
-          ad_account_id?: string
-          amount_total?: number | null
-          closed_at?: string | null
-          contact_email?: string | null
-          contact_name?: string | null
-          created_at?: string
-          custom_fields?: Json
-          deal_owner_name?: string | null
-          first_touch_utm_campaign?: string | null
-          id?: string
-          last_touch_utm_campaign?: string | null
-          lead_city?: string | null
-          lead_created_at?: string | null
-          lead_state?: string | null
-          lead_state_source?: string | null
-          lost_reason?: string | null
-          raw?: Json | null
-          rd_deal_id?: string
-          rd_funnel_id?: string
-          rd_product_name?: string | null
-          rd_stage_id?: string | null
-          rd_stage_name?: string | null
-          rd_stage_order?: number | null
-          stage_bucket?: string
-          stage_updated_at?: string | null
-          touch_count?: number
-          updated_at?: string
-          user_id?: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
-          win?: boolean
-        }
-        Relationships: []
-      }
-      rd_field_configs: {
-        Row: {
-          ad_account_id: string
-          created_at: string
-          field_type: string
-          id: string
-          key: string
-          label: string
-          options: Json
-          rd_field_aliases: string[]
-          rd_field_label: string
-          rd_source: string
-          show_in_dashboard: boolean
+          public_key: Json
           updated_at: string
           user_id: string
         }
         Insert: {
-          ad_account_id: string
           created_at?: string
-          field_type?: string
-          id?: string
-          key: string
-          label: string
-          options?: Json
-          rd_field_aliases?: string[]
-          rd_field_label: string
-          rd_source?: string
-          show_in_dashboard?: boolean
+          public_key: Json
           updated_at?: string
           user_id: string
         }
         Update: {
-          ad_account_id?: string
           created_at?: string
-          field_type?: string
-          id?: string
-          key?: string
-          label?: string
-          options?: Json
-          rd_field_aliases?: string[]
-          rd_field_label?: string
-          rd_source?: string
-          show_in_dashboard?: boolean
+          public_key?: Json
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      rd_funnel_stages: {
-        Row: {
-          ad_account_id: string
-          created_at: string
-          id: string
-          is_lost: boolean
-          is_won: boolean
-          name: string
-          nickname: string | null
-          order: number
-          rd_funnel_id: string
-          rd_stage_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          ad_account_id: string
-          created_at?: string
-          id?: string
-          is_lost?: boolean
-          is_won?: boolean
-          name: string
-          nickname?: string | null
-          order?: number
-          rd_funnel_id: string
-          rd_stage_id: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          ad_account_id?: string
-          created_at?: string
-          id?: string
-          is_lost?: boolean
-          is_won?: boolean
-          name?: string
-          nickname?: string | null
-          order?: number
-          rd_funnel_id?: string
-          rd_stage_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      rd_funnels: {
-        Row: {
-          ad_account_id: string
-          created_at: string
-          expert_name: string | null
-          id: string
-          is_active: boolean
-          name: string
-          rd_funnel_id: string | null
-          updated_at: string
-          user_id: string
-          utm_campaign_pattern: string | null
-        }
-        Insert: {
-          ad_account_id: string
-          created_at?: string
-          expert_name?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          rd_funnel_id?: string | null
-          updated_at?: string
-          user_id: string
-          utm_campaign_pattern?: string | null
-        }
-        Update: {
-          ad_account_id?: string
-          created_at?: string
-          expert_name?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          rd_funnel_id?: string | null
-          updated_at?: string
-          user_id?: string
-          utm_campaign_pattern?: string | null
-        }
-        Relationships: []
-      }
-      sales: {
-        Row: {
-          ad_account_id: string | null
-          ad_id: string | null
-          adset_id: string | null
-          campaign_ids: string[] | null
-          chargeback_amount: number | null
-          contact_email: string | null
-          contact_name: string | null
-          contact_phone: string | null
-          created_at: string
-          custom_fields: Json
-          gross_revenue: number
-          id: string
-          lead_city: string | null
-          lead_entry_date: string | null
-          lead_formation: string | null
-          lead_state: string | null
-          manual_ad_id: string | null
-          manual_adset_id: string | null
-          manual_campaign_id: string | null
-          manual_override: boolean
-          manual_platform: string | null
-          match_method: string | null
-          matched_campaign_id: string | null
-          net_revenue: number
-          notes: string | null
-          payment_method: string
-          payment_method_source: string
-          product_id: string | null
-          quantity: number
-          rd_campaign_name: string | null
-          rd_deal_id: string | null
-          rd_funnel_id: string | null
-          rd_product_name: string | null
-          refund_amount: number | null
-          sale_date: string
-          status: string
-          tax_amount: number | null
-          updated_at: string
-          user_id: string
-          utm_campaign: string | null
-          utm_content: string | null
-          utm_medium: string | null
-          utm_source: string | null
-          utm_term: string | null
-        }
-        Insert: {
-          ad_account_id?: string | null
-          ad_id?: string | null
-          adset_id?: string | null
-          campaign_ids?: string[] | null
-          chargeback_amount?: number | null
-          contact_email?: string | null
-          contact_name?: string | null
-          contact_phone?: string | null
-          created_at?: string
-          custom_fields?: Json
-          gross_revenue?: number
-          id?: string
-          lead_city?: string | null
-          lead_entry_date?: string | null
-          lead_formation?: string | null
-          lead_state?: string | null
-          manual_ad_id?: string | null
-          manual_adset_id?: string | null
-          manual_campaign_id?: string | null
-          manual_override?: boolean
-          manual_platform?: string | null
-          match_method?: string | null
-          matched_campaign_id?: string | null
-          net_revenue?: number
-          notes?: string | null
-          payment_method?: string
-          payment_method_source?: string
-          product_id?: string | null
-          quantity?: number
-          rd_campaign_name?: string | null
-          rd_deal_id?: string | null
-          rd_funnel_id?: string | null
-          rd_product_name?: string | null
-          refund_amount?: number | null
-          sale_date?: string
-          status?: string
-          tax_amount?: number | null
-          updated_at?: string
-          user_id: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
-        }
-        Update: {
-          ad_account_id?: string | null
-          ad_id?: string | null
-          adset_id?: string | null
-          campaign_ids?: string[] | null
-          chargeback_amount?: number | null
-          contact_email?: string | null
-          contact_name?: string | null
-          contact_phone?: string | null
-          created_at?: string
-          custom_fields?: Json
-          gross_revenue?: number
-          id?: string
-          lead_city?: string | null
-          lead_entry_date?: string | null
-          lead_formation?: string | null
-          lead_state?: string | null
-          manual_ad_id?: string | null
-          manual_adset_id?: string | null
-          manual_campaign_id?: string | null
-          manual_override?: boolean
-          manual_platform?: string | null
-          match_method?: string | null
-          matched_campaign_id?: string | null
-          net_revenue?: number
-          notes?: string | null
-          payment_method?: string
-          payment_method_source?: string
-          product_id?: string | null
-          quantity?: number
-          rd_campaign_name?: string | null
-          rd_deal_id?: string | null
-          rd_funnel_id?: string | null
-          rd_product_name?: string | null
-          refund_amount?: number | null
-          sale_date?: string
-          status?: string
-          tax_amount?: number | null
-          updated_at?: string
-          user_id?: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sales_ad_account_id_fkey"
-            columns: ["ad_account_id"]
-            isOneToOne: false
-            referencedRelation: "ad_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      social_accounts: {
-        Row: {
-          connection_status: string
-          created_at: string
-          display_name: string
-          followers_count: number
-          id: string
-          last_error: string | null
-          last_sync_at: string | null
-          media_count: number
-          profile_picture_url: string | null
-          provider: string
-          provider_account_id: string
-          updated_at: string
-          user_id: string
-          username: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          connection_status?: string
-          created_at?: string
-          display_name: string
-          followers_count?: number
-          id?: string
-          last_error?: string | null
-          last_sync_at?: string | null
-          media_count?: number
-          profile_picture_url?: string | null
-          provider: string
-          provider_account_id: string
-          updated_at?: string
-          user_id: string
-          username?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          connection_status?: string
-          created_at?: string
-          display_name?: string
-          followers_count?: number
-          id?: string
-          last_error?: string | null
-          last_sync_at?: string | null
-          media_count?: number
-          profile_picture_url?: string | null
-          provider?: string
-          provider_account_id?: string
-          updated_at?: string
-          user_id?: string
-          username?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: []
-      }
-      social_insights_daily: {
-        Row: {
-          follower_delta: number
-          followers: number
-          id: string
-          impressions: number
-          insight_date: string
-          interactions: number
-          profile_views: number
-          reach: number
-          social_account_id: string
-          website_clicks: number
-        }
-        Insert: {
-          follower_delta?: number
-          followers?: number
-          id?: string
-          impressions?: number
-          insight_date: string
-          interactions?: number
-          profile_views?: number
-          reach?: number
-          social_account_id: string
-          website_clicks?: number
-        }
-        Update: {
-          follower_delta?: number
-          followers?: number
-          id?: string
-          impressions?: number
-          insight_date?: string
-          interactions?: number
-          profile_views?: number
-          reach?: number
-          social_account_id?: string
-          website_clicks?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "social_insights_daily_social_account_id_fkey"
-            columns: ["social_account_id"]
-            isOneToOne: false
-            referencedRelation: "social_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      social_media: {
-        Row: {
-          caption: string | null
-          comments: number
-          engagement_rate: number
-          id: string
-          impressions: number
-          interactions: number
-          likes: number
-          media_type: string
-          media_url: string | null
-          permalink: string | null
-          provider_media_id: string
-          published_at: string | null
-          raw_metrics: Json
-          reach: number
-          saves: number
-          shares: number
-          social_account_id: string
-          synced_at: string
-          thumbnail_url: string | null
-          video_views: number
-        }
-        Insert: {
-          caption?: string | null
-          comments?: number
-          engagement_rate?: number
-          id?: string
-          impressions?: number
-          interactions?: number
-          likes?: number
-          media_type?: string
-          media_url?: string | null
-          permalink?: string | null
-          provider_media_id: string
-          published_at?: string | null
-          raw_metrics?: Json
-          reach?: number
-          saves?: number
-          shares?: number
-          social_account_id: string
-          synced_at?: string
-          thumbnail_url?: string | null
-          video_views?: number
-        }
-        Update: {
-          caption?: string | null
-          comments?: number
-          engagement_rate?: number
-          id?: string
-          impressions?: number
-          interactions?: number
-          likes?: number
-          media_type?: string
-          media_url?: string | null
-          permalink?: string | null
-          provider_media_id?: string
-          published_at?: string | null
-          raw_metrics?: Json
-          reach?: number
-          saves?: number
-          shares?: number
-          social_account_id?: string
-          synced_at?: string
-          thumbnail_url?: string | null
-          video_views?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "social_media_social_account_id_fkey"
-            columns: ["social_account_id"]
-            isOneToOne: false
-            referencedRelation: "social_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      sync_runs: {
-        Row: {
-          contacts_fetched: number
-          created_count: number
-          deals_fetched: number
-          details_fetched: number
-          duration_ms: number | null
-          error_message: string | null
-          errors_total: number
-          finished_at: string | null
-          funnel_id: string | null
-          id: string
-          processed_count: number
-          provider: string
-          retries_total: number
-          skipped_count: number
-          started_at: string
-          status: string
-          total_expected: number | null
-          trigger_source: string | null
-          updated_count: number
-          user_id: string
-        }
-        Insert: {
-          contacts_fetched?: number
-          created_count?: number
-          deals_fetched?: number
-          details_fetched?: number
-          duration_ms?: number | null
-          error_message?: string | null
-          errors_total?: number
-          finished_at?: string | null
-          funnel_id?: string | null
-          id?: string
-          processed_count?: number
-          provider?: string
-          retries_total?: number
-          skipped_count?: number
-          started_at?: string
-          status?: string
-          total_expected?: number | null
-          trigger_source?: string | null
-          updated_count?: number
-          user_id: string
-        }
-        Update: {
-          contacts_fetched?: number
-          created_count?: number
-          deals_fetched?: number
-          details_fetched?: number
-          duration_ms?: number | null
-          error_message?: string | null
-          errors_total?: number
-          finished_at?: string | null
-          funnel_id?: string | null
-          id?: string
-          processed_count?: number
-          provider?: string
-          retries_total?: number
-          skipped_count?: number
-          started_at?: string
-          status?: string
-          total_expected?: number | null
-          trigger_source?: string | null
-          updated_count?: number
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_ad_account_access: {
-        Row: {
-          ad_account_id: string
-          created_at: string
-          user_id: string
-        }
-        Insert: {
-          ad_account_id: string
-          created_at?: string
-          user_id: string
-        }
-        Update: {
-          ad_account_id?: string
-          created_at?: string
           user_id?: string
         }
         Relationships: []
       }
       user_permissions: {
         Row: {
-          can_campaigns: boolean
-          can_classes: boolean
-          can_dashboard: boolean
-          can_funnels: boolean
           created_at: string
+          id: string
+          level: string
+          module: string
           updated_at: string
           user_id: string
-          username: string
         }
         Insert: {
-          can_campaigns?: boolean
-          can_classes?: boolean
-          can_dashboard?: boolean
-          can_funnels?: boolean
           created_at?: string
+          id?: string
+          level: string
+          module: string
           updated_at?: string
           user_id: string
-          username: string
         }
         Update: {
-          can_campaigns?: boolean
-          can_classes?: boolean
-          can_dashboard?: boolean
-          can_funnels?: boolean
           created_at?: string
+          id?: string
+          level?: string
+          module?: string
           updated_at?: string
           user_id?: string
-          username?: string
         }
         Relationships: []
       }
-      user_rd_funnel_access: {
+      user_private_keys: {
         Row: {
           created_at: string
-          rd_funnel_id: string
+          encrypted_private_key: string
+          iterations: number
+          iv: string
+          salt: string
+          updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          rd_funnel_id: string
+          encrypted_private_key: string
+          iterations?: number
+          iv: string
+          salt: string
+          updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
-          rd_funnel_id?: string
+          encrypted_private_key?: string
+          iterations?: number
+          iv?: string
+          salt?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
       user_roles: {
         Row: {
+          created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          created_at?: string
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
@@ -2110,7 +477,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _normalize_uf: { Args: { _raw: string }; Returns: string }
+      can_view_profile: {
+        Args: { _target: string; _viewer: string }
+        Returns: boolean
+      }
+      current_chat_code_day: { Args: never; Returns: string }
+      ensure_conversation_access_code: {
+        Args: { _conversation_id: string }
+        Returns: {
+          access_code: string
+          code_day: string
+          generated_at: string
+        }[]
+      }
+      generate_chat_access_code: { Args: never; Returns: string }
+      generate_unambiguous_code: { Args: { _len?: number }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2118,39 +499,17 @@ export type Database = {
         }
         Returns: boolean
       }
-      infer_uf_from_phone: { Args: { _phone: string }; Returns: string }
-      is_master: { Args: { _user_id: string }; Returns: boolean }
-      user_can_access_ad: {
-        Args: { _ad_id: string; _user_id: string }
+      is_conversation_participant: {
+        Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
-      user_can_access_campaign: {
-        Args: { _campaign_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_can_view_ad: {
-        Args: { _ad_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_can_view_ad_account: {
-        Args: { _ad_account_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_can_view_campaign: {
-        Args: { _campaign_id: string; _user_id: string }
-        Returns: boolean
-      }
-      user_has_page: {
-        Args: { _page: string; _user_id: string }
-        Returns: boolean
-      }
-      user_owns_ad_account: {
-        Args: { _ad_account_id: string; _user_id: string }
-        Returns: boolean
+      rotate_conversation_access_code: {
+        Args: { _conversation_id: string }
+        Returns: string
       }
     }
     Enums: {
-      app_role: "admin" | "user" | "master" | "gestor" | "usuario"
+      app_role: "admin" | "professional" | "patient"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2278,7 +637,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "master", "gestor", "usuario"],
+      app_role: ["admin", "professional", "patient"],
     },
   },
 } as const
