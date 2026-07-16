@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // @ts-ignore - default export missing types alias
 import RGL, { Responsive, WidthProvider } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
@@ -18,6 +18,8 @@ import {
 } from "@/lib/responsiveDashboardLayout";
 
 const ResponsiveGrid = WidthProvider(Responsive);
+const GRID_ROW_HEIGHT = 60;
+const GRID_MARGIN_Y = 12;
 
 interface Props {
   view: DashboardView;
@@ -29,10 +31,42 @@ interface Props {
 
 // System widgets always appended at the end (not persisted in view.widgets)
 const SYSTEM_TAIL = [
-  { id: "__sys_budget", type: "budget_bm", title: "Análise de Orçamento", config: {}, layoutDefault: { w: 12, h: 5 } },
   { id: "__sys_campaigns", type: "campaigns_detail", title: "Detalhamento por Campanha", config: {}, layoutDefault: { w: 12, h: 6 } },
   { id: "__sys_ask_ai", type: "ask_ai", title: "Pergunte à IA", config: {}, layoutDefault: { w: 12, h: 4 } },
 ];
+
+function pixelsToGridRows(height: number) {
+  return Math.max(1, Math.ceil((height + GRID_MARGIN_Y) / (GRID_ROW_HEIGHT + GRID_MARGIN_Y)));
+}
+
+function AutoHeightWidget({
+  widgetId,
+  onHeightChange,
+  children,
+}: {
+  widgetId: string;
+  onHeightChange: (widgetId: string, rows: number) => void;
+  children: React.ReactNode;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+
+    const reportHeight = () => {
+      const height = Math.ceil(content.getBoundingClientRect().height);
+      if (height > 0) onHeightChange(widgetId, pixelsToGridRows(height));
+    };
+
+    reportHeight();
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [onHeightChange, widgetId]);
+
+  return <div ref={contentRef} className="min-w-0 w-full">{children}</div>;
+}
 
 function appendSystemTail(baseLayout: DashboardGridItem[], columns: number, widgetIds: Set<string>) {
   const visibleLayout = baseLayout.filter((item) => widgetIds.has(item.i));
@@ -52,12 +86,18 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
   // Local state mirrors the persisted view, with auto-debounced save via onChange.
   const [layout, setLayout] = useState<any[]>(view.layout || []);
   const [widgets, setWidgets] = useState<any[]>(view.widgets || []);
+  const [autoHeightRows, setAutoHeightRows] = useState<Record<string, number>>({});
   const saveTimer = useRef<any>(null);
 
   useEffect(() => {
     setLayout(view.layout || []);
     setWidgets(view.widgets || []);
+    setAutoHeightRows({});
   }, [view.id, view.layout, view.widgets]);
+
+  const handleAutoHeight = useCallback((widgetId: string, rows: number) => {
+    setAutoHeightRows((current) => current[widgetId] === rows ? current : { ...current, [widgetId]: rows });
+  }, []);
 
   function scheduleSave(nextLayout: any[], nextWidgets: any[]) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -70,15 +110,18 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
 
   const responsiveLayouts = useMemo(() => {
     const widgetIds = new Set((widgets || []).map((widget) => widget.id));
-    const lg = buildResponsiveDashboardLayout(desktopLayout, 12, 12);
-    const md = buildResponsiveDashboardLayout(desktopLayout, 12, 8);
-    const sm = buildResponsiveDashboardLayout(desktopLayout, 12, 4);
+    const applyAutoHeight = (items: DashboardGridItem[]) => items.map((item) =>
+      autoHeightRows[item.i] ? { ...item, h: autoHeightRows[item.i] } : item,
+    );
+    const lg = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 12));
+    const md = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 8));
+    const sm = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 4));
     return {
       lg: appendSystemTail(lg, 12, widgetIds),
       md: appendSystemTail(md, 8, widgetIds),
       sm: appendSystemTail(sm, 4, widgetIds),
     };
-  }, [desktopLayout, widgets]);
+  }, [autoHeightRows, desktopLayout, widgets]);
 
   const fullWidgets = useMemo(() => [...widgets, ...SYSTEM_TAIL], [widgets]);
 
@@ -138,8 +181,8 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
         layouts={responsiveLayouts}
         breakpoints={{ lg: 1280, md: 900, sm: 0 }}
         cols={{ lg: 12, md: 8, sm: 4 }}
-        rowHeight={60}
-        margin={[12, 12]}
+        rowHeight={GRID_ROW_HEIGHT}
+        margin={[12, GRID_MARGIN_Y]}
         compactType="vertical"
         preventCollision={false}
         isDraggable={isEditing && breakpoint === "lg"}
@@ -165,7 +208,13 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
                 </button>
               )}
               <div className="h-full w-full no-drag-children">
-                <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
+                {w.type === "default_block" ? (
+                  <AutoHeightWidget widgetId={w.id} onHeightChange={handleAutoHeight}>
+                    <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
+                  </AutoHeightWidget>
+                ) : (
+                  <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
+                )}
               </div>
             </div>
           );
