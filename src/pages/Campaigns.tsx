@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
@@ -29,11 +30,11 @@ import {
   RectangleHorizontal,
   SlidersHorizontal,
   Eye,
-  CheckCircle2,
   TriangleAlert,
   Download,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   BrainCircuit,
 } from "lucide-react";
@@ -122,10 +123,10 @@ async function fetchAllPages(query: any, pageSize = 1000, maxPages = 20) {
 }
 
 const CAMP_DEFAULTS: Record<CampColKey, number> = {
-  check: 44, name: 300, delivery: 156, objective: 130, budget: 120, spend: 120, impressions: 120,
-  reach: 110, frequency: 100, cpm: 110, clicks: 110, ctr: 100, cpc: 100, leads: 110, cpl: 120,
-  conversion: 120, sales: 105, cpa: 120, revenue: 135, roas: 100, profit: 130, roi: 100,
-  videoViews: 140, actions: 86,
+  check: 40, name: 390, delivery: 105, objective: 120, budget: 120, spend: 110, impressions: 95,
+  reach: 100, frequency: 90, cpm: 80, clicks: 88, ctr: 85, cpc: 96, leads: 135, cpl: 118,
+  conversion: 110, sales: 95, cpa: 110, revenue: 125, roas: 90, profit: 120, roi: 90,
+  videoViews: 130, actions: 70,
 };
 const ADSET_DEFAULTS: Record<AdsetColKey, number> = {
   name: 260, campaign: 220, budget: 130, spend: 120, leads: 90, cpl: 110, clicks: 100, ctr: 90,
@@ -152,7 +153,7 @@ export default function Campaigns() {
   const [sortAsc, setSortAsc] = useState(false);
   const [columnPreset, setColumnPreset] = useState<MetaColumnPresetKey>("performance");
   const [visibleColumns, setVisibleColumns] = useState<Set<CampaignColumnKey>>(() => {
-    try { const saved = JSON.parse(localStorage.getItem("growdash:meta-columns") || "[]"); if (Array.isArray(saved) && saved.length) return new Set(saved); } catch { /* usa o preset padrão */ }
+    try { const saved = JSON.parse(localStorage.getItem("growdash:meta-columns-v2") || "[]"); if (Array.isArray(saved) && saved.length) return new Set(saved); } catch { /* usa o preset padrão */ }
     return new Set(getMetaColumnPreset("performance").columns);
   });
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
@@ -162,7 +163,7 @@ export default function Campaigns() {
   const pageSize = 50;
 
   useEffect(() => {
-    localStorage.setItem("growdash:meta-columns", JSON.stringify(Array.from(visibleColumns)));
+    localStorage.setItem("growdash:meta-columns-v2", JSON.stringify(Array.from(visibleColumns)));
     localStorage.setItem("growdash:meta-breakdown", breakdown);
   }, [visibleColumns, breakdown]);
 
@@ -184,7 +185,7 @@ export default function Campaigns() {
     : adAccounts, [adAccounts, businessUnitId, segment]);
   const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount });
 
-  const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v1");
+  const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v3");
   const adset = useColWidths<AdsetColKey>(ADSET_DEFAULTS, "campaigns-adset-cols-v1");
   const ad = useColWidths<AdColKey>(AD_DEFAULTS, "campaigns-ad-cols-v1");
 
@@ -452,11 +453,6 @@ export default function Campaigns() {
     }));
   }, [endDate, filtered, startDate]);
 
-  const activeCampaigns = useMemo(() => campaigns.filter((campaign: any) => {
-    const matchesSearch = !search || campaign.name.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch && normalizeStatus(campaign.status) === "ACTIVE";
-  }).length, [campaigns, search]);
-
   const selectedCampaign = useMemo(() => {
     if (selectedIds.size !== 1) return null;
     const id = Array.from(selectedIds)[0];
@@ -558,107 +554,22 @@ export default function Campaigns() {
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
 
   return (
-    <MotionPage className="overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-sm">
-      <MotionItem className="border-b border-border bg-gradient-to-r from-primary/5 via-card to-muted px-3 py-3 sm:px-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#1d1b17] text-[#f2c94c] shadow-sm">
-              <Megaphone className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-black tracking-tight">Campanhas</h1>
-                <Badge className="border-[#dfc36f] bg-[#fff4cc] text-[#72530b] hover:bg-[#fff4cc]">
-                  {filtered.length} campanhas
-                </Badge>
-              </div>
-              <p className="truncate text-xs text-muted-foreground">Gerenciador integrado à Meta Ads</p>
+    <MotionPage className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm dark:border-[#2a271f] dark:bg-[#070706]">
+      <MotionItem className="border-b border-border bg-card px-3 py-2.5 dark:border-[#2a271f] dark:bg-[#070706]">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex shrink-0 items-baseline gap-2">
+              <h1 className="text-lg font-black tracking-tight">Campanhas</h1>
+              <span className="text-[10px] text-muted-foreground">Gerenciador de campanhas</span>
+            </div>
+            <div className="relative w-full sm:max-w-[550px]">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Pesquise para filtrar por: nome, identificação ou métrica" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 border-border bg-background pl-9 text-xs" />
             </div>
           </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {visibleAdAccounts.length > 0 && (
-              <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                <SelectTrigger className="h-9 w-full border-border bg-background sm:w-[260px]">
-                  <SelectValue placeholder="Conta de anúncio" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as contas de anúncio</SelectItem>
-                  {visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-            <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-              {dataUpdatedAt ? `Atualizado às ${new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Aguardando dados"}
-            </span>
-            <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="h-9 gap-2 bg-background">
-              <RefreshCw className={cn("h-4 w-4", (isFetching || syncMeta.isPending) && "animate-spin")} /> {syncMeta.isPending ? "Sincronizando…" : "Atualizar"}
-            </Button>
-          </div>
-        </div>
-      </MotionItem>
-
-      <MotionItem className="border-b border-border bg-muted/40 px-3 py-2 sm:px-4">
-        <div className="growdash-scrollbar flex gap-2 overflow-x-auto pb-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setStatusFilter("all"); setHealthFilter("all"); }}
-            className={cn("h-9 shrink-0 gap-2 bg-background", statusFilter === "all" && "border-primary bg-primary/10 text-foreground")}
-          >
-            <FolderKanban className="h-4 w-4" /> Todos os anúncios
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="h-8 shrink-0 gap-2 bg-background">
+            <RefreshCw className={cn("h-3.5 w-3.5", (isFetching || syncMeta.isPending) && "animate-spin")} /> {syncMeta.isPending ? "Sincronizando…" : "Atualizar"}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setStatusFilter("ACTIVE")}
-            className={cn("h-9 shrink-0 gap-2 bg-background", statusFilter === "ACTIVE" && "border-primary bg-primary/10 text-foreground")}
-          >
-            <CheckCircle2 className="h-4 w-4" /> Ativos ({activeCampaigns})
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { setSortKey("roi"); setSortAsc(false); }} className="h-9 shrink-0 gap-2 bg-background">
-            <BarChart3 className="h-4 w-4" /> Desempenho e ROAS
-          </Button>
-          <div className="ml-auto hidden items-center gap-2 text-[11px] text-muted-foreground lg:flex">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" /> Alterações exigem confirmação e são enviadas pelo backend seguro.
-          </div>
-        </div>
-      </MotionItem>
-
-      <MotionItem className="border-b border-border bg-muted/70 p-2 sm:p-3">
-        <div className="space-y-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Pesquise para filtrar por: nome, identificação ou métrica"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-9 border-border bg-background pl-9"
-            />
-          </div>
-          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-full bg-background sm:w-[180px]"><SelectValue placeholder="Todos os status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="ACTIVE"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Ativa</span></SelectItem>
-                  <SelectItem value="PAUSED"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-muted-foreground/60" /> Pausada</span></SelectItem>
-                  <SelectItem value="ARCHIVED"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" /> Arquivada</span></SelectItem>
-                  <SelectItem value="IN_PROCESS"><span className="inline-flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-blue-500" /> Em análise</span></SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="h-9 gap-2 bg-background" title="Restaurar largura das colunas">
-                <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Redefinir colunas</span>
-              </Button>
-            </div>
-            <DateFilterBar
-              preset={preset} onPresetChange={setPreset}
-              customRange={customRange} onCustomRangeChange={setCustomRange}
-              startDate={startDate} endDate={endDate}
-              adAccounts={[]} selectedAccount="" onAccountChange={() => {}}
-            />
-          </div>
         </div>
       </MotionItem>
 
@@ -666,55 +577,47 @@ export default function Campaigns() {
 
       <MotionItem>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-muted/50 p-0">
-            <TabsTrigger value="campaigns" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <FolderKanban className="h-4 w-4" /> Campanhas <Badge variant="secondary" className="ml-auto tabular-nums">{filtered.length}</Badge>
-              {selectedIds.size > 0 && <Badge className="border-primary/40 bg-primary/15 text-foreground" title="Campanhas selecionadas">{selectedIds.size} sel.</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="adsets" className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <Layers3 className="h-4 w-4" /> Conjuntos de anúncios <Badge variant="secondary" className="ml-auto tabular-nums">{selectedAdsets.length}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="ads" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
-              <RectangleHorizontal className="h-4 w-4" /> Anúncios <Badge variant="secondary" className="ml-auto tabular-nums">{selectedAds.length}</Badge>
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
-            {activeTab === "campaigns" && <>
-            <Button
-              size="sm"
-              disabled={!selectedCampaign}
-              onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })}
-              className="h-8 gap-2"
-            >
-              <Pencil className="h-4 w-4" /> Editar
-            </Button>
-            <Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-8 gap-2">
-              <Eye className="h-4 w-4" /> Ver desempenho
-            </Button>
-            </>}
-            <Button size="sm" onClick={downloadCurrentView} disabled={(activeTab === "campaigns" ? filtered : activeTab === "adsets" ? selectedAdsets : selectedAds).length === 0} className="gold-action h-8 gap-2">
-              <Download className="h-4 w-4" /> <span className="hidden sm:inline">Baixar relatório</span>
-            </Button>
-            <AnimatePresence>
-              {selectedIds.size > 0 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
-                  <Badge variant="secondary">{selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}</Badge>
-                  {selectedCampaign && <span className="max-w-[260px] truncate text-[10px] text-muted-foreground">Filtrando por: <b className="text-foreground">{selectedCampaign.name}</b></span>}
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-8 gap-1 text-xs">
-                    <X className="h-3 w-3" /> Limpar
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {activeTab === "campaigns" && <>
-                <Button variant="outline" size="sm" onClick={() => { const opening = analysisPanel !== "alerts"; setAnalysisPanel(opening ? "alerts" : null); if (!opening) setHealthFilter("all"); }} className={cn("h-8 gap-2", analysisPanel === "alerts" && "border-primary bg-primary/10 text-foreground")} aria-pressed={analysisPanel === "alerts"}><Sparkles className="h-4 w-4 text-primary" />Análises</Button>
-                <Button variant="outline" size="sm" onClick={() => { setHealthFilter("all"); setAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }} className={cn("h-8 gap-2", analysisPanel === "intelligence" && "border-primary bg-primary/10 text-foreground")} aria-pressed={analysisPanel === "intelligence"}><BrainCircuit className="h-4 w-4 text-primary" />Intelligence</Button>
-              </>}
-              {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
+          <div className="flex flex-col border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706] xl:flex-row xl:items-center">
+            <TabsList className="growdash-scrollbar h-auto min-w-0 flex-1 justify-start overflow-x-auto rounded-none bg-transparent p-0">
+              <TabsTrigger value="campaigns" className="h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
+                <FolderKanban className="h-3.5 w-3.5" /> Campanhas ({filtered.length})
+              </TabsTrigger>
+              <TabsTrigger value="adsets" className="h-10 min-w-[210px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
+                <Layers3 className="h-3.5 w-3.5" /> Conjuntos de anúncios ({selectedAdsets.length})
+              </TabsTrigger>
+              <TabsTrigger value="ads" className="h-10 min-w-[160px] shrink-0 justify-start gap-2 rounded-none px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
+                <RectangleHorizontal className="h-3.5 w-3.5" /> Anúncios ({selectedAds.length})
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 py-1.5 xl:justify-end">
+              <div className="w-full sm:w-[285px] [&_button]:!h-8 [&_button]:!min-h-0"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
+              {activeTab === "campaigns" && <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn("h-8 gap-2 bg-background", analysisPanel && "border-primary bg-primary/10")}><BarChart3 className="h-3.5 w-3.5" />Análises<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => { const opening = analysisPanel !== "alerts"; setAnalysisPanel(opening ? "alerts" : null); if (!opening) setHealthFilter("all"); }}><Sparkles className="mr-2 h-4 w-4 text-primary" />Alertas operacionais</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => { setHealthFilter("all"); setAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }}><BrainCircuit className="mr-2 h-4 w-4 text-primary" />Intelligence</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>}
+              <Button size="sm" onClick={downloadCurrentView} disabled={(activeTab === "campaigns" ? filtered : activeTab === "adsets" ? selectedAdsets : selectedAds).length === 0} className="gold-action h-8 gap-2"><Download className="h-3.5 w-3.5" />Baixar relatório</Button>
             </div>
           </div>
+
+          <div className="flex min-h-11 flex-col gap-2 border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908] xl:flex-row xl:items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              {visibleAdAccounts.length > 0 && <Select value={selectedAccount} onValueChange={setSelectedAccount}><SelectTrigger className="h-8 w-full bg-background sm:w-[210px]"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as contas</SelectItem>{visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select>}
+              <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
+              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="h-8 gap-2 bg-background"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
+            </div>
+            <div className="xl:ml-auto">{activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}</div>
+          </div>
+
+          <AnimatePresence>
+            {selectedIds.size > 0 && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-10 flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5">
+              <Badge variant="secondary">{selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}</Badge>
+              {activeTab === "campaigns" && <><Button size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })} className="h-7 gap-1.5"><Pencil className="h-3.5 w-3.5" />Editar</Button><Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-7 gap-1.5"><Eye className="h-3.5 w-3.5" />Ver desempenho</Button></>}
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-7 gap-1 text-xs"><X className="h-3 w-3" />Limpar</Button>
+            </motion.div>}
+          </AnimatePresence>
 
           {activeTab !== "campaigns" && (
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-3 py-2 text-[11px]">
@@ -803,27 +706,27 @@ export default function Campaigns() {
                 <div className="space-y-2 p-2 md:hidden">
                   {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status })} />)}
                 </div>
-                <div className="growdash-scrollbar hidden overflow-x-auto md:block">
+                <div className="growdash-scrollbar hidden min-h-[420px] max-h-[calc(100vh-300px)] overflow-auto md:block">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-50 bg-card shadow-[0_1px_0_hsl(var(--border))]">
-                      <TableRow className="h-11 border-b border-border bg-muted/60 hover:bg-muted/60">
-                        <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted">
-                          <Checkbox checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
+                      <TableRow className="h-10 border-b border-border bg-muted/60 hover:bg-muted/60 [&>th]:h-10 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e] dark:bg-[#11110f] dark:hover:bg-[#11110f]">
+                        <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted dark:bg-[#11110f]">
+                          <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
                         </ResizableHead>
-                        <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")} className="sticky z-40 bg-muted" style={{ left: camp.colWidths.check }}>Desativado/Ativado</ResizableHead>
-                        <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)]" style={{ left: camp.colWidths.check + camp.colWidths.delivery }}>Campanha</ResizableHead>
+                        <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")} className="sticky z-40 bg-muted dark:bg-[#11110f]" style={{ left: camp.colWidths.check }}>Status</ResizableHead>
+                        <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] dark:border-[#28251e] dark:bg-[#11110f]" style={{ left: camp.colWidths.check + camp.colWidths.delivery }}>Campanha</ResizableHead>
                         {showColumn("objective") && <ResizableHead colKey="objective" width={camp.colWidths.objective} onResize={camp.startResize("objective")} sortable sortableKey="objective" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Objetivo</ResizableHead>}
                         {showColumn("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
-                        {showColumn("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Valor usado</ResizableHead>}
+                        {showColumn("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Invest.</ResizableHead>}
+                        {showColumn("leads") && <ResizableHead colKey="leads" width={camp.colWidths.leads} onResize={camp.startResize("leads")} sortable sortableKey="leads" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Resultado</ResizableHead>}
+                        {showColumn("cpl") && <ResizableHead colKey="cpl" width={camp.colWidths.cpl} onResize={camp.startResize("cpl")} sortable sortableKey="cpl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo/resultado</ResizableHead>}
                         {showColumn("impressions") && <ResizableHead colKey="impressions" width={camp.colWidths.impressions} onResize={camp.startResize("impressions")} sortable sortableKey="impressions" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Impressões</ResizableHead>}
+                        {showColumn("cpm") && <ResizableHead colKey="cpm" width={camp.colWidths.cpm} onResize={camp.startResize("cpm")} sortable sortableKey="cpm" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPM</ResizableHead>}
+                        {showColumn("clicks") && <ResizableHead colKey="clicks" width={camp.colWidths.clicks} onResize={camp.startResize("clicks")} sortable sortableKey="clicks" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Cliques</ResizableHead>}
+                        {showColumn("cpc") && <ResizableHead colKey="cpc" width={camp.colWidths.cpc} onResize={camp.startResize("cpc")} sortable sortableKey="cpc" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPC</ResizableHead>}
+                        {showColumn("ctr") && <ResizableHead colKey="ctr" width={camp.colWidths.ctr} onResize={camp.startResize("ctr")} sortable sortableKey="ctr" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CTR</ResizableHead>}
                         {showColumn("reach") && <ResizableHead colKey="reach" width={camp.colWidths.reach} onResize={camp.startResize("reach")} sortable sortableKey="reach" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Alcance*</ResizableHead>}
                         {showColumn("frequency") && <ResizableHead colKey="frequency" width={camp.colWidths.frequency} onResize={camp.startResize("frequency")} sortable sortableKey="frequency" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Frequência*</ResizableHead>}
-                        {showColumn("cpm") && <ResizableHead colKey="cpm" width={camp.colWidths.cpm} onResize={camp.startResize("cpm")} sortable sortableKey="cpm" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPM</ResizableHead>}
-                        {showColumn("clicks") && <ResizableHead colKey="clicks" width={camp.colWidths.clicks} onResize={camp.startResize("clicks")} sortable sortableKey="clicks" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Cliques no link</ResizableHead>}
-                        {showColumn("ctr") && <ResizableHead colKey="ctr" width={camp.colWidths.ctr} onResize={camp.startResize("ctr")} sortable sortableKey="ctr" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CTR</ResizableHead>}
-                        {showColumn("cpc") && <ResizableHead colKey="cpc" width={camp.colWidths.cpc} onResize={camp.startResize("cpc")} sortable sortableKey="cpc" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPC</ResizableHead>}
-                        {showColumn("leads") && <ResizableHead colKey="leads" width={camp.colWidths.leads} onResize={camp.startResize("leads")} sortable sortableKey="leads" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Resultados</ResizableHead>}
-                        {showColumn("cpl") && <ResizableHead colKey="cpl" width={camp.colWidths.cpl} onResize={camp.startResize("cpl")} sortable sortableKey="cpl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo por resultado</ResizableHead>}
                         {showColumn("conversion") && <ResizableHead colKey="conversion" width={camp.colWidths.conversion} onResize={camp.startResize("conversion")} sortable sortableKey="conversionRate" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Taxa de conversão</ResizableHead>}
                         {showColumn("sales") && <ResizableHead colKey="sales" width={camp.colWidths.sales} onResize={camp.startResize("sales")} sortable sortableKey="salesCount" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Vendas</ResizableHead>}
                         {showColumn("cpa") && <ResizableHead colKey="cpa" width={camp.colWidths.cpa} onResize={camp.startResize("cpa")} sortable sortableKey="cpa" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPA</ResizableHead>}
@@ -832,26 +735,25 @@ export default function Campaigns() {
                         {showColumn("profit") && <ResizableHead colKey="profit" width={camp.colWidths.profit} onResize={camp.startResize("profit")} sortable sortableKey="profit" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Lucro</ResizableHead>}
                         {showColumn("roi") && <ResizableHead colKey="roi" width={camp.colWidths.roi} onResize={camp.startResize("roi")} sortable sortableKey="roi" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">ROI</ResizableHead>}
                         {showColumn("videoViews") && <ResizableHead colKey="videoViews" width={camp.colWidths.videoViews} onResize={camp.startResize("videoViews")} align="right">Reproduções de vídeo</ResizableHead>}
-                        <ResizableHead colKey="actions" width={camp.colWidths.actions} onResize={camp.startResize("actions")}>{""}</ResizableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       <AnimatePresence mode="popLayout">
                         {pagedCampaigns.map((c: any, rowIndex: number) => {
-                          const stickySurface = selectedIds.has(c.id) ? "bg-accent" : rowIndex % 2 ? "bg-muted" : "bg-card";
+                          const stickySurface = selectedIds.has(c.id) ? "bg-accent dark:bg-[#201b0d]" : rowIndex % 2 ? "bg-muted dark:bg-[#0c0c0b]" : "bg-card dark:bg-[#070706]";
                           return (
                           <motion.tr
                             key={c.id}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className={`group h-12 cursor-pointer border-b border-border transition-colors hover:bg-primary/5 ${selectedIds.has(c.id) ? "bg-primary/10" : "odd:bg-card even:bg-muted/20"}`}
+                            className={`group h-11 cursor-pointer border-b border-border transition-colors hover:bg-primary/5 [&>td]:px-3 [&>td]:py-1 dark:border-[#24221c] dark:hover:bg-[#18150c] ${selectedIds.has(c.id) ? "bg-primary/10" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
                             onClick={() => setDetailCampaignId(c.id)}
                           >
                             <TableCell style={{ ...cellW("check"), left: 0 }} className={cn("sticky z-20 transition-colors group-hover:bg-accent", stickySurface)} onClick={(e) => e.stopPropagation()}>
-                              <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
+                              <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
                             </TableCell>
                             <TableCell style={{ ...cellW("delivery"), left: camp.colWidths.check }} className={cn("sticky z-20 transition-colors group-hover:bg-accent", stickySurface)} onClick={(event) => event.stopPropagation()}>
-                              <div className={cn("flex items-center gap-2 text-xs font-semibold", getStatusBadge(c.status).textColor)}>
+                              <div className="flex items-center gap-2 text-xs font-semibold">
                                 <button
                                   type="button"
                                   onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status })}
@@ -868,27 +770,23 @@ export default function Campaigns() {
                                     normalizeStatus(c.status) === "ACTIVE" ? "left-[17px]" : "left-0.5",
                                   )} />
                                 </button>
-                                <span>{getStatusBadge(c.status).label}</span>
                               </div>
                             </TableCell>
                             <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] transition-colors group-hover:bg-accent", stickySurface)}>
-                              <div className="flex min-w-0 items-center gap-2">
-                                <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary" />
-                                <span className="truncate font-semibold text-foreground" title={c.name}>{c.name}</span>
-                              </div>
+                              <span className="block truncate font-medium text-foreground" title={c.name}>{c.name}</span>
                             </TableCell>
                             {showColumn("objective") && <TableCell style={cellW("objective")} className="truncate text-xs text-muted-foreground" title={c.objective || "Não informado"}>{c.objective || "—"}</TableCell>}
                             {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))}><AnimatedNumber value={c.leads} decimals={0} /><span className="block text-[8px] text-muted-foreground">Leads na Meta</span></TableCell>}
+                            {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("impressions") && <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>}
-                            {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
-                            {showColumn("frequency") && <TableCell style={cellW("frequency")} className={cn("text-right tabular-nums text-sm", sortBg("frequency"))}><AnimatedNumber value={c.frequency} decimals={2} /></TableCell>}
                             {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("clicks") && <TableCell style={cellW("clicks")} className={cn("text-right tabular-nums text-sm", sortBg("clicks"))}><AnimatedNumber value={c.clicks} decimals={0} /></TableCell>}
-                            {showColumn("ctr") && <TableCell style={cellW("ctr")} className={cn("text-right tabular-nums text-sm", sortBg("ctr"))}><AnimatedNumber value={c.ctr} suffix="%" decimals={2} /></TableCell>}
                             {showColumn("cpc") && <TableCell style={cellW("cpc")} className={cn("text-right tabular-nums text-sm", sortBg("cpc"))}><AnimatedNumber value={c.cpc} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))}><AnimatedNumber value={c.leads} decimals={0} /><span className="block text-[8px] text-muted-foreground">Lead da Meta</span></TableCell>}
-                            {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /><span className="block text-[8px] text-muted-foreground">Por lead</span></TableCell>}
+                            {showColumn("ctr") && <TableCell style={cellW("ctr")} className={cn("text-right tabular-nums text-sm", sortBg("ctr"))}><AnimatedNumber value={c.ctr} suffix="%" decimals={2} /></TableCell>}
+                            {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
+                            {showColumn("frequency") && <TableCell style={cellW("frequency")} className={cn("text-right tabular-nums text-sm", sortBg("frequency"))}><AnimatedNumber value={c.frequency} decimals={2} /></TableCell>}
                             {showColumn("conversion") && <TableCell style={cellW("conversion")} className={cn("text-right tabular-nums text-sm", sortBg("conversionRate"))}><AnimatedNumber value={c.conversionRate} suffix="%" decimals={2} /></TableCell>}
                             {showColumn("sales") && <TableCell style={cellW("sales")} className={cn("text-right tabular-nums text-sm", sortBg("salesCount"))}><AnimatedNumber value={c.salesCount} decimals={0} /></TableCell>}
                             {showColumn("cpa") && <TableCell style={cellW("cpa")} className={cn("text-right tabular-nums text-sm", sortBg("cpa"))}><AnimatedNumber value={c.cpa} prefix="R$ " decimals={2} /></TableCell>}
@@ -897,37 +795,39 @@ export default function Campaigns() {
                             {showColumn("profit") && <TableCell style={cellW("profit")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.profit), sortBg("profit"))}><AnimatedNumber value={c.profit} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("roi") && <TableCell style={cellW("roi")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.roi), sortBg("roi"))}><AnimatedNumber value={c.roi} suffix="%" decimals={1} /></TableCell>}
                             {showColumn("videoViews") && <TableCell style={cellW("videoViews")} className="text-right text-sm text-muted-foreground">—<span className="block text-[8px]">não sincronizado</span></TableCell>}
-                            <TableCell style={cellW("actions")} onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailCampaignId(c.id)} title="Ver detalhes">
-                                  <BarChart3 className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status })} title="Editar na Meta Ads">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
                           </motion.tr>
                         );})}
                       </AnimatePresence>
                     </TableBody>
                   </Table>
                 </div>
-                <div className="sticky bottom-0 z-20 border-t border-primary/20 bg-card/95 px-3 py-3 shadow-[0_-10px_28px_rgba(0,0,0,.12)] backdrop-blur-xl">
-                  <div className="growdash-scrollbar flex min-w-0 gap-2 overflow-x-auto pb-1">
-                    <TotalMetric label={`Totais (${filtered.length})`} value={`${filtered.length} campanhas`} />
-                    <TotalMetric label="Orçamento" value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-                    <TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-                    <TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} />
-                    <TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} />
-                    <TotalMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />
-                    <TotalMetric label="CPC" value={totalCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-                    <TotalMetric label="CPM" value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-                    <TotalMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} />
-                    <TotalMetric label="Vendas" value={totals.salesCount.toLocaleString("pt-BR")} />
+                <div className="sticky bottom-0 z-20 border-t border-border bg-card/95 shadow-[0_-8px_22px_rgba(0,0,0,.12)] backdrop-blur-xl dark:border-[#28251e] dark:bg-[#080807]/95">
+                  <div className="growdash-scrollbar overflow-x-auto">
+                    <div className="flex h-10 w-max items-stretch text-[10px]">
+                      <AlignedTotal width={camp.colWidths.check + camp.colWidths.delivery + camp.colWidths.name} label={`Totais (${filtered.length})`} value={`${filtered.length} campanhas`} align="left" />
+                      {showColumn("objective") && <AlignedTotal width={camp.colWidths.objective} value="—" />}
+                      {showColumn("budget") && <AlignedTotal width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("spend") && <AlignedTotal width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("leads") && <AlignedTotal width={camp.colWidths.leads} value={totals.leads.toLocaleString("pt-BR")} />}
+                      {showColumn("cpl") && <AlignedTotal width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("impressions") && <AlignedTotal width={camp.colWidths.impressions} value={totals.impressions.toLocaleString("pt-BR")} />}
+                      {showColumn("cpm") && <AlignedTotal width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("clicks") && <AlignedTotal width={camp.colWidths.clicks} value={totals.clicks.toLocaleString("pt-BR")} />}
+                      {showColumn("cpc") && <AlignedTotal width={camp.colWidths.cpc} value={totalCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("ctr") && <AlignedTotal width={camp.colWidths.ctr} value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />}
+                      {showColumn("reach") && <AlignedTotal width={camp.colWidths.reach} value={totals.reach.toLocaleString("pt-BR")} />}
+                      {showColumn("frequency") && <AlignedTotal width={camp.colWidths.frequency} value={totals.reach > 0 ? (totals.impressions / totals.reach).toFixed(2).replace(".", ",") : "0,00"} />}
+                      {showColumn("conversion") && <AlignedTotal width={camp.colWidths.conversion} value={`${totalResultRate.toFixed(2).replace(".", ",")}%`} />}
+                      {showColumn("sales") && <AlignedTotal width={camp.colWidths.sales} value={totals.salesCount.toLocaleString("pt-BR")} />}
+                      {showColumn("cpa") && <AlignedTotal width={camp.colWidths.cpa} value={(totals.salesCount > 0 ? totals.spend / totals.salesCount : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("revenue") && <AlignedTotal width={camp.colWidths.revenue} value={totals.revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("roas") && <AlignedTotal width={camp.colWidths.roas} value={`${totalRoas.toFixed(2).replace(".", ",")}x`} />}
+                      {showColumn("profit") && <AlignedTotal width={camp.colWidths.profit} value={totals.profit.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("roi") && <AlignedTotal width={camp.colWidths.roi} value={`${(totals.spend > 0 ? totals.profit / totals.spend * 100 : 0).toFixed(1).replace(".", ",")}%`} />}
+                      {showColumn("videoViews") && <AlignedTotal width={camp.colWidths.videoViews} value="—" />}
+                    </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3"><span className="text-[10px] text-muted-foreground">Exibindo {filtered.length ? campaignPage * pageSize + 1 : 0}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}; 50 por página para reduzir renderização.</span><div className="flex items-center gap-1"><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-20 text-center text-[10px]">Página {campaignPage + 1} de {pageCount}</span><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>
-                  {(showColumn("reach") || showColumn("frequency")) && <p className="mt-2 text-[9px] text-muted-foreground">* Alcance soma linhas diárias por anúncio e pode repetir pessoas; a frequência é direcional até a sincronização de alcance deduplicado por período.</p>}
+                  {pageCount > 1 && <div className="flex h-8 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
                 </div>
               </Card>
             )}
@@ -1171,6 +1071,13 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
 
 function ChartPanel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return <article className="min-w-0 rounded-xl border border-border bg-card p-4"><h3 className="text-xs font-black">{title}</h3><p className="mt-1 text-[9px] text-muted-foreground">{description}</p><div className="mt-4 h-[260px] min-w-0">{children}</div></article>;
+}
+
+function AlignedTotal({ width, value, label, align = "right" }: { width: number; value: string; label?: string; align?: "left" | "right" }) {
+  return <div style={{ width, minWidth: width, maxWidth: width }} className={cn("flex shrink-0 flex-col justify-center border-r border-border/60 px-3 tabular-nums dark:border-[#24221c]", align === "right" ? "items-end text-right" : "items-start text-left")}>
+    {label && <span className="text-[8px] text-muted-foreground">{label}</span>}
+    <strong className="truncate text-[10px] font-semibold">{value}</strong>
+  </div>;
 }
 
 function TotalMetric({ label, value }: { label: string; value: string }) {

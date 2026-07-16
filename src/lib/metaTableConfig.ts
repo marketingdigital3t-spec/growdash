@@ -10,7 +10,7 @@ export const campaignColumnLabels: Record<CampaignColumnKey, string> = {
 };
 
 export const metaColumnPresets: { id: MetaColumnPresetKey; label: string; description: string; columns: CampaignColumnKey[] }[] = [
-  { id: "performance", label: "Desempenho", description: "Resultados, custo, orçamento, gasto e entrega.", columns: ["name", "delivery", "leads", "cpl", "budget", "spend", "impressions", "reach", "frequency"] },
+  { id: "performance", label: "Pré-definidas", description: "A mesma visão operacional usada no gerenciador de campanhas.", columns: ["name", "delivery", "budget", "spend", "leads", "cpl", "impressions", "cpm", "clicks", "cpc", "ctr"] },
   { id: "performance_clicks", label: "Desempenho e cliques", description: "Entrega e eficiência de clique.", columns: ["name", "delivery", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpc", "cpm", "leads", "cpl"] },
   { id: "delivery", label: "Veiculação", description: "Status, objetivo, orçamento e distribuição.", columns: ["name", "delivery", "objective", "budget", "spend", "impressions", "reach", "frequency", "cpm"] },
   { id: "engagement", label: "Engajamento", description: "Interação, cliques e conversão.", columns: ["name", "delivery", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpc", "conversion"] },

@@ -1,5 +1,5 @@
 /* saved_table_views is available after the additive automation migration. */
-import { Columns3, Layers3, Save } from "lucide-react";
+import { Columns3, Layers3, Save, SlidersHorizontal } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,8 +33,25 @@ export function MetaTableControls({ preset, columns, breakdown, onPreset, onColu
   const selectSaved = (item: any) => { const config = item.config ?? {}; if (config.preset) onPreset(config.preset); if (Array.isArray(config.columns)) onColumns(new Set(config.columns)); if (config.breakdown) onBreakdown(config.breakdown); toast({ title: `Visualização “${item.name}” aplicada` }); };
   const toggle = (column: CampaignColumnKey, checked: boolean) => { const next = new Set(columns); if (checked) next.add(column); else next.delete(column); onColumns(next); };
   return <div className="flex flex-wrap items-center gap-2">
-    <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><Columns3 className="h-4 w-4" />Colunas: {getMetaColumnPreset(preset).label}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto"><DropdownMenuLabel>Predefinições da Meta</DropdownMenuLabel>{metaColumnPresets.map((item) => <DropdownMenuItem key={item.id} onSelect={() => selectPreset(item.id)} className="flex-col items-start"><span className="text-xs font-bold">{item.label}</span><span className="text-[10px] text-muted-foreground">{item.description}</span></DropdownMenuItem>)}{savedViews.length > 0 && <><DropdownMenuSeparator /><DropdownMenuLabel>Minhas visualizações</DropdownMenuLabel>{savedViews.map((item: any) => <DropdownMenuItem key={item.id} onSelect={() => selectSaved(item)}><span className="text-xs font-bold">{item.name}</span></DropdownMenuItem>)}</>}<DropdownMenuSeparator /><DropdownMenuLabel>Personalizar colunas</DropdownMenuLabel>{editableCampaignColumns.map((column) => <DropdownMenuCheckboxItem key={column} checked={columns.has(column)} onCheckedChange={(checked) => toggle(column, checked === true)} onSelect={(event) => event.preventDefault()} className="text-xs">{campaignColumnLabels[column]}</DropdownMenuCheckboxItem>)}</DropdownMenuContent></DropdownMenu>
-    <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><Layers3 className="h-4 w-4" />Detalhamento: {getBreakdownLabel(breakdown)}</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="max-h-[75vh] w-[300px] overflow-y-auto"><DropdownMenuRadioGroup value={breakdown} onValueChange={onBreakdown}>{metaBreakdownGroups.map((group) => <div key={group.label}><DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">{group.label}</DropdownMenuLabel>{group.items.map((item) => <DropdownMenuRadioItem key={item.id} value={item.id} className="text-xs">{item.label}{item.id !== "none" && <span className="ml-auto text-[8px] text-amber-600">requer breakdown</span>}</DropdownMenuRadioItem>)}</div>)}</DropdownMenuRadioGroup></DropdownMenuContent></DropdownMenu>
-    <Button variant="outline" size="sm" className="h-8 gap-2 bg-background" onClick={() => saveView.mutate()} disabled={saveView.isPending}><Save className="h-4 w-4" />Salvar visualização</Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><Columns3 className="h-4 w-4" />Colunas: pré-definidas</Button></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto">
+        <DropdownMenuLabel>Predefinições da Meta</DropdownMenuLabel>
+        {metaColumnPresets.map((item) => <DropdownMenuItem key={item.id} onSelect={() => selectPreset(item.id)} className="flex-col items-start"><span className="text-xs font-bold">{item.label}</span><span className="text-[10px] text-muted-foreground">{item.description}</span></DropdownMenuItem>)}
+        {savedViews.length > 0 && <><DropdownMenuSeparator /><DropdownMenuLabel>Minhas visualizações</DropdownMenuLabel>{savedViews.map((item: any) => <DropdownMenuItem key={item.id} onSelect={() => selectSaved(item)}><span className="text-xs font-bold">{item.name}</span></DropdownMenuItem>)}</>}
+      </DropdownMenuContent>
+    </DropdownMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><SlidersHorizontal className="h-4 w-4" />Personalizar colunas</Button></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto">
+        <DropdownMenuLabel>Colunas exibidas</DropdownMenuLabel>
+        {editableCampaignColumns.map((column) => <DropdownMenuCheckboxItem key={column} checked={columns.has(column)} onCheckedChange={(checked) => toggle(column, checked === true)} onSelect={(event) => event.preventDefault()} className="text-xs">{campaignColumnLabels[column]}</DropdownMenuCheckboxItem>)}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="flex items-center gap-2"><Layers3 className="h-3.5 w-3.5" />Detalhamento: {getBreakdownLabel(breakdown)}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={breakdown} onValueChange={onBreakdown}>{metaBreakdownGroups.map((group) => <div key={group.label}><DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">{group.label}</DropdownMenuLabel>{group.items.map((item) => <DropdownMenuRadioItem key={item.id} value={item.id} className="text-xs">{item.label}</DropdownMenuRadioItem>)}</div>)}</DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => saveView.mutate()} disabled={saveView.isPending}><Save className="mr-2 h-4 w-4" />{saveView.isPending ? "Salvando…" : "Salvar visualização"}</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   </div>;
 }

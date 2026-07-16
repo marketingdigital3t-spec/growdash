@@ -29,9 +29,7 @@ const CampaignsManager = lazy(() => import("@/pages/Campaigns"));
 const validTabs = new Set(["campaigns", "budget", "ai", "funnels"]);
 const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
-  { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
   { id: "ai", label: "IA & Relatórios de Leads", icon: Bot },
-  { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
 ] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -48,7 +46,7 @@ export default function TrafficPage() {
 
   return (
     <div className="mx-auto max-w-[1700px] space-y-3">
-      <nav className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/70 p-1 lg:grid-cols-4" aria-label="Áreas de Tráfego Pago">
+      <nav className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/55 p-1 lg:max-w-[550px]" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 

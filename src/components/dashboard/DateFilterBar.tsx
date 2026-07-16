@@ -23,6 +23,7 @@ interface DateFilterBarProps {
   onCampaignIdsChange?: (ids: string[]) => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  showSummary?: boolean;
 }
 
 export function DateFilterBar({
@@ -40,6 +41,7 @@ export function DateFilterBar({
   onCampaignIdsChange,
   onRefresh,
   isRefreshing,
+  showSummary = true,
 }: DateFilterBarProps) {
   return (
     <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
@@ -80,9 +82,9 @@ export function DateFilterBar({
         </Button>
       )}
 
-      <span className="min-w-0 text-xs text-muted-foreground sm:ml-auto">
+      {showSummary && <span className="min-w-0 text-xs text-muted-foreground sm:ml-auto">
         {format(startDate, "dd MMM", { locale: ptBR })} — {format(endDate, "dd MMM yyyy", { locale: ptBR })}
-      </span>
+      </span>}
     </div>
   );
 }

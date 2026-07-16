@@ -136,23 +136,22 @@ export default function GrowdashLayout() {
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
+                  const isActive = item.path === "/" ? location.pathname === "/" : location.pathname.startsWith(item.path);
                   const link = (
                     <NavLink
                       to={item.path}
                       end={item.path === "/"}
                       title={!showSidebarLabels ? item.label : undefined}
                       aria-label={item.label}
-                      className={({ isActive }) =>
-                        cn(
-                          "group flex h-10 items-center rounded-lg text-[13px] font-medium transition-colors",
-                          showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
-                          !showSidebarLabels
-                            ? "border border-transparent bg-transparent text-[#ffd868] shadow-none hover:bg-transparent hover:text-[#ffe68a]"
-                            : isActive
-                            ? "border border-[#f0bd35]/30 bg-gradient-to-r from-[#6a521e] to-[#3a301a] text-[#ffd868] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
-                            : "border border-transparent text-white/78 hover:bg-white/[.07] hover:text-white",
-                        )
-                      }
+                      className={cn(
+                        "group flex h-10 items-center rounded-lg text-[13px] font-medium transition-colors",
+                        showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
+                        !showSidebarLabels
+                          ? "border border-transparent bg-transparent text-[#ffd868] shadow-none hover:bg-transparent hover:text-[#ffe68a]"
+                          : isActive
+                          ? "border border-[#f0bd35]/30 bg-gradient-to-r from-[#6a521e] to-[#3a301a] text-[#ffd868] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
+                          : "border border-transparent text-white/78 hover:bg-white/[.07] hover:text-white",
+                      )}
                     >
                       <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
                       {showSidebarLabels && <span className="truncate">{item.label}</span>}
