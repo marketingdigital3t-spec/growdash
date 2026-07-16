@@ -10,6 +10,12 @@ import type { DashboardView } from "@/hooks/useDashboardViews";
 import { getWidgetDef } from "@/lib/widgetCatalog";
 import type { Sale } from "@/hooks/useSales";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  buildResponsiveDashboardLayout,
+  findDashboardSlot,
+  normalizeDesktopDashboardLayout,
+  type DashboardGridItem,
+} from "@/lib/responsiveDashboardLayout";
 
 const ResponsiveGrid = WidthProvider(Responsive);
 
@@ -28,11 +34,21 @@ const SYSTEM_TAIL = [
   { id: "__sys_ask_ai", type: "ask_ai", title: "Pergunte à IA", config: {}, layoutDefault: { w: 12, h: 4 } },
 ];
 
+function appendSystemTail(baseLayout: DashboardGridItem[], columns: number, widgetIds: Set<string>) {
+  const visibleLayout = baseLayout.filter((item) => widgetIds.has(item.i));
+  const maxY = visibleLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
+  let y = maxY;
+  const tail = SYSTEM_TAIL.map((systemWidget) => {
+    const item = { i: systemWidget.id, x: 0, y, w: columns, h: systemWidget.layoutDefault.h, static: true };
+    y += systemWidget.layoutDefault.h;
+    return item;
+  });
+  return [...visibleLayout, ...tail];
+}
+
 export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSale }: Props) {
   const isMobile = useIsMobile();
-  const [isCompact, setIsCompact] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches,
-  );
+  const [breakpoint, setBreakpoint] = useState("lg");
   // Local state mirrors the persisted view, with auto-debounced save via onChange.
   const [layout, setLayout] = useState<any[]>(view.layout || []);
   const [widgets, setWidgets] = useState<any[]>(view.widgets || []);
@@ -41,35 +57,28 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
   useEffect(() => {
     setLayout(view.layout || []);
     setWidgets(view.widgets || []);
-  }, [view.id]);
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 1279px)");
-    const update = () => setIsCompact(media.matches);
-    media.addEventListener("change", update);
-    update();
-    return () => media.removeEventListener("change", update);
-  }, []);
+  }, [view.id, view.layout, view.widgets]);
 
   function scheduleSave(nextLayout: any[], nextWidgets: any[]) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => onChange(nextLayout, nextWidgets), 800);
   }
 
-  // Build display layout: persisted widgets + system tail
-  const fullLayout = useMemo(() => {
-    const ids = new Set((widgets || []).map((w) => w.id));
-    const baseLayout = layout.filter((l) => ids.has(l.i));
-    // Compute true max Y considering compaction would have brought items up.
-    const maxY = baseLayout.reduce((m, l) => Math.max(m, (l.y || 0) + (l.h || 0)), 0);
-    let y = maxY;
-    const tail = SYSTEM_TAIL.map((s) => {
-      const item = { i: s.id, x: 0, y, w: s.layoutDefault.w, h: s.layoutDefault.h, static: true };
-      y += s.layoutDefault.h;
-      return item;
-    });
-    return [...baseLayout, ...tail];
-  }, [layout, widgets]);
+  const desktopLayout = useMemo(() =>
+    normalizeDesktopDashboardLayout(layout, widgets, 12),
+  [layout, widgets]);
+
+  const responsiveLayouts = useMemo(() => {
+    const widgetIds = new Set((widgets || []).map((widget) => widget.id));
+    const lg = buildResponsiveDashboardLayout(desktopLayout, 12, 12);
+    const md = buildResponsiveDashboardLayout(desktopLayout, 12, 8);
+    const sm = buildResponsiveDashboardLayout(desktopLayout, 12, 4);
+    return {
+      lg: appendSystemTail(lg, 12, widgetIds),
+      md: appendSystemTail(md, 8, widgetIds),
+      sm: appendSystemTail(sm, 4, widgetIds),
+    };
+  }, [desktopLayout, widgets]);
 
   const fullWidgets = useMemo(() => [...widgets, ...SYSTEM_TAIL], [widgets]);
 
@@ -83,12 +92,14 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
     return true;
   }
 
-  function onLayoutChange(next: any[]) {
+  function onLayoutChange(next: any[], allLayouts?: Record<string, any[]>) {
+    if (!isEditing) return;
     // strip system widgets
-    const userOnly = next.filter((l) => !l.i.startsWith("__sys_"));
+    const desktopNext = allLayouts?.lg ?? (breakpoint === "lg" ? next : layout);
+    const userOnly = desktopNext.filter((l) => !l.i.startsWith("__sys_"));
     if (layoutsEqual(userOnly, layout)) return;
     setLayout(userOnly);
-    if (isEditing) scheduleSave(userOnly, widgets);
+    scheduleSave(userOnly, widgets);
   }
 
 
@@ -100,7 +111,7 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
     scheduleSave(nextLayout, nextWidgets);
   }
 
-  if (isMobile || isCompact) {
+  if (isMobile) {
     return <div className="min-w-0 space-y-4 overflow-x-clip">
       {isEditing && <div className="sticky top-[160px] z-10 flex justify-end"><Button size="sm" onClick={onAddClick} className="min-h-11 gap-1.5 shadow"><Plus className="h-3.5 w-3.5" />Adicionar widget</Button></div>}
       {fullWidgets.map((widget) => {
@@ -124,18 +135,19 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
       )}
       <ResponsiveGrid
         className="layout"
-        layouts={{ lg: fullLayout, md: fullLayout, sm: fullLayout, xs: fullLayout }}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
-        cols={{ lg: 12, md: 12, sm: 6, xs: 2 }}
+        layouts={responsiveLayouts}
+        breakpoints={{ lg: 1280, md: 900, sm: 0 }}
+        cols={{ lg: 12, md: 8, sm: 4 }}
         rowHeight={60}
         margin={[12, 12]}
         compactType="vertical"
         preventCollision={false}
-        isDraggable={isEditing}
-        isResizable={isEditing}
+        isDraggable={isEditing && breakpoint === "lg"}
+        isResizable={isEditing && breakpoint === "lg"}
         isBounded={true}
         useCSSTransforms={true}
         onLayoutChange={onLayoutChange}
+        onBreakpointChange={setBreakpoint}
         draggableCancel=".no-drag,button,input,select,textarea,a"
       >
 
@@ -167,10 +179,10 @@ export function buildWidgetFromDef(typeKey: string, existingLayout: any[] = []):
   const def = getWidgetDef(typeKey as any);
   if (!def) return null;
   const id = `${typeKey}_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
-  const maxY = (existingLayout || []).reduce((m, l) => Math.max(m, (l.y || 0) + (l.h || 0)), 0);
+  const slot = findDashboardSlot(existingLayout, def.defaultLayout.w, def.defaultLayout.h, 12);
   return {
     widget: { id, type: def.type, title: def.title, config: { ...def.defaultConfig } },
-    layout: { i: id, x: 0, y: maxY, w: def.defaultLayout.w, h: def.defaultLayout.h, minW: def.defaultLayout.minW, minH: def.defaultLayout.minH },
+    layout: { i: id, x: slot.x, y: slot.y, w: def.defaultLayout.w, h: def.defaultLayout.h, minW: def.defaultLayout.minW, minH: def.defaultLayout.minH },
   };
 
 }
