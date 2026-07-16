@@ -7,7 +7,7 @@ export function useCampaigns(adAccountId?: string) {
     queryFn: async () => {
       let query = supabase
         .from("campaigns")
-        .select("id, name, ad_account_id, objective, created_at")
+        .select("id, name, ad_account_id, status, objective, created_at")
         .order("created_at", { ascending: false });
 
       if (adAccountId) {

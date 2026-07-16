@@ -16,6 +16,7 @@ import { useLastTopUp, useNextTopUpEstimate } from "@/hooks/useCampaignTargets";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
+import { CampaignAttentionPanel } from "@/components/campaigns/CampaignAttentionPanel";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getTrafficFunnelTemplates, trafficObjectives, type TrafficObjectiveId } from "@/lib/trafficFunnelTemplates";
@@ -59,21 +60,22 @@ export default function TrafficPage() {
       </section>}
 
       {activeTab === "campaigns" && <Suspense fallback={<Loading />}><CampaignsManager /></Suspense>}
-      {activeTab === "budget" && <BudgetWorkspace accountId={adAccountId} visibleAccountIds={visibleAccounts.map((item) => item.id)} />}
+      {activeTab === "budget" && <BudgetWorkspace accountId={adAccountId} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
       {activeTab === "ai" && <AIAndLeadReports accountId={adAccountId} accountName={account?.name} />}
       {activeTab === "funnels" && <TrafficFunnels />}
     </div>
   );
 }
 
-function BudgetWorkspace({ accountId, visibleAccountIds }: { accountId: string; visibleAccountIds: string[] }) {
+function BudgetWorkspace({ accountId, accounts, startDate, endDate }: { accountId: string; accounts: Array<{ id: string; name: string }>; startDate: Date; endDate: Date }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const all = useBudgetAnalysis();
+  const visibleAccountIds = accounts.map((account) => account.id);
   const rows = all.filter((item) => visibleAccountIds.includes(item.id) && (accountId === "all" || item.id === accountId));
   const totals = rows.reduce((sum, item) => ({ budget: sum.budget + item.dailyBudgetActive, spend: sum.spend + item.avgDailySpend, balance: sum.balance + Number(item.balance || 0) }), { budget: 0, spend: 0, balance: 0 });
   const refresh = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }), queryClient.invalidateQueries({ queryKey: ["daily_spend_by_account"] }), queryClient.invalidateQueries({ queryKey: ["daily_budget_active_by_account"] }), queryClient.invalidateQueries({ queryKey: ["last_top_up"] }), queryClient.invalidateQueries({ queryKey: ["next_top_up_estimate"] })]); toast({ title: "Orçamentos atualizados", description: "Os valores locais foram reconsultados; a data depende da última sincronização Meta." }); };
-  return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="Orçamento diário ativo" value={brl.format(totals.budget)} note="Soma dos conjuntos ativos" /><Kpi label="Gasto médio por dia" value={brl.format(totals.spend)} note="Média móvel dos últimos 7 dias" emphasis /><Kpi label="Saldo informado" value={brl.format(totals.balance)} note="Saldo consolidado das contas" /><Kpi label="Autonomia estimada" value={totals.spend > 0 ? `${Math.floor(totals.balance / totals.spend)} dias` : "Sem histórico"} note="Saldo ÷ gasto médio" /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Análise de Orçamento por BM</h2><p className="text-xs text-muted-foreground">Ritmo, saldo, aportes, autonomia e risco de interrupção.</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={refresh}><RefreshCw className="mr-2 h-4 w-4" />Atualizar saldos</Button></header><div className="grid gap-3 p-4 lg:grid-cols-2 xl:grid-cols-3">{rows.map((item) => <BudgetAccountCard key={item.id} item={item} />)}{rows.length === 0 && <Empty text="Nenhuma conta com orçamento ou saldo disponível." />}</div></section></div>;
+  return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Kpi label="Orçamento diário ativo" value={brl.format(totals.budget)} note="Soma dos conjuntos ativos" /><Kpi label="Gasto médio por dia" value={brl.format(totals.spend)} note="Média móvel dos últimos 7 dias" emphasis /><Kpi label="Saldo informado" value={brl.format(totals.balance)} note="Saldo consolidado das contas" /><Kpi label="Autonomia estimada" value={totals.spend > 0 ? `${Math.floor(totals.balance / totals.spend)} dias` : "Sem histórico"} note="Saldo ÷ gasto médio" /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Análise de Orçamento por BM</h2><p className="text-xs text-muted-foreground">Ritmo, saldo, aportes, autonomia e risco de interrupção.</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={refresh}><RefreshCw className="mr-2 h-4 w-4" />Atualizar saldos</Button></header><div className="grid gap-3 p-4 lg:grid-cols-2 xl:grid-cols-3">{rows.map((item) => <BudgetAccountCard key={item.id} item={item} />)}{rows.length === 0 && <Empty text="Nenhuma conta com orçamento ou saldo disponível." />}</div></section><CampaignAttentionPanel accountId={accountId} accounts={accounts} startDate={startDate} endDate={endDate} /></div>;
 }
 
 function BudgetAccountCard({ item }: { item: BudgetAnalysisItem }) {

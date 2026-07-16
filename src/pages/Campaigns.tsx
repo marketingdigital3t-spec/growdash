@@ -50,13 +50,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierarchy";
+import { getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
 
 type CampSortKey = "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
 type CampColKey = CampaignColumnKey;
 type AdsetColKey = "name" | "campaign" | "budget" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
 type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
-type CampaignHealth = "critical" | "warning" | "observation" | "initial" | "healthy" | "inactive";
-
 const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; active: string }> = [
   { id: "critical", label: "Crítico", dot: "bg-red-500", active: "border-red-500/55 bg-red-500/10 text-red-500" },
   { id: "warning", label: "Atenção", dot: "bg-amber-400", active: "border-amber-400/55 bg-amber-400/10 text-amber-500" },
@@ -65,11 +64,6 @@ const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; ac
   { id: "healthy", label: "Saudável", dot: "bg-emerald-500", active: "border-emerald-500/55 bg-emerald-500/10 text-emerald-500" },
   { id: "inactive", label: "Inativas", dot: "bg-zinc-400", active: "border-zinc-400/55 bg-zinc-400/10 text-zinc-500" },
 ];
-
-function getActiveDays(createdAt?: string) {
-  if (!createdAt) return Number.POSITIVE_INFINITY;
-  return Math.max(0, (Date.now() - new Date(createdAt).getTime()) / 86_400_000);
-}
 
 function formatApiDate(date: Date) {
   const year = date.getFullYear();
@@ -112,20 +106,6 @@ async function fetchAllPages(query: any, pageSize = 1000, maxPages = 20) {
     if (batch.length < pageSize) break;
   }
   return rows;
-}
-
-function getCampaignHealth(campaign: any, averageCpl: number, targetCpl?: number | null): CampaignHealth {
-  if (normalizeStatus(campaign.status) !== "ACTIVE") return "inactive";
-  const activeDays = getActiveDays(campaign.created_at);
-  if (activeDays < 3) return "initial";
-  if (campaign.spend <= 0 || campaign.impressions <= 0) return "inactive";
-  const referenceCpl = Number(targetCpl || 0) > 0 ? Number(targetCpl) : averageCpl;
-  const ratio = referenceCpl > 0 && campaign.leads > 0 ? campaign.cpl / referenceCpl : 0;
-  const hasRevenueSignal = campaign.salesCount > 0 || campaign.revenue > 0;
-  if ((campaign.leads <= 0 && activeDays >= 3) || ratio > 2 || (hasRevenueSignal && campaign.roas < 0.5)) return "critical";
-  if (ratio >= 1.5 || (hasRevenueSignal && campaign.roas < 1)) return "warning";
-  if (ratio >= 1 || campaign.frequency >= 3 || campaign.conversionRate < 3) return "observation";
-  return "healthy";
 }
 
 const CAMP_DEFAULTS: Record<CampColKey, number> = {
@@ -526,12 +506,6 @@ export default function Campaigns() {
     exportCsv(header, rows, `growdash-${label}-${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
-  const problemCampaigns = useMemo(() => campaigns
-    .map((campaign: any) => ({ campaign, health: getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id)) }))
-    .filter(({ health }) => health === "critical" || health === "observation")
-    .sort((a, b) => (a.health === "critical" ? -1 : 1) - (b.health === "critical" ? -1 : 1))
-    .slice(0, 6), [averageCpl, campaigns, targetByCampaign]);
-
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const showColumn = (key: CampaignColumnKey) => visibleColumns.has(key);
@@ -653,15 +627,6 @@ export default function Campaigns() {
           })}
         </div>
       </MotionItem>
-
-      {!isLoading && problemCampaigns.length > 0 && (
-        <MotionItem className="border-b border-border bg-muted/20 p-3 sm:p-4">
-          <div className="mb-3 flex items-center justify-between gap-3"><div><h2 className="text-sm font-black">Campanhas que exigem atenção</h2><p className="text-[10px] text-muted-foreground">Detalhes automáticos calculados com meta de CPL, período, veiculação e resultados reais.</p></div><Badge variant="outline">{problemCampaigns.length} exibida(s)</Badge></div>
-          <div className="grid gap-2 lg:grid-cols-2">
-            {problemCampaigns.map(({ campaign, health }) => <CampaignIssueCard key={campaign.id} campaign={campaign} health={health} targetCpl={targetByCampaign.get(campaign.id) || averageCpl} accountName={visibleAdAccounts.find((account) => account.id === campaign.ad_account_id)?.name || "Conta Meta"} onOpen={() => setDetailCampaignId(campaign.id)} />)}
-          </div>
-        </MotionItem>
-      )}
 
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
 
@@ -1033,12 +998,6 @@ function TotalMetric({ label, value }: { label: string; value: string }) {
 
 function AnalysisMetric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg border border-border bg-card px-3 py-2"><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-1 block text-sm tabular-nums">{value}</strong></div>;
-}
-
-function CampaignIssueCard({ campaign, health, targetCpl, accountName, onOpen }: { campaign: any; health: CampaignHealth; targetCpl: number; accountName: string; onOpen: () => void }) {
-  const critical = health === "critical";
-  const days = getActiveDays(campaign.created_at);
-  return <button type="button" onClick={onOpen} className={cn("rounded-xl border bg-card p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lg", critical ? "border-red-500/35" : "border-orange-500/35")}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><span className={cn("h-2.5 w-2.5 rounded-full", critical ? "bg-red-500" : "bg-orange-500")} /><span className={cn("text-[9px] font-black uppercase tracking-wider", critical ? "text-red-500" : "text-orange-500")}>{critical ? "Crítico" : "Observação"}</span></div><h3 className="mt-2 truncate text-sm font-black">{campaign.name}</h3><p className="mt-1 truncate text-[10px] text-muted-foreground">BM: {accountName} · Alvo CPL: {targetCpl > 0 ? targetCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "não definido"}</p></div><span className="shrink-0 rounded-full bg-muted px-2 py-1 text-[9px] text-muted-foreground">{Number.isFinite(days) ? `${days.toFixed(1)}d ativa` : "idade indisponível"}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4"><IssueMetric label="Investido" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} /><IssueMetric label="Custo/resultado" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></div></button>;
 }
 
 function IssueMetric({ label, value }: { label: string; value: string }) {
