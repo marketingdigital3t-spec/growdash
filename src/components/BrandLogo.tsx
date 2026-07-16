@@ -7,8 +7,10 @@ export function BrandMark({ className }: { className?: string }) {
 export function BrandLogo({ className, eager = false }: { className?: string; eager?: boolean }) {
   return (
     <img
-      src="./growdash-brand-gold.svg"
+      src="/growdash-brand-gold.png"
       alt="Growdash"
+      width={620}
+      height={250}
       className={cn("block object-contain", className)}
       loading={eager ? "eager" : "lazy"}
       decoding="async"

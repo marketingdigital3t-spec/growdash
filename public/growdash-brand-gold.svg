@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 250" role="img" aria-labelledby="title desc">
   <title id="title">Growdash</title>
-  <desc id="desc">Marca Growdash em preto e dourado.</desc>
+  <desc id="desc">Marca Growdash dourada com fundo transparente.</desc>
   <defs>
     <linearGradient id="gold" x1="20" y1="25" x2="520" y2="230" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fff2ad"/>
@@ -19,7 +19,6 @@
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <rect width="620" height="250" rx="28" fill="#070503"/>
   <g filter="url(#glow)">
     <path d="M28 112 105 35l77 77-24 24-53-53-53 53Z" fill="url(#gold)" stroke="#ffd76a" stroke-width="2" stroke-linejoin="round"/>
     <path d="m105 104 34 34-34 34-34-34Z" fill="url(#gold)" stroke="#ffd76a" stroke-width="2" stroke-linejoin="round"/>
