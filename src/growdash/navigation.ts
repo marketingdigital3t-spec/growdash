@@ -256,14 +256,9 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Anúncios",
         path: "/anuncios",
         icon: PanelTop,
-        description: "Analise criativos e anúncios de todas as contas conectadas.",
-        metrics: [
-          { label: "Anúncios ativos", value: "72", change: "+8" },
-          { label: "Criativos", value: "118", change: "+14" },
-          { label: "CTR médio", value: "2,48%", change: "+0,3%" },
-          { label: "Vencedores", value: "16", change: "+4" },
-        ],
-        highlights: ["Criativos vencedores", "Anúncios com fadiga", "Biblioteca de mídia"],
+        description: "Publique banners globais por tela, período e prioridade.",
+        metrics: [],
+        highlights: ["Segmentação por tela", "Agendamento", "Controle de prioridade"],
       },
       {
         label: "Marcas",

@@ -22,6 +22,7 @@ import { PRESET_LABELS, type DatePreset } from "@/hooks/useDateFilter";
 import { useIsMaster } from "@/hooks/useIsMaster";
 import { BrandLogo, BrandMark } from "@/components/BrandLogo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 
@@ -258,20 +259,21 @@ export default function GrowdashLayout() {
             <button
               type="button"
               onClick={() => setSegment("infoproduto")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "bg-[#f2c548] text-[#382707] shadow-[0_0_18px_rgba(242,197,72,.25)]" : "text-white/55")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(242,197,72,.2)]" : "text-white/55")}
             >
               Infoproduto
             </button>
             <button
               type="button"
               onClick={() => setSegment("saas")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "bg-[#f2c548] text-[#382707] shadow-[0_0_18px_rgba(242,197,72,.25)]" : "text-white/55")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(242,197,72,.2)]" : "text-white/55")}
             >
               SaaS
             </button>
           </div>
         </header>
         <main className="growdash-main min-h-[calc(100vh-48px)] min-w-0 max-w-full overflow-x-clip p-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] sm:p-5">
+          <GlobalAnnouncementBanner />
           <Outlet />
         </main>
       </div>

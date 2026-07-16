@@ -28,6 +28,7 @@ const StoragePage = lazy(() => import("@/growdash/StoragePage"));
 const IntegrationsPage = lazy(() => import("@/growdash/IntegrationsPage"));
 const ProfilePage = lazy(() => import("@/growdash/ProfilePage"));
 const SocialMediaPage = lazy(() => import("@/growdash/SocialMediaPage"));
+const AnnouncementsPage = lazy(() => import("@/growdash/AnnouncementsPage"));
 const ModulePage = lazy(() => import("@/growdash/ModulePage"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
@@ -116,7 +117,7 @@ export default function App() {
                     <Route path="perfil" element={<ProfilePage />} />
                     <Route path="midia-social" element={analytics(<SocialMediaPage />)} />
                     <Route path="kanban" element={<Navigate to="/crm" replace />} />
-                    <Route path="anuncios" element={<Navigate to="/campanhas" replace />} />
+                    <Route path="anuncios" element={<RequirePage page="master"><AnnouncementsPage /></RequirePage>} />
                     <Route path="marcas" element={<ModulePage />} />
                     <Route path="agentes" element={<ModulePage />} />
                     <Route path=":module" element={<ModulePage />} />

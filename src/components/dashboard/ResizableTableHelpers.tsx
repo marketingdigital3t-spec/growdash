@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { TableHead } from "@/components/ui/table";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,16 +61,17 @@ interface ResizableHeadProps<T extends string, S extends string> {
   onSort?: (key: S) => void;
   align?: "left" | "right";
   className?: string;
+  style?: CSSProperties;
 }
 
 export function ResizableHead<T extends string, S extends string>({
   colKey, width, onResize, children, sortable, sortableKey,
-  sortKey, sortAsc, onSort, align = "left", className,
+  sortKey, sortAsc, onSort, align = "left", className, style,
 }: ResizableHeadProps<T, S>) {
   const isActive = sortable && sortableKey && sortableKey === sortKey;
   return (
     <TableHead
-      style={{ width, minWidth: width, maxWidth: width }}
+      style={{ width, minWidth: width, maxWidth: width, ...style }}
       className={cn(
         "relative select-none",
         align === "right" && "text-right",

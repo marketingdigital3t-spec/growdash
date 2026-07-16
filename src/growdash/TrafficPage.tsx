@@ -49,7 +49,7 @@ export default function TrafficPage() {
   return (
     <div className="mx-auto max-w-[1700px] space-y-3">
       <nav className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/70 p-1 lg:grid-cols-4" aria-label="Áreas de Tráfego Pago">
-        {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "bg-gradient-to-r from-[#bb8211] via-[#f1c94c] to-[#b97b08] text-[#2f2308] shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
+        {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 
       {activeTab !== "campaigns" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">

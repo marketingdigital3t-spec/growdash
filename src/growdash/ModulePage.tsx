@@ -13,7 +13,7 @@ export default function ModulePage() {
       <PageHeading eyebrow="Growdash" title={module.label} description={module.description} />
       <section className="gd-panel overflow-hidden">
         <div className="border-b border-border bg-gradient-to-r from-[#fff8e4] to-transparent p-6 dark:from-[#211b0e]">
-          <span className="grid h-12 w-12 place-items-center rounded-xl bg-[#f4c94d] text-[#332407]"><Construction className="h-6 w-6" /></span>
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground"><Construction className="h-6 w-6" /></span>
           <h2 className="mt-5 text-xl font-black">Módulo em implementação segura</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Esta área ainda não possui uma fonte de dados real finalizada. Os números demonstrativos foram removidos para impedir decisões baseadas em informações fictícias.

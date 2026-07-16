@@ -35,7 +35,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  BrainCircuit,
 } from "lucide-react";
+import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  LineChart as RechartsLineChart,
+  ResponsiveContainer,
+  Tooltip as ChartTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
 import { EditableMetaEntity, MetaEntityEditor } from "@/components/campaigns/MetaEntityEditor";
@@ -145,7 +158,7 @@ export default function Campaigns() {
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
-  const [showIntelligence, setShowIntelligence] = useState(false);
+  const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(null);
   const pageSize = 50;
 
   useEffect(() => {
@@ -407,6 +420,37 @@ export default function Campaigns() {
   const totalCtr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
   const totalCpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : 0;
+  const totalCpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
+  const totalRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
+  const totalResultRate = totals.clicks > 0 ? totals.leads / totals.clicks * 100 : 0;
+  const intelligenceSeries = useMemo(() => {
+    const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number }>();
+    for (const campaign of filtered) {
+      for (const currentAdset of campaign.adsets || []) {
+        for (const currentAd of currentAdset.ads || []) {
+          for (const insight of currentAd.insights || []) {
+            if (!insight.date) continue;
+            if (insight.date < formatApiDate(startDate) || insight.date > formatApiDate(endDate)) continue;
+            const current = byDate.get(insight.date) ?? { date: insight.date, spend: 0, impressions: 0, clicks: 0, leads: 0 };
+            current.spend += Number(insight.spend || 0);
+            current.impressions += Number(insight.impressions || 0);
+            current.clicks += Number(insight.clicks || 0);
+            current.leads += Number(insight.leads || 0);
+            byDate.set(insight.date, current);
+          }
+        }
+      }
+    }
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date)).map((item) => ({
+      ...item,
+      label: new Date(`${item.date}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      ctr: item.impressions > 0 ? item.clicks / item.impressions * 100 : 0,
+      cpc: item.clicks > 0 ? item.spend / item.clicks : 0,
+      cpm: item.impressions > 0 ? item.spend / item.impressions * 1000 : 0,
+      cpl: item.leads > 0 ? item.spend / item.leads : 0,
+      resultRate: item.clicks > 0 ? item.leads / item.clicks * 100 : 0,
+    }));
+  }, [endDate, filtered, startDate]);
 
   const activeCampaigns = useMemo(() => campaigns.filter((campaign: any) => {
     const matchesSearch = !search || campaign.name.toLowerCase().includes(search.toLowerCase());
@@ -625,7 +669,7 @@ export default function Campaigns() {
           <TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-muted/50 p-0">
             <TabsTrigger value="campaigns" className="h-11 min-w-[180px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
               <FolderKanban className="h-4 w-4" /> Campanhas <Badge variant="secondary" className="ml-auto tabular-nums">{filtered.length}</Badge>
-              {selectedIds.size > 0 && <Badge className="bg-[#d7aa30] text-[#2d2107]" title="Campanhas selecionadas">{selectedIds.size} sel.</Badge>}
+              {selectedIds.size > 0 && <Badge className="border-primary/40 bg-primary/15 text-foreground" title="Campanhas selecionadas">{selectedIds.size} sel.</Badge>}
             </TabsTrigger>
             <TabsTrigger value="adsets" className="h-11 min-w-[220px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-4 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[inset_0_-3px_0_hsl(var(--primary))]">
               <Layers3 className="h-4 w-4" /> Conjuntos de anúncios <Badge variant="secondary" className="ml-auto tabular-nums">{selectedAdsets.length}</Badge>
@@ -641,7 +685,7 @@ export default function Campaigns() {
               size="sm"
               disabled={!selectedCampaign}
               onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })}
-              className="h-8 gap-2 bg-[#c99519] text-[#2d2107] hover:bg-[#d7aa30]"
+              className="h-8 gap-2"
             >
               <Pencil className="h-4 w-4" /> Editar
             </Button>
@@ -664,7 +708,10 @@ export default function Campaigns() {
               )}
             </AnimatePresence>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {activeTab === "campaigns" && <Button variant="outline" size="sm" onClick={() => { if (showIntelligence) setHealthFilter("all"); setShowIntelligence(!showIntelligence); }} className={cn("h-8 gap-2", showIntelligence && "border-primary bg-primary/10 text-foreground")} aria-pressed={showIntelligence}><Sparkles className="h-4 w-4 text-primary" />Análises</Button>}
+              {activeTab === "campaigns" && <>
+                <Button variant="outline" size="sm" onClick={() => { const opening = analysisPanel !== "alerts"; setAnalysisPanel(opening ? "alerts" : null); if (!opening) setHealthFilter("all"); }} className={cn("h-8 gap-2", analysisPanel === "alerts" && "border-primary bg-primary/10 text-foreground")} aria-pressed={analysisPanel === "alerts"}><Sparkles className="h-4 w-4 text-primary" />Análises</Button>
+                <Button variant="outline" size="sm" onClick={() => { setHealthFilter("all"); setAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }} className={cn("h-8 gap-2", analysisPanel === "intelligence" && "border-primary bg-primary/10 text-foreground")} aria-pressed={analysisPanel === "intelligence"}><BrainCircuit className="h-4 w-4 text-primary" />Intelligence</Button>
+              </>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
             </div>
           </div>
@@ -681,11 +728,11 @@ export default function Campaigns() {
           )}
 
           {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
-          {activeTab === "campaigns" && showIntelligence && (
+          {activeTab === "campaigns" && analysisPanel === "alerts" && (
             <section className="border-b border-primary/20 bg-muted/15">
               <header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center">
                 <div>
-                  <h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análise inteligente</h2>
+                  <h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análises e alertas operacionais</h2>
                   <p className="text-[10px] text-muted-foreground">Conta: {visibleAdAccounts.find((account) => account.id === selectedAccount)?.name || "todas as contas selecionadas"} · {startDate.toLocaleDateString("pt-BR")}–{endDate.toLocaleDateString("pt-BR")}</p>
                 </div>
               </header>
@@ -717,9 +764,25 @@ export default function Campaigns() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 min-[900px]:grid-cols-6"><AnalysisMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><AnalysisMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} /><AnalysisMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} /><AnalysisMetric label="CPL" value={(totals.leads ? totals.spend / totals.leads : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><AnalysisMetric label="ROAS" value={`${(totals.spend ? totals.revenue / totals.spend : 0).toFixed(2)}x`} /></div>
-              <TrafficAIAnalysis accountId={selectedAccount} accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name} startDate={startDate} endDate={endDate} selectedCampaignIds={Array.from(selectedIds)} />
             </section>
+          )}
+
+          {activeTab === "campaigns" && analysisPanel === "intelligence" && (
+            <CampaignIntelligence
+              totals={totals}
+              totalCtr={totalCtr}
+              totalCpc={totalCpc}
+              totalCpm={totalCpm}
+              totalCpl={totalCpl}
+              totalRoas={totalRoas}
+              totalResultRate={totalResultRate}
+              series={intelligenceSeries}
+              accountId={selectedAccount}
+              accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name}
+              startDate={startDate}
+              endDate={endDate}
+              selectedCampaignIds={Array.from(selectedIds)}
+            />
           )}
 
           {/* Campaigns Tab */}
@@ -742,13 +805,13 @@ export default function Campaigns() {
                 </div>
                 <div className="growdash-scrollbar hidden overflow-x-auto md:block">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
-                    <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
+                    <TableHeader className="sticky top-0 z-50 bg-card shadow-[0_1px_0_hsl(var(--border))]">
                       <TableRow className="h-11 border-b border-border bg-muted/60 hover:bg-muted/60">
-                        <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")}>
+                        <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted">
                           <Checkbox checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
                         </ResizableHead>
-                        {showColumn("name") && <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Campanha</ResizableHead>}
-                        {showColumn("delivery") && <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")}>Veiculação</ResizableHead>}
+                        <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")} className="sticky z-40 bg-muted" style={{ left: camp.colWidths.check }}>Desativado/Ativado</ResizableHead>
+                        <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)]" style={{ left: camp.colWidths.check + camp.colWidths.delivery }}>Campanha</ResizableHead>
                         {showColumn("objective") && <ResizableHead colKey="objective" width={camp.colWidths.objective} onResize={camp.startResize("objective")} sortable sortableKey="objective" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Objetivo</ResizableHead>}
                         {showColumn("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
                         {showColumn("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Valor usado</ResizableHead>}
@@ -774,24 +837,20 @@ export default function Campaigns() {
                     </TableHeader>
                     <TableBody>
                       <AnimatePresence mode="popLayout">
-                        {pagedCampaigns.map((c: any) => (
+                        {pagedCampaigns.map((c: any, rowIndex: number) => {
+                          const stickySurface = selectedIds.has(c.id) ? "bg-accent" : rowIndex % 2 ? "bg-muted" : "bg-card";
+                          return (
                           <motion.tr
                             key={c.id}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className={`h-12 cursor-pointer border-b border-border transition-colors hover:bg-primary/5 ${selectedIds.has(c.id) ? "bg-primary/10" : "odd:bg-card even:bg-muted/20"}`}
+                            className={`group h-12 cursor-pointer border-b border-border transition-colors hover:bg-primary/5 ${selectedIds.has(c.id) ? "bg-primary/10" : "odd:bg-card even:bg-muted/20"}`}
                             onClick={() => setDetailCampaignId(c.id)}
                           >
-                            <TableCell style={cellW("check")} onClick={(e) => e.stopPropagation()}>
+                            <TableCell style={{ ...cellW("check"), left: 0 }} className={cn("sticky z-20 transition-colors group-hover:bg-accent", stickySurface)} onClick={(e) => e.stopPropagation()}>
                               <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
                             </TableCell>
-                            {showColumn("name") && <TableCell style={cellW("name")} className="font-medium">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary" />
-                                <span className="truncate font-semibold text-[#6f5311]" title={c.name}>{c.name}</span>
-                              </div>
-                            </TableCell>}
-                            {showColumn("delivery") && <TableCell style={cellW("delivery")} onClick={(event) => event.stopPropagation()}>
+                            <TableCell style={{ ...cellW("delivery"), left: camp.colWidths.check }} className={cn("sticky z-20 transition-colors group-hover:bg-accent", stickySurface)} onClick={(event) => event.stopPropagation()}>
                               <div className={cn("flex items-center gap-2 text-xs font-semibold", getStatusBadge(c.status).textColor)}>
                                 <button
                                   type="button"
@@ -799,8 +858,8 @@ export default function Campaigns() {
                                   className={cn(
                                     "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
                                     normalizeStatus(c.status) === "ACTIVE"
-                                      ? "border-[#b98914] bg-[#d8aa2d]"
-                                      : "border-[#c8c2b8] bg-[#e7e3dc]",
+                                      ? "border-emerald-600/70 bg-emerald-500"
+                                      : "border-border bg-muted",
                                   )}
                                   title="Editar status na Meta Ads"
                                 >
@@ -811,7 +870,13 @@ export default function Campaigns() {
                                 </button>
                                 <span>{getStatusBadge(c.status).label}</span>
                               </div>
-                            </TableCell>}
+                            </TableCell>
+                            <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] transition-colors group-hover:bg-accent", stickySurface)}>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                <span className="truncate font-semibold text-foreground" title={c.name}>{c.name}</span>
+                              </div>
+                            </TableCell>
                             {showColumn("objective") && <TableCell style={cellW("objective")} className="truncate text-xs text-muted-foreground" title={c.objective || "Não informado"}>{c.objective || "—"}</TableCell>}
                             {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
@@ -843,7 +908,7 @@ export default function Campaigns() {
                               </div>
                             </TableCell>
                           </motion.tr>
-                        ))}
+                        );})}
                       </AnimatePresence>
                     </TableBody>
                   </Table>
@@ -1019,6 +1084,93 @@ export default function Campaigns() {
       />
     </MotionPage>
   );
+}
+
+function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, totalRoas, totalResultRate, series, accountId, accountName, startDate, endDate, selectedCampaignIds }: {
+  totals: any;
+  totalCtr: number;
+  totalCpc: number;
+  totalCpm: number;
+  totalCpl: number;
+  totalRoas: number;
+  totalResultRate: number;
+  series: any[];
+  accountId: string;
+  accountName?: string;
+  startDate: Date;
+  endDate: Date;
+  selectedCampaignIds: string[];
+}) {
+  const currency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const tooltipStyle = { borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))", fontSize: 11 };
+  return (
+    <section className="border-b border-primary/20 bg-muted/15">
+      <header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-black"><BrainCircuit className="h-4 w-4 text-primary" />Growdash Intelligence</h2>
+          <p className="text-[10px] text-muted-foreground">Diagnóstico quantitativo da entrega, eficiência e resultado no período selecionado.</p>
+        </div>
+        <Badge variant="outline" className="w-fit">{series.length} dia(s) com dados</Badge>
+      </header>
+
+      <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-5">
+        <AnalysisMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} />
+        <AnalysisMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />
+        <AnalysisMetric label="Investimento" value={currency(totals.spend)} />
+        <AnalysisMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} />
+        <AnalysisMetric label="CPL" value={currency(totalCpl)} />
+        <AnalysisMetric label="ROAS" value={`${totalRoas.toFixed(2).replace(".", ",")}x`} />
+        <AnalysisMetric label="CPM" value={currency(totalCpm)} />
+        <AnalysisMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} />
+        <AnalysisMetric label="CPC" value={currency(totalCpc)} />
+        <AnalysisMetric label="Taxa de resultado" value={`${totalResultRate.toFixed(2).replace(".", ",")}%`} />
+      </div>
+
+      {series.length > 0 ? (
+        <div className="grid gap-3 border-t border-border p-3 xl:grid-cols-2">
+          <ChartPanel title="Investimento × leads" description="Evolução diária com duas escalas para não distorcer volume e custo.">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={series} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis yAxisId="money" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis yAxisId="volume" orientation="right" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                <ChartTooltip contentStyle={tooltipStyle} formatter={(value: number, name: string) => [name === "Investimento" ? currency(value) : Number(value).toLocaleString("pt-BR"), name]} />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar yAxisId="money" dataKey="spend" name="Investimento" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="volume" type="monotone" dataKey="leads" name="Leads" stroke="hsl(var(--success))" strokeWidth={2.5} dot={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </ChartPanel>
+          <ChartPanel title="Eficiência de mídia" description="CTR, taxa de resultado, CPC e CPL por dia.">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsLineChart data={series} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                <ChartTooltip contentStyle={tooltipStyle} formatter={(value: number, name: string) => [name === "CTR" || name === "Taxa de resultado" ? `${Number(value).toFixed(2)}%` : currency(Number(value)), name]} />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Line type="monotone" dataKey="ctr" name="CTR" stroke="#38bdf8" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="resultRate" name="Taxa de resultado" stroke="#34d399" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="cpc" name="CPC" stroke="#fbbf24" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="cpl" name="CPL" stroke="#fb7185" strokeWidth={2} dot={false} />
+              </RechartsLineChart>
+            </ResponsiveContainer>
+          </ChartPanel>
+        </div>
+      ) : (
+        <div className="border-t border-border p-8 text-center text-xs text-muted-foreground">Sincronize insights diários da Meta para habilitar os gráficos de evolução.</div>
+      )}
+
+      <div className="border-t border-border">
+        <TrafficAIAnalysis accountId={accountId} accountName={accountName} startDate={startDate} endDate={endDate} selectedCampaignIds={selectedCampaignIds} />
+      </div>
+    </section>
+  );
+}
+
+function ChartPanel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return <article className="min-w-0 rounded-xl border border-border bg-card p-4"><h3 className="text-xs font-black">{title}</h3><p className="mt-1 text-[9px] text-muted-foreground">{description}</p><div className="mt-4 h-[260px] min-w-0">{children}</div></article>;
 }
 
 function TotalMetric({ label, value }: { label: string; value: string }) {

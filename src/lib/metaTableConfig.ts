@@ -22,7 +22,9 @@ export const metaColumnPresets: { id: MetaColumnPresetKey; label: string; descri
   { id: "setup", label: "Configuração", description: "Objetivo, orçamento e situação da campanha.", columns: ["name", "delivery", "objective", "budget", "spend"] },
 ];
 
-export const editableCampaignColumns = (Object.keys(campaignColumnLabels) as CampaignColumnKey[]).filter((key) => !["check", "actions"].includes(key));
+// Seleção, status e nome reproduzem a hierarquia operacional da Meta e são
+// colunas estruturais: nunca podem ser ocultadas por um preset do usuário.
+export const editableCampaignColumns = (Object.keys(campaignColumnLabels) as CampaignColumnKey[]).filter((key) => !["check", "delivery", "name", "actions"].includes(key));
 
 export const metaBreakdownGroups = [
   { label: "Geral", items: [{ id: "none", label: "Sem detalhamento", supported: true }] },
