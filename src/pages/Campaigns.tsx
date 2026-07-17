@@ -632,8 +632,8 @@ export default function Campaigns() {
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
 
   return (
-    <MotionPage className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm dark:border-[#2a271f] dark:bg-[#070706]">
-      <MotionItem className="border-b border-border bg-card px-3 py-2.5 dark:border-[#2a271f] dark:bg-[#070706]">
+    <MotionPage className="campaigns-workspace overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm dark:border-[#2a271f] dark:bg-[#070706] md:flex md:min-h-0 md:flex-1 md:flex-col">
+      <MotionItem className="shrink-0 border-b border-border bg-card px-3 py-2.5 dark:border-[#2a271f] dark:bg-[#070706]">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex shrink-0 items-baseline gap-2">
@@ -653,8 +653,8 @@ export default function Campaigns() {
 
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
 
-      <MotionItem>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <MotionItem className="md:min-h-0 md:flex-1 md:overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="md:flex md:h-full md:min-h-0 md:flex-col">
           <div className="flex flex-col border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706] xl:flex-row xl:items-center">
             <TabsList className="growdash-scrollbar h-auto min-w-0 flex-1 justify-start overflow-x-auto rounded-none bg-transparent p-0">
               <TabsTrigger value="campaigns" className="h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
@@ -710,7 +710,7 @@ export default function Campaigns() {
 
           {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
           {activeTab === "campaigns" && analysisPanel === "alerts" && (
-            <section className="border-b border-primary/20 bg-muted/15">
+            <section className="border-b border-primary/20 bg-muted/15 md:max-h-[34dvh] md:shrink-0 md:overflow-y-auto">
               <header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center">
                 <div>
                   <h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análises e alertas operacionais</h2>
@@ -767,7 +767,7 @@ export default function Campaigns() {
           )}
 
           {/* Campaigns Tab */}
-          <TabsContent value="campaigns" className="m-0">
+          <TabsContent value="campaigns" className="m-0 md:min-h-0 md:flex-1 md:overflow-hidden">
             {isLoading ? (
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : filtered.length === 0 ? (
@@ -780,11 +780,11 @@ export default function Campaigns() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="overflow-hidden rounded-none border-0 shadow-none">
+              <Card className="overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col">
                 <div className="space-y-2 p-2 md:hidden">
                   {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status })} />)}
                 </div>
-                <div className="growdash-scrollbar hidden min-h-[420px] max-h-[calc(100vh-300px)] overflow-auto md:block">
+                <div data-campaign-table-scroll className="growdash-scrollbar hidden min-h-0 flex-1 overflow-auto md:block">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-50 bg-card shadow-[0_1px_0_hsl(var(--border))]">
                       <TableRow className="h-10 border-b border-border bg-muted/60 hover:bg-muted/60 [&>th]:h-10 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e] dark:bg-[#11110f] dark:hover:bg-[#11110f]">
@@ -903,7 +903,7 @@ export default function Campaigns() {
                     </TableBody>
                   </Table>
                 </div>
-                <div className="sticky bottom-0 z-20 border-t border-border bg-card/95 shadow-[0_-8px_22px_rgba(0,0,0,.12)] backdrop-blur-xl dark:border-[#28251e] dark:bg-[#080807]/95">
+                <div data-campaign-totals className="z-20 shrink-0 border-t border-border bg-card/95 shadow-[0_-8px_22px_rgba(0,0,0,.12)] backdrop-blur-xl dark:border-[#28251e] dark:bg-[#080807]/95">
                   <div className="growdash-scrollbar overflow-x-auto">
                     <div className="flex h-10 w-max items-stretch text-[10px]">
                       <AlignedTotal width={camp.colWidths.check + camp.colWidths.delivery + camp.colWidths.name} label={`Totais (${filtered.length})`} value={`${filtered.length} campanhas`} align="left" />
@@ -948,11 +948,11 @@ export default function Campaigns() {
           </TabsContent>
 
           {/* Adsets Tab */}
-          <TabsContent value="adsets" className="m-0">
-            <Card className="overflow-hidden rounded-none border-0 shadow-none">
+          <TabsContent value="adsets" className="m-0 md:min-h-0 md:flex-1 md:overflow-hidden">
+            <Card className="overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col">
               {isLoadingAdsets ? <LevelLoading /> : selectedAdsets.length === 0 ? <LevelEmpty level="conjuntos de anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
               <div className="space-y-2 p-2 md:hidden">{selectedAdsets.map((entity: any) => <LevelMobileCard key={entity.id} entity={{ ...entity, type: "adset" }} onOpen={() => setDetailEntity({ ...entity, type: "adset" })} />)}</div>
-              <div className="growdash-scrollbar hidden overflow-x-auto md:block">
+              <div className="growdash-scrollbar hidden min-h-0 flex-1 overflow-auto md:block">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
                     <TableRow className="h-11 bg-muted/60 hover:bg-muted/60">
@@ -1006,11 +1006,11 @@ export default function Campaigns() {
           </TabsContent>
 
           {/* Ads Tab */}
-          <TabsContent value="ads" className="m-0">
-            <Card className="overflow-hidden rounded-none border-0 shadow-none">
+          <TabsContent value="ads" className="m-0 md:min-h-0 md:flex-1 md:overflow-hidden">
+            <Card className="overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col">
               {isLoadingAds ? <LevelLoading /> : selectedAds.length === 0 ? <LevelEmpty level="anúncios" selected={selectedIds.size > 0} onClear={() => setSelectedIds(new Set())} /> : <>
               <div className="space-y-2 p-2 md:hidden">{selectedAds.map((entity: any) => <LevelMobileCard key={entity.id} entity={{ ...entity, type: "ad" }} onOpen={() => setDetailEntity({ ...entity, type: "ad" })} />)}</div>
-              <div className="growdash-scrollbar hidden overflow-x-auto md:block">
+              <div className="growdash-scrollbar hidden min-h-0 flex-1 overflow-auto md:block">
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader>
                     <TableRow className="h-11 bg-muted/60 hover:bg-muted/60">
@@ -1118,7 +1118,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
   const currency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const tooltipStyle = { borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))", fontSize: 11 };
   return (
-    <section className="border-b border-primary/20 bg-muted/15">
+    <section className="border-b border-primary/20 bg-muted/15 md:max-h-[34dvh] md:shrink-0 md:overflow-y-auto">
       <header className="flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-black"><BrainCircuit className="h-4 w-4 text-primary" />Growdash Intelligence</h2>
@@ -1254,7 +1254,7 @@ function aggregateLevelTotals(rows: Array<{ spend: number; impressions: number; 
 function LevelTotals({ label, count, totals }: { label: string; count: number; totals: ReturnType<typeof aggregateLevelTotals> }) {
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
-  return <div className="sticky bottom-0 z-20 border-t border-primary/20 bg-card/95 px-3 py-3 shadow-[0_-10px_28px_rgba(0,0,0,.12)] backdrop-blur-xl"><div className="growdash-scrollbar flex gap-2 overflow-x-auto"><TotalMetric label="Total" value={`${count} ${label}`} /><TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><TotalMetric label="Alcance*" value={totals.reach.toLocaleString("pt-BR")} /><TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} /><TotalMetric label="CTR" value={`${ctr.toFixed(2).replace(".", ",")}%`} /><TotalMetric label="Resultados" value={totals.leads.toLocaleString("pt-BR")} /><TotalMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>;
+  return <div className="z-20 shrink-0 border-t border-primary/20 bg-card/95 px-3 py-3 shadow-[0_-10px_28px_rgba(0,0,0,.12)] backdrop-blur-xl"><div className="growdash-scrollbar flex gap-2 overflow-x-auto"><TotalMetric label="Total" value={`${count} ${label}`} /><TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><TotalMetric label="Alcance*" value={totals.reach.toLocaleString("pt-BR")} /><TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} /><TotalMetric label="CTR" value={`${ctr.toFixed(2).replace(".", ",")}%`} /><TotalMetric label="Resultados" value={totals.leads.toLocaleString("pt-BR")} /><TotalMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>;
 }
 
 function exportCsv(header: string[], rows: Array<Array<string | number>>, filename: string) {

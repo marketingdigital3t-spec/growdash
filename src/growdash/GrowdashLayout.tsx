@@ -72,6 +72,7 @@ export default function GrowdashLayout() {
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
   const showSidebarLabels = !collapsed || mobileOpen;
+  const isCampaignsWorkspace = pathname.startsWith("/campanhas");
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
@@ -252,8 +253,20 @@ export default function GrowdashLayout() {
             </button>
           </div>
         </header>
-        <main className="growdash-main min-h-[calc(100vh-48px)] min-w-0 max-w-full overflow-x-clip px-3 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4 lg:px-6 lg:py-5">
-          <div className="growdash-content-frame mx-auto w-full min-w-0 max-w-[1700px]">
+        <main
+          className={cn(
+            "growdash-main min-w-0 max-w-full overflow-x-clip px-3 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4 lg:px-6 lg:py-5",
+            isCampaignsWorkspace
+              ? "md:h-[calc(100dvh-48px)] md:min-h-0 md:overflow-hidden"
+              : "min-h-[calc(100vh-48px)]",
+          )}
+        >
+          <div
+            className={cn(
+              "growdash-content-frame mx-auto w-full min-w-0 max-w-[1700px]",
+              isCampaignsWorkspace && "md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden",
+            )}
+          >
             <GlobalAnnouncementBanner />
             <Outlet />
           </div>

@@ -46,8 +46,13 @@ export default function TrafficPage() {
   const account = visibleAccounts.find((item) => item.id === adAccountId);
 
   return (
-    <div className="mx-auto max-w-[1700px] space-y-3">
-      <nav className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-muted/55 p-1 lg:max-w-[850px]" aria-label="Áreas de Tráfego Pago">
+    <div className={cn(
+      "mx-auto w-full max-w-[1700px]",
+      activeTab === "campaigns"
+        ? "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
+        : "space-y-3",
+    )}>
+      <nav className="grid shrink-0 grid-cols-3 gap-1 rounded-lg border border-border bg-muted/55 p-1 lg:max-w-[850px]" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 
