@@ -66,7 +66,7 @@ import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierarchy";
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
 
-type CampSortKey = "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
+type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
 type CampColKey = CampaignColumnKey;
 type AdsetColKey = "name" | "campaign" | "budget" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
 type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
@@ -151,6 +151,7 @@ export default function Campaigns() {
   const [editingEntity, setEditingEntity] = useState<EditableMetaEntity | null>(null);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
+  const [statusSortCycle, setStatusSortCycle] = useState<0 | 1 | 2>(0);
   const [columnPreset, setColumnPreset] = useState<MetaColumnPresetKey>("performance");
   const [visibleColumns, setVisibleColumns] = useState<Set<CampaignColumnKey>>(() => {
     try { const saved = JSON.parse(localStorage.getItem("growdash:meta-columns-v2") || "[]"); if (Array.isArray(saved) && saved.length) return new Set(saved); } catch { /* usa o preset padrão */ }
@@ -190,6 +191,23 @@ export default function Campaigns() {
   const ad = useColWidths<AdColKey>(AD_DEFAULTS, "campaigns-ad-cols-v1");
 
   const handleSort = (key: CampSortKey) => {
+    if (key === "status") {
+      if (sortKey !== "status" || statusSortCycle === 0) {
+        setSortKey("status");
+        setSortAsc(false);
+        setStatusSortCycle(1);
+      } else if (statusSortCycle === 1) {
+        setSortAsc(true);
+        setStatusSortCycle(2);
+      } else {
+        setSortKey("spend");
+        setSortAsc(false);
+        setStatusSortCycle(0);
+      }
+      return;
+    }
+
+    setStatusSortCycle(0);
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(false); }
   };
@@ -375,6 +393,15 @@ export default function Campaigns() {
       result = result.filter((c: any) => getCampaignHealth(c, averageCpl, targetByCampaign.get(c.id)) === healthFilter);
     }
     result = [...result].sort((a: any, b: any) => {
+      if (sortKey === "status") {
+        const activeA = normalizeStatus(a.status) === "ACTIVE" ? 1 : 0;
+        const activeB = normalizeStatus(b.status) === "ACTIVE" ? 1 : 0;
+        const difference = activeA - activeB;
+
+        // Primeiro clique: ativas no topo. Segundo clique: ativas no fim.
+        return sortAsc ? difference : -difference;
+      }
+
       const av = a[sortKey], bv = b[sortKey];
       if (typeof av === "string" && typeof bv === "string") {
         return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
@@ -385,7 +412,7 @@ export default function Campaigns() {
   }, [averageCpl, campaigns, healthFilter, search, statusFilter, sortKey, sortAsc, targetByCampaign]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pagedCampaigns = useMemo(() => filtered.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize), [campaignPage, filtered]);
-  useEffect(() => { setCampaignPage(0); }, [search, statusFilter, healthFilter, selectedAccount, startDate, endDate]);
+  useEffect(() => { setCampaignPage(0); }, [search, statusFilter, healthFilter, selectedAccount, startDate, endDate, sortKey, sortAsc]);
   useEffect(() => { if (campaignPage >= pageCount) setCampaignPage(pageCount - 1); }, [campaignPage, pageCount]);
 
   const toggleSelect = (id: string) => {
@@ -713,7 +740,7 @@ export default function Campaigns() {
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted dark:bg-[#11110f]">
                           <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
                         </ResizableHead>
-                        <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")} className="sticky z-40 bg-muted dark:bg-[#11110f]" style={{ left: camp.colWidths.check }}>Status</ResizableHead>
+                        <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")} sortable sortableKey="status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 bg-muted dark:bg-[#11110f]" style={{ left: camp.colWidths.check }}>Status</ResizableHead>
                         <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] dark:border-[#28251e] dark:bg-[#11110f]" style={{ left: camp.colWidths.check + camp.colWidths.delivery }}>Campanha</ResizableHead>
                         {showColumn("objective") && <ResizableHead colKey="objective" width={camp.colWidths.objective} onResize={camp.startResize("objective")} sortable sortableKey="objective" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Objetivo</ResizableHead>}
                         {showColumn("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
