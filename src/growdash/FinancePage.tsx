@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
+import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
@@ -43,7 +44,18 @@ export default function FinancePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: workspace } = useWorkspace();
-  const { adAccountId, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
+  const {
+    adAccountId,
+    setAdAccountId,
+    preset,
+    setPreset,
+    customRange,
+    setCustomRange,
+    startDate,
+    endDate,
+    businessUnitId,
+    segment,
+  } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
   const [entryOpen, setEntryOpen] = useState(false);
   const [includeMetaTax, setIncludeMetaTax] = useState(true);
@@ -165,6 +177,20 @@ export default function FinancePage() {
   return (
     <div className="mx-auto max-w-[1500px]">
       <PageHeading eyebrow="Gestão" title="Financeiro" description={`DRE, caixa, previsões e mídia da unidade ${segment === "saas" ? "SaaS" : "Infoproduto"}, com dados reais e filtros globais.`} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportCsv} disabled={!rows.length}><Download className="mr-2 h-4 w-4" />Exportar</Button><Button onClick={() => setEntryOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo lançamento</Button></div>} />
+
+      <section aria-label="Filtros financeiros" className="mb-4 rounded-xl border border-border bg-card p-3 shadow-sm">
+        <DateFilterBar
+          preset={preset}
+          onPresetChange={setPreset}
+          customRange={customRange}
+          onCustomRangeChange={setCustomRange}
+          startDate={startDate}
+          endDate={endDate}
+          adAccounts={unitAccounts}
+          selectedAccount={adAccountId}
+          onAccountChange={setAdAccountId}
+        />
+      </section>
 
       <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"><span className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">Unidade ativa: {segment === "saas" ? "SaaS" : "Infoproduto"}</span><div className="flex items-center gap-3"><div className="text-right"><b className="block text-xs">Incluir imposto Meta</b><span className="text-[10px] text-muted-foreground">Simulação de 12,15%; o dado bruto permanece intacto.</span></div><Switch checked={includeMetaTax} onCheckedChange={setIncludeMetaTax} /></div></div>
 
