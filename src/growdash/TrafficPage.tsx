@@ -74,10 +74,16 @@ export default function TrafficPage() {
 function BudgetWorkspace({ accountId, accounts, startDate, endDate }: { accountId: string; accounts: Array<{ id: string; name: string }>; startDate: Date; endDate: Date }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [severityFilter, setSeverityFilter] = useState<"all" | BudgetAnalysisItem["severity"]>("all");
   const all = useBudgetAnalysis();
   const visibleAccountIds = accounts.map((account) => account.id);
-  const rows = all.filter((item) => visibleAccountIds.includes(item.id) && (accountId === "all" || item.id === accountId));
-  const totals = rows.reduce((sum, item) => ({
+  const scopedRows = all.filter((item) => visibleAccountIds.includes(item.id) && (accountId === "all" || item.id === accountId));
+  const severityCounts = scopedRows.reduce((counts, item) => ({
+    ...counts,
+    [item.severity]: counts[item.severity] + 1,
+  }), { critical: 0, warning: 0, info: 0 });
+  const rows = severityFilter === "all" ? scopedRows : scopedRows.filter((item) => item.severity === severityFilter);
+  const totals = scopedRows.reduce((sum, item) => ({
     budget: sum.budget + item.dailyBudgetActive,
     spend: sum.spend + item.avgDailySpend,
     balance: sum.balance + Number(item.balance || 0),
@@ -86,7 +92,68 @@ function BudgetWorkspace({ accountId, accounts, startDate, endDate }: { accountI
   }), { budget: 0, spend: 0, balance: 0, projected: 0, critical: 0 });
   const refresh = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }), queryClient.invalidateQueries({ queryKey: ["daily_spend_by_account"] }), queryClient.invalidateQueries({ queryKey: ["daily_budget_active_by_account"] }), queryClient.invalidateQueries({ queryKey: ["last_top_up"] }), queryClient.invalidateQueries({ queryKey: ["next_top_up_estimate"] })]); toast({ title: "Orçamentos atualizados", description: "Os valores locais foram reconsultados; a data depende da última sincronização Meta." }); };
   const buffer = totals.balance - totals.projected;
-  return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"><Kpi label="Orçamento diário ativo" value={brl.format(totals.budget)} note="Soma dos conjuntos ativos" /><Kpi label="Gasto médio por dia" value={brl.format(totals.spend)} note="Média móvel dos últimos 7 dias" emphasis /><Kpi label="Saldo informado" value={brl.format(totals.balance)} note="Saldo consolidado das contas" /><Kpi label="Autonomia estimada" value={totals.spend > 0 ? `${Math.floor(totals.balance / totals.spend)} dias` : "Sem histórico"} note="Saldo ÷ gasto médio" /><Kpi label="Necessidade até segunda" value={brl.format(totals.projected)} note="Projeção pelo ritmo atual" /><Kpi label="Folga financeira" value={brl.format(buffer)} note={`${totals.critical} conta(s) em situação crítica`} emphasis={buffer < 0 || totals.critical > 0} /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Análise de Orçamento por BM</h2><p className="text-xs text-muted-foreground">Ritmo, saldo, aportes, autonomia e risco de interrupção.</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={refresh}><RefreshCw className="mr-2 h-4 w-4" />Atualizar saldos</Button></header><div className="grid gap-3 p-4 lg:grid-cols-2 xl:grid-cols-3">{rows.map((item) => <BudgetAccountCard key={item.id} item={item} />)}{rows.length === 0 && <Empty text="Nenhuma conta com orçamento ou saldo disponível." />}</div></section><CampaignAttentionPanel accountId={accountId} accounts={accounts} startDate={startDate} endDate={endDate} /></div>;
+  const filters: Array<{ id: "all" | BudgetAnalysisItem["severity"]; label: string; count: number; dot: string; active: string }> = [
+    { id: "all", label: "Todas", count: scopedRows.length, dot: "bg-primary", active: "border-primary/60 bg-primary/10 text-primary" },
+    { id: "critical", label: "Críticas", count: severityCounts.critical, dot: "bg-red-500", active: "border-red-500/50 bg-red-500/10 text-red-500" },
+    { id: "warning", label: "Atenção", count: severityCounts.warning, dot: "bg-amber-400", active: "border-amber-400/50 bg-amber-400/10 text-amber-600 dark:text-amber-300" },
+    { id: "info", label: "Saudáveis", count: severityCounts.info, dot: "bg-emerald-500", active: "border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <Kpi label="Orçamento diário ativo" value={brl.format(totals.budget)} note="Soma dos conjuntos ativos" />
+        <Kpi label="Gasto médio por dia" value={brl.format(totals.spend)} note="Média móvel dos últimos 7 dias" emphasis />
+        <Kpi label="Saldo informado" value={brl.format(totals.balance)} note="Saldo consolidado das contas" />
+        <Kpi label="Autonomia estimada" value={totals.spend > 0 ? `${Math.floor(totals.balance / totals.spend)} dias` : "Sem histórico"} note="Saldo ÷ gasto médio" />
+        <Kpi label="Necessidade até segunda" value={brl.format(totals.projected)} note="Projeção pelo ritmo atual" />
+        <Kpi label="Folga financeira" value={brl.format(buffer)} note={`${totals.critical} conta(s) em situação crítica`} emphasis={buffer < 0 || totals.critical > 0} />
+      </div>
+
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
+        <header className="flex flex-col gap-3 border-b border-border p-4 xl:flex-row xl:items-center">
+          <div>
+            <h2 className="font-black">Análise de Orçamento por BM</h2>
+            <p className="text-xs text-muted-foreground">Clique em um estado para exibir somente as contas daquela classificação.</p>
+          </div>
+          <div className="growdash-scrollbar flex max-w-full gap-2 overflow-x-auto pb-1 xl:ml-auto xl:pb-0" role="group" aria-label="Filtrar contas por estado do orçamento">
+            {filters.map((filter) => {
+              const selected = severityFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  data-budget-severity-filter={filter.id}
+                  aria-pressed={selected}
+                  onClick={() => setSeverityFilter(filter.id)}
+                  className={cn(
+                    "flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-[10px] font-black transition hover:border-primary/35 hover:bg-muted",
+                    selected && filter.active,
+                  )}
+                >
+                  <span className={cn("h-2.5 w-2.5 rounded-full", filter.dot)} />
+                  {filter.label}
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] tabular-nums text-muted-foreground">{filter.count}</span>
+                </button>
+              );
+            })}
+          </div>
+          <Button variant="outline" size="sm" className="shrink-0 self-start" onClick={refresh}><RefreshCw className="mr-2 h-4 w-4" />Atualizar saldos</Button>
+        </header>
+
+        <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-muted/25 px-4 py-2 text-[10px] text-muted-foreground">
+          <span data-budget-filter-result>{rows.length} de {scopedRows.length} conta(s) exibida(s)</span>
+          {severityFilter !== "all" && <button type="button" className="font-bold text-primary hover:underline" onClick={() => setSeverityFilter("all")}>Limpar filtro</button>}
+        </div>
+
+        <div className="grid gap-3 p-4 lg:grid-cols-2 xl:grid-cols-3">
+          {rows.map((item) => <BudgetAccountCard key={item.id} item={item} />)}
+          {rows.length === 0 && <Empty text={severityFilter === "all" ? "Nenhuma conta com orçamento ou saldo disponível." : "Nenhuma conta encontrada neste estado."} />}
+        </div>
+      </section>
+      <CampaignAttentionPanel accountId={accountId} accounts={accounts} startDate={startDate} endDate={endDate} />
+    </div>
+  );
 }
 
 function BudgetAccountCard({ item }: { item: BudgetAnalysisItem }) {
@@ -95,7 +162,7 @@ function BudgetAccountCard({ item }: { item: BudgetAnalysisItem }) {
   const use = item.dailyBudgetActive > 0 ? Math.min(100, item.avgDailySpend / item.dailyBudgetActive * 100) : 0;
   const urgent = item.severity === "critical" && ((item.balance != null && item.balance <= 0) || (item.daysBalanceLasts != null && item.daysBalanceLasts <= 2));
   const mondayBuffer = item.balance == null ? null : item.balance - item.projectedSpendUntilMonday;
-  return <article className={cn("rounded-xl border bg-muted/15 p-4", item.severity === "critical" ? "border-red-500/35" : item.severity === "warning" ? "border-amber-500/35" : "border-emerald-500/25", urgent && "shadow-[0_0_26px_-12px_rgba(239,68,68,.8)]")}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{item.name}</h3><p className="mt-1 text-[10px] text-muted-foreground">{item.summary}</p></div><span className={cn("rounded-full px-2 py-1 text-[9px] font-black uppercase", item.severity === "critical" ? "bg-red-500/10 text-red-500" : item.severity === "warning" ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500")}>{item.severity === "critical" ? "Crítico" : item.severity === "warning" ? "Atenção" : "Saudável"}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3"><SmallMetric label="Orçamento diário (ativos)" value={brl.format(item.dailyBudgetActive)} /><SmallMetric label="Gasto médio/dia" value={brl.format(item.avgDailySpend)} /><SmallMetric label="Saldo restante" value={item.balance == null ? "Não informado" : brl.format(item.balance)} /><SmallMetric label="Saldo dura" value={item.daysBalanceLasts == null ? "Sem estimativa" : `${item.daysBalanceLasts} dia(s)`} /><SmallMetric label={`Previsão próximos ${item.daysUntilMonday} dias`} value={brl.format(item.projectedSpendUntilMonday)} /><SmallMetric label="Folga até segunda" value={mondayBuffer == null ? "Saldo não informado" : brl.format(mondayBuffer)} /></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", use > 100 ? "bg-red-500" : use > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${Math.min(use, 100)}%` }} /></div><div className="mt-4 space-y-2 border-t border-border/60 pt-3 text-[10px] text-muted-foreground"><p>⏱ Próxima recarga: {nextTopUp?.hasEnoughHistory && nextTopUp.estimatedDate ? <b className="text-foreground">~ {format(nextTopUp.estimatedDate, "dd/MM/yyyy")} · {brl.format(nextTopUp.avgAmount)}</b> : <i>histórico insuficiente</i>}</p><p>⊕ Último aporte: {lastTopUp ? <b className="text-foreground">{brl.format(Number(lastTopUp.delta))} em {format(new Date(lastTopUp.event_at), "dd/MM/yyyy")}</b> : <i>nenhum aporte registrado</i>}</p>{item.reasons.length > 0 && <p><CircleAlert className="mr-1 inline h-3.5 w-3.5" />{item.reasons[0]}</p>}</div></article>;
+  return <article data-budget-account-severity={item.severity} className={cn("rounded-xl border bg-muted/15 p-4", item.severity === "critical" ? "border-red-500/35" : item.severity === "warning" ? "border-amber-500/35" : "border-emerald-500/25", urgent && "shadow-[0_0_26px_-12px_rgba(239,68,68,.8)]")}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{item.name}</h3><p className="mt-1 text-[10px] text-muted-foreground">{item.summary}</p></div><span className={cn("rounded-full px-2 py-1 text-[9px] font-black uppercase", item.severity === "critical" ? "bg-red-500/10 text-red-500" : item.severity === "warning" ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500")}>{item.severity === "critical" ? "Crítico" : item.severity === "warning" ? "Atenção" : "Saudável"}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3"><SmallMetric label="Orçamento diário (ativos)" value={brl.format(item.dailyBudgetActive)} /><SmallMetric label="Gasto médio/dia" value={brl.format(item.avgDailySpend)} /><SmallMetric label="Saldo restante" value={item.balance == null ? "Não informado" : brl.format(item.balance)} /><SmallMetric label="Saldo dura" value={item.daysBalanceLasts == null ? "Sem estimativa" : `${item.daysBalanceLasts} dia(s)`} /><SmallMetric label={`Previsão próximos ${item.daysUntilMonday} dias`} value={brl.format(item.projectedSpendUntilMonday)} /><SmallMetric label="Folga até segunda" value={mondayBuffer == null ? "Saldo não informado" : brl.format(mondayBuffer)} /></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", use > 100 ? "bg-red-500" : use > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${Math.min(use, 100)}%` }} /></div><div className="mt-4 space-y-2 border-t border-border/60 pt-3 text-[10px] text-muted-foreground"><p>⏱ Próxima recarga: {nextTopUp?.hasEnoughHistory && nextTopUp.estimatedDate ? <b className="text-foreground">~ {format(nextTopUp.estimatedDate, "dd/MM/yyyy")} · {brl.format(nextTopUp.avgAmount)}</b> : <i>histórico insuficiente</i>}</p><p>⊕ Último aporte: {lastTopUp ? <b className="text-foreground">{brl.format(Number(lastTopUp.delta))} em {format(new Date(lastTopUp.event_at), "dd/MM/yyyy")}</b> : <i>nenhum aporte registrado</i>}</p>{item.reasons.length > 0 && <p><CircleAlert className="mr-1 inline h-3.5 w-3.5" />{item.reasons[0]}</p>}</div></article>;
 }
 
 function AIAndLeadReports({ accountId, accountName }: { accountId: string; accountName?: string }) {
