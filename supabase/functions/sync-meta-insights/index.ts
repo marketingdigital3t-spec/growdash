@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
         // 4. Buscar insights a nível de CONTA (não depende da listagem de campanhas)
         //    Captura inclusive ads de campanhas arquivadas/finalizadas
         const insightsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
         );
         if (insightsRes.error) {
           errors.push(`Conta ${account.name} insights: ${insightsRes.error}`);
@@ -434,6 +434,8 @@ Deno.serve(async (req) => {
           const spend = Number(insight.spend || 0);
           const impressions = Number(insight.impressions || 0);
           const clicks = Number(insight.clicks || 0);
+          const inlineLinkClicks = Number(insight.inline_link_clicks || 0);
+          const uniqueInlineLinkClicks = Number(insight.unique_inline_link_clicks || 0);
           const reach = Number(insight.reach || 0);
           const ctr = Number(insight.ctr || 0);
           const cpm = Number(insight.cpm || 0);
@@ -458,7 +460,10 @@ Deno.serve(async (req) => {
           return {
             ad_id: insight.ad_id,
             date: insight.date_start,
-            spend, impressions, reach, clicks, ctr, cpm, frequency,
+            spend, impressions, reach, clicks,
+            inline_link_clicks: inlineLinkClicks,
+            unique_inline_link_clicks: uniqueInlineLinkClicks,
+            ctr, cpm, frequency,
             leads, cpl, conversion_rate: conversionRate,
             efficiency_rate: efficiencyRate, health_score: healthScore,
           };

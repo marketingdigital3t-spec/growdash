@@ -65,8 +65,10 @@ import { useNavigate } from "react-router-dom";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierarchy";
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 
-type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency";
+type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
 type AdsetColKey = "name" | "campaign" | "budget" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
 type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
@@ -126,7 +128,10 @@ const CAMP_DEFAULTS: Record<CampColKey, number> = {
   check: 40, name: 390, delivery: 105, objective: 120, budget: 120, spend: 110, impressions: 95,
   reach: 100, frequency: 90, cpm: 80, clicks: 88, ctr: 85, cpc: 96, leads: 135, cpl: 118,
   conversion: 110, sales: 95, cpa: 110, revenue: 125, roas: 90, profit: 120, roi: 90,
-  videoViews: 130, actions: 70,
+  deliveryStatus: 125, linkClicks: 120, linkCpc: 150, uniqueLinkCtr: 160,
+  landingPageViews: 175, costPerLandingPageView: 190, checkouts: 175, costPerCheckout: 190,
+  metaPurchases: 100, metaCostPerPurchase: 140, metaPurchaseRoas: 100,
+  videoViews: 130, actions: 90,
 };
 const ADSET_DEFAULTS: Record<AdsetColKey, number> = {
   name: 260, campaign: 220, budget: 130, spend: 120, leads: 90, cpl: 110, clicks: 100, ctr: 90,
@@ -212,7 +217,7 @@ export default function Campaigns() {
     else { setSortKey(key); setSortAsc(false); }
   };
 
-  const { data: campaigns = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
+  const { data: campaignBaseRows = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
     queryFn: async () => {
       let query = supabase
@@ -223,7 +228,7 @@ export default function Campaigns() {
             id, name, daily_budget, status,
             ads(
               id, name, thumbnail_url, status,
-              insights(spend, leads, clicks, impressions, reach, ctr, cpm, cpl, frequency, conversion_rate, health_score, date)
+              insights(spend, leads, clicks, inline_link_clicks, unique_inline_link_clicks, impressions, reach, ctr, cpm, cpl, frequency, conversion_rate, health_score, date)
             )
           )
         `)
@@ -239,7 +244,7 @@ export default function Campaigns() {
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((c: any) => {
-        let spend = 0, leads = 0, clicks = 0, impressions = 0, reach = 0;
+        let spend = 0, leads = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
         const adsets = c.adsets || [];
         let budget = 0;
 
@@ -252,6 +257,8 @@ export default function Campaigns() {
               spend += i.spend ?? 0;
               leads += i.leads ?? 0;
               clicks += i.clicks ?? 0;
+              linkClicks += i.inline_link_clicks ?? 0;
+              uniqueLinkClicks += i.unique_inline_link_clicks ?? 0;
               impressions += i.impressions ?? 0;
               reach += i.reach ?? 0;
             }
@@ -272,10 +279,44 @@ export default function Campaigns() {
         const conversionRate = clicks > 0 ? (leads / clicks) * 100 : 0;
         const roas = spend > 0 ? revenue / spend : 0;
 
-        return { ...c, adsets, budget, spend, leads, clicks, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
+        const linkCpc = linkClicks > 0 ? spend / linkClicks : 0;
+        const uniqueLinkCtr = reach > 0 ? uniqueLinkClicks / reach * 100 : 0;
+
+        return { ...c, adsets, budget, spend, leads, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
       });
     },
   });
+
+  const campaignAdIds = useMemo(() => campaignBaseRows.flatMap((campaign: any) =>
+    (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => currentAd.id))), [campaignBaseRows]);
+  const { data: actionData } = useActionTotalsByAds(campaignAdIds, startDate, endDate);
+  const campaigns = useMemo(() => campaignBaseRows.map((campaign: any) => {
+    const actionMetrics = { linkClicks: 0, landingPageViews: 0, checkouts: 0, purchases: 0, purchaseValue: 0 };
+    for (const currentAdset of campaign.adsets || []) {
+      for (const currentAd of currentAdset.ads || []) {
+        const resolved = resolveMetaActionMetrics(actionData?.totalsByAd[currentAd.id], actionData?.valueTotalsByAd[currentAd.id]);
+        actionMetrics.linkClicks += resolved.linkClicks;
+        actionMetrics.landingPageViews += resolved.landingPageViews;
+        actionMetrics.checkouts += resolved.checkouts;
+        actionMetrics.purchases += resolved.purchases;
+        actionMetrics.purchaseValue += resolved.purchaseValue;
+      }
+    }
+
+    const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
+    return {
+      ...campaign,
+      linkClicks,
+      linkCpc: linkClicks > 0 ? campaign.spend / linkClicks : 0,
+      landingPageViews: actionMetrics.landingPageViews,
+      costPerLandingPageView: actionMetrics.landingPageViews > 0 ? campaign.spend / actionMetrics.landingPageViews : 0,
+      checkouts: actionMetrics.checkouts,
+      costPerCheckout: actionMetrics.checkouts > 0 ? campaign.spend / actionMetrics.checkouts : 0,
+      metaPurchases: actionMetrics.purchases,
+      metaCostPerPurchase: actionMetrics.purchases > 0 ? campaign.spend / actionMetrics.purchases : 0,
+      metaPurchaseRoas: campaign.spend > 0 ? actionMetrics.purchaseValue / campaign.spend : 0,
+    };
+  }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignBaseRows]);
 
   // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
   // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
@@ -441,15 +482,25 @@ export default function Campaigns() {
       budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads,
       salesCount: acc.salesCount + c.salesCount, revenue: acc.revenue + c.revenue,
       profit: acc.profit + c.profit, impressions: acc.impressions + c.impressions, clicks: acc.clicks + c.clicks,
-      reach: acc.reach + c.reach,
+      reach: acc.reach + c.reach, linkClicks: acc.linkClicks + c.linkClicks,
+      uniqueLinkClicks: acc.uniqueLinkClicks + c.uniqueLinkClicks,
+      landingPageViews: acc.landingPageViews + c.landingPageViews,
+      checkouts: acc.checkouts + c.checkouts, metaPurchases: acc.metaPurchases + c.metaPurchases,
+      metaPurchaseValue: acc.metaPurchaseValue + (c.metaPurchaseRoas * c.spend),
     }),
-    { budget: 0, spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0 }
+    { budget: 0, spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0, linkClicks: 0, uniqueLinkClicks: 0, landingPageViews: 0, checkouts: 0, metaPurchases: 0, metaPurchaseValue: 0 }
   ), [filtered]);
   const totalCtr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
   const totalCpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : 0;
   const totalCpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
   const totalRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
+  const totalLinkCpc = totals.linkClicks > 0 ? totals.spend / totals.linkClicks : 0;
+  const totalUniqueLinkCtr = totals.reach > 0 ? totals.uniqueLinkClicks / totals.reach * 100 : 0;
+  const totalCostPerLandingPageView = totals.landingPageViews > 0 ? totals.spend / totals.landingPageViews : 0;
+  const totalCostPerCheckout = totals.checkouts > 0 ? totals.spend / totals.checkouts : 0;
+  const totalMetaCostPerPurchase = totals.metaPurchases > 0 ? totals.spend / totals.metaPurchases : 0;
+  const totalMetaPurchaseRoas = totals.spend > 0 ? totals.metaPurchaseValue / totals.spend : 0;
   const totalResultRate = totals.clicks > 0 ? totals.leads / totals.clicks * 100 : 0;
   const intelligenceSeries = useMemo(() => {
     const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number }>();
@@ -742,18 +793,30 @@ export default function Campaigns() {
                         </ResizableHead>
                         <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")} sortable sortableKey="status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 bg-muted dark:bg-[#11110f]" style={{ left: camp.colWidths.check }}>Status</ResizableHead>
                         <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] dark:border-[#28251e] dark:bg-[#11110f]" style={{ left: camp.colWidths.check + camp.colWidths.delivery }}>Campanha</ResizableHead>
-                        {showColumn("objective") && <ResizableHead colKey="objective" width={camp.colWidths.objective} onResize={camp.startResize("objective")} sortable sortableKey="objective" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Objetivo</ResizableHead>}
-                        {showColumn("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
-                        {showColumn("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Invest.</ResizableHead>}
-                        {showColumn("leads") && <ResizableHead colKey="leads" width={camp.colWidths.leads} onResize={camp.startResize("leads")} sortable sortableKey="leads" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Resultado</ResizableHead>}
-                        {showColumn("cpl") && <ResizableHead colKey="cpl" width={camp.colWidths.cpl} onResize={camp.startResize("cpl")} sortable sortableKey="cpl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo/resultado</ResizableHead>}
+                        {showColumn("deliveryStatus") && <ResizableHead colKey="deliveryStatus" width={camp.colWidths.deliveryStatus} onResize={camp.startResize("deliveryStatus")}>Veiculação</ResizableHead>}
+                        {showColumn("actions") && <ResizableHead colKey="actions" width={camp.colWidths.actions} onResize={camp.startResize("actions")}>Ações</ResizableHead>}
+                        {showColumn("reach") && <ResizableHead colKey="reach" width={camp.colWidths.reach} onResize={camp.startResize("reach")} sortable sortableKey="reach" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Alcance</ResizableHead>}
                         {showColumn("impressions") && <ResizableHead colKey="impressions" width={camp.colWidths.impressions} onResize={camp.startResize("impressions")} sortable sortableKey="impressions" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Impressões</ResizableHead>}
+                        {showColumn("frequency") && <ResizableHead colKey="frequency" width={camp.colWidths.frequency} onResize={camp.startResize("frequency")} sortable sortableKey="frequency" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Frequência</ResizableHead>}
+                        {showColumn("linkClicks") && <ResizableHead colKey="linkClicks" width={camp.colWidths.linkClicks} onResize={camp.startResize("linkClicks")} sortable sortableKey="linkClicks" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Cliques no link</ResizableHead>}
+                        {showColumn("linkCpc") && <ResizableHead colKey="linkCpc" width={camp.colWidths.linkCpc} onResize={camp.startResize("linkCpc")} sortable sortableKey="linkCpc" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPC (clique no link)</ResizableHead>}
+                        {showColumn("uniqueLinkCtr") && <ResizableHead colKey="uniqueLinkCtr" width={camp.colWidths.uniqueLinkCtr} onResize={camp.startResize("uniqueLinkCtr")} sortable sortableKey="uniqueLinkCtr" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CTR único (link)</ResizableHead>}
                         {showColumn("cpm") && <ResizableHead colKey="cpm" width={camp.colWidths.cpm} onResize={camp.startResize("cpm")} sortable sortableKey="cpm" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPM</ResizableHead>}
+                        {showColumn("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
+                        {showColumn("leads") && <ResizableHead colKey="leads" width={camp.colWidths.leads} onResize={camp.startResize("leads")} sortable sortableKey="leads" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Resultado</ResizableHead>}
+                        {showColumn("cpl") && <ResizableHead colKey="cpl" width={camp.colWidths.cpl} onResize={camp.startResize("cpl")} sortable sortableKey="cpl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo por resultado</ResizableHead>}
+                        {showColumn("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Valor usado</ResizableHead>}
+                        {showColumn("landingPageViews") && <ResizableHead colKey="landingPageViews" width={camp.colWidths.landingPageViews} onResize={camp.startResize("landingPageViews")} sortable sortableKey="landingPageViews" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Visualização da página de destino</ResizableHead>}
+                        {showColumn("costPerLandingPageView") && <ResizableHead colKey="costPerLandingPageView" width={camp.colWidths.costPerLandingPageView} onResize={camp.startResize("costPerLandingPageView")} sortable sortableKey="costPerLandingPageView" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo por visualização da página</ResizableHead>}
+                        {showColumn("checkouts") && <ResizableHead colKey="checkouts" width={camp.colWidths.checkouts} onResize={camp.startResize("checkouts")} sortable sortableKey="checkouts" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Finalização de compra iniciada</ResizableHead>}
+                        {showColumn("costPerCheckout") && <ResizableHead colKey="costPerCheckout" width={camp.colWidths.costPerCheckout} onResize={camp.startResize("costPerCheckout")} sortable sortableKey="costPerCheckout" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo por finalização de compra</ResizableHead>}
+                        {showColumn("metaPurchases") && <ResizableHead colKey="metaPurchases" width={camp.colWidths.metaPurchases} onResize={camp.startResize("metaPurchases")} sortable sortableKey="metaPurchases" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Compras</ResizableHead>}
+                        {showColumn("metaCostPerPurchase") && <ResizableHead colKey="metaCostPerPurchase" width={camp.colWidths.metaCostPerPurchase} onResize={camp.startResize("metaCostPerPurchase")} sortable sortableKey="metaCostPerPurchase" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo por compra</ResizableHead>}
+                        {showColumn("metaPurchaseRoas") && <ResizableHead colKey="metaPurchaseRoas" width={camp.colWidths.metaPurchaseRoas} onResize={camp.startResize("metaPurchaseRoas")} sortable sortableKey="metaPurchaseRoas" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">ROAS</ResizableHead>}
+                        {showColumn("objective") && <ResizableHead colKey="objective" width={camp.colWidths.objective} onResize={camp.startResize("objective")} sortable sortableKey="objective" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort}>Objetivo</ResizableHead>}
                         {showColumn("clicks") && <ResizableHead colKey="clicks" width={camp.colWidths.clicks} onResize={camp.startResize("clicks")} sortable sortableKey="clicks" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Cliques</ResizableHead>}
                         {showColumn("cpc") && <ResizableHead colKey="cpc" width={camp.colWidths.cpc} onResize={camp.startResize("cpc")} sortable sortableKey="cpc" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPC</ResizableHead>}
                         {showColumn("ctr") && <ResizableHead colKey="ctr" width={camp.colWidths.ctr} onResize={camp.startResize("ctr")} sortable sortableKey="ctr" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CTR</ResizableHead>}
-                        {showColumn("reach") && <ResizableHead colKey="reach" width={camp.colWidths.reach} onResize={camp.startResize("reach")} sortable sortableKey="reach" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Alcance*</ResizableHead>}
-                        {showColumn("frequency") && <ResizableHead colKey="frequency" width={camp.colWidths.frequency} onResize={camp.startResize("frequency")} sortable sortableKey="frequency" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Frequência*</ResizableHead>}
                         {showColumn("conversion") && <ResizableHead colKey="conversion" width={camp.colWidths.conversion} onResize={camp.startResize("conversion")} sortable sortableKey="conversionRate" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Taxa de conversão</ResizableHead>}
                         {showColumn("sales") && <ResizableHead colKey="sales" width={camp.colWidths.sales} onResize={camp.startResize("sales")} sortable sortableKey="salesCount" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Vendas</ResizableHead>}
                         {showColumn("cpa") && <ResizableHead colKey="cpa" width={camp.colWidths.cpa} onResize={camp.startResize("cpa")} sortable sortableKey="cpa" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPA</ResizableHead>}
@@ -802,18 +865,30 @@ export default function Campaigns() {
                             <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] transition-colors group-hover:bg-accent", stickySurface)}>
                               <span className="block truncate font-medium text-foreground" title={c.name}>{c.name}</span>
                             </TableCell>
-                            {showColumn("objective") && <TableCell style={cellW("objective")} className="truncate text-xs text-muted-foreground" title={c.objective || "Não informado"}>{c.objective || "—"}</TableCell>}
+                            {showColumn("deliveryStatus") && <TableCell style={cellW("deliveryStatus")} className="text-xs"><span className="inline-flex items-center gap-2"><StatusDot status={c.status} />{getStatusBadge(c.status).label}</span></TableCell>}
+                            {showColumn("actions") && <TableCell style={cellW("actions")} onClick={(event) => event.stopPropagation()}><Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status })}><Pencil className="mr-1 h-3 w-3" />Editar</Button></TableCell>}
+                            {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
+                            {showColumn("impressions") && <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>}
+                            {showColumn("frequency") && <TableCell style={cellW("frequency")} className={cn("text-right tabular-nums text-sm", sortBg("frequency"))}><AnimatedNumber value={c.frequency} decimals={2} /></TableCell>}
+                            {showColumn("linkClicks") && <TableCell style={cellW("linkClicks")} className={cn("text-right tabular-nums text-sm", sortBg("linkClicks"))}><AnimatedNumber value={c.linkClicks} decimals={0} /></TableCell>}
+                            {showColumn("linkCpc") && <TableCell style={cellW("linkCpc")} className={cn("text-right tabular-nums text-sm", sortBg("linkCpc"))}><AnimatedNumber value={c.linkCpc} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("uniqueLinkCtr") && <TableCell style={cellW("uniqueLinkCtr")} className={cn("text-right tabular-nums text-sm", sortBg("uniqueLinkCtr"))}><AnimatedNumber value={c.uniqueLinkCtr} suffix="%" decimals={2} /></TableCell>}
+                            {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))}><AnimatedNumber value={c.leads} decimals={0} /><span className="block text-[8px] text-muted-foreground">Leads na Meta</span></TableCell>}
                             {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("impressions") && <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>}
-                            {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("landingPageViews") && <TableCell style={cellW("landingPageViews")} className={cn("text-right tabular-nums text-sm", sortBg("landingPageViews"))}><AnimatedNumber value={c.landingPageViews} decimals={0} /></TableCell>}
+                            {showColumn("costPerLandingPageView") && <TableCell style={cellW("costPerLandingPageView")} className={cn("text-right tabular-nums text-sm", sortBg("costPerLandingPageView"))}><AnimatedNumber value={c.costPerLandingPageView} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("checkouts") && <TableCell style={cellW("checkouts")} className={cn("text-right tabular-nums text-sm", sortBg("checkouts"))}><AnimatedNumber value={c.checkouts} decimals={0} /></TableCell>}
+                            {showColumn("costPerCheckout") && <TableCell style={cellW("costPerCheckout")} className={cn("text-right tabular-nums text-sm", sortBg("costPerCheckout"))}><AnimatedNumber value={c.costPerCheckout} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("metaPurchases") && <TableCell style={cellW("metaPurchases")} className={cn("text-right tabular-nums text-sm", sortBg("metaPurchases"))}><AnimatedNumber value={c.metaPurchases} decimals={0} /></TableCell>}
+                            {showColumn("metaCostPerPurchase") && <TableCell style={cellW("metaCostPerPurchase")} className={cn("text-right tabular-nums text-sm", sortBg("metaCostPerPurchase"))}><AnimatedNumber value={c.metaCostPerPurchase} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("metaPurchaseRoas") && <TableCell style={cellW("metaPurchaseRoas")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.metaPurchaseRoas), sortBg("metaPurchaseRoas"))}><AnimatedNumber value={c.metaPurchaseRoas} suffix="x" decimals={2} /></TableCell>}
+                            {showColumn("objective") && <TableCell style={cellW("objective")} className="truncate text-xs text-muted-foreground" title={c.objective || "Não informado"}>{c.objective || "—"}</TableCell>}
                             {showColumn("clicks") && <TableCell style={cellW("clicks")} className={cn("text-right tabular-nums text-sm", sortBg("clicks"))}><AnimatedNumber value={c.clicks} decimals={0} /></TableCell>}
                             {showColumn("cpc") && <TableCell style={cellW("cpc")} className={cn("text-right tabular-nums text-sm", sortBg("cpc"))}><AnimatedNumber value={c.cpc} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("ctr") && <TableCell style={cellW("ctr")} className={cn("text-right tabular-nums text-sm", sortBg("ctr"))}><AnimatedNumber value={c.ctr} suffix="%" decimals={2} /></TableCell>}
-                            {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
-                            {showColumn("frequency") && <TableCell style={cellW("frequency")} className={cn("text-right tabular-nums text-sm", sortBg("frequency"))}><AnimatedNumber value={c.frequency} decimals={2} /></TableCell>}
                             {showColumn("conversion") && <TableCell style={cellW("conversion")} className={cn("text-right tabular-nums text-sm", sortBg("conversionRate"))}><AnimatedNumber value={c.conversionRate} suffix="%" decimals={2} /></TableCell>}
                             {showColumn("sales") && <TableCell style={cellW("sales")} className={cn("text-right tabular-nums text-sm", sortBg("salesCount"))}><AnimatedNumber value={c.salesCount} decimals={0} /></TableCell>}
                             {showColumn("cpa") && <TableCell style={cellW("cpa")} className={cn("text-right tabular-nums text-sm", sortBg("cpa"))}><AnimatedNumber value={c.cpa} prefix="R$ " decimals={2} /></TableCell>}
@@ -832,18 +907,30 @@ export default function Campaigns() {
                   <div className="growdash-scrollbar overflow-x-auto">
                     <div className="flex h-10 w-max items-stretch text-[10px]">
                       <AlignedTotal width={camp.colWidths.check + camp.colWidths.delivery + camp.colWidths.name} label={`Totais (${filtered.length})`} value={`${filtered.length} campanhas`} align="left" />
-                      {showColumn("objective") && <AlignedTotal width={camp.colWidths.objective} value="—" />}
+                      {showColumn("deliveryStatus") && <AlignedTotal width={camp.colWidths.deliveryStatus} value="—" />}
+                      {showColumn("actions") && <AlignedTotal width={camp.colWidths.actions} value="—" />}
+                      {showColumn("reach") && <AlignedTotal width={camp.colWidths.reach} value={totals.reach.toLocaleString("pt-BR")} />}
+                      {showColumn("impressions") && <AlignedTotal width={camp.colWidths.impressions} value={totals.impressions.toLocaleString("pt-BR")} />}
+                      {showColumn("frequency") && <AlignedTotal width={camp.colWidths.frequency} value={totals.reach > 0 ? (totals.impressions / totals.reach).toFixed(2).replace(".", ",") : "0,00"} />}
+                      {showColumn("linkClicks") && <AlignedTotal width={camp.colWidths.linkClicks} value={totals.linkClicks.toLocaleString("pt-BR")} />}
+                      {showColumn("linkCpc") && <AlignedTotal width={camp.colWidths.linkCpc} value={totalLinkCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("uniqueLinkCtr") && <AlignedTotal width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} />}
+                      {showColumn("cpm") && <AlignedTotal width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
                       {showColumn("budget") && <AlignedTotal width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("spend") && <AlignedTotal width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
                       {showColumn("leads") && <AlignedTotal width={camp.colWidths.leads} value={totals.leads.toLocaleString("pt-BR")} />}
                       {showColumn("cpl") && <AlignedTotal width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("impressions") && <AlignedTotal width={camp.colWidths.impressions} value={totals.impressions.toLocaleString("pt-BR")} />}
-                      {showColumn("cpm") && <AlignedTotal width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("spend") && <AlignedTotal width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("landingPageViews") && <AlignedTotal width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} />}
+                      {showColumn("costPerLandingPageView") && <AlignedTotal width={camp.colWidths.costPerLandingPageView} value={totalCostPerLandingPageView.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("checkouts") && <AlignedTotal width={camp.colWidths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} />}
+                      {showColumn("costPerCheckout") && <AlignedTotal width={camp.colWidths.costPerCheckout} value={totalCostPerCheckout.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("metaPurchases") && <AlignedTotal width={camp.colWidths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} />}
+                      {showColumn("metaCostPerPurchase") && <AlignedTotal width={camp.colWidths.metaCostPerPurchase} value={totalMetaCostPerPurchase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
+                      {showColumn("metaPurchaseRoas") && <AlignedTotal width={camp.colWidths.metaPurchaseRoas} value={`${totalMetaPurchaseRoas.toFixed(2).replace(".", ",")}x`} />}
+                      {showColumn("objective") && <AlignedTotal width={camp.colWidths.objective} value="—" />}
                       {showColumn("clicks") && <AlignedTotal width={camp.colWidths.clicks} value={totals.clicks.toLocaleString("pt-BR")} />}
                       {showColumn("cpc") && <AlignedTotal width={camp.colWidths.cpc} value={totalCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
                       {showColumn("ctr") && <AlignedTotal width={camp.colWidths.ctr} value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />}
-                      {showColumn("reach") && <AlignedTotal width={camp.colWidths.reach} value={totals.reach.toLocaleString("pt-BR")} />}
-                      {showColumn("frequency") && <AlignedTotal width={camp.colWidths.frequency} value={totals.reach > 0 ? (totals.impressions / totals.reach).toFixed(2).replace(".", ",") : "0,00"} />}
                       {showColumn("conversion") && <AlignedTotal width={camp.colWidths.conversion} value={`${totalResultRate.toFixed(2).replace(".", ",")}%`} />}
                       {showColumn("sales") && <AlignedTotal width={camp.colWidths.sales} value={totals.salesCount.toLocaleString("pt-BR")} />}
                       {showColumn("cpa") && <AlignedTotal width={camp.colWidths.cpa} value={(totals.salesCount > 0 ? totals.spend / totals.salesCount : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}

@@ -11,6 +11,8 @@ export interface ActionTotalsResult {
   dailyByAccount: Record<string, Record<string, Record<string, number>>>;
   /** Per-ad totals: { [ad_id]: { [action_type]: value } }. Used to classify campaigns by mechanism. */
   totalsByAd: Record<string, Record<string, number>>;
+  /** Per-ad monetary values keyed by action_type (for purchase value and ROAS). */
+  valueTotalsByAd: Record<string, Record<string, number>>;
   /** Number of ad_ids excluded because their campaign was DELETED/ARCHIVED. */
   excludedAdCount: number;
 }
@@ -52,6 +54,7 @@ export function useActionTotalsByAds(
       const totalsByAccount: Record<string, Record<string, number>> = {};
       const dailyByAccount: Record<string, Record<string, Record<string, number>>> = {};
       const totalsByAd: Record<string, Record<string, number>> = {};
+      const valueTotalsByAd: Record<string, Record<string, number>> = {};
       const start = startDate ? format(startDate, "yyyy-MM-dd") : null;
       const end = endDate ? format(endDate, "yyyy-MM-dd") : null;
 
@@ -109,7 +112,7 @@ export function useActionTotalsByAds(
         for (let from = 0; ; from += PAGE) {
           let q = supabase
             .from("insight_actions" as any)
-            .select("ad_id, action_type, value, date")
+            .select("ad_id, action_type, value, value_amount, date")
             .in("ad_id", chunk);
           if (start) q = q.gte("date", start);
           if (end) q = q.lte("date", end);
@@ -121,6 +124,8 @@ export function useActionTotalsByAds(
             totals[r.action_type] = (totals[r.action_type] || 0) + v;
             if (!totalsByAd[r.ad_id]) totalsByAd[r.ad_id] = {};
             totalsByAd[r.ad_id][r.action_type] = (totalsByAd[r.ad_id][r.action_type] || 0) + v;
+            if (!valueTotalsByAd[r.ad_id]) valueTotalsByAd[r.ad_id] = {};
+            valueTotalsByAd[r.ad_id][r.action_type] = (valueTotalsByAd[r.ad_id][r.action_type] || 0) + Number(r.value_amount || 0);
             const acc = adAccountByAdId ? adAccountByAdId[r.ad_id] : undefined;
             if (acc) {
               if (!totalsByAccount[acc]) totalsByAccount[acc] = {};
@@ -134,8 +139,7 @@ export function useActionTotalsByAds(
           if (rows.length < PAGE) break;
         }
       }
-      return { totals, totalsByAccount, dailyByAccount, totalsByAd, excludedAdCount };
+      return { totals, totalsByAccount, dailyByAccount, totalsByAd, valueTotalsByAd, excludedAdCount };
     },
   });
 }
-

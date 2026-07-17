@@ -85,7 +85,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
     for (const r of insights) m[r.ad_id] = r.ad_account_id;
     return m;
   }, [insights]);
-  const { data: actionData = { totals: {}, totalsByAccount: {}, dailyByAccount: {}, totalsByAd: {}, excludedAdCount: 0 } } = useActionTotalsByAds(
+  const { data: actionData = { totals: {}, totalsByAccount: {}, dailyByAccount: {}, totalsByAd: {}, valueTotalsByAd: {}, excludedAdCount: 0 } } = useActionTotalsByAds(
     allAdIds,
     startDate,
     endDate,

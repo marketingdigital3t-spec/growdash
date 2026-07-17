@@ -1,16 +1,21 @@
-export type CampaignColumnKey = "check" | "name" | "delivery" | "objective" | "budget" | "spend" | "impressions" | "reach" | "frequency" | "cpm" | "clicks" | "ctr" | "cpc" | "leads" | "cpl" | "conversion" | "sales" | "cpa" | "revenue" | "roas" | "profit" | "roi" | "videoViews" | "actions";
-export type MetaColumnPresetKey = "performance" | "performance_clicks" | "delivery" | "engagement" | "video" | "awareness" | "traffic" | "leads" | "sales" | "setup";
+export type CampaignColumnKey = "check" | "name" | "delivery" | "deliveryStatus" | "objective" | "budget" | "spend" | "impressions" | "reach" | "frequency" | "cpm" | "clicks" | "ctr" | "cpc" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "leads" | "cpl" | "conversion" | "sales" | "cpa" | "revenue" | "roas" | "profit" | "roi" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas" | "videoViews" | "actions";
+export type MetaColumnPresetKey = "performance" | "vtsd" | "performance_clicks" | "delivery" | "engagement" | "video" | "awareness" | "traffic" | "leads" | "sales" | "setup";
 
 export const campaignColumnLabels: Record<CampaignColumnKey, string> = {
-  check: "Selecionar", name: "Campanha", delivery: "Veiculação", objective: "Objetivo", budget: "Orçamento",
+  check: "Selecionar", name: "Campanha", delivery: "Status", deliveryStatus: "Veiculação", objective: "Objetivo", budget: "Orçamento",
   spend: "Valor usado", impressions: "Impressões", reach: "Alcance", frequency: "Frequência", cpm: "CPM",
   clicks: "Cliques no link", ctr: "CTR", cpc: "CPC", leads: "Resultados / Leads", cpl: "Custo por resultado",
   conversion: "Taxa de conversão", sales: "Compras / Vendas", cpa: "Custo por compra", revenue: "Valor de conversão",
+  linkClicks: "Cliques no link", linkCpc: "CPC (clique no link)", uniqueLinkCtr: "CTR único (clique no link)",
+  landingPageViews: "Visualizações da página de destino", costPerLandingPageView: "Custo por visualização da página de destino",
+  checkouts: "Finalizações de compra iniciadas", costPerCheckout: "Custo por finalização de compra iniciada",
+  metaPurchases: "Compras", metaCostPerPurchase: "Custo por compra", metaPurchaseRoas: "ROAS de compras",
   roas: "ROAS", profit: "Lucro", roi: "ROI", videoViews: "Reproduções de vídeo", actions: "Ações",
 };
 
 export const metaColumnPresets: { id: MetaColumnPresetKey; label: string; description: string; columns: CampaignColumnKey[] }[] = [
   { id: "performance", label: "Pré-definidas", description: "A mesma visão operacional usada no gerenciador de campanhas.", columns: ["name", "delivery", "budget", "spend", "leads", "cpl", "impressions", "cpm", "clicks", "cpc", "ctr"] },
+  { id: "vtsd", label: "VTSD", description: "Tráfego, página de destino, checkout, compras e ROAS da Meta.", columns: ["name", "delivery", "deliveryStatus", "actions", "reach", "impressions", "frequency", "linkClicks", "linkCpc", "uniqueLinkCtr", "cpm", "budget", "leads", "cpl", "spend", "landingPageViews", "costPerLandingPageView", "checkouts", "costPerCheckout", "metaPurchases", "metaCostPerPurchase", "metaPurchaseRoas"] },
   { id: "performance_clicks", label: "Desempenho e cliques", description: "Entrega e eficiência de clique.", columns: ["name", "delivery", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpc", "cpm", "leads", "cpl"] },
   { id: "delivery", label: "Veiculação", description: "Status, objetivo, orçamento e distribuição.", columns: ["name", "delivery", "objective", "budget", "spend", "impressions", "reach", "frequency", "cpm"] },
   { id: "engagement", label: "Engajamento", description: "Interação, cliques e conversão.", columns: ["name", "delivery", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpc", "conversion"] },
@@ -24,7 +29,7 @@ export const metaColumnPresets: { id: MetaColumnPresetKey; label: string; descri
 
 // Seleção, status e nome reproduzem a hierarquia operacional da Meta e são
 // colunas estruturais: nunca podem ser ocultadas por um preset do usuário.
-export const editableCampaignColumns = (Object.keys(campaignColumnLabels) as CampaignColumnKey[]).filter((key) => !["check", "delivery", "name", "actions"].includes(key));
+export const editableCampaignColumns = (Object.keys(campaignColumnLabels) as CampaignColumnKey[]).filter((key) => !["check", "delivery", "name"].includes(key));
 
 export const metaBreakdownGroups = [
   { label: "Geral", items: [{ id: "none", label: "Sem detalhamento", supported: true }] },

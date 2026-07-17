@@ -32,9 +32,10 @@ export function MetaTableControls({ preset, columns, breakdown, onPreset, onColu
   const selectPreset = (value: MetaColumnPresetKey) => { const selected = getMetaColumnPreset(value); onPreset(value); onColumns(new Set(selected.columns)); };
   const selectSaved = (item: any) => { const config = item.config ?? {}; if (config.preset) onPreset(config.preset); if (Array.isArray(config.columns)) onColumns(new Set(config.columns)); if (config.breakdown) onBreakdown(config.breakdown); toast({ title: `Visualização “${item.name}” aplicada` }); };
   const toggle = (column: CampaignColumnKey, checked: boolean) => { const next = new Set(columns); if (checked) next.add(column); else next.delete(column); onColumns(next); };
+  const selectedPreset = getMetaColumnPreset(preset);
   return <div className="flex flex-wrap items-center gap-2">
     <DropdownMenu>
-      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><Columns3 className="h-4 w-4" />Colunas: pré-definidas</Button></DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><Columns3 className="h-4 w-4" />Colunas: {selectedPreset.label}</Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto">
         <DropdownMenuLabel>Predefinições da Meta</DropdownMenuLabel>
         {metaColumnPresets.map((item) => <DropdownMenuItem key={item.id} onSelect={() => selectPreset(item.id)} className="flex-col items-start"><span className="text-xs font-bold">{item.label}</span><span className="text-[10px] text-muted-foreground">{item.description}</span></DropdownMenuItem>)}
