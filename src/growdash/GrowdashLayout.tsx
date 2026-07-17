@@ -157,7 +157,7 @@ export default function GrowdashLayout() {
                   return collapsed && !showSidebarLabels ? (
                     <Tooltip key={item.path}>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" sideOffset={12} className="z-[120] border-[#d3a62e]/35 bg-[#12100b] px-3 py-2 text-xs font-semibold text-[#f8df9a] shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
+                      <TooltipContent side="right" sideOffset={12} className="z-[120] border-[#d3a62e]/35 bg-[#080808] px-3 py-2 text-xs font-semibold text-[#f8df9a] shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
                         {item.label}
                       </TooltipContent>
                     </Tooltip>
@@ -273,7 +273,7 @@ export default function GrowdashLayout() {
         </main>
       </div>
       {!isOnline && (
-        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#17130a]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
+        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#080808]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
           Você está offline. Os dados exibidos podem estar desatualizados e nenhuma alteração será enviada até a conexão voltar.
         </div>
       )}

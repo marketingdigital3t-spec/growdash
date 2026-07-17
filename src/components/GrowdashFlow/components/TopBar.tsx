@@ -54,7 +54,7 @@ export function TopBar({
 }) {
   const controlClass = "h-9 w-9 shrink-0 text-slate-600 hover:bg-slate-100 hover:text-[#9d6908] dark:text-white/70 dark:hover:bg-white/5 dark:hover:text-[#F5A623]";
   return <>
-    <div aria-label="Ações do quadro" className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-2xl border border-black/10 bg-white/95 p-1.5 shadow-[0_12px_35px_-18px_rgba(0,0,0,.35)] backdrop-blur-xl dark:border-[#F5A623]/20 dark:bg-[#16130f]/94">
+    <div aria-label="Ações do quadro" className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-2xl border border-black/10 bg-white/95 p-1.5 shadow-[0_12px_35px_-18px_rgba(0,0,0,.35)] backdrop-blur-xl dark:border-[#F5A623]/20 dark:bg-[#090909]/94">
       <Button variant="ghost" size="icon" className={cn(controlClass, showGrid && "bg-[#F5A623]/10 text-[#9d6908] dark:text-[#F5A623]")} onClick={onToggleGrid} title="Mostrar ou esconder grade"><Grid3X3 className="h-4 w-4" /></Button>
       <button type="button" onClick={onToggleSnap} className={cn("h-9 shrink-0 rounded-xl px-2 text-[10px] font-black uppercase tracking-wide text-slate-500 hover:bg-slate-100 dark:text-white/55 dark:hover:bg-white/5", snapToGrid && "bg-[#F5A623]/10 text-[#9d6908] dark:text-[#F5A623]")} title="Encaixar na grade">Snap</button>
       <AlertDialog>
@@ -68,7 +68,7 @@ export function TopBar({
       <Button size="sm" onClick={onSave} disabled={saving} className="h-9 shrink-0 gap-1.5 bg-[#F5A623] font-black text-[#1d1405] hover:bg-[#ffc14d]"><Save className="h-4 w-4" /><span className="hidden 2xl:inline">{saving ? "Salvando…" : "Salvar"}</span></Button>
     </div>
 
-    <div aria-label="Zoom e histórico" className="absolute bottom-3 left-3 z-30 flex items-center gap-1 rounded-2xl border border-black/10 bg-white/95 p-1.5 shadow-[0_12px_35px_-18px_rgba(0,0,0,.35)] backdrop-blur-xl dark:border-[#F5A623]/20 dark:bg-[#16130f]/94">
+    <div aria-label="Zoom e histórico" className="absolute bottom-3 left-3 z-30 flex items-center gap-1 rounded-2xl border border-black/10 bg-white/95 p-1.5 shadow-[0_12px_35px_-18px_rgba(0,0,0,.35)] backdrop-blur-xl dark:border-[#F5A623]/20 dark:bg-[#090909]/94">
       <Button variant="ghost" size="icon" className={controlClass} onClick={() => onZoom(-0.15)} title="Diminuir zoom"><ZoomOut className="h-4 w-4" /></Button>
       <button type="button" onClick={onResetView} className="min-w-14 shrink-0 rounded-lg px-2 py-1 text-[11px] font-black tabular-nums text-slate-700 hover:bg-slate-100 dark:text-white/75 dark:hover:bg-white/5" title="Restaurar visão em 100%">{Math.round(zoom * 100)}%</button>
       <Button variant="ghost" size="icon" className={controlClass} onClick={() => onZoom(0.15)} title="Aumentar zoom"><ZoomIn className="h-4 w-4" /></Button>

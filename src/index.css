@@ -58,20 +58,20 @@
   }
 
   .dark {
-    --background: 36 44% 3%;
-    --foreground: 40 34% 94%;
-    --card: 36 34% 6%;
-    --card-foreground: 40 34% 94%;
-    --popover: 36 34% 6%;
-    --popover-foreground: 40 34% 94%;
-    --secondary: 37 24% 11%;
-    --secondary-foreground: 40 24% 91%;
-    --muted: 37 21% 11%;
-    --muted-foreground: 36 13% 62%;
+    --background: 0 0% 2%;
+    --foreground: 40 18% 94%;
+    --card: 0 0% 4%;
+    --card-foreground: 40 18% 94%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 40 18% 94%;
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 40 12% 91%;
+    --muted: 0 0% 9%;
+    --muted-foreground: 36 8% 62%;
     --accent: 39 38% 14%;
     --accent-foreground: 43 100% 76%;
-    --border: 39 31% 16%;
-    --input: 39 31% 16%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
     --primary: 38 76% 39%;
     --primary-foreground: 42 65% 98%;
     --ring: 42 100% 58%;
@@ -115,20 +115,20 @@
   }
 
   .dark .analytics-module {
-    --background: 36 44% 3%;
-    --foreground: 40 34% 94%;
-    --card: 36 34% 6%;
-    --card-foreground: 40 34% 94%;
-    --popover: 36 34% 6%;
-    --popover-foreground: 40 34% 94%;
-    --secondary: 37 24% 11%;
-    --secondary-foreground: 40 24% 91%;
-    --muted: 37 21% 11%;
-    --muted-foreground: 36 13% 62%;
+    --background: 0 0% 2%;
+    --foreground: 40 18% 94%;
+    --card: 0 0% 4%;
+    --card-foreground: 40 18% 94%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 40 18% 94%;
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 40 12% 91%;
+    --muted: 0 0% 9%;
+    --muted-foreground: 36 8% 62%;
     --accent: 39 38% 14%;
     --accent-foreground: 43 100% 76%;
-    --border: 39 31% 16%;
-    --input: 39 31% 16%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
     --primary: 38 76% 39%;
     --primary-foreground: 42 65% 98%;
     --ring: 41 88% 55%;
@@ -196,34 +196,34 @@
 
   .dark .brand-shell {
     background:
-      radial-gradient(circle at 80% -12%, rgba(255, 174, 25, .1), transparent 34rem),
-      linear-gradient(145deg, #080603, #0b0804 46%, #070503);
+      radial-gradient(circle at 82% -14%, rgba(255, 190, 46, .065), transparent 32rem),
+      #050505;
   }
 
   .brand-sidebar {
     border-color: rgba(255, 196, 61, .14);
     background:
-      linear-gradient(180deg, rgba(255, 196, 61, .075), transparent 16rem),
-      linear-gradient(160deg, #090603, #050403 70%);
+      linear-gradient(180deg, rgba(255, 196, 61, .055), transparent 13rem),
+      #030303;
     box-shadow: 12px 0 40px rgba(0, 0, 0, .22);
   }
 
   .brand-topbar {
     border-color: rgba(255, 196, 61, .18);
     background:
-      linear-gradient(90deg, rgba(255, 196, 61, .06), transparent 30%),
-      rgba(7, 5, 3, .96);
+      linear-gradient(90deg, rgba(255, 196, 61, .035), transparent 26%),
+      rgba(4, 4, 4, .97);
     box-shadow: 0 8px 30px rgba(0, 0, 0, .18), inset 0 -1px 0 rgba(255, 215, 106, .035);
     backdrop-filter: blur(18px);
   }
 
   .gd-panel {
-    @apply min-w-0 max-w-full rounded-xl border border-[#ddcfb5] bg-[#fffdf8] shadow-[0_10px_35px_-30px_rgba(48,34,10,.45)] dark:border-[#352814] dark:bg-[#100c07] dark:shadow-[inset_0_1px_0_rgba(255,226,138,.035),0_18px_60px_-45px_rgba(0,0,0,.9)];
+    @apply min-w-0 max-w-full rounded-xl border border-[#ddcfb5] bg-[#fffdf8] shadow-[0_10px_35px_-30px_rgba(48,34,10,.45)] dark:border-white/[.11] dark:bg-[#080808] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.025),0_18px_60px_-45px_rgba(0,0,0,.9)];
     background-image: linear-gradient(145deg, rgba(255,255,255,.35), transparent 38%);
   }
 
   .dark .gd-panel {
-    background-image: linear-gradient(145deg, rgba(255,211,103,.025), transparent 42%);
+    background-image: linear-gradient(145deg, rgba(255,255,255,.018), transparent 42%);
   }
 
   .growdash-main :where(button, a, input, select, textarea):focus-visible {
@@ -268,7 +268,7 @@
 }
 
   .gd-button {
-    @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d9c8a8] bg-[#fffdf8] px-3 text-[10px] font-bold text-[#4e4438] shadow-sm transition hover:border-[#c99a2e] hover:bg-[#fff8e7] dark:border-[#3c2c16] dark:bg-[#130e08] dark:text-[#eee4d3] dark:hover:border-[#735017] dark:hover:bg-[#211609];
+    @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d9c8a8] bg-[#fffdf8] px-3 text-[10px] font-bold text-[#4e4438] shadow-sm transition hover:border-[#c99a2e] hover:bg-[#fff8e7] dark:border-white/[.13] dark:bg-[#090909] dark:text-[#eeeae2] dark:hover:border-[#9a701f] dark:hover:bg-[#111111];
   }
 
   .gold-action {

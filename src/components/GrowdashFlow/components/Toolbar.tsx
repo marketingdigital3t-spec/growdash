@@ -29,7 +29,7 @@ const TOOLS: Array<{ tool: ToolType; label: string; shortcut: string; icon: type
 ];
 
 export function Toolbar({ tool, onToolChange, onImage }: { tool: ToolType; onToolChange: (tool: ToolType) => void; onImage: () => void }) {
-  return <div aria-label="Ferramentas de desenho" className="absolute left-1/2 top-16 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-2xl border border-black/10 bg-white/95 p-1.5 shadow-[0_12px_35px_-18px_rgba(0,0,0,.35)] backdrop-blur-xl dark:border-[#F5A623]/20 dark:bg-[#16130f]/94 2xl:top-3 2xl:max-w-[calc(100%-30rem)]">
+  return <div aria-label="Ferramentas de desenho" className="absolute left-1/2 top-16 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-2xl border border-black/10 bg-white/95 p-1.5 shadow-[0_12px_35px_-18px_rgba(0,0,0,.35)] backdrop-blur-xl dark:border-[#F5A623]/20 dark:bg-[#090909]/94 2xl:top-3 2xl:max-w-[calc(100%-30rem)]">
     {TOOLS.map((item, index) => {
       const Icon = item.icon;
       const active = tool === item.tool;
