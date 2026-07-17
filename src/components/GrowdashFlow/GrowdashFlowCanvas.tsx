@@ -313,7 +313,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
     setEditingId(null);
   }, [history]);
 
-  return <section ref={rootRef} className={`relative min-h-[620px] h-[calc(100dvh-7.5rem)] w-full overflow-hidden rounded-2xl border border-[#F5A623]/20 bg-[#121212] shadow-[0_24px_80px_rgba(0,0,0,.38)] ${className}`}>
+  return <section ref={rootRef} className={`relative min-h-[620px] h-[calc(100dvh-7.5rem)] w-full overflow-hidden rounded-2xl border border-black/10 bg-[#fbfbfd] shadow-[0_24px_80px_rgba(0,0,0,.16)] dark:border-[#F5A623]/20 dark:bg-[#121212] dark:shadow-[0_24px_80px_rgba(0,0,0,.38)] ${className}`}>
     <Canvas
       elements={history.value}
       selectedIds={selectedIds}
@@ -336,7 +336,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       onContextMenu={(event) => { event.preventDefault(); setContextMenu({ client: { x: event.clientX - rootRect().left, y: event.clientY - rootRect().top }, world: clientToWorld(event.clientX, event.clientY) }); }}
     />
 
-    <div className="pointer-events-none absolute left-2 top-2 z-20 flex max-w-[36%] items-center gap-2 sm:left-3 sm:top-3"><div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#16130f]/88 p-1.5 pr-3 backdrop-blur-xl">{onBack && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-white/60 hover:bg-white/5 hover:text-[#F5A623]" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>}<div className="hidden min-w-0 sm:block"><span className="block truncate text-[10px] font-black uppercase tracking-[.16em] text-[#F5A623]">Growdash Flow</span><strong className="block truncate text-xs text-white/85">{title}</strong></div></div></div>
+    <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[25%] items-center gap-2"><div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-xl border border-black/10 bg-white/95 p-1.5 pr-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-[#16130f]/92">{onBack && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-slate-500 hover:bg-slate-100 hover:text-[#9d6908] dark:text-white/60 dark:hover:bg-white/5 dark:hover:text-[#F5A623]" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>}<div className="hidden min-w-0 xl:block"><span className="block truncate text-[10px] font-black uppercase tracking-[.16em] text-[#b5790b] dark:text-[#F5A623]">Growdash Flow</span><strong className="block truncate text-xs text-slate-800 dark:text-white/85">{title}</strong></div></div></div>
     <Toolbar tool={tool} onToolChange={setTool} onImage={() => fileInputRef.current?.click()} />
     <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
     {primarySelected && <PropertiesPanel element={primarySelected} selectionCount={selectedIds.length} onChange={changeSelected} onDuplicate={duplicateSelected} onDelete={deleteSelected} onFront={() => moveLayer("front")} onBack={() => moveLayer("back")} onClose={() => setSelectedIds([])} />}
@@ -348,7 +348,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       <ContextAction icon={Trash2} label="Excluir" shortcut="Delete" danger disabled={!selectedIds.length} onClick={() => { deleteSelected(); setContextMenu(null); }} />
     </div>}
 
-    <div className="pointer-events-none absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-[#16130f]/82 px-3 py-1.5 text-[9px] font-bold text-white/45 backdrop-blur-xl"><span>{history.value.length} elementos</span><span className="h-1 w-1 rounded-full bg-[#F5A623]" /><span>{selectedIds.length} selecionado(s)</span><span className="hidden sm:inline">Espaço + arrastar para mover</span></div>
+    <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-3 rounded-full border border-black/10 bg-white/88 px-3 py-1.5 text-[9px] font-bold text-slate-500 backdrop-blur-xl md:flex dark:border-white/10 dark:bg-[#16130f]/82 dark:text-white/45"><span>{history.value.length} elementos</span><span className="h-1 w-1 rounded-full bg-[#F5A623]" /><span>{selectedIds.length} selecionado(s)</span><span>Espaço + arrastar para mover</span></div>
     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" multiple onChange={(event) => { Array.from(event.target.files || []).forEach((file) => addImage(file)); event.target.value = ""; }} />
   </section>;
 });

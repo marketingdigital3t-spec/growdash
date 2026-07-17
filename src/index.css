@@ -245,6 +245,11 @@
     container-type: inline-size;
   }
 
+  .growdash-content-frame {
+    padding-inline: 0;
+    transition: max-width 220ms ease, padding 220ms ease;
+  }
+
   .growdash-main :where(section, article, div, header, footer, nav, form, fieldset) {
     min-width: 0;
     max-width: 100%;

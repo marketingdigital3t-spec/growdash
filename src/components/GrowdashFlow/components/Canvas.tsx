@@ -57,7 +57,7 @@ export const Canvas = memo(function Canvas({
 
   return <div
     data-growdash-flow-canvas
-    className="absolute inset-0 touch-none overflow-hidden bg-[#121212]"
+    className="absolute inset-0 touch-none overflow-hidden bg-[#fbfbfd] dark:bg-[#121212]"
     style={{ cursor }}
     onPointerDown={onPointerDown}
     onPointerMove={onPointerMove}
@@ -68,7 +68,7 @@ export const Canvas = memo(function Canvas({
     onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }}
     onDrop={(event) => { event.preventDefault(); if (event.dataTransfer.files.length) onDropFiles(event.dataTransfer.files, { x: event.clientX, y: event.clientY }); }}
   >
-    {showGrid && <div className="pointer-events-none absolute inset-0 opacity-45" style={{ backgroundImage: "radial-gradient(circle, rgba(245,166,35,.35) 1px, transparent 1.2px)", backgroundSize: `${20 * zoom}px ${20 * zoom}px`, backgroundPosition: `${panOffset.x}px ${panOffset.y}px` }} />}
+    {showGrid && <div className="pointer-events-none absolute inset-0 opacity-45 dark:opacity-40" style={{ backgroundImage: "radial-gradient(circle, rgba(120,113,108,.26) 1px, transparent 1.2px)", backgroundSize: `${20 * zoom}px ${20 * zoom}px`, backgroundPosition: `${panOffset.x}px ${panOffset.y}px` }} />}
     <svg className="absolute inset-0 h-full w-full overflow-visible" aria-label="Canvas do Growdash Flow">
       <defs>
         <marker id="growdash-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#F5A623" /></marker>
@@ -98,7 +98,7 @@ export const Canvas = memo(function Canvas({
             ["nw", selectedBounds.x, selectedBounds.y], ["n", selectedBounds.x + selectedBounds.width / 2, selectedBounds.y], ["ne", selectedBounds.x + selectedBounds.width, selectedBounds.y],
             ["e", selectedBounds.x + selectedBounds.width, selectedBounds.y + selectedBounds.height / 2], ["se", selectedBounds.x + selectedBounds.width, selectedBounds.y + selectedBounds.height],
             ["s", selectedBounds.x + selectedBounds.width / 2, selectedBounds.y + selectedBounds.height], ["sw", selectedBounds.x, selectedBounds.y + selectedBounds.height], ["w", selectedBounds.x, selectedBounds.y + selectedBounds.height / 2],
-          ] as Array<[ResizeHandle, number, number]>).map(([handle, x, y]) => <rect key={handle} x={x - 5 / zoom} y={y - 5 / zoom} width={10 / zoom} height={10 / zoom} rx={2 / zoom} fill="#121212" stroke="#F5A623" strokeWidth={2 / zoom} data-resize-handle={handle} onPointerDown={(event) => onResizePointerDown(event, handle)} style={{ cursor: `${handle}-resize` }} />)}
+          ] as Array<[ResizeHandle, number, number]>).map(([handle, x, y]) => <rect key={handle} x={x - 5 / zoom} y={y - 5 / zoom} width={10 / zoom} height={10 / zoom} rx={2 / zoom} fill="#ffffff" stroke="#F5A623" strokeWidth={2 / zoom} data-resize-handle={handle} onPointerDown={(event) => onResizePointerDown(event, handle)} style={{ cursor: `${handle}-resize` }} />)}
         </>}
 
         {selection && <rect x={selection.x} y={selection.y} width={selection.width} height={selection.height} fill="rgba(245,166,35,.10)" stroke="#F5A623" strokeWidth={1 / zoom} strokeDasharray={`${5 / zoom} ${4 / zoom}`} pointerEvents="none" />}

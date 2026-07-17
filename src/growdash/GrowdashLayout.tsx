@@ -37,7 +37,6 @@ function getInitialSidebarState() {
 export default function GrowdashLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
-  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const { pathname } = useLocation();
   const { theme, setTheme } = useTheme();
@@ -72,7 +71,7 @@ export default function GrowdashLayout() {
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
-  const showSidebarLabels = !collapsed || sidebarHovered || mobileOpen;
+  const showSidebarLabels = !collapsed || mobileOpen;
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
@@ -97,10 +96,8 @@ export default function GrowdashLayout() {
   return (
     <div className="brand-shell min-h-screen max-w-full overflow-x-clip text-foreground transition-colors">
       <aside
-        onMouseEnter={() => collapsed && setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}
         className={cn(
-          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-white shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-all duration-300",
+          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-white shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
           showSidebarLabels ? "w-[220px]" : "w-16",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
@@ -141,7 +138,6 @@ export default function GrowdashLayout() {
                     <NavLink
                       to={item.path}
                       end={item.path === "/"}
-                      title={!showSidebarLabels ? item.label : undefined}
                       aria-label={item.label}
                       className={cn(
                         "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
@@ -160,7 +156,7 @@ export default function GrowdashLayout() {
                   return collapsed && !showSidebarLabels ? (
                     <Tooltip key={item.path}>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" sideOffset={10} className="border-[#d3a62e]/35 bg-[#12100b] text-xs font-semibold text-[#f8df9a] shadow-xl">
+                      <TooltipContent side="right" sideOffset={12} className="z-[120] border-[#d3a62e]/35 bg-[#12100b] px-3 py-2 text-xs font-semibold text-[#f8df9a] shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
                         {item.label}
                       </TooltipContent>
                     </Tooltip>
@@ -256,9 +252,11 @@ export default function GrowdashLayout() {
             </button>
           </div>
         </header>
-        <main className="growdash-main min-h-[calc(100vh-48px)] min-w-0 max-w-full overflow-x-clip p-2 pb-[calc(.5rem+env(safe-area-inset-bottom))] sm:p-5">
-          <GlobalAnnouncementBanner />
-          <Outlet />
+        <main className="growdash-main min-h-[calc(100vh-48px)] min-w-0 max-w-full overflow-x-clip px-3 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4 lg:px-6 lg:py-5">
+          <div className="growdash-content-frame mx-auto w-full min-w-0 max-w-[1700px]">
+            <GlobalAnnouncementBanner />
+            <Outlet />
+          </div>
         </main>
       </div>
       {!isOnline && (
