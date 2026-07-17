@@ -124,7 +124,7 @@ export default function GrowdashLayout() {
         </div>
 
         <TooltipProvider delayDuration={180}>
-        <nav className="grow overflow-y-auto px-2 py-4 growdash-scrollbar">
+        <nav className={cn("grow overflow-y-auto px-2 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
           {NAV_SECTIONS.map((section) => (
             <section key={section.label} className="mb-5">
               {showSidebarLabels && (
@@ -144,10 +144,10 @@ export default function GrowdashLayout() {
                       title={!showSidebarLabels ? item.label : undefined}
                       aria-label={item.label}
                       className={cn(
-                        "group flex h-10 items-center rounded-lg text-[13px] font-medium transition-colors",
+                        "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
                         showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
                         !showSidebarLabels
-                          ? "border border-transparent bg-transparent text-[#ffd868] shadow-none hover:bg-transparent hover:text-[#ffe68a]"
+                          ? "border border-transparent bg-transparent text-white shadow-none hover:bg-transparent hover:text-white"
                           : isActive
                           ? "border border-[#f0bd35]/30 bg-gradient-to-r from-[#6a521e] to-[#3a301a] text-[#ffd868] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
                           : "border border-transparent text-white/78 hover:bg-white/[.07] hover:text-white",

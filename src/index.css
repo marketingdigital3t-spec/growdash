@@ -319,6 +319,17 @@
     border-radius: 99px;
     background: rgba(236, 190, 61, 0.35);
   }
+
+  .growdash-scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .growdash-scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
 
 @media (max-width: 767px) {
