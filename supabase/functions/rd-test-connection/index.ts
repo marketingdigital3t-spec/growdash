@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await admin
       .from("integrations")
-      .select("id, api_token, is_active")
+      .select("id, api_token, is_active, webhook_secret")
       .eq("user_id", userId)
       .eq("provider", "rd_station_crm")
       .order("updated_at", { ascending: false })
@@ -81,10 +81,13 @@ Deno.serve(async (req) => {
       }, 400);
     }
 
+    let webhookWarning: string | undefined;
+    const webhookSecret = existing?.webhook_secret || crypto.randomUUID();
     if (suppliedToken) {
       const values = {
         api_token: suppliedToken,
         is_active: true,
+        webhook_secret: webhookSecret,
         updated_at: new Date().toISOString(),
       };
       const operation = existing?.id
@@ -96,17 +99,70 @@ Deno.serve(async (req) => {
           });
       const { error } = await operation;
       if (error) throw error;
+
+    } else if (existing?.id && !existing.webhook_secret) {
+      await admin.from("integrations").update({ webhook_secret: webhookSecret }).eq("id", existing.id);
+    }
+
+    try {
+      await ensureRDWebhooks(token, webhookSecret);
+    } catch (error) {
+      // O polling incremental de 15 min continua funcionando mesmo quando o
+      // plano do RD não permite webhooks ou a API limita a configuração.
+      webhookWarning = error instanceof Error ? error.message : "Não foi possível ativar os webhooks do RD.";
     }
 
     return json({
       ok: true,
       connected: true,
-      warning: rateLimited
-        ? "Token aceito e salvo, mas o RD Station limitou temporariamente as requisições. Tente sincronizar novamente em alguns minutos."
-        : undefined,
+      warning: [
+        rateLimited ? "Token aceito e salvo, mas o RD Station limitou temporariamente as requisições." : null,
+        webhookWarning,
+      ].filter(Boolean).join(" ") || undefined,
     });
   } catch (error) {
     console.error("rd-test-connection", error);
     return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500);
   }
 });
+
+async function ensureRDWebhooks(token: string, secret: string) {
+  const callbackUrl = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/sync-rd-crm`;
+  const listResponse = await fetch(
+    `https://crm.rdstation.com/api/v1/webhooks?token=${encodeURIComponent(token)}`,
+    { headers: { Accept: "application/json" } },
+  );
+  const listPayload = listResponse.ok ? await listResponse.json().catch(() => ({})) : {};
+  const existing = Array.isArray(listPayload)
+    ? listPayload
+    : (listPayload.webhooks || listPayload.data || []);
+  const events = ["crm_deal_created", "crm_deal_updated", "crm_deal_deleted"];
+
+  for (const eventType of events) {
+    const configured = existing.find((webhook: any) =>
+      String(webhook.event_type || webhook.event_name) === eventType && String(webhook.url) === callbackUrl
+    );
+    const webhookId = configured?.uuid || configured?.id;
+    const endpoint = webhookId
+      ? `https://crm.rdstation.com/api/v1/webhooks/${encodeURIComponent(String(webhookId))}?token=${encodeURIComponent(token)}`
+      : `https://crm.rdstation.com/api/v1/webhooks?token=${encodeURIComponent(token)}`;
+    const response = await fetch(
+      endpoint,
+      {
+        method: webhookId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          event_type: eventType,
+          http_method: "POST",
+          url: callbackUrl,
+          auth_header: "x-webhook-secret",
+          auth_key: secret,
+        }),
+      },
+    );
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`RD webhook ${eventType}: HTTP ${response.status}${detail ? ` — ${detail.slice(0, 120)}` : ""}`);
+    }
+  }
+}

@@ -232,6 +232,9 @@ Deno.serve(async (req) => {
       start_date,
       end_date,
       max_deals = 1000,
+      realtime = false,
+      max_pages,
+      trigger_source,
     } = body || {};
     let deal_ids = body?.deal_ids;
     if (!funnel_id) {
@@ -329,7 +332,7 @@ Deno.serve(async (req) => {
       funnel_id: funnel.id,
       provider: "rd_station_crm",
       status: "running",
-      trigger_source: isReprocess ? "reprocess" : "manual",
+      trigger_source: isReprocess ? "reprocess" : (trigger_source || (realtime ? "auto_realtime" : "manual")),
     }).select("id").single();
     runId = runRow?.id || null;
 
@@ -685,7 +688,10 @@ Deno.serve(async (req) => {
       }
     } else {
       let page = 1;
-      const maxPages = analytics_mode ? 20 : 50;
+      const requestedPages = Number(max_pages);
+      const maxPages = realtime
+        ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
+        : analytics_mode ? 20 : 50;
       const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
       const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
       const maxAnalyticsDeals = Math.max(1, Math.min(Number(max_deals) || 1000, 3000));
@@ -722,16 +728,20 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        totalDeals += deals.length;
+        const realtimeLimit = Math.max(1, Math.min(Number(max_deals) || 60, 200));
+        const dealsToProcess = realtime
+          ? deals.slice(0, Math.max(0, realtimeLimit - totalDeals))
+          : deals;
+        totalDeals += dealsToProcess.length;
 
-        for (let i = 0; i < deals.length; i += BATCH_SIZE) {
-          const batch = deals.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < dealsToProcess.length; i += BATCH_SIZE) {
+          const batch = dealsToProcess.slice(i, i + BATCH_SIZE);
           const details = await Promise.all(batch.map(processDeal));
           for (const d of details) await persistDeal(d);
           await sleep(BATCH_PAUSE_MS);
         }
 
-        if (deals.length < 200) break;
+        if (deals.length < 200 || (realtime && totalDeals >= realtimeLimit)) break;
         page++;
       }
     }

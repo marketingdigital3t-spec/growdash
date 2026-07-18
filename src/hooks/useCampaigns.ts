@@ -18,5 +18,8 @@ export function useCampaigns(adAccountId?: string) {
       if (error) throw error;
       return data;
     },
+    staleTime: 15 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 }

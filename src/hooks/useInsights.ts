@@ -133,5 +133,8 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
       })) as InsightRow[];
     },
     enabled,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 }

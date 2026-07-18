@@ -49,8 +49,17 @@ Deno.serve(async (req) => {
       ? body.adAccountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
     const includeBreakdowns = body.includeBreakdowns === true;
-    const startDate = body.startDate || new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
-    const endDate = body.endDate || new Date().toISOString().split("T")[0];
+    const incremental = body.incremental === true;
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    // A sincronização sem intervalo é sempre incremental. Backfills continuam
+    // enviando startDate/endDate explicitamente e preservam todo o histórico.
+    const startDate = body.startDate || today;
+    const endDate = body.endDate || today;
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
@@ -235,8 +244,10 @@ Deno.serve(async (req) => {
           if (changes.length > 0) await supabaseAdmin.from("campaign_changes").insert(changes);
         }
 
-        // 3.5 Fetch Meta Ads activity log (auto change history)
-        try {
+        // 3.5 O histórico de atividades dos últimos 60 dias é pesado. Ele roda
+        // apenas em sincronizações manuais/backfill; o ciclo de 15 min atualiza
+        // somente entidades e métricas do dia.
+        if (!incremental) try {
           const since = Math.floor((Date.now() - 60 * 86400000) / 1000); // last 60d
           const until = Math.floor(Date.now() / 1000);
           let activitiesUrl = `${graphBase}/${metaAccountId}/activities?fields=event_time,event_type,translated_event_type,object_id,object_name,object_type,extra_data&since=${since}&until=${until}&access_token=${accessToken}&limit=200`;

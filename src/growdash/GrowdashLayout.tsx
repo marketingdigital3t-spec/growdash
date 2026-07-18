@@ -24,6 +24,7 @@ import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnou
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { TopbarMonthlyGoal } from "@/components/dashboard/DashboardGoalProgress";
+import { useNearRealtimeSync } from "@/hooks/useNearRealtimeSync";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -80,6 +81,10 @@ export default function GrowdashLayout() {
   const goalAccountLabel = adAccountId === "all"
     ? `Meta mensal · todas as contas · ${segment === "saas" ? "SaaS" : "Infoproduto"}`
     : `Meta mensal · ${visibleAccounts.find((account) => account.id === adAccountId)?.name || "Conta selecionada"}`;
+
+  // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
+  // plano, sem bloquear a navegação ou trocar a tela por um loader.
+  useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId });
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();

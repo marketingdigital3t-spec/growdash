@@ -77,6 +77,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
       }
       return all;
     },
+    staleTime: 15 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 }
 
