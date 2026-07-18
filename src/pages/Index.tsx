@@ -220,54 +220,53 @@ const Index = () => {
       </MotionItem>
 
       <MotionItem>
-        <div className="flex flex-wrap items-center gap-3">
-          <DateFilterBar
-            preset={preset}
-            onPresetChange={setPreset}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-            startDate={startDate}
-            endDate={endDate}
-            adAccounts={visibleAccounts.map((a) => ({ id: a.id, name: a.name }))}
-            selectedAccount={selectedAccount}
-            onAccountChange={(id) => { setSelectedAccount(id); setSelectedCampaignIds([]); }}
-            campaigns={(() => {
-              const spendByCamp = new Map<string, number>();
-              const imprByCamp = new Map<string, number>();
-              for (const r of visiblePickerInsights as any[]) {
-                if (!r.campaign_id) continue;
-                spendByCamp.set(r.campaign_id, (spendByCamp.get(r.campaign_id) || 0) + (r.spend ?? 0));
-                imprByCamp.set(r.campaign_id, (imprByCamp.get(r.campaign_id) || 0) + (r.impressions ?? 0));
-              }
-              return visibleCampaigns
-                .filter((c: any) => (spendByCamp.get(c.id) || 0) > 0 || (imprByCamp.get(c.id) || 0) > 0)
-                .map((c: any) => ({ id: c.id, name: c.name, spend: spendByCamp.get(c.id) || 0 }))
-                .sort((a, b) => b.spend - a.spend)
-                .map(({ id, name }) => ({ id, name }));
-            })()}
-            selectedCampaignIds={selectedCampaignIds}
-            onCampaignIdsChange={setSelectedCampaignIds}
-            onRefresh={handleSync}
-            isRefreshing={syncMeta.isPending || isLoading}
-          />
-        </div>
-      </MotionItem>
+        <div className="flex flex-col gap-3 border-b border-border/60 pb-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <DateFilterBar
+              preset={preset}
+              onPresetChange={setPreset}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+              startDate={startDate}
+              endDate={endDate}
+              adAccounts={visibleAccounts.map((a) => ({ id: a.id, name: a.name }))}
+              selectedAccount={selectedAccount}
+              onAccountChange={(id) => { setSelectedAccount(id); setSelectedCampaignIds([]); }}
+              campaigns={(() => {
+                const spendByCamp = new Map<string, number>();
+                const imprByCamp = new Map<string, number>();
+                for (const r of visiblePickerInsights as any[]) {
+                  if (!r.campaign_id) continue;
+                  spendByCamp.set(r.campaign_id, (spendByCamp.get(r.campaign_id) || 0) + (r.spend ?? 0));
+                  imprByCamp.set(r.campaign_id, (imprByCamp.get(r.campaign_id) || 0) + (r.impressions ?? 0));
+                }
+                return visibleCampaigns
+                  .filter((c: any) => (spendByCamp.get(c.id) || 0) > 0 || (imprByCamp.get(c.id) || 0) > 0)
+                  .map((c: any) => ({ id: c.id, name: c.name, spend: spendByCamp.get(c.id) || 0 }))
+                  .sort((a, b) => b.spend - a.spend)
+                  .map(({ id, name }) => ({ id, name }));
+              })()}
+              selectedCampaignIds={selectedCampaignIds}
+              onCampaignIdsChange={setSelectedCampaignIds}
+              onRefresh={handleSync}
+              isRefreshing={syncMeta.isPending || isLoading}
+              showSummary={false}
+            />
+          </div>
 
-      {canEditDashboard && activeView && !isEditing && (
-        <MotionItem>
-          <div className="flex items-center justify-end border-b border-border/60 pb-2">
+          {canEditDashboard && activeView && !isEditing && (
             <Button
               size="sm"
               variant="outline"
               onClick={beginDashboardEdit}
-              className="gap-1.5"
+              className="w-full shrink-0 gap-1.5 sm:w-auto"
             >
               <Pencil className="h-3.5 w-3.5" />
               Editar dashboard
             </Button>
-          </div>
-        </MotionItem>
-      )}
+          )}
+        </div>
+      </MotionItem>
 
       <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} openAlerts={openAlerts} sales={glassSales.totalQuantity} />
 
