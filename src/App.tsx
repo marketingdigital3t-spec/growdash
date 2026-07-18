@@ -74,7 +74,7 @@ function RequirePage({ page, children }: { page: PagePermission | "master"; chil
 }
 
 const analytics = (element: ReactNode) => (
-  <div className="analytics-module min-w-0 w-full text-foreground">
+  <div className="analytics-module flex h-full min-h-0 w-full min-w-0 flex-col text-foreground">
     {element}
   </div>
 );
