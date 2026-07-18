@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_VIEW } from "@/lib/widgetCatalog";
+import { ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
 
 export interface DashboardView {
   id: string;
@@ -47,7 +48,7 @@ export function useGlobalView() {
         console.warn("Não foi possível carregar a visualização do dashboard; usando o layout padrão.", error);
         return fallbackGlobalView;
       }
-      return (data as DashboardView | null) ?? fallbackGlobalView;
+      return ensureDefaultDashboardContent((data as DashboardView | null) ?? fallbackGlobalView);
     },
   });
 }

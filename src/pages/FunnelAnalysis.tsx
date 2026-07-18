@@ -39,7 +39,6 @@ export default function FunnelAnalysis() {
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
   const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(adAccountId === "all" ? undefined : adAccountId);
-  const [selectedFunnel, setSelectedFunnel] = useState<string>("");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
   const [selectedState, setSelectedState] = useState<string>("all");
@@ -50,8 +49,8 @@ export default function FunnelAnalysis() {
   const syncMeta = useSyncMeta();
 
   const activeFunnels = funnels.filter((f) => f.is_active && f.rd_funnel_id);
-  const funnelId = selectedFunnel || activeFunnels[0]?.id || "";
-  const selectedFunnelRecord = activeFunnels.find((funnel) => funnel.id === funnelId);
+  const selectedFunnelRecord = activeFunnels[0];
+  const funnelId = selectedFunnelRecord?.id || "";
   const effectiveAdAccountId = adAccountId === "all" ? selectedFunnelRecord?.ad_account_id : adAccountId;
 
   const { data: stages = [], isLoading: loadingStages } = useFunnelStages(funnelId);
@@ -201,7 +200,7 @@ export default function FunnelAnalysis() {
 
       <MotionItem>
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
-          <Select value={adAccountId} onValueChange={(value) => { setAdAccountId(value); setSelectedFunnel(""); }}>
+          <Select value={adAccountId} onValueChange={setAdAccountId}>
             <SelectTrigger className="w-full bg-background/60 sm:w-[230px]">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Conta de anúncio" />
@@ -211,16 +210,6 @@ export default function FunnelAnalysis() {
               {visibleAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={funnelId} onValueChange={setSelectedFunnel} disabled={loadingFunnels || activeFunnels.length === 0}>
-            <SelectTrigger className="w-full bg-background/60 sm:w-[260px]">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Funil" />
-            </SelectTrigger>
-            <SelectContent>
-              {activeFunnels.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
           <MetaDateRangePicker
             preset={preset}
             onPresetChange={setPreset}
@@ -246,7 +235,7 @@ export default function FunnelAnalysis() {
             </p>
           </div>
         </MotionItem>
-      ) : isLoading || loadingStages ? (
+      ) : loadingFunnels || isLoading || loadingStages ? (
         <MotionItem>
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>
