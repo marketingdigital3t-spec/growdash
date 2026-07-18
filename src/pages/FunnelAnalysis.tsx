@@ -199,9 +199,9 @@ export default function FunnelAnalysis() {
       </MotionItem>
 
       <MotionItem>
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
+        <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
           <Select value={adAccountId} onValueChange={setAdAccountId}>
-            <SelectTrigger className="w-full bg-background/60 sm:w-[230px]">
+            <SelectTrigger className="gd-filter-control gd-filter-account w-full bg-background/60 sm:w-[230px]">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Conta de anúncio" />
             </SelectTrigger>
@@ -217,6 +217,7 @@ export default function FunnelAnalysis() {
             onCustomRangeChange={setCustomRange}
             startDate={startDate}
             endDate={endDate}
+            className="gd-filter-control gd-filter-date"
           />
 
           <FilterSelect label="Origem" value={selectedSource} onChange={setSelectedSource} options={sources} />
@@ -312,7 +313,7 @@ function FilterSelect({
 }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-full bg-background/60 sm:w-[160px]">
+      <SelectTrigger className="gd-filter-control w-full bg-background/60 sm:w-[160px]">
         <SelectValue placeholder={label} />
       </SelectTrigger>
       <SelectContent>

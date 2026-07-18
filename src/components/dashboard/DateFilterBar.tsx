@@ -44,7 +44,7 @@ export function DateFilterBar({
   showSummary = true,
 }: DateFilterBarProps) {
   return (
-    <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+    <div className="gd-filter-strip w-full min-w-0">
       <MetaDateRangePicker
         preset={preset}
         onPresetChange={onPresetChange}
@@ -52,11 +52,12 @@ export function DateFilterBar({
         onCustomRangeChange={onCustomRangeChange}
         startDate={startDate}
         endDate={endDate}
+        className="gd-filter-control gd-filter-date"
       />
 
       {adAccounts.length > 0 && (
         <Select value={selectedAccount} onValueChange={onAccountChange}>
-          <SelectTrigger className="min-h-11 w-full min-w-0 bg-card sm:h-10 sm:min-h-0 sm:w-[200px]">
+          <SelectTrigger className="gd-filter-control gd-filter-account min-h-11 w-full min-w-0 bg-card sm:h-10 sm:min-h-0 sm:w-[200px]">
             <SelectValue placeholder="Todas as contas" />
           </SelectTrigger>
           <SelectContent>
@@ -73,11 +74,12 @@ export function DateFilterBar({
           campaigns={campaigns}
           selectedIds={selectedCampaignIds}
           onChange={onCampaignIdsChange}
+          className="gd-filter-control gd-filter-campaign"
         />
       )}
 
       {onRefresh && (
-        <Button variant="outline" size="icon" onClick={onRefresh} disabled={isRefreshing} className="min-h-11 w-full bg-card sm:h-10 sm:min-h-0 sm:w-10">
+        <Button variant="outline" size="icon" onClick={onRefresh} disabled={isRefreshing} className="gd-filter-refresh min-h-11 w-full bg-card sm:h-10 sm:min-h-0 sm:w-10">
           <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
         </Button>
       )}

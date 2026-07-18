@@ -20,6 +20,7 @@ interface Props {
   onCustomRangeChange: (range: { from: Date; to: Date }) => void;
   startDate: Date;
   endDate: Date;
+  className?: string;
 }
 
 const PRESET_ORDER: DatePreset[] = [
@@ -54,6 +55,7 @@ export function MetaDateRangePicker({
   onCustomRangeChange,
   startDate,
   endDate,
+  className,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pendingPreset, setPendingPreset] = useState<DatePreset>(preset);
@@ -99,7 +101,13 @@ export function MetaDateRangePicker({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto">
+        <Button
+          variant="outline"
+          className={cn(
+            "min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto",
+            className,
+          )}
+        >
           <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
           <span className="truncate">{formatTrigger(preset, startDate, endDate)}</span>
         </Button>

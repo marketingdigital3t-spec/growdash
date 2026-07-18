@@ -874,3 +874,68 @@
 .dashboard-layout-editing > .react-grid-item.dashboard-default-static .react-resizable-handle {
   display: none !important;
 }
+
+/* Barras de filtros operacionais: mantêm todos os controles em uma única
+   linha sem provocar overflow na página. Em telas menores, a própria barra
+   recebe rolagem horizontal contida. */
+.gd-filter-strip {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / .28) transparent;
+}
+
+.gd-filter-strip > * {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.gd-filter-strip .gd-filter-control {
+  width: auto !important;
+  min-width: 9.5rem;
+  max-width: none;
+}
+
+.gd-filter-strip .gd-filter-account {
+  min-width: 12rem;
+}
+
+.gd-filter-strip .gd-filter-date {
+  min-width: 16rem;
+}
+
+.gd-filter-strip .gd-filter-campaign {
+  min-width: 13rem;
+}
+
+.gd-filter-strip .gd-filter-refresh {
+  width: 2.5rem !important;
+  min-width: 2.5rem;
+  flex-basis: 2.5rem;
+}
+
+@media (min-width: 1280px) {
+  .gd-funnel-filter-strip {
+    overflow-x: hidden;
+  }
+
+  .gd-funnel-filter-strip .gd-filter-control {
+    width: 100% !important;
+    min-width: 0;
+    flex: 1 1 0;
+  }
+
+  .gd-funnel-filter-strip .gd-filter-account {
+    flex-grow: 1.35;
+  }
+
+  .gd-funnel-filter-strip .gd-filter-date {
+    flex-grow: 1.7;
+  }
+}
