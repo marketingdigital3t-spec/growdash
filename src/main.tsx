@@ -6,4 +6,6 @@ import "@fontsource/nunito/800.css";
 import App from "./App.tsx";
 import "./index.css";
 
-createRoot(document.getElementById("root")!).render(<App />);
+const rootElement = document.getElementById("root")!;
+rootElement.dataset.build = "2026-07-18-dashboard-restore";
+createRoot(rootElement).render(<App />);
