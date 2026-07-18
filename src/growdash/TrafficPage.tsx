@@ -48,7 +48,7 @@ export default function TrafficPage() {
 
   return (
     <div className={cn(
-      "mx-auto w-full max-w-[1700px]",
+      "mx-auto w-full max-w-[1920px]",
       activeTab === "campaigns"
         ? "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
         : "space-y-3",

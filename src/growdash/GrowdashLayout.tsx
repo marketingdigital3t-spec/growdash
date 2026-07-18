@@ -319,7 +319,7 @@ export default function GrowdashLayout() {
         </header>
         <main
           className={cn(
-            "growdash-main min-w-0 max-w-full overflow-x-clip px-3 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-4 lg:px-6 lg:py-5",
+            "growdash-main min-w-0 max-w-full overflow-x-clip px-[clamp(.625rem,1.25vw,1.5rem)] py-[clamp(.625rem,1vw,1.25rem)] pb-[calc(clamp(.625rem,1vw,1.25rem)+env(safe-area-inset-bottom))]",
             isCampaignsWorkspace
               ? "md:h-[calc(100dvh-48px)] md:min-h-0 md:overflow-hidden"
               : "min-h-[calc(100vh-48px)]",
@@ -327,7 +327,7 @@ export default function GrowdashLayout() {
         >
           <div
             className={cn(
-              "growdash-content-frame mx-auto w-full min-w-0 max-w-[1700px]",
+              "growdash-content-frame mx-auto w-full min-w-0 max-w-[1920px]",
               isCampaignsWorkspace && "md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden",
             )}
           >

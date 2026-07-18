@@ -11,10 +11,8 @@ import {
   FileSpreadsheet,
   FolderPlus,
   Instagram,
-  KeyRound,
   LayoutGrid,
   ListFilter,
-  LockKeyhole,
   MailPlus,
   MessageSquareText,
   MoreHorizontal,
@@ -36,6 +34,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { cn } from "@/lib/utils";
+import AgentsOfficePage from "./AgentsOfficePage";
 
 type TabOption = { id: string; label: string };
 
@@ -176,25 +175,6 @@ function MetaConnectModule() {
   );
 }
 
-function AgentsModule() {
-  const [password, setPassword] = useState("");
-  return (
-    <Page title="Agentes" description="Agentes especializados para monitorar mídia, funil e operação com acesso protegido.">
-      <div className="grid min-h-[560px] place-items-center overflow-hidden rounded-2xl border border-border bg-[radial-gradient(circle_at_50%_25%,rgba(255,196,61,.12),transparent_36%),linear-gradient(145deg,#070707,#0d0d0d)] p-5">
-        <form className="w-full max-w-md rounded-2xl border border-white/10 bg-black/55 p-6 text-center shadow-2xl backdrop-blur-xl" onSubmit={(event) => event.preventDefault()}>
-          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-primary"><LockKeyhole className="h-7 w-7" /></span>
-          <h2 className="mt-5 text-xl font-black text-white">Área protegida</h2>
-          <p className="mt-2 text-sm leading-relaxed text-white/55">O acesso adicional deve ser validado pelo backend. A Growdash não armazena essa senha no navegador.</p>
-          <label className="mt-6 block text-left text-xs font-bold text-white/70">Senha adicional</label>
-          <div className="mt-2 flex h-11 items-center rounded-xl border border-white/15 bg-black/50 px-3"><KeyRound className="h-4 w-4 text-primary" /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Digite sua senha" className="h-full min-w-0 grow bg-transparent px-3 text-sm text-white outline-none placeholder:text-white/30" /></div>
-          <button type="submit" disabled={!password} className="gold-action mt-4 w-full justify-center disabled:cursor-not-allowed disabled:opacity-40">Entrar <ArrowRight className="h-4 w-4" /></button>
-          <button type="button" className="mt-4 text-xs font-bold text-primary">Esqueci minha senha</button>
-        </form>
-      </div>
-    </Page>
-  );
-}
-
 function FunnelAIModule() {
   return (
     <Page title="IA do Funil" description="Diagnósticos baseados nos dados reais de Meta Ads e RD Station da conta selecionada." action={<Link to="/analise-de-funis" className="gold-action"><Sparkles className="h-4 w-4" /> Analisar funil</Link>}>
@@ -233,7 +213,7 @@ export default function ModulePage() {
   if (pathname === "/chamados") return <TicketsModule />;
   if (pathname === "/marcas") return <BrandsModule />;
   if (pathname === "/meta-connect") return <MetaConnectModule />;
-  if (pathname === "/agentes") return <AgentsModule />;
+  if (pathname === "/agentes") return <AgentsOfficePage />;
   if (pathname === "/ia-do-funil") return <FunnelAIModule />;
   return <Navigate to="/" replace />;
 }

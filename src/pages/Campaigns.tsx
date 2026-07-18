@@ -37,6 +37,12 @@ import {
   ChevronDown,
   Sparkles,
   BrainCircuit,
+  Plus,
+  Copy as CopyIcon,
+  FlaskConical,
+  MoreHorizontal,
+  Send,
+  FolderOpen,
 } from "lucide-react";
 import {
   Bar,
@@ -634,21 +640,47 @@ export default function Campaigns() {
 
   return (
     <MotionPage className="campaigns-workspace overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm dark:border-[#2a271f] dark:bg-[#070706] md:flex md:min-h-0 md:flex-1 md:flex-col">
-      <MotionItem className="shrink-0 border-b border-border bg-card px-3 py-2.5 dark:border-[#2a271f] dark:bg-[#070706]">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex shrink-0 items-baseline gap-2">
-              <h1 className="text-lg font-black tracking-tight">Campanhas</h1>
-              <span className="text-[10px] text-muted-foreground">Gerenciador de campanhas</span>
-            </div>
-            <div className="relative w-full sm:max-w-[550px]">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Pesquise para filtrar por: nome, identificação ou métrica" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 border-border bg-background pl-9 text-xs" />
-            </div>
+      <MotionItem className="campaign-manager-top shrink-0 border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
+        <div className="flex flex-col gap-2 px-3 py-2 lg:flex-row lg:items-center">
+          <div className="flex shrink-0 items-center gap-2">
+            <h1 className="text-lg font-black tracking-tight">Campanhas</h1>
+            <span className="grid h-7 w-7 place-items-center rounded-md border border-primary/25 bg-primary/10 text-[9px] font-black text-primary">GD</span>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="meta-toolbar-button shrink-0">
-            <RefreshCw className={cn("h-3.5 w-3.5", (isFetching || syncMeta.isPending) && "animate-spin")} /> {syncMeta.isPending ? "Sincronizando…" : "Atualizar"}
-          </Button>
+          {visibleAdAccounts.length > 0 && (
+            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+              <SelectTrigger className="h-8 w-full bg-background text-xs sm:w-[285px]" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todas as contas de anúncio</SelectItem>{visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
+          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-primary text-[10px] font-black text-primary">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
+            <span className="truncate">Pontuação de oportunidade</span>
+            <ChevronDown className="h-3.5 w-3.5" />
+          </div>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <span className="hidden text-[10px] text-muted-foreground xl:inline">Atualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+            <Button variant="outline" size="icon" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="h-8 w-8" title="Atualizar dados">
+              <RefreshCw className={cn("h-3.5 w-3.5", (isFetching || syncMeta.isPending) && "animate-spin")} />
+            </Button>
+            <Button variant="outline" size="sm" disabled className="meta-toolbar-button hidden sm:inline-flex"><Send className="h-3.5 w-3.5" />Conferir e publicar</Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" title="Mais opções"><MoreHorizontal className="h-4 w-4" /></Button>
+          </div>
+        </div>
+
+        <div className="growdash-scrollbar flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
+          <Button variant="outline" size="sm" className="meta-toolbar-button meta-toolbar-button-active shrink-0"><FolderOpen className="h-3.5 w-3.5" />Todos os anúncios</Button>
+          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Megaphone className="h-3.5 w-3.5" />Anúncios ativos</Button>
+          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0"><ShieldCheck className="h-3.5 w-3.5" />Ações</Button>
+          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Eye className="h-3.5 w-3.5" />Tiveram veiculação</Button>
+          <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-2 text-[11px]"><Plus className="h-3.5 w-3.5" />Ver mais</Button>
+          <Button variant="outline" size="sm" className="meta-toolbar-primary ml-auto shrink-0"><SlidersHorizontal className="h-3.5 w-3.5" />Criar visualização</Button>
+        </div>
+
+        <div className="border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Pesquise para filtrar por: nome, identificação ou métrica" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 border-border bg-background pl-9 text-xs" />
+          </div>
         </div>
       </MotionItem>
 
@@ -670,13 +702,16 @@ export default function Campaigns() {
             </TabsList>
             <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 py-1.5 xl:justify-end">
               <div className="w-full sm:w-[285px] [&_button]:!h-8 [&_button]:!min-h-0"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
-              <Button size="sm" onClick={downloadCurrentView} disabled={(activeTab === "campaigns" ? filtered : activeTab === "adsets" ? selectedAdsets : selectedAds).length === 0} className="meta-toolbar-primary"><Download className="h-3.5 w-3.5" />Baixar relatório</Button>
             </div>
           </div>
 
           <div className="flex min-h-11 flex-col gap-2 border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908] xl:flex-row xl:items-center">
             <div className="flex flex-wrap items-center gap-2">
-              {visibleAdAccounts.length > 0 && <Select value={selectedAccount} onValueChange={setSelectedAccount}><SelectTrigger className="h-8 w-full bg-background sm:w-[210px]"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as contas</SelectItem>{visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select>}
+              <Button size="sm" className="h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => toast({ title: "Criação segura de campanha", description: "Selecione uma única conta Meta. A campanha será preparada como rascunho antes de qualquer publicação." })}><Plus className="h-3.5 w-3.5" />Criar</Button>
+              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
+              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
+              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><FlaskConical className="h-3.5 w-3.5" />Teste A/B</Button>
+              <Button variant="ghost" size="sm" className="h-8 gap-2 text-[11px]">Mais<ChevronDown className="h-3 w-3" /></Button>
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
               <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
             </div>
@@ -689,6 +724,7 @@ export default function Campaigns() {
                 </DropdownMenuContent>
               </DropdownMenu>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
+              <Button size="sm" onClick={downloadCurrentView} disabled={(activeTab === "campaigns" ? filtered : activeTab === "adsets" ? selectedAdsets : selectedAds).length === 0} className="meta-toolbar-primary"><Download className="h-3.5 w-3.5" />Baixar relatório</Button>
             </div>
           </div>
 
