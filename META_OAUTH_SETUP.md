@@ -7,7 +7,7 @@ A Growdash usa OAuth oficial da Meta. O navegador nunca recebe `META_APP_SECRET`
 No aplicativo Business da Meta, habilite Facebook Login/Marketing API e cadastre exatamente esta URL em **Valid OAuth Redirect URIs**:
 
 ```text
-https://tpseftxktzhwthekydac.supabase.co/functions/v1/meta-oauth-callback
+https://cixnvosxqlacjbpymjha.supabase.co/functions/v1/meta-oauth-callback
 ```
 
 Solicite App Review/Advanced Access, quando necessário, para:

@@ -5,6 +5,10 @@ const sha256 = async (value: string) => {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
+const instagramError = (payload: any, fallback: string) => {
+  const message = String(payload?.error_message ?? payload?.error_description ?? payload?.error?.message ?? payload?.message ?? "").trim();
+  return message ? `${fallback}: ${message}` : fallback;
+};
 const page = (status: "success" | "error", message: string) => {
   const payload = JSON.stringify({ type: "growdash-instagram-oauth", status, message }).replaceAll("<", "\\u003c");
   return new Response(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Growdash · Instagram</title><style>body{margin:0;background:#090806;color:#f8f4e8;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}main{max-width:520px;border:1px solid #604a17;border-radius:20px;background:#15120b;padding:32px;text-align:center;box-shadow:0 24px 70px #000a}h1{color:${status === "success" ? "#f2c94c" : "#ff7474"}}p{color:#c9c1ae;line-height:1.6}button{border:0;border-radius:11px;background:#f2c94c;color:#211806;padding:12px 20px;font-weight:800}</style></head><body><main><h1>${status === "success" ? "Instagram conectado" : "Conexão não concluída"}</h1><p>${escapeHtml(message)}</p><button onclick="window.close()">Voltar para a Growdash</button></main><script>try{if(window.opener)window.opener.postMessage(${payload},'*')}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1600)" : ""}</script></body></html>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'" } });
@@ -26,14 +30,17 @@ Deno.serve(async (req) => {
     if (oauthState) await admin.from("instagram_oauth_states").delete().eq("state_hash", stateHash);
     if (!oauthState || new Date(oauthState.expires_at).getTime() < Date.now()) return page("error", "Esta tentativa expirou ou já foi utilizada.");
     const denied = url.searchParams.get("error_description") ?? url.searchParams.get("error_message");
-    if (denied) return page("error", denied);
+    if (denied) return page("error", `O Instagram recusou a autorização: ${denied}`);
     const code = url.searchParams.get("code")?.replace(/#_$/, "");
     if (!code) return page("error", "O Instagram não devolveu o código de autorização.");
     const redirectUri = Deno.env.get("INSTAGRAM_OAUTH_REDIRECT_URI") ?? `${supabaseUrl}/functions/v1/instagram-oauth-callback`;
     const form = new URLSearchParams({ client_id: appId, client_secret: appSecret, grant_type: "authorization_code", redirect_uri: redirectUri, code });
     const shortResponse = await fetch("https://api.instagram.com/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form });
     const short = await shortResponse.json().catch(() => ({}));
-    if (!shortResponse.ok || !short.access_token) return page("error", "O Instagram não aceitou a troca do código de autorização.");
+    if (!shortResponse.ok || !short.access_token) {
+      console.error("Instagram short token exchange failed", short?.error_type ?? shortResponse.status);
+      return page("error", instagramError(short, "O Instagram não aceitou a troca do código. Confira o App ID, o App Secret e a URL de redirecionamento cadastrada"));
+    }
     const longUrl = new URL("https://graph.instagram.com/access_token");
     longUrl.searchParams.set("grant_type", "ig_exchange_token");
     longUrl.searchParams.set("client_secret", appSecret);
@@ -48,7 +55,10 @@ Deno.serve(async (req) => {
     profileUrl.searchParams.set("access_token", token);
     const profileResponse = await fetch(profileUrl);
     const profile = await profileResponse.json().catch(() => ({}));
-    if (!profileResponse.ok || !profile.id) return page("error", "A conta foi autorizada, mas o perfil profissional não pôde ser lido.");
+    if (!profileResponse.ok || !profile.id) {
+      console.error("Instagram profile lookup failed", profile?.error?.code ?? profileResponse.status);
+      return page("error", instagramError(profile, "A conta foi autorizada, mas o perfil profissional não pôde ser lido. Use uma conta Business ou Creator"));
+    }
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
     const integrationValues = { api_token: token, is_active: true, provider_account_id: String(profile.id), token_expires_at: expiresAt, updated_at: new Date().toISOString() };
     const { data: existing } = await admin.from("integrations").select("id").eq("user_id", oauthState.user_id).eq("provider", "instagram_business").eq("provider_account_id", String(profile.id)).maybeSingle();
@@ -62,6 +72,7 @@ Deno.serve(async (req) => {
     return page("success", `@${profile.username ?? "perfil"} foi conectado com segurança.`);
   } catch (error) {
     console.error("instagram-oauth-callback", error);
-    return page("error", "Falha interna ao concluir a conexão.");
+    const message = error instanceof Error ? error.message : "Falha interna ao concluir a conexão.";
+    return page("error", `Falha ao concluir a conexão: ${message}`);
   }
 });

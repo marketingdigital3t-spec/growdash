@@ -35,7 +35,12 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
 
     if (!appId || !appSecret) {
-      return json({ error: "As credenciais do aplicativo Meta ainda não foram configuradas no servidor." }, 503);
+      const missing = [!appId && "META_APP_ID", !appSecret && "META_APP_SECRET"].filter(Boolean).join(" e ");
+      return json({
+        error: "As credenciais do aplicativo Meta ainda não foram configuradas no servidor.",
+        code: "META_APP_NOT_CONFIGURED",
+        action: `Cadastre ${missing} nos segredos do Supabase. A URL de retorno já está configurada.`,
+      }, 503);
     }
     if (!authHeader.startsWith("Bearer ")) return json({ error: "Não autenticado" }, 401);
 

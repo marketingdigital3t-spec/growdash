@@ -20,7 +20,14 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const appId = Deno.env.get("INSTAGRAM_APP_ID") ?? Deno.env.get("META_APP_ID");
     const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET") ?? Deno.env.get("META_APP_SECRET");
-    if (!appId || !appSecret) return json({ error: "Configure INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET no servidor." }, 503);
+    if (!appId || !appSecret) {
+      const missing = [!appId && "INSTAGRAM_APP_ID", !appSecret && "INSTAGRAM_APP_SECRET"].filter(Boolean).join(" e ");
+      return json({
+      error: "O Instagram Login ainda não foi configurado no servidor.",
+      code: "INSTAGRAM_APP_NOT_CONFIGURED",
+        action: `Cadastre ${missing} nos segredos do Supabase. A URL de retorno já está configurada.`,
+      }, 503);
+    }
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "Sessão inválida" }, 401);
@@ -35,11 +42,11 @@ Deno.serve(async (req) => {
     url.searchParams.set("client_id", appId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "instagram_business_basic,instagram_business_manage_insights");
+    url.searchParams.set("scope", Deno.env.get("INSTAGRAM_OAUTH_SCOPES") ?? "instagram_business_basic,instagram_business_manage_insights");
     url.searchParams.set("state", state);
     url.searchParams.set("enable_fb_login", "0");
     url.searchParams.set("force_authentication", "1");
-    return json({ authUrl: url.toString() });
+    return json({ authUrl: url.toString(), redirectUri, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() });
   } catch (error) {
     console.error("instagram-oauth-start", error);
     return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500);

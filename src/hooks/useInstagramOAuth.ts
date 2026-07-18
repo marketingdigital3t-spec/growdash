@@ -19,7 +19,8 @@ export function useInstagramOAuth() {
       if (error || !data?.authUrl) {
         popup.close();
         popupRef.current = null;
-        throw new Error(data?.error || error?.message || "Não foi possível iniciar o login do Instagram.");
+        const action = data?.action ? ` ${data.action}` : "";
+        throw new Error(`${data?.error || error?.message || "Não foi possível iniciar o login do Instagram."}${action}`);
       }
       popup.location.replace(data.authUrl);
     },
@@ -35,6 +36,8 @@ export function useInstagramOAuth() {
       if (event.data.status === "success") {
         toast({ title: "Instagram profissional conectado", description: event.data.message });
         queryClient.invalidateQueries({ queryKey: ["social_accounts"] });
+        queryClient.invalidateQueries({ queryKey: ["social_media"] });
+        queryClient.invalidateQueries({ queryKey: ["social_insights_daily"] });
       } else {
         toast({ title: "Conexão não concluída", description: event.data.message, variant: "destructive" });
       }

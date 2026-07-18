@@ -1,0 +1,2 @@
+-- This migration version already exists in the production migration history.
+-- Its original SQL was applied remotely before this repository was recovered.

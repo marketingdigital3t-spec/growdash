@@ -27,7 +27,8 @@ export function useMetaOAuth() {
       if (error || !data?.authUrl) {
         popup.close();
         oauthPopup.current = null;
-        throw new Error(data?.error || error?.message || "Não foi possível iniciar a conexão com a Meta.");
+        const action = data?.action ? ` ${data.action}` : "";
+        throw new Error(`${data?.error || error?.message || "Não foi possível iniciar a conexão com a Meta."}${action}`);
       }
 
       popup.location.replace(data.authUrl);
