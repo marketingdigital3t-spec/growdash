@@ -182,6 +182,7 @@ Deno.serve(async (req) => {
   let runId: string | null = null;
   let userId: string | null = null;
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  let caller: any = null;
 
   async function finishRun(opts: {
     status: "success" | "partial" | "failed";
@@ -221,7 +222,17 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { funnel_id, only_missing_names, missing_names_limit = 80, service_user_id, cron_trigger } = body || {};
+    const {
+      funnel_id,
+      only_missing_names,
+      missing_names_limit = 80,
+      service_user_id,
+      cron_trigger,
+      analytics_mode = false,
+      start_date,
+      end_date,
+      max_deals = 1000,
+    } = body || {};
     let deal_ids = body?.deal_ids;
     if (!funnel_id) {
       return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
@@ -243,12 +254,12 @@ Deno.serve(async (req) => {
     if (isServiceCall) {
       userId = String(service_user_id);
     } else {
-      const supabase = createClient(
+      caller = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_ANON_KEY")!,
         { global: { headers: { Authorization: authHeader } } },
       );
-      const { data: userRes } = await supabase.auth.getUser();
+      const { data: userRes } = await caller.auth.getUser();
       userId = userRes.user?.id || null;
       if (!userId) {
         return new Response(JSON.stringify({ error: "Usuário inválido" }), {
@@ -258,12 +269,16 @@ Deno.serve(async (req) => {
     }
 
 
-    const { data: funnel } = await admin
+    // Chamadas manuais usam o mesmo cliente com RLS da interface. Assim,
+    // proprietários, masters e usuários explicitamente atribuídos enxergam
+    // exatamente os mesmos funis aqui e na tela, sem ampliar acesso entre
+    // clientes. O cron continua limitado ao owner informado pelo service role.
+    const funnelQuery = (isServiceCall ? admin : caller!)
       .from("rd_funnels")
-      .select("id, ad_account_id, rd_funnel_id, name")
-      .eq("id", funnel_id)
-      .eq("user_id", userId)
-      .maybeSingle();
+      .select("id, user_id, ad_account_id, rd_funnel_id, name")
+      .eq("id", funnel_id);
+    if (isServiceCall) funnelQuery.eq("user_id", userId);
+    const { data: funnel } = await funnelQuery.maybeSingle();
 
     if (!funnel) {
       return new Response(JSON.stringify({ error: "Funil não encontrado" }), {
@@ -275,6 +290,10 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Credenciais e registros sincronizados continuam pertencendo ao owner
+    // original do vínculo, mesmo quando um master executa a manutenção.
+    userId = String(funnel.user_id);
 
     const { data: integration } = await admin
       .from("integrations")
@@ -615,6 +634,43 @@ Deno.serve(async (req) => {
       }
     }
 
+    async function persistAnalyticsBatch(items: any[]) {
+      if (!items.length) return;
+      const rows = items.map((d) => {
+        const rdDealId = String(d.id || d._id);
+        const stageName = d.deal_stage?.name || null;
+        const stageId = d.deal_stage?.id ? String(d.deal_stage.id) : null;
+        const won = isWonDeal(d);
+        const lost = Boolean(d.deal_lost_reason) || bucketFromStage(stageName, won, false) === "lost";
+        const row: Record<string, unknown> = {
+          user_id: userId!,
+          ad_account_id: funnel!.ad_account_id,
+          rd_funnel_id: funnel!.id,
+          rd_deal_id: rdDealId,
+          rd_stage_id: stageId,
+          rd_stage_name: stageName,
+          rd_stage_order: stageId && stageOrderMap.has(stageId) ? stageOrderMap.get(stageId) : null,
+          stage_bucket: bucketFromStage(stageName, won, lost),
+          win: won,
+          amount_total: parseFloat(d.amount_total || d.amount || "0") || 0,
+          lead_created_at: d.created_at || null,
+          stage_updated_at: d.updated_at || d.stage_updated_at || null,
+          closed_at: d.closed_at || null,
+          raw: d,
+        };
+        if (d.deal_lost_reason?.name || d.deal_lost_reason) row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
+        if (d.user?.name || d.deal_user?.name || d.owner?.name) row.deal_owner_name = d.user?.name || d.deal_user?.name || d.owner?.name;
+        if (d.deal_products?.[0]?.name) row.rd_product_name = d.deal_products[0].name;
+        for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"] as const) {
+          if (d[key]) row[key] = d[key];
+        }
+        return row;
+      });
+      const { error } = await admin.from("rd_deals").upsert(rows, { onConflict: "user_id,rd_deal_id" });
+      if (error) throw error;
+      totalUpdated += rows.length;
+    }
+
     const BATCH_SIZE = 2;
     const BATCH_PAUSE_MS = 400;
 
@@ -629,9 +685,12 @@ Deno.serve(async (req) => {
       }
     } else {
       let page = 1;
-      const maxPages = 50;
+      const maxPages = analytics_mode ? 20 : 50;
+      const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
+      const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
+      const maxAnalyticsDeals = Math.max(1, Math.min(Number(max_deals) || 1000, 3000));
       while (page <= maxPages) {
-        const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200`;
+        const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc`;
         const r = await fetchWithRetry(url);
         if (!r.ok) {
           const txt = await r.text();
@@ -643,6 +702,26 @@ Deno.serve(async (req) => {
         const payload = await r.json();
         const deals = payload.deals || payload || [];
         if (!Array.isArray(deals) || deals.length === 0) break;
+
+        if (analytics_mode) {
+          const rangedDeals = deals.filter((deal: any) => {
+            const rawDate = deal.created_at || deal.updated_at;
+            if (!rawDate) return true;
+            const timestamp = new Date(rawDate).getTime();
+            return (!startMs || timestamp >= startMs) && (!endMs || timestamp <= endMs);
+          }).slice(0, Math.max(0, maxAnalyticsDeals - totalDeals));
+          await persistAnalyticsBatch(rangedDeals);
+          totalDeals += rangedDeals.length;
+
+          const timestamps = deals
+            .map((deal: any) => new Date(deal.created_at || deal.updated_at || 0).getTime())
+            .filter((value: number) => Number.isFinite(value) && value > 0);
+          const reachedOlderBoundary = Boolean(startMs && timestamps.some((value: number) => value < startMs));
+          if (deals.length < 200 || totalDeals >= maxAnalyticsDeals || reachedOlderBoundary) break;
+          page++;
+          continue;
+        }
+
         totalDeals += deals.length;
 
         for (let i = 0; i < deals.length; i += BATCH_SIZE) {

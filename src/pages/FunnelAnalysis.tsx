@@ -18,12 +18,19 @@ import { FunnelStateMap } from "@/components/funnel-analysis/FunnelStateMap";
 import { FunnelAutoInsights } from "@/components/funnel-analysis/FunnelAutoInsights";
 import { FunnelWeekdayChart } from "@/components/funnel-analysis/FunnelWeekdayChart";
 import { FunnelHourChart } from "@/components/funnel-analysis/FunnelHourChart";
+import { FunnelMediaOverview } from "@/components/funnel-analysis/FunnelMediaOverview";
 import { RefreshCw, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRDHealthCheck } from "@/hooks/useRDHealthCheck";
+import { useInsights } from "@/hooks/useInsights";
+import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { computeFunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
+import { format } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
+import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
 
 export default function FunnelAnalysis() {
   const { adAccountId, setAdAccountId, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
@@ -39,9 +46,13 @@ export default function FunnelAnalysis() {
   const [selectedOwner, setSelectedOwner] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<string>("all");
   const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
+  const syncMeta = useSyncMeta();
 
   const activeFunnels = funnels.filter((f) => f.is_active && f.rd_funnel_id);
   const funnelId = selectedFunnel || activeFunnels[0]?.id || "";
+  const selectedFunnelRecord = activeFunnels.find((funnel) => funnel.id === funnelId);
+  const effectiveAdAccountId = adAccountId === "all" ? selectedFunnelRecord?.ad_account_id : adAccountId;
 
   const { data: stages = [], isLoading: loadingStages } = useFunnelStages(funnelId);
   const { data: deals = [], isLoading, refetch } = useRDDeals({
@@ -65,17 +76,92 @@ export default function FunnelAnalysis() {
 
   const analytics = useMemo(() => computeFunnelAnalytics(deals, stages), [deals, stages]);
 
+  const { data: insightRows = [], isLoading: loadingInsights } = useInsights({
+    // A análise detalhada sempre representa um funil. Quando o filtro global
+    // está em "todas", a mídia precisa seguir a conta vinculada a esse funil
+    // para não misturar investimento de clientes diferentes.
+    adAccountId: effectiveAdAccountId,
+    startDate,
+    endDate,
+    enabled: visibleAccounts.length > 0,
+  });
+
+  const scopedInsights = useMemo(() => {
+    if (selectedCampaign === "all") return insightRows;
+    const campaign = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
+    const matches = insightRows.filter((row) => {
+      const metaName = row.campaign_name.trim().toLocaleLowerCase("pt-BR");
+      return metaName === campaign || metaName.includes(campaign) || campaign.includes(metaName);
+    });
+    // UTMs nem sempre repetem o nome da campanha da Meta. Não zeramos a mídia
+    // silenciosamente quando não existe correspondência segura.
+    return matches.length > 0 ? matches : insightRows;
+  }, [insightRows, selectedCampaign]);
+
+  const mediaMetrics = useMemo(
+    () => computeFunnelMediaMetrics(scopedInsights, analytics.totalLeads, analytics.conversions, analytics.revenue),
+    [scopedInsights, analytics.totalLeads, analytics.conversions, analytics.revenue],
+  );
+
   async function handleSync() {
-    if (!funnelId) return;
+    if (!funnelId && visibleAccounts.length === 0) return;
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
-        body: { funnel_id: funnelId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success(`Sincronizado: ${data?.deals ?? 0} deals do RD.`);
-      refetch();
+      const start = format(startDate, "yyyy-MM-dd");
+      const end = format(endDate, "yyyy-MM-dd");
+      const funnelsToSync = activeFunnels.filter((funnel) => funnel.id === funnelId);
+
+      const [metaResult, ...rdResults] = await Promise.allSettled([
+        syncMeta.mutateAsync({
+          adAccountId: effectiveAdAccountId,
+          startDate: start,
+          endDate: end,
+        }),
+        ...funnelsToSync.map(async (funnel) => {
+          const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
+            body: {
+              funnel_id: funnel.id,
+              analytics_mode: true,
+              start_date: start,
+              end_date: end,
+              max_deals: 1200,
+            },
+          });
+          if (error) {
+            const details = await edgeFunctionErrorDetails(error);
+            throw new Error(formatEdgeFunctionError(details));
+          }
+          if (data?.error) throw new Error(data.error);
+          return data;
+        }),
+      ]);
+
+      const rdFailures = rdResults.filter((result) => result.status === "rejected");
+      if (metaResult.status === "rejected" && rdFailures.length === rdResults.length) {
+        throw metaResult.reason;
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["insights"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] }),
+      ]);
+      await refetch();
+
+      if (metaResult.status === "rejected" || rdFailures.length > 0) {
+        const metaMessage = metaResult.status === "rejected"
+          ? (metaResult.reason instanceof Error ? metaResult.reason.message : String(metaResult.reason))
+          : "";
+        const rdMessage = rdFailures
+          .map((result) => result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "")
+          .filter(Boolean)
+          .join(" · ");
+        toast.warning("Sincronização parcial", {
+          description: [metaMessage && `Meta: ${metaMessage}`, rdMessage && `RD: ${rdMessage}`].filter(Boolean).join(" · "),
+        });
+      } else {
+        toast.success(`Meta Ads e ${funnelsToSync.length} funil(is) do RD atualizados.`);
+      }
     } catch (e: any) {
       toast.error(e.message || "Erro ao sincronizar");
     } finally {
@@ -97,12 +183,20 @@ export default function FunnelAnalysis() {
           </div>
           <div className="flex items-center gap-2">
             <HealthBadge />
-            <Button onClick={handleSync} disabled={syncing || !funnelId} variant="default" size="sm">
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-              Sincronizar do RD
+            <Button onClick={handleSync} disabled={syncing || syncMeta.isPending || (!funnelId && visibleAccounts.length === 0)} variant="default" size="sm">
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing || syncMeta.isPending ? "animate-spin" : ""}`} />
+              Sincronizar Meta + RD
             </Button>
           </div>
         </div>
+      </MotionItem>
+
+      <MotionItem>
+        {loadingInsights ? (
+          <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Carregando métricas da Meta…</div>
+        ) : (
+          <FunnelMediaOverview metrics={mediaMetrics} />
+        )}
       </MotionItem>
 
       <MotionItem>
@@ -189,7 +283,7 @@ export default function FunnelAnalysis() {
         </MotionItem>
       ) : (
         <>
-          <MotionItem><FunnelKPIs a={analytics} /></MotionItem>
+          <MotionItem><FunnelKPIs a={analytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} /></MotionItem>
 
           <MotionItem>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

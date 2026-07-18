@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { endOfDay } from "date-fns";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -103,7 +104,7 @@ export function useRDDeals(params: Params) {
         .order("lead_created_at", { ascending: false });
 
       if (startDate) query = query.gte("lead_created_at", startDate.toISOString());
-      if (endDate) query = query.lte("lead_created_at", endDate.toISOString());
+      if (endDate) query = query.lte("lead_created_at", endOfDay(endDate).toISOString());
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
       if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
