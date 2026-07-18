@@ -24,6 +24,9 @@ html
 .wrangler/
 .dev.vars
 supabase/.temp/
+test-results/
+playwright-report/
+tests/visual/__screenshots__/growdash.spec.ts/auth.png
 
 # Editor directories and files
 .vscode/*

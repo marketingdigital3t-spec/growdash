@@ -81,16 +81,20 @@ ALTER TABLE public.social_insights_daily ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.social_accounts, public.social_media, public.social_insights_daily TO authenticated;
 GRANT ALL ON public.social_accounts, public.social_media, public.social_insights_daily TO service_role;
 
+DROP POLICY IF EXISTS "Users manage own social accounts" ON public.social_accounts;
 CREATE POLICY "Users manage own social accounts" ON public.social_accounts FOR ALL TO authenticated
   USING (user_id = auth.uid() OR public.is_master(auth.uid()))
   WITH CHECK (user_id = auth.uid() OR public.is_master(auth.uid()));
 
+DROP POLICY IF EXISTS "Users view own social media" ON public.social_media;
 CREATE POLICY "Users view own social media" ON public.social_media FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.social_accounts account WHERE account.id = social_account_id AND (account.user_id = auth.uid() OR public.is_master(auth.uid()))));
 
+DROP POLICY IF EXISTS "Users view own social daily insights" ON public.social_insights_daily;
 CREATE POLICY "Users view own social daily insights" ON public.social_insights_daily FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.social_accounts account WHERE account.id = social_account_id AND (account.user_id = auth.uid() OR public.is_master(auth.uid()))));
 
+DROP TRIGGER IF EXISTS social_accounts_updated_at ON public.social_accounts;
 CREATE TRIGGER social_accounts_updated_at BEFORE UPDATE ON public.social_accounts
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 

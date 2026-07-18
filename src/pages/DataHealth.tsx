@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Activity, AlertTriangle, Database, Loader2, MapPin, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CalendarRange, Database, KeyRound, Loader2, MapPin, RefreshCw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DuplicatesCard } from "@/components/data-health/DuplicatesCard";
@@ -15,6 +15,7 @@ import { JobRunsCard } from "@/components/data-health/JobRunsCard";
 import { MetaValidationCard } from "@/components/data-health/MetaValidationCard";
 import { MetaLeadsReconciliationCard } from "@/components/data-health/MetaLeadsReconciliationCard";
 import { Inbox } from "lucide-react";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 
 interface HealthData {
   orphanSales: number;
@@ -23,6 +24,7 @@ interface HealthData {
   daysSpendNoLeads: number;
   accountsMissingLpConfig: { id: string; name: string }[];
   lastSyncs: { id: string; name: string; last_sync_success_at: string | null; connection_status: string }[];
+  oauthIntegrations: { id: string; provider: string; is_active: boolean | null; token_expires_at: string | null; permission_health: string | null; last_permission_check_at: string | null; last_health_error: string | null }[];
 }
 
 function useHealth() {
@@ -76,6 +78,10 @@ function useHealth() {
       const { data: accounts } = await supabase
         .from("ad_accounts")
         .select("id, name, last_sync_success_at, connection_status");
+      const { data: oauthIntegrations } = await supabase
+        .from("integrations")
+        .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
+        .order("updated_at", { ascending: false });
       const { data: lpRows } = await supabase.from("account_lp_config").select("ad_account_id, action_type");
       const lpMap = new Map((lpRows || []).map((r: any) => [r.ad_account_id, r.action_type]));
       const accountsMissingLpConfig = (accounts || [])
@@ -89,16 +95,33 @@ function useHealth() {
         daysSpendNoLeads,
         accountsMissingLpConfig,
         lastSyncs: (accounts || []) as any,
+        oauthIntegrations: (oauthIntegrations || []) as any,
       };
     },
   });
 }
 
 export default function DataHealth() {
+  const { adAccountId, startDate, endDate } = useGlobalFilters();
   const { data, isLoading, refetch } = useHealth();
   const [enriching, setEnriching] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [syncingLeads, setSyncingLeads] = useState(false);
+  const [checkingOAuth, setCheckingOAuth] = useState(false);
+
+  const runOAuthCheck = async () => {
+    setCheckingOAuth(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke("monitor-oauth-health", { body: {} });
+      if (error) throw error;
+      toast({ title: "Saúde OAuth verificada", description: `${(result as any)?.checked ?? 0} integração(ões) auditada(s), sem expor tokens no navegador.` });
+      refetch();
+    } catch (error) {
+      toast({ title: "Falha na auditoria OAuth", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setCheckingOAuth(false);
+    }
+  };
 
   const runSyncMetaLeads = async () => {
     setSyncingLeads(true);
@@ -168,6 +191,13 @@ export default function DataHealth() {
         </Button>
       </div>
 
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div><span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Diagnóstico por conta e período</span><p className="mt-1 text-sm font-bold">{adAccountId === "all" ? "Todas as contas" : data.lastSyncs.find((item) => item.id === adAccountId)?.name || "Conta selecionada"}</p></div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarRange className="h-4 w-4 text-primary" />{format(startDate, "dd/MM/yyyy")} — {format(endDate, "dd/MM/yyyy")}</div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -231,6 +261,21 @@ export default function DataHealth() {
             {syncingLeads ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Inbox className="mr-2 h-4 w-4" />}
             Sincronizar Meta Leads agora
           </Button>
+          <Button onClick={runOAuthCheck} disabled={checkingOAuth} variant="secondary">
+            {checkingOAuth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+            Verificar tokens e permissões
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Tokens, expiração e permissões OAuth</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {data.oauthIntegrations.length ? data.oauthIntegrations.map((integration) => {
+            const status = integration.permission_health || "unchecked";
+            const unhealthy = ["expired", "permission_removed", "error"].includes(status);
+            return <div key={integration.id} className="flex flex-col gap-2 border-b border-border/40 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><Badge variant={unhealthy ? "destructive" : "outline"}>{status}</Badge><b className="text-sm capitalize">{integration.provider.replaceAll("_", " ")}</b></div><div className="text-xs text-muted-foreground">{integration.token_expires_at ? `Expira ${format(parseISO(integration.token_expires_at), "dd/MM/yyyy HH:mm")}` : "Expiração não informada"}{integration.last_health_error ? ` · ${integration.last_health_error}` : ""}</div></div>;
+          }) : <p className="py-4 text-sm text-muted-foreground">Nenhuma integração OAuth cadastrada.</p>}
         </CardContent>
       </Card>
 
@@ -240,7 +285,7 @@ export default function DataHealth() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {data.lastSyncs.map((a) => {
+            {data.lastSyncs.filter((account) => adAccountId === "all" || account.id === adAccountId).map((a) => {
               const stale = !a.last_sync_success_at || Date.now() - new Date(a.last_sync_success_at).getTime() > 24 * 3600 * 1000;
               return (
                 <div key={a.id} className="flex items-center justify-between border-b border-border/40 py-2 text-sm last:border-0">

@@ -50,16 +50,10 @@ Deno.serve(async (req) => {
       : [];
     const includeBreakdowns = body.includeBreakdowns === true;
     const incremental = body.incremental === true;
-    const today = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Sao_Paulo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
     // A sincronização sem intervalo é sempre incremental. Backfills continuam
     // enviando startDate/endDate explicitamente e preservam todo o histórico.
-    const startDate = body.startDate || today;
-    const endDate = body.endDate || today;
+    const requestedStartDate = body.startDate;
+    const requestedEndDate = body.endDate;
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
@@ -85,6 +79,16 @@ Deno.serve(async (req) => {
     for (const account of accounts) {
       const attemptedAt = new Date().toISOString();
       try {
+        const accountToday = new Intl.DateTimeFormat("en-CA", {
+          timeZone: account.timezone_name || "America/Sao_Paulo",
+          year: "numeric", month: "2-digit", day: "2-digit",
+        }).format(new Date());
+        const startDate = requestedStartDate || accountToday;
+        const endDate = requestedEndDate || accountToday;
+        const attributionWindows = account.attribution_window && account.attribution_window !== "account_default"
+          ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
+          : ["7d_click", "1d_view"];
+        const attributionParam = encodeURIComponent(JSON.stringify(attributionWindows));
         const accessToken = account.access_token;
         const rawAccountId = account.account_id;
         const metaAccountId = rawAccountId.startsWith("act_") ? rawAccountId : `act_${rawAccountId}`;
@@ -330,7 +334,7 @@ Deno.serve(async (req) => {
         // 4. Buscar insights a nível de CONTA (não depende da listagem de campanhas)
         //    Captura inclusive ads de campanhas arquivadas/finalizadas
         const insightsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
         );
         if (insightsRes.error) {
           errors.push(`Conta ${account.name} insights: ${insightsRes.error}`);
@@ -498,7 +502,7 @@ Deno.serve(async (req) => {
           const breakdownTypes = ["age", "gender", "publisher_platform", "platform_position", "region"];
           for (const bt of breakdownTypes) {
             const bRes = await fetchMetaPaginated(
-              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
             if (bRes.error) {
               console.warn(`Breakdown ${bt} error: ${bRes.error}`);

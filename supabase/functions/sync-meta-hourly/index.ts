@@ -49,10 +49,8 @@ Deno.serve(async (req) => {
     const adAccountIds = Array.isArray(body.adAccountIds)
       ? body.adAccountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
-    const startDate: string =
-      body.startDate || new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
-    const endDate: string =
-      body.endDate || new Date().toISOString().split("T")[0];
+    const requestedStartDate: string | undefined = body.startDate;
+    const requestedEndDate: string | undefined = body.endDate;
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
@@ -76,9 +74,20 @@ Deno.serve(async (req) => {
 
     for (const account of accounts) {
       try {
+        const accountToday = new Intl.DateTimeFormat("en-CA", {
+          timeZone: account.timezone_name || "America/Sao_Paulo",
+          year: "numeric", month: "2-digit", day: "2-digit",
+        }).format(new Date());
+        // Sem intervalo explícito, atualiza somente o dia corrente da conta.
+        // Backfills continuam disponíveis ao informar startDate/endDate.
+        const startDate = requestedStartDate || accountToday;
+        const endDate = requestedEndDate || accountToday;
         const accessToken = account.access_token as string;
         const raw = account.account_id as string;
         const metaAccountId = raw.startsWith("act_") ? raw : `act_${raw}`;
+        const attributionWindows = account.attribution_window && account.attribution_window !== "account_default"
+          ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
+          : ["7d_click", "1d_view"];
 
         // Match daily sync: leads = onsite_conversion.lead_grouped + per-account configured LP event.
         const { data: lpCfg } = await supabaseAdmin
@@ -95,7 +104,7 @@ Deno.serve(async (req) => {
           `&breakdowns=hourly_stats_aggregated_by_audience_time_zone` +
           `&fields=ad_id,campaign_id,spend,clicks,actions` +
           `&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}` +
-          `&action_attribution_windows=${encodeURIComponent('["7d_click","1d_view"]')}` +
+          `&action_attribution_windows=${encodeURIComponent(JSON.stringify(attributionWindows))}` +
           `&use_unified_attribution_setting=true` +
           `&access_token=${accessToken}` +
           `&limit=500`;
