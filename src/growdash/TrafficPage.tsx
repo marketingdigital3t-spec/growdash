@@ -3,9 +3,10 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
-  Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, GitBranch, Megaphone,
-  MessageCircle, MousePointerClick, RefreshCw, Smartphone, Sparkles, Target,
-  UsersRound, Video, WalletCards, Zap,
+  BarChart3, Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, CreditCard,
+  ExternalLink, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
+  Network, RefreshCw, Settings2, Smartphone, Sparkles, Target, UsersRound, Video,
+  WalletCards, Wrench, Zap,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -27,18 +28,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 const CampaignsManager = lazy(() => import("@/pages/Campaigns"));
-const validTabs = new Set(["campaigns", "budget", "ai", "funnels"]);
+const validTabs = new Set(["campaigns", "budget", "ai", "funnels", "tools"]);
 const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
   { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
   { id: "ai", label: "IA & Relatórios de Leads", icon: Bot },
   { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
+  { id: "tools", label: "Ferramentas Meta", icon: Wrench },
 ] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 
 export default function TrafficPage() {
   const [params, setParams] = useSearchParams();
+  const { toast } = useToast();
   const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
   const { adAccountId, setAdAccountId, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
@@ -54,7 +57,7 @@ export default function TrafficPage() {
         ? "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
         : "space-y-3",
     )}>
-      <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-4 lg:max-w-[1180px]" aria-label="Áreas de Tráfego Pago">
+      <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-3 lg:max-w-[1500px] lg:grid-cols-5" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 
@@ -69,7 +72,55 @@ export default function TrafficPage() {
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountId} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
       {activeTab === "ai" && <AIAndLeadReports accountId={adAccountId} accountName={account?.name} />}
       {activeTab === "funnels" && <TrafficFunnels />}
+      {activeTab === "tools" && <MetaToolsWorkspace
+        providerAccountId={account?.account_id}
+        accountName={account?.name}
+        onCampaigns={() => setParams({ aba: "campaigns" })}
+        onMissingAccount={() => toast({ title: "Selecione uma conta Meta", description: "Escolha uma conta específica acima para abrir a ferramenta no contexto correto." })}
+      />}
     </div>
+  );
+}
+
+function MetaToolsWorkspace({ providerAccountId, accountName, onCampaigns, onMissingAccount }: {
+  providerAccountId?: string;
+  accountName?: string;
+  onCampaigns: () => void;
+  onMissingAccount: () => void;
+}) {
+  const normalizedAccountId = String(providerAccountId || "").replace(/^act_/i, "");
+  const openMeta = (url: string) => {
+    if (!normalizedAccountId) return onMissingAccount();
+    window.open(url.replace("{account}", normalizedAccountId), "_blank", "noopener,noreferrer");
+  };
+  const tools = [
+    { title: "Relatórios de Anúncios", description: "Crie, salve e compare relatórios detalhados da conta.", icon: FileBarChart, url: "https://business.facebook.com/adsmanager/reporting/view?act={account}" },
+    { title: "Públicos", description: "Crie públicos personalizados, semelhantes e salvos.", icon: UsersRound, url: "https://business.facebook.com/adsmanager/audiences?act={account}" },
+    { title: "Configurações de publicidade", description: "Gerencie ativos, permissões e preferências da conta.", icon: Settings2, url: "https://business.facebook.com/settings/ad-accounts/{account}" },
+    { title: "Cobrança e pagamentos", description: "Consulte saldo, formas de pagamento e transações.", icon: CreditCard, url: "https://business.facebook.com/billing_hub/accounts/details/?asset_id={account}" },
+    { title: "Gerenciador de Eventos", description: "Configure Pixel, CAPI, eventos e diagnósticos.", icon: Network, url: "https://business.facebook.com/events_manager2/overview?act={account}" },
+    { title: "Todas as ferramentas", description: "Abra a central oficial de ferramentas empresariais da Meta.", icon: Wrench, url: "https://business.facebook.com/latest/home?asset_id={account}" },
+  ];
+
+  return (
+    <section className="space-y-4 rounded-xl border border-border bg-card p-4">
+      <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-black"><Wrench className="h-5 w-5 text-primary" />Ferramentas Meta</h2>
+          <p className="text-xs text-muted-foreground">{accountName ? `Conta selecionada: ${accountName}` : "Selecione uma conta para abrir as ferramentas oficiais no contexto correto."}</p>
+        </div>
+        <Button className="sm:ml-auto" onClick={onCampaigns}><Megaphone className="mr-2 h-4 w-4" />Criar ou editar campanha</Button>
+      </header>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {tools.map(({ title, description, icon: Icon, url }) => (
+          <button key={title} type="button" onClick={() => openMeta(url)} className="group flex min-h-28 items-start gap-3 rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary/50 hover:bg-primary/5">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
+            <span className="min-w-0"><span className="flex items-center gap-2 font-black">{title}<ExternalLink className="h-3.5 w-3.5 text-muted-foreground transition group-hover:text-primary" /></span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span></span>
+          </button>
+        ))}
+      </div>
+      <p className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3 text-[11px] text-muted-foreground"><Check className="mr-2 inline h-4 w-4 text-emerald-500" />A criação e a edição de campanhas acontecem dentro da Growdash com confirmação e auditoria. Ferramentas sensíveis abrem diretamente na Meta, sem expor o token no navegador.</p>
+    </section>
   );
 }
 

@@ -33,6 +33,77 @@ Deno.serve(async (req) => {
     if (userError || !user) return json({ error: "Sessão inválida ou expirada" }, 401);
 
     const body = await req.json().catch(() => null);
+    const operation = String(body?.operation ?? "update");
+
+    if (operation === "create_campaign") {
+      const accountId = String(body?.accountId ?? "").trim();
+      const name = String(body?.campaign?.name ?? "").trim();
+      const objective = String(body?.campaign?.objective ?? "").toUpperCase();
+      const allowedObjectives = ["OUTCOME_AWARENESS", "OUTCOME_TRAFFIC", "OUTCOME_ENGAGEMENT", "OUTCOME_LEADS", "OUTCOME_APP_PROMOTION", "OUTCOME_SALES"];
+      if (!/^[0-9a-f-]{36}$/i.test(accountId)) return json({ error: "Conta inválida" }, 400);
+      if (name.length < 1 || name.length > 255) return json({ error: "Nome inválido" }, 400);
+      if (!allowedObjectives.includes(objective)) return json({ error: "Objetivo inválido" }, 400);
+
+      const { data: account } = await admin
+        .from("ad_accounts")
+        .select("id, account_id, user_id, access_token, connection_status")
+        .eq("id", accountId)
+        .maybeSingle();
+      if (!account?.access_token) return json({ error: "Conta Meta sem token válido" }, 409);
+
+      const [{ data: privileged }, { data: delegated }, { data: permissions }] = await Promise.all([
+        admin.from("user_roles").select("role").eq("user_id", user.id).in("role", ["admin", "master"]).maybeSingle(),
+        admin.from("user_ad_account_access").select("ad_account_id").eq("user_id", user.id).eq("ad_account_id", account.id).maybeSingle(),
+        admin.from("user_permissions").select("can_campaigns").eq("user_id", user.id).maybeSingle(),
+      ]);
+      const canCreate = account.user_id === user.id || !!privileged || (!!delegated && permissions?.can_campaigns === true);
+      if (!canCreate) return json({ error: "Sem permissão para criar nesta conta" }, 403);
+
+      const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
+      const metaPayload = new URLSearchParams({
+        access_token: account.access_token,
+        name,
+        objective,
+        status: "PAUSED",
+        special_ad_categories: "[]",
+      });
+      const providerAccountId = String(account.account_id ?? "").replace(/^act_/i, "");
+      const metaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/act_${providerAccountId}/campaigns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: metaPayload,
+      });
+      const metaResult = await metaResponse.json().catch(() => ({}));
+      if (!metaResponse.ok || metaResult?.error || !metaResult?.id) {
+        const message = metaResult?.error?.message ?? "A Meta recusou a criação";
+        const code = metaResult?.error?.code ?? metaResponse.status;
+        return json({ error: `${message} (código ${code})` }, 422);
+      }
+
+      const campaignId = String(metaResult.id);
+      const { error: insertError } = await admin.from("campaigns").upsert({
+        id: campaignId,
+        ad_account_id: account.id,
+        name,
+        objective,
+        status: "PAUSED",
+        updated_at: new Date().toISOString(),
+      });
+      if (insertError) console.error("Meta campaign created, local insert failed", insertError);
+      await admin.from("campaign_changes").insert({
+        campaign_id: campaignId,
+        entity_type: "campaign",
+        entity_id: campaignId,
+        change_type: "manual_create",
+        field: "campaign",
+        old_value: null,
+        new_value: name,
+        created_by: user.id,
+        note: "Campanha pausada criada pela Growdash",
+      });
+      return json({ success: true, operation, campaignId, status: "PAUSED" });
+    }
+
     const entityType = body?.entityType as EntityType;
     const entityId = String(body?.entityId ?? "").trim();
     const changes = body?.changes ?? {};

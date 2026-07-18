@@ -31,7 +31,6 @@ import {
   SlidersHorizontal,
   Eye,
   TriangleAlert,
-  Download,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -59,6 +58,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
 import { EditableMetaEntity, MetaEntityEditor } from "@/components/campaigns/MetaEntityEditor";
+import { MetaCampaignCreator } from "@/components/campaigns/MetaCampaignCreator";
 import { ResizableHead, StatusDot, normalizeStatus, useColWidths } from "@/components/dashboard/ResizableTableHelpers";
 import { cn } from "@/lib/utils";
 import { getStatusBadge } from "@/lib/status";
@@ -160,6 +160,7 @@ export default function Campaigns() {
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
   const [detailEntity, setDetailEntity] = useState<MetaDetailEntity | null>(null);
   const [editingEntity, setEditingEntity] = useState<EditableMetaEntity | null>(null);
+  const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
   const [statusSortCycle, setStatusSortCycle] = useState<0 | 1 | 2>(0);
@@ -476,14 +477,6 @@ export default function Campaigns() {
     else setSelectedIds(new Set(filtered.map((c: any) => c.id)));
   };
 
-  const downloadCampaigns = () => {
-    const header = ["Campanha", "Status", "Objetivo", "Orçamento", "Valor usado", "Impressões", "Alcance", "Frequência", "CPM", "Cliques", "CTR", "CPC", "Leads", "CPL", "Conversão", "Vendas", "CPA", "Receita", "ROAS", "Lucro", "ROI"];
-    const rows = filtered.map((item: any) => [item.name, item.status, item.objective || "", item.budget, item.spend, item.impressions, item.reach, item.frequency, item.cpm, item.clicks, item.ctr, item.cpc, item.leads, item.cpl, item.conversionRate, item.salesCount, item.cpa, item.revenue, item.roas, item.profit, item.roi]);
-    const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
-    const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a"); link.href = url; link.download = `growdash-campanhas-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
-  };
-
   const totals = useMemo(() => filtered.reduce(
     (acc: any, c: any) => ({
       budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads,
@@ -618,19 +611,6 @@ export default function Campaigns() {
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
-  const downloadCurrentView = () => {
-    if (activeTab === "campaigns") { downloadCampaigns(); return; }
-    const source = activeTab === "adsets" ? selectedAdsets : selectedAds;
-    const label = activeTab === "adsets" ? "conjuntos" : "anuncios";
-    const header = activeTab === "adsets"
-      ? ["Conjunto", "Campanha", "Status", "Orçamento", "Investimento", "Impressões", "Alcance", "Cliques", "Leads", "CPL"]
-      : ["Anúncio", "Conjunto", "Campanha", "Status", "Investimento", "Impressões", "Alcance", "Cliques", "CTR", "CPC", "Leads", "CPL"];
-    const rows = source.map((item: any) => activeTab === "adsets"
-      ? [item.name, item.campaignName, item.status, item.daily_budget || 0, item.spend, item.impressions, item.reach, item.clicks, item.leads, item.leads > 0 ? item.spend / item.leads : 0]
-      : [item.name, item.adsetName, item.campaignName, item.status, item.spend, item.impressions, item.reach, item.clicks, item.impressions > 0 ? item.clicks / item.impressions * 100 : 0, item.clicks > 0 ? item.spend / item.clicks : 0, item.leads, item.leads > 0 ? item.spend / item.leads : 0]);
-    exportCsv(header, rows, `growdash-${label}-${new Date().toISOString().slice(0, 10)}.csv`);
-  };
-
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const showColumn = (key: CampaignColumnKey) => visibleColumns.has(key);
@@ -705,9 +685,9 @@ export default function Campaigns() {
             </div>
           </div>
 
-          <div className="flex min-h-11 flex-col gap-2 border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908] xl:flex-row xl:items-center">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" className="h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => toast({ title: "Criação segura de campanha", description: "Selecione uma única conta Meta. A campanha será preparada como rascunho antes de qualquer publicação." })}><Plus className="h-3.5 w-3.5" />Criar</Button>
+          <div className="growdash-scrollbar flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
+            <div className="flex shrink-0 items-center gap-2">
+              <Button size="sm" className="h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
               <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
               <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
               <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><FlaskConical className="h-3.5 w-3.5" />Teste A/B</Button>
@@ -715,7 +695,7 @@ export default function Campaigns() {
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
               <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
             </div>
-            <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               {activeTab === "campaigns" && <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn("meta-toolbar-button", analysisPanel && "meta-toolbar-button-active")}><BarChart3 className="h-3.5 w-3.5" />Análises<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -724,7 +704,6 @@ export default function Campaigns() {
                 </DropdownMenuContent>
               </DropdownMenu>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
-              <Button size="sm" onClick={downloadCurrentView} disabled={(activeTab === "campaigns" ? filtered : activeTab === "adsets" ? selectedAdsets : selectedAds).length === 0} className="meta-toolbar-primary"><Download className="h-3.5 w-3.5" />Baixar relatório</Button>
             </div>
           </div>
 
@@ -819,7 +798,7 @@ export default function Campaigns() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col">
+              <Card className={cn("relative overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col", pageCount > 1 ? "md:pb-[74px]" : "md:pb-10")}>
                 <div className="space-y-2 p-2 md:hidden">
                   {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
                 </div>
@@ -942,7 +921,7 @@ export default function Campaigns() {
                     </TableBody>
                   </Table>
                 </div>
-                <div data-campaign-totals className="campaign-total-bar z-20 shrink-0">
+                <div data-campaign-totals className="campaign-total-bar z-30 shrink-0 md:absolute md:inset-x-0 md:bottom-0">
                   <div className="growdash-scrollbar overflow-x-auto">
                     <div className="flex h-10 w-max items-stretch text-[10px]">
                       <AlignedTotal width={camp.colWidths.check + camp.colWidths.delivery + camp.colWidths.name} label={`Totais (${filtered.length})`} value={`${filtered.length} campanhas`} align="left" />
@@ -1135,6 +1114,13 @@ export default function Campaigns() {
         onOpenChange={(open) => !open && setEditingEntity(null)}
         onSaved={async () => { await refetch(); }}
       />
+      <MetaCampaignCreator
+        open={createCampaignOpen}
+        accounts={visibleAdAccounts.map((account) => ({ id: account.id, name: account.name }))}
+        defaultAccountId={selectedAccount !== "all" ? selectedAccount : undefined}
+        onOpenChange={setCreateCampaignOpen}
+        onCreated={async () => { await refetch(); }}
+      />
     </MotionPage>
   );
 }
@@ -1294,14 +1280,4 @@ function LevelTotals({ label, count, totals }: { label: string; count: number; t
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
   return <div className="campaign-total-bar z-20 shrink-0 px-3 py-3"><div className="growdash-scrollbar flex gap-2 overflow-x-auto"><TotalMetric label="Total" value={`${count} ${label}`} /><TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><TotalMetric label="Alcance*" value={totals.reach.toLocaleString("pt-BR")} /><TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} /><TotalMetric label="CTR" value={`${ctr.toFixed(2).replace(".", ",")}%`} /><TotalMetric label="Resultados" value={totals.leads.toLocaleString("pt-BR")} /><TotalMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>;
-}
-
-function exportCsv(header: string[], rows: Array<Array<string | number>>, filename: string) {
-  const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
-  const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
