@@ -3,6 +3,7 @@ import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { Users, CheckCircle2, Trophy, Percent, Clock, DollarSign, TrendingUp, Target } from "lucide-react";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 import { metricDescription } from "@/lib/metricPresentation";
+import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 
 interface Props {
   a: FunnelAnalytics;
@@ -39,25 +40,23 @@ export function FunnelKPIs({ a, cpl, cac }: Props) {
       {cards.map((c) => {
         const Icon = c.icon;
         return (
-          <Card key={c.label} className="gd-metric-card cursor-default bg-card/75 border-border/60 backdrop-blur" title={metricDescription(c.label)}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">{c.label}</span>
-                <Icon className={`h-4 w-4 ${c.color}`} />
-              </div>
-              <div className="text-2xl font-semibold">
-                {c.format === "int" && <AnimatedNumber value={Math.round(c.value)} decimals={0} />}
-                {c.format === "pct" && (
-                  <><AnimatedNumber value={c.value} decimals={1} />%</>
-                )}
-                {c.format === "days" && (
-                  <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>
-                )}
-                {c.format === "brl" && fmtBRL(c.value)}
-                {c.format === "custom" && <span className="text-base">{c.custom}</span>}
-              </div>
-            </CardContent>
-          </Card>
+          <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} className="h-full" showHint>
+            <Card className="gd-metric-card h-full cursor-default bg-card/75 border-border/60 backdrop-blur">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2 pr-5">
+                  <span className="text-xs text-muted-foreground">{c.label}</span>
+                  <Icon className={`h-4 w-4 ${c.color}`} />
+                </div>
+                <div className="text-2xl font-semibold">
+                  {c.format === "int" && <AnimatedNumber value={Math.round(c.value)} decimals={0} />}
+                  {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={1} />%</>}
+                  {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
+                  {c.format === "brl" && fmtBRL(c.value)}
+                  {c.format === "custom" && <span className="text-base">{c.custom}</span>}
+                </div>
+              </CardContent>
+            </Card>
+          </MetricHelpTooltip>
         );
       })}
     </div>

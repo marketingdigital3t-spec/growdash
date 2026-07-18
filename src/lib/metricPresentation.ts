@@ -8,6 +8,12 @@ const descriptions: Record<string, string> = {
   "tempo médio até conversão": "Média de dias entre a entrada do lead e a conversão.",
   "ticket médio": "Receita dividida pela quantidade de vendas confirmadas.",
   "receita gerada": "Valor total atribuído às vendas do período.",
+  "investimento meta": "Valor consumido pelas campanhas da Meta Ads no período e conta selecionados.",
+  "cliques no link": "Quantidade de cliques que levaram o usuário ao destino configurado no anúncio.",
+  "leads meta": "Resultados de lead atribuídos pela Meta conforme a janela de atribuição da conta.",
+  "leads no rd": "Negociações encontradas no RD Station para a mesma conta e o mesmo período.",
+  "cac / roas": "CAC é o investimento dividido pelas vendas; ROAS é a receita atribuída dividida pelo investimento.",
+  "cpl / cac": "CPL é o investimento por lead no RD; CAC é o investimento por venda confirmada.",
   "faturamento líquido": "Receita após descontos, taxas e ajustes registrados.",
   "gastos com anúncios": "Valor investido em mídia paga no período selecionado.",
   investimento: "Valor consumido pelas campanhas no período selecionado.",
@@ -42,4 +48,3 @@ export function formatMetric(value: number, kind: MetricKind, locale = "pt-BR") 
   if (kind === "duration") return `${safe.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} dias`;
   return safe.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-

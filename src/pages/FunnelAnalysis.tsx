@@ -31,6 +31,29 @@ import { computeFunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
+import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
+
+const blockHelp = {
+  media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
+  distribution: ["Distribuição por etapa do funil", "Mostra quantos leads estão em cada etapa do RD, sua participação, tempo médio e valor em negociação."],
+  conversion: ["Taxa de avanço entre etapas", "Calcula a passagem entre etapas consecutivas e destaca onde o funil perde mais leads."],
+  evolution: ["Evolução do funil", "Exibe a variação diária de leads, oportunidades e vendas no período selecionado."],
+  bottlenecks: ["Gargalos do funil", "Aponta a maior queda de conversão e quantos leads estão parados há mais de 3, 7 e 15 dias."],
+  sources: ["Origem dos leads", "Compara volume, vendas, conversão e receita por origem para revelar os canais de maior qualidade."],
+  losses: ["Motivos de perda", "Agrupa os motivos registrados no RD para mostrar por que as negociações não avançaram."],
+  insights: ["Insights automáticos", "Transforma padrões do funil em observações acionáveis sobre origem, gargalos, região e tempo parado."],
+  states: ["Mapa por estado", "Distribui leads e conversões geograficamente para identificar regiões com maior volume e eficiência."],
+  weekdays: ["Dias que mais convertem", "Compara conversões e receita por dia da semana usando a data dos eventos do RD."],
+  hours: ["Melhor período do dia", "Compara manhã, tarde, noite e madrugada; clique em um período para detalhar as vendas por hora."],
+} as const;
+
+function HelpBlock({ help, children, className }: { help: readonly string[]; children: React.ReactNode; className?: string }) {
+  return (
+    <MetricHelpTooltip title={help[0]} description={help[1]} detail={help[2]} className={className ?? "h-full"} showHint>
+      {children}
+    </MetricHelpTooltip>
+  );
+}
 
 export default function FunnelAnalysis() {
   const { adAccountId, setAdAccountId, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
@@ -194,7 +217,7 @@ export default function FunnelAnalysis() {
         {loadingInsights ? (
           <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Carregando métricas da Meta…</div>
         ) : (
-          <FunnelMediaOverview metrics={mediaMetrics} />
+          <HelpBlock help={blockHelp.media}><FunnelMediaOverview metrics={mediaMetrics} /></HelpBlock>
         )}
       </MotionItem>
 
@@ -270,36 +293,36 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <FunnelStageDistribution a={analytics} />
-              <FunnelStageConversion a={analytics} />
+              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={analytics} /></HelpBlock>
             </div>
           </MotionItem>
 
           <MotionItem>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2">
-                <FunnelLeadsEvolution a={analytics} />
+                <HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={analytics} /></HelpBlock>
               </div>
-              <FunnelBottlenecks a={analytics} />
+              <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={analytics} /></HelpBlock>
             </div>
           </MotionItem>
 
           <MotionItem>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <FunnelSourceTable a={analytics} />
-              <FunnelLostReasons a={analytics} />
-              <FunnelAutoInsights a={analytics} />
+              <HelpBlock help={blockHelp.sources}><FunnelSourceTable a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.losses}><FunnelLostReasons a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.insights}><FunnelAutoInsights a={analytics} /></HelpBlock>
             </div>
           </MotionItem>
 
           <MotionItem>
-            <FunnelStateMap a={analytics} />
+            <HelpBlock help={blockHelp.states}><FunnelStateMap a={analytics} /></HelpBlock>
           </MotionItem>
 
           <MotionItem>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <FunnelWeekdayChart a={analytics} />
-              <FunnelHourChart a={analytics} />
+              <HelpBlock help={blockHelp.weekdays}><FunnelWeekdayChart a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.hours}><FunnelHourChart a={analytics} /></HelpBlock>
             </div>
           </MotionItem>
         </>
