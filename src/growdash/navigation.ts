@@ -84,7 +84,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Inteligência",
     items: [
       {
-        label: "Campanhas",
+        label: "Tráfego Pago",
         path: "/campanhas",
         icon: Megaphone,
         description: "Gerencie campanhas, mídia e performance de aquisição.",
@@ -303,6 +303,14 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "Falhas", value: "1", change: "revisar" },
         ],
         highlights: ["Meta Ads", "RD Station CRM", "Google Ads"],
+      },
+      {
+        label: "Meta Connect",
+        path: "/meta-connect",
+        icon: Cable,
+        description: "Gerencie Facebook, Instagram e contas de anúncio vinculadas ao workspace.",
+        metrics: [],
+        highlights: ["Login Facebook", "Contas de anúncio", "Perfis do Instagram"],
       },
       {
         label: "Usuários",

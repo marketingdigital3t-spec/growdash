@@ -89,6 +89,7 @@ export default function App() {
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route element={<AuthenticatedLayout />}>
                     <Route index element={<RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage>} />
+                    <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
                     <Route path="crm" element={<CrmPage />} />
                     <Route path="comercial" element={<CommercialPage />} />
@@ -97,6 +98,7 @@ export default function App() {
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />
                     <Route path="analise-de-funis" element={<RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage>} />
+                    <Route path="analise-funis" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="funnels" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="alertas" element={<RequirePage page="master">{analytics(<FullAlerts />)}</RequirePage>} />
                     <Route path="agenda-turmas" element={<RequirePage page="classes">{analytics(<EventClasses />)}</RequirePage>} />
@@ -116,9 +118,11 @@ export default function App() {
                     <Route path="integracoes" element={<IntegrationsPage />} />
                     <Route path="perfil" element={<ProfilePage />} />
                     <Route path="midia-social" element={analytics(<SocialMediaPage />)} />
-                    <Route path="kanban" element={<Navigate to="/crm" replace />} />
+                    <Route path="kanban" element={<ModulePage />} />
                     <Route path="anuncios" element={<RequirePage page="master"><AnnouncementsPage /></RequirePage>} />
                     <Route path="marcas" element={<ModulePage />} />
+                    <Route path="marca" element={<Navigate to="/marcas" replace />} />
+                    <Route path="meta-connect" element={<ModulePage />} />
                     <Route path="agentes" element={<ModulePage />} />
                     <Route path=":module" element={<ModulePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />

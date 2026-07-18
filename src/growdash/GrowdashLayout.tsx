@@ -26,6 +26,7 @@ import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { TopbarMonthlyGoal } from "@/components/dashboard/DashboardGoalProgress";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
+const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
 
 function getInitialSidebarState() {
   if (typeof window === "undefined") return false;
@@ -34,9 +35,20 @@ function getInitialSidebarState() {
   return window.innerWidth >= 768 && window.innerWidth < 1024;
 }
 
+function getInitialSectionState() {
+  const defaults = Object.fromEntries(NAV_SECTIONS.map((section) => [section.label, true]));
+  if (typeof window === "undefined") return defaults;
+  try {
+    return { ...defaults, ...JSON.parse(window.localStorage.getItem(SIDEBAR_SECTIONS_STORAGE_KEY) || "{}") } as Record<string, boolean>;
+  } catch {
+    return defaults;
+  }
+}
+
 export default function GrowdashLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const { pathname } = useLocation();
   const { theme, setTheme } = useTheme();
@@ -78,6 +90,9 @@ export default function GrowdashLayout() {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
   }, [collapsed]);
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_SECTIONS_STORAGE_KEY, JSON.stringify(openSections));
+  }, [openSections]);
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -126,12 +141,17 @@ export default function GrowdashLayout() {
           {NAV_SECTIONS.map((section) => (
             <section key={section.label} className="mb-5">
               {showSidebarLabels && (
-                <div className="mb-1 flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-[.19em] text-white/55">
+                <button
+                  type="button"
+                  onClick={() => setOpenSections((current) => ({ ...current, [section.label]: !current[section.label] }))}
+                  className="mb-1 flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[.19em] text-white/55 transition hover:bg-white/[.05] hover:text-white"
+                  aria-expanded={openSections[section.label]}
+                >
                   <span>{section.label}</span>
-                  <ChevronDown className="h-3 w-3" />
-                </div>
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", !openSections[section.label] && "-rotate-90")} />
+                </button>
               )}
-              <div className="space-y-1">
+              <div className={cn("space-y-1", showSidebarLabels && !openSections[section.label] && "hidden")}>
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = item.path === "/" ? location.pathname === "/" : location.pathname.startsWith(item.path);
@@ -225,6 +245,9 @@ export default function GrowdashLayout() {
           >
             <Menu className="h-5 w-5" />
           </button>
+          <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex md:hidden">
+            <BrandMark className="h-7 w-7 drop-shadow-[0_0_10px_rgba(255,193,45,.25)]" />
+          </NavLink>
           <button
             type="button"
             onClick={() => setCollapsed((value) => !value)}
