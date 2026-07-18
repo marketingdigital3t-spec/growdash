@@ -79,7 +79,7 @@ export function WidgetRenderer({ type, title, config, onEditSale }: Props) {
     case "campaigns_detail":
       return <CampaignsDetailWidget />;
     case "default_block":
-      return <DefaultDashboardContent onEditSale={onEditSale ?? (() => {})} />;
+      return <DefaultDashboardContent onEditSale={onEditSale ?? (() => {})} hidePrimary={config.hidePrimary} />;
     default:
       return <div className="p-4 text-sm text-muted-foreground">Widget desconhecido: {type}</div>;
   }

@@ -223,7 +223,7 @@ const Funnel = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] font-semibold text-muted-foreground tracking-wider uppercase whitespace-nowrap">{step.label}</p>
                         <p className="text-xl font-bold text-foreground mt-1 whitespace-nowrap">
-                          <AnimatedNumber value={step.numValue} prefix={step.isCurrency ? "R$ " : ""} decimals={step.decimals ?? 2} duration={600} />
+                          <AnimatedNumber value={step.numValue} prefix={step.isCurrency ? "R$ " : ""} decimals={step.decimals ?? (Number.isInteger(step.numValue) ? 0 : 2)} duration={600} />
                         </p>
                       </div>
                       {step.secondaryLabel && (
@@ -281,7 +281,7 @@ const Funnel = () => {
                         <div className="flex-1 min-w-0">
                           <p className="text-[9px] font-medium text-muted-foreground tracking-wide uppercase truncate">{step.label}</p>
                           <p className="text-sm font-bold text-foreground mt-0.5 truncate">
-                            <AnimatedNumber value={step.numValue} prefix={step.isCurrency ? "R$ " : ""} decimals={step.decimals ?? 2} duration={600} />
+                            <AnimatedNumber value={step.numValue} prefix={step.isCurrency ? "R$ " : ""} decimals={step.decimals ?? (Number.isInteger(step.numValue) ? 0 : 2)} duration={600} />
                           </p>
                         </div>
                         {step.secondaryLabel && (

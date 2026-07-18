@@ -103,9 +103,12 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
 
   const responsiveLayouts = useMemo(() => {
     const widgetIds = new Set((widgets || []).map((widget) => widget.id));
-    const applyAutoHeight = (items: DashboardGridItem[]) => items.map((item) =>
-      !isEditing && autoHeightRows[item.i] ? { ...item, h: autoHeightRows[item.i] } : item,
-    );
+    const defaultIds = new Set((widgets || []).filter((widget) => widget.type === "default_block").map((widget) => widget.id));
+    const applyAutoHeight = (items: DashboardGridItem[]) => items.map((item) => ({
+      ...item,
+      ...(!isEditing && autoHeightRows[item.i] ? { h: autoHeightRows[item.i] } : {}),
+      ...(defaultIds.has(item.i) ? { static: true } : {}),
+    }));
     const lg = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 12));
     const md = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 8));
     const sm = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 4));
@@ -150,7 +153,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
   if (isMobile) {
     return <div className="min-w-0 space-y-4 overflow-x-clip">
       {fullWidgets.map((widget) => {
-        const isSystem = widget.id.startsWith("__sys_");
+        const isSystem = widget.id.startsWith("__sys_") || widget.type === "default_block";
         return <section key={widget.id} className="relative min-w-0 max-w-full overflow-hidden rounded-xl">
           {isEditing && !isSystem && <button onClick={() => removeWidget(widget.id)} className="no-drag absolute right-2 top-2 z-20 grid h-11 w-11 place-items-center rounded-full bg-destructive/90 text-destructive-foreground shadow" aria-label="Remover"><X className="h-4 w-4" /></button>}
           <div className="min-w-0 max-w-full overflow-hidden"><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} /></div>
@@ -180,9 +183,9 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
       >
 
         {fullWidgets.map((w) => {
-          const isSystem = w.id.startsWith("__sys_");
+          const isSystem = w.id.startsWith("__sys_") || w.type === "default_block";
           return (
-            <div key={w.id} className="overflow-hidden">
+            <div key={w.id} className={w.type === "default_block" ? "dashboard-default-static overflow-hidden" : "overflow-hidden"}>
               {isEditing && !isSystem && (
                 <button
                   onClick={() => removeWidget(w.id)}

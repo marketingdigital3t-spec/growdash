@@ -53,9 +53,10 @@ const MESSAGE_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
 interface Props {
   onEditSale: (s: Sale) => void;
+  hidePrimary?: boolean;
 }
 
-export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
+export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false }: Props) {
   const { insights, sales, rdDeals, campaigns, startDate, endDate, adAccountId } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
@@ -536,8 +537,9 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
 
   return (
     <div className="min-w-0 space-y-6">
-      {/* 1. KPIs principais */}
-      <div className="gd-auto-grid gap-2 sm:gap-3">
+      {/* 1. KPIs principais. Em layouts novos estes cards são widgets
+          independentes para permitir mover, redimensionar e ocultar um a um. */}
+      {!hidePrimary && <div className="gd-auto-grid gap-2 sm:gap-3">
         <MetricCard title="Faturamento Líquido" value={salesMetrics.totalNet} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
@@ -550,7 +552,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
           colorByValue
           tooltip="Faturamento líquido − gastos com anúncios − impostos. Não inclui custos de produto, equipe ou operação (não cadastrados no sistema)."
         />
-      </div>
+      </div>}
 
       {/* 2. KPIs financeiros */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -573,10 +575,10 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale }: Props) {
               })()}
             </div>
             <Tabs value={platformView} onValueChange={(v) => setPlatformView(v as any)}>
-              <TabsList className="h-8 w-full grid grid-cols-3">
-                <TabsTrigger value="leads" className="text-xs">Leads</TabsTrigger>
-                <TabsTrigger value="revenue" className="text-xs">Receita</TabsTrigger>
-                <TabsTrigger value="conv" className="text-xs">Conversão</TabsTrigger>
+              <TabsList className="mx-auto grid h-9 w-full max-w-md grid-cols-3 place-items-stretch p-1">
+                <TabsTrigger value="leads" className="w-full justify-center text-xs">Leads</TabsTrigger>
+                <TabsTrigger value="revenue" className="w-full justify-center text-xs">Receita</TabsTrigger>
+                <TabsTrigger value="conv" className="w-full justify-center text-xs">Conversão</TabsTrigger>
               </TabsList>
             </Tabs>
           </CardHeader>

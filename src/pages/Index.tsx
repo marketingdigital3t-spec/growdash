@@ -157,12 +157,21 @@ const Index = () => {
   const toggleDashboardWidget = useCallback((type: string) => {
     setDraftView((current) => {
       if (!current) return current;
-      const matching = current.widgets.filter((widget) => widget.type === type);
+      if (type.startsWith("widget:")) {
+        const id = type.slice("widget:".length);
+        return {
+          ...current,
+          widgets: current.widgets.filter((widget) => widget.id !== id),
+          layout: current.layout.filter((item) => item.i !== id),
+        };
+      }
+      const catalogType = type.startsWith("add:") ? type.slice("add:".length) : type;
+      const matching = current.widgets.filter((widget) => widget.type === catalogType);
       if (matching.length) {
         const ids = new Set(matching.map((widget) => widget.id));
         return { ...current, widgets: current.widgets.filter((widget) => !ids.has(widget.id)), layout: current.layout.filter((item) => !ids.has(item.i)) };
       }
-      const built = buildWidgetFromDef(type, current.layout || []);
+      const built = buildWidgetFromDef(catalogType, current.layout || []);
       if (!built) return current;
       return { ...current, widgets: [...current.widgets, built.widget], layout: [...current.layout, built.layout] };
     });
@@ -180,13 +189,30 @@ const Index = () => {
     });
   }, [canEditDashboard, draftView, saveView, setEditor]);
 
-  const editorItems = useMemo(() => WIDGET_CATALOG.filter((item) => !item.system).map((item) => ({
-    type: item.type,
-    title: item.title,
-    description: item.description,
-    category: item.category,
-    enabled: !!draftView?.widgets.some((widget) => widget.type === item.type),
-  })), [draftView?.widgets]);
+  const editorItems = useMemo(() => {
+    const removable = (draftView?.widgets ?? [])
+      .filter((widget) => widget.type !== "default_block")
+      .map((widget) => {
+        const definition = WIDGET_CATALOG.find((item) => item.type === widget.type);
+        return {
+          type: `widget:${widget.id}`,
+          title: widget.title || definition?.title || "Métrica",
+          description: definition?.description || "Bloco individual do dashboard.",
+          category: definition?.category || "KPI",
+          enabled: true,
+        };
+      });
+    const available = WIDGET_CATALOG
+      .filter((item) => !item.system)
+      .map((item) => ({
+        type: `add:${item.type}`,
+        title: `Adicionar ${item.title}`,
+        description: item.description,
+        category: "Adicionar",
+        enabled: false,
+      }));
+    return [...removable, ...available];
+  }, [draftView?.widgets]);
 
   useEffect(() => {
     if (!isEditing || !draftView) {

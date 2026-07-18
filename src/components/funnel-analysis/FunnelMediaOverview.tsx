@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { FunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
 import { Activity, BadgeDollarSign, Eye, Gauge, MousePointerClick, Users } from "lucide-react";
+import { metricDescription } from "@/lib/metricPresentation";
 
 const fmtInt = (value: number) => Math.round(value).toLocaleString("pt-BR");
 const fmtPct = (value: number) => `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
@@ -25,7 +26,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
       : "text-amber-400";
 
   return (
-    <Card className="border-border/50 bg-card/70">
+    <Card className="gd-panel border-border/50 bg-card/70">
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -40,7 +41,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
       <CardContent>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {cards.map(({ label, value, detail, icon: Icon }) => (
-            <div key={label} className="min-w-0 rounded-xl border border-border/50 bg-background/70 p-3">
+            <div key={label} className="gd-metric-card min-w-0 cursor-default rounded-xl border border-border/50 bg-background/70 p-3" title={metricDescription(label)}>
               <div className="flex items-start justify-between gap-2">
                 <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
                 <Icon className="h-4 w-4 shrink-0 text-[#e6b83f]" />

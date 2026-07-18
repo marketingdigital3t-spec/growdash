@@ -14,19 +14,23 @@ export function AnimatedNumber({
   value,
   prefix = "",
   suffix = "",
-  decimals = 2,
+  decimals,
   duration = 600,
   locale = "pt-BR",
   className,
 }: AnimatedNumberProps) {
-  const animated = useAnimatedNumber(value, duration, decimals);
+  // Counts (leads, sales, clicks, people) must never inherit a monetary
+  // presentation such as `45,00`. Decimal values keep two places unless the
+  // caller explicitly defines another precision.
+  const resolvedDecimals = decimals ?? (Number.isInteger(value) ? 0 : 2);
+  const animated = useAnimatedNumber(value, duration, resolvedDecimals);
 
   const formatted =
-    decimals === 0
+    resolvedDecimals === 0
       ? Math.round(animated).toLocaleString(locale)
       : animated.toLocaleString(locale, {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals,
+          minimumFractionDigits: resolvedDecimals,
+          maximumFractionDigits: resolvedDecimals,
         });
 
   return (

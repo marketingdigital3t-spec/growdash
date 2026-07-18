@@ -11,18 +11,26 @@ describe("ensureDefaultDashboardContent", () => {
 
     const restored = ensureDefaultDashboardContent(view);
 
-    expect(restored.widgets.map((widget) => widget.id)).toEqual(["default", "custom"]);
-    expect(restored.layout[0]).toMatchObject({ i: "default", x: 0, y: 0, w: 12 });
-    expect(restored.layout[1]).toMatchObject({ i: "custom", y: 33 });
+    expect(restored.widgets.map((widget) => widget.id)).toEqual([
+      "primary-revenue", "primary-spend", "primary-roas", "primary-profit", "default", "custom",
+    ]);
+    expect(restored.layout[0]).toMatchObject({ i: "primary-revenue", x: 0, y: 0, w: 3 });
+    expect(restored.layout[4]).toMatchObject({ i: "default", x: 0, y: 2, w: 12 });
+    expect(restored.layout[5]).toMatchObject({ i: "custom", y: 35 });
   });
 
-  it("não altera uma visualização que já possui o bloco padrão", () => {
+  it("migra uma vez o bloco legado e depois preserva a edição individual", () => {
     const view = {
       id: "view-2",
       widgets: [{ id: "default", type: "default_block", title: "Padrão", config: {} }],
       layout: [{ i: "default", x: 0, y: 0, w: 12, h: 30 }],
     };
 
-    expect(ensureDefaultDashboardContent(view)).toBe(view);
+    const migrated = ensureDefaultDashboardContent(view);
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      hidePrimary: true,
+      individualized: true,
+    });
+    expect(ensureDefaultDashboardContent(migrated)).toBe(migrated);
   });
 });

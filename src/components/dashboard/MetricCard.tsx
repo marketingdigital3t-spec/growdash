@@ -3,6 +3,7 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import type { ReactNode } from "react";
+import { metricDescription } from "@/lib/metricPresentation";
 
 interface MetricCardProps {
   title: string;
@@ -18,9 +19,10 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, variation, icon, prefix, suffix, decimals = 2, colorByValue, tooltip }: MetricCardProps) {
   const isPositive = (variation ?? 0) >= 0;
+  const description = metricDescription(title, tooltip);
 
   return (
-    <Card className="group h-full min-w-0 cursor-default overflow-hidden transition-shadow duration-300" title={tooltip}>
+    <Card className="gd-metric-card group h-full min-w-0 cursor-default overflow-hidden transition-shadow duration-300" title={description} aria-label={`${title}. ${description}`}>
       <CardContent className="min-w-0 p-3 sm:p-4 xl:p-5">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:gap-3">
           <div className="min-w-0 space-y-1 sm:space-y-2">

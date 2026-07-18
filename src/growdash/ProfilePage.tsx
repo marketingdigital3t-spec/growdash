@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Check, LockKeyhole, Mail, Palette, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlans, useWorkspace, useWorkspaceSubscription } from "@/hooks/useWorkspace";
@@ -15,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
+import { useAccentTheme, type AccentTheme } from "@/hooks/useAccentTheme";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -23,6 +26,8 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
+  const { accent, setAccent } = useAccentTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: workspace } = useWorkspace();
   const { data: plans = [] } = usePlans();
   const { data: subscription } = useWorkspaceSubscription(workspace?.id);
@@ -114,7 +119,7 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-[1250px]">
       <PageHeading eyebrow="Conta" title="Meu perfil" description="Gerencie identidade, segurança, aparência e assinatura do seu workspace." />
 
-      <Tabs defaultValue="personal" className="space-y-4">
+      <Tabs value={searchParams.get("tab") || "personal"} onValueChange={(tab) => setSearchParams({ tab })} className="space-y-4">
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-muted/70 p-1">
           <TabsTrigger value="personal"><UserRound className="mr-2 h-4 w-4" />Dados pessoais</TabsTrigger>
           <TabsTrigger value="security"><LockKeyhole className="mr-2 h-4 w-4" />Segurança</TabsTrigger>
@@ -164,8 +169,21 @@ export default function ProfilePage() {
             <AppearanceCard active={theme === "dark"} title="Modo escuro" description="Maior conforto visual em operações prolongadas." onClick={() => setTheme("dark")} />
             <AppearanceCard active={theme === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setTheme("light")} />
           </div>
+          <div className="mt-7 border-t border-border pt-6">
+            <h2 className="font-black">Cor de destaque da plataforma</h2>
+            <p className="mt-1 text-xs text-muted-foreground">A cor é aplicada aos botões, seleções, glass do Dashboard e realces, mantendo contraste acessível.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {([['gold', 'Dourado', '#e6ad28'], ['purple', 'Roxo', '#9258ff'], ['blue', 'Azul', '#2f80ff'], ['pink', 'Rosa', '#f04f9a']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
+                <button key={value} type="button" onClick={() => setAccent(value)} className={`flex min-h-16 items-center gap-3 rounded-xl border p-3 text-left transition ${accent === value ? "border-primary bg-primary/10 ring-1 ring-primary/35" : "border-border hover:bg-muted/45"}`}>
+                  <span className="h-9 w-9 rounded-xl border border-white/20 shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, #ffffff55)` }} />
+                  <span><b className="block text-sm">{label}</b><small className="text-[10px] text-muted-foreground">Tema operacional</small></span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="mt-6 max-w-sm"><Field label="Densidade da interface"><Select value={form.density} onValueChange={(value) => setForm({ ...form, density: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="comfortable">Confortável</SelectItem><SelectItem value="compact">Compacta</SelectItem></SelectContent></Select></Field></div>
           <Button className="mt-5" onClick={() => saveProfile.mutate()}><Save className="mr-2 h-4 w-4" />Salvar aparência</Button>
+          <div className="mt-8"><SalesGoalSettingsCard /></div>
         </TabsContent>
 
         <TabsContent value="plan" className="space-y-4">

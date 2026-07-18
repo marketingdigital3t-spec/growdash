@@ -11,6 +11,9 @@ import {
   X,
   Check,
   RotateCcw,
+  UserRound,
+  Palette,
+  BadgeDollarSign,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { endOfMonth, startOfMonth } from "date-fns";
@@ -29,6 +32,7 @@ import { TopbarMonthlyGoal } from "@/components/dashboard/DashboardGoalProgress"
 import { useNearRealtimeSync } from "@/hooks/useNearRealtimeSync";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -243,7 +247,9 @@ export default function GrowdashLayout() {
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {showSidebarLabels && <span>{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
           </button>
-          <NavLink to="/perfil" aria-label="Abrir meu perfil" className={cn("mt-1 flex items-center rounded-lg px-2 py-2 hover:bg-white/[.06]", showSidebarLabels ? "gap-3" : "justify-center")}>
+          <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Abrir opções do meu perfil" className={cn("mt-1 flex w-full items-center rounded-lg px-2 py-2 text-left hover:bg-white/[.06]", showSidebarLabels ? "gap-3" : "justify-center")}>
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#f7e6bf] to-[#a37c43] text-[11px] font-extrabold text-[#21190e]">
               {initials || "GD"}
             </span>
@@ -254,7 +260,16 @@ export default function GrowdashLayout() {
               </div>
             )}
             {showSidebarLabels && <ChevronRight className="h-4 w-4 text-white/40" />}
-          </NavLink>
+          </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="end" sideOffset={10} className="z-[130] w-60">
+            <DropdownMenuLabel><span className="block truncate">{displayName}</span><span className="block truncate text-[10px] font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild><NavLink to="/perfil?tab=personal"><UserRound className="mr-2 h-4 w-4" />Perfil e dados</NavLink></DropdownMenuItem>
+            <DropdownMenuItem asChild><NavLink to="/perfil?tab=appearance"><Palette className="mr-2 h-4 w-4" />Personalização e metas</NavLink></DropdownMenuItem>
+            <DropdownMenuItem asChild><NavLink to="/perfil?tab=plan"><BadgeDollarSign className="mr-2 h-4 w-4" />Planos e assinatura</NavLink></DropdownMenuItem>
+          </DropdownMenuContent>
+          </DropdownMenu>
           {showSidebarLabels && (
             <button
               type="button"
@@ -319,7 +334,7 @@ export default function GrowdashLayout() {
         </header>
         <main
           className={cn(
-            "growdash-main min-w-0 max-w-full overflow-x-clip px-[clamp(.625rem,1.25vw,1.5rem)] py-[clamp(.625rem,1vw,1.25rem)] pb-[calc(clamp(.625rem,1vw,1.25rem)+env(safe-area-inset-bottom))]",
+            "growdash-main min-w-0 max-w-full overflow-x-clip px-[var(--gd-page-gutter)] py-[var(--gd-page-gutter)] pb-[calc(var(--gd-page-gutter)+env(safe-area-inset-bottom))]",
             isCampaignsWorkspace
               ? "md:h-[calc(100dvh-48px)] md:min-h-0 md:overflow-hidden"
               : "min-h-[calc(100vh-48px)]",

@@ -10,6 +10,7 @@ import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
 import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
+import { useAccentTheme } from "@/hooks/useAccentTheme";
 
 const FullDashboard = lazy(() => import("@/pages/Index"));
 const TrafficPage = lazy(() => import("@/growdash/TrafficPage"));
@@ -49,6 +50,11 @@ function AuthenticatedLayout() {
   return <DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider>;
 }
 
+function AccentInitializer({ children }: { children: ReactNode }) {
+  useAccentTheme();
+  return <>{children}</>;
+}
+
 function RequirePage({ page, children }: { page: PagePermission | "master"; children: ReactNode }) {
   const permissions = usePermissions();
   if (permissions.loading) return <LoadingModule />;
@@ -84,6 +90,7 @@ export default function App() {
           <Router>
             <AuthProvider>
               <GlobalFiltersProvider>
+                <AccentInitializer>
                 <Suspense fallback={<LoadingModule />}>
                   <Routes>
                   <Route path="/auth" element={<Auth />} />
@@ -130,6 +137,7 @@ export default function App() {
                   </Route>
                   </Routes>
                 </Suspense>
+                </AccentInitializer>
               </GlobalFiltersProvider>
             </AuthProvider>
           </Router>

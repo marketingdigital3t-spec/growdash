@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { metricDescription } from "@/lib/metricPresentation";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useBudgetAnalysis, type BudgetAnalysisItem } from "@/hooks/useBudgetAnalysis";
@@ -279,7 +280,7 @@ function TrafficFunnels() {
   </div>;
 }
 
-function Kpi({ label, value, note, emphasis }: { label: string; value: string; note: string; emphasis?: boolean }) { return <article className={cn("min-w-0 overflow-hidden rounded-xl border border-border bg-card p-4", emphasis && "border-primary/60 bg-primary/5")}><p className="min-h-[2.25em] break-words text-[9px] font-black uppercase leading-tight tracking-[.12em] text-muted-foreground">{label}</p><p className="mt-2 truncate text-xl font-black" title={value}>{value}</p><p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">{note}</p></article>; }
+function Kpi({ label, value, note, emphasis }: { label: string; value: string; note: string; emphasis?: boolean }) { return <article className={cn("gd-metric-card min-w-0 cursor-default overflow-hidden rounded-xl border border-border bg-card p-4", emphasis && "border-primary/60 bg-primary/5")} title={metricDescription(label)}><p className="min-h-[2.25em] break-words text-[9px] font-black uppercase leading-tight tracking-[.12em] text-muted-foreground">{label}</p><p className="mt-2 truncate text-xl font-black" title={value}>{value}</p><p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">{note}</p></article>; }
 function SmallMetric({ label, value }: { label: string; value: string }) { return <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-background p-3"><span className="line-clamp-2 text-[9px] font-bold text-muted-foreground">{label}</span><strong className="mt-1 block truncate text-xs" title={value}>{value}</strong></div>; }
 function Empty({ text }: { text: string }) { return <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border bg-card p-6 text-center text-xs text-muted-foreground">{text}</div>; }
 function Loading() { return <div className="grid min-h-[320px] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>; }

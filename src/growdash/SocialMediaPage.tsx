@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { useToast } from "@/hooks/use-toast";
+import { metricDescription } from "@/lib/metricPresentation";
 
 type SocialAccount = {
   id: string;
@@ -159,7 +160,7 @@ export default function SocialMediaPage() {
   );
 }
 
-function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <article className="gd-panel group p-4 transition hover:-translate-y-0.5 hover:border-primary/30"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.13em] text-muted-foreground">{label}</p><strong className="mt-3 block text-2xl font-black tabular-nums">{value}</strong></div><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></article>; }
+function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <article className="gd-panel gd-metric-card group cursor-default p-4 transition hover:-translate-y-0.5 hover:border-primary/30" title={metricDescription(label)}><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.13em] text-muted-foreground">{label}</p><strong className="mt-3 block text-2xl font-black tabular-nums">{value}</strong></div><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></article>; }
 function Mini({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-border bg-muted/20 p-3"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">{label}</span><b className="mt-1 block text-sm tabular-nums">{value}</b></div>; }
 function Empty({ text }: { text: string }) { return <div className="grid min-h-32 place-items-center rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{text}</div>; }
 function Recommendation({ title, text }: { title: string; text: string }) { return <article className="gd-panel p-5"><div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /><b className="text-sm">{title}</b></div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">{text}</p></article>; }
