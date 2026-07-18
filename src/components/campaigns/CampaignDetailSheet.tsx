@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronRight, ChevronDown, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, History, Target, Pencil, PauseCircle, PlayCircle, Layers3 } from "lucide-react";
+import { ChevronRight, ChevronDown, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, History, Target, Pencil, PauseCircle, PlayCircle, Layers3, Minus, Maximize2, Minimize2 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface Adset {
   id: string;
@@ -84,10 +85,15 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
   const { data: actionTotals = [] } = useCampaignActionTotals(campaign?.id);
   const { data: customMetrics = [] } = useCustomMetrics();
   const [targetInput, setTargetInput] = useState("");
+  const [panelSize, setPanelSize] = useState<"compact" | "normal" | "maximized">("normal");
 
   useEffect(() => {
     setTargetInput(targetData?.target_cpl != null ? String(targetData.target_cpl) : "");
   }, [targetData?.target_cpl, campaign?.id]);
+
+  useEffect(() => {
+    if (open) setPanelSize("normal");
+  }, [open, campaign?.id]);
 
   const allInsights: Insight[] = useMemo(() => {
     if (!campaign) return [];
@@ -194,11 +200,25 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="text-xl">{campaign.name}</SheetTitle>
+      <SheetContent className={cn(
+        "w-full overflow-y-auto transition-[max-width,width] duration-200",
+        panelSize === "compact" ? "sm:max-w-[360px]" : panelSize === "maximized" ? "sm:max-w-[calc(100vw-5rem)]" : "sm:max-w-2xl",
+      )}>
+        <SheetHeader className="pr-24">
+          <SheetTitle className="truncate text-xl" title={campaign.name}>{campaign.name}</SheetTitle>
           <SheetDescription>Análise de desempenho da campanha</SheetDescription>
         </SheetHeader>
+
+        <div className="absolute right-10 top-3 flex items-center gap-1">
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPanelSize("compact")} title="Minimizar painel"><Minus className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPanelSize(panelSize === "maximized" ? "normal" : "maximized")} title={panelSize === "maximized" ? "Restaurar painel" : "Maximizar painel"}>{panelSize === "maximized" ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
+        </div>
+
+        {panelSize === "compact" ? (
+          <div className="mt-6 rounded-xl border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
+            Painel minimizado. Use o botão de maximizar para reabrir toda a análise.
+          </div>
+        ) : <>
 
         <div className="mt-4 grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
           <Button variant="outline" size="sm" onClick={() => onEdit?.(campaign)}><Pencil className="mr-2 h-4 w-4" />Editar</Button>
@@ -464,6 +484,7 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
             </div>
           )}
         </div>
+        </>}
       </SheetContent>
     </Sheet>
   );

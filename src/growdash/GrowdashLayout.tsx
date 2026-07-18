@@ -9,6 +9,8 @@ import {
   PanelLeftClose,
   Sun,
   X,
+  Check,
+  RotateCcw,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { endOfMonth, startOfMonth } from "date-fns";
@@ -25,6 +27,8 @@ import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { TopbarMonthlyGoal } from "@/components/dashboard/DashboardGoalProgress";
 import { useNearRealtimeSync } from "@/hooks/useNearRealtimeSync";
+import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
+import { Button } from "@/components/ui/button";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -51,7 +55,8 @@ export default function GrowdashLayout() {
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
-  const { pathname } = useLocation();
+  const { editor } = useDashboardEditor();
+  const { pathname, search } = useLocation();
   const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
   const { data: isMaster = false } = useIsMaster();
@@ -88,8 +93,12 @@ export default function GrowdashLayout() {
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
-  const showSidebarLabels = !collapsed || mobileOpen;
-  const isCampaignsWorkspace = pathname.startsWith("/campanhas");
+  const effectiveCollapsed = editor ? false : collapsed;
+  const showSidebarLabels = !!editor || !effectiveCollapsed || mobileOpen;
+  const campaignWorkspaceTab = new URLSearchParams(search).get("aba") || "campaigns";
+  // Somente a grade do Gerenciador usa viewport travada. Orçamento, IA e
+  // Funis precisam da rolagem normal da página para nunca cortar conteúdo.
+  const isCampaignsWorkspace = pathname.startsWith("/campanhas") && campaignWorkspaceTab === "campaigns";
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
@@ -141,7 +150,34 @@ export default function GrowdashLayout() {
           </button>
         </div>
 
-        <TooltipProvider delayDuration={180}>
+        {editor ? (
+          <div className="flex min-h-0 grow flex-col">
+            <div className="border-b border-white/10 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[.18em] text-[#e8bd4f]">Editor do dashboard</p>
+              <h2 className="mt-1 truncate text-sm font-black">{editor.title}</h2>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/48">Mostre ou oculte métricas. No conteúdo, arraste e redimensione pelos cantos.</p>
+            </div>
+            <div className="growdash-scrollbar min-h-0 grow space-y-4 overflow-y-auto px-3 py-3">
+              {Array.from(new Set(editor.items.map((item) => item.category))).map((category) => (
+                <section key={category}>
+                  <p className="mb-2 px-1 text-[9px] font-black uppercase tracking-[.16em] text-white/38">{category}</p>
+                  <div className="space-y-1.5">
+                    {editor.items.filter((item) => item.category === category).map((item) => (
+                      <button key={item.type} type="button" onClick={() => editor.onToggle(item.type)} className={cn("w-full rounded-lg border px-3 py-2 text-left transition", item.enabled ? "border-[#d9aa34]/45 bg-[#d9aa34]/12" : "border-white/8 bg-white/[.025] hover:bg-white/[.06]")}>
+                        <span className="flex items-center gap-2 text-[11px] font-bold"><span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", item.enabled ? "border-[#efc758] bg-[#d9aa34] text-black" : "border-white/20 text-transparent")}>{item.enabled && <Check className="h-3 w-3" />}</span><span className="truncate">{item.title}</span></span>
+                        <span className="mt-1 block line-clamp-2 pl-6 text-[9px] leading-relaxed text-white/42">{item.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+            <div className="space-y-2 border-t border-white/10 p-3">
+              <Button variant="outline" size="sm" className="w-full border-white/15 bg-transparent text-white hover:bg-white/10" onClick={editor.onReset}><RotateCcw className="mr-2 h-3.5 w-3.5" />Restaurar original</Button>
+              <div className="grid grid-cols-2 gap-2"><Button variant="ghost" size="sm" className="text-white/65 hover:bg-white/10 hover:text-white" onClick={editor.onCancel}>Cancelar</Button><Button size="sm" onClick={editor.onSave} disabled={editor.saving}>{editor.saving ? "Salvando…" : "Salvar"}</Button></div>
+            </div>
+          </div>
+        ) : <><TooltipProvider delayDuration={180}>
         <nav className={cn("grow overflow-y-auto px-2 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
           {NAV_SECTIONS.map((section) => (
             <section key={section.label} className="mb-5">
@@ -228,7 +264,7 @@ export default function GrowdashLayout() {
               <LogOut className="h-4 w-4" /> Sair
             </button>
           )}
-        </div>
+        </div></>}
       </aside>
 
       {mobileOpen && (
@@ -240,7 +276,7 @@ export default function GrowdashLayout() {
         />
       )}
 
-      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", collapsed ? "md:pl-16" : "md:pl-[220px]")}>
+      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", effectiveCollapsed ? "md:pl-16" : "md:pl-[220px]")}>
         <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b px-2 py-2 text-white shadow-sm sm:px-5">
           <button
             type="button"
@@ -255,11 +291,11 @@ export default function GrowdashLayout() {
           </NavLink>
           <button
             type="button"
-            onClick={() => setCollapsed((value) => !value)}
-            className="mr-4 hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 md:block"
-            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            onClick={() => !editor && setCollapsed((value) => !value)}
+            className={cn("mr-4 hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 md:block", editor && "pointer-events-none opacity-30")}
+            aria-label={effectiveCollapsed ? "Expandir menu" : "Recolher menu"}
           >
-            <PanelLeftClose className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
+            <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
           </button>
           <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
             <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} />

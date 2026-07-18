@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
           value: ["ACTIVE", "PAUSED", "DELETED", "ARCHIVED", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "IN_PROCESS", "WITH_ISSUES"],
         }]));
         const campaignsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/campaigns?fields=id,name,objective,effective_status&filtering=${campaignStatusFilter}&access_token=${accessToken}&limit=200`
+          `${graphBase}/${metaAccountId}/campaigns?fields=id,name,objective,effective_status,daily_budget,lifetime_budget&filtering=${campaignStatusFilter}&access_token=${accessToken}&limit=200`
         );
         if (campaignsRes.error) {
           failedAccounts++;
@@ -159,6 +159,8 @@ Deno.serve(async (req) => {
             return {
               id: c.id, name: c.name, ad_account_id: account.id,
               objective: c.objective || null, status: newStatus,
+              daily_budget: c.daily_budget ? Number(c.daily_budget) / 100 : null,
+              lifetime_budget: c.lifetime_budget ? Number(c.lifetime_budget) / 100 : null,
               previous_status: prevStatus, last_activated_at,
             };
           });

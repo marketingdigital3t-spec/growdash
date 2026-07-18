@@ -58,7 +58,7 @@ export function MetaEntityEditor({ entity, onOpenChange, onSaved }: Props) {
       status,
     };
 
-    if (entity.type === "adset") {
+    if (entity.type === "campaign" || entity.type === "adset") {
       const normalizedBudget = Number(dailyBudget.replace(",", "."));
       if (!Number.isFinite(normalizedBudget) || normalizedBudget <= 0) {
         toast.error("Informe um orçamento diário válido.");
@@ -119,7 +119,7 @@ export function MetaEntityEditor({ entity, onOpenChange, onSaved }: Props) {
             </Select>
           </div>
 
-          {entity?.type === "adset" && (
+          {(entity?.type === "campaign" || entity?.type === "adset") && (
             <div className="space-y-2">
               <Label htmlFor="meta-daily-budget">Orçamento diário (R$)</Label>
               <Input
@@ -132,12 +132,7 @@ export function MetaEntityEditor({ entity, onOpenChange, onSaved }: Props) {
             </div>
           )}
 
-          {entity?.type === "campaign" && (
-            <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-              O orçamento desta estrutura está nos conjuntos. Selecione a campanha e abra a aba
-              <strong> Conjuntos</strong> para editar o valor diário.
-            </p>
-          )}
+          {entity?.type === "campaign" && <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">O valor será aplicado no nível da campanha quando ela usar orçamento Advantage/CBO. Em campanhas ABO, a Meta preserva os orçamentos individuais dos conjuntos e pode recusar a mudança.</p>}
 
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-xs">
             <Checkbox checked={confirmed} onCheckedChange={(value) => setConfirmed(value === true)} />

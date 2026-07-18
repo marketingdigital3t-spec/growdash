@@ -38,7 +38,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {cards.map(({ label, value, detail, icon: Icon }) => (
             <div key={label} className="min-w-0 rounded-xl border border-border/50 bg-background/70 p-3">
               <div className="flex items-start justify-between gap-2">

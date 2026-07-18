@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { SalesDialog } from "@/components/dashboard/SalesDialog";
@@ -16,11 +16,12 @@ import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardGrid, buildWidgetFromDef } from "@/components/dashboard/grid/DashboardGrid";
-import { AddWidgetDialog } from "@/components/dashboard/grid/AddWidgetDialog";
-import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView } from "@/hooks/useDashboardViews";
+import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView, type DashboardView } from "@/hooks/useDashboardViews";
 import { useIsMaster } from "@/hooks/useIsMaster";
-import { Pencil, Check } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip";
+import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
+import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 
 const Index = () => {
   const {
@@ -44,7 +45,9 @@ const Index = () => {
   const [salesDialogOpen, setSalesDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
+  const [draftView, setDraftView] = useState<DashboardView | null>(null);
+  const originalViewRef = useRef<DashboardView | null>(null);
+  const { setEditor } = useDashboardEditor();
 
   const { data: adAccounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
@@ -126,14 +129,81 @@ const Index = () => {
       .then(() => refetch());
   };
 
-  function handleAddWidget(def: any) {
+  const cloneView = useCallback((view: DashboardView): DashboardView => ({
+    ...view,
+    layout: JSON.parse(JSON.stringify(view.layout || [])),
+    widgets: JSON.parse(JSON.stringify(view.widgets || [])),
+  }), []);
+
+  const beginDashboardEdit = useCallback(() => {
     if (!activeView || !canEditDashboard) return;
-    const built = buildWidgetFromDef(def.type, activeView.layout || []);
-    if (!built) return;
-    const nextWidgets = [...(activeView.widgets || []), built.widget];
-    const nextLayout = [...(activeView.layout || []), built.layout];
-    saveView.mutate({ id: activeView.id, layout: nextLayout, widgets: nextWidgets });
-  }
+    const original = cloneView(activeView);
+    originalViewRef.current = original;
+    setDraftView(cloneView(original));
+    setIsEditing(true);
+  }, [activeView, canEditDashboard, cloneView]);
+
+  const cancelDashboardEdit = useCallback(() => {
+    setDraftView(null);
+    originalViewRef.current = null;
+    setIsEditing(false);
+    setEditor(null);
+  }, [setEditor]);
+
+  const resetDashboardEdit = useCallback(() => {
+    if (originalViewRef.current) setDraftView(cloneView(originalViewRef.current));
+  }, [cloneView]);
+
+  const toggleDashboardWidget = useCallback((type: string) => {
+    setDraftView((current) => {
+      if (!current) return current;
+      const matching = current.widgets.filter((widget) => widget.type === type);
+      if (matching.length) {
+        const ids = new Set(matching.map((widget) => widget.id));
+        return { ...current, widgets: current.widgets.filter((widget) => !ids.has(widget.id)), layout: current.layout.filter((item) => !ids.has(item.i)) };
+      }
+      const built = buildWidgetFromDef(type, current.layout || []);
+      if (!built) return current;
+      return { ...current, widgets: [...current.widgets, built.widget], layout: [...current.layout, built.layout] };
+    });
+  }, []);
+
+  const saveDashboardEdit = useCallback(() => {
+    if (!draftView || !canEditDashboard) return;
+    saveView.mutate({ id: draftView.id, layout: draftView.layout, widgets: draftView.widgets }, {
+      onSuccess: () => {
+        setDraftView(null);
+        originalViewRef.current = null;
+        setIsEditing(false);
+        setEditor(null);
+      },
+    });
+  }, [canEditDashboard, draftView, saveView, setEditor]);
+
+  const editorItems = useMemo(() => WIDGET_CATALOG.filter((item) => !item.system).map((item) => ({
+    type: item.type,
+    title: item.title,
+    description: item.description,
+    category: item.category,
+    enabled: !!draftView?.widgets.some((widget) => widget.type === item.type),
+  })), [draftView?.widgets]);
+
+  useEffect(() => {
+    if (!isEditing || !draftView) {
+      setEditor(null);
+      return;
+    }
+    setEditor({
+      title: draftView.name || "Dashboard",
+      items: editorItems,
+      saving: saveView.isPending,
+      onToggle: toggleDashboardWidget,
+      onReset: resetDashboardEdit,
+      onCancel: cancelDashboardEdit,
+      onSave: saveDashboardEdit,
+    });
+    return () => setEditor(null);
+  }, [cancelDashboardEdit, draftView, editorItems, isEditing, resetDashboardEdit, saveDashboardEdit, saveView.isPending, setEditor, toggleDashboardWidget]);
 
   return (
     <MotionPage className="min-w-0 space-y-4 sm:space-y-6">
@@ -183,17 +253,17 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      {canEditDashboard && activeView && (
+      {canEditDashboard && activeView && !isEditing && (
         <MotionItem>
           <div className="flex items-center justify-end border-b border-border/60 pb-2">
             <Button
               size="sm"
-              variant={isEditing ? "default" : "outline"}
-              onClick={() => setIsEditing((b) => !b)}
+              variant="outline"
+              onClick={beginDashboardEdit}
               className="gap-1.5"
             >
-              {isEditing ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-              {isEditing ? "Concluir edição" : "Editar dashboard"}
+              <Pencil className="h-3.5 w-3.5" />
+              Editar dashboard
             </Button>
           </div>
         </MotionItem>
@@ -201,7 +271,7 @@ const Index = () => {
 
       <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} openAlerts={openAlerts} sales={glassSales.totalQuantity} />
 
-      {activeView && (
+      {(isEditing ? draftView : activeView) && (
         <DashboardProvider
           value={{
             startDate,
@@ -218,19 +288,16 @@ const Index = () => {
           }}
         >
           <DashboardGrid
-            view={activeView}
+            view={(isEditing ? draftView : activeView)!}
             isEditing={isEditing && canEditDashboard}
             onChange={(layout, widgets) => {
-              if (!canEditDashboard) return;
-              saveView.mutate({ id: activeView.id, layout, widgets });
+              if (!canEditDashboard || !isEditing) return;
+              setDraftView((current) => current ? { ...current, layout, widgets } : current);
             }}
-            onAddClick={() => setAddOpen(true)}
             onEditSale={(s) => { setEditingSale(s); setSalesDialogOpen(true); }}
           />
         </DashboardProvider>
       )}
-
-      <AddWidgetDialog open={addOpen} onOpenChange={setAddOpen} onAdd={handleAddWidget} />
 
       <SalesDialog
         open={salesDialogOpen}

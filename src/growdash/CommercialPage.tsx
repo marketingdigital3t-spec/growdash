@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Award, Medal, Trophy } from "lucide-react";
+import { Award, Medal, Target, TrendingUp, Trophy } from "lucide-react";
 import { format } from "date-fns";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useProducts } from "@/hooks/useProducts";
@@ -52,6 +52,7 @@ export default function CommercialPage() {
     }
     return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
   }, [filtered]);
+  const rankingLeaderRevenue = ranking[0]?.revenue || 0;
 
   return (
     <div className="mx-auto max-w-[1500px]">
@@ -73,12 +74,50 @@ export default function CommercialPage() {
         <MetricCard label="Vendedores identificados" value={isLoading ? "Carregando…" : String(ranking.length)} change="dados RD/venda" />
       </div>
 
-      <section className="mt-4 grid gap-3 md:grid-cols-3">
+      <section className="gd-panel mt-4 overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.16em] text-primary">Ranking comercial</p>
+            <h2 className="mt-1 text-lg font-black">Pódio do período</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Receita líquida, participação, vendas, ticket e comissão por responsável.</p>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-bold text-primary">
+            <TrendingUp className="h-4 w-4" /> {ranking.length} vendedor(es) ranqueado(s)
+          </div>
+        </div>
+        <div className="grid gap-3 p-4 lg:grid-cols-3">
         {[0, 1, 2].map((position) => {
           const item = ranking[position];
           const Icon = position === 0 ? Trophy : position === 1 ? Medal : Award;
-          return <article key={position} className={`gd-panel p-5 ${position === 0 ? "border-[#d9ad33] bg-gradient-to-br from-[#fffaf0] to-white dark:from-[#211c10] dark:to-[#111216]" : ""}`}><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-full bg-[#f4cf61]/25 text-[#a67811]"><Icon className="h-5 w-5" /></span><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{position + 1}º lugar</p><h2 className="truncate font-black">{item?.seller || "Sem dados"}</h2></div></div><p className="mt-5 text-2xl font-black">{item ? brl.format(item.revenue) : "—"}</p><div className="mt-2 flex justify-between text-[10px] text-muted-foreground"><span>{item?.count || 0} venda(s)</span><span>Comissão {item?.commission ? brl.format(item.commission) : "não informada"}</span></div></article>;
+          const share = item && totals.totalNet > 0 ? (item.revenue / totals.totalNet) * 100 : 0;
+          const progress = item && rankingLeaderRevenue > 0 ? (item.revenue / rankingLeaderRevenue) * 100 : 0;
+          const ticket = item?.count ? item.revenue / item.count : 0;
+          const medalTone = position === 0
+            ? "border-[#d9ad33]/70 bg-gradient-to-br from-[#fff8df] via-white to-white dark:from-[#211a09] dark:via-[#0d0c09] dark:to-[#080808]"
+            : position === 1
+              ? "border-slate-400/35 bg-gradient-to-br from-slate-100/70 to-transparent dark:from-slate-400/10"
+              : "border-amber-700/30 bg-gradient-to-br from-amber-600/10 to-transparent";
+          return (
+            <article key={position} className={`min-w-0 rounded-xl border p-5 shadow-sm ${medalTone}`}>
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary"><Icon className="h-6 w-6" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-[.14em] text-muted-foreground">{position + 1}º lugar</p>
+                  <h3 className="truncate text-base font-black" title={item?.seller || "Sem dados"}>{item?.seller || "Sem dados"}</h3>
+                </div>
+                <span className="rounded-full border border-border bg-background/70 px-2.5 py-1 text-[10px] font-black tabular-nums">{share.toFixed(1).replace(".", ",")}%</span>
+              </div>
+              <p className="mt-5 text-2xl font-black tabular-nums">{item ? brl.format(item.revenue) : "—"}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-gradient-to-r from-[#a66b00] via-[#f4cf61] to-[#fff0a8]" style={{ width: `${progress}%` }} /></div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-[10px]">
+                <div className="rounded-lg border border-border/70 bg-background/50 p-2"><span className="text-muted-foreground">Vendas</span><strong className="mt-1 block text-xs">{item?.count || 0}</strong></div>
+                <div className="rounded-lg border border-border/70 bg-background/50 p-2"><span className="text-muted-foreground">Ticket médio</span><strong className="mt-1 block truncate text-xs" title={brl.format(ticket)}>{item ? brl.format(ticket) : "—"}</strong></div>
+              </div>
+              <div className="mt-3 flex items-center gap-2 text-[10px] text-muted-foreground"><Target className="h-3.5 w-3.5 text-primary" /> Comissão: {item?.commission ? brl.format(item.commission) : "não informada"}</div>
+            </article>
+          );
         })}
+        </div>
       </section>
 
       <section className="gd-panel mt-4 overflow-hidden">

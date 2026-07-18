@@ -508,3 +508,29 @@
 .react-grid-item > .react-resizable-handle::after {
   border-color: hsl(var(--primary)) !important;
 }
+/* Editor visual do dashboard: deixa claro onde arrastar e redimensionar sem
+   alterar o visual normal da operação. */
+.dashboard-layout-editing > .react-grid-item:not(.react-grid-placeholder) {
+  cursor: grab;
+  outline: 1px dashed hsl(var(--primary) / .55);
+  outline-offset: -2px;
+}
+
+.dashboard-layout-editing > .react-grid-item:active {
+  cursor: grabbing;
+}
+
+.dashboard-layout-editing .react-resizable-handle {
+  width: 22px;
+  height: 22px;
+  opacity: 1;
+  border-radius: 8px 0 8px 0;
+  background: hsl(var(--primary));
+  box-shadow: 0 0 16px hsl(var(--primary) / .35);
+}
+
+.dashboard-layout-editing .react-resizable-handle::after {
+  right: 6px;
+  bottom: 6px;
+  border-color: hsl(var(--primary-foreground));
+}

@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
 import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
+import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 
 const FullDashboard = lazy(() => import("@/pages/Index"));
 const TrafficPage = lazy(() => import("@/growdash/TrafficPage"));
@@ -45,7 +46,7 @@ function AuthenticatedLayout() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingModule />;
   if (!user) return <Navigate to="/auth" replace />;
-  return <GrowdashLayout />;
+  return <DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider>;
 }
 
 function RequirePage({ page, children }: { page: PagePermission | "master"; children: ReactNode }) {

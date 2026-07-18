@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     let source: Record<string, unknown>;
     let campaignId: string;
     if (entityType === "campaign") {
-      const { data, error } = await admin.from("campaigns").select("id, name, status, ad_account_id").eq("id", entityId).maybeSingle();
+      const { data, error } = await admin.from("campaigns").select("id, name, status, daily_budget, ad_account_id").eq("id", entityId).maybeSingle();
       if (error || !data) return json({ error: "Campanha não encontrada" }, 404);
       source = data;
       campaignId = data.id;
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       status,
     });
     let normalizedBudget: number | null = null;
-    if (entityType === "adset") {
+    if (entityType === "campaign" || entityType === "adset") {
       const budget = Number(changes.dailyBudget);
       if (!Number.isFinite(budget) || budget <= 0 || budget > 100_000_000) {
         return json({ error: "Orçamento diário inválido" }, 400);
@@ -118,14 +118,14 @@ Deno.serve(async (req) => {
 
     const table = entityType === "campaign" ? "campaigns" : entityType === "adset" ? "adsets" : "ads";
     const localUpdate: Record<string, unknown> = { name, status, updated_at: new Date().toISOString() };
-    if (entityType === "adset") localUpdate.daily_budget = normalizedBudget;
+    if (entityType === "campaign" || entityType === "adset") localUpdate.daily_budget = normalizedBudget;
     const { error: updateError } = await admin.from(table).update(localUpdate).eq("id", entityId);
     if (updateError) console.error("Meta updated, local update failed", updateError);
 
     const auditRows = [
       { field: "name", oldValue: source.name, newValue: name },
       { field: "status", oldValue: source.status, newValue: status },
-      ...(entityType === "adset" ? [{ field: "daily_budget", oldValue: source.daily_budget, newValue: normalizedBudget }] : []),
+      ...((entityType === "campaign" || entityType === "adset") ? [{ field: "daily_budget", oldValue: source.daily_budget, newValue: normalizedBudget }] : []),
     ].filter((row) => String(row.oldValue ?? "") !== String(row.newValue ?? ""));
 
     if (auditRows.length > 0) {

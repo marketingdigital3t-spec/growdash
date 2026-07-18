@@ -223,7 +223,7 @@ export default function Campaigns() {
       let query = supabase
         .from("campaigns")
         .select(`
-          id, name, ad_account_id, status, objective, created_at,
+          id, name, ad_account_id, status, objective, daily_budget, lifetime_budget, created_at,
           adsets(
             id, name, daily_budget, status,
             ads(
@@ -246,10 +246,10 @@ export default function Campaigns() {
       return (data || []).map((c: any) => {
         let spend = 0, leads = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
         const adsets = c.adsets || [];
-        let budget = 0;
+        let adsetBudget = 0;
 
         for (const adset of adsets) {
-          budget += adset.daily_budget ?? 0;
+          adsetBudget += adset.daily_budget ?? 0;
           for (const ad of adset.ads || []) {
             for (const i of ad.insights || []) {
               if (startDate && i.date < startDate.toISOString().split("T")[0]) continue;
@@ -282,6 +282,7 @@ export default function Campaigns() {
         const linkCpc = linkClicks > 0 ? spend / linkClicks : 0;
         const uniqueLinkCtr = reach > 0 ? uniqueLinkClicks / reach * 100 : 0;
 
+        const budget = Number(c.daily_budget || 0) > 0 ? Number(c.daily_budget) : adsetBudget;
         return { ...c, adsets, budget, spend, leads, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
       });
     },
@@ -669,13 +670,6 @@ export default function Campaigns() {
             </TabsList>
             <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 py-1.5 xl:justify-end">
               <div className="w-full sm:w-[285px] [&_button]:!h-8 [&_button]:!min-h-0"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
-              {activeTab === "campaigns" && <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn("meta-toolbar-button", analysisPanel && "meta-toolbar-button-active")}><BarChart3 className="h-3.5 w-3.5" />Análises<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => { const opening = analysisPanel !== "alerts"; setAnalysisPanel(opening ? "alerts" : null); if (!opening) setHealthFilter("all"); }}><Sparkles className="mr-2 h-4 w-4 text-primary" />Alertas operacionais</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setHealthFilter("all"); setAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }}><BrainCircuit className="mr-2 h-4 w-4 text-primary" />Intelligence</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>}
               <Button size="sm" onClick={downloadCurrentView} disabled={(activeTab === "campaigns" ? filtered : activeTab === "adsets" ? selectedAdsets : selectedAds).length === 0} className="meta-toolbar-primary"><Download className="h-3.5 w-3.5" />Baixar relatório</Button>
             </div>
           </div>
@@ -686,13 +680,22 @@ export default function Campaigns() {
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
               <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
             </div>
-            <div className="xl:ml-auto">{activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}</div>
+            <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+              {activeTab === "campaigns" && <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn("meta-toolbar-button", analysisPanel && "meta-toolbar-button-active")}><BarChart3 className="h-3.5 w-3.5" />Análises<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => { const opening = analysisPanel !== "alerts"; setAnalysisPanel(opening ? "alerts" : null); if (!opening) setHealthFilter("all"); }}><Sparkles className="mr-2 h-4 w-4 text-primary" />Alertas operacionais</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => { setHealthFilter("all"); setAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }}><BrainCircuit className="mr-2 h-4 w-4 text-primary" />Intelligence</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>}
+              {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
+            </div>
           </div>
 
           <AnimatePresence>
             {selectedIds.size > 0 && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-10 flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5">
               <Badge variant="secondary">{selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}</Badge>
-              {activeTab === "campaigns" && <><Button size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })} className="h-7 gap-1.5"><Pencil className="h-3.5 w-3.5" />Editar</Button><Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-7 gap-1.5"><Eye className="h-3.5 w-3.5" />Ver desempenho</Button></>}
+              {activeTab === "campaigns" && <><Button size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })} className="h-7 gap-1.5"><Pencil className="h-3.5 w-3.5" />Editar orçamento e campanha</Button><Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-7 gap-1.5"><Eye className="h-3.5 w-3.5" />Ver desempenho</Button></>}
               <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-7 gap-1 text-xs"><X className="h-3 w-3" />Limpar</Button>
             </motion.div>}
           </AnimatePresence>
@@ -782,7 +785,7 @@ export default function Campaigns() {
             ) : (
               <Card className="overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col">
                 <div className="space-y-2 p-2 md:hidden">
-                  {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status })} />)}
+                  {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
                 </div>
                 <div data-campaign-table-scroll className="growdash-scrollbar hidden min-h-0 flex-1 overflow-auto md:block">
                   <Table style={{ tableLayout: "fixed", width: "max-content" }}>
@@ -846,7 +849,7 @@ export default function Campaigns() {
                               <div className="flex items-center gap-2 text-xs font-semibold">
                                 <button
                                   type="button"
-                                  onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status })}
+                                  onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget })}
                                   className={cn(
                                     "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
                                     normalizeStatus(c.status) === "ACTIVE"
@@ -866,7 +869,7 @@ export default function Campaigns() {
                               <span className="block truncate font-medium text-foreground" title={c.name}>{c.name}</span>
                             </TableCell>
                             {showColumn("deliveryStatus") && <TableCell style={cellW("deliveryStatus")} className="text-xs"><span className="inline-flex items-center gap-2"><StatusDot status={c.status} />{getStatusBadge(c.status).label}</span></TableCell>}
-                            {showColumn("actions") && <TableCell style={cellW("actions")} onClick={(event) => event.stopPropagation()}><Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status })}><Pencil className="mr-1 h-3 w-3" />Editar</Button></TableCell>}
+                            {showColumn("actions") && <TableCell style={cellW("actions")} onClick={(event) => event.stopPropagation()}><Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget })}><Pencil className="mr-1 h-3 w-3" />Editar</Button></TableCell>}
                             {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
                             {showColumn("impressions") && <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>}
                             {showColumn("frequency") && <TableCell style={cellW("frequency")} className={cn("text-right tabular-nums text-sm", sortBg("frequency"))}><AnimatedNumber value={c.frequency} decimals={2} /></TableCell>}
@@ -1074,7 +1077,7 @@ export default function Campaigns() {
         open={!!detailCampaignId}
         onOpenChange={(v) => !v && setDetailCampaignId(null)}
         campaign={detailCampaignId ? (campaigns.find((c: any) => c.id === detailCampaignId) || null) : null}
-        onEdit={(campaign) => { setDetailCampaignId(null); setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status }); }}
+        onEdit={(campaign) => { setDetailCampaignId(null); setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: (campaign as any).daily_budget ?? (campaign as any).budget }); }}
         onViewAds={(campaign) => { setSelectedIds(new Set([campaign.id])); setActiveTab("ads"); setDetailCampaignId(null); }}
       />
       <MetaEntityDetailSheet

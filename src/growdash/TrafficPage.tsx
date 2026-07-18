@@ -31,6 +31,7 @@ const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
   { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
   { id: "ai", label: "IA & Relatórios de Leads", icon: Bot },
+  { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
 ] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -52,7 +53,7 @@ export default function TrafficPage() {
         ? "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
         : "space-y-3",
     )}>
-      <nav className="grid shrink-0 grid-cols-3 gap-1 rounded-lg border border-border bg-muted/55 p-1 lg:max-w-[850px]" aria-label="Áreas de Tráfego Pago">
+      <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-4 lg:max-w-[1180px]" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 

@@ -4,8 +4,7 @@ import RGL, { Responsive, WidthProvider } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { WidgetRenderer } from "./WidgetRenderer";
-import { Button } from "@/components/ui/button";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { DashboardView } from "@/hooks/useDashboardViews";
 import { getWidgetDef } from "@/lib/widgetCatalog";
 import type { Sale } from "@/hooks/useSales";
@@ -25,7 +24,7 @@ interface Props {
   view: DashboardView;
   isEditing: boolean;
   onChange: (layout: any[], widgets: any[]) => void;
-  onAddClick: () => void;
+  onAddClick?: () => void;
   onEditSale: (s: Sale) => void;
 }
 
@@ -80,14 +79,13 @@ function appendSystemTail(baseLayout: DashboardGridItem[], columns: number, widg
   return [...visibleLayout, ...tail];
 }
 
-export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSale }: Props) {
+export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) {
   const isMobile = useIsMobile();
   const [breakpoint, setBreakpoint] = useState("lg");
   // Local state mirrors the persisted view, with auto-debounced save via onChange.
   const [layout, setLayout] = useState<any[]>(view.layout || []);
   const [widgets, setWidgets] = useState<any[]>(view.widgets || []);
   const [autoHeightRows, setAutoHeightRows] = useState<Record<string, number>>({});
-  const saveTimer = useRef<any>(null);
 
   useEffect(() => {
     setLayout(view.layout || []);
@@ -99,11 +97,6 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
     setAutoHeightRows((current) => current[widgetId] === rows ? current : { ...current, [widgetId]: rows });
   }, []);
 
-  function scheduleSave(nextLayout: any[], nextWidgets: any[]) {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => onChange(nextLayout, nextWidgets), 800);
-  }
-
   const desktopLayout = useMemo(() =>
     normalizeDesktopDashboardLayout(layout, widgets, 12),
   [layout, widgets]);
@@ -111,7 +104,7 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
   const responsiveLayouts = useMemo(() => {
     const widgetIds = new Set((widgets || []).map((widget) => widget.id));
     const applyAutoHeight = (items: DashboardGridItem[]) => items.map((item) =>
-      autoHeightRows[item.i] ? { ...item, h: autoHeightRows[item.i] } : item,
+      !isEditing && autoHeightRows[item.i] ? { ...item, h: autoHeightRows[item.i] } : item,
     );
     const lg = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 12));
     const md = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 8));
@@ -121,7 +114,7 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
       md: appendSystemTail(md, 8, widgetIds),
       sm: appendSystemTail(sm, 4, widgetIds),
     };
-  }, [autoHeightRows, desktopLayout, widgets]);
+  }, [autoHeightRows, desktopLayout, isEditing, widgets]);
 
   const fullWidgets = useMemo(() => [...widgets, ...SYSTEM_TAIL], [widgets]);
 
@@ -142,7 +135,7 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
     const userOnly = desktopNext.filter((l) => !l.i.startsWith("__sys_"));
     if (layoutsEqual(userOnly, layout)) return;
     setLayout(userOnly);
-    scheduleSave(userOnly, widgets);
+    onChange(userOnly, widgets);
   }
 
 
@@ -151,12 +144,11 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
     const nextLayout = layout.filter((l) => l.i !== id);
     setWidgets(nextWidgets);
     setLayout(nextLayout);
-    scheduleSave(nextLayout, nextWidgets);
+    onChange(nextLayout, nextWidgets);
   }
 
   if (isMobile) {
     return <div className="min-w-0 space-y-4 overflow-x-clip">
-      {isEditing && <div className="sticky top-[160px] z-10 flex justify-end"><Button size="sm" onClick={onAddClick} className="min-h-11 gap-1.5 shadow"><Plus className="h-3.5 w-3.5" />Adicionar widget</Button></div>}
       {fullWidgets.map((widget) => {
         const isSystem = widget.id.startsWith("__sys_");
         return <section key={widget.id} className="relative min-w-0 max-w-full overflow-hidden rounded-xl">
@@ -169,15 +161,8 @@ export function DashboardGrid({ view, isEditing, onChange, onAddClick, onEditSal
 
   return (
     <div className="relative min-w-0 max-w-full overflow-x-clip">
-      {isEditing && (
-        <div className="sticky top-0 z-30 flex justify-end mb-2">
-          <Button size="sm" onClick={onAddClick} className="gap-1.5 shadow">
-            <Plus className="h-3.5 w-3.5" /> Adicionar widget
-          </Button>
-        </div>
-      )}
       <ResponsiveGrid
-        className="layout"
+        className={isEditing ? "layout dashboard-layout-editing" : "layout"}
         layouts={responsiveLayouts}
         breakpoints={{ lg: 1280, md: 900, sm: 0 }}
         cols={{ lg: 12, md: 8, sm: 4 }}

@@ -217,14 +217,7 @@ export default function FunnelAnalysis() {
               <SelectValue placeholder="Funil" />
             </SelectTrigger>
             <SelectContent>
-              {activeFunnels.map((f) => {
-                const acc = adAccounts.find((a) => a.id === f.ad_account_id);
-                return (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}{acc ? ` · ${acc.name}` : ""}
-                  </SelectItem>
-                );
-              })}
+              {activeFunnels.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
             </SelectContent>
           </Select>
 
