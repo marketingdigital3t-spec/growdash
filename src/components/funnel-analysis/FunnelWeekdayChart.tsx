@@ -29,7 +29,7 @@ export function FunnelWeekdayChart({ a }: { a: FunnelAnalytics }) {
                 formatter={(v: number, name) => name === "Receita" ? [fmtBRL(v), name] : [v, name]}
               />
               <Bar dataKey="Conversões" radius={[4, 4, 0, 0]}>
-                {data.map((_, i) => <Cell key={i} fill="hsl(142 71% 45%)" />)}
+                {data.map((_, i) => <Cell key={i} fill="hsl(var(--primary))" />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>

@@ -81,19 +81,31 @@
   }
 
   html[data-accent="purple"] {
-    --primary: 268 82% 60%;
-    --ring: 268 92% 68%;
+    --primary: 258 90% 66%;
+    --ring: 258 94% 72%;
     --accent: 268 44% 18%;
     --accent-foreground: 270 100% 87%;
-    --brand-accent-rgb: 156, 91, 255;
+    --sidebar-primary: 258 90% 66%;
+    --sidebar-icon-active: 258 90% 66%;
+    --sidebar-ring: 258 94% 72%;
+    --brand-gold: #8b5cf6;
+    --brand-gold-light: #c4b5fd;
+    --brand-bronze: #6d3de0;
+    --brand-accent-rgb: 139, 92, 246;
   }
 
   html[data-accent="blue"] {
-    --primary: 213 90% 55%;
-    --ring: 211 100% 67%;
-    --accent: 213 46% 18%;
-    --accent-foreground: 211 100% 88%;
-    --brand-accent-rgb: 56, 139, 253;
+    --primary: 220 90% 57%;
+    --ring: 220 96% 68%;
+    --accent: 220 46% 18%;
+    --accent-foreground: 220 100% 90%;
+    --sidebar-primary: 220 90% 57%;
+    --sidebar-icon-active: 220 90% 57%;
+    --sidebar-ring: 220 96% 68%;
+    --brand-gold: #2f6bf4;
+    --brand-gold-light: #82a7ff;
+    --brand-bronze: #1d4ed8;
+    --brand-accent-rgb: 47, 107, 244;
   }
 
   html[data-accent="pink"] {
@@ -101,7 +113,34 @@
     --ring: 329 96% 70%;
     --accent: 329 42% 18%;
     --accent-foreground: 329 100% 89%;
+    --sidebar-primary: 329 84% 57%;
+    --sidebar-icon-active: 329 84% 57%;
+    --sidebar-ring: 329 96% 70%;
+    --brand-gold: #ec4899;
+    --brand-gold-light: #f9a8d4;
+    --brand-bronze: #be185d;
     --brand-accent-rgb: 236, 72, 153;
+  }
+
+  .brand-mark-tint,
+  .brand-logo-tint {
+    background: linear-gradient(145deg, rgb(var(--brand-accent-rgb)) 0%, color-mix(in srgb, rgb(var(--brand-accent-rgb)) 58%, white) 50%, rgb(var(--brand-accent-rgb)) 100%);
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+  }
+
+  .brand-mark-tint {
+    -webkit-mask-image: url('/growdash-mark-gold.svg');
+    mask-image: url('/growdash-mark-gold.svg');
+  }
+
+  .brand-logo-tint {
+    -webkit-mask-image: url('/growdash-brand-gold.png');
+    mask-image: url('/growdash-brand-gold.png');
   }
 
   /* Analytics modules share the same Growdash palette as the rest of the SaaS.

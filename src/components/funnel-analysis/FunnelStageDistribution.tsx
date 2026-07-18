@@ -8,12 +8,12 @@ interface Props {
 }
 
 const STAGE_COLORS = [
-  "hsl(217 91% 60%)",
-  "hsl(199 89% 48%)",
-  "hsl(188 95% 43%)",
-  "hsl(160 84% 39%)",
-  "hsl(142 71% 45%)",
-  "hsl(45 93% 55%)",
+  "hsl(var(--primary))",
+  "hsl(var(--primary) / .84)",
+  "hsl(var(--primary) / .68)",
+  "hsl(var(--primary) / .52)",
+  "hsl(var(--primary) / .38)",
+  "hsl(var(--warning))",
   "hsl(25 95% 53%)",
   "hsl(0 84% 60%)",
 ];

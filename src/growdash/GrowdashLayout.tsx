@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   LogOut,
   Menu,
   Moon,
@@ -33,6 +34,7 @@ import { useNearRealtimeSync } from "@/hooks/useNearRealtimeSync";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAccentTheme } from "@/hooks/useAccentTheme";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -55,6 +57,7 @@ function getInitialSectionState() {
 }
 
 export default function GrowdashLayout() {
+  useAccentTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
@@ -259,10 +262,10 @@ export default function GrowdashLayout() {
                 <div className="truncate text-[10px] text-white/45">{isMaster ? "Proprietário" : "Membro"}</div>
               </div>
             )}
-            {showSidebarLabels && <ChevronRight className="h-4 w-4 text-white/40" />}
+            {showSidebarLabels && <ChevronUp className="h-4 w-4 text-white/40" />}
           </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="end" sideOffset={10} className="z-[130] w-60">
+          <DropdownMenuContent side="top" align={showSidebarLabels ? "start" : "center"} sideOffset={8} collisionPadding={12} className="z-[130] w-60">
             <DropdownMenuLabel><span className="block truncate">{displayName}</span><span className="block truncate text-[10px] font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><NavLink to="/perfil?tab=personal"><UserRound className="mr-2 h-4 w-4" />Perfil e dados</NavLink></DropdownMenuItem>

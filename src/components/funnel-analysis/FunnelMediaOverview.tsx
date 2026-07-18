@@ -46,7 +46,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
               <div className="gd-metric-card h-full min-w-0 cursor-default rounded-xl border border-border/50 bg-background/70 p-3">
                 <div className="flex items-start justify-between gap-2 pr-5">
                   <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
-                  <Icon className="h-4 w-4 shrink-0 text-[#e6b83f]" />
+                  <Icon className="h-4 w-4 shrink-0 text-primary" />
                 </div>
                 <p className="mt-2 truncate text-lg font-bold text-foreground">{value}</p>
                 <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>

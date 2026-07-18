@@ -9,7 +9,7 @@ import { Plus, Minus, Maximize2 } from "lucide-react";
 
 interface BrazilMapProps {
   data: Record<string, number>;
-  colorScheme?: "blue" | "green";
+  colorScheme?: "brand" | "blue" | "green";
   metricLabel?: string;
   title?: string;
   subtitle?: string;
@@ -31,13 +31,18 @@ const STATE_NAMES: Record<string, string> = {
 
 // Choropleth ramps (light → dark)
 const RAMPS = {
+  brand: [
+    "hsl(var(--primary) / .10)", "hsl(var(--primary) / .20)",
+    "hsl(var(--primary) / .34)", "hsl(var(--primary) / .50)",
+    "hsl(var(--primary) / .66)", "hsl(var(--primary) / .82)", "hsl(var(--primary))",
+  ],
   blue: ["#eff4ff", "#dbe6ff", "#b8ccff", "#8aaaff", "#5b86f7", "#3b6fe8", "#1d4ed8"],
   green: ["#ecfdf5", "#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#047857"],
 } as const;
 
 export function BrazilMap({
   data,
-  colorScheme = "blue",
+  colorScheme = "brand",
   metricLabel = "leads",
   title = "Leads por estado",
   subtitle,
@@ -65,7 +70,7 @@ export function BrazilMap({
     return scaleQuantize<string>().domain([0, maxValue]).range(ramp as unknown as string[]);
   }, [data, maxValue, ramp]);
 
-  const accentText = colorScheme === "blue" ? "text-blue-600" : "text-emerald-600";
+  const accentText = colorScheme === "green" ? "text-emerald-600" : colorScheme === "blue" ? "text-blue-600" : "text-primary";
 
   return (
     <Card className="h-full">
@@ -152,7 +157,7 @@ export function BrazilMap({
                   {geographies.map((geo) => {
                     const uf: string = geo.properties.sigla;
                     const value = data[uf] || 0;
-                    const fill = value > 0 ? colorScale(value) : "hsl(220 14% 96%)";
+                    const fill = value > 0 ? colorScale(value) : "hsl(var(--muted))";
                     return (
                       <Geography
                         key={geo.rsmKey}

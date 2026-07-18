@@ -1,19 +1,12 @@
 import { cn } from "@/lib/utils";
 
 export function BrandMark({ className }: { className?: string }) {
-  return <img src="./growdash-mark-gold.svg" alt="" aria-hidden="true" className={cn("block object-contain", className)} />;
+  return <span aria-hidden="true" className={cn("brand-mark-tint block shrink-0", className)} />;
 }
 
 export function BrandLogo({ className, eager = false }: { className?: string; eager?: boolean }) {
+  void eager;
   return (
-    <img
-      src="/growdash-brand-gold.png"
-      alt="Growdash"
-      width={620}
-      height={250}
-      className={cn("block object-contain", className)}
-      loading={eager ? "eager" : "lazy"}
-      decoding="async"
-    />
+    <span role="img" aria-label="Growdash" className={cn("brand-logo-tint block shrink-0", className)} />
   );
 }

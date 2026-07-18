@@ -91,7 +91,7 @@ export function GeoOriginWidget() {
   }));
 
   const insightTop = sortedRows[0];
-  const colorScheme = mode === "leads" ? "blue" : "green";
+  const colorScheme = mode === "leads" ? "brand" : "green";
   const accentBar = mode === "leads" ? "hsl(142, 71%, 45%)" : "hsl(142, 71%, 45%)";
 
   // Empty / explanation state

@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useRDDeals, useFunnelStages, computeFunnelAnalytics } from "@/hooks/useRDDeals";
+import { useRDDeals, useRDClosedDeals, useFunnelStages, computeFunnelAnalytics } from "@/hooks/useRDDeals";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -76,8 +76,29 @@ export default function FunnelAnalysis() {
   const funnelId = selectedFunnelRecord?.id || "";
   const effectiveAdAccountId = adAccountId === "all" ? selectedFunnelRecord?.ad_account_id : adAccountId;
 
+  // A análise de etapas precisa representar uma conta/funil real. Antes, a
+  // opção "Todas as contas" exibia silenciosamente apenas o primeiro funil,
+  // o que fazia os totais parecerem incorretos. Selecionamos essa conta de
+  // forma explícita para que filtro, RD e Meta permaneçam reconciliados.
+  useEffect(() => {
+    if (adAccountId === "all" && selectedFunnelRecord?.ad_account_id) {
+      setAdAccountId(selectedFunnelRecord.ad_account_id);
+    }
+  }, [adAccountId, selectedFunnelRecord?.ad_account_id, setAdAccountId]);
+
   const { data: stages = [], isLoading: loadingStages } = useFunnelStages(funnelId);
   const { data: deals = [], isLoading, refetch } = useRDDeals({
+    funnelId,
+    startDate,
+    endDate,
+    source: selectedSource,
+    campaign: selectedCampaign,
+    state: selectedState,
+    owner: selectedOwner,
+    product: selectedProduct,
+    enabled: !!funnelId,
+  });
+  const { data: closedDeals = [], isLoading: loadingClosedDeals } = useRDClosedDeals({
     funnelId,
     startDate,
     endDate,
@@ -96,7 +117,7 @@ export default function FunnelAnalysis() {
   const owners = useMemo(() => Array.from(new Set(deals.map((d) => d.deal_owner_name).filter(Boolean) as string[])).sort(), [deals]);
   const products = useMemo(() => Array.from(new Set(deals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [deals]);
 
-  const analytics = useMemo(() => computeFunnelAnalytics(deals, stages), [deals, stages]);
+  const analytics = useMemo(() => computeFunnelAnalytics(deals, stages, closedDeals), [closedDeals, deals, stages]);
 
   const { data: insightRows = [], isLoading: loadingInsights } = useInsights({
     // A análise detalhada sempre representa um funil. Quando o filtro global
@@ -131,7 +152,7 @@ export default function FunnelAnalysis() {
     try {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
-      const funnelsToSync = activeFunnels.filter((funnel) => funnel.id === funnelId);
+      const funnelsToSync = activeFunnels;
 
       const [metaResult, ...rdResults] = await Promise.allSettled([
         syncMeta.mutateAsync({
@@ -144,9 +165,10 @@ export default function FunnelAnalysis() {
             body: {
               funnel_id: funnel.id,
               analytics_mode: true,
-              start_date: start,
-              end_date: end,
-              max_deals: 1200,
+              // A sincronização manual reconcilia o histórico completo do
+              // funil. A atualização automática de 15 min continua incremental.
+              max_deals: 10000,
+              max_pages: 50,
             },
           });
           if (error) {
@@ -166,6 +188,7 @@ export default function FunnelAnalysis() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["insights"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_closed_deals"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] }),
       ]);
       await refetch();
@@ -259,7 +282,7 @@ export default function FunnelAnalysis() {
             </p>
           </div>
         </MotionItem>
-      ) : loadingFunnels || isLoading || loadingStages ? (
+      ) : loadingFunnels || isLoading || loadingClosedDeals || loadingStages ? (
         <MotionItem>
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>

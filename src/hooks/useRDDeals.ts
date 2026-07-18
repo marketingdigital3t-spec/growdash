@@ -131,6 +131,62 @@ export function useRDDeals(params: Params) {
   });
 }
 
+/** Negócios ganhos pela data real de fechamento.
+ *
+ * Leads e distribuição de etapas usam a data de entrada do lead; vendas,
+ * receita e tempo de conversão precisam usar `closed_at`. Misturar as duas
+ * datas foi a principal causa de divergência com os relatórios do RD.
+ */
+export function useRDClosedDeals(params: Params) {
+  const { funnelId, startDate, endDate, source, state, campaign, owner, product, enabled = true } = params;
+  return useQuery({
+    queryKey: [
+      "rd_closed_deals",
+      funnelId,
+      startDate?.toISOString(),
+      endDate?.toISOString(),
+      source ?? "all",
+      state ?? "all",
+      campaign ?? "all",
+      owner ?? "all",
+      product ?? "all",
+    ],
+    enabled: enabled && !!funnelId,
+    queryFn: async () => {
+      let query = supabase
+        .from("rd_deals")
+        .select(DEAL_FIELDS)
+        .eq("rd_funnel_id", funnelId!)
+        .eq("win", true)
+        .not("closed_at", "is", null)
+        .order("closed_at", { ascending: false });
+
+      if (startDate) query = query.gte("closed_at", startDate.toISOString());
+      if (endDate) query = query.lte("closed_at", endOfDay(endDate).toISOString());
+      if (source && source !== "all") query = query.eq("utm_source", source);
+      if (state && state !== "all") query = query.eq("lead_state", state);
+      if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
+      if (owner && owner !== "all") query = query.eq("deal_owner_name", owner);
+      if (product && product !== "all") query = query.eq("rd_product_name", product);
+
+      const PAGE = 1000;
+      const MAX = 10;
+      let all: RDDeal[] = [];
+      for (let p = 0; p < MAX; p++) {
+        const { data, error } = await query.range(p * PAGE, p * PAGE + PAGE - 1);
+        if (error) throw error;
+        const batch = (data || []) as unknown as RDDeal[];
+        all = all.concat(batch);
+        if (batch.length < PAGE) break;
+      }
+      return all;
+    },
+    staleTime: 15 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
+}
+
 export function useFunnelStages(funnelId?: string) {
   return useQuery({
     queryKey: ["rd_funnel_stages", funnelId],
@@ -226,7 +282,7 @@ function periodOfHour(h: number): "Manhã" | "Tarde" | "Noite" | "Madrugada" {
   return "Madrugada";
 }
 
-export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): FunnelAnalytics {
+export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], closedDeals: RDDeal[] = deals.filter((deal) => deal.win)): FunnelAnalytics {
   const totalLeads = deals.length;
 
   // Ordena estágios pelo "order" real do RD
@@ -246,10 +302,10 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
   const daysCountByStage = new Map<string, number>();
 
   let qualifiedLeads = 0;
-  let conversions = 0;
+  const conversions = closedDeals.length;
   let lostDeals = 0;
-  let revenue = 0;
-  const wonAmounts: number[] = [];
+  const revenue = closedDeals.reduce((sum, deal) => sum + (deal.amount_total || 0), 0);
+  const wonAmounts: number[] = closedDeals.map((deal) => deal.amount_total || 0);
 
   const now = Date.now();
   for (const d of deals) {
@@ -265,11 +321,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
       }
     }
 
-    if (d.win) {
-      conversions += 1;
-      revenue += d.amount_total || 0;
-      wonAmounts.push(d.amount_total || 0);
-    } else if (d.stage_bucket === "lost") {
+    if (!d.win && d.stage_bucket === "lost") {
       lostDeals += 1;
     }
   }
@@ -291,7 +343,10 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
 
   // Define "qualificados" como quem passou da metade do funil
   const midIdx = Math.floor(sequence.length / 2);
-  qualifiedLeads = sequence.length > 0 ? cumulativeBySeqIdx[Math.max(1, midIdx)] || 0 : 0;
+  const semanticQualified = deals.filter((deal) => ["mql", "sql", "opportunity", "client"].includes(deal.stage_bucket)).length;
+  qualifiedLeads = semanticQualified > 0
+    ? semanticQualified
+    : sequence.length > 0 ? cumulativeBySeqIdx[Math.max(1, midIdx)] || 0 : 0;
 
   const stagesOut = sortedStages.map((s) => {
     const idx = indexInSeq.get(s.rd_stage_id);
@@ -343,7 +398,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
   const avgTicket = wonAmounts.length > 0 ? wonAmounts.reduce((a, b) => a + b, 0) / wonAmounts.length : 0;
 
   // Tempo médio até conversão
-  const wonWithDates = deals.filter((d) => d.win && d.lead_created_at && d.closed_at);
+  const wonWithDates = closedDeals.filter((d) => d.lead_created_at && d.closed_at);
   const avgDaysToConvert =
     wonWithDates.length > 0
       ? wonWithDates.reduce((s, d) => {
@@ -365,12 +420,13 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
       if (idx >= oppIdxThreshold) cur.opportunities += 1;
       evoMap.set(day, cur);
     }
-    if (d.win && d.closed_at) {
-      const day = d.closed_at.slice(0, 10);
-      const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
-      cur.conversions += 1;
-      evoMap.set(day, cur);
-    }
+  }
+  for (const d of closedDeals) {
+    if (!d.closed_at) continue;
+    const day = d.closed_at.slice(0, 10);
+    const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
+    cur.conversions += 1;
+    evoMap.set(day, cur);
   }
   const evolution = Array.from(evoMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
@@ -398,10 +454,13 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
     const k = d.utm_source || "Não informado";
     const cur = srcMap.get(k) || { leads: 0, sales: 0, revenue: 0 };
     cur.leads += 1;
-    if (d.win) {
-      cur.sales += 1;
-      cur.revenue += d.amount_total || 0;
-    }
+    srcMap.set(k, cur);
+  }
+  for (const d of closedDeals) {
+    const k = d.utm_source || "Não informado";
+    const cur = srcMap.get(k) || { leads: 0, sales: 0, revenue: 0 };
+    cur.sales += 1;
+    cur.revenue += d.amount_total || 0;
     srcMap.set(k, cur);
   }
   const sourceBreakdown = Array.from(srcMap.entries())
@@ -433,7 +492,12 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
     const k = normalizeUF(d.lead_state);
     const cur = stateMap.get(k) || { leads: 0, conversions: 0 };
     cur.leads += 1;
-    if (d.win) cur.conversions += 1;
+    stateMap.set(k, cur);
+  }
+  for (const d of closedDeals) {
+    const k = normalizeUF(d.lead_state);
+    const cur = stateMap.get(k) || { leads: 0, conversions: 0 };
+    cur.conversions += 1;
     stateMap.set(k, cur);
   }
   const stateBreakdown = Array.from(stateMap.entries())
@@ -454,12 +518,13 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
       const cur = wdMap.get(wd)!;
       cur.leads += 1;
     }
-    if (d.win && d.closed_at) {
-      const wd = new Date(d.closed_at).getDay();
-      const cur = wdMap.get(wd)!;
-      cur.conversions += 1;
-      cur.revenue += d.amount_total || 0;
-    }
+  }
+  for (const d of closedDeals) {
+    if (!d.closed_at) continue;
+    const wd = new Date(d.closed_at).getDay();
+    const cur = wdMap.get(wd)!;
+    cur.conversions += 1;
+    cur.revenue += d.amount_total || 0;
   }
   const weekdayBreakdown = Array.from(wdMap.entries()).map(([wd, v]) => ({
     weekday: wd,
@@ -486,14 +551,15 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[]): 
       periodMap.get(p)!.leads += 1;
       hourMap.get(h)!.leads += 1;
     }
-    if (d.win && d.closed_at) {
-      const h = new Date(d.closed_at).getHours();
-      const p = periodOfHour(h);
-      periodMap.get(p)!.conversions += 1;
-      const hv = hourMap.get(h)!;
-      hv.conversions += 1;
-      hv.revenue += d.amount_total || 0;
-    }
+  }
+  for (const d of closedDeals) {
+    if (!d.closed_at) continue;
+    const h = new Date(d.closed_at).getHours();
+    const p = periodOfHour(h);
+    periodMap.get(p)!.conversions += 1;
+    const hv = hourMap.get(h)!;
+    hv.conversions += 1;
+    hv.revenue += d.amount_total || 0;
   }
   const hourBreakdown = (["Manhã", "Tarde", "Noite", "Madrugada"] as const).map((p) => {
     const v = periodMap.get(p)!;

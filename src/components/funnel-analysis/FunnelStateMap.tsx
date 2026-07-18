@@ -18,7 +18,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
-            <BrazilMap data={leadMap} metricLabel="Leads" colorScheme="blue" />
+            <BrazilMap data={leadMap} metricLabel="Leads" colorScheme="brand" />
           </div>
           <div className="space-y-3">
             <div className="overflow-x-auto max-h-64">
@@ -55,7 +55,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
                     contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted) / 0.25)", stroke: "hsl(var(--border))" }}
                   />
                   <Bar dataKey="conv" radius={[4, 4, 0, 0]}>
-                    {topStates.slice(0, 8).map((_, i) => <Cell key={i} fill="hsl(160 84% 39%)" />)}
+                    {topStates.slice(0, 8).map((_, i) => <Cell key={i} fill="hsl(var(--primary))" />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

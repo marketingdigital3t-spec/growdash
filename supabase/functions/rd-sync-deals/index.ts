@@ -359,8 +359,11 @@ Deno.serve(async (req) => {
         const rows = stagesArr.map((s, idx) => {
           const name = String(s?.name || "");
           const lname = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const isWon = lname.includes("ganho") || lname.includes("venda real") || lname.includes("venda concl") || lname.includes("fechado ganho") || lname.includes("won") || lname.includes("cliente");
-          const isLost = lname.includes("perdido") || lname.includes("perda") || lname.includes("lost");
+          const isWon = Boolean(s?.win ?? s?.is_won ?? s?.won)
+            || lname.includes("ganho") || lname.includes("venda real") || lname.includes("venda concl")
+            || lname.includes("fechado ganho") || lname.includes("won") || lname.includes("cliente");
+          const isLost = Boolean(s?.loss ?? s?.is_lost ?? s?.lost)
+            || lname.includes("perdido") || lname.includes("perda") || lname.includes("lost");
           const ord = Number(s?.order ?? s?.position ?? idx);
           const sid = String(s?.id || s?._id);
           stageOrderMap.set(sid, ord);
@@ -448,10 +451,13 @@ Deno.serve(async (req) => {
     async function persistDeal(d: any) {
       const rdDealId = String(d.id || d._id);
       const amountTotal = parseFloat(d.amount_total || d.amount || "0") || 0;
-      const won = isWonDeal(d);
-      const lost = d.win === false || (d.deal_lost_reason != null && !won);
       const stageName = d.deal_stage?.name || null;
       const stageId = d.deal_stage?.id ? String(d.deal_stage.id) : null;
+      const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
+      // A API do RD envia `win: false` também para negócios ainda abertos.
+      // Portanto, perda só pode ser inferida pela etapa de perda ou por um
+      // motivo de perda explícito; caso contrário o funil inteiro fica errado.
+      const lost = !won && (Boolean(stageId && stageLostMap.get(stageId)) || d.deal_lost_reason != null);
       const bucket = bucketFromStage(stageName, won, lost);
       const lostReason = d.deal_lost_reason?.name || d.deal_lost_reason || null;
 
@@ -643,8 +649,20 @@ Deno.serve(async (req) => {
         const rdDealId = String(d.id || d._id);
         const stageName = d.deal_stage?.name || null;
         const stageId = d.deal_stage?.id ? String(d.deal_stage.id) : null;
-        const won = isWonDeal(d);
-        const lost = Boolean(d.deal_lost_reason) || bucketFromStage(stageName, won, false) === "lost";
+        const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
+        const lost = !won && (Boolean(stageId && stageLostMap.get(stageId)) || Boolean(d.deal_lost_reason));
+        const baseContact = d.contact || d.deal_contact || {};
+        const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
+        const inline = inlineContacts[0]?.contact || inlineContacts[0] || {};
+        const contact = { ...inline, ...baseContact };
+        const contactFields = contact.contact_custom_fields || [];
+        const dealFields = d.deal_custom_fields || d.custom_fields || [];
+        const contactState = contact.state || contact.address_state
+          || findCustomField([dealFields, contactFields], ["state", "estado", "uf", "lead_state", "estadouf"])
+          || null;
+        const contactCity = contact.city || contact.address_city
+          || findCustomField([dealFields, contactFields], ["city", "cidade", "lead_city", "cidadelead"])
+          || null;
         const row: Record<string, unknown> = {
           user_id: userId!,
           ad_account_id: funnel!.ad_account_id,
@@ -661,6 +679,10 @@ Deno.serve(async (req) => {
           closed_at: d.closed_at || null,
           raw: d,
         };
+        if (contactState) row.lead_state = contactState;
+        if (contactCity) row.lead_city = contactCity;
+        if (contact.name || d.contact_name) row.contact_name = contact.name || d.contact_name;
+        if (contact.email) row.contact_email = contact.email;
         if (d.deal_lost_reason?.name || d.deal_lost_reason) row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
         if (d.user?.name || d.deal_user?.name || d.owner?.name) row.deal_owner_name = d.user?.name || d.deal_user?.name || d.owner?.name;
         if (d.deal_products?.[0]?.name) row.rd_product_name = d.deal_products[0].name;
@@ -691,10 +713,12 @@ Deno.serve(async (req) => {
       const requestedPages = Number(max_pages);
       const maxPages = realtime
         ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
-        : analytics_mode ? 20 : 50;
+        : analytics_mode
+          ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 50, 50))
+          : 50;
       const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
       const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
-      const maxAnalyticsDeals = Math.max(1, Math.min(Number(max_deals) || 1000, 3000));
+      const maxAnalyticsDeals = Math.max(1, Math.min(Number(max_deals) || 10000, 10000));
       while (page <= maxPages) {
         const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc`;
         const r = await fetchWithRetry(url);

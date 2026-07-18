@@ -29,7 +29,7 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
                 contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted) / 0.25)", stroke: "hsl(var(--border))" }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="Leads" stroke="hsl(217 91% 60%)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="Leads" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="Oportunidades" stroke="hsl(45 93% 55%)" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="Vendas" stroke="hsl(142 71% 45%)" strokeWidth={2} dot={false} />
             </LineChart>

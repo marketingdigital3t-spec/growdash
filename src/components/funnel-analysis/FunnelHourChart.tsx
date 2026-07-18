@@ -53,7 +53,7 @@ export function FunnelHourChart({ a }: { a: FunnelAnalytics }) {
               />
               <Bar dataKey="Leads" radius={[4, 4, 0, 0]} cursor="pointer">
                 {data.map((d, i) => (
-                  <Cell key={`l-${i}`} fill="hsl(217 91% 60%)" opacity={selected && selected !== d.label ? 0.35 : 1} />
+                  <Cell key={`l-${i}`} fill="hsl(var(--primary))" opacity={selected && selected !== d.label ? 0.35 : 1} />
                 ))}
               </Bar>
               <Bar dataKey="Conversões" radius={[4, 4, 0, 0]} cursor="pointer">
