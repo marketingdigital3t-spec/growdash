@@ -40,6 +40,7 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
         queryClient.invalidateQueries({ queryKey: ["meta-ads-independent"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),
         queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }),
       ]);
     }, 350);

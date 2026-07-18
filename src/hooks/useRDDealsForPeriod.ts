@@ -9,6 +9,7 @@ export interface RDDealLite {
   rd_funnel_id: string | null;
   rd_stage_id: string | null;
   rd_stage_name: string | null;
+  rd_stage_order: number | null;
   stage_bucket: string;
   win: boolean;
   lost_reason: string | null;
@@ -31,6 +32,7 @@ export interface RDDealLite {
   last_touch_utm_campaign: string | null;
   rd_campaign_name: string | null;
   custom_fields?: Record<string, string> | null;
+  updated_at?: string | null;
 }
 
 interface Params {
@@ -41,7 +43,7 @@ interface Params {
 }
 
 const FIELDS =
-  "id, rd_deal_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_content, utm_term, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields";
+  "id, rd_deal_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_content, utm_term, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, updated_at";
 
 export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled = true }: Params) {
   return useQuery({
@@ -79,6 +81,50 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * Base operacional do CRM. Diferente dos relatórios, ela não corta negócios
+ * pela data de criação: um lead antigo que continua aberto precisa permanecer
+ * visível no pipeline, exatamente como no RD Station.
+ */
+export function useRDCRMDeals(adAccountId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ["rd_crm_deals", adAccountId ?? "all"],
+    enabled,
+    queryFn: async () => {
+      const pageSize = 1_000;
+      const maxPages = 20;
+      let all: RDDealLite[] = [];
+
+      for (let page = 0; page < maxPages; page += 1) {
+        let query = supabase
+          .from("rd_deals")
+          .select(FIELDS)
+          .order("stage_updated_at", { ascending: false, nullsFirst: false })
+          .order("lead_created_at", { ascending: false, nullsFirst: false });
+        if (adAccountId) query = query.eq("ad_account_id", adAccountId);
+
+        const from = page * pageSize;
+        const { data, error } = await query.range(from, from + pageSize - 1);
+        if (error) throw error;
+        const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
+          ...deal,
+          rd_campaign_name: deal.last_touch_utm_campaign
+            ?? deal.first_touch_utm_campaign
+            ?? deal.utm_campaign
+            ?? null,
+        }));
+        all = all.concat(batch);
+        if (batch.length < pageSize) break;
+      }
+
+      return all;
+    },
+    staleTime: 15 * 60 * 1_000,
+    gcTime: 24 * 60 * 60 * 1_000,
     refetchOnWindowFocus: true,
   });
 }
