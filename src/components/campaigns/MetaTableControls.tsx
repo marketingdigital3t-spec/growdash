@@ -35,7 +35,7 @@ export function MetaTableControls({ preset, columns, breakdown, onPreset, onColu
   const selectedPreset = getMetaColumnPreset(preset);
   return <div className="flex flex-wrap items-center gap-2">
     <DropdownMenu>
-      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><Columns3 className="h-4 w-4" />Colunas: {selectedPreset.label}</Button></DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="meta-toolbar-button"><Columns3 className="h-4 w-4" />Colunas: {selectedPreset.label}</Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto">
         <DropdownMenuLabel>Predefinições da Meta</DropdownMenuLabel>
         {metaColumnPresets.map((item) => <DropdownMenuItem key={item.id} onSelect={() => selectPreset(item.id)} className="flex-col items-start"><span className="text-xs font-bold">{item.label}</span><span className="text-[10px] text-muted-foreground">{item.description}</span></DropdownMenuItem>)}
@@ -43,7 +43,7 @@ export function MetaTableControls({ preset, columns, breakdown, onPreset, onColu
       </DropdownMenuContent>
     </DropdownMenu>
     <DropdownMenu>
-      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="h-8 gap-2 bg-background"><SlidersHorizontal className="h-4 w-4" />Personalizar colunas</Button></DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="meta-toolbar-button"><SlidersHorizontal className="h-4 w-4" />Detalhamento e colunas</Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto">
         <DropdownMenuLabel>Colunas exibidas</DropdownMenuLabel>
         {editableCampaignColumns.map((column) => <DropdownMenuCheckboxItem key={column} checked={columns.has(column)} onCheckedChange={(checked) => toggle(column, checked === true)} onSelect={(event) => event.preventDefault()} className="text-xs">{campaignColumnLabels[column]}</DropdownMenuCheckboxItem>)}

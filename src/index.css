@@ -271,6 +271,77 @@
     @apply inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-[#d9c8a8] bg-[#fffdf8] px-3 text-[10px] font-bold text-[#4e4438] shadow-sm transition hover:border-[#c99a2e] hover:bg-[#fff8e7] dark:border-white/[.13] dark:bg-[#090909] dark:text-[#eeeae2] dark:hover:border-[#9a701f] dark:hover:bg-[#111111];
   }
 
+  .meta-toolbar-button {
+    @apply h-8 gap-2 rounded-md border border-border bg-background px-3 text-[11px] font-bold text-foreground shadow-none transition hover:border-primary/45 hover:bg-muted/70 hover:text-foreground;
+  }
+
+  .meta-toolbar-button-active {
+    @apply border-primary/55 bg-primary/10 text-primary shadow-[inset_0_-2px_0_hsl(var(--primary))];
+  }
+
+  .meta-toolbar-primary {
+    @apply h-8 gap-2 rounded-md border border-[#b97808] bg-gradient-to-r from-[#9a5d08] via-[#d99c24] to-[#a76608] px-3 text-[11px] font-black text-white shadow-[0_3px_12px_rgba(180,112,10,.18)] transition hover:brightness-110;
+  }
+
+  .campaigns-workspace .campaign-metric-header > th {
+    border-color: hsl(var(--border));
+    background: hsl(var(--muted) / .82);
+    color: hsl(var(--foreground) / .82);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .015em;
+  }
+
+  .dark .campaigns-workspace .campaign-metric-header > th {
+    border-color: rgba(255, 255, 255, .09);
+    background: #141413;
+    color: rgba(255, 255, 255, .8);
+  }
+
+  .campaigns-workspace .campaign-metric-header > th:hover {
+    background: hsl(var(--muted));
+  }
+
+  .dark .campaigns-workspace .campaign-metric-header > th:hover {
+    background: #191815;
+  }
+
+  .campaign-total-bar {
+    border-top: 2px solid hsl(var(--primary) / .38);
+    background:
+      linear-gradient(90deg, hsl(var(--primary) / .055), transparent 34%),
+      hsl(var(--muted) / .76);
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255, 255, 255, .035);
+    backdrop-filter: blur(18px);
+  }
+
+  .dark .campaign-total-bar {
+    border-top-color: rgba(222, 161, 35, .42);
+    background:
+      linear-gradient(90deg, rgba(210, 145, 22, .07), transparent 34%),
+      rgba(17, 17, 16, .97);
+  }
+
+  .campaign-analysis-shell {
+    background:
+      linear-gradient(135deg, hsl(var(--primary) / .035), transparent 42%),
+      hsl(var(--background) / .82);
+  }
+
+  .campaign-analysis-header {
+    background: hsl(var(--muted) / .72);
+    box-shadow: inset 0 -1px 0 hsl(var(--border));
+  }
+
+  .dark .campaign-analysis-header {
+    background: #121211;
+  }
+
+  .campaign-analysis-card {
+    @apply rounded-lg border border-border bg-card shadow-sm transition hover:border-primary/30;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+  }
+
   .gold-action {
     @apply relative inline-flex h-9 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-md border border-[#b96d05] bg-gradient-to-r from-[#a85d02] via-[#ffe079] to-[#c87907] bg-[length:200%_100%] px-4 text-[10px] font-black text-[#2c1a03] shadow-[0_4px_18px_rgba(228,148,11,.28)] transition hover:brightness-105;
     animation: gold-pulse 2.8s ease-in-out infinite;
