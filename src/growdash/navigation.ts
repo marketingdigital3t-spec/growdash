@@ -85,12 +85,12 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Inteligência",
     items: [
       {
-        label: "Central de Inteligência",
-        path: "/inteligencia",
+        label: "Intelligence",
+        path: "/campanhas?aba=campaigns&analise=intelligence",
         icon: BrainCircuit,
-        description: "Cruze Meta, RD, vendas e financeiro com diagnósticos, previsões e playbooks.",
+        description: "Analise métricas, campanhas, conjuntos, criativos e ações sem sair do gerenciador.",
         metrics: [],
-        highlights: ["Resumo executivo", "Anomalias", "Previsões e ações"],
+        highlights: ["Métricas", "Campanhas e conjuntos", "Criativos e ações"],
       },
       {
         label: "Tráfego Pago",

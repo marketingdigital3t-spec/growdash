@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Bot,
@@ -33,6 +35,8 @@ import {
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import AgentsOfficePage from "./AgentsOfficePage";
 
@@ -152,10 +156,86 @@ function TicketsModule() {
 }
 
 function BrandsModule() {
+  const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const { data: workspace } = useWorkspace();
+  const { data: accounts = [] } = useAdAccounts();
+  const companiesQuery = useQuery({
+    queryKey: ["companies", workspace?.id],
+    enabled: !!workspace?.id && !workspace.id.startsWith("legacy-"),
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("companies")
+        .select("id, workspace_id, business_unit_id, name, status, metadata, created_at, updated_at")
+        .eq("workspace_id", workspace!.id)
+        .neq("status", "archived")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const storedCompanies = companiesQuery.data ?? [];
+  const brands = useMemo(() => {
+    const byMetaId = new Map<string, any>();
+    const result = storedCompanies.map((company: any) => {
+      const metaId = company.metadata?.meta_account_id;
+      if (metaId) byMetaId.set(String(metaId), company);
+      return company;
+    });
+    for (const account of accounts) {
+      if (byMetaId.has(String(account.account_id))) continue;
+      result.push({
+        id: `account-${account.id}`,
+        name: account.name || `Conta Meta ${account.account_id}`,
+        status: "active",
+        metadata: { source: "meta_ads", meta_account_id: account.account_id, ad_account_id: account.id, pending_persistence: true },
+      });
+    }
+    const query = search.trim().toLocaleLowerCase("pt-BR");
+    return result
+      .filter((brand: any) => !query || brand.name.toLocaleLowerCase("pt-BR").includes(query) || String(brand.metadata?.meta_account_id || "").includes(query))
+      .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [accounts, search, storedCompanies]);
+
+  const syncBrands = async () => {
+    if (!workspace?.id || workspace.id.startsWith("legacy-") || accounts.length === 0) return;
+    setSyncing(true);
+    try {
+      const rows = accounts.map((account) => ({
+        workspace_id: workspace.id,
+        business_unit_id: account.business_unit_id || null,
+        name: account.name || `Conta Meta ${account.account_id}`,
+        status: "active",
+        metadata: { source: "meta_ads", ad_account_id: account.id, meta_account_id: account.account_id, auto_created: true },
+      }));
+      const { error } = await (supabase as any).from("companies").upsert(rows, { onConflict: "workspace_id,name" });
+      if (error) throw error;
+      await companiesQuery.refetch();
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
-    <Page title="Marca" description="Centralize diagnóstico, oferta, público, posicionamento e histórico de tráfego de cada operação." action={<ActionButton primary><Plus className="h-4 w-4" /> Nova marca</ActionButton>}>
-      <Toolbar left={<SearchField placeholder="Buscar marca" />} right={<ActionButton><Zap className="h-4 w-4" /> Sincronizar marcas</ActionButton>} />
-      <EmptyState icon={<UsersRound className="h-6 w-6" />} title="Nenhuma marca disponível para este usuário" description="Sincronize as marcas das integrações ou cadastre uma nova. Contas de anúncio só serão associadas após confirmação." action={<ActionButton primary><Plus className="h-4 w-4" /> Cadastrar marca</ActionButton>} />
+    <Page title="Marcas" description="Cada conta de anúncio integrada gera automaticamente uma marca com diagnóstico e histórico próprios." action={<Link to="/integracoes" className="gold-action"><Plus className="h-4 w-4" /> Integrar conta</Link>}>
+      <Toolbar
+        left={<label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar marca" placeholder="Buscar marca ou ID da conta" className="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-muted-foreground" /></label>}
+        right={<button type="button" onClick={syncBrands} disabled={syncing || accounts.length === 0} className="gd-button disabled:cursor-not-allowed disabled:opacity-50"><Zap className={cn("h-4 w-4", syncing && "animate-pulse")} /> {syncing ? "Sincronizando…" : "Sincronizar marcas"}</button>}
+      />
+      {brands.length > 0 ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {brands.map((brand: any) => <article key={brand.id} className="gd-panel group overflow-hidden">
+          <div className="relative h-28 border-b border-border bg-[radial-gradient(circle_at_18%_12%,hsl(var(--primary)/.28),transparent_36%),radial-gradient(circle_at_85%_20%,hsl(var(--primary)/.12),transparent_42%),linear-gradient(145deg,#050505,#11100d)]">
+            <span className="absolute left-4 top-4 grid h-11 w-11 place-items-center rounded-2xl border border-primary/25 bg-black/55 text-primary shadow-[0_0_24px_hsl(var(--primary)/.15)]"><UsersRound className="h-5 w-5" /></span>
+            <span className="absolute right-4 top-4 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase text-emerald-400">Integrada</span>
+          </div>
+          <div className="p-4">
+            <h2 className="truncate text-sm font-black" title={brand.name}>{brand.name}</h2>
+            <p className="mt-1 text-[10px] text-muted-foreground">Meta Ads · {brand.metadata?.meta_account_id || "ID em sincronização"}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-lg border border-border bg-background/50 p-2"><span className="block text-[8px] font-black uppercase text-muted-foreground">Contas</span><strong className="mt-1 block text-sm">1</strong></div><div className="rounded-lg border border-border bg-background/50 p-2"><span className="block text-[8px] font-black uppercase text-muted-foreground">Status</span><strong className="mt-1 block text-sm text-emerald-500">Ativa</strong></div></div>
+            <Link to={`/campanhas?aba=campaigns&conta=${brand.metadata?.ad_account_id || "all"}`} className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary">Abrir diagnóstico <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+          </div>
+        </article>)}
+      </div> : <EmptyState icon={<UsersRound className="h-6 w-6" />} title="Nenhuma conta integrada" description="Ao integrar uma conta Meta Ads, a marca correspondente será criada automaticamente e aparecerá aqui, mesmo antes de receber métricas." action={<Link to="/integracoes" className="gold-action"><Plus className="h-4 w-4" /> Integrar primeira conta</Link>} />}
     </Page>
   );
 }

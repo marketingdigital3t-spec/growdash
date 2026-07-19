@@ -30,7 +30,6 @@ const StoragePage = lazy(() => import("@/growdash/StoragePage"));
 const IntegrationsPage = lazy(() => import("@/growdash/IntegrationsPage"));
 const ProfilePage = lazy(() => import("@/growdash/ProfilePage"));
 const SocialMediaPage = lazy(() => import("@/growdash/SocialMediaPage"));
-const IntelligenceCenterPage = lazy(() => import("@/growdash/IntelligenceCenterPage"));
 const AnnouncementsPage = lazy(() => import("@/growdash/AnnouncementsPage"));
 const ModulePage = lazy(() => import("@/growdash/ModulePage"));
 const Auth = lazy(() => import("@/pages/Auth"));
@@ -103,7 +102,7 @@ export default function App() {
                     <Route path="crm" element={<CrmPage />} />
                     <Route path="comercial" element={<CommercialPage />} />
                     <Route path="campanhas" element={<RequirePage page="campaigns">{analytics(<TrafficPage />)}</RequirePage>} />
-                    <Route path="inteligencia" element={<RequirePage page="campaigns">{analytics(<IntelligenceCenterPage />)}</RequirePage>} />
+                    <Route path="inteligencia" element={<Navigate to="/campanhas?aba=campaigns&analise=intelligence" replace />} />
                     <Route path="trafego-pago" element={<Navigate to="/campanhas" replace />} />
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />

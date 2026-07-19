@@ -67,7 +67,7 @@ import { getBreakdownLabel, getMetaColumnPreset, type CampaignColumnKey, type Me
 import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 import { MetaEntityDetailSheet, type MetaDetailEntity } from "@/components/campaigns/MetaEntityDetailSheet";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierarchy";
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
@@ -150,6 +150,7 @@ const AD_DEFAULTS: Record<AdColKey, number> = {
 
 export default function Campaigns() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const syncMeta = useSyncMeta();
@@ -172,13 +173,29 @@ export default function Campaigns() {
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
-  const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(null);
+  const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
+    const requested = searchParams.get("analise");
+    return requested === "alerts" || requested === "intelligence" ? requested : null;
+  });
   const pageSize = 50;
 
   useEffect(() => {
     localStorage.setItem("growdash:meta-columns-v2", JSON.stringify(Array.from(visibleColumns)));
     localStorage.setItem("growdash:meta-breakdown", breakdown);
   }, [visibleColumns, breakdown]);
+
+  useEffect(() => {
+    const requested = searchParams.get("analise");
+    if (requested === "alerts" || requested === "intelligence") setAnalysisPanel(requested);
+  }, [searchParams]);
+
+  const updateAnalysisPanel = (next: "alerts" | "intelligence" | null) => {
+    setAnalysisPanel(next);
+    const updated = new URLSearchParams(searchParams);
+    if (next) updated.set("analise", next);
+    else updated.delete("analise");
+    setSearchParams(updated, { replace: true });
+  };
 
   const {
     preset,
@@ -196,6 +213,14 @@ export default function Campaigns() {
   const visibleAdAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
+
+  useEffect(() => {
+    const requestedAccount = searchParams.get("conta");
+    if (requestedAccount && requestedAccount !== selectedAccount && visibleAdAccounts.some((account) => account.id === requestedAccount)) {
+      setSelectedAccount(requestedAccount);
+    }
+  }, [searchParams, selectedAccount, setSelectedAccount, visibleAdAccounts]);
+
   const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount });
 
   const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v3");
@@ -699,8 +724,8 @@ export default function Campaigns() {
               {activeTab === "campaigns" && <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn("meta-toolbar-button", analysisPanel && "meta-toolbar-button-active")}><BarChart3 className="h-3.5 w-3.5" />Análises<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => { const opening = analysisPanel !== "alerts"; setAnalysisPanel(opening ? "alerts" : null); if (!opening) setHealthFilter("all"); }}><Sparkles className="mr-2 h-4 w-4 text-primary" />Alertas operacionais</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setHealthFilter("all"); setAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }}><BrainCircuit className="mr-2 h-4 w-4 text-primary" />Intelligence</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => { const opening = analysisPanel !== "alerts"; updateAnalysisPanel(opening ? "alerts" : null); if (!opening) setHealthFilter("all"); }}><Sparkles className="mr-2 h-4 w-4 text-primary" />Alertas operacionais</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => { setHealthFilter("all"); updateAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }}><BrainCircuit className="mr-2 h-4 w-4 text-primary" />Intelligence</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
@@ -776,6 +801,9 @@ export default function Campaigns() {
               totalRoas={totalRoas}
               totalResultRate={totalResultRate}
               series={intelligenceSeries}
+              campaigns={filtered}
+              adsets={selectedAdsets}
+              ads={selectedAds}
               accountId={selectedAccount}
               accountName={visibleAdAccounts.find((account) => account.id === selectedAccount)?.name}
               startDate={startDate}
@@ -1132,7 +1160,7 @@ export default function Campaigns() {
   );
 }
 
-function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, totalRoas, totalResultRate, series, accountId, accountName, startDate, endDate, selectedCampaignIds }: {
+function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, totalRoas, totalResultRate, series, campaigns, adsets, ads, accountId, accountName, startDate, endDate, selectedCampaignIds }: {
   totals: any;
   totalCtr: number;
   totalCpc: number;
@@ -1141,16 +1169,46 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
   totalRoas: number;
   totalResultRate: number;
   series: any[];
+  campaigns: any[];
+  adsets: any[];
+  ads: any[];
   accountId: string;
   accountName?: string;
   startDate: Date;
   endDate: Date;
   selectedCampaignIds: string[];
 }) {
+  const [view, setView] = useState<"overview" | "metrics" | "campaigns" | "adsets" | "creatives" | "actions">("overview");
   const currency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const tooltipStyle = { borderRadius: 12, border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))", fontSize: 11 };
+  const safeSeries = useMemo(() => {
+    if (series.length > 0) return series;
+    const emptyPoint = (date: Date) => ({
+      label: date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      spend: 0,
+      leads: 0,
+      impressions: 0,
+      clicks: 0,
+      ctr: 0,
+      resultRate: 0,
+      cpc: 0,
+      cpl: 0,
+      cpm: 0,
+    });
+    const start = emptyPoint(startDate);
+    return startDate.toDateString() === endDate.toDateString() ? [start] : [start, emptyPoint(endDate)];
+  }, [endDate, series, startDate]);
+  const views = [
+    { id: "overview", label: "Visão geral" },
+    { id: "metrics", label: "Métricas" },
+    { id: "campaigns", label: `Campanhas (${campaigns.length})` },
+    { id: "adsets", label: `Conjuntos (${adsets.length})` },
+    { id: "creatives", label: `Criativos (${ads.length})` },
+    { id: "actions", label: "IA e ações" },
+  ] as const;
+  const showMetrics = view === "overview" || view === "metrics";
   return (
-    <section className="campaign-analysis-shell border-b border-primary/20 md:max-h-[34dvh] md:shrink-0 md:overflow-y-auto">
+    <section className="campaign-analysis-shell border-b border-primary/20 md:max-h-[52dvh] md:shrink-0 md:overflow-y-auto">
       <header className="campaign-analysis-header flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-black"><BrainCircuit className="h-4 w-4 text-primary" />Growdash Intelligence</h2>
@@ -1159,24 +1217,41 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
         <Badge variant="outline" className="w-fit">{series.length} dia(s) com dados</Badge>
       </header>
 
+      <nav className="flex max-w-full gap-1 overflow-x-auto border-b border-border bg-muted/20 p-2 growdash-scrollbar-hidden" aria-label="Análises de tráfego pago">
+        {views.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setView(item.id)}
+            className={cn(
+              "min-h-9 shrink-0 rounded-lg border px-3 text-[10px] font-black transition",
+              view === item.id ? "border-primary/55 bg-primary text-primary-foreground shadow-[0_0_20px_rgba(213,166,42,.16)]" : "border-transparent text-muted-foreground hover:border-border hover:bg-background hover:text-foreground",
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      {showMetrics && <>
       <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-5">
-        <AnalysisMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} />
-        <AnalysisMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />
-        <AnalysisMetric label="Investimento" value={currency(totals.spend)} />
-        <AnalysisMetric label="Leads" value={totals.leads.toLocaleString("pt-BR")} />
-        <AnalysisMetric label="CPL" value={currency(totalCpl)} />
-        <AnalysisMetric label="ROAS" value={`${totalRoas.toFixed(2).replace(".", ",")}x`} />
-        <AnalysisMetric label="CPM" value={currency(totalCpm)} />
-        <AnalysisMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} />
-        <AnalysisMetric label="CPC" value={currency(totalCpc)} />
-        <AnalysisMetric label="Taxa de resultado" value={`${totalResultRate.toFixed(2).replace(".", ",")}%`} />
+        <AnalysisMetric label="Impressões" value={Number(totals.impressions || 0).toLocaleString("pt-BR")} />
+        <AnalysisMetric label="CTR" value={`${Number(totalCtr || 0).toFixed(2).replace(".", ",")}%`} />
+        <AnalysisMetric label="Investimento" value={currency(Number(totals.spend || 0))} />
+        <AnalysisMetric label="Leads" value={Number(totals.leads || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
+        <AnalysisMetric label="CPL" value={currency(Number(totalCpl || 0))} />
+        <AnalysisMetric label="ROAS" value={`${Number(totalRoas || 0).toFixed(2).replace(".", ",")}x`} />
+        <AnalysisMetric label="CPM" value={currency(Number(totalCpm || 0))} />
+        <AnalysisMetric label="Cliques" value={Number(totals.clicks || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
+        <AnalysisMetric label="CPC" value={currency(Number(totalCpc || 0))} />
+        <AnalysisMetric label="Taxa de resultado" value={`${Number(totalResultRate || 0).toFixed(2).replace(".", ",")}%`} />
       </div>
 
-      {series.length > 0 ? (
-        <div className="grid gap-3 border-t border-border p-3 xl:grid-cols-2">
+        <div className="relative grid gap-3 border-t border-border p-3 xl:grid-cols-2">
+          {series.length === 0 && <span className="absolute right-5 top-5 z-10 rounded-full border border-border bg-background/90 px-2 py-1 text-[9px] font-bold text-muted-foreground">Sem dados no período · exibindo estrutura zerada</span>}
           <ChartPanel title="Investimento × leads" description="Evolução diária com duas escalas para não distorcer volume e custo.">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={series} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
+              <ComposedChart data={safeSeries} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
                 <XAxis dataKey="label" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
                 <YAxis yAxisId="money" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
@@ -1190,7 +1265,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
           </ChartPanel>
           <ChartPanel title="Eficiência de mídia" description="CTR, taxa de resultado, CPC e CPL por dia.">
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsLineChart data={series} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
+              <RechartsLineChart data={safeSeries} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
                 <XAxis dataKey="label" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
                 <YAxis tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
@@ -1204,15 +1279,59 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
             </ResponsiveContainer>
           </ChartPanel>
         </div>
-      ) : (
-        <div className="border-t border-border p-8 text-center text-xs text-muted-foreground">Sincronize insights diários da Meta para habilitar os gráficos de evolução.</div>
-      )}
+      </>}
 
-      <div className="border-t border-border">
+      {view === "campaigns" && <EntityIntelligenceTable title="Desempenho por campanha" nameLabel="Campanha" entities={campaigns} />}
+      {view === "adsets" && <EntityIntelligenceTable title="Desempenho por conjunto de anúncios" nameLabel="Conjunto de anúncios" entities={adsets} />}
+      {view === "creatives" && <EntityIntelligenceTable title="Desempenho por criativo" nameLabel="Criativo" entities={ads} />}
+
+      {view === "actions" && <div className="border-t border-border">
         <TrafficAIAnalysis accountId={accountId} accountName={accountName} startDate={startDate} endDate={endDate} selectedCampaignIds={selectedCampaignIds} />
-      </div>
+      </div>}
+
+      {view === "overview" && <div className="border-t border-border bg-muted/10 px-4 py-3 text-[10px] text-muted-foreground">
+        Use as abas para comparar métricas, campanhas, conjuntos e criativos sem sair do gerenciador. Os filtros de conta, campanha e período permanecem aplicados.
+      </div>}
     </section>
   );
+}
+
+function EntityIntelligenceTable({ title, nameLabel, entities }: { title: string; nameLabel: string; entities: any[] }) {
+  const rows = useMemo(() => [...entities]
+    .map((entity) => ({
+      id: entity.id,
+      name: entity.name || "Sem nome",
+      status: normalizeStatus(entity.status),
+      spend: Number(entity.spend || 0),
+      impressions: Number(entity.impressions || 0),
+      clicks: Number(entity.clicks || entity.linkClicks || 0),
+      leads: Number(entity.leads || entity.results || 0),
+      ctr: Number(entity.ctr || 0),
+      cpl: Number(entity.cpl || 0),
+    }))
+    .sort((a, b) => b.spend - a.spend), [entities]);
+  const totals = useMemo(() => rows.reduce((acc, row) => ({
+    spend: acc.spend + row.spend,
+    impressions: acc.impressions + row.impressions,
+    clicks: acc.clicks + row.clicks,
+    leads: acc.leads + row.leads,
+  }), { spend: 0, impressions: 0, clicks: 0, leads: 0 }), [rows]);
+  const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return <div className="border-t border-border p-3">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div><h3 className="text-xs font-black">{title}</h3><p className="mt-1 text-[9px] text-muted-foreground">Ordenado por investimento no período selecionado.</p></div>
+      <Badge variant="outline">{rows.length} item(ns)</Badge>
+    </div>
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full min-w-[820px] text-left text-[10px]">
+        <thead className="bg-muted/70 text-muted-foreground"><tr><th className="px-3 py-2">{nameLabel}</th><th className="px-3 py-2">Veiculação</th><th className="px-3 py-2 text-right">Investimento</th><th className="px-3 py-2 text-right">Impressões</th><th className="px-3 py-2 text-right">Cliques</th><th className="px-3 py-2 text-right">CTR</th><th className="px-3 py-2 text-right">Leads</th><th className="px-3 py-2 text-right">CPL</th></tr></thead>
+        <tbody className="divide-y divide-border">
+          {rows.length > 0 ? rows.map((row) => <tr key={row.id} className="hover:bg-muted/25"><td className="max-w-[320px] truncate px-3 py-2 font-bold">{row.name}</td><td className="px-3 py-2"><span className={cn("inline-flex items-center gap-1 font-bold", row.status === "active" ? "text-emerald-500" : "text-muted-foreground")}><span className={cn("h-2 w-2 rounded-full", row.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/50")} />{row.status === "active" ? "Ativo" : "Desativado"}</span></td><td className="px-3 py-2 text-right tabular-nums">{money(row.spend)}</td><td className="px-3 py-2 text-right tabular-nums">{row.impressions.toLocaleString("pt-BR")}</td><td className="px-3 py-2 text-right tabular-nums">{row.clicks.toLocaleString("pt-BR")}</td><td className="px-3 py-2 text-right tabular-nums">{row.ctr.toFixed(2).replace(".", ",")}%</td><td className="px-3 py-2 text-right tabular-nums">{row.leads.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td><td className="px-3 py-2 text-right tabular-nums">{money(row.cpl)}</td></tr>) : <tr><td colSpan={8} className="h-28 px-4 text-center text-muted-foreground">Nenhum dado neste nível. A tabela e os indicadores permanecem disponíveis e serão preenchidos após a sincronização.</td></tr>}
+        </tbody>
+        <tfoot className="border-t border-border bg-muted/50 font-black"><tr><td className="px-3 py-2" colSpan={2}>Resultados de {rows.length} {nameLabel.toLowerCase()}(s)</td><td className="px-3 py-2 text-right tabular-nums">{money(totals.spend)}</td><td className="px-3 py-2 text-right tabular-nums">{totals.impressions.toLocaleString("pt-BR")}</td><td className="px-3 py-2 text-right tabular-nums">{totals.clicks.toLocaleString("pt-BR")}</td><td className="px-3 py-2 text-right">—</td><td className="px-3 py-2 text-right tabular-nums">{totals.leads.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td><td className="px-3 py-2 text-right tabular-nums">{money(totals.leads > 0 ? totals.spend / totals.leads : 0)}</td></tr></tfoot>
+      </table>
+    </div>
+  </div>;
 }
 
 function ChartPanel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {

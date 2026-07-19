@@ -202,11 +202,19 @@ export default function GrowdashLayout() {
               <div className={cn("space-y-1", showSidebarLabels && !openSections[section.label] && "hidden")}>
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  const isActive = item.path === "/" ? location.pathname === "/" : location.pathname.startsWith(item.path);
+                  const [itemPathname, itemSearch = ""] = item.path.split("?");
+                  const targetAnalysis = new URLSearchParams(itemSearch).get("analise");
+                  const currentAnalysis = new URLSearchParams(location.search).get("analise");
+                  const isActive = targetAnalysis
+                    ? location.pathname.startsWith(itemPathname) && currentAnalysis === targetAnalysis
+                    : itemPathname === "/"
+                      ? location.pathname === "/"
+                      : location.pathname.startsWith(itemPathname)
+                        && !(itemPathname === "/campanhas" && currentAnalysis === "intelligence");
                   const link = (
                     <NavLink
                       to={item.path}
-                      end={item.path === "/"}
+                      end={itemPathname === "/"}
                       aria-label={item.label}
                       className={cn(
                         "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
