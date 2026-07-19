@@ -4,7 +4,6 @@ import {
   BarChart3,
   BadgeDollarSign,
   Bot,
-  BrainCircuit,
   Building2,
   Cable,
   CalendarDays,
@@ -84,14 +83,6 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Inteligência",
     items: [
-      {
-        label: "Intelligence",
-        path: "/campanhas?aba=campaigns&analise=intelligence",
-        icon: BrainCircuit,
-        description: "Analise métricas, campanhas, conjuntos, criativos e ações sem sair do gerenciador.",
-        metrics: [],
-        highlights: ["Métricas", "Campanhas e conjuntos", "Criativos e ações"],
-      },
       {
         label: "Tráfego Pago",
         path: "/campanhas",
