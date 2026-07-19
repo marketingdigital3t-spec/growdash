@@ -693,8 +693,8 @@ export default function Campaigns() {
 
       <MotionItem className="md:min-h-0 md:flex-1 md:overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="md:flex md:h-full md:min-h-0 md:flex-col">
-          <div className="flex flex-col border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706] xl:flex-row xl:items-center">
-            <TabsList className="growdash-scrollbar h-auto min-w-0 flex-1 justify-start overflow-x-auto rounded-none bg-transparent p-0">
+          <div className="growdash-scrollbar flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
+            <TabsList className="h-auto w-max min-w-0 shrink-0 justify-start rounded-none bg-transparent p-0">
               <TabsTrigger value="campaigns" className="h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
                 <FolderKanban className="h-3.5 w-3.5" /> Campanhas ({filtered.length})
               </TabsTrigger>
@@ -705,8 +705,8 @@ export default function Campaigns() {
                 <RectangleHorizontal className="h-3.5 w-3.5" /> Anúncios ({selectedAds.length})
               </TabsTrigger>
             </TabsList>
-            <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 py-1.5 xl:justify-end">
-              <div className="w-full sm:w-[285px] [&_button]:!h-8 [&_button]:!min-h-0"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
+            <div className="ml-auto flex shrink-0 items-center px-2 py-1.5">
+              <div className="w-[230px] [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[11px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
             </div>
           </div>
 
