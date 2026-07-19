@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
@@ -798,7 +798,7 @@ export default function Campaigns() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className={cn("relative overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col", pageCount > 1 ? "md:pb-[74px]" : "md:pb-10")}>
+              <Card className="relative overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col">
                 <div className="space-y-2 p-2 md:hidden">
                   {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
                 </div>
@@ -919,48 +919,55 @@ export default function Campaigns() {
                         );})}
                       </AnimatePresence>
                     </TableBody>
+                    <TableFooter className="campaign-total-bar">
+                      <TableRow data-campaign-totals className="h-14 border-b border-border/70 bg-transparent hover:bg-transparent dark:border-[#2a271f] [&>td]:px-3 [&>td]:py-1">
+                        <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
+                        <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
+                        <CampaignTotalCell
+                          width={camp.colWidths.name}
+                          value={`Resultados de ${filtered.length} campanhas`}
+                          label="Totais do período e filtros selecionados"
+                          align="left"
+                          stickyLeft={camp.colWidths.check + camp.colWidths.delivery}
+                          strongDivider
+                        />
+                        {showColumn("deliveryStatus") && <CampaignTotalCell width={camp.colWidths.deliveryStatus} value="—" />}
+                        {showColumn("actions") && <CampaignTotalCell width={camp.colWidths.actions} value="—" />}
+                        {showColumn("reach") && <CampaignTotalCell width={camp.colWidths.reach} value={totals.reach.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("impressions") && <CampaignTotalCell width={camp.colWidths.impressions} value={totals.impressions.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("frequency") && <CampaignTotalCell width={camp.colWidths.frequency} value={totals.reach > 0 ? (totals.impressions / totals.reach).toFixed(2).replace(".", ",") : "0,00"} label="Média" />}
+                        {showColumn("linkClicks") && <CampaignTotalCell width={camp.colWidths.linkClicks} value={totals.linkClicks.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("linkCpc") && <CampaignTotalCell width={camp.colWidths.linkCpc} value={totalLinkCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por clique no link" />}
+                        {showColumn("uniqueLinkCtr") && <CampaignTotalCell width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
+                        {showColumn("cpm") && <CampaignTotalCell width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por 1.000 impressões" />}
+                        {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Orçamento somado" />}
+                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.leads.toLocaleString("pt-BR")} label="Resultados" />}
+                        {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado" />}
+                        {showColumn("spend") && <CampaignTotalCell width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total usado" />}
+                        {showColumn("landingPageViews") && <CampaignTotalCell width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("costPerLandingPageView") && <CampaignTotalCell width={camp.colWidths.costPerLandingPageView} value={totalCostPerLandingPageView.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por visualização" />}
+                        {showColumn("checkouts") && <CampaignTotalCell width={camp.colWidths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("costPerCheckout") && <CampaignTotalCell width={camp.colWidths.costPerCheckout} value={totalCostPerCheckout.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por finalização" />}
+                        {showColumn("metaPurchases") && <CampaignTotalCell width={camp.colWidths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("metaCostPerPurchase") && <CampaignTotalCell width={camp.colWidths.metaCostPerPurchase} value={totalMetaCostPerPurchase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por compra" />}
+                        {showColumn("metaPurchaseRoas") && <CampaignTotalCell width={camp.colWidths.metaPurchaseRoas} value={`${totalMetaPurchaseRoas.toFixed(2).replace(".", ",")}x`} label="Retorno total" />}
+                        {showColumn("objective") && <CampaignTotalCell width={camp.colWidths.objective} value="—" />}
+                        {showColumn("clicks") && <CampaignTotalCell width={camp.colWidths.clicks} value={totals.clicks.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("cpc") && <CampaignTotalCell width={camp.colWidths.cpc} value={totalCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por clique" />}
+                        {showColumn("ctr") && <CampaignTotalCell width={camp.colWidths.ctr} value={`${totalCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
+                        {showColumn("conversion") && <CampaignTotalCell width={camp.colWidths.conversion} value={`${totalResultRate.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
+                        {showColumn("sales") && <CampaignTotalCell width={camp.colWidths.sales} value={totals.salesCount.toLocaleString("pt-BR")} label="Total" />}
+                        {showColumn("cpa") && <CampaignTotalCell width={camp.colWidths.cpa} value={(totals.salesCount > 0 ? totals.spend / totals.salesCount : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por venda" />}
+                        {showColumn("revenue") && <CampaignTotalCell width={camp.colWidths.revenue} value={totals.revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Valor total" />}
+                        {showColumn("roas") && <CampaignTotalCell width={camp.colWidths.roas} value={`${totalRoas.toFixed(2).replace(".", ",")}x`} label="Retorno total" />}
+                        {showColumn("profit") && <CampaignTotalCell width={camp.colWidths.profit} value={totals.profit.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total" />}
+                        {showColumn("roi") && <CampaignTotalCell width={camp.colWidths.roi} value={`${(totals.spend > 0 ? totals.profit / totals.spend * 100 : 0).toFixed(1).replace(".", ",")}%`} label="Retorno total" />}
+                        {showColumn("videoViews") && <CampaignTotalCell width={camp.colWidths.videoViews} value="—" label="Não sincronizado" />}
+                      </TableRow>
+                    </TableFooter>
                   </Table>
                 </div>
-                <div data-campaign-totals className="campaign-total-bar z-30 shrink-0 md:absolute md:inset-x-0 md:bottom-0">
-                  <div className="growdash-scrollbar overflow-x-auto">
-                    <div className="flex h-10 w-max items-stretch text-[10px]">
-                      <AlignedTotal width={camp.colWidths.check + camp.colWidths.delivery + camp.colWidths.name} label={`Totais (${filtered.length})`} value={`${filtered.length} campanhas`} align="left" />
-                      {showColumn("deliveryStatus") && <AlignedTotal width={camp.colWidths.deliveryStatus} value="—" />}
-                      {showColumn("actions") && <AlignedTotal width={camp.colWidths.actions} value="—" />}
-                      {showColumn("reach") && <AlignedTotal width={camp.colWidths.reach} value={totals.reach.toLocaleString("pt-BR")} />}
-                      {showColumn("impressions") && <AlignedTotal width={camp.colWidths.impressions} value={totals.impressions.toLocaleString("pt-BR")} />}
-                      {showColumn("frequency") && <AlignedTotal width={camp.colWidths.frequency} value={totals.reach > 0 ? (totals.impressions / totals.reach).toFixed(2).replace(".", ",") : "0,00"} />}
-                      {showColumn("linkClicks") && <AlignedTotal width={camp.colWidths.linkClicks} value={totals.linkClicks.toLocaleString("pt-BR")} />}
-                      {showColumn("linkCpc") && <AlignedTotal width={camp.colWidths.linkCpc} value={totalLinkCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("uniqueLinkCtr") && <AlignedTotal width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} />}
-                      {showColumn("cpm") && <AlignedTotal width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("budget") && <AlignedTotal width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("leads") && <AlignedTotal width={camp.colWidths.leads} value={totals.leads.toLocaleString("pt-BR")} />}
-                      {showColumn("cpl") && <AlignedTotal width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("spend") && <AlignedTotal width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("landingPageViews") && <AlignedTotal width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} />}
-                      {showColumn("costPerLandingPageView") && <AlignedTotal width={camp.colWidths.costPerLandingPageView} value={totalCostPerLandingPageView.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("checkouts") && <AlignedTotal width={camp.colWidths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} />}
-                      {showColumn("costPerCheckout") && <AlignedTotal width={camp.colWidths.costPerCheckout} value={totalCostPerCheckout.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("metaPurchases") && <AlignedTotal width={camp.colWidths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} />}
-                      {showColumn("metaCostPerPurchase") && <AlignedTotal width={camp.colWidths.metaCostPerPurchase} value={totalMetaCostPerPurchase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("metaPurchaseRoas") && <AlignedTotal width={camp.colWidths.metaPurchaseRoas} value={`${totalMetaPurchaseRoas.toFixed(2).replace(".", ",")}x`} />}
-                      {showColumn("objective") && <AlignedTotal width={camp.colWidths.objective} value="—" />}
-                      {showColumn("clicks") && <AlignedTotal width={camp.colWidths.clicks} value={totals.clicks.toLocaleString("pt-BR")} />}
-                      {showColumn("cpc") && <AlignedTotal width={camp.colWidths.cpc} value={totalCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("ctr") && <AlignedTotal width={camp.colWidths.ctr} value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />}
-                      {showColumn("conversion") && <AlignedTotal width={camp.colWidths.conversion} value={`${totalResultRate.toFixed(2).replace(".", ",")}%`} />}
-                      {showColumn("sales") && <AlignedTotal width={camp.colWidths.sales} value={totals.salesCount.toLocaleString("pt-BR")} />}
-                      {showColumn("cpa") && <AlignedTotal width={camp.colWidths.cpa} value={(totals.salesCount > 0 ? totals.spend / totals.salesCount : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("revenue") && <AlignedTotal width={camp.colWidths.revenue} value={totals.revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("roas") && <AlignedTotal width={camp.colWidths.roas} value={`${totalRoas.toFixed(2).replace(".", ",")}x`} />}
-                      {showColumn("profit") && <AlignedTotal width={camp.colWidths.profit} value={totals.profit.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />}
-                      {showColumn("roi") && <AlignedTotal width={camp.colWidths.roi} value={`${(totals.spend > 0 ? totals.profit / totals.spend * 100 : 0).toFixed(1).replace(".", ",")}%`} />}
-                      {showColumn("videoViews") && <AlignedTotal width={camp.colWidths.videoViews} value="—" />}
-                    </div>
-                  </div>
-                  {pageCount > 1 && <div className="flex h-8 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
-                </div>
+                {pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}
           </TabsContent>
@@ -1212,11 +1219,19 @@ function ChartPanel({ title, description, children }: { title: string; descripti
   return <article className="campaign-analysis-card min-w-0 p-4"><h3 className="text-xs font-black">{title}</h3><p className="mt-1 text-[9px] text-muted-foreground">{description}</p><div className="mt-4 h-[260px] min-w-0">{children}</div></article>;
 }
 
-function AlignedTotal({ width, value, label, align = "right" }: { width: number; value: string; label?: string; align?: "left" | "right" }) {
-  return <div style={{ width, minWidth: width, maxWidth: width }} className={cn("flex shrink-0 flex-col justify-center border-r border-border/60 px-3 tabular-nums dark:border-[#24221c]", align === "right" ? "items-end text-right" : "items-start text-left")}>
-    {label && <span className="text-[8px] text-muted-foreground">{label}</span>}
-    <strong className="truncate text-[10px] font-semibold">{value}</strong>
-  </div>;
+function CampaignTotalCell({ width, value, label, align = "right", stickyLeft, strongDivider = false }: { width: number; value?: string; label?: string; align?: "left" | "right"; stickyLeft?: number; strongDivider?: boolean }) {
+  return <TableCell
+    style={{ width, minWidth: width, maxWidth: width, ...(stickyLeft !== undefined ? { left: stickyLeft } : {}) }}
+    className={cn(
+      "tabular-nums",
+      align === "right" ? "text-right" : "text-left",
+      stickyLeft !== undefined && "sticky z-30 bg-muted/95 backdrop-blur-xl dark:bg-[#11110f]/95",
+      strongDivider && "border-r border-border shadow-[8px_0_14px_-14px_rgba(0,0,0,.9)] dark:border-[#28251e]",
+    )}
+  >
+    {value && <strong className="block truncate text-[10px] font-semibold text-foreground">{value}</strong>}
+    {label && <span className="mt-0.5 block truncate text-[8px] leading-tight text-muted-foreground">{label}</span>}
+  </TableCell>;
 }
 
 function TotalMetric({ label, value }: { label: string; value: string }) {
