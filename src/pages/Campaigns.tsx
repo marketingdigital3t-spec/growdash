@@ -706,7 +706,7 @@ export default function Campaigns() {
               </TabsTrigger>
             </TabsList>
             <div className="ml-auto flex shrink-0 items-center px-2 py-1.5">
-              <div className="w-[230px] [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[11px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
+              <div className="w-[230px] [&_.gd-filter-date]:!w-full [&_.gd-filter-date]:!min-w-0 [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[11px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
             </div>
           </div>
 
