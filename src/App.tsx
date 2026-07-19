@@ -32,6 +32,7 @@ const ProfilePage = lazy(() => import("@/growdash/ProfilePage"));
 const SocialMediaPage = lazy(() => import("@/growdash/SocialMediaPage"));
 const AnnouncementsPage = lazy(() => import("@/growdash/AnnouncementsPage"));
 const ModulePage = lazy(() => import("@/growdash/ModulePage"));
+const BrandDiagnosticPage = lazy(() => import("@/growdash/BrandDiagnosticPage"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 
@@ -130,6 +131,7 @@ export default function App() {
                     <Route path="kanban" element={<ModulePage />} />
                     <Route path="anuncios" element={<RequirePage page="master"><AnnouncementsPage /></RequirePage>} />
                     <Route path="marcas" element={<ModulePage />} />
+                    <Route path="marcas/:brandId" element={analytics(<BrandDiagnosticPage />)} />
                     <Route path="marca" element={<Navigate to="/marcas" replace />} />
                     <Route path="meta-connect" element={<ModulePage />} />
                     <Route path="agentes" element={<ModulePage />} />

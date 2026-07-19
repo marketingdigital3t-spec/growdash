@@ -232,7 +232,7 @@ function BrandsModule() {
             <h2 className="truncate text-sm font-black" title={brand.name}>{brand.name}</h2>
             <p className="mt-1 text-[10px] text-muted-foreground">Meta Ads · {brand.metadata?.meta_account_id || "ID em sincronização"}</p>
             <div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-lg border border-border bg-background/50 p-2"><span className="block text-[8px] font-black uppercase text-muted-foreground">Contas</span><strong className="mt-1 block text-sm">1</strong></div><div className="rounded-lg border border-border bg-background/50 p-2"><span className="block text-[8px] font-black uppercase text-muted-foreground">Status</span><strong className="mt-1 block text-sm text-emerald-500">Ativa</strong></div></div>
-            <Link to={`/campanhas?aba=campaigns&conta=${brand.metadata?.ad_account_id || "all"}`} className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary">Abrir diagnóstico <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+            <Link to={`/marcas/${encodeURIComponent(brand.id)}`} className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary">Abrir diagnóstico <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
           </div>
         </article>)}
       </div> : <EmptyState icon={<UsersRound className="h-6 w-6" />} title="Nenhuma conta integrada" description="Ao integrar uma conta Meta Ads, a marca correspondente será criada automaticamente e aparecerá aqui, mesmo antes de receber métricas." action={<Link to="/integracoes" className="gold-action"><Plus className="h-4 w-4" /> Integrar primeira conta</Link>} />}
