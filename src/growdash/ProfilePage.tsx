@@ -42,7 +42,7 @@ export default function ProfilePage() {
       const { data, error } = await (supabase as any).from("profiles").select("full_name, email, phone, gender, job_title, avatar_url, theme, density").eq("user_id", user!.id).single();
       if (!error) return data;
       if (!/phone|gender|job_title|avatar_url|theme|density|schema cache/i.test(error.message)) throw error;
-      const legacy = await supabase.from("profiles").select("full_name, email").eq("user_id", user!.id).single();
+      const legacy = await (supabase as any).from("profiles").select("full_name, email").eq("user_id", user!.id).single();
       if (legacy.error) throw legacy.error;
       return { ...legacy.data, phone: "", gender: "", job_title: "", avatar_url: "", theme: "dark", density: "comfortable" };
     },
@@ -66,7 +66,7 @@ export default function ProfilePage() {
       const { error } = await (supabase as any).from("profiles").update({ ...form, theme }).eq("user_id", user!.id);
       if (error) {
         if (!/phone|gender|job_title|avatar_url|theme|density|schema cache/i.test(error.message)) throw error;
-        const legacy = await supabase.from("profiles").update({ full_name: form.full_name }).eq("user_id", user!.id);
+        const legacy = await (supabase as any).from("profiles").update({ full_name: form.full_name }).eq("user_id", user!.id);
         if (legacy.error) throw legacy.error;
       }
       const { error: metadataError } = await supabase.auth.updateUser({ data: { full_name: form.full_name, avatar_url: form.avatar_url } });

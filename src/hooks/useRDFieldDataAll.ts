@@ -46,7 +46,7 @@ export function useRDFieldDataAll(adAccountId: string | null | undefined, fieldK
       const path = `custom_fields->>${key}`;
 
       const deals = await fetchAllPaged<RDDealForField>((from, to) =>
-        supabase
+        (supabase as any)
           .from("rd_deals")
           .select("id, win, custom_fields")
           .eq("ad_account_id", acc)
@@ -58,7 +58,7 @@ export function useRDFieldDataAll(adAccountId: string | null | undefined, fieldK
       // Sales: those with the field populated directly + those linked to one of the deals
       const dealIds = deals.map((d) => d.id);
       const salesByField = await fetchAllPaged<SaleForField>((from, to) =>
-        supabase
+        (supabase as any)
           .from("sales")
           .select("id, rd_deal_id, custom_fields")
           .eq("ad_account_id", acc)
@@ -73,7 +73,7 @@ export function useRDFieldDataAll(adAccountId: string | null | undefined, fieldK
         const CHUNK = 200;
         for (let i = 0; i < dealIds.length; i += CHUNK) {
           const slice = dealIds.slice(i, i + CHUNK);
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from("sales")
             .select("id, rd_deal_id, custom_fields")
             .eq("ad_account_id", acc)

@@ -31,14 +31,14 @@ function useReconciliation(days: number) {
       const startISO = new Date(`${startStr}T00:00:00`).toISOString();
       const endISO = new Date(`${endStr}T23:59:59.999`).toISOString();
 
-      const { data: accounts } = await supabase
+      const { data: accounts } = await (supabase as any)
         .from("ad_accounts")
         .select("id, name");
 
       const rows: AccountRow[] = [];
       for (const acc of (accounts || []) as any[]) {
         // meta_leads count + coverage
-        const { data: mlRows } = await supabase
+        const { data: mlRows } = await (supabase as any)
           .from("meta_leads" as any)
           .select("lead_state")
           .eq("ad_account_id", acc.id)
@@ -50,7 +50,7 @@ function useReconciliation(days: number) {
         const coveragePct = metaLeads > 0 ? (withState / metaLeads) * 100 : 0;
 
         // insights leads (sum) via campaigns join
-        const { data: camps } = await supabase
+        const { data: camps } = await (supabase as any)
           .from("campaigns")
           .select("id")
           .eq("ad_account_id", acc.id);
@@ -62,7 +62,7 @@ function useReconciliation(days: number) {
           const adsetIds: string[] = [];
           for (let i = 0; i < campIds.length; i += CHUNK) {
             const chunk = campIds.slice(i, i + CHUNK);
-            const { data: asRows } = await supabase
+            const { data: asRows } = await (supabase as any)
               .from("adsets")
               .select("id")
               .in("campaign_id", chunk);
@@ -71,7 +71,7 @@ function useReconciliation(days: number) {
           const adIds: string[] = [];
           for (let i = 0; i < adsetIds.length; i += CHUNK) {
             const chunk = adsetIds.slice(i, i + CHUNK);
-            const { data: adRows } = await supabase
+            const { data: adRows } = await (supabase as any)
               .from("ads")
               .select("id")
               .in("adset_id", chunk);
@@ -79,7 +79,7 @@ function useReconciliation(days: number) {
           }
           for (let j = 0; j < adIds.length; j += CHUNK) {
             const slice = adIds.slice(j, j + CHUNK);
-            const { data: ins } = await supabase
+            const { data: ins } = await (supabase as any)
               .from("insights")
               .select("leads")
               .in("ad_id", slice)
@@ -90,7 +90,7 @@ function useReconciliation(days: number) {
         }
 
         // hourly leads
-        const { data: hourly } = await supabase
+        const { data: hourly } = await (supabase as any)
           .from("insights_hourly" as any)
           .select("leads")
           .eq("ad_account_id", acc.id)
@@ -100,7 +100,7 @@ function useReconciliation(days: number) {
         const hourlyLeads = (hourly || []).reduce((s: number, r: any) => s + Number(r.leads || 0), 0);
 
         // rd_deals count
-        const { count: rdCount } = await supabase
+        const { count: rdCount } = await (supabase as any)
           .from("rd_deals")
           .select("id", { count: "exact", head: true })
           .eq("ad_account_id", acc.id)

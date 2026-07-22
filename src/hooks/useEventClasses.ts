@@ -67,7 +67,7 @@ export function useEventClasses() {
         list.flatMap((c) => [c.rd_funnel_id, c.rd_model_patient_funnel_id]).filter(Boolean) as string[],
       ));
       const { data: funnels } = funnelIds.length > 0
-        ? await supabase.from("rd_funnels").select("id, name").in("id", funnelIds)
+        ? await (supabase as any).from("rd_funnels").select("id, name").in("id", funnelIds)
         : { data: [] as any[] };
       const funnelMap = new Map((funnels || []).map((f: any) => [f.id, f.name]));
 
@@ -108,12 +108,12 @@ export function useEventClassMembers(eventClassId: string | null, type: MemberTy
       if (list.length === 0) return [];
 
       const dealIds = list.map((m) => m.rd_deal_id);
-      const { data: deals } = await supabase
+      const { data: deals } = await (supabase as any)
         .from("rd_deals")
         .select("rd_deal_id, rd_stage_name, rd_stage_id, deal_owner_name, amount_total, lead_state, lead_city, utm_campaign, utm_source, stage_bucket, win, closed_at, lead_created_at")
         .in("rd_deal_id", dealIds);
 
-      const { data: sales } = await supabase
+      const { data: sales } = await (supabase as any)
         .from("sales")
         .select("rd_deal_id, contact_name, contact_email, contact_phone")
         .in("rd_deal_id", dealIds);
@@ -264,7 +264,7 @@ export function useRDDealSearch(params: {
     queryKey: ["rd_deal_search", funnelId, allowedStageIds, excludeDealIds.length, query],
     enabled: enabled && !!funnelId,
     queryFn: async () => {
-      let q = supabase
+      let q = (supabase as any)
         .from("rd_deals")
         .select("rd_deal_id, rd_stage_id, rd_stage_name, deal_owner_name, amount_total, lead_state, lead_city, utm_campaign, utm_source, closed_at, lead_created_at, win")
         .eq("rd_funnel_id", funnelId!)
@@ -278,7 +278,7 @@ export function useRDDealSearch(params: {
       if (filteredByExclude.length === 0) return [] as RDPickerResult[];
 
       const dealIds = filteredByExclude.map((d) => d.rd_deal_id);
-      const { data: sales } = await supabase
+      const { data: sales } = await (supabase as any)
         .from("sales")
         .select("rd_deal_id, contact_name, contact_email, contact_phone")
         .in("rd_deal_id", dealIds);

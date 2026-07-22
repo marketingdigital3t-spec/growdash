@@ -16,7 +16,7 @@ export function useAccountLeadActions() {
     queryKey: ["account-lead-actions", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<Record<string, AccountLeadActions>> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("account_lead_action" as any)
         .select("ad_account_id, lp_lead_action, scope");
       if (error) throw error;
@@ -44,7 +44,7 @@ export function useUpdateAccountLeadAction() {
       values: string[];
     }) => {
       // Replace strategy: delete all rows in that scope, then insert the new set.
-      const { error: delErr } = await supabase
+      const { error: delErr } = await (supabase as any)
         .from("account_lead_action" as any)
         .delete()
         .eq("ad_account_id", adAccountId)
@@ -56,7 +56,7 @@ export function useUpdateAccountLeadAction() {
           lp_lead_action: v,
           scope,
         }));
-        const { error } = await supabase.from("account_lead_action" as any).insert(rows as any);
+        const { error } = await (supabase as any).from("account_lead_action" as any).insert(rows as any);
         if (error) throw error;
       }
     },

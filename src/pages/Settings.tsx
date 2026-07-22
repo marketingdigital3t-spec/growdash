@@ -27,14 +27,14 @@ export default function SettingsPage() {
     queryKey: ["profile-preferences", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("email_alerts_enabled").eq("user_id", user!.id).single();
+      const { data, error } = await (supabase as any).from("profiles").select("email_alerts_enabled").eq("user_id", user!.id).single();
       if (error) throw error;
       return data;
     },
   });
   const updateAlerts = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const { error } = await supabase.from("profiles").update({ email_alerts_enabled: enabled }).eq("user_id", user!.id);
+      const { error } = await (supabase as any).from("profiles").update({ email_alerts_enabled: enabled }).eq("user_id", user!.id);
       if (error) throw error;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["profile-preferences", user?.id] }); toast({ title: "Notificações atualizadas" }); },

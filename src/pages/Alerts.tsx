@@ -58,7 +58,7 @@ export default function Alerts() {
     queryKey: ["daily_spend_by_account"],
     queryFn: async () => {
       const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("insights")
         .select(`spend, date, ads!inner(adsets!inner(campaigns!inner(ad_account_id)))`)
         .gte("date", sevenDaysAgo);

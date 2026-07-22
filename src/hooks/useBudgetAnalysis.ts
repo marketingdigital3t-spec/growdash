@@ -29,7 +29,7 @@ export function useBudgetAnalysis() {
       const { toLocalDateString } = await import("@/lib/dateRange");
       const sevenDaysAgo = toLocalDateString(new Date(Date.now() - 7 * 86400000));
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("insights")
         .select(`spend, date, ads!inner(adsets!inner(campaigns!inner(ad_account_id)))`)
         .gte("date", sevenDaysAgo);
@@ -55,7 +55,7 @@ export function useBudgetAnalysis() {
   const { data: dailyBudgetActiveByAccount = [] } = useQuery({
     queryKey: ["daily_budget_active_by_account"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("adsets")
         .select(`daily_budget, status, campaigns!inner(ad_account_id, status)`)
         .eq("status", "ACTIVE");

@@ -14,14 +14,14 @@ export function useCampaignActionTotals(campaignId?: string) {
     enabled: !!campaignId,
     queryFn: async (): Promise<CampaignActionTotal[]> => {
       // 1) ads dessa campanha
-      const { data: adsetRows, error: aErr } = await supabase
+      const { data: adsetRows, error: aErr } = await (supabase as any)
         .from("adsets")
         .select("id")
         .eq("campaign_id", campaignId!);
       if (aErr) throw aErr;
       const adsetIds = (adsetRows || []).map((r: any) => r.id);
       if (adsetIds.length === 0) return [];
-      const { data: adsRows, error: a2Err } = await supabase
+      const { data: adsRows, error: a2Err } = await (supabase as any)
         .from("ads")
         .select("id")
         .in("adset_id", adsetIds);
@@ -34,7 +34,7 @@ export function useCampaignActionTotals(campaignId?: string) {
       // paginate to avoid 1000 limit
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("insight_actions" as any)
           .select("action_type, value, value_amount")
           .in("ad_id", adIds)

@@ -6,7 +6,7 @@ export function useCampaignTarget(campaignId?: string) {
     queryKey: ["campaign_target", campaignId],
     enabled: !!campaignId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaign_targets")
         .select("campaign_id, target_cpl")
         .eq("campaign_id", campaignId!)
@@ -22,10 +22,10 @@ export function useSetCampaignTarget() {
   return useMutation({
     mutationFn: async ({ campaignId, targetCpl }: { campaignId: string; targetCpl: number | null }) => {
       if (targetCpl == null) {
-        const { error } = await supabase.from("campaign_targets").delete().eq("campaign_id", campaignId);
+        const { error } = await (supabase as any).from("campaign_targets").delete().eq("campaign_id", campaignId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("campaign_targets")
           .upsert({ campaign_id: campaignId, target_cpl: targetCpl }, { onConflict: "campaign_id" });
         if (error) throw error;
@@ -43,7 +43,7 @@ export function useCampaignChanges(campaignId?: string) {
     queryKey: ["campaign_changes", campaignId],
     enabled: !!campaignId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaign_changes")
         .select("*")
         .eq("campaign_id", campaignId!)
@@ -59,7 +59,7 @@ export function useAddCampaignChange() {
   return useMutation({
     mutationFn: async ({ campaignId, note, changeType = "manual_note", field, oldValue, newValue }: { campaignId: string; note?: string; changeType?: string; field?: string; oldValue?: string; newValue?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("campaign_changes").insert({
+      const { error } = await (supabase as any).from("campaign_changes").insert({
         campaign_id: campaignId,
         change_type: changeType,
         field, old_value: oldValue, new_value: newValue,
@@ -76,7 +76,7 @@ export function useLastTopUp(adAccountId?: string) {
     queryKey: ["last_top_up", adAccountId],
     enabled: !!adAccountId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("account_balance_events")
         .select("event_at, delta, new_balance")
         .eq("ad_account_id", adAccountId!)
@@ -95,7 +95,7 @@ export function useNextTopUpEstimate(adAccountId?: string) {
     queryKey: ["next_top_up_estimate", adAccountId],
     enabled: !!adAccountId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("account_balance_events")
         .select("event_at, delta")
         .eq("ad_account_id", adAccountId!)

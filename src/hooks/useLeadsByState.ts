@@ -67,7 +67,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
       const PAGE = 1000;
 
       // ------------- 1. Resolve scoped campaigns (used for Meta totals/breakdown & spend) -------------
-      let campQ = supabase.from("campaigns").select("id, ad_account_id");
+      let campQ = (supabase as any).from("campaigns").select("id, ad_account_id");
       if (adAccountId) campQ = campQ.eq("ad_account_id", adAccountId);
       const { data: camps, error: e1 } = await campQ;
       if (e1) throw e1;
@@ -85,7 +85,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
         const chunk = scopedCampaignIds.slice(i, i + CHUNK);
         if (chunk.length === 0) break;
         for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from("insights_breakdowns" as any)
             .select("segment_key, leads, spend")
             .eq("breakdown_type", "region")
@@ -121,7 +121,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
         // 3b. action_type da LP por account
         const lpActions = new Set<string>();
         if (accountIds.size > 0) {
-          const { data: lpCfg } = await supabase
+          const { data: lpCfg } = await (supabase as any)
             .from("account_lp_config")
             .select("ad_account_id, action_type")
             .in("ad_account_id", Array.from(accountIds));
@@ -136,7 +136,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
 
         // 3c. paginar insight_actions com join via ads->adsets->campaigns
         for (let from = 0; ; from += PAGE) {
-          let q = supabase
+          let q = (supabase as any)
             .from("insight_actions" as any)
             .select("value, action_type, ads!inner(adsets!inner(campaigns!inner(id, ad_account_id)))")
             .in("action_type", allowedActions)
@@ -156,7 +156,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
       const canonicalByUF: Record<string, number> = {};
       let canonicalTotal = 0;
       let canonicalWithState = 0;
-      let metaLeadsQ = supabase
+      let metaLeadsQ = (supabase as any)
         .from("meta_leads" as any)
         .select("lead_state, ad_account_id")
         .gte("created_time", startISO)
@@ -181,7 +181,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
       const seenRdDealIds = new Set<string>();
 
       // 4a. vendas da tabela `sales` (inclui as criadas via sync do RD)
-      let salesQ = supabase
+      let salesQ = (supabase as any)
         .from("sales")
         .select("lead_state, net_revenue, ad_account_id, rd_deal_id, status")
         .gte("sale_date", start)
@@ -202,7 +202,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
 
       // 4b. deals ganhos no RD que ainda NÃO existam em `sales` — evita dupla contagem
       {
-        let rdWonQ = supabase
+        let rdWonQ = (supabase as any)
           .from("rd_deals")
           .select("rd_deal_id, lead_state, amount_total, ad_account_id")
           .eq("win", true)
@@ -227,7 +227,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
       let rdTotal = 0;
       let rdWithState = 0;
       const leadsByUF: Record<string, number> = {};
-      let rdQ = supabase
+      let rdQ = (supabase as any)
         .from("rd_deals")
         .select("lead_state, ad_account_id")
         .gte("lead_created_at", startISO)

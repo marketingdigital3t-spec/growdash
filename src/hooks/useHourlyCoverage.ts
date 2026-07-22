@@ -42,20 +42,20 @@ export function useHourlyCoverage(): HourlyCoverage {
     enabled: scopedIds.length > 0,
     queryFn: async () => {
       // Per-account rows + distribution signal in window
-      const { data: inWindow } = await supabase
+      const { data: inWindow } = await (supabase as any)
         .from("insights_hourly")
         .select("ad_account_id, leads, clicks, spend")
         .in("ad_account_id", scopedIds)
         .gte("date", start)
         .lte("date", end);
       // Per-account presence anywhere
-      const { data: anywhere } = await supabase
+      const { data: anywhere } = await (supabase as any)
         .from("insights_hourly")
         .select("ad_account_id")
         .in("ad_account_id", scopedIds)
         .limit(1000);
       // LP config presence per account
-      const { data: lpRows } = await supabase
+      const { data: lpRows } = await (supabase as any)
         .from("account_lp_config")
         .select("ad_account_id, action_type")
         .in("ad_account_id", scopedIds);

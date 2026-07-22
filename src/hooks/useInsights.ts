@@ -46,7 +46,7 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
 
-      let query = supabase
+      let query = (supabase as any)
         .from("insights")
         .select(`
           ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency,

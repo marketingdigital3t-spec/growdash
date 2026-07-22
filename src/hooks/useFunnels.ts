@@ -19,7 +19,7 @@ export function useFunnels() {
   return useQuery({
     queryKey: ["funnels"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("funnels")
         .select("*")
         .order("updated_at", { ascending: false });
@@ -34,7 +34,7 @@ export function useFunnel(id: string | null) {
     queryKey: ["funnel", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("funnels")
         .select("*")
         .eq("id", id)
@@ -65,7 +65,7 @@ export function useCreateFunnel() {
       ad_account_id?: string | null;
       campaign_ids?: string[];
     }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("funnels")
         .insert({
           user_id: session!.user.id,
@@ -93,7 +93,7 @@ export function useUpdateFunnel() {
       if (name !== undefined) update.name = name;
       if (nodes !== undefined) update.nodes = nodes;
       if (connections !== undefined) update.connections = connections;
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("funnels")
         .update(update)
         .eq("id", id)
@@ -113,7 +113,7 @@ export function useDeleteFunnel() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("funnels").delete().eq("id", id);
+      const { error } = await (supabase as any).from("funnels").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["funnels"] }),

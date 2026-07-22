@@ -715,7 +715,7 @@ function CustomMetricsBlock({
     queryKey: ["campaign-account-id", campaignId],
     enabled: !!campaignId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaigns")
         .select("ad_account_id")
         .eq("id", campaignId!)

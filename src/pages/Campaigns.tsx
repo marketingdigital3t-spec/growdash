@@ -252,7 +252,7 @@ export default function Campaigns() {
   const { data: campaignBaseRows = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("campaigns")
         .select(`
           id, name, ad_account_id, status, objective, daily_budget, lifetime_budget, created_at,
@@ -357,7 +357,7 @@ export default function Campaigns() {
   const { data: accountAdsets = [], isLoading: isLoadingAdsets } = useQuery({
     queryKey: ["meta-adsets-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("adsets")
         .select("id,name,daily_budget,status,campaign_id,campaigns!inner(id,name,ad_account_id)")
         .order("name", { ascending: true });
@@ -373,7 +373,7 @@ export default function Campaigns() {
   const { data: accountAds = [], isLoading: isLoadingAds } = useQuery({
     queryKey: ["meta-ads-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("ads")
         .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,ad_account_id))")
         .order("name", { ascending: true });
@@ -434,7 +434,7 @@ export default function Campaigns() {
     queryKey: ["campaign-targets-overview", campaignIds.join(",")],
     enabled: campaignIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.from("campaign_targets").select("campaign_id,target_cpl").in("campaign_id", campaignIds);
+      const { data, error } = await (supabase as any).from("campaign_targets").select("campaign_id,target_cpl").in("campaign_id", campaignIds);
       if (error) throw error;
       return data || [];
     },

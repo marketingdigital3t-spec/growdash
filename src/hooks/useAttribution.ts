@@ -30,7 +30,7 @@ export function useAttribution(model: AttributionModel = "last") {
     queryKey: ["attribution", startDate, endDate, adAccountId, model],
     queryFn: async () => {
       // 1) Buscar deals ganhos no período (e na conta, se filtrado)
-      let dealsQ = supabase
+      let dealsQ = (supabase as any)
         .from("rd_deals")
         .select("rd_deal_id, ad_account_id, amount_total, closed_at, win")
         .eq("win", true)
@@ -47,7 +47,7 @@ export function useAttribution(model: AttributionModel = "last") {
       deals.forEach((d) => dealValue.set(d.rd_deal_id, Number(d.amount_total) || 0));
 
       // 2) Buscar toques desses deals
-      const { data: touches, error: tErr } = await supabase
+      const { data: touches, error: tErr } = await (supabase as any)
         .from("rd_deal_touches")
         .select("rd_deal_id, utm_campaign, matched_campaign_id, touch_order, touch_at")
         .in("rd_deal_id", dealIds)
@@ -103,7 +103,7 @@ export function useAttribution(model: AttributionModel = "last") {
       // 5) Resolver nome de campanha quando temos id
       const ids = Array.from(credit.values()).map((r) => r.campaign_id).filter(Boolean) as string[];
       if (ids.length > 0) {
-        const { data: camps } = await supabase.from("campaigns").select("id, name").in("id", ids);
+        const { data: camps } = await (supabase as any).from("campaigns").select("id, name").in("id", ids);
         const nameById = new Map((camps ?? []).map((c) => [c.id, c.name]));
         credit.forEach((row) => {
           if (row.campaign_id && nameById.has(row.campaign_id)) {

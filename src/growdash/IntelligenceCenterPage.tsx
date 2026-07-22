@@ -94,7 +94,7 @@ export default function IntelligenceCenterPage() {
     if (!workspace?.id || !user?.id || intelligence.context.id === "all") return toast.warning("Selecione uma conta específica antes de agendar.");
     setSavingSchedule(true);
     try {
-      const { error } = await supabase.from("whatsapp_report_schedules").insert({
+      const { error } = await (supabase as any).from("whatsapp_report_schedules").insert({
         workspace_id: workspace.id,
         ad_account_id: intelligence.context.id,
         created_by: user.id,

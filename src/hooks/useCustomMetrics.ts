@@ -24,7 +24,7 @@ export function useCustomMetrics() {
   return useQuery({
     queryKey: ["custom_metrics"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("custom_metrics" as any)
         .select("*")
         .order("position", { ascending: true })
@@ -44,17 +44,17 @@ export function useUpsertCustomMetric() {
       const payload: any = { ...m, user_id: user.id };
       // If marking as default lead, unset others first
       if (payload.is_default_lead) {
-        await supabase
+        await (supabase as any)
           .from("custom_metrics" as any)
           .update({ is_default_lead: false } as any)
           .eq("user_id", user.id)
           .neq("id", payload.id ?? "00000000-0000-0000-0000-000000000000");
       }
       if (payload.id) {
-        const { error } = await supabase.from("custom_metrics" as any).update(payload).eq("id", payload.id);
+        const { error } = await (supabase as any).from("custom_metrics" as any).update(payload).eq("id", payload.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("custom_metrics" as any).insert(payload);
+        const { error } = await (supabase as any).from("custom_metrics" as any).insert(payload);
         if (error) throw error;
       }
     },
@@ -66,7 +66,7 @@ export function useDeleteCustomMetric() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("custom_metrics" as any).delete().eq("id", id);
+      const { error } = await (supabase as any).from("custom_metrics" as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["custom_metrics"] }),
@@ -80,7 +80,7 @@ export function useAvailableActions() {
   return useQuery({
     queryKey: ["available_actions"],
     queryFn: async (): Promise<ActionEntry[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("insight_actions" as any)
         .select("action_type, value")
         .limit(50000);
@@ -105,10 +105,10 @@ export function useActionsByAccount() {
     queryKey: ["actions_by_account"],
     queryFn: async (): Promise<Record<string, ActionEntry[]>> => {
       const [campaignsRes, adsetsRes, adsRes, actionsRes] = await Promise.all([
-        supabase.from("campaigns").select("id, ad_account_id"),
-        supabase.from("adsets").select("id, campaign_id"),
-        supabase.from("ads").select("id, adset_id"),
-        supabase.from("insight_actions" as any).select("ad_id, action_type, value").limit(100000),
+        (supabase as any).from("campaigns").select("id, ad_account_id"),
+        (supabase as any).from("adsets").select("id, campaign_id"),
+        (supabase as any).from("ads").select("id, adset_id"),
+        (supabase as any).from("insight_actions" as any).select("ad_id, action_type, value").limit(100000),
       ]);
       if (campaignsRes.error) throw campaignsRes.error;
       if (adsetsRes.error) throw adsetsRes.error;

@@ -97,7 +97,7 @@ export function useRDDeals(params: Params) {
     ],
     enabled: enabled && !!funnelId,
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("rd_deals")
         .select(DEAL_FIELDS)
         .eq("rd_funnel_id", funnelId!)
@@ -153,7 +153,7 @@ export function useRDClosedDeals(params: Params) {
     ],
     enabled: enabled && !!funnelId,
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("rd_deals")
         .select(DEAL_FIELDS)
         .eq("rd_funnel_id", funnelId!)
@@ -192,7 +192,7 @@ export function useFunnelStages(funnelId?: string) {
     queryKey: ["rd_funnel_stages", funnelId],
     enabled: !!funnelId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("rd_funnel_stages")
         .select("rd_stage_id, name, order, is_won, is_lost")
         .eq("rd_funnel_id", funnelId!)

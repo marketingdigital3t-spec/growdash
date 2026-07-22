@@ -26,7 +26,7 @@ export function useAccountUtmMappings() {
   return useQuery({
     queryKey: ["account_utm_mapping"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("account_utm_mapping").select("*");
+      const { data, error } = await (supabase as any).from("account_utm_mapping").select("*");
       if (error) throw error;
       return (data ?? []) as AccountUtmMapping[];
     },
@@ -44,7 +44,7 @@ export function useUpsertAccountUtmMapping() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Partial<AccountUtmMapping> & { ad_account_id: string }) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("account_utm_mapping")
         .upsert({ ...DEFAULT_MAPPING, ...input }, { onConflict: "ad_account_id" });
       if (error) throw error;

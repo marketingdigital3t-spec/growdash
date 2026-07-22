@@ -14,9 +14,9 @@ export function usePermissions() {
     enabled: !!user,
     queryFn: async () => {
       const [perm, accs, funs] = await Promise.all([
-        supabase.from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
-        supabase.from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id),
-        supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id),
+        (supabase as any).from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
+        (supabase as any).from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id),
+        (supabase as any).from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id),
       ]);
       return {
         perm: perm.data,

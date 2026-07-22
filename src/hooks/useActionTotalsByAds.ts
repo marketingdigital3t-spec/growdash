@@ -64,7 +64,7 @@ export function useActionTotalsByAds(
       const adsetByAd: Record<string, string> = {};
       for (let i = 0; i < sortedIds.length; i += CHUNK_IDS) {
         const chunk = sortedIds.slice(i, i + CHUNK_IDS);
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("ads")
           .select("id, adset_id")
           .in("id", chunk);
@@ -75,7 +75,7 @@ export function useActionTotalsByAds(
       const campaignByAdset: Record<string, string> = {};
       for (let i = 0; i < adsetIds.length; i += CHUNK_IDS) {
         const chunk = adsetIds.slice(i, i + CHUNK_IDS);
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("adsets")
           .select("id, campaign_id")
           .in("id", chunk);
@@ -86,7 +86,7 @@ export function useActionTotalsByAds(
       const campaignStatus: Record<string, string | null> = {};
       for (let i = 0; i < campaignIds.length; i += CHUNK_IDS) {
         const chunk = campaignIds.slice(i, i + CHUNK_IDS);
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("campaigns")
           .select("id, status")
           .in("id", chunk);
@@ -110,7 +110,7 @@ export function useActionTotalsByAds(
       for (let i = 0; i < allowedIds.length; i += CHUNK) {
         const chunk = allowedIds.slice(i, i + CHUNK);
         for (let from = 0; ; from += PAGE) {
-          let q = supabase
+          let q = (supabase as any)
             .from("insight_actions" as any)
             .select("ad_id, action_type, value, value_amount, date")
             .in("ad_id", chunk);

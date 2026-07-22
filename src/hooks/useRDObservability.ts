@@ -77,7 +77,7 @@ export function useRDObservability() {
       const since30 = new Date(now - 30 * 86400_000).toISOString();
 
       // ---- Funnels + sync_runs ----
-      const { data: funnels = [] } = await supabase
+      const { data: funnels = [] } = await (supabase as any)
         .from("rd_funnels")
         .select("id, name")
         .eq("is_active", true);
@@ -85,15 +85,15 @@ export function useRDObservability() {
       const funnelRows: FunnelSyncRow[] = [];
       for (const f of funnels ?? []) {
         const [{ data: lastRunArr }, { count: c24 }, { count: c7 }, { count: c30 }] = await Promise.all([
-          supabase
+          (supabase as any)
             .from("sync_runs")
             .select("started_at, finished_at, status, duration_ms, error_message")
             .eq("funnel_id", f.id)
             .order("started_at", { ascending: false })
             .limit(1),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since24),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since7),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since30),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since24),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since7),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since30),
         ]);
         const last = lastRunArr?.[0];
         const lastTs = last?.started_at ? new Date(last.started_at).getTime() : 0;
@@ -117,7 +117,7 @@ export function useRDObservability() {
       }
 
       // ---- Data quality (deals últimos 30d) ----
-      const { data: dealsQ = [] } = await supabase
+      const { data: dealsQ = [] } = await (supabase as any)
         .from("rd_deals")
         .select("utm_source, utm_medium, utm_campaign, deal_owner_name, win, amount_total, updated_at")
         .gte("updated_at", since30)
@@ -150,19 +150,19 @@ export function useRDObservability() {
       };
 
       // ---- Webhooks (proxy via rd_deals.updated_at) ----
-      const { count: ev24 } = await supabase
+      const { count: ev24 } = await (supabase as any)
         .from("rd_deals")
         .select("id", { count: "exact", head: true })
         .gte("updated_at", since24);
-      const { count: ev7 } = await supabase
+      const { count: ev7 } = await (supabase as any)
         .from("rd_deals")
         .select("id", { count: "exact", head: true })
         .gte("updated_at", since7);
-      const { count: ev30 } = await supabase
+      const { count: ev30 } = await (supabase as any)
         .from("rd_deals")
         .select("id", { count: "exact", head: true })
         .gte("updated_at", since30);
-      const { data: lastEvArr } = await supabase
+      const { data: lastEvArr } = await (supabase as any)
         .from("rd_deals")
         .select("updated_at")
         .order("updated_at", { ascending: false })
@@ -187,7 +187,7 @@ export function useRDObservability() {
       };
 
       // ---- Attribution health ----
-      const { data: dealsAttr = [] } = await supabase
+      const { data: dealsAttr = [] } = await (supabase as any)
         .from("rd_deals")
         .select("touch_count, first_touch_utm_campaign")
         .gte("updated_at", since30)
@@ -197,11 +197,11 @@ export function useRDObservability() {
       const withTouches = (dealsAttr ?? []).filter((d) => (d.touch_count ?? 0) > 0).length;
       const multi = (dealsAttr ?? []).filter((d) => (d.touch_count ?? 0) > 1).length;
 
-      const { count: totalTouches } = await supabase
+      const { count: totalTouches } = await (supabase as any)
         .from("rd_deal_touches")
         .select("id", { count: "exact", head: true })
         .gte("touch_at", since30);
-      const { count: matchedTouches } = await supabase
+      const { count: matchedTouches } = await (supabase as any)
         .from("rd_deal_touches")
         .select("id", { count: "exact", head: true })
         .not("matched_campaign_id", "is", null)
@@ -227,7 +227,7 @@ export function useRDObservability() {
       };
 
       // ---- Recent runs (últimas 10) ----
-      const { data: runs = [] } = await supabase
+      const { data: runs = [] } = await (supabase as any)
         .from("sync_runs")
         .select("id, funnel_id, started_at, finished_at, status, duration_ms, deals_fetched, errors_total, error_message")
         .order("started_at", { ascending: false })

@@ -29,8 +29,8 @@ export function useAccountPixels() {
     queryKey: ["account-pixels"],
     queryFn: async () => {
       const [pxRes, evRes] = await Promise.all([
-        supabase.from("ad_account_pixel" as any).select("id, pixel_id, name, ad_account_id").order("name"),
-        supabase.from("pixel_event" as any).select("id, pixel_id, event_name, action_type, is_custom").order("event_name"),
+        (supabase as any).from("ad_account_pixel" as any).select("id, pixel_id, name, ad_account_id").order("name"),
+        (supabase as any).from("pixel_event" as any).select("id, pixel_id, event_name, action_type, is_custom").order("event_name"),
       ]);
       if (pxRes.error) throw pxRes.error;
       if (evRes.error) throw evRes.error;
@@ -55,7 +55,7 @@ export function useAccountLpConfigs() {
   return useQuery({
     queryKey: ["account-lp-configs"],
     queryFn: async (): Promise<Record<string, AccountLpConfig>> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("account_lp_config" as any)
         .select("ad_account_id, pixel_id, action_type");
       if (error) throw error;
@@ -70,7 +70,7 @@ export function useUpdateAccountLpConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cfg: { ad_account_id: string; pixel_id: string | null; action_type: string | null }) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("account_lp_config" as any)
         .upsert({ ...cfg, updated_at: new Date().toISOString() }, { onConflict: "ad_account_id" });
       if (error) throw error;

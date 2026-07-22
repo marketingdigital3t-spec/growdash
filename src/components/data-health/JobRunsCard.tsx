@@ -26,7 +26,7 @@ export function JobRunsCard() {
   const { data: runs, refetch } = useQuery({
     queryKey: ["job-runs"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("job_runs")
         .select("*")
         .order("started_at", { ascending: false })

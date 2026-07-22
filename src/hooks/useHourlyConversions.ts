@@ -49,7 +49,7 @@ export function useHourlyConversions() {
   const hourlyQ = useQuery({
     queryKey: ["hourly_insights_distribution", adAccountId ?? "all", scopedIdsKey, start, end],
     queryFn: async () => {
-      let q = supabase
+      let q = (supabase as any)
         .from("insights_hourly")
         .select("ad_account_id, campaign_id, ad_id, date, hour, leads, clicks, spend")
         .gte("date", start)

@@ -7,5 +7,6 @@ import App from "./App.tsx";
 import "./index.css";
 
 const rootElement = document.getElementById("root")!;
+window.__GROWDASH_BOOTED__ = true;
 rootElement.dataset.build = "2026-07-18-dashboard-restore";
 createRoot(rootElement).render(<App />);

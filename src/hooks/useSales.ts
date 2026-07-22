@@ -55,7 +55,7 @@ export function useSales(params?: UseSalesParams) {
   return useQuery({
     queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId],
     queryFn: async () => {
-      let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
+      let query = (supabase as any).from("sales").select("*").order("sale_date", { ascending: false });
 
       if (params?.startDate) {
         query = query.gte("sale_date", toLocalDateString(params.startDate));
@@ -126,7 +126,7 @@ export function useCreateSale() {
   const { session } = useAuth();
   return useMutation({
     mutationFn: async (input: CreateSaleInput) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("sales")
         .insert({ ...input, user_id: session!.user.id })
         .select()
@@ -146,7 +146,7 @@ export function useUpdateSale() {
       if (Object.prototype.hasOwnProperty.call(input, "payment_method")) {
         payload.payment_method_source = "manual";
       }
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("sales")
         .update(payload)
         .eq("id", id)
@@ -163,7 +163,7 @@ export function useDeleteSale() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("sales").delete().eq("id", id);
+      const { error } = await (supabase as any).from("sales").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sales"] }),

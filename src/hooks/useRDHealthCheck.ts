@@ -50,7 +50,7 @@ export function useRDHealthCheck() {
       const since7 = new Date(Date.now() - 7 * 86400000).toISOString();
 
       // 1) Token RD CRM
-      const { data: integration } = await supabase
+      const { data: integration } = await (supabase as any)
         .from("integrations")
         .select("id, is_active")
         .eq("provider", "rd_station_crm")
@@ -85,7 +85,7 @@ export function useRDHealthCheck() {
       }
 
       // 2) Funis vinculados
-      const { data: funnels = [] } = await supabase
+      const { data: funnels = [] } = await (supabase as any)
         .from("rd_funnels")
         .select("id, name, rd_funnel_id, is_active, ad_account_id");
 
@@ -112,11 +112,11 @@ export function useRDHealthCheck() {
 
       for (const f of activeLinked) {
         const [{ count: stageCount }, deals30, deals7Latest, rdWinsAgg, salesAgg] = await Promise.all([
-          supabase.from("rd_funnel_stages").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("created_at", since30),
-          supabase.from("rd_deals").select("updated_at").eq("rd_funnel_id", f.id).order("updated_at", { ascending: false }).limit(1),
-          supabase.from("rd_deals").select("amount_total").eq("rd_funnel_id", f.id).eq("win", true).gte("closed_at", since30),
-          supabase.from("sales").select("gross_revenue, matched_campaign_id, rd_deal_id").eq("rd_funnel_id", f.id).gte("sale_date", since30.slice(0, 10)),
+          (supabase as any).from("rd_funnel_stages").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("created_at", since30),
+          (supabase as any).from("rd_deals").select("updated_at").eq("rd_funnel_id", f.id).order("updated_at", { ascending: false }).limit(1),
+          (supabase as any).from("rd_deals").select("amount_total").eq("rd_funnel_id", f.id).eq("win", true).gte("closed_at", since30),
+          (supabase as any).from("sales").select("gross_revenue, matched_campaign_id, rd_deal_id").eq("rd_funnel_id", f.id).gte("sale_date", since30.slice(0, 10)),
         ]);
 
         if (!stageCount || stageCount === 0) {

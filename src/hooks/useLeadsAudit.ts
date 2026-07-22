@@ -38,7 +38,7 @@ export function useLeadsAudit({ adAccountId, startDate, endDate }: Params) {
   return useQuery({
     queryKey: ["leads-audit", adAccountId ?? "all", start, end],
     queryFn: async (): Promise<AuditLead[]> => {
-      let q = supabase
+      let q = (supabase as any)
         .from("rd_deals")
         .select("id, rd_deal_id, contact_name, contact_email, lead_state, lead_state_source, lead_created_at, raw")
         .gte("lead_created_at", startISO)

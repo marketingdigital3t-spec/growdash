@@ -5,7 +5,7 @@ export function useAlerts(onlyUnread = false) {
   return useQuery({
     queryKey: ["alerts", onlyUnread],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("alerts")
         .select("*")
         .order("created_at", { ascending: false })
@@ -26,7 +26,7 @@ export function useMarkAlertRead() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (alertId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("alerts")
         .update({ is_read: true })
         .eq("id", alertId);

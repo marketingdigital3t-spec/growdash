@@ -37,7 +37,7 @@ export function useGlobalView() {
   return useQuery({
     queryKey: ["dashboard_view_global"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("dashboard_views")
         .select("*")
         .eq("scope", "global")
@@ -57,7 +57,7 @@ export function useSaveView() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, layout, widgets }: { id: string; layout: any[]; widgets: any[] }) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("dashboard_views")
         .update({ layout, widgets, updated_at: new Date().toISOString() })
         .eq("id", id);

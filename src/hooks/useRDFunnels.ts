@@ -19,7 +19,7 @@ export function useRDFunnels(adAccountId?: string) {
   return useQuery({
     queryKey: ["rd_funnels", adAccountId ?? "all"],
     queryFn: async () => {
-      let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
+      let q = (supabase as any).from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
       const { data, error } = await q;
       if (error) throw error;
@@ -33,7 +33,7 @@ export function useCreateRDFunnel() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: Omit<RDFunnel, "id" | "user_id" | "created_at" | "updated_at" | "is_active"> & { is_active?: boolean }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("rd_funnels")
         .insert({ ...input, user_id: user!.id, is_active: input.is_active ?? true })
         .select()
@@ -49,7 +49,7 @@ export function useUpdateRDFunnel() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...input }: Partial<RDFunnel> & { id: string }) => {
-      const { data, error } = await supabase.from("rd_funnels").update(input).eq("id", id).select().single();
+      const { data, error } = await (supabase as any).from("rd_funnels").update(input).eq("id", id).select().single();
       if (error) throw error;
       return data as RDFunnel;
     },
@@ -61,7 +61,7 @@ export function useDeleteRDFunnel() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("rd_funnels").delete().eq("id", id);
+      const { error } = await (supabase as any).from("rd_funnels").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rd_funnels"] }),

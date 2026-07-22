@@ -45,7 +45,7 @@ export function useCampaignBreakdowns(campaignId?: string, startDate?: Date, end
     queryKey: ["campaign-breakdowns", campaignId, startDate?.toISOString(), endDate?.toISOString()],
     enabled: !!campaignId,
     queryFn: async (): Promise<CampaignBreakdowns> => {
-      let q = supabase
+      let q = (supabase as any)
         .from("insights_breakdowns" as any)
         .select("breakdown_type, segment_key, spend, impressions, clicks, leads, date")
         .eq("campaign_id", campaignId!);
