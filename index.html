@@ -16,10 +16,58 @@
   </head>
   <body>
     <div id="root">
-      <div style="display:grid;min-height:100vh;place-items:center;background:#070503;color:#f6c94a;font:700 14px Nunito,system-ui,sans-serif;letter-spacing:.08em">
-        Carregando Growdash…
+      <div id="boot-fallback" style="display:grid;min-height:100vh;place-items:center;background:#070503;color:#f6c94a;font:700 14px Nunito,system-ui,sans-serif;letter-spacing:.08em;text-align:center;padding:24px">
+        <div>
+          <div style="font-size:20px">Carregando Growdash…</div>
+          <div id="boot-help" style="display:none;margin-top:18px;max-width:520px;color:#f7efe0;font:500 13px Nunito,system-ui,sans-serif;letter-spacing:0;line-height:1.55">
+            O carregamento demorou mais que o normal. Vou tentar atualizar automaticamente; se continuar, toque em <b>Atualizar preview</b>.
+          </div>
+          <button id="boot-refresh" type="button" style="display:none;margin-top:18px;border:1px solid rgba(246,201,74,.45);border-radius:999px;background:#f6c94a;color:#070503;padding:10px 18px;font:800 13px Nunito,system-ui,sans-serif;cursor:pointer">
+            Atualizar preview
+          </button>
+          <noscript>
+            <div style="margin-top:18px;max-width:520px;color:#f7efe0;font:500 13px Nunito,system-ui,sans-serif;letter-spacing:0;line-height:1.55">
+              O JavaScript está bloqueado neste navegador. Ative o JavaScript para abrir o Growdash.
+            </div>
+          </noscript>
+        </div>
       </div>
     </div>
+    <script>
+      window.__GROWDASH_BOOTED__ = false;
+      (function () {
+        var refresh = document.getElementById('boot-refresh');
+        var help = document.getElementById('boot-help');
+        function reloadWithCacheBust() {
+          try {
+            var url = new URL(window.location.href);
+            url.searchParams.set('refresh', String(Date.now()));
+            window.location.replace(url.toString());
+          } catch (error) {
+            window.location.reload();
+          }
+        }
+        if (refresh) refresh.onclick = reloadWithCacheBust;
+        window.addEventListener('error', function (event) {
+          if (!window.__GROWDASH_BOOTED__ && help) {
+            help.style.display = 'block';
+            help.textContent = 'Não consegui carregar os arquivos do app. Clique em Atualizar preview para tentar novamente.';
+          }
+          if (refresh) refresh.style.display = 'inline-block';
+        }, true);
+        setTimeout(function () {
+          if (window.__GROWDASH_BOOTED__) return;
+          if (help) help.style.display = 'block';
+          if (refresh) refresh.style.display = 'inline-block';
+          try {
+            if (!sessionStorage.getItem('growdash_boot_retry')) {
+              sessionStorage.setItem('growdash_boot_retry', '1');
+              reloadWithCacheBust();
+            }
+          } catch (error) {}
+        }, 7000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
