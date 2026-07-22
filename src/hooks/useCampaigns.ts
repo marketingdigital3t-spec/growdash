@@ -5,7 +5,7 @@ export function useCampaigns(adAccountId?: string) {
   return useQuery({
     queryKey: ["campaigns", adAccountId],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase as any)
         .from("campaigns")
         .select("id, name, ad_account_id, status, objective, daily_budget, lifetime_budget, created_at")
         .order("created_at", { ascending: false });

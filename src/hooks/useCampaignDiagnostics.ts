@@ -50,7 +50,7 @@ export function useCampaignDiagnostics() {
     queryKey: ["campaign_diagnostics_v3"],
     queryFn: async (): Promise<CampaignDiagnostic[]> => {
       const [campRes, targetRes] = await Promise.all([
-        supabase
+        (supabase as any)
           .from("campaigns")
           .select(`
             id, name, ad_account_id, status, last_activated_at, created_at,

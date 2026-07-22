@@ -59,7 +59,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
       const MAX = 10;
       let all: RDDealLite[] = [];
       for (let p = 0; p < MAX; p++) {
-        let q = supabase
+        let q = (supabase as any)
           .from("rd_deals")
           .select(FIELDS)
           .gte("lead_created_at", startDate.toISOString())
@@ -100,7 +100,7 @@ export function useRDCRMDeals(adAccountId?: string, enabled = true) {
       let all: RDDealLite[] = [];
 
       for (let page = 0; page < maxPages; page += 1) {
-        let query = supabase
+        let query = (supabase as any)
           .from("rd_deals")
           .select(FIELDS)
           .order("stage_updated_at", { ascending: false, nullsFirst: false })

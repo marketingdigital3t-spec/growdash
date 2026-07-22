@@ -44,7 +44,7 @@ export function useUpsertAccountUtmMapping() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Partial<AccountUtmMapping> & { ad_account_id: string }) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("account_utm_mapping")
         .upsert({ ...DEFAULT_MAPPING, ...input }, { onConflict: "ad_account_id" });
       if (error) throw error;

@@ -32,7 +32,7 @@ export function useAccountAdsets(adAccountId?: string) {
       for (let i = 0; i < ids.length; i += CHUNK) {
         const chunk = ids.slice(i, i + CHUNK);
         for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from("adsets")
             .select("id, campaign_id, status, destination_type")
             .in("campaign_id", chunk)

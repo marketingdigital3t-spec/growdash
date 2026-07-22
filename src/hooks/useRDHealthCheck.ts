@@ -50,7 +50,7 @@ export function useRDHealthCheck() {
       const since7 = new Date(Date.now() - 7 * 86400000).toISOString();
 
       // 1) Token RD CRM
-      const { data: integration } = await supabase
+      const { data: integration } = await (supabase as any)
         .from("integrations")
         .select("id, is_active")
         .eq("provider", "rd_station_crm")
@@ -85,7 +85,7 @@ export function useRDHealthCheck() {
       }
 
       // 2) Funis vinculados
-      const { data: funnels = [] } = await supabase
+      const { data: funnels = [] } = await (supabase as any)
         .from("rd_funnels")
         .select("id, name, rd_funnel_id, is_active, ad_account_id");
 

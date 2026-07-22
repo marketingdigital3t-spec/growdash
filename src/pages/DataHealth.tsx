@@ -32,7 +32,7 @@ function useHealth() {
     queryKey: ["data-health"],
     queryFn: async (): Promise<HealthData> => {
       // Orphan sales: sales with rd_deal_id but no matching rd_deals
-      const { data: sales } = await supabase
+      const { data: sales } = await (supabase as any)
         .from("sales")
         .select("rd_deal_id")
         .eq("status", "confirmed")
@@ -51,15 +51,15 @@ function useHealth() {
       }
 
       // Deals missing state
-      const { count: missing } = await supabase
+      const { count: missing } = await (supabase as any)
         .from("rd_deals").select("id", { count: "exact", head: true })
         .is("lead_state", null);
-      const { count: total } = await supabase
+      const { count: total } = await (supabase as any)
         .from("rd_deals").select("id", { count: "exact", head: true });
 
       // Days with spend > 0 but no leads (last 30 days, rough)
       const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-      const { data: ins } = await supabase
+      const { data: ins } = await (supabase as any)
         .from("insights")
         .select("date, spend, leads")
         .gte("date", since)
@@ -75,10 +75,10 @@ function useHealth() {
       const daysSpendNoLeads = Array.from(byDate.values()).filter((v) => v.spend > 0 && v.leads === 0).length;
 
       // Accounts and LP config status
-      const { data: accounts } = await supabase
+      const { data: accounts } = await (supabase as any)
         .from("ad_accounts")
         .select("id, name, last_sync_success_at, connection_status");
-      const { data: oauthIntegrations } = await supabase
+      const { data: oauthIntegrations } = await (supabase as any)
         .from("integrations")
         .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
         .order("updated_at", { ascending: false });

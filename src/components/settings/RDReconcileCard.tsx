@@ -13,7 +13,7 @@ interface OrphanCount {
 
 async function fetchOrphanCount(userId: string): Promise<OrphanCount> {
   // Busca todas as vendas confirmadas do usuário e verifica quais não têm rd_deals.
-  const { data: sales } = await supabase
+  const { data: sales } = await (supabase as any)
     .from("sales")
     .select("rd_deal_id")
     .eq("user_id", userId)

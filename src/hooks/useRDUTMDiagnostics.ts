@@ -39,7 +39,7 @@ export function useRDUTMDiagnostics(adAccountId?: string) {
       const since7d = new Date(Date.now() - 7 * 86400000).toISOString();
 
       // ---- 1) Load deals (últimos 30d) ----
-      let dealsQuery = supabase
+      let dealsQuery = (supabase as any)
         .from("rd_deals")
         .select("rd_deal_id, ad_account_id, rd_funnel_id, utm_source, utm_medium, utm_campaign, created_at")
         .gte("created_at", since30);
@@ -150,13 +150,13 @@ export function useRDUTMDiagnostics(adAccountId?: string) {
       }
 
       // ---- Check 4: Etapas órfãs em event_classes ----
-      let classQuery = supabase
+      let classQuery = (supabase as any)
         .from("event_classes")
         .select("id, title, rd_funnel_id, rd_model_patient_funnel_id, allowed_student_stage_ids, allowed_model_patient_stage_ids, ad_account_id, status");
       if (adAccountId) classQuery = classQuery.eq("ad_account_id", adAccountId);
       const { data: classes = [] } = await classQuery;
 
-      const { data: allStages = [] } = await supabase
+      const { data: allStages = [] } = await (supabase as any)
         .from("rd_funnel_stages")
         .select("rd_stage_id, rd_funnel_id");
       const stagesByFunnel = new Map<string, Set<string>>();
@@ -205,7 +205,7 @@ export function useRDUTMDiagnostics(adAccountId?: string) {
 
       const staleFunnels: DiagSample[] = [];
       for (const f of activeFunnels) {
-        const { data: latest } = await supabase
+        const { data: latest } = await (supabase as any)
           .from("rd_deals")
           .select("created_at")
           .eq("rd_funnel_id", f.id)

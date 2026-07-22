@@ -171,7 +171,7 @@ export function PlatformRulesSection() {
   const clearOverrides = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("auth");
-      const { error, count } = await supabase
+      const { error, count } = await (supabase as any)
         .from("sales")
         .update({ manual_platform: null }, { count: "exact" })
         .eq("user_id", user.id)
@@ -362,7 +362,7 @@ function UnknownDiagnostics({
     queryFn: async () => {
       const since = new Date();
       since.setDate(since.getDate() - 90);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("sales")
         .select("utm_source, utm_medium, utm_campaign, utm_content, utm_term, rd_campaign_name, manual_platform")
         .eq("user_id", user!.id)
@@ -379,7 +379,7 @@ function UnknownDiagnostics({
     queryFn: async () => {
       const since = new Date();
       since.setDate(since.getDate() - 90);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("rd_deals")
         .select("utm_source, utm_medium, utm_campaign, utm_content, utm_term, last_touch_utm_campaign, first_touch_utm_campaign")
         .eq("user_id", user!.id)

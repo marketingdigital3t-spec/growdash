@@ -38,7 +38,7 @@ export function CampaignAttentionPanel({ accountId, accounts, startDate, endDate
     queryKey: ["campaign-targets-budget-attention", campaignIds.join(",")],
     enabled: campaignIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaign_targets")
         .select("campaign_id,target_cpl")
         .in("campaign_id", campaignIds);

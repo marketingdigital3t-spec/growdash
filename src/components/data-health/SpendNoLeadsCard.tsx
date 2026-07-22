@@ -10,7 +10,7 @@ export function SpendNoLeadsCard() {
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
       // Fetch insights joined with campaign objective
-      const { data: rows } = await supabase
+      const { data: rows } = await (supabase as any)
         .from("insights")
         .select("spend, leads, ads!inner(adsets!inner(campaigns!inner(id, name, objective)))")
         .gte("date", since)

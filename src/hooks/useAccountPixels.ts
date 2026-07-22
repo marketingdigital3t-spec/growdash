@@ -55,7 +55,7 @@ export function useAccountLpConfigs() {
   return useQuery({
     queryKey: ["account-lp-configs"],
     queryFn: async (): Promise<Record<string, AccountLpConfig>> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("account_lp_config" as any)
         .select("ad_account_id, pixel_id, action_type");
       if (error) throw error;
@@ -70,7 +70,7 @@ export function useUpdateAccountLpConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cfg: { ad_account_id: string; pixel_id: string | null; action_type: string | null }) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("account_lp_config" as any)
         .upsert({ ...cfg, updated_at: new Date().toISOString() }, { onConflict: "ad_account_id" });
       if (error) throw error;

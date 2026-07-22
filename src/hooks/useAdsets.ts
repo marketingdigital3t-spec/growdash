@@ -6,7 +6,7 @@ export function useAdsets(campaignId?: string) {
     queryKey: ["adsets", campaignId],
     enabled: !!campaignId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("adsets")
         .select("id, name, campaign_id")
         .eq("campaign_id", campaignId!)

@@ -126,7 +126,7 @@ export function useCreateSale() {
   const { session } = useAuth();
   return useMutation({
     mutationFn: async (input: CreateSaleInput) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("sales")
         .insert({ ...input, user_id: session!.user.id })
         .select()
@@ -146,7 +146,7 @@ export function useUpdateSale() {
       if (Object.prototype.hasOwnProperty.call(input, "payment_method")) {
         payload.payment_method_source = "manual";
       }
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("sales")
         .update(payload)
         .eq("id", id)

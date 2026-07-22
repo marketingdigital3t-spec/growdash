@@ -53,7 +53,7 @@ export function useLeadsCanonical() {
     queryFn: async () => {
       const startISO = new Date(`${start}T00:00:00`).toISOString();
       const endISO = new Date(`${end}T23:59:59.999`).toISOString();
-      let query = supabase
+      let query = (supabase as any)
         .from("meta_leads" as any)
         .select("meta_lead_id, ad_account_id, ad_id, created_time, lead_state")
         .gte("created_time", startISO)

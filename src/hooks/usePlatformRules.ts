@@ -38,7 +38,7 @@ export function usePlatformRules() {
   const query = useQuery({
     queryKey: ["platform_rules"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("platform_rules")
         .select("*")
         .order("priority", { ascending: true });

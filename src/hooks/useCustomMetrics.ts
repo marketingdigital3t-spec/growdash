@@ -24,7 +24,7 @@ export function useCustomMetrics() {
   return useQuery({
     queryKey: ["custom_metrics"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("custom_metrics" as any)
         .select("*")
         .order("position", { ascending: true })
@@ -44,7 +44,7 @@ export function useUpsertCustomMetric() {
       const payload: any = { ...m, user_id: user.id };
       // If marking as default lead, unset others first
       if (payload.is_default_lead) {
-        await supabase
+        await (supabase as any)
           .from("custom_metrics" as any)
           .update({ is_default_lead: false } as any)
           .eq("user_id", user.id)
@@ -80,7 +80,7 @@ export function useAvailableActions() {
   return useQuery({
     queryKey: ["available_actions"],
     queryFn: async (): Promise<ActionEntry[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("insight_actions" as any)
         .select("action_type, value")
         .limit(50000);

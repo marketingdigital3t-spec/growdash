@@ -74,7 +74,7 @@ export function useCanonicalLeadsByAccountDate() {
       for (let i = 0; i < scopedAdIds.length; i += CHUNK) {
         const chunk = scopedAdIds.slice(i, i + CHUNK);
         for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from("insight_actions" as any)
             .select("ad_id, action_type, value, date")
             .in("ad_id", chunk)

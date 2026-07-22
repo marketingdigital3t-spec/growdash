@@ -16,7 +16,7 @@ export function useProducts() {
   return useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("products")
         .select("*")
         .order("created_at", { ascending: false });
@@ -31,7 +31,7 @@ export function useCreateProduct() {
   const { session } = useAuth();
   return useMutation({
     mutationFn: async (input: { name: string; price: number; tax_rate: number }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("products")
         .insert({ ...input, user_id: session!.user.id })
         .select()

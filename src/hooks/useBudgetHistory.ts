@@ -56,7 +56,7 @@ export function useBudgetHistory(adAccountId?: string, startDate?: Date, endDate
       const endISO = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999).toISOString();
 
       // 1) Saldo atual da conta (Meta) — âncora confiável
-      const { data: acc } = await supabase
+      const { data: acc } = await (supabase as any)
         .from("ad_accounts")
         .select("remaining_balance")
         .eq("id", adAccountId!)
@@ -64,7 +64,7 @@ export function useBudgetHistory(adAccountId?: string, startDate?: Date, endDate
       const currentBalance = acc?.remaining_balance != null ? Number(acc.remaining_balance) : null;
 
       // 2) Transações reais (Meta Billing) — fonte de verdade para aportes
-      const { data: txs, error: txErr } = await supabase
+      const { data: txs, error: txErr } = await (supabase as any)
         .from("account_transactions")
         .select("id, time, amount, status, payment_method, reference")
         .eq("ad_account_id", adAccountId!)
@@ -74,7 +74,7 @@ export function useBudgetHistory(adAccountId?: string, startDate?: Date, endDate
       if (txErr) throw txErr;
 
       // 3) Transações posteriores ao período (para ancorar do "hoje" → fim do período)
-      const { data: txsAfter } = await supabase
+      const { data: txsAfter } = await (supabase as any)
         .from("account_transactions")
         .select("time, amount, status")
         .eq("ad_account_id", adAccountId!)
@@ -82,20 +82,20 @@ export function useBudgetHistory(adAccountId?: string, startDate?: Date, endDate
         .order("time", { ascending: true });
 
       // 4) Daily spend via ads → insights
-      const { data: camps } = await supabase
+      const { data: camps } = await (supabase as any)
         .from("campaigns")
         .select("id")
         .eq("ad_account_id", adAccountId!);
       const campIds = (camps ?? []).map((c) => c.id);
       let adIds: string[] = [];
       if (campIds.length > 0) {
-        const { data: adsetsData } = await supabase
+        const { data: adsetsData } = await (supabase as any)
           .from("adsets")
           .select("id, campaign_id")
           .in("campaign_id", campIds);
         const adsetIds = (adsetsData ?? []).map((a) => a.id);
         if (adsetIds.length > 0) {
-          const { data: adsData } = await supabase
+          const { data: adsData } = await (supabase as any)
             .from("ads")
             .select("id, adset_id")
             .in("adset_id", adsetIds);
@@ -113,7 +113,7 @@ export function useBudgetHistory(adAccountId?: string, startDate?: Date, endDate
         const fetchEnd = todayOnly > endDateOnly ? todayOnly : endDateOnly;
         for (let i = 0; i < adIds.length; i += chunkSize) {
           const chunk = adIds.slice(i, i + chunkSize);
-          const { data: ins, error: insErr } = await supabase
+          const { data: ins, error: insErr } = await (supabase as any)
             .from("insights")
             .select("date, spend")
             .in("ad_id", chunk)
@@ -193,7 +193,7 @@ export function useBudgetHistory(adAccountId?: string, startDate?: Date, endDate
         }
       } else {
         // Fallback: opening balance via account_balance_events anterior
-        const { data: prior } = await supabase
+        const { data: prior } = await (supabase as any)
           .from("account_balance_events")
           .select("new_balance, event_at")
           .eq("ad_account_id", adAccountId!)

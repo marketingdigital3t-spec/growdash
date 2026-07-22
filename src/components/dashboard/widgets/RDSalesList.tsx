@@ -63,7 +63,7 @@ export function RDSalesList() {
     setSyncingId(sale.id);
     try {
       // Resolve funnel_id for this deal
-      const { data: deal, error: dErr } = await supabase
+      const { data: deal, error: dErr } = await (supabase as any)
         .from("rd_deals")
         .select("rd_funnel_id")
         .eq("rd_deal_id", sale.rd_deal_id)

@@ -33,7 +33,7 @@ export function useCreateRDFunnel() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (input: Omit<RDFunnel, "id" | "user_id" | "created_at" | "updated_at" | "is_active"> & { is_active?: boolean }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("rd_funnels")
         .insert({ ...input, user_id: user!.id, is_active: input.is_active ?? true })
         .select()

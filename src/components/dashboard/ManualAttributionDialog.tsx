@@ -43,7 +43,7 @@ export function ManualAttributionDialog({ sale, open, onClose }: Props) {
     queryKey: ["mattr-campaigns-by-account", accountId],
     enabled: !!accountId && open,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaigns")
         .select("id, name, ad_account_id")
         .eq("ad_account_id", accountId)
@@ -58,7 +58,7 @@ export function ManualAttributionDialog({ sale, open, onClose }: Props) {
     queryKey: ["mattr-adsets", campaignId],
     enabled: !!campaignId && open,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("adsets").select("id, name").eq("campaign_id", campaignId).order("name").range(0, 4999);
       if (error) throw error;
       return data ?? [];
@@ -69,7 +69,7 @@ export function ManualAttributionDialog({ sale, open, onClose }: Props) {
     queryKey: ["mattr-ads", adsetId],
     enabled: !!adsetId && open,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("ads").select("id, name").eq("adset_id", adsetId).order("name").range(0, 4999);
       if (error) throw error;
       return data ?? [];
