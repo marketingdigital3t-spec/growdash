@@ -103,7 +103,7 @@ export function useAttribution(model: AttributionModel = "last") {
       // 5) Resolver nome de campanha quando temos id
       const ids = Array.from(credit.values()).map((r) => r.campaign_id).filter(Boolean) as string[];
       if (ids.length > 0) {
-        const { data: camps } = await supabase.from("campaigns").select("id, name").in("id", ids);
+        const { data: camps } = await (supabase as any).from("campaigns").select("id, name").in("id", ids);
         const nameById = new Map((camps ?? []).map((c) => [c.id, c.name]));
         credit.forEach((row) => {
           if (row.campaign_id && nameById.has(row.campaign_id)) {

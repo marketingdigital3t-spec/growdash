@@ -434,7 +434,7 @@ export default function Campaigns() {
     queryKey: ["campaign-targets-overview", campaignIds.join(",")],
     enabled: campaignIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.from("campaign_targets").select("campaign_id,target_cpl").in("campaign_id", campaignIds);
+      const { data, error } = await (supabase as any).from("campaign_targets").select("campaign_id,target_cpl").in("campaign_id", campaignIds);
       if (error) throw error;
       return data || [];
     },

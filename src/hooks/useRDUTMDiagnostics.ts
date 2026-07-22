@@ -50,7 +50,7 @@ export function useRDUTMDiagnostics(adAccountId?: string) {
       const total = dealsList.length;
 
       // ---- 2) Load Meta campaigns (filtered by ad_account) ----
-      let campQuery = supabase.from("campaigns").select("id, name, ad_account_id");
+      let campQuery = (supabase as any).from("campaigns").select("id, name, ad_account_id");
       if (adAccountId) campQuery = campQuery.eq("ad_account_id", adAccountId);
       const { data: campaigns = [] } = await campQuery;
 
@@ -198,7 +198,7 @@ export function useRDUTMDiagnostics(adAccountId?: string) {
       }
 
       // ---- Check 5: Funis sem deals recentes (>7d) ----
-      let funnelsQuery = supabase.from("rd_funnels").select("id, name, is_active, ad_account_id");
+      let funnelsQuery = (supabase as any).from("rd_funnels").select("id, name, is_active, ad_account_id");
       if (adAccountId) funnelsQuery = funnelsQuery.eq("ad_account_id", adAccountId);
       const { data: funnels = [] } = await funnelsQuery;
       const activeFunnels = (funnels || []).filter((f) => f.is_active);

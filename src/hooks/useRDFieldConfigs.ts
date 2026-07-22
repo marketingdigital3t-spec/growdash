@@ -33,7 +33,7 @@ export function useRDFieldConfigs(adAccountId?: string | null) {
     queryKey: ["rd_field_configs", adAccountId ?? "all"],
     enabled: !!adAccountId,
     queryFn: async () => {
-      let q = supabase.from("rd_field_configs" as any).select("*").order("created_at");
+      let q = (supabase as any).from("rd_field_configs" as any).select("*").order("created_at");
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
       const { data, error } = await q;
       if (error) throw error;
@@ -49,11 +49,11 @@ export function useSaveRDFieldConfig() {
     mutationFn: async (input: Partial<RDFieldConfig> & { ad_account_id: string }) => {
       if (input.id) {
         const { id, user_id, created_at, updated_at, ...rest } = input as any;
-        const { error } = await supabase.from("rd_field_configs" as any).update(rest).eq("id", id);
+        const { error } = await (supabase as any).from("rd_field_configs" as any).update(rest).eq("id", id);
         if (error) throw error;
       } else {
         const payload = { ...input, user_id: session!.user.id };
-        const { error } = await supabase.from("rd_field_configs" as any).insert(payload as any);
+        const { error } = await (supabase as any).from("rd_field_configs" as any).insert(payload as any);
         if (error) throw error;
       }
     },
@@ -65,7 +65,7 @@ export function useDeleteRDFieldConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("rd_field_configs" as any).delete().eq("id", id);
+      const { error } = await (supabase as any).from("rd_field_configs" as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rd_field_configs"] }),

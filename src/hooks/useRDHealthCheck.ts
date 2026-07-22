@@ -112,11 +112,11 @@ export function useRDHealthCheck() {
 
       for (const f of activeLinked) {
         const [{ count: stageCount }, deals30, deals7Latest, rdWinsAgg, salesAgg] = await Promise.all([
-          supabase.from("rd_funnel_stages").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("created_at", since30),
-          supabase.from("rd_deals").select("updated_at").eq("rd_funnel_id", f.id).order("updated_at", { ascending: false }).limit(1),
-          supabase.from("rd_deals").select("amount_total").eq("rd_funnel_id", f.id).eq("win", true).gte("closed_at", since30),
-          supabase.from("sales").select("gross_revenue, matched_campaign_id, rd_deal_id").eq("rd_funnel_id", f.id).gte("sale_date", since30.slice(0, 10)),
+          (supabase as any).from("rd_funnel_stages").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("created_at", since30),
+          (supabase as any).from("rd_deals").select("updated_at").eq("rd_funnel_id", f.id).order("updated_at", { ascending: false }).limit(1),
+          (supabase as any).from("rd_deals").select("amount_total").eq("rd_funnel_id", f.id).eq("win", true).gte("closed_at", since30),
+          (supabase as any).from("sales").select("gross_revenue, matched_campaign_id, rd_deal_id").eq("rd_funnel_id", f.id).gte("sale_date", since30.slice(0, 10)),
         ]);
 
         if (!stageCount || stageCount === 0) {

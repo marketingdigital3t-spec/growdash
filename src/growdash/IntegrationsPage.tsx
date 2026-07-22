@@ -62,7 +62,7 @@ export default function IntegrationsPage() {
   const { data: socialAccounts = [] } = useQuery({
     queryKey: ["social_accounts"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_accounts").select("id,username,display_name,connection_status,last_sync_at").order("created_at", { ascending: false });
+      const { data, error } = await (supabase as any).from("social_accounts").select("id,username,display_name,connection_status,last_sync_at").order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -71,7 +71,7 @@ export default function IntegrationsPage() {
 
   const { data: latestRDDeal } = useQuery({
     queryKey: ["rd_latest_sync"], enabled: !!rdIntegration?.is_active,
-    queryFn: async () => { const { data, error } = await supabase.from("rd_deals").select("updated_at").order("updated_at", { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data; },
+    queryFn: async () => { const { data, error } = await (supabase as any).from("rd_deals").select("updated_at").order("updated_at", { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data; },
   });
 
   const metaConnected = adAccounts.length > 0;

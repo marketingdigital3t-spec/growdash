@@ -53,7 +53,7 @@ export function usePlatformRules() {
     if (query.data.length > 0) return;
     (async () => {
       const rows = DEFAULT_SEEDS.map((r) => ({ ...r, user_id: user.id }));
-      const { error } = await supabase.from("platform_rules").insert(rows);
+      const { error } = await (supabase as any).from("platform_rules").insert(rows);
       if (!error) qc.invalidateQueries({ queryKey: ["platform_rules"] });
     })();
   }, [user, query.data, query.isLoading, qc]);
@@ -68,10 +68,10 @@ export function useUpsertPlatformRule() {
     mutationFn: async (rule: Partial<PlatformRule> & NewPlatformRule) => {
       if (!user) throw new Error("Not authenticated");
       if (rule.id) {
-        const { error } = await supabase.from("platform_rules").update(rule).eq("id", rule.id);
+        const { error } = await (supabase as any).from("platform_rules").update(rule).eq("id", rule.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("platform_rules").insert({ is_fallback: false, ...rule, user_id: user.id });
+        const { error } = await (supabase as any).from("platform_rules").insert({ is_fallback: false, ...rule, user_id: user.id });
         if (error) throw error;
       }
     },
@@ -83,7 +83,7 @@ export function useDeletePlatformRule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("platform_rules").delete().eq("id", id);
+      const { error } = await (supabase as any).from("platform_rules").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform_rules"] }),

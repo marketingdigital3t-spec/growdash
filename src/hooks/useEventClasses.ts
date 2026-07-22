@@ -67,7 +67,7 @@ export function useEventClasses() {
         list.flatMap((c) => [c.rd_funnel_id, c.rd_model_patient_funnel_id]).filter(Boolean) as string[],
       ));
       const { data: funnels } = funnelIds.length > 0
-        ? await supabase.from("rd_funnels").select("id, name").in("id", funnelIds)
+        ? await (supabase as any).from("rd_funnels").select("id, name").in("id", funnelIds)
         : { data: [] as any[] };
       const funnelMap = new Map((funnels || []).map((f: any) => [f.id, f.name]));
 

@@ -26,7 +26,7 @@ export function useAccountUtmMappings() {
   return useQuery({
     queryKey: ["account_utm_mapping"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("account_utm_mapping").select("*");
+      const { data, error } = await (supabase as any).from("account_utm_mapping").select("*");
       if (error) throw error;
       return (data ?? []) as AccountUtmMapping[];
     },

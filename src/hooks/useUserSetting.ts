@@ -56,7 +56,7 @@ export function useUpdateAccountLeadAction() {
           lp_lead_action: v,
           scope,
         }));
-        const { error } = await supabase.from("account_lead_action" as any).insert(rows as any);
+        const { error } = await (supabase as any).from("account_lead_action" as any).insert(rows as any);
         if (error) throw error;
       }
     },

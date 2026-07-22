@@ -91,9 +91,9 @@ export function useRDObservability() {
             .eq("funnel_id", f.id)
             .order("started_at", { ascending: false })
             .limit(1),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since24),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since7),
-          supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since30),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since24),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since7),
+          (supabase as any).from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("updated_at", since30),
         ]);
         const last = lastRunArr?.[0];
         const lastTs = last?.started_at ? new Date(last.started_at).getTime() : 0;

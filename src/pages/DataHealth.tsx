@@ -44,7 +44,7 @@ function useHealth() {
         const matched = new Set<string>();
         for (let i = 0; i < dealIds.length; i += CHUNK) {
           const slice = dealIds.slice(i, i + CHUNK);
-          const { data: rd } = await supabase.from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
+          const { data: rd } = await (supabase as any).from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
           for (const r of (rd || []) as any[]) matched.add(r.rd_deal_id);
         }
         orphanSales = dealIds.filter((id) => !matched.has(id)).length;
@@ -82,7 +82,7 @@ function useHealth() {
         .from("integrations")
         .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
         .order("updated_at", { ascending: false });
-      const { data: lpRows } = await supabase.from("account_lp_config").select("ad_account_id, action_type");
+      const { data: lpRows } = await (supabase as any).from("account_lp_config").select("ad_account_id, action_type");
       const lpMap = new Map((lpRows || []).map((r: any) => [r.ad_account_id, r.action_type]));
       const accountsMissingLpConfig = (accounts || [])
         .filter((a: any) => !lpMap.get(a.id))

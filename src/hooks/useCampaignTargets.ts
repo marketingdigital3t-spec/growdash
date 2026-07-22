@@ -22,7 +22,7 @@ export function useSetCampaignTarget() {
   return useMutation({
     mutationFn: async ({ campaignId, targetCpl }: { campaignId: string; targetCpl: number | null }) => {
       if (targetCpl == null) {
-        const { error } = await supabase.from("campaign_targets").delete().eq("campaign_id", campaignId);
+        const { error } = await (supabase as any).from("campaign_targets").delete().eq("campaign_id", campaignId);
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -59,7 +59,7 @@ export function useAddCampaignChange() {
   return useMutation({
     mutationFn: async ({ campaignId, note, changeType = "manual_note", field, oldValue, newValue }: { campaignId: string; note?: string; changeType?: string; field?: string; oldValue?: string; newValue?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("campaign_changes").insert({
+      const { error } = await (supabase as any).from("campaign_changes").insert({
         campaign_id: campaignId,
         change_type: changeType,
         field, old_value: oldValue, new_value: newValue,

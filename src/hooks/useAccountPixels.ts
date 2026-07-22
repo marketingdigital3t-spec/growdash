@@ -29,8 +29,8 @@ export function useAccountPixels() {
     queryKey: ["account-pixels"],
     queryFn: async () => {
       const [pxRes, evRes] = await Promise.all([
-        supabase.from("ad_account_pixel" as any).select("id, pixel_id, name, ad_account_id").order("name"),
-        supabase.from("pixel_event" as any).select("id, pixel_id, event_name, action_type, is_custom").order("event_name"),
+        (supabase as any).from("ad_account_pixel" as any).select("id, pixel_id, name, ad_account_id").order("name"),
+        (supabase as any).from("pixel_event" as any).select("id, pixel_id, event_name, action_type, is_custom").order("event_name"),
       ]);
       if (pxRes.error) throw pxRes.error;
       if (evRes.error) throw evRes.error;

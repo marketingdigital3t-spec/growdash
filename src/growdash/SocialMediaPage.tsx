@@ -64,7 +64,7 @@ export default function SocialMediaPage() {
   const accountsQuery = useQuery({
     queryKey: ["social_accounts"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_accounts").select("*").order("created_at", { ascending: false });
+      const { data, error } = await (supabase as any).from("social_accounts").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as SocialAccount[];
     },
@@ -77,7 +77,7 @@ export default function SocialMediaPage() {
     queryKey: ["social_media", selectedId, startDate.toISOString(), endDate.toISOString()],
     enabled: !!selectedId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_media").select("*").eq("social_account_id", selectedId).gte("published_at", startDate.toISOString()).lte("published_at", endDate.toISOString()).order("published_at", { ascending: false });
+      const { data, error } = await (supabase as any).from("social_media").select("*").eq("social_account_id", selectedId).gte("published_at", startDate.toISOString()).lte("published_at", endDate.toISOString()).order("published_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as SocialMedia[];
     },
@@ -86,7 +86,7 @@ export default function SocialMediaPage() {
     queryKey: ["social_insights_daily", selectedId, startDate.toISOString(), endDate.toISOString()],
     enabled: !!selectedId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date");
+      const { data, error } = await (supabase as any).from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date");
       if (error) throw error;
       return (data ?? []) as DailyInsight[];
     },

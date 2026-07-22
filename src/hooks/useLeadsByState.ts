@@ -67,7 +67,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
       const PAGE = 1000;
 
       // ------------- 1. Resolve scoped campaigns (used for Meta totals/breakdown & spend) -------------
-      let campQ = supabase.from("campaigns").select("id, ad_account_id");
+      let campQ = (supabase as any).from("campaigns").select("id, ad_account_id");
       if (adAccountId) campQ = campQ.eq("ad_account_id", adAccountId);
       const { data: camps, error: e1 } = await campQ;
       if (e1) throw e1;

@@ -19,7 +19,7 @@ export function useAccountAdsets(adAccountId?: string) {
     queryFn: async (): Promise<AccountAdsetRow[]> => {
       // Resolve campaign_ids scoped to the selected account(s) first,
       // because adsets table doesn't have ad_account_id.
-      let campQ = supabase.from("campaigns").select("id, ad_account_id");
+      let campQ = (supabase as any).from("campaigns").select("id, ad_account_id");
       if (adAccountId) campQ = campQ.eq("ad_account_id", adAccountId);
       const { data: camps, error: e1 } = await campQ;
       if (e1) throw e1;

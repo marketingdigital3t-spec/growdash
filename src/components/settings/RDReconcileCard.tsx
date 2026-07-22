@@ -26,7 +26,7 @@ async function fetchOrphanCount(userId: string): Promise<OrphanCount> {
   const chunk = 200;
   for (let i = 0; i < ids.length; i += chunk) {
     const slice = ids.slice(i, i + chunk);
-    const { data } = await supabase.from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
+    const { data } = await (supabase as any).from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
     for (const r of data || []) present.add(String(r.rd_deal_id));
   }
   const total = ids.filter((id) => !present.has(id)).length;

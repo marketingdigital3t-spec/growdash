@@ -48,7 +48,7 @@ export function AddTopUpDialog({ open, onOpenChange, accountId, accountName }: P
         throw new Error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       }
       const id = `manual_${crypto.randomUUID()}`;
-      const { error } = await supabase.from("account_transactions").insert({
+      const { error } = await (supabase as any).from("account_transactions").insert({
         id,
         ad_account_id: accountId,
         time: parsed.data.date.toISOString(),

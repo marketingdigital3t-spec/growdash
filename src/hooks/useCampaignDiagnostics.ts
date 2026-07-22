@@ -63,7 +63,7 @@ export function useCampaignDiagnostics() {
               )
             )
           `),
-        supabase.from("campaign_targets").select("campaign_id, target_cpl"),
+        (supabase as any).from("campaign_targets").select("campaign_id, target_cpl"),
       ]);
       if (campRes.error) throw campRes.error;
       if (targetRes.error) throw targetRes.error;
