@@ -13,7 +13,7 @@ interface ChartCardProps {
   formatLabel?: (v: any) => string;
 }
 
-export function ChartCard({ title, data, type, dataKey, color = "hsl(221, 83%, 53%)", xKey = "date", formatLabel }: ChartCardProps) {
+export function ChartCard({ title, data, type, dataKey, color = "hsl(var(--primary))", xKey = "date", formatLabel }: ChartCardProps) {
   const formatX = (value: string) => {
     try {
       return format(parseISO(value), "dd/MM", { locale: ptBR });

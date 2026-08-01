@@ -7,10 +7,10 @@ interface PaymentChartProps {
 }
 
 const COLORS = [
-  "hsl(142, 71%, 45%)",
-  "hsl(221, 83%, 53%)",
-  "hsl(38, 92%, 50%)",
-  "hsl(262, 83%, 58%)",
+  "hsl(var(--primary))",
+  "hsl(var(--primary) / .78)",
+  "hsl(var(--primary) / .56)",
+  "hsl(var(--primary) / .34)",
 ];
 
 const LABELS: Record<string, string> = {

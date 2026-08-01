@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   ChevronDown,
@@ -24,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useIsMaster } from "@/hooks/useIsMaster";
+import { usePermissions } from "@/hooks/usePermissions";
 import { BrandLogo, BrandMark } from "@/components/BrandLogo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner";
@@ -35,6 +37,8 @@ import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { supabase } from "@/integrations/supabase/client";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -66,7 +70,17 @@ export default function GrowdashLayout() {
   const { pathname, search } = useLocation();
   const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
+  const { data: sidebarProfile } = useQuery({
+    queryKey: ["sidebar-profile", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("full_name, avatar_url").eq("user_id", user!.id).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
   const { data: isMaster = false } = useIsMaster();
+  const permissions = usePermissions();
   const { data: adAccounts = [] } = useAdAccounts();
   const {
     adAccountId,
@@ -98,14 +112,52 @@ export default function GrowdashLayout() {
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
   useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId });
 
-  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
+  const displayName = sidebarProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
+  const avatarUrl = sidebarProfile?.avatar_url || user?.user_metadata?.avatar_url || "";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]).join("").toUpperCase();
   const effectiveCollapsed = editor ? false : collapsed;
   const showSidebarLabels = !!editor || !effectiveCollapsed || mobileOpen;
-  const campaignWorkspaceTab = new URLSearchParams(search).get("aba") || "campaigns";
-  // Somente a grade do Gerenciador usa viewport travada. Orçamento, IA e
-  // Funis precisam da rolagem normal da página para nunca cortar conteúdo.
-  const isCampaignsWorkspace = pathname.startsWith("/campanhas") && campaignWorkspaceTab === "campaigns";
+  const campaignSearchParams = new URLSearchParams(search);
+  const campaignWorkspaceTab = campaignSearchParams.get("aba") || "campaigns";
+  const campaignAnalysisMode = ["alerts", "intelligence"].includes(campaignSearchParams.get("analise") || "");
+  // Somente a grade do Gerenciador usa viewport travada. Quando uma análise
+  // está aberta, a página volta ao fluxo normal e exibe o conteúdo completo.
+  const isCampaignsWorkspace = pathname.startsWith("/campanhas")
+    && campaignWorkspaceTab === "campaigns"
+    && !campaignAnalysisMode;
+  const permittedPath = (path: string) => {
+    const pathnameOnly = path.split("?")[0];
+    const guarded: Record<string, boolean> = {
+      "/": permissions.canDashboard,
+      "/crm": permissions.canCrm,
+      "/comercial": permissions.canCommercial,
+      "/campanhas": permissions.canCampaigns,
+      "/analise-de-funis": permissions.canFunnels,
+      "/growdash-flow": permissions.canFlow,
+      "/midia-social": permissions.canSocialMedia,
+      "/alertas": permissions.canAlerts,
+      "/automacoes": permissions.canAutomations,
+      "/agenda-turmas": permissions.canClasses,
+      "/leads-incompletos": permissions.canLeads,
+      "/kanban": permissions.canKanban,
+      "/chamados": permissions.canTickets,
+      "/financeiro": permissions.canFinance,
+      "/armazenamento": permissions.canStorage,
+      "/marcas": permissions.canBrands,
+      "/produtos": permissions.canProducts,
+      "/integracoes": permissions.canIntegrations,
+      "/meta-connect": permissions.canMetaConnect,
+      "/anuncios": permissions.canAnnouncements,
+      "/usuarios": permissions.canUsers,
+      "/agentes": permissions.canAgents,
+      "/configuracoes": permissions.canSettings,
+      "/saude-dos-dados": permissions.canDataHealth,
+    };
+    return guarded[pathnameOnly] ?? isMaster;
+  };
+  const visibleSections = NAV_SECTIONS
+    .map((section) => ({ ...section, items: section.items.filter((item) => permittedPath(item.path)) }))
+    .filter((section) => section.items.length > 0);
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
@@ -134,9 +186,9 @@ export default function GrowdashLayout() {
     <div className="brand-shell min-h-screen max-w-full overflow-x-clip text-foreground transition-colors">
       <aside
         className={cn(
-          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-white shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
+          "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
           showSidebarLabels ? "w-[220px]" : "w-16",
-          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
         <div className={cn("flex h-[86px] shrink-0 items-center border-b border-white/5", showSidebarLabels ? "px-4" : "justify-center px-2")}>
@@ -150,7 +202,7 @@ export default function GrowdashLayout() {
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 md:hidden"
+            className="ml-auto rounded-lg p-2 text-white/60 hover:bg-white/10 lg:hidden"
             aria-label="Fechar menu"
           >
             <X className="h-5 w-5" />
@@ -170,8 +222,8 @@ export default function GrowdashLayout() {
                   <p className="mb-2 px-1 text-[9px] font-black uppercase tracking-[.16em] text-white/38">{category}</p>
                   <div className="space-y-1.5">
                     {editor.items.filter((item) => item.category === category).map((item) => (
-                      <button key={item.type} type="button" onClick={() => editor.onToggle(item.type)} className={cn("w-full rounded-lg border px-3 py-2 text-left transition", item.enabled ? "border-[#d9aa34]/45 bg-[#d9aa34]/12" : "border-white/8 bg-white/[.025] hover:bg-white/[.06]")}>
-                        <span className="flex items-center gap-2 text-[11px] font-bold"><span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", item.enabled ? "border-[#efc758] bg-[#d9aa34] text-black" : "border-white/20 text-transparent")}>{item.enabled && <Check className="h-3 w-3" />}</span><span className="truncate">{item.title}</span></span>
+                      <button key={item.type} type="button" onClick={() => editor.onToggle(item.type)} className={cn("w-full rounded-lg border px-3 py-2 text-left transition", item.enabled ? "border-primary/45 bg-primary/10" : "border-white/8 bg-white/[.025] hover:bg-white/[.06]")}>
+                        <span className="flex items-center gap-2 text-[11px] font-bold"><span className={cn("grid h-4 w-4 shrink-0 place-items-center rounded border", item.enabled ? "border-primary bg-primary text-primary-foreground" : "border-white/20 text-transparent")}>{item.enabled && <Check className="h-3 w-3" />}</span><span className="truncate">{item.title}</span></span>
                         <span className="mt-1 block line-clamp-2 pl-6 text-[9px] leading-relaxed text-white/42">{item.description}</span>
                       </button>
                     ))}
@@ -186,7 +238,7 @@ export default function GrowdashLayout() {
           </div>
         ) : <><TooltipProvider delayDuration={180}>
         <nav className={cn("grow overflow-y-auto px-2 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
-          {NAV_SECTIONS.map((section) => (
+          {visibleSections.map((section) => (
             <section key={section.label} className="mb-5">
               {showSidebarLabels && (
                 <button
@@ -209,8 +261,7 @@ export default function GrowdashLayout() {
                     ? location.pathname.startsWith(itemPathname) && currentAnalysis === targetAnalysis
                     : itemPathname === "/"
                       ? location.pathname === "/"
-                      : location.pathname.startsWith(itemPathname)
-                        && !(itemPathname === "/campanhas" && currentAnalysis === "intelligence");
+                      : location.pathname.startsWith(itemPathname);
                   const link = (
                     <NavLink
                       to={item.path}
@@ -220,9 +271,9 @@ export default function GrowdashLayout() {
                         "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
                         showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
                         !showSidebarLabels
-                          ? "border border-transparent bg-transparent text-white shadow-none hover:bg-transparent hover:text-white"
+                          ? "border border-transparent bg-transparent text-primary shadow-none hover:bg-transparent hover:text-primary"
                           : isActive
-                          ? "border border-[#f0bd35]/30 bg-gradient-to-r from-[#6a521e] to-[#3a301a] text-[#ffd868] shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
+                          ? "border border-primary/30 bg-primary/15 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
                           : "border border-transparent text-white/78 hover:bg-white/[.07] hover:text-white",
                       )}
                     >
@@ -233,7 +284,7 @@ export default function GrowdashLayout() {
                   return collapsed && !showSidebarLabels ? (
                     <Tooltip key={item.path}>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" sideOffset={12} className="z-[120] border-[#d3a62e]/35 bg-[#080808] px-3 py-2 text-xs font-semibold text-[#f8df9a] shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
+                      <TooltipContent side="right" sideOffset={12} className="z-[120] border-primary/35 bg-[#080808] px-3 py-2 text-xs font-semibold text-primary shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
                         {item.label}
                       </TooltipContent>
                     </Tooltip>
@@ -261,8 +312,8 @@ export default function GrowdashLayout() {
           <DropdownMenu>
           <DropdownMenuTrigger asChild>
           <button type="button" aria-label="Abrir opções do meu perfil" className={cn("mt-1 flex w-full items-center rounded-lg px-2 py-2 text-left hover:bg-white/[.06]", showSidebarLabels ? "gap-3" : "justify-center")}>
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#f7e6bf] to-[#a37c43] text-[11px] font-extrabold text-[#21190e]">
-              {initials || "GD"}
+            <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-primary/90 to-primary/45 text-[11px] font-extrabold text-primary-foreground">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials || "GD"}
             </span>
             {showSidebarLabels && (
               <div className="min-w-0 grow">
@@ -297,28 +348,28 @@ export default function GrowdashLayout() {
         <button
           type="button"
           aria-label="Fechar navegação"
-          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", effectiveCollapsed ? "md:pl-16" : "md:pl-[220px]")}>
-        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b px-2 py-2 text-white shadow-sm sm:px-5">
+      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", effectiveCollapsed ? "lg:pl-16" : "lg:pl-[220px]")}>
+        <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b px-2 py-2 text-foreground shadow-sm sm:px-5">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="mr-3 rounded-md p-1.5 text-white/75 hover:bg-white/10 md:hidden"
+            className="mr-3 rounded-md p-1.5 text-white/75 hover:bg-white/10 lg:hidden"
             aria-label="Abrir menu"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex md:hidden">
+          <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex lg:hidden">
             <BrandMark className="h-7 w-7 drop-shadow-[0_0_10px_rgba(255,193,45,.25)]" />
           </NavLink>
           <button
             type="button"
             onClick={() => !editor && setCollapsed((value) => !value)}
-            className={cn("mr-4 hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 md:block", editor && "pointer-events-none opacity-30")}
+            className={cn("mr-4 hidden rounded-md p-1.5 text-white/65 hover:bg-white/10 lg:block", editor && "pointer-events-none opacity-30")}
             aria-label={effectiveCollapsed ? "Expandir menu" : "Recolher menu"}
           >
             <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
@@ -326,6 +377,7 @@ export default function GrowdashLayout() {
           <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
             <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} />
           </div>
+          <NotificationCenter />
           <div className="order-2 ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px] lg:order-none">
             <button
               type="button"

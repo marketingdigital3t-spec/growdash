@@ -22,7 +22,7 @@ O pacote preserva:
 ## Limitação importante
 
 Este material é a cópia local mais completa disponível, mas não é um export
-oficial do repositório privado mais recente do Lovable/GitHub. Algumas telas
+oficial do repositório privado mais recente. Algumas telas
 novas são reconstruções visuais e usam dados demonstrativos. Elas devem ser
 religadas ao backend antes de qualquer publicação em produção.
 

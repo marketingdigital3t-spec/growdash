@@ -11,6 +11,7 @@ import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
+import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
 
 const FullDashboard = lazy(() => import("@/pages/Index"));
 const TrafficPage = lazy(() => import("@/growdash/TrafficPage"));
@@ -33,22 +34,24 @@ const SocialMediaPage = lazy(() => import("@/growdash/SocialMediaPage"));
 const AnnouncementsPage = lazy(() => import("@/growdash/AnnouncementsPage"));
 const ModulePage = lazy(() => import("@/growdash/ModulePage"));
 const BrandDiagnosticPage = lazy(() => import("@/growdash/BrandDiagnosticPage"));
+const IntelligenceCenterPage = lazy(() => import("@/growdash/IntelligenceCenterPage"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const SharedLeadReport = lazy(() => import("@/pages/SharedLeadReport"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
 function LoadingModule() {
-  return <div className="grid min-h-[40vh] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-[#d5a62a] border-t-transparent" /></div>;
+  return <div className="grid min-h-[40vh] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 }
 
 function AuthenticatedLayout() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingModule />;
   if (!user) return <Navigate to="/auth" replace />;
-  return <DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider>;
+  return <MfaChallengeGate><DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider></MfaChallengeGate>;
 }
 
 function AccentInitializer({ children }: { children: ReactNode }) {
@@ -59,15 +62,33 @@ function AccentInitializer({ children }: { children: ReactNode }) {
 function RequirePage({ page, children }: { page: PagePermission | "master"; children: ReactNode }) {
   const permissions = usePermissions();
   if (permissions.loading) return <LoadingModule />;
-  const allowed = page === "master"
-    ? permissions.isMaster
-    : page === "dashboard"
-      ? permissions.canDashboard
-      : page === "campaigns"
-        ? permissions.canCampaigns
-        : page === "funnels"
-          ? permissions.canFunnels
-          : permissions.canClasses;
+  const allowedByPage: Record<PagePermission, boolean> = {
+    dashboard: permissions.canDashboard,
+    crm: permissions.canCrm,
+    commercial: permissions.canCommercial,
+    campaigns: permissions.canCampaigns,
+    funnels: permissions.canFunnels,
+    flow: permissions.canFlow,
+    socialMedia: permissions.canSocialMedia,
+    classes: permissions.canClasses,
+    leads: permissions.canLeads,
+    kanban: permissions.canKanban,
+    tickets: permissions.canTickets,
+    alerts: permissions.canAlerts,
+    automations: permissions.canAutomations,
+    finance: permissions.canFinance,
+    storage: permissions.canStorage,
+    brands: permissions.canBrands,
+    products: permissions.canProducts,
+    integrations: permissions.canIntegrations,
+    metaConnect: permissions.canMetaConnect,
+    announcements: permissions.canAnnouncements,
+    users: permissions.canUsers,
+    agents: permissions.canAgents,
+    settings: permissions.canSettings,
+    dataHealth: permissions.canDataHealth,
+  };
+  const allowed = page === "master" ? permissions.isMaster : allowedByPage[page];
 
   if (!allowed) return <Navigate to={firstAllowedPath(permissions)} replace />;
   return <>{children}</>;
@@ -96,45 +117,49 @@ export default function App() {
                   <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />
                   <Route element={<AuthenticatedLayout />}>
                     <Route index element={<RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
-                    <Route path="crm" element={<CrmPage />} />
-                    <Route path="comercial" element={<CommercialPage />} />
+                    <Route path="crm" element={<RequirePage page="crm"><CrmPage /></RequirePage>} />
+                    <Route path="comercial" element={<RequirePage page="commercial"><CommercialPage /></RequirePage>} />
                     <Route path="campanhas" element={<RequirePage page="campaigns">{analytics(<TrafficPage />)}</RequirePage>} />
-                    <Route path="inteligencia" element={<Navigate to="/campanhas?aba=campaigns&analise=intelligence" replace />} />
+                    <Route path="inteligencia" element={<RequirePage page="campaigns">{analytics(<IntelligenceCenterPage />)}</RequirePage>} />
                     <Route path="trafego-pago" element={<Navigate to="/campanhas" replace />} />
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />
                     <Route path="analise-de-funis" element={<RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage>} />
                     <Route path="analise-funis" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="funnels" element={<Navigate to="/analise-de-funis" replace />} />
-                    <Route path="alertas" element={<RequirePage page="master">{analytics(<FullAlerts />)}</RequirePage>} />
+                    <Route path="alertas" element={<RequirePage page="alerts">{analytics(<FullAlerts />)}</RequirePage>} />
                     <Route path="agenda-turmas" element={<RequirePage page="classes">{analytics(<EventClasses />)}</RequirePage>} />
                     <Route path="classes" element={<Navigate to="/agenda-turmas" replace />} />
-                    <Route path="leads-incompletos" element={<RequirePage page="master">{analytics(<IncompleteLeads />)}</RequirePage>} />
-                    <Route path="growdash-flow" element={analytics(<Funnelytics />)} />
-                    <Route path="saude-dos-dados" element={<RequirePage page="master">{analytics(<DataHealth />)}</RequirePage>} />
+                    <Route path="leads-incompletos" element={<RequirePage page="leads">{analytics(<IncompleteLeads />)}</RequirePage>} />
+                    <Route path="automacoes" element={<RequirePage page="automations"><ModulePage /></RequirePage>} />
+                    <Route path="growdash-flow" element={<RequirePage page="flow">{analytics(<Funnelytics />)}</RequirePage>} />
+                    <Route path="saude-dos-dados" element={<RequirePage page="dataHealth">{analytics(<DataHealth />)}</RequirePage>} />
                     <Route path="data-health" element={<Navigate to="/saude-dos-dados" replace />} />
-                    <Route path="produtos" element={<RequirePage page="master">{analytics(<Products />)}</RequirePage>} />
-                    <Route path="configuracoes" element={<RequirePage page="master">{analytics(<FullSettings />)}</RequirePage>} />
+                    <Route path="produtos" element={<RequirePage page="products">{analytics(<Products />)}</RequirePage>} />
+                    <Route path="configuracoes" element={<RequirePage page="settings">{analytics(<FullSettings />)}</RequirePage>} />
                     <Route path="settings" element={<Navigate to="/configuracoes" replace />} />
-                    <Route path="usuarios" element={<RequirePage page="master">{analytics(<FullUsers />)}</RequirePage>} />
+                    <Route path="usuarios" element={<RequirePage page="users">{analytics(<FullUsers />)}</RequirePage>} />
                     <Route path="usuarios/avancado" element={<Navigate to="/usuarios" replace />} />
                     <Route path="users" element={<Navigate to="/usuarios" replace />} />
-                    <Route path="financeiro" element={<FinancePage />} />
-                    <Route path="armazenamento" element={<StoragePage />} />
-                    <Route path="integracoes" element={<IntegrationsPage />} />
+                    <Route path="financeiro" element={<RequirePage page="finance"><FinancePage /></RequirePage>} />
+                    <Route path="armazenamento" element={<RequirePage page="storage"><StoragePage /></RequirePage>} />
+                    <Route path="integracoes" element={<RequirePage page="integrations"><IntegrationsPage /></RequirePage>} />
                     <Route path="perfil" element={<ProfilePage />} />
-                    <Route path="midia-social" element={analytics(<SocialMediaPage />)} />
-                    <Route path="kanban" element={<ModulePage />} />
-                    <Route path="anuncios" element={<RequirePage page="master"><AnnouncementsPage /></RequirePage>} />
-                    <Route path="marcas" element={<ModulePage />} />
-                    <Route path="marcas/:brandId" element={analytics(<BrandDiagnosticPage />)} />
+                    <Route path="midia-social" element={<RequirePage page="socialMedia">{analytics(<SocialMediaPage />)}</RequirePage>} />
+                    <Route path="kanban" element={<RequirePage page="kanban"><ModulePage /></RequirePage>} />
+                    <Route path="chamados" element={<RequirePage page="tickets"><ModulePage /></RequirePage>} />
+                    <Route path="anuncios" element={<RequirePage page="announcements"><AnnouncementsPage /></RequirePage>} />
+                    <Route path="marcas" element={<RequirePage page="brands"><ModulePage /></RequirePage>} />
+                    <Route path="marcas/:brandId" element={<RequirePage page="brands">{analytics(<BrandDiagnosticPage />)}</RequirePage>} />
                     <Route path="marca" element={<Navigate to="/marcas" replace />} />
-                    <Route path="meta-connect" element={<ModulePage />} />
-                    <Route path="agentes" element={<ModulePage />} />
+                    <Route path="meta-connect" element={<RequirePage page="metaConnect"><ModulePage /></RequirePage>} />
+                    <Route path="agentes" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
+                    <Route path="ia-do-funil" element={<Navigate to="/crm?tab=ai" replace />} />
                     <Route path=":module" element={<ModulePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>

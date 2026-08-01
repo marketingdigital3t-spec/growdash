@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   FolderPlus,
   Instagram,
+  ImageUp,
   LayoutGrid,
   ListFilter,
   MailPlus,
@@ -39,6 +40,7 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import AgentsOfficePage from "./AgentsOfficePage";
+import { useToast } from "@/hooks/use-toast";
 
 type TabOption = { id: string; label: string };
 
@@ -130,7 +132,7 @@ function KanbanModule() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {templates.map((template, index) => (
             <article key={template} className="gd-panel overflow-hidden">
-              <div className="h-28 bg-[radial-gradient(circle_at_top_right,rgba(255,196,61,.24),transparent_55%),linear-gradient(135deg,#080808,#151515)] p-4">
+              <div className="h-28 bg-[radial-gradient(circle_at_top_right,rgba(var(--brand-accent-rgb),.24),transparent_55%),linear-gradient(135deg,#080808,#151515)] p-4">
                 <div className="flex gap-2">{[0, 1, 2].map((item) => <span key={item} className="h-14 flex-1 rounded-lg border border-white/10 bg-white/[.04]" />)}</div>
               </div>
               <div className="p-4"><span className="text-[9px] font-black uppercase tracking-[.16em] text-primary">Template {index + 1}</span><h2 className="mt-1 font-black">{template}</h2><button type="button" className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary">Usar template <ArrowRight className="h-4 w-4" /></button></div>
@@ -148,7 +150,7 @@ function TicketsModule() {
   return (
     <Page title="Chamados" description="Abra, acompanhe e resolva problemas por marca." action={<ActionButton primary><Plus className="h-4 w-4" /> Novo chamado</ActionButton>}>
       <Toolbar left={<><ActionButton><FileSpreadsheet className="h-4 w-4" /> Abrir planilha</ActionButton><ActionButton><Zap className="h-4 w-4" /> Sincronizar Sheets</ActionButton></>} right={<ActionButton><Settings2 className="h-4 w-4" /> Todas as marcas</ActionButton>} />
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">{counters.map((label) => <div key={label} className="gd-panel p-4"><span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span><strong className="mt-2 block text-2xl">0</strong></div>)}</div>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">{counters.map((label) => <div key={label} className="gd-panel min-w-0 p-4"><span className="block truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span><strong className="mt-2 block text-2xl">0</strong></div>)}</div>
       <Tabs options={[{ id: "all", label: "Todos" }, { id: "open", label: "Abertos" }, { id: "progress", label: "Em andamento" }]} value={tab} onChange={setTab} />
       <EmptyState icon={<TicketCheck className="h-6 w-6" />} title="Nenhum chamado por aqui" description="Os chamados da marca e do status selecionados aparecerão nesta lista." />
     </Page>
@@ -158,6 +160,8 @@ function TicketsModule() {
 function BrandsModule() {
   const [search, setSearch] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [uploadingBrand, setUploadingBrand] = useState<string | null>(null);
+  const { toast } = useToast();
   const { data: workspace } = useWorkspace();
   const { data: accounts = [] } = useAdAccounts();
   const companiesQuery = useQuery({
@@ -216,6 +220,47 @@ function BrandsModule() {
     }
   };
 
+  const uploadBanner = async (brand: any, file?: File) => {
+    if (!file || !workspace?.id || workspace.id.startsWith("legacy-")) return;
+    if (!file.type.startsWith("image/") || file.size > 10 * 1024 * 1024) {
+      toast({ title: "Banner inválido", description: "Use PNG, JPG ou WebP com até 10 MB.", variant: "destructive" });
+      return;
+    }
+    setUploadingBrand(brand.id);
+    try {
+      let companyId = brand.id;
+      let metadata = brand.metadata || {};
+      if (String(brand.id).startsWith("account-")) {
+        const account = accounts.find((item) => item.id === brand.metadata?.ad_account_id);
+        const { data, error } = await (supabase as any).from("companies").upsert({
+          workspace_id: workspace.id,
+          business_unit_id: account?.business_unit_id || null,
+          name: brand.name,
+          status: "active",
+          metadata,
+        }, { onConflict: "workspace_id,name" }).select("id,metadata").single();
+        if (error) throw error;
+        companyId = data.id;
+        metadata = data.metadata || metadata;
+      }
+      const extension = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `${workspace.id}/${companyId}/banner-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from("brand-banners").upload(path, file, { cacheControl: "3600", upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage.from("brand-banners").getPublicUrl(path);
+      const previousPath = metadata.banner_path;
+      const { error: updateError } = await (supabase as any).from("companies").update({ metadata: { ...metadata, banner_path: path, banner_url: publicData.publicUrl }, updated_at: new Date().toISOString() }).eq("id", companyId).eq("workspace_id", workspace.id);
+      if (updateError) throw updateError;
+      if (previousPath && previousPath !== path) await supabase.storage.from("brand-banners").remove([previousPath]);
+      await companiesQuery.refetch();
+      toast({ title: "Banner atualizado", description: `A identidade visual de ${brand.name} foi salva.` });
+    } catch (error) {
+      toast({ title: "Não foi possível alterar o banner", description: error instanceof Error ? error.message : "Tente novamente.", variant: "destructive" });
+    } finally {
+      setUploadingBrand(null);
+    }
+  };
+
   return (
     <Page title="Marcas" description="Cada conta de anúncio integrada gera automaticamente uma marca com diagnóstico e histórico próprios." action={<Link to="/integracoes" className="gold-action"><Plus className="h-4 w-4" /> Integrar conta</Link>}>
       <Toolbar
@@ -224,9 +269,13 @@ function BrandsModule() {
       />
       {brands.length > 0 ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {brands.map((brand: any) => <article key={brand.id} className="gd-panel group overflow-hidden">
-          <div className="relative h-28 border-b border-border bg-[radial-gradient(circle_at_18%_12%,hsl(var(--primary)/.28),transparent_36%),radial-gradient(circle_at_85%_20%,hsl(var(--primary)/.12),transparent_42%),linear-gradient(145deg,#050505,#11100d)]">
+          <div className="relative h-32 border-b border-border bg-[radial-gradient(circle_at_18%_12%,hsl(var(--primary)/.28),transparent_36%),radial-gradient(circle_at_85%_20%,hsl(var(--primary)/.12),transparent_42%),linear-gradient(145deg,#050505,#11100d)] bg-cover bg-center" style={brand.metadata?.banner_url ? { backgroundImage: `linear-gradient(90deg,rgba(0,0,0,.62),rgba(0,0,0,.08)),url(${brand.metadata.banner_url})` } : undefined}>
             <span className="absolute left-4 top-4 grid h-11 w-11 place-items-center rounded-2xl border border-primary/25 bg-black/55 text-primary shadow-[0_0_24px_hsl(var(--primary)/.15)]"><UsersRound className="h-5 w-5" /></span>
             <span className="absolute right-4 top-4 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase text-emerald-400">Integrada</span>
+            <label className="absolute bottom-3 right-3 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-white/20 bg-black/70 px-2.5 text-[9px] font-black text-white backdrop-blur-md transition hover:bg-black/85">
+              <ImageUp className="h-3.5 w-3.5" />{uploadingBrand === brand.id ? "Enviando…" : "Alterar banner"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingBrand === brand.id} className="sr-only" onChange={(event) => { void uploadBanner(brand, event.target.files?.[0]); event.currentTarget.value = ""; }} />
+            </label>
           </div>
           <div className="p-4">
             <h2 className="truncate text-sm font-black" title={brand.name}>{brand.name}</h2>

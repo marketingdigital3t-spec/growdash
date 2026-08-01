@@ -81,7 +81,7 @@ export function aggregateUnifiedMetrics(insights: InsightRow[], deals: RDDealLit
     clicks: acc.clicks + safe(row.clicks),
     leads: acc.leads + safe(row.leads),
   }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
-  const validSales = salesRows.filter((sale) => sale.status === "confirmed" || sale.status === "pending");
+  const validSales = salesRows.filter((sale) => sale.status === "confirmed");
   const sales = validSales.reduce((sum, sale) => sum + Math.max(0, safe(sale.quantity)), 0);
   const revenue = validSales.reduce((sum, sale) => sum + safe(sale.net_revenue), 0);
   const qualifiedLeads = deals.filter((deal) => deal.win || ["sql", "opportunity", "client"].includes(deal.stage_bucket)).length;

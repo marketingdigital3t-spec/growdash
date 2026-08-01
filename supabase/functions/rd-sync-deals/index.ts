@@ -6,21 +6,92 @@ const corsHeaders = {
 };
 
 function normalize(s: string) {
-  return s.toLowerCase().replace(/\[.*?\]/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+  return s
+    .toLowerCase()
+    .replace(/\[.*?\]/g, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function keyNorm(s: string) {
-  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
 }
 
 const DDD_TO_UF: Record<string, string> = {
-  "11":"SP","12":"SP","13":"SP","14":"SP","15":"SP","16":"SP","17":"SP","18":"SP","19":"SP",
-  "21":"RJ","22":"RJ","24":"RJ","27":"ES","28":"ES","31":"MG","32":"MG","33":"MG","34":"MG","35":"MG","37":"MG","38":"MG",
-  "41":"PR","42":"PR","43":"PR","44":"PR","45":"PR","46":"PR","47":"SC","48":"SC","49":"SC","51":"RS","53":"RS","54":"RS","55":"RS",
-  "61":"DF","62":"GO","64":"GO","63":"TO","65":"MT","66":"MT","67":"MS","68":"AC","69":"RO","71":"BA","73":"BA","74":"BA","75":"BA","77":"BA","79":"SE",
-  "81":"PE","87":"PE","82":"AL","83":"PB","84":"RN","85":"CE","88":"CE","86":"PI","89":"PI","91":"PA","93":"PA","94":"PA","92":"AM","97":"AM","95":"RR","96":"AP","98":"MA","99":"MA",
+  "11": "SP",
+  "12": "SP",
+  "13": "SP",
+  "14": "SP",
+  "15": "SP",
+  "16": "SP",
+  "17": "SP",
+  "18": "SP",
+  "19": "SP",
+  "21": "RJ",
+  "22": "RJ",
+  "24": "RJ",
+  "27": "ES",
+  "28": "ES",
+  "31": "MG",
+  "32": "MG",
+  "33": "MG",
+  "34": "MG",
+  "35": "MG",
+  "37": "MG",
+  "38": "MG",
+  "41": "PR",
+  "42": "PR",
+  "43": "PR",
+  "44": "PR",
+  "45": "PR",
+  "46": "PR",
+  "47": "SC",
+  "48": "SC",
+  "49": "SC",
+  "51": "RS",
+  "53": "RS",
+  "54": "RS",
+  "55": "RS",
+  "61": "DF",
+  "62": "GO",
+  "64": "GO",
+  "63": "TO",
+  "65": "MT",
+  "66": "MT",
+  "67": "MS",
+  "68": "AC",
+  "69": "RO",
+  "71": "BA",
+  "73": "BA",
+  "74": "BA",
+  "75": "BA",
+  "77": "BA",
+  "79": "SE",
+  "81": "PE",
+  "87": "PE",
+  "82": "AL",
+  "83": "PB",
+  "84": "RN",
+  "85": "CE",
+  "88": "CE",
+  "86": "PI",
+  "89": "PI",
+  "91": "PA",
+  "93": "PA",
+  "94": "PA",
+  "92": "AM",
+  "97": "AM",
+  "95": "RR",
+  "96": "AP",
+  "98": "MA",
+  "99": "MA",
 };
 function phoneToUF(phone: string | null | undefined): string | null {
   if (!phone) return null;
@@ -34,7 +105,8 @@ function findCustomField(sources: any[], aliases: string[]): string | null {
   for (const arr of sources) {
     if (!Array.isArray(arr)) continue;
     for (const f of arr) {
-      const label = f?.custom_field?.label || f?.label || f?.custom_field_id?.label || f?.name || "";
+      const label =
+        f?.custom_field?.label || f?.label || f?.custom_field_id?.label || f?.name || "";
       const k = keyNorm(label);
       if (wanted.includes(k)) {
         const v = f?.value ?? f?.values ?? null;
@@ -62,12 +134,25 @@ function extractPaymentMethod(sources: any[]): string | null {
     "paymentmethod",
   ]);
   if (!raw) return null;
-  const n = String(raw).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const n = String(raw)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
   if (!n) return null;
   if (n.includes("pix")) return "pix";
   if (n.includes("boleto")) return "boleto";
   if (n.includes("cart") || n.includes("credit") || n.includes("debit")) return "cartao";
-  if (n.includes("transfer") || n.includes("ted") || n.includes("doc") || n.includes("dinheiro") || n.includes("cash") || n.includes("especie") || n.includes("outro")) return "outros";
+  if (
+    n.includes("transfer") ||
+    n.includes("ted") ||
+    n.includes("doc") ||
+    n.includes("dinheiro") ||
+    n.includes("cash") ||
+    n.includes("especie") ||
+    n.includes("outro")
+  )
+    return "outros";
   return "outros";
 }
 
@@ -87,7 +172,12 @@ function extractConfiguredFields(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const c of configs) {
-    const sources = c.rd_source === "contact" ? [contactCfs] : c.rd_source === "deal" ? [dealCfs] : [dealCfs, contactCfs];
+    const sources =
+      c.rd_source === "contact"
+        ? [contactCfs]
+        : c.rd_source === "deal"
+          ? [dealCfs]
+          : [dealCfs, contactCfs];
     const aliases = [c.rd_field_label, ...(c.rd_field_aliases || [])].filter(Boolean);
     const v = findCustomField(sources, aliases);
     if (v != null && String(v).trim() !== "") out[c.key] = String(v).trim();
@@ -115,15 +205,34 @@ function asArray(value: unknown): any[] {
 function isWonDeal(d: any): boolean {
   if (d.win === true) return true;
   const stage = (d.deal_stage?.name || "").toLowerCase();
-  return stage.includes("venda realizada") || stage.includes("ganho") || stage.includes("won") || stage.includes("fechado");
+  return (
+    stage.includes("venda realizada") ||
+    stage.includes("ganho") ||
+    stage.includes("won") ||
+    stage.includes("fechado")
+  );
 }
 
-function bucketFromStage(stageName: string | null | undefined, win: boolean, lost: boolean): string {
+function bucketFromStage(
+  stageName: string | null | undefined,
+  win: boolean,
+  lost: boolean,
+): string {
   if (win) return "client";
   if (lost) return "lost";
-  const s = (stageName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const s = (stageName || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
   if (s.includes("perdido") || s.includes("lost")) return "lost";
-  if (s.includes("venda") || s.includes("ganho") || s.includes("won") || s.includes("cliente") || s.includes("fechado")) return "client";
+  if (
+    s.includes("venda") ||
+    s.includes("ganho") ||
+    s.includes("won") ||
+    s.includes("cliente") ||
+    s.includes("fechado")
+  )
+    return "client";
   if (s.includes("oport") || s.includes("negoc") || s.includes("propos")) return "opportunity";
   if (s.includes("sql") || s.includes("qualif")) return "sql";
   if (s.includes("mql") || s.includes("marketing")) return "mql";
@@ -155,7 +264,9 @@ async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
         const ra = parseInt(r.headers.get("Retry-After") || "0", 10);
         const wait = ra > 0 ? ra * 1000 : backoffs[i];
         metrics.retries++;
-        console.log(`[retry] ${r.status} on ${url.split("?")[0]} — waiting ${wait}ms (attempt ${i + 1}/${attempts})`);
+        console.log(
+          `[retry] ${r.status} on ${url.split("?")[0]} — waiting ${wait}ms (attempt ${i + 1}/${attempts})`,
+        );
         await sleep(wait);
         continue;
       }
@@ -164,7 +275,9 @@ async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
       lastErr = e;
       if (i < attempts - 1) {
         metrics.retries++;
-        console.log(`[retry] network error — waiting ${backoffs[i]}ms (attempt ${i + 1}/${attempts})`);
+        console.log(
+          `[retry] network error — waiting ${backoffs[i]}ms (attempt ${i + 1}/${attempts})`,
+        );
         await sleep(backoffs[i]);
         continue;
       }
@@ -178,46 +291,64 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const startedAt = Date.now();
-  metrics.retries = 0; metrics.errors = 0; metrics.details = 0; metrics.contacts = 0;
+  metrics.retries = 0;
+  metrics.errors = 0;
+  metrics.details = 0;
+  metrics.contacts = 0;
   let runId: string | null = null;
   let userId: string | null = null;
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
   let caller: any = null;
 
   async function finishRun(opts: {
     status: "success" | "partial" | "failed";
-    deals: number; created: number; updated: number; skipped: number;
+    deals: number;
+    created: number;
+    updated: number;
+    skipped: number;
     errorMessage?: string | null;
     funnelName?: string;
   }) {
     const duration = Date.now() - startedAt;
     if (runId) {
-      await admin.from("sync_runs").update({
-        finished_at: new Date().toISOString(),
-        duration_ms: duration,
-        status: opts.status,
-        deals_fetched: opts.deals,
-        created_count: opts.created,
-        updated_count: opts.updated,
-        skipped_count: opts.skipped,
-        details_fetched: metrics.details,
-        contacts_fetched: metrics.contacts,
-        retries_total: metrics.retries,
-        errors_total: metrics.errors,
-        error_message: opts.errorMessage ?? null,
-      }).eq("id", runId);
+      await admin
+        .from("sync_runs")
+        .update({
+          finished_at: new Date().toISOString(),
+          duration_ms: duration,
+          status: opts.status,
+          deals_fetched: opts.deals,
+          created_count: opts.created,
+          updated_count: opts.updated,
+          skipped_count: opts.skipped,
+          details_fetched: metrics.details,
+          contacts_fetched: metrics.contacts,
+          retries_total: metrics.retries,
+          errors_total: metrics.errors,
+          error_message: opts.errorMessage ?? null,
+        })
+        .eq("id", runId);
     }
     // Alertas
     if (userId && (opts.status !== "success" || duration > 60000)) {
       const severity = opts.status === "failed" ? "critical" : "warning";
-      const message = opts.status === "failed"
-        ? `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} falhou: ${opts.errorMessage || "erro desconhecido"}`
-        : `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} demorou ${(duration/1000).toFixed(1)}s (acima do esperado).`;
+      const message =
+        opts.status === "failed"
+          ? `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} falhou: ${opts.errorMessage || "erro desconhecido"}`
+          : `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} demorou ${(duration / 1000).toFixed(1)}s (acima do esperado).`;
       await admin.from("alerts").insert({
-        user_id: userId, alert_type: "rd_sync", severity, message,
+        user_id: userId,
+        alert_type: "rd_sync",
+        severity,
+        message,
       });
     }
-    console.log(`[sync_runs] finished status=${opts.status} duration=${duration}ms retries=${metrics.retries} errors=${metrics.errors} details=${metrics.details} contacts=${metrics.contacts}`);
+    console.log(
+      `[sync_runs] finished status=${opts.status} duration=${duration}ms retries=${metrics.retries} errors=${metrics.errors} details=${metrics.details} contacts=${metrics.contacts}`,
+    );
   }
 
   try {
@@ -239,38 +370,43 @@ Deno.serve(async (req) => {
     let deal_ids = body?.deal_ids;
     if (!funnel_id) {
       return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autenticado" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Service-role path (cron/orchestrator): trust supplied user_id when bearer matches SERVICE_ROLE_KEY
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const isServiceCall = !!(cron_trigger && service_user_id && serviceKey && authHeader === `Bearer ${serviceKey}`);
+    const isServiceCall = !!(
+      cron_trigger &&
+      service_user_id &&
+      serviceKey &&
+      authHeader === `Bearer ${serviceKey}`
+    );
 
     if (isServiceCall) {
       userId = String(service_user_id);
     } else {
-      caller = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY")!,
-        { global: { headers: { Authorization: authHeader } } },
-      );
+      caller = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
       const { data: userRes } = await caller.auth.getUser();
       userId = userRes.user?.id || null;
       if (!userId) {
         return new Response(JSON.stringify({ error: "Usuário inválido" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
-
 
     // Chamadas manuais usam o mesmo cliente com RLS da interface. Assim,
     // proprietários, masters e usuários explicitamente atribuídos enxergam
@@ -285,12 +421,14 @@ Deno.serve(async (req) => {
 
     if (!funnel) {
       return new Response(JSON.stringify({ error: "Funil não encontrado" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (!funnel.rd_funnel_id) {
       return new Response(JSON.stringify({ error: "Funil sem rd_funnel_id vinculado" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -307,9 +445,15 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!integration?.api_token) {
-      return new Response(JSON.stringify({ error: "RD Station CRM não conectado. Configure o token nas Configurações." }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: "RD Station CRM não conectado. Configure o token nas Configurações.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
     const token = integration.api_token;
 
@@ -327,16 +471,25 @@ Deno.serve(async (req) => {
 
     // Cria sync_run (status=running)
     const isReprocess = Array.isArray(deal_ids) && deal_ids.length > 0;
-    const { data: runRow } = await admin.from("sync_runs").insert({
-      user_id: userId,
-      funnel_id: funnel.id,
-      provider: "rd_station_crm",
-      status: "running",
-      trigger_source: isReprocess ? "reprocess" : (trigger_source || (realtime ? "auto_realtime" : "manual")),
-    }).select("id").single();
+    const { data: runRow } = await admin
+      .from("sync_runs")
+      .insert({
+        user_id: userId,
+        funnel_id: funnel.id,
+        provider: "rd_station_crm",
+        status: "running",
+        trigger_source: isReprocess
+          ? "reprocess"
+          : trigger_source || (realtime ? "auto_realtime" : "manual"),
+      })
+      .select("id")
+      .single();
     runId = runRow?.id || null;
 
-    const { data: products } = await admin.from("products").select("id, name, tax_rate").eq("user_id", userId);
+    const { data: products } = await admin
+      .from("products")
+      .select("id, name, tax_rate")
+      .eq("user_id", userId);
     const productList = products || [];
 
     const { data: fieldConfigsRows } = await admin
@@ -358,12 +511,23 @@ Deno.serve(async (req) => {
         const stagesArr: any[] = sjson?.deal_stages || sjson || [];
         const rows = stagesArr.map((s, idx) => {
           const name = String(s?.name || "");
-          const lname = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const isWon = Boolean(s?.win ?? s?.is_won ?? s?.won)
-            || lname.includes("ganho") || lname.includes("venda real") || lname.includes("venda concl")
-            || lname.includes("fechado ganho") || lname.includes("won") || lname.includes("cliente");
-          const isLost = Boolean(s?.loss ?? s?.is_lost ?? s?.lost)
-            || lname.includes("perdido") || lname.includes("perda") || lname.includes("lost");
+          const lname = name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+          const isWon =
+            Boolean(s?.win ?? s?.is_won ?? s?.won) ||
+            lname.includes("ganho") ||
+            lname.includes("venda real") ||
+            lname.includes("venda concl") ||
+            lname.includes("fechado ganho") ||
+            lname.includes("won") ||
+            lname.includes("cliente");
+          const isLost =
+            Boolean(s?.loss ?? s?.is_lost ?? s?.lost) ||
+            lname.includes("perdido") ||
+            lname.includes("perda") ||
+            lname.includes("lost");
           const ord = Number(s?.order ?? s?.position ?? idx);
           const sid = String(s?.id || s?._id);
           stageOrderMap.set(sid, ord);
@@ -383,7 +547,9 @@ Deno.serve(async (req) => {
           };
         });
         if (rows.length > 0) {
-          await admin.from("rd_funnel_stages").upsert(rows, { onConflict: "rd_funnel_id,rd_stage_id" });
+          await admin
+            .from("rd_funnel_stages")
+            .upsert(rows, { onConflict: "rd_funnel_id,rd_stage_id" });
           console.log(`[stages] sincronizadas ${rows.length} etapas reais do funil ${funnel.name}`);
         }
       } else {
@@ -393,22 +559,39 @@ Deno.serve(async (req) => {
       console.log(`[stages] erro: ${(e as Error).message}`);
     }
 
-    let totalCreated = 0, totalUpdated = 0, totalSkipped = 0, totalDeals = 0;
+    let totalCreated = 0,
+      totalUpdated = 0,
+      totalSkipped = 0,
+      totalDeals = 0;
+    let reconciledDeleted = 0;
+    const seenAnalyticsDealIds = new Set<string>();
     let debugLogged = false;
-
 
     async function processDeal(d: any) {
       const id = String(d.id || d._id);
       let detail: any = d;
       let detailOk = false;
       try {
-        const dr = await fetchWithRetry(`https://crm.rdstation.com/api/v1/deals/${id}?token=${encodeURIComponent(token)}`);
-        if (dr.ok) { detail = { ...d, ...(await dr.json()) }; metrics.details++; detailOk = true; }
-        else { console.log(`[deal ${id}] detail FAILED status=${dr.status}`); metrics.errors++; }
-      } catch (e) { console.log(`[deal ${id}] detail threw: ${(e as Error).message}`); metrics.errors++; }
+        const dr = await fetchWithRetry(
+          `https://crm.rdstation.com/api/v1/deals/${id}?token=${encodeURIComponent(token)}`,
+        );
+        if (dr.ok) {
+          detail = { ...d, ...(await dr.json()) };
+          metrics.details++;
+          detailOk = true;
+        } else {
+          console.log(`[deal ${id}] detail FAILED status=${dr.status}`);
+          metrics.errors++;
+        }
+      } catch (e) {
+        console.log(`[deal ${id}] detail threw: ${(e as Error).message}`);
+        metrics.errors++;
+      }
       let dealContacts: any[] = [];
       try {
-        const cr = await fetchWithRetry(`https://crm.rdstation.com/api/v1/deals/${id}/contacts?token=${encodeURIComponent(token)}`);
+        const cr = await fetchWithRetry(
+          `https://crm.rdstation.com/api/v1/deals/${id}/contacts?token=${encodeURIComponent(token)}`,
+        );
         if (cr.ok) {
           const cj = await cr.json();
           dealContacts = asArray(cj?.contacts ?? cj?.data ?? cj);
@@ -416,21 +599,34 @@ Deno.serve(async (req) => {
         } else {
           console.log(`[deal ${id}] /contacts FAILED status=${cr.status}`);
         }
-      } catch (e) { console.log(`[deal ${id}] /contacts threw: ${(e as Error).message}`); }
+      } catch (e) {
+        console.log(`[deal ${id}] /contacts threw: ${(e as Error).message}`);
+      }
 
       // Fallback: enriquecer contatos inline do detalhe via /contacts/{id} quando não vier nome
-      const inlineContacts: any[] = asArray(detail.contacts ?? detail.set_contacts ?? detail.deal_contacts);
+      const inlineContacts: any[] = asArray(
+        detail.contacts ?? detail.set_contacts ?? detail.deal_contacts,
+      );
       const haveNamed = dealContacts.some((c) => cleanContactName(c?.name ?? c?.contact?.name));
       if (!haveNamed && inlineContacts.length > 0) {
         const enriched: any[] = [];
         for (const c of inlineContacts.slice(0, 3)) {
           const cid = c?.id || c?._id || c?.contact_id || c?.contact?.id || c?.contact?._id;
-          if (!cid) { if (c?.name) enriched.push(c); continue; }
+          if (!cid) {
+            if (c?.name) enriched.push(c);
+            continue;
+          }
           try {
-            const r = await fetchWithRetry(`https://crm.rdstation.com/api/v1/contacts/${cid}?token=${encodeURIComponent(token)}`);
-            if (r.ok) { const cj = await r.json(); enriched.push(cj || c); }
-            else enriched.push(c);
-          } catch { enriched.push(c); }
+            const r = await fetchWithRetry(
+              `https://crm.rdstation.com/api/v1/contacts/${cid}?token=${encodeURIComponent(token)}`,
+            );
+            if (r.ok) {
+              const cj = await r.json();
+              enriched.push(cj || c);
+            } else enriched.push(c);
+          } catch {
+            enriched.push(c);
+          }
         }
         if (enriched.length > 0) dealContacts = enriched;
       }
@@ -438,12 +634,17 @@ Deno.serve(async (req) => {
       if (!debugLogged && detailOk) {
         debugLogged = true;
         const cfs = detail.deal_custom_fields || detail.custom_fields || [];
-        const labels = (Array.isArray(cfs) ? cfs : []).map((f: any) =>
-          ({ label: f?.custom_field?.label || f?.label || f?.name, value: f?.value ?? f?.values }));
+        const labels = (Array.isArray(cfs) ? cfs : []).map((f: any) => ({
+          label: f?.custom_field?.label || f?.label || f?.name,
+          value: f?.value ?? f?.values,
+        }));
         console.log(`[rd-debug ${id}] deal keys=`, Object.keys(detail).join(","));
         console.log(`[rd-debug ${id}] deal_custom_fields=`, JSON.stringify(labels).slice(0, 1500));
         console.log(`[rd-debug ${id}] contact keys=`, Object.keys(detail.contact || {}).join(","));
-        console.log(`[rd-debug ${id}] _contacts sample=`, JSON.stringify(dealContacts[0] || null).slice(0, 800));
+        console.log(
+          `[rd-debug ${id}] _contacts sample=`,
+          JSON.stringify(dealContacts[0] || null).slice(0, 800),
+        );
       }
       return { ...detail, _contacts: dealContacts };
     }
@@ -457,43 +658,78 @@ Deno.serve(async (req) => {
       // A API do RD envia `win: false` também para negócios ainda abertos.
       // Portanto, perda só pode ser inferida pela etapa de perda ou por um
       // motivo de perda explícito; caso contrário o funil inteiro fica errado.
-      const lost = !won && (Boolean(stageId && stageLostMap.get(stageId)) || d.deal_lost_reason != null);
+      const lost =
+        !won && (Boolean(stageId && stageLostMap.get(stageId)) || d.deal_lost_reason != null);
       const bucket = bucketFromStage(stageName, won, lost);
       const lostReason = d.deal_lost_reason?.name || d.deal_lost_reason || null;
 
       const baseContact = d.contact || d.deal_contact || {};
       const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
       const inline = inlineContacts.length > 0 ? inlineContacts[0] : {};
-      const firstContact = Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
+      const firstContact =
+        Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
       const nestedContact = firstContact.contact || inline.contact || baseContact.contact || {};
       const contact = { ...inline, ...firstContact, ...baseContact };
-      const phones = (baseContact.phones?.length ? baseContact.phones : (firstContact.phones?.length ? firstContact.phones : (nestedContact.phones?.length ? nestedContact.phones : inline.phones))) || [];
-      const emails = (baseContact.emails?.length ? baseContact.emails : (firstContact.emails?.length ? firstContact.emails : (nestedContact.emails?.length ? nestedContact.emails : inline.emails))) || [];
+      const phones =
+        (baseContact.phones?.length
+          ? baseContact.phones
+          : firstContact.phones?.length
+            ? firstContact.phones
+            : nestedContact.phones?.length
+              ? nestedContact.phones
+              : inline.phones) || [];
+      const emails =
+        (baseContact.emails?.length
+          ? baseContact.emails
+          : firstContact.emails?.length
+            ? firstContact.emails
+            : nestedContact.emails?.length
+              ? nestedContact.emails
+              : inline.emails) || [];
 
-      const rawName = firstString(baseContact.name, firstContact.name, nestedContact.name, inline.name, d.contact_name, d.deal_lead?.name, d.name);
+      const rawName = firstString(
+        baseContact.name,
+        firstContact.name,
+        nestedContact.name,
+        inline.name,
+        d.contact_name,
+        d.deal_lead?.name,
+        d.name,
+      );
       const contactName = cleanContactName(rawName);
-      const contactPhone = phones.length > 0 ? (phones[0]?.phone || phones[0] || null) : (baseContact.phone || firstContact.phone || nestedContact.phone || null);
-      const contactEmail = emails.length > 0
-        ? (emails[0]?.email || emails[0] || null)
-        : (baseContact.email || firstContact.email || nestedContact.email || inline.email || null);
+      const contactPhone =
+        phones.length > 0
+          ? phones[0]?.phone || phones[0] || null
+          : baseContact.phone || firstContact.phone || nestedContact.phone || null;
+      const contactEmail =
+        emails.length > 0
+          ? emails[0]?.email || emails[0] || null
+          : baseContact.email || firstContact.email || nestedContact.email || inline.email || null;
 
-      const contactCustomFields = firstContact?.contact_custom_fields || baseContact?.contact_custom_fields || [];
+      const contactCustomFields =
+        firstContact?.contact_custom_fields || baseContact?.contact_custom_fields || [];
       const dealCustomFields = d.deal_custom_fields || d.custom_fields || d.cf_custom_fields || [];
       const allCfSources = [dealCustomFields, contactCustomFields];
 
       const waPhone = phones?.[0]?.whatsapp_full_internacional || null;
-      const contactState = contact.state || contact.address_state
-        || findCustomField(allCfSources, ["state", "estado", "uf", "lead_state", "estadouf"])
-        || phoneToUF(waPhone)
-        || phoneToUF(contactPhone)
-        || null;
-      const contactCity = contact.city || contact.address_city
-        || findCustomField(allCfSources, ["city", "cidade", "lead_city", "cidadelead"]) || null;
+      const contactState =
+        contact.state ||
+        contact.address_state ||
+        findCustomField(allCfSources, ["state", "estado", "uf", "lead_state", "estadouf"]) ||
+        phoneToUF(waPhone) ||
+        phoneToUF(contactPhone) ||
+        null;
+      const contactCity =
+        contact.city ||
+        contact.address_city ||
+        findCustomField(allCfSources, ["city", "cidade", "lead_city", "cidadelead"]) ||
+        null;
 
-      const saleDate = d.closed_at
-        ? toBrtDateString(d.closed_at)
-        : toBrtDateString(new Date().toISOString());
-
+      // Nunca use "agora" como data de uma venda histórica. O fechamento é
+      // a fonte oficial; os fallbacks preservam a data original do negócio.
+      const saleTimestamp =
+        d.closed_at || d.updated_at || d.last_activity_at || d.created_at || new Date().toISOString();
+      const saleDate = toBrtDateString(saleTimestamp);
 
       let productId: string | null = null;
       let rdProductName: string | null = null;
@@ -503,8 +739,10 @@ Deno.serve(async (req) => {
       if (rdProductName && productList.length > 0) {
         const norm = normalize(rdProductName);
         let match = productList.find((p) => normalize(p.name) === norm);
-        if (!match && norm.includes("online")) match = productList.find((p) => normalize(p.name).includes("online"));
-        if (!match && norm.includes("presencial")) match = productList.find((p) => normalize(p.name).includes("presencial"));
+        if (!match && norm.includes("online"))
+          match = productList.find((p) => normalize(p.name).includes("online"));
+        if (!match && norm.includes("presencial"))
+          match = productList.find((p) => normalize(p.name).includes("presencial"));
         if (!match) match = productList.find((p) => norm.includes(normalize(p.name)));
         if (match) {
           productId = match.id;
@@ -515,18 +753,36 @@ Deno.serve(async (req) => {
         }
       }
 
-      const rdCampaignName = d.campaign?.name || (typeof d.campaign === "string" ? d.campaign : null) || d.deal_source?.name || null;
+      const rdCampaignName =
+        d.campaign?.name ||
+        (typeof d.campaign === "string" ? d.campaign : null) ||
+        d.deal_source?.name ||
+        null;
 
       const cfSources = [dealCustomFields, contactCustomFields];
-      const utms = d.utms || d.utm || baseContact?.utms || firstContact?.utms || d.deal_source || d.lead_origin || {};
+      const utms =
+        d.utms ||
+        d.utm ||
+        baseContact?.utms ||
+        firstContact?.utms ||
+        d.deal_source ||
+        d.lead_origin ||
+        {};
       const pickUtm = (name: string, aliases: string[]) =>
-        d[`utm_${name}`] || utms?.[name] || utms?.[`utm_${name}`] || findCustomField(cfSources, aliases);
+        d[`utm_${name}`] ||
+        utms?.[name] ||
+        utms?.[`utm_${name}`] ||
+        findCustomField(cfSources, aliases);
 
-      const utm_source   = pickUtm("source",   ["utmsource",   "utm_source",   "source",   "fonte"]) || null;
-      const utm_medium   = pickUtm("medium",   ["utmmedium",   "utm_medium",   "medium",   "midia", "mídia"]) || null;
-      const utm_campaign = pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campanha"]) || null;
-      const utm_term     = pickUtm("term",     ["utmterm",     "utm_term",     "term",     "termo"]) || null;
-      const utm_content  = pickUtm("content",  ["utmcontent",  "utm_content",  "content",  "conteudo", "conteúdo"]) || null;
+      const utm_source = pickUtm("source", ["utmsource", "utm_source", "source", "fonte"]) || null;
+      const utm_medium =
+        pickUtm("medium", ["utmmedium", "utm_medium", "medium", "midia", "mídia"]) || null;
+      const utm_campaign =
+        pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campanha"]) || null;
+      const utm_term = pickUtm("term", ["utmterm", "utm_term", "term", "termo"]) || null;
+      const utm_content =
+        pickUtm("content", ["utmcontent", "utm_content", "content", "conteudo", "conteúdo"]) ||
+        null;
 
       const leadEntryDate = d.created_at
         ? new Date(d.created_at).toISOString().split("T")[0]
@@ -534,56 +790,80 @@ Deno.serve(async (req) => {
 
       const dealOwnerName = d.user?.name || d.deal_user?.name || d.owner?.name || null;
 
-      const customFieldsExtracted = extractConfiguredFields(fieldConfigs, dealCustomFields, contactCustomFields);
+      const customFieldsExtracted = extractConfiguredFields(
+        fieldConfigs,
+        dealCustomFields,
+        contactCustomFields,
+      );
 
       // Upsert rd_deals (todos os deals, não apenas ganhos)
       try {
-        await admin.from("rd_deals").upsert({
-          user_id: userId!,
-          ad_account_id: funnel!.ad_account_id,
-          rd_funnel_id: funnel!.id,
-          rd_deal_id: rdDealId,
-          rd_stage_id: stageId,
-          rd_stage_name: stageName,
-          rd_stage_order: stageId && stageOrderMap.has(stageId) ? stageOrderMap.get(stageId) : null,
-          deal_owner_name: dealOwnerName,
-          rd_product_name: rdProductName,
-          stage_bucket: bucket,
-          win: won,
-          lost_reason: lostReason,
-          amount_total: amountTotal,
-          utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-          contact_name: contactName,
-          contact_email: contactEmail,
-          lead_state: contactState,
-          lead_city: contactCity,
-          lead_created_at: d.created_at || null,
-          stage_updated_at: d.updated_at || d.last_activity_at || null,
-          closed_at: d.closed_at || null,
-          raw: d,
-          custom_fields: customFieldsExtracted,
-        }, { onConflict: "user_id,rd_deal_id" });
+        await admin.from("rd_deals").upsert(
+          {
+            user_id: userId!,
+            ad_account_id: funnel!.ad_account_id,
+            rd_funnel_id: funnel!.id,
+            rd_deal_id: rdDealId,
+            rd_stage_id: stageId,
+            rd_stage_name: stageName,
+            rd_stage_order:
+              stageId && stageOrderMap.has(stageId) ? stageOrderMap.get(stageId) : null,
+            deal_owner_name: dealOwnerName,
+            rd_product_name: rdProductName,
+            stage_bucket: bucket,
+            win: won,
+            lost_reason: lostReason,
+            amount_total: amountTotal,
+            utm_source,
+            utm_medium,
+            utm_campaign,
+            utm_content,
+            utm_term,
+            contact_name: contactName,
+            contact_email: contactEmail,
+            lead_state: contactState,
+            lead_city: contactCity,
+            lead_created_at: d.created_at || null,
+            stage_updated_at: d.updated_at || d.last_activity_at || null,
+            closed_at: d.closed_at || null,
+            raw: d,
+            custom_fields: customFieldsExtracted,
+          },
+          { onConflict: "user_id,rd_deal_id" },
+        );
       } catch (e) {
         console.log(`[rd_deals upsert] ${rdDealId} failed: ${(e as Error).message}`);
         metrics.errors++;
       }
 
+      // Se o negócio foi reaberto/perdido, a receita anteriormente realizada
+      // deve sair de todos os painéis sem apagar o vínculo de auditoria.
+      if (!won) {
+        await admin
+          .from("sales")
+          .update({ status: "cancelled", attribution_reason: "rd_deal_not_won" })
+          .eq("user_id", userId!)
+          .eq("rd_deal_id", rdDealId);
+        return;
+      }
 
-
-      // A partir daqui só persistimos `sales` para deals ganhos.
-      if (!won) return;
-
-      const { data: existing } = await admin.from("sales")
-        .select("id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, contact_name, contact_phone, contact_email, lead_entry_date")
-        .eq("rd_deal_id", rdDealId).maybeSingle();
+      const { data: existing } = await admin
+        .from("sales")
+        .select(
+          "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
+        )
+        .eq("rd_deal_id", rdDealId)
+        .maybeSingle();
 
       const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
 
       // Constrói payload preservando valores manuais já preenchidos.
       // Regra: campos vindos do RD só são gravados quando o registro existente
       // estiver vazio. Pagamento: RD sobrescreve, exceto se usuário marcou manual.
-      const preserve = <T,>(current: T | null | undefined, incoming: T | null | undefined): T | null =>
-        (current != null && current !== "" ? current : (incoming ?? null)) as T | null;
+      const preserve = <T>(
+        current: T | null | undefined,
+        incoming: T | null | undefined,
+      ): T | null => (current != null && current !== "" ? current : (incoming ?? null)) as T | null;
 
       const baseData: Record<string, any> = {
         user_id: userId!,
@@ -595,29 +875,33 @@ Deno.serve(async (req) => {
         status: "confirmed",
         sale_date: saleDate,
         product_id: productId,
-        quantity: d.deal_products?.length || 1,
+        // Um negócio ganho no RD representa uma venda. A quantidade de
+        // produtos do negócio não pode multiplicar vendas, conversão ou
+        // ticket médio nos painéis da Growdash.
+        quantity: 1,
         rd_product_name: rdProductName,
         rd_campaign_name: rdCampaignName,
         rd_funnel_id: funnel!.id,
-        match_method: "rd_sync",
-        campaign_ids: [],
         custom_fields: customFieldsExtracted,
+        source_provider: "rd_station",
+        source_record_id: rdDealId,
+        source_closed_at: d.closed_at || null,
       };
 
       if (existing) {
         const update: Record<string, any> = {
           ...baseData,
           lead_entry_date: preserve(existing.lead_entry_date, leadEntryDate),
-          lead_state:      preserve(existing.lead_state, contactState),
-          lead_city:       preserve(existing.lead_city, contactCity),
-          contact_name:    preserve(existing.contact_name, contactName),
-          contact_phone:   preserve(existing.contact_phone, contactPhone),
-          contact_email:   preserve(existing.contact_email, contactEmail),
-          utm_source:      preserve(existing.utm_source, utm_source),
-          utm_medium:      preserve(existing.utm_medium, utm_medium),
-          utm_campaign:    preserve(existing.utm_campaign, utm_campaign),
-          utm_term:        preserve(existing.utm_term, utm_term),
-          utm_content:     preserve(existing.utm_content, utm_content),
+          lead_state: preserve(existing.lead_state, contactState),
+          lead_city: preserve(existing.lead_city, contactCity),
+          contact_name: preserve(existing.contact_name, contactName),
+          contact_phone: preserve(existing.contact_phone, contactPhone),
+          contact_email: preserve(existing.contact_email, contactEmail),
+          utm_source: preserve(existing.utm_source, utm_source),
+          utm_medium: preserve(existing.utm_medium, utm_medium),
+          utm_campaign: preserve(existing.utm_campaign, utm_campaign),
+          utm_term: preserve(existing.utm_term, utm_term),
+          utm_content: preserve(existing.utm_content, utm_content),
         };
         if (rdPayment && (existing as any).payment_method_source !== "manual") {
           update.payment_method = rdPayment;
@@ -634,7 +918,11 @@ Deno.serve(async (req) => {
           contact_name: contactName,
           contact_phone: contactPhone,
           contact_email: contactEmail,
-          utm_source, utm_medium, utm_campaign, utm_term, utm_content,
+          utm_source,
+          utm_medium,
+          utm_campaign,
+          utm_term,
+          utm_content,
           payment_method: rdPayment ?? "pix",
           payment_method_source: rdPayment ? "rd" : "default",
           notes: null,
@@ -647,22 +935,42 @@ Deno.serve(async (req) => {
       if (!items.length) return;
       const rows = items.map((d) => {
         const rdDealId = String(d.id || d._id);
+        seenAnalyticsDealIds.add(rdDealId);
         const stageName = d.deal_stage?.name || null;
         const stageId = d.deal_stage?.id ? String(d.deal_stage.id) : null;
         const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
-        const lost = !won && (Boolean(stageId && stageLostMap.get(stageId)) || Boolean(d.deal_lost_reason));
+        const lost =
+          !won && (Boolean(stageId && stageLostMap.get(stageId)) || Boolean(d.deal_lost_reason));
         const baseContact = d.contact || d.deal_contact || {};
         const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
         const inline = inlineContacts[0]?.contact || inlineContacts[0] || {};
         const contact = { ...inline, ...baseContact };
         const contactFields = contact.contact_custom_fields || [];
         const dealFields = d.deal_custom_fields || d.custom_fields || [];
-        const contactState = contact.state || contact.address_state
-          || findCustomField([dealFields, contactFields], ["state", "estado", "uf", "lead_state", "estadouf"])
-          || null;
-        const contactCity = contact.city || contact.address_city
-          || findCustomField([dealFields, contactFields], ["city", "cidade", "lead_city", "cidadelead"])
-          || null;
+        const allCfSources = [dealFields, contactFields];
+        const contactState =
+          contact.state ||
+          contact.address_state ||
+          findCustomField(
+            [dealFields, contactFields],
+            ["state", "estado", "uf", "lead_state", "estadouf"],
+          ) ||
+          null;
+        const contactCity =
+          contact.city ||
+          contact.address_city ||
+          findCustomField(
+            [dealFields, contactFields],
+            ["city", "cidade", "lead_city", "cidadelead"],
+          ) ||
+          null;
+        const utms = d.utms || d.utm || contact.utms || d.deal_source || d.lead_origin || {};
+        const pickUtm = (name: string, aliases: string[]) =>
+          d[`utm_${name}`] ||
+          utms?.[name] ||
+          utms?.[`utm_${name}`] ||
+          findCustomField(allCfSources, aliases) ||
+          null;
         const row: Record<string, unknown> = {
           user_id: userId!,
           ad_account_id: funnel!.ad_account_id,
@@ -678,20 +986,26 @@ Deno.serve(async (req) => {
           stage_updated_at: d.updated_at || d.stage_updated_at || null,
           closed_at: d.closed_at || null,
           raw: d,
+          utm_source: pickUtm("source", ["utmsource", "utm_source", "source", "fonte"]),
+          utm_medium: pickUtm("medium", ["utmmedium", "utm_medium", "medium", "midia", "mídia"]),
+          utm_campaign: pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campanha"]),
+          utm_term: pickUtm("term", ["utmterm", "utm_term", "term", "termo"]),
+          utm_content: pickUtm("content", ["utmcontent", "utm_content", "content", "conteudo", "conteúdo"]),
         };
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;
         if (contact.name || d.contact_name) row.contact_name = contact.name || d.contact_name;
         if (contact.email) row.contact_email = contact.email;
-        if (d.deal_lost_reason?.name || d.deal_lost_reason) row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
-        if (d.user?.name || d.deal_user?.name || d.owner?.name) row.deal_owner_name = d.user?.name || d.deal_user?.name || d.owner?.name;
+        if (d.deal_lost_reason?.name || d.deal_lost_reason)
+          row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
+        if (d.user?.name || d.deal_user?.name || d.owner?.name)
+          row.deal_owner_name = d.user?.name || d.deal_user?.name || d.owner?.name;
         if (d.deal_products?.[0]?.name) row.rd_product_name = d.deal_products[0].name;
-        for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"] as const) {
-          if (d[key]) row[key] = d[key];
-        }
         return row;
       });
-      const { error } = await admin.from("rd_deals").upsert(rows, { onConflict: "user_id,rd_deal_id" });
+      const { error } = await admin
+        .from("rd_deals")
+        .upsert(rows, { onConflict: "user_id,rd_deal_id" });
       if (error) throw error;
       totalUpdated += rows.length;
     }
@@ -709,7 +1023,7 @@ Deno.serve(async (req) => {
         await sleep(BATCH_PAUSE_MS);
       }
     } else {
-      let page = 1;
+      let analyticsRangeComplete = false;
       const requestedPages = Number(max_pages);
       const maxPages = realtime
         ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
@@ -719,68 +1033,192 @@ Deno.serve(async (req) => {
       const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
       const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
       const maxAnalyticsDeals = Math.max(1, Math.min(Number(max_deals) || 10000, 10000));
-      while (page <= maxPages) {
-        const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc`;
-        const r = await fetchWithRetry(url);
-        if (!r.ok) {
-          const txt = await r.text();
-          await finishRun({ status: "failed", deals: totalDeals, created: totalCreated, updated: totalUpdated, skipped: totalSkipped, errorMessage: `RD API ${r.status}: ${txt.slice(0, 200)}`, funnelName: funnel.name });
-          return new Response(JSON.stringify({ error: `RD API ${r.status}: ${txt.slice(0, 200)}`, page }), {
-            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const payload = await r.json();
-        const deals = payload.deals || payload || [];
-        if (!Array.isArray(deals) || deals.length === 0) break;
+      const periodParams =
+        analytics_mode && start_date && end_date
+          ? `&created_at_period=true&start_date=${encodeURIComponent(`${start_date}T00:00:00-03:00`)}&end_date=${encodeURIComponent(`${end_date}T23:59:59-03:00`)}`
+          : "";
+      // A API v1 do RD não devolve "Todas as negociações" em uma única
+      // chamada. Sem o parâmetro `win`, ela retorna somente as negociações em
+      // aberto. Para reproduzir o filtro "Todos os status" do CRM precisamos
+      // percorrer também ganhas, perdidas e pausadas, consolidando pelos IDs.
+      // https://developers.rdstation.com/reference/crm-v1-list-deals
+      const analyticsSegments = analytics_mode
+        ? [
+            { name: "ongoing", params: "" },
+            { name: "won", params: "&win=true" },
+            { name: "lost", params: "&win=false" },
+            { name: "paused", params: "&hold=true" },
+          ]
+        : [{ name: "ongoing", params: "" }];
+      analyticsRangeComplete = analytics_mode;
 
-        if (analytics_mode) {
-          const rangedDeals = deals.filter((deal: any) => {
-            const rawDate = deal.created_at || deal.updated_at;
-            if (!rawDate) return true;
-            const timestamp = new Date(rawDate).getTime();
-            return (!startMs || timestamp >= startMs) && (!endMs || timestamp <= endMs);
-          }).slice(0, Math.max(0, maxAnalyticsDeals - totalDeals));
-          await persistAnalyticsBatch(rangedDeals);
-          totalDeals += rangedDeals.length;
+      segmentLoop: for (const segment of analyticsSegments) {
+        let page = 1;
+        let segmentComplete = false;
 
-          const timestamps = deals
-            .map((deal: any) => new Date(deal.created_at || deal.updated_at || 0).getTime())
-            .filter((value: number) => Number.isFinite(value) && value > 0);
-          const reachedOlderBoundary = Boolean(startMs && timestamps.some((value: number) => value < startMs));
-          if (deals.length < 200 || totalDeals >= maxAnalyticsDeals || reachedOlderBoundary) break;
+        while (page <= maxPages) {
+          const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc${periodParams}${segment.params}`;
+          const r = await fetchWithRetry(url);
+          if (!r.ok) {
+            const txt = await r.text();
+            await finishRun({
+              status: "failed",
+              deals: totalDeals,
+              created: totalCreated,
+              updated: totalUpdated,
+              skipped: totalSkipped,
+              errorMessage: `RD API ${r.status}: ${txt.slice(0, 200)}`,
+              funnelName: funnel.name,
+            });
+            return new Response(
+              JSON.stringify({
+                error: `RD API ${r.status}: ${txt.slice(0, 200)}`,
+                page,
+                segment: segment.name,
+              }),
+              {
+                status: 502,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              },
+            );
+          }
+          const payload = await r.json();
+          const deals = payload.deals || payload || [];
+          if (!Array.isArray(deals) || deals.length === 0) {
+            segmentComplete = true;
+            break;
+          }
+
+          if (analytics_mode) {
+            const rangedDeals = deals
+              .filter((deal: any) => {
+                const rdDealId = String(deal.id || deal._id || "");
+                if (!rdDealId || seenAnalyticsDealIds.has(rdDealId)) return false;
+                const rawDate = deal.created_at || deal.updated_at;
+                if (!rawDate) return true;
+                const timestamp = new Date(rawDate).getTime();
+                return (!startMs || timestamp >= startMs) && (!endMs || timestamp <= endMs);
+              })
+              .slice(0, Math.max(0, maxAnalyticsDeals - totalDeals));
+            await persistAnalyticsBatch(rangedDeals);
+            totalDeals += rangedDeals.length;
+
+            const timestamps = deals
+              .map((deal: any) => new Date(deal.created_at || deal.updated_at || 0).getTime())
+              .filter((value: number) => Number.isFinite(value) && value > 0);
+            const reachedOlderBoundary = Boolean(
+              startMs && timestamps.some((value: number) => value < startMs),
+            );
+            if (deals.length < 200 || reachedOlderBoundary) {
+              segmentComplete = true;
+              break;
+            }
+            if (totalDeals >= maxAnalyticsDeals) {
+              analyticsRangeComplete = false;
+              break segmentLoop;
+            }
+            page++;
+            continue;
+          }
+
+          const realtimeLimit = Math.max(1, Math.min(Number(max_deals) || 60, 200));
+          const dealsToProcess = realtime
+            ? deals.slice(0, Math.max(0, realtimeLimit - totalDeals))
+            : deals;
+          totalDeals += dealsToProcess.length;
+
+          for (let i = 0; i < dealsToProcess.length; i += BATCH_SIZE) {
+            const batch = dealsToProcess.slice(i, i + BATCH_SIZE);
+            const details = await Promise.all(batch.map(processDeal));
+            for (const d of details) await persistDeal(d);
+            await sleep(BATCH_PAUSE_MS);
+          }
+
+          if (deals.length < 200 || (realtime && totalDeals >= realtimeLimit)) break;
           page++;
-          continue;
         }
 
-        const realtimeLimit = Math.max(1, Math.min(Number(max_deals) || 60, 200));
-        const dealsToProcess = realtime
-          ? deals.slice(0, Math.max(0, realtimeLimit - totalDeals))
-          : deals;
-        totalDeals += dealsToProcess.length;
+        if (analytics_mode && !segmentComplete) analyticsRangeComplete = false;
+      }
 
-        for (let i = 0; i < dealsToProcess.length; i += BATCH_SIZE) {
-          const batch = dealsToProcess.slice(i, i + BATCH_SIZE);
-          const details = await Promise.all(batch.map(processDeal));
-          for (const d of details) await persistDeal(d);
-          await sleep(BATCH_PAUSE_MS);
+      // Um upsert isolado não remove negociações que foram excluídas ou
+      // transferidas para outro funil no RD. Só depois de percorrer todo o
+      // intervalo com sucesso reconciliamos esses registros locais antigos.
+      // Assim, a contagem por etapa representa o snapshot atual exibido pelo
+      // RD para a mesma conta e o mesmo filtro de data.
+      if (analytics_mode && start_date && end_date && analyticsRangeComplete) {
+        const localIds: string[] = [];
+        const pageSize = 1000;
+        for (let localPage = 0; localPage < 50; localPage++) {
+          const { data: localRows, error: localError } = await admin
+            .from("rd_deals")
+            .select("rd_deal_id")
+            .eq("rd_funnel_id", funnel.id)
+            .gte("lead_created_at", `${start_date}T00:00:00-03:00`)
+            .lte("lead_created_at", `${end_date}T23:59:59.999-03:00`)
+            .order("rd_deal_id", { ascending: true })
+            .range(localPage * pageSize, localPage * pageSize + pageSize - 1);
+          if (localError) throw localError;
+          const batch = (localRows || []).map((row: any) => String(row.rd_deal_id));
+          localIds.push(...batch);
+          if (batch.length < pageSize) break;
         }
 
-        if (deals.length < 200 || (realtime && totalDeals >= realtimeLimit)) break;
-        page++;
+        const staleIds = localIds.filter((id) => !seenAnalyticsDealIds.has(id));
+        for (let index = 0; index < staleIds.length; index += 200) {
+          const chunk = staleIds.slice(index, index + 200);
+          const { error: deleteError } = await admin
+            .from("rd_deals")
+            .delete()
+            .eq("rd_funnel_id", funnel.id)
+            .in("rd_deal_id", chunk);
+          if (deleteError) throw deleteError;
+          reconciledDeleted += chunk.length;
+        }
       }
     }
 
     const status = metrics.errors > 0 ? "partial" : "success";
-    await finishRun({ status, deals: totalDeals, created: totalCreated, updated: totalUpdated, skipped: totalSkipped, funnelName: funnel.name });
-
-    return new Response(JSON.stringify({ ok: true, created: totalCreated, updated: totalUpdated, skipped: totalSkipped, deals: totalDeals, details_fetched: metrics.details, contacts_fetched: metrics.contacts, retries: metrics.retries, errors: metrics.errors }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    await finishRun({
+      status,
+      deals: totalDeals,
+      created: totalCreated,
+      updated: totalUpdated,
+      skipped: totalSkipped,
+      funnelName: funnel.name,
     });
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        created: totalCreated,
+        updated: totalUpdated,
+        skipped: totalSkipped,
+        deals: totalDeals,
+        reconciled_deleted: reconciledDeleted,
+        details_fetched: metrics.details,
+        contacts_fetched: metrics.contacts,
+        retries: metrics.retries,
+        errors: metrics.errors,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (err) {
     const msg = (err as Error).message;
-    await finishRun({ status: "failed", deals: 0, created: 0, updated: 0, skipped: 0, errorMessage: msg });
+    await finishRun({
+      status: "failed",
+      deals: 0,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errorMessage: msg,
+    });
     return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

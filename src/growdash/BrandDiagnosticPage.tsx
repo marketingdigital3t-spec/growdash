@@ -30,6 +30,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMetric, metricDescription, type MetricKind } from "@/lib/metricPresentation";
@@ -128,9 +129,11 @@ export default function BrandDiagnosticPage() {
   const campaignsQuery = useCampaigns(accountId);
   const insightsQuery = useInsights({ adAccountId: accountId, startDate, endDate, enabled: !!accountId });
   const rdQuery = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountId, enabled: !!accountId });
+  const salesQuery = useSales({ startDate, endDate, adAccountId: accountId, enabled: !!accountId });
   const campaigns = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);
   const insights = useMemo(() => insightsQuery.data ?? [], [insightsQuery.data]);
   const deals = useMemo(() => rdQuery.data ?? [], [rdQuery.data]);
+  const sales = useMemo(() => salesQuery.data ?? [], [salesQuery.data]);
 
   const totals = useMemo(() => {
     const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
@@ -138,8 +141,8 @@ export default function BrandDiagnosticPage() {
     const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
     const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
     const leads = insights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
-    const won = deals.filter((deal) => deal.win);
-    const revenue = won.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0);
+    const saleTotals = aggregateSales(sales);
+    const revenue = saleTotals.totalNet;
     return {
       spend,
       impressions,
@@ -151,13 +154,13 @@ export default function BrandDiagnosticPage() {
       cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
       frequency: reach > 0 ? impressions / reach : 0,
       rdLeads: deals.length,
-      won: won.length,
+      won: saleTotals.totalQuantity,
       revenue,
-      conversion: deals.length > 0 ? (won.length / deals.length) * 100 : 0,
+      conversion: deals.length > 0 ? (saleTotals.totalQuantity / deals.length) * 100 : 0,
       roas: spend > 0 ? revenue / spend : 0,
       activeCampaigns: campaigns.filter((item) => ["ACTIVE", "active", "Ativa"].includes(String(item.status))).length,
     };
-  }, [campaigns, deals, insights]);
+  }, [campaigns, deals, insights, sales]);
 
   const campaignPerformance = useMemo(() => {
     const groups = new Map<string, { id: string; name: string; spend: number; impressions: number; clicks: number; leads: number }>();

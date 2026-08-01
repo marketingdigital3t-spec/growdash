@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableFooter, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
+import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
@@ -38,7 +40,6 @@ import {
   BrainCircuit,
   Plus,
   Copy as CopyIcon,
-  FlaskConical,
   MoreHorizontal,
   Send,
   FolderOpen,
@@ -86,6 +87,29 @@ const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; ac
   { id: "healthy", label: "Saudável", dot: "bg-emerald-500", active: "border-emerald-500/55 bg-emerald-500/10 text-emerald-500" },
   { id: "inactive", label: "Inativas", dot: "bg-zinc-400", active: "border-zinc-400/55 bg-zinc-400/10 text-zinc-500" },
 ];
+
+const CAMPAIGN_COLUMN_FILTERS: Array<{ key: string; label: string; column?: CampaignColumnKey }> = [
+  { key: "status", label: "Status" }, { key: "name", label: "Campanha" },
+  { key: "deliveryStatus", label: "Veiculação", column: "deliveryStatus" }, { key: "objective", label: "Objetivo", column: "objective" },
+  { key: "budget", label: "Orçamento", column: "budget" }, { key: "spend", label: "Valor usado", column: "spend" },
+  { key: "impressions", label: "Impressões", column: "impressions" }, { key: "reach", label: "Alcance", column: "reach" },
+  { key: "frequency", label: "Frequência", column: "frequency" }, { key: "cpm", label: "CPM", column: "cpm" },
+  { key: "clicks", label: "Cliques", column: "clicks" }, { key: "linkClicks", label: "Cliques no link", column: "linkClicks" },
+  { key: "cpc", label: "CPC", column: "cpc" }, { key: "linkCpc", label: "CPC do link", column: "linkCpc" },
+  { key: "ctr", label: "CTR", column: "ctr" }, { key: "uniqueLinkCtr", label: "CTR único", column: "uniqueLinkCtr" },
+  { key: "leads", label: "Resultados", column: "leads" }, { key: "cpl", label: "Custo por resultado", column: "cpl" },
+  { key: "conversionRate", label: "Taxa de resultado", column: "conversion" }, { key: "salesCount", label: "Vendas", column: "sales" },
+  { key: "cpa", label: "CPA", column: "cpa" }, { key: "revenue", label: "Receita", column: "revenue" },
+  { key: "roas", label: "ROAS", column: "roas" }, { key: "profit", label: "Lucro", column: "profit" },
+  { key: "roi", label: "ROI", column: "roi" }, { key: "landingPageViews", label: "Visualizações da página", column: "landingPageViews" },
+  { key: "checkouts", label: "Finalizações iniciadas", column: "checkouts" }, { key: "metaPurchases", label: "Compras", column: "metaPurchases" },
+  { key: "metaPurchaseRoas", label: "ROAS de compras", column: "metaPurchaseRoas" },
+];
+
+function campaignColumnValue(campaign: any, key: string) {
+  if (key === "status" || key === "deliveryStatus") return `${getStatusBadge(campaign.status).label} ${campaign.status || ""}`;
+  return String(campaign[key] ?? "");
+}
 
 function formatApiDate(date: Date) {
   const year = date.getFullYear();
@@ -148,6 +172,28 @@ const AD_DEFAULTS: Record<AdColKey, number> = {
   cpc: 100, impressions: 120, reach: 110, frequency: 100, cpm: 110,
 };
 
+function levelMetricValue(entity: any, key: AdsetColKey | AdColKey) {
+  if (key === "name") return String(entity.name || "").toLocaleLowerCase("pt-BR");
+  if (key === "campaign") return String(entity.campaignName || "").toLocaleLowerCase("pt-BR");
+  if (key === "adset") return String(entity.adsetName || "").toLocaleLowerCase("pt-BR");
+  if (key === "budget") return Number(entity.daily_budget || 0);
+  if (key === "cpl") return entity.leads > 0 ? entity.spend / entity.leads : 0;
+  if (key === "ctr") return entity.impressions > 0 ? entity.clicks / entity.impressions * 100 : 0;
+  if (key === "cpc") return entity.clicks > 0 ? entity.spend / entity.clicks : 0;
+  if (key === "frequency") return entity.reach > 0 ? entity.impressions / entity.reach : 0;
+  if (key === "cpm") return entity.impressions > 0 ? entity.spend / entity.impressions * 1000 : 0;
+  return Number(entity[key] || 0);
+}
+
+function sortLevelRows<T>(rows: T[], key: AdsetColKey | AdColKey, ascending: boolean) {
+  return [...rows].sort((left: any, right: any) => {
+    const a = levelMetricValue(left, key);
+    const b = levelMetricValue(right, key);
+    const comparison = typeof a === "string" && typeof b === "string" ? a.localeCompare(b, "pt-BR") : Number(a) - Number(b);
+    return ascending ? comparison : -comparison;
+  });
+}
+
 export default function Campaigns() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -157,6 +203,8 @@ export default function Campaigns() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [columnFiltersOpen, setColumnFiltersOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("campaigns");
   const [detailCampaignId, setDetailCampaignId] = useState<string | null>(null);
   const [detailEntity, setDetailEntity] = useState<MetaDetailEntity | null>(null);
@@ -164,6 +212,10 @@ export default function Campaigns() {
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
+  const [adsetSortKey, setAdsetSortKey] = useState<AdsetColKey>("spend");
+  const [adsetSortAsc, setAdsetSortAsc] = useState(false);
+  const [adSortKey, setAdSortKey] = useState<AdColKey>("spend");
+  const [adSortAsc, setAdSortAsc] = useState(false);
   const [statusSortCycle, setStatusSortCycle] = useState<0 | 1 | 2>(0);
   const [columnPreset, setColumnPreset] = useState<MetaColumnPresetKey>("performance");
   const [visibleColumns, setVisibleColumns] = useState<Set<CampaignColumnKey>>(() => {
@@ -172,11 +224,17 @@ export default function Campaigns() {
   });
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
+  const [campaignTotalsDock, setCampaignTotalsDock] = useState<HTMLDivElement | null>(null);
+  const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
     const requested = searchParams.get("analise");
     return requested === "alerts" || requested === "intelligence" ? requested : null;
   });
+  const analysisMode = analysisPanel !== null;
+  // A paginação só existe no gerenciador compacto. Quando uma análise está
+  // aberta, todas as campanhas permanecem disponíveis em uma única lista e o
+  // próprio bloco da tabela assume o scroll vertical.
   const pageSize = 50;
 
   useEffect(() => {
@@ -188,6 +246,10 @@ export default function Campaigns() {
     const requested = searchParams.get("analise");
     if (requested === "alerts" || requested === "intelligence") setAnalysisPanel(requested);
   }, [searchParams]);
+
+  useEffect(() => {
+    setCampaignPage(0);
+  }, [analysisMode]);
 
   const updateAnalysisPanel = (next: "alerts" | "intelligence" | null) => {
     setAnalysisPanel(next);
@@ -249,6 +311,16 @@ export default function Campaigns() {
     else { setSortKey(key); setSortAsc(false); }
   };
 
+  const handleAdsetSort = (key: AdsetColKey) => {
+    if (adsetSortKey === key) setAdsetSortAsc((current) => !current);
+    else { setAdsetSortKey(key); setAdsetSortAsc(false); }
+  };
+
+  const handleAdSort = (key: AdColKey) => {
+    if (adSortKey === key) setAdSortAsc((current) => !current);
+    else { setAdSortKey(key); setAdSortAsc(false); }
+  };
+
   const { data: campaignBaseRows = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
     queryFn: async () => {
@@ -297,7 +369,11 @@ export default function Campaigns() {
           }
         }
 
-        const campaignSales = sales.filter(s => s.campaign_ids && s.campaign_ids.includes(c.id));
+        const campaignSales = sales.filter((sale) => saleMatchesCampaign(sale, {
+          id: c.id,
+          name: c.name,
+          ad_account_id: c.ad_account_id,
+        }));
         const salesCount = campaignSales.length;
         const revenue = campaignSales.reduce((sum, s) => sum + (s.net_revenue ?? 0), 0);
         const profit = revenue - spend;
@@ -466,6 +542,11 @@ export default function Campaigns() {
     if (healthFilter !== "all") {
       result = result.filter((c: any) => getCampaignHealth(c, averageCpl, targetByCampaign.get(c.id)) === healthFilter);
     }
+    for (const [key, rawValue] of Object.entries(columnFilters)) {
+      const value = rawValue.trim().toLocaleLowerCase("pt-BR");
+      if (!value) continue;
+      result = result.filter((campaign: any) => campaignColumnValue(campaign, key).toLocaleLowerCase("pt-BR").includes(value));
+    }
     result = [...result].sort((a: any, b: any) => {
       if (sortKey === "status") {
         const activeA = normalizeStatus(a.status) === "ACTIVE" ? 1 : 0;
@@ -483,10 +564,13 @@ export default function Campaigns() {
       return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
     return result;
-  }, [averageCpl, campaigns, healthFilter, search, statusFilter, sortKey, sortAsc, targetByCampaign]);
+  }, [averageCpl, campaigns, columnFilters, healthFilter, search, statusFilter, sortKey, sortAsc, targetByCampaign]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pagedCampaigns = useMemo(() => filtered.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize), [campaignPage, filtered]);
-  useEffect(() => { setCampaignPage(0); }, [search, statusFilter, healthFilter, selectedAccount, startDate, endDate, sortKey, sortAsc]);
+  const visibleCampaigns = useMemo(
+    () => analysisMode ? filtered : filtered.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize),
+    [analysisMode, campaignPage, filtered],
+  );
+  useEffect(() => { setCampaignPage(0); }, [search, statusFilter, healthFilter, columnFilters, selectedAccount, startDate, endDate, sortKey, sortAsc]);
   useEffect(() => { if (campaignPage >= pageCount) setCampaignPage(pageCount - 1); }, [campaignPage, pageCount]);
 
   const toggleSelect = (id: string) => {
@@ -597,7 +681,7 @@ export default function Campaigns() {
 
   const selectedAdsets = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return accountAdsets
+    const rows = accountAdsets
       .map((currentAdset: any) => {
         const campaign = firstRelation(currentAdset.campaigns);
         const embeddedAdset = embeddedAdsetsById.get(currentAdset.id);
@@ -612,11 +696,12 @@ export default function Campaigns() {
       .filter((currentAdset: any) => !descendantCampaignIds || descendantCampaignIds.has(currentAdset.campaignId))
       .filter((currentAdset: any) => statusFilter === "all" || normalizeStatus(currentAdset.status) === statusFilter)
       .filter((currentAdset: any) => !query || currentAdset.name.toLowerCase().includes(query) || currentAdset.campaignName.toLowerCase().includes(query));
-  }, [accountAdsets, descendantCampaignIds, embeddedAdsetsById, endDate, search, startDate, statusFilter]);
+    return sortLevelRows(rows, adsetSortKey, adsetSortAsc);
+  }, [accountAdsets, adsetSortAsc, adsetSortKey, descendantCampaignIds, embeddedAdsetsById, endDate, search, startDate, statusFilter]);
 
   const selectedAds = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return accountAds
+    const rows = accountAds
       .map((currentAd: any) => {
         const currentAdset = firstRelation(currentAd.adsets);
         const campaign = firstRelation(currentAdset?.campaigns);
@@ -632,19 +717,27 @@ export default function Campaigns() {
       .filter((currentAd: any) => !descendantCampaignIds || descendantCampaignIds.has(currentAd.campaignId))
       .filter((currentAd: any) => statusFilter === "all" || normalizeStatus(currentAd.status) === statusFilter)
       .filter((currentAd: any) => !query || currentAd.name.toLowerCase().includes(query) || currentAd.adsetName.toLowerCase().includes(query) || currentAd.campaignName.toLowerCase().includes(query));
-  }, [accountAds, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
+    return sortLevelRows(rows, adSortKey, adSortAsc);
+  }, [accountAds, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const showColumn = (key: CampaignColumnKey) => visibleColumns.has(key);
+  const availableColumnFilters = useMemo(() => CAMPAIGN_COLUMN_FILTERS.filter((item) => !item.column || visibleColumns.has(item.column)), [visibleColumns]);
+  const activeColumnFilterCount = Object.values(columnFilters).filter((value) => value.trim()).length;
   const cellW = (k: CampColKey) => ({ width: camp.colWidths[k], minWidth: camp.colWidths[k], maxWidth: camp.colWidths[k] });
   const adsetCellW = (k: AdsetColKey) => ({ width: adset.colWidths[k], minWidth: adset.colWidths[k], maxWidth: adset.colWidths[k] });
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
 
   return (
-    <MotionPage className="campaigns-workspace overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm dark:border-[#2a271f] dark:bg-[#070706] md:flex md:min-h-0 md:flex-1 md:flex-col">
+    <MotionPage
+      className={cn(
+        "campaigns-workspace rounded-lg border border-border bg-card text-card-foreground shadow-sm dark:border-[#2a271f] dark:bg-[#070706]",
+        analysisMode ? "overflow-visible" : "overflow-hidden md:flex md:min-h-0 md:flex-1 md:flex-col",
+      )}
+    >
       <MotionItem className="campaign-manager-top shrink-0 border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
         <div className="flex flex-col gap-2 px-3 py-2 lg:flex-row lg:items-center">
           <div className="flex shrink-0 items-center gap-2">
@@ -653,7 +746,7 @@ export default function Campaigns() {
           </div>
           {visibleAdAccounts.length > 0 && (
             <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-              <SelectTrigger className="h-8 w-full bg-background text-xs sm:w-[285px]" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
+              <SelectTrigger className="h-8 w-full bg-background text-left text-xs sm:w-[260px] [&>span]:truncate [&>span]:text-left" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
               <SelectContent><SelectItem value="all">Todas as contas de anúncio</SelectItem>{visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
             </Select>
           )}
@@ -672,7 +765,7 @@ export default function Campaigns() {
           </div>
         </div>
 
-        <div className="growdash-scrollbar flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
+        <div className="growdash-scrollbar-hidden flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
           <Button variant="outline" size="sm" className="meta-toolbar-button meta-toolbar-button-active shrink-0"><FolderOpen className="h-3.5 w-3.5" />Todos os anúncios</Button>
           <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Megaphone className="h-3.5 w-3.5" />Anúncios ativos</Button>
           <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0"><ShieldCheck className="h-3.5 w-3.5" />Ações</Button>
@@ -691,9 +784,9 @@ export default function Campaigns() {
 
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
 
-      <MotionItem className="md:min-h-0 md:flex-1 md:overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="md:flex md:h-full md:min-h-0 md:flex-col">
-          <div className="growdash-scrollbar flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
+      <MotionItem className={cn(!analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={cn(!analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
+          <div className="growdash-scrollbar-hidden flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
             <TabsList className="h-auto w-max min-w-0 shrink-0 justify-start rounded-none bg-transparent p-0">
               <TabsTrigger value="campaigns" className="h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
                 <FolderKanban className="h-3.5 w-3.5" /> Campanhas ({filtered.length})
@@ -706,17 +799,15 @@ export default function Campaigns() {
               </TabsTrigger>
             </TabsList>
             <div className="ml-auto flex shrink-0 items-center px-2 py-1.5">
-              <div className="w-[230px] [&_.gd-filter-date]:!w-full [&_.gd-filter-date]:!min-w-0 [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[11px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
+              <div className="w-[205px] [&_.gd-filter-date]:!w-full [&_.gd-filter-date]:!min-w-0 [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[10px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
             </div>
           </div>
 
-          <div className="growdash-scrollbar flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
+          <div className="growdash-scrollbar-hidden flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
             <div className="flex shrink-0 items-center gap-2">
               <Button size="sm" className="h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
               <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
               <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
-              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><FlaskConical className="h-3.5 w-3.5" />Teste A/B</Button>
-              <Button variant="ghost" size="sm" className="h-8 gap-2 text-[11px]">Mais<ChevronDown className="h-3 w-3" /></Button>
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
               <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
             </div>
@@ -729,8 +820,21 @@ export default function Campaigns() {
                 </DropdownMenuContent>
               </DropdownMenu>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
+              {activeTab === "campaigns" && <Button variant="outline" size="sm" className={cn("meta-toolbar-button", columnFiltersOpen && "meta-toolbar-button-active")} onClick={() => setColumnFiltersOpen((open) => !open)}><SlidersHorizontal className="h-3.5 w-3.5" />Filtros por coluna{activeColumnFilterCount > 0 && <Badge className="ml-1 h-4 min-w-4 px-1 text-[8px]">{activeColumnFilterCount}</Badge>}</Button>}
             </div>
           </div>
+
+          {activeTab === "campaigns" && columnFiltersOpen && (
+            <section className="border-b border-border bg-muted/20 px-3 py-3" aria-label="Filtros individuais das colunas">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div><h2 className="text-[11px] font-black">Filtrar cada coluna</h2><p className="text-[9px] text-muted-foreground">Os filtros são combinados e respeitam somente as colunas exibidas.</p></div>
+                {activeColumnFilterCount > 0 && <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={() => setColumnFilters({})}><X className="mr-1 h-3 w-3" />Limpar filtros</Button>}
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 min-[900px]:grid-cols-7">
+                {availableColumnFilters.map((filter) => <label key={filter.key} className="min-w-0"><span className="mb-1 block truncate text-[8px] font-black uppercase tracking-wide text-muted-foreground" title={filter.label}>{filter.label}</span><Input value={columnFilters[filter.key] || ""} onChange={(event) => setColumnFilters((current) => ({ ...current, [filter.key]: event.target.value }))} className="h-7 bg-background px-2 text-[10px]" placeholder="Filtrar…" /></label>)}
+              </div>
+            </section>
+          )}
 
           <AnimatePresence>
             {selectedIds.size > 0 && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-10 flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5">
@@ -753,7 +857,7 @@ export default function Campaigns() {
 
           {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
           {activeTab === "campaigns" && analysisPanel === "alerts" && (
-            <section className="campaign-analysis-shell border-b border-primary/20 md:max-h-[34dvh] md:shrink-0 md:overflow-y-auto">
+            <section className="campaign-analysis-shell border-b border-primary/20" data-analysis-content="alerts">
               <header className="campaign-analysis-header flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center">
                 <div>
                   <h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-primary" />Análises e alertas operacionais</h2>
@@ -813,7 +917,7 @@ export default function Campaigns() {
           )}
 
           {/* Campaigns Tab */}
-          <TabsContent value="campaigns" className="m-0 md:min-h-0 md:flex-1 md:overflow-hidden">
+          <TabsContent value="campaigns" className={cn("m-0", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
             {isLoading ? (
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : filtered.length === 0 ? (
@@ -826,12 +930,27 @@ export default function Campaigns() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="relative overflow-hidden rounded-none border-0 shadow-none md:flex md:h-full md:min-h-0 md:flex-col">
+              <Card className={cn(
+                "relative overflow-hidden rounded-none border-0 shadow-none md:flex md:flex-col",
+                analysisMode ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]" : "md:h-full md:min-h-0",
+              )}>
                 <div className="space-y-2 p-2 md:hidden">
-                  {pagedCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
+                  {visibleCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
                 </div>
-                <div data-campaign-table-scroll className="growdash-scrollbar hidden min-h-0 flex-1 overflow-auto md:block">
-                  <Table style={{ tableLayout: "fixed", width: "max-content" }}>
+                <div
+                  ref={campaignTableScrollRef}
+                  data-campaign-table-scroll
+                  onScroll={(event) => {
+                    if (campaignTotalsDock && campaignTotalsDock.scrollLeft !== event.currentTarget.scrollLeft) {
+                      campaignTotalsDock.scrollLeft = event.currentTarget.scrollLeft;
+                    }
+                  }}
+                  className={cn(
+                    "growdash-scrollbar-hidden relative hidden md:block",
+                    "min-h-0 flex-1 overflow-auto",
+                  )}
+                >
+                  <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-50 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
                       <TableRow className="campaign-metric-header h-10 border-b border-border hover:bg-transparent [&>th]:h-10 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e]">
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted dark:bg-[#11110f]">
@@ -875,7 +994,7 @@ export default function Campaigns() {
                     </TableHeader>
                     <TableBody>
                       <AnimatePresence mode="popLayout">
-                        {pagedCampaigns.map((c: any, rowIndex: number) => {
+                        {visibleCampaigns.map((c: any, rowIndex: number) => {
                           const stickySurface = selectedIds.has(c.id) ? "bg-accent dark:bg-[#201b0d]" : rowIndex % 2 ? "bg-muted dark:bg-[#0c0c0b]" : "bg-card dark:bg-[#070706]";
                           return (
                           <motion.tr
@@ -947,8 +1066,9 @@ export default function Campaigns() {
                         );})}
                       </AnimatePresence>
                     </TableBody>
-                    <TableFooter className="campaign-total-bar">
-                      <TableRow data-campaign-totals className="h-14 border-b border-border/70 bg-transparent hover:bg-transparent dark:border-[#2a271f] [&>td]:px-3 [&>td]:py-1">
+                    {(() => {
+                      const footer = <TableFooter className="campaign-total-bar shadow-[0_-8px_20px_-14px_rgba(0,0,0,.75)]">
+                      <TableRow data-campaign-totals className="h-14 border-y border-border/80 bg-muted/95 backdrop-blur-xl hover:bg-muted/95 dark:border-[#373226] dark:bg-[#11110f]/95 dark:hover:bg-[#11110f]/95 [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
                         <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
                         <CampaignTotalCell
@@ -992,10 +1112,33 @@ export default function Campaigns() {
                         {showColumn("roi") && <CampaignTotalCell width={camp.colWidths.roi} value={`${(totals.spend > 0 ? totals.profit / totals.spend * 100 : 0).toFixed(1).replace(".", ",")}%`} label="Retorno total" />}
                         {showColumn("videoViews") && <CampaignTotalCell width={camp.colWidths.videoViews} value="—" label="Não sincronizado" />}
                       </TableRow>
-                    </TableFooter>
-                  </Table>
+                    </TableFooter>;
+
+                      if (!campaignTotalsDock) return null;
+
+                      return createPortal(
+                        <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}>
+                          {footer}
+                        </table>,
+                        campaignTotalsDock,
+                      );
+                    })()}
+                  </table>
                 </div>
-                {pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
+                {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
+                <div
+                  ref={setCampaignTotalsDock}
+                  data-campaign-totals-fixed
+                  onScroll={(event) => {
+                    if (campaignTableScrollRef.current && campaignTableScrollRef.current.scrollLeft !== event.currentTarget.scrollLeft) {
+                      campaignTableScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+                    }
+                  }}
+                  className={cn(
+                    "growdash-scrollbar hidden h-[72px] shrink-0 overflow-x-auto overflow-y-hidden border-t border-border/80 bg-muted/95 md:block dark:border-[#373226] dark:bg-[#11110f]/95",
+                  )}
+                  aria-label="Totais das campanhas"
+                />
               </Card>
             )}
           </TabsContent>
@@ -1009,19 +1152,19 @@ export default function Campaigns() {
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader className="sticky top-0 z-40 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
                     <TableRow className="campaign-metric-header h-11 hover:bg-transparent">
-                      <ResizableHead colKey="name" width={adset.colWidths.name} onResize={adset.startResize("name")}>Conjunto</ResizableHead>
-                      <ResizableHead colKey="campaign" width={adset.colWidths.campaign} onResize={adset.startResize("campaign")}>Campanha</ResizableHead>
-                      <ResizableHead colKey="spend" width={adset.colWidths.spend} onResize={adset.startResize("spend")} align="right">Gastos</ResizableHead>
-                      <ResizableHead colKey="budget" width={adset.colWidths.budget} onResize={adset.startResize("budget")} align="right">Orçamento Diário</ResizableHead>
-                      <ResizableHead colKey="impressions" width={adset.colWidths.impressions} onResize={adset.startResize("impressions")} align="right">Impressões</ResizableHead>
-                      <ResizableHead colKey="cpm" width={adset.colWidths.cpm} onResize={adset.startResize("cpm")} align="right">CPM</ResizableHead>
-                      <ResizableHead colKey="reach" width={adset.colWidths.reach} onResize={adset.startResize("reach")} align="right">Alcance*</ResizableHead>
-                      <ResizableHead colKey="frequency" width={adset.colWidths.frequency} onResize={adset.startResize("frequency")} align="right">Frequência*</ResizableHead>
-                      <ResizableHead colKey="clicks" width={adset.colWidths.clicks} onResize={adset.startResize("clicks")} align="right">Cliques</ResizableHead>
-                      <ResizableHead colKey="ctr" width={adset.colWidths.ctr} onResize={adset.startResize("ctr")} align="right">CTR</ResizableHead>
-                      <ResizableHead colKey="cpc" width={adset.colWidths.cpc} onResize={adset.startResize("cpc")} align="right">CPC</ResizableHead>
-                      <ResizableHead colKey="leads" width={adset.colWidths.leads} onResize={adset.startResize("leads")} align="right">Resultados</ResizableHead>
-                      <ResizableHead colKey="cpl" width={adset.colWidths.cpl} onResize={adset.startResize("cpl")} align="right">Custo por resultado</ResizableHead>
+                      <ResizableHead colKey="name" width={adset.colWidths.name} onResize={adset.startResize("name")} sortable sortableKey="name" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort}>Conjunto</ResizableHead>
+                      <ResizableHead colKey="campaign" width={adset.colWidths.campaign} onResize={adset.startResize("campaign")} sortable sortableKey="campaign" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort}>Campanha</ResizableHead>
+                      <ResizableHead colKey="spend" width={adset.colWidths.spend} onResize={adset.startResize("spend")} sortable sortableKey="spend" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Gastos</ResizableHead>
+                      <ResizableHead colKey="budget" width={adset.colWidths.budget} onResize={adset.startResize("budget")} sortable sortableKey="budget" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Orçamento Diário</ResizableHead>
+                      <ResizableHead colKey="impressions" width={adset.colWidths.impressions} onResize={adset.startResize("impressions")} sortable sortableKey="impressions" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Impressões</ResizableHead>
+                      <ResizableHead colKey="cpm" width={adset.colWidths.cpm} onResize={adset.startResize("cpm")} sortable sortableKey="cpm" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">CPM</ResizableHead>
+                      <ResizableHead colKey="reach" width={adset.colWidths.reach} onResize={adset.startResize("reach")} sortable sortableKey="reach" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Alcance*</ResizableHead>
+                      <ResizableHead colKey="frequency" width={adset.colWidths.frequency} onResize={adset.startResize("frequency")} sortable sortableKey="frequency" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Frequência*</ResizableHead>
+                      <ResizableHead colKey="clicks" width={adset.colWidths.clicks} onResize={adset.startResize("clicks")} sortable sortableKey="clicks" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Cliques</ResizableHead>
+                      <ResizableHead colKey="ctr" width={adset.colWidths.ctr} onResize={adset.startResize("ctr")} sortable sortableKey="ctr" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">CTR</ResizableHead>
+                      <ResizableHead colKey="cpc" width={adset.colWidths.cpc} onResize={adset.startResize("cpc")} sortable sortableKey="cpc" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">CPC</ResizableHead>
+                      <ResizableHead colKey="leads" width={adset.colWidths.leads} onResize={adset.startResize("leads")} sortable sortableKey="leads" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Resultados</ResizableHead>
+                      <ResizableHead colKey="cpl" width={adset.colWidths.cpl} onResize={adset.startResize("cpl")} sortable sortableKey="cpl" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Custo por resultado</ResizableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1067,19 +1210,19 @@ export default function Campaigns() {
                 <Table style={{ tableLayout: "fixed", width: "max-content" }}>
                   <TableHeader className="sticky top-0 z-40 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
                     <TableRow className="campaign-metric-header h-11 hover:bg-transparent">
-                      <ResizableHead colKey="name" width={ad.colWidths.name} onResize={ad.startResize("name")}>Anúncio</ResizableHead>
-                      <ResizableHead colKey="adset" width={ad.colWidths.adset} onResize={ad.startResize("adset")}>Conjunto</ResizableHead>
-                      <ResizableHead colKey="campaign" width={ad.colWidths.campaign} onResize={ad.startResize("campaign")}>Campanha</ResizableHead>
-                      <ResizableHead colKey="spend" width={ad.colWidths.spend} onResize={ad.startResize("spend")} align="right">Gastos</ResizableHead>
-                      <ResizableHead colKey="impressions" width={ad.colWidths.impressions} onResize={ad.startResize("impressions")} align="right">Impressões</ResizableHead>
-                      <ResizableHead colKey="cpm" width={ad.colWidths.cpm} onResize={ad.startResize("cpm")} align="right">CPM</ResizableHead>
-                      <ResizableHead colKey="reach" width={ad.colWidths.reach} onResize={ad.startResize("reach")} align="right">Alcance*</ResizableHead>
-                      <ResizableHead colKey="frequency" width={ad.colWidths.frequency} onResize={ad.startResize("frequency")} align="right">Frequência*</ResizableHead>
-                      <ResizableHead colKey="clicks" width={ad.colWidths.clicks} onResize={ad.startResize("clicks")} align="right">Cliques</ResizableHead>
-                      <ResizableHead colKey="ctr" width={ad.colWidths.ctr} onResize={ad.startResize("ctr")} align="right">CTR</ResizableHead>
-                      <ResizableHead colKey="cpc" width={ad.colWidths.cpc} onResize={ad.startResize("cpc")} align="right">CPC</ResizableHead>
-                      <ResizableHead colKey="leads" width={ad.colWidths.leads} onResize={ad.startResize("leads")} align="right">Leads</ResizableHead>
-                      <ResizableHead colKey="cpl" width={ad.colWidths.cpl} onResize={ad.startResize("cpl")} align="right">CPL</ResizableHead>
+                      <ResizableHead colKey="name" width={ad.colWidths.name} onResize={ad.startResize("name")} sortable sortableKey="name" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort}>Anúncio</ResizableHead>
+                      <ResizableHead colKey="adset" width={ad.colWidths.adset} onResize={ad.startResize("adset")} sortable sortableKey="adset" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort}>Conjunto</ResizableHead>
+                      <ResizableHead colKey="campaign" width={ad.colWidths.campaign} onResize={ad.startResize("campaign")} sortable sortableKey="campaign" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort}>Campanha</ResizableHead>
+                      <ResizableHead colKey="spend" width={ad.colWidths.spend} onResize={ad.startResize("spend")} sortable sortableKey="spend" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Gastos</ResizableHead>
+                      <ResizableHead colKey="impressions" width={ad.colWidths.impressions} onResize={ad.startResize("impressions")} sortable sortableKey="impressions" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Impressões</ResizableHead>
+                      <ResizableHead colKey="cpm" width={ad.colWidths.cpm} onResize={ad.startResize("cpm")} sortable sortableKey="cpm" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">CPM</ResizableHead>
+                      <ResizableHead colKey="reach" width={ad.colWidths.reach} onResize={ad.startResize("reach")} sortable sortableKey="reach" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Alcance*</ResizableHead>
+                      <ResizableHead colKey="frequency" width={ad.colWidths.frequency} onResize={ad.startResize("frequency")} sortable sortableKey="frequency" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Frequência*</ResizableHead>
+                      <ResizableHead colKey="clicks" width={ad.colWidths.clicks} onResize={ad.startResize("clicks")} sortable sortableKey="clicks" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Cliques</ResizableHead>
+                      <ResizableHead colKey="ctr" width={ad.colWidths.ctr} onResize={ad.startResize("ctr")} sortable sortableKey="ctr" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">CTR</ResizableHead>
+                      <ResizableHead colKey="cpc" width={ad.colWidths.cpc} onResize={ad.startResize("cpc")} sortable sortableKey="cpc" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">CPC</ResizableHead>
+                      <ResizableHead colKey="leads" width={ad.colWidths.leads} onResize={ad.startResize("leads")} sortable sortableKey="leads" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Leads</ResizableHead>
+                      <ResizableHead colKey="cpl" width={ad.colWidths.cpl} onResize={ad.startResize("cpl")} sortable sortableKey="cpl" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">CPL</ResizableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1208,13 +1351,16 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
   ] as const;
   const showMetrics = view === "overview" || view === "metrics";
   return (
-    <section className="campaign-analysis-shell border-b border-primary/20 md:max-h-[52dvh] md:shrink-0 md:overflow-y-auto">
+    <section className="campaign-analysis-shell border-b border-primary/20" data-analysis-content="intelligence">
       <header className="campaign-analysis-header flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-black"><BrainCircuit className="h-4 w-4 text-primary" />Growdash Intelligence</h2>
           <p className="text-[10px] text-muted-foreground">Diagnóstico quantitativo da entrega, eficiência e resultado no período selecionado.</p>
         </div>
-        <Badge variant="outline" className="w-fit">{series.length} dia(s) com dados</Badge>
+        <div className="flex items-center gap-2">
+          <a href="/inteligencia" className="gd-button h-8 px-3 text-[10px]"><Sparkles className="h-3.5 w-3.5" />10 automações IA</a>
+          <Badge variant="outline" className="w-fit">{series.length} dia(s) com dados</Badge>
+        </div>
       </header>
 
       <nav className="flex max-w-full gap-1 overflow-x-auto border-b border-border bg-muted/20 p-2 growdash-scrollbar-hidden" aria-label="Análises de tráfego pago">
@@ -1273,7 +1419,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
                 <Legend wrapperStyle={{ fontSize: 10 }} />
                 <Line type="monotone" dataKey="ctr" name="CTR" stroke="#38bdf8" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="resultRate" name="Taxa de resultado" stroke="#34d399" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="cpc" name="CPC" stroke="#fbbf24" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="cpc" name="CPC" stroke="var(--brand-gold-light)" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="cpl" name="CPL" stroke="#fb7185" strokeWidth={2} dot={false} />
               </RechartsLineChart>
             </ResponsiveContainer>
@@ -1283,7 +1429,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
 
       {view === "campaigns" && <EntityIntelligenceTable title="Desempenho por campanha" nameLabel="Campanha" entities={campaigns} />}
       {view === "adsets" && <EntityIntelligenceTable title="Desempenho por conjunto de anúncios" nameLabel="Conjunto de anúncios" entities={adsets} />}
-      {view === "creatives" && <EntityIntelligenceTable title="Desempenho por criativo" nameLabel="Criativo" entities={ads} />}
+      {view === "creatives" && <><CreativeIntelligenceGallery ads={ads} /><EntityIntelligenceTable title="Desempenho por criativo" nameLabel="Criativo" entities={ads} /></>}
 
       {view === "actions" && <div className="border-t border-border">
         <TrafficAIAnalysis accountId={accountId} accountName={accountName} startDate={startDate} endDate={endDate} selectedCampaignIds={selectedCampaignIds} />
@@ -1294,6 +1440,31 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
       </div>}
     </section>
   );
+}
+
+function CreativeIntelligenceGallery({ ads }: { ads: any[] }) {
+  const creatives = useMemo(() => ads.map((ad) => ({
+    ...ad,
+    mediaUrl: ad.thumbnail_url || ad.media_url || ad.video_url || null,
+  })).sort((a, b) => Number(b.spend || 0) - Number(a.spend || 0)), [ads]);
+
+  return <section className="border-t border-border p-3">
+    <div className="mb-3"><h3 className="text-xs font-black">Galeria de criativos</h3><p className="mt-1 text-[9px] text-muted-foreground">Imagem ou vídeo original disponível na Meta, sem desfoque e com identificação do anúncio.</p></div>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {creatives.length > 0 ? creatives.map((ad) => {
+        const isVideo = typeof ad.mediaUrl === "string" && /\.(mp4|webm|mov|m4v)(?:\?|$)/i.test(ad.mediaUrl);
+        return <article key={ad.id} className="overflow-hidden rounded-xl border border-border bg-background">
+          <div className="grid aspect-video place-items-center overflow-hidden bg-black">
+            {ad.mediaUrl ? isVideo
+              ? <video src={ad.mediaUrl} controls preload="metadata" className="h-full w-full object-contain" aria-label={`Vídeo do criativo ${ad.name || "sem nome"}`} />
+              : <img src={ad.mediaUrl} alt={`Criativo ${ad.name || "sem nome"}`} loading="lazy" className="h-full w-full object-contain" />
+              : <div className="px-4 text-center text-[10px] text-white/55"><RectangleHorizontal className="mx-auto mb-2 h-7 w-7" />Prévia ainda não sincronizada</div>}
+          </div>
+          <div className="p-3"><h4 className="truncate text-[11px] font-black" title={ad.name || "Sem nome"}>{ad.name || "Sem nome"}</h4><p className="mt-1 truncate text-[9px] text-muted-foreground">{ad.campaignName || "Campanha não identificada"}</p><div className="mt-3 grid grid-cols-3 gap-2"><IssueMetric label="Investido" value={Number(ad.spend || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Leads" value={Number(ad.leads || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} /><IssueMetric label="CTR" value={`${Number(ad.ctr || 0).toFixed(2).replace(".", ",")}%`} /></div></div>
+        </article>;
+      }) : <div className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">Nenhum criativo sincronizado para os filtros atuais.</div>}
+    </div>
+  </section>;
 }
 
 function EntityIntelligenceTable({ title, nameLabel, entities }: { title: string; nameLabel: string; entities: any[] }) {
@@ -1342,14 +1513,14 @@ function CampaignTotalCell({ width, value, label, align = "right", stickyLeft, s
   return <TableCell
     style={{ width, minWidth: width, maxWidth: width, ...(stickyLeft !== undefined ? { left: stickyLeft } : {}) }}
     className={cn(
-      "tabular-nums",
+      "border-r border-border/55 bg-muted/95 tabular-nums backdrop-blur-xl dark:border-[#2a271f] dark:bg-[#11110f]/95",
       align === "right" ? "text-right" : "text-left",
-      stickyLeft !== undefined && "sticky z-30 bg-muted/95 backdrop-blur-xl dark:bg-[#11110f]/95",
+      stickyLeft !== undefined && "sticky z-50",
       strongDivider && "border-r border-border shadow-[8px_0_14px_-14px_rgba(0,0,0,.9)] dark:border-[#28251e]",
     )}
   >
-    {value && <strong className="block truncate text-[10px] font-semibold text-foreground">{value}</strong>}
-    {label && <span className="mt-0.5 block truncate text-[8px] leading-tight text-muted-foreground">{label}</span>}
+    {value && <strong className="block truncate text-[11px] font-bold text-foreground">{value}</strong>}
+    {label && <span className="mt-0.5 block truncate text-[9px] font-semibold leading-tight text-muted-foreground">{label}</span>}
   </TableCell>;
 }
 

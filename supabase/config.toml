@@ -35,3 +35,8 @@ verify_jwt = true
 
 [functions.sync-rd-crm]
 verify_jwt = false
+
+[functions.daily-incremental-sync]
+verify_jwt = false
+[functions.admin-create-user]
+verify_jwt = false

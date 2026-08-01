@@ -6,7 +6,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const GRAPH = `https://graph.facebook.com/${Deno.env.get("META_GRAPH_API_VERSION") || "v25.0"}`;
+const GRAPH = `https://graph.facebook.com/${
+  Deno.env.get("META_GRAPH_API_VERSION") || "v25.0"
+}`;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 type LeadRow = {
   ad_account_id: string;
@@ -29,27 +32,114 @@ type LeadRow = {
 const STATE_KEYS = ["state", "estado", "uf", "província", "provincia"];
 const CITY_KEYS = ["city", "cidade", "municipio", "município"];
 const EMAIL_KEYS = ["email", "e-mail", "e_mail"];
-const PHONE_KEYS = ["phone_number", "phone", "telefone", "whatsapp", "celular", "número"];
+const PHONE_KEYS = [
+  "phone_number",
+  "phone",
+  "telefone",
+  "whatsapp",
+  "celular",
+  "número",
+];
 const NAME_KEYS = ["full_name", "name", "nome", "nome completo"];
 
 const NAME_TO_UF: Record<string, string> = {
-  "acre":"AC","alagoas":"AL","amapa":"AP","amazonas":"AM","bahia":"BA","ceara":"CE",
-  "distrito federal":"DF","espirito santo":"ES","goias":"GO","maranhao":"MA","mato grosso":"MT",
-  "mato grosso do sul":"MS","minas gerais":"MG","para":"PA","paraiba":"PB","parana":"PR",
-  "pernambuco":"PE","piaui":"PI","rio de janeiro":"RJ","rio grande do norte":"RN","rio grande do sul":"RS",
-  "rondonia":"RO","roraima":"RR","santa catarina":"SC","sao paulo":"SP","sergipe":"SE","tocantins":"TO",
+  "acre": "AC",
+  "alagoas": "AL",
+  "amapa": "AP",
+  "amazonas": "AM",
+  "bahia": "BA",
+  "ceara": "CE",
+  "distrito federal": "DF",
+  "espirito santo": "ES",
+  "goias": "GO",
+  "maranhao": "MA",
+  "mato grosso": "MT",
+  "mato grosso do sul": "MS",
+  "minas gerais": "MG",
+  "para": "PA",
+  "paraiba": "PB",
+  "parana": "PR",
+  "pernambuco": "PE",
+  "piaui": "PI",
+  "rio de janeiro": "RJ",
+  "rio grande do norte": "RN",
+  "rio grande do sul": "RS",
+  "rondonia": "RO",
+  "roraima": "RR",
+  "santa catarina": "SC",
+  "sao paulo": "SP",
+  "sergipe": "SE",
+  "tocantins": "TO",
 };
 
 const DDD_TO_UF: Record<string, string> = {
-  "11":"SP","12":"SP","13":"SP","14":"SP","15":"SP","16":"SP","17":"SP","18":"SP","19":"SP",
-  "21":"RJ","22":"RJ","24":"RJ","27":"ES","28":"ES",
-  "31":"MG","32":"MG","33":"MG","34":"MG","35":"MG","37":"MG","38":"MG",
-  "41":"PR","42":"PR","43":"PR","44":"PR","45":"PR","46":"PR",
-  "47":"SC","48":"SC","49":"SC","51":"RS","53":"RS","54":"RS","55":"RS",
-  "61":"DF","62":"GO","64":"GO","63":"TO","65":"MT","66":"MT","67":"MS","68":"AC","69":"RO",
-  "71":"BA","73":"BA","74":"BA","75":"BA","77":"BA","79":"SE",
-  "81":"PE","87":"PE","82":"AL","83":"PB","84":"RN","85":"CE","88":"CE","86":"PI","89":"PI",
-  "91":"PA","93":"PA","94":"PA","92":"AM","97":"AM","95":"RR","96":"AP","98":"MA","99":"MA",
+  "11": "SP",
+  "12": "SP",
+  "13": "SP",
+  "14": "SP",
+  "15": "SP",
+  "16": "SP",
+  "17": "SP",
+  "18": "SP",
+  "19": "SP",
+  "21": "RJ",
+  "22": "RJ",
+  "24": "RJ",
+  "27": "ES",
+  "28": "ES",
+  "31": "MG",
+  "32": "MG",
+  "33": "MG",
+  "34": "MG",
+  "35": "MG",
+  "37": "MG",
+  "38": "MG",
+  "41": "PR",
+  "42": "PR",
+  "43": "PR",
+  "44": "PR",
+  "45": "PR",
+  "46": "PR",
+  "47": "SC",
+  "48": "SC",
+  "49": "SC",
+  "51": "RS",
+  "53": "RS",
+  "54": "RS",
+  "55": "RS",
+  "61": "DF",
+  "62": "GO",
+  "64": "GO",
+  "63": "TO",
+  "65": "MT",
+  "66": "MT",
+  "67": "MS",
+  "68": "AC",
+  "69": "RO",
+  "71": "BA",
+  "73": "BA",
+  "74": "BA",
+  "75": "BA",
+  "77": "BA",
+  "79": "SE",
+  "81": "PE",
+  "87": "PE",
+  "82": "AL",
+  "83": "PB",
+  "84": "RN",
+  "85": "CE",
+  "88": "CE",
+  "86": "PI",
+  "89": "PI",
+  "91": "PA",
+  "93": "PA",
+  "94": "PA",
+  "92": "AM",
+  "97": "AM",
+  "95": "RR",
+  "96": "AP",
+  "98": "MA",
+  "99": "MA",
 };
 function dddToUF(phone: string | null): string | null {
   if (!phone) return null;
@@ -70,7 +160,8 @@ function normalizeUF(s: string | null): string | null {
 }
 
 function norm(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim();
 }
 
 function pickField(fd: any[], wants: string[]): string | null {
@@ -85,14 +176,19 @@ function pickField(fd: any[], wants: string[]): string | null {
   return null;
 }
 
-async function fetchAll(url: string, maxPages = 80): Promise<{ data: any[]; error?: string }> {
+async function fetchAll(
+  url: string,
+  maxPages = 80,
+): Promise<{ data: any[]; error?: string }> {
   const all: any[] = [];
   let next: string | undefined = url;
   let pages = 0;
   while (next && pages < maxPages) {
-    const r = await fetch(next);
-    const json = await r.json();
-    if (json.error) return { data: all, error: json.error.message || String(json.error) };
+    const r: Response = await fetch(next);
+    const json: any = await r.json();
+    if (json.error) {
+      return { data: all, error: json.error.message || String(json.error) };
+    }
     if (Array.isArray(json.data)) all.push(...json.data);
     next = json.paging?.next;
     pages++;
@@ -100,8 +196,42 @@ async function fetchAll(url: string, maxPages = 80): Promise<{ data: any[]; erro
   return { data: all };
 }
 
+function parseExactDateRange(body: Record<string, unknown>): {
+  startDate: string;
+  endDate: string;
+  startEpoch: number;
+  endExclusiveEpoch: number;
+} | null {
+  const startDate = String(body.startDate ?? body.start_date ?? "").trim();
+  const endDate = String(body.endDate ?? body.end_date ?? "").trim();
+  if (!startDate && !endDate) return null;
+  if (!DATE_RE.test(startDate) || !DATE_RE.test(endDate)) {
+    throw new Error(
+      "startDate e endDate devem ser informados juntos no formato YYYY-MM-DD",
+    );
+  }
+  if (startDate > endDate) {
+    throw new Error("startDate não pode ser posterior a endDate");
+  }
+
+  const startMs = Date.parse(`${startDate}T00:00:00-03:00`);
+  const endMs = Date.parse(`${endDate}T00:00:00-03:00`) + 86400000;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    throw new Error("Intervalo de datas inválido");
+  }
+
+  return {
+    startDate,
+    endDate,
+    startEpoch: Math.floor(startMs / 1000),
+    endExclusiveEpoch: Math.floor(endMs / 1000),
+  };
+}
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -115,19 +245,33 @@ Deno.serve(async (req) => {
 
     let userId: string | null = null;
     if (!isService) {
-      const sb = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-        global: { headers: { Authorization: authHeader } },
-      });
+      const sb = createClient(
+        SUPABASE_URL,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        {
+          global: { headers: { Authorization: authHeader } },
+        },
+      );
       const { data: { user } } = await sb.auth.getUser();
-      if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: corsHeaders,
+        });
+      }
       userId = user.id;
     }
 
-    const adAccountId: string | undefined = body.ad_account_id || body.adAccountId;
+    const adAccountId: string | undefined = body.ad_account_id ||
+      body.adAccountId;
+    const exactRange = parseExactDateRange(body);
     const days: number = Math.max(1, Math.min(90, Number(body.days ?? 7)));
-    const since = Math.floor((Date.now() - days * 86400000) / 1000);
+    const since = exactRange?.startEpoch ??
+      Math.floor((Date.now() - days * 86400000) / 1000);
 
-    let q = admin.from("ad_accounts").select("id,name,account_id,access_token,user_id");
+    let q = admin.from("ad_accounts").select(
+      "id,name,account_id,access_token,user_id",
+    );
     if (adAccountId) q = q.eq("id", adAccountId);
     if (userId) q = q.eq("user_id", userId);
     const { data: accounts, error: accErr } = await q;
@@ -151,7 +295,8 @@ Deno.serve(async (req) => {
         const discoveryWarnings: string[] = [];
         if (adsRes.error) discoveryWarnings.push(`ads: ${adsRes.error}`);
         // Also discover via /leadgen_forms on the account (covers forms not bound to specific ads)
-        const formsUrl = `${GRAPH}/${actId}/leadgen_forms?fields=id&limit=200&access_token=${token}`;
+        const formsUrl =
+          `${GRAPH}/${actId}/leadgen_forms?fields=id&limit=200&access_token=${token}`;
         const formsRes = await fetchAll(formsUrl, 10);
         if (formsRes.error) discoveryWarnings.push(`forms: ${formsRes.error}`);
         for (const f of formsRes.data || []) {
@@ -162,7 +307,21 @@ Deno.serve(async (req) => {
         const formErrors: string[] = [];
 
         for (const formId of formIds) {
-          const filtering = encodeURIComponent(JSON.stringify([{ field: "time_created", operator: "GREATER_THAN", value: since }]));
+          const filters: Array<Record<string, string | number>> = [
+            {
+              field: "time_created",
+              operator: "GREATER_THAN",
+              value: since - 1,
+            },
+          ];
+          if (exactRange) {
+            filters.push({
+              field: "time_created",
+              operator: "LESS_THAN",
+              value: exactRange.endExclusiveEpoch,
+            });
+          }
+          const filtering = encodeURIComponent(JSON.stringify(filters));
           const leadsUrl =
             `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
           const r = await fetchAll(leadsUrl, 50);
@@ -170,7 +329,19 @@ Deno.serve(async (req) => {
             formErrors.push(`form ${formId}: ${r.error}`);
             continue;
           }
-          const rows: LeadRow[] = r.data.map((l: any) => {
+          // Meta may occasionally ignore one of the filtering clauses. Enforce the
+          // exact closed calendar range locally before persisting any record.
+          const leadsInRange = exactRange
+            ? r.data.filter((lead: any) => {
+              const createdEpoch = Math.floor(
+                Date.parse(String(lead?.created_time ?? "")) / 1000,
+              );
+              return Number.isFinite(createdEpoch) &&
+                createdEpoch >= exactRange.startEpoch &&
+                createdEpoch < exactRange.endExclusiveEpoch;
+            })
+            : r.data;
+          const rows: LeadRow[] = leadsInRange.map((l: any) => {
             const fd = l.field_data || [];
             const email = pickField(fd, EMAIL_KEYS);
             const phone = pickField(fd, PHONE_KEYS);
@@ -179,7 +350,10 @@ Deno.serve(async (req) => {
             let source: string | null = formState ? "form" : null;
             if (!state) {
               const fromDDD = dddToUF(phone);
-              if (fromDDD) { state = fromDDD; source = "ddd"; }
+              if (fromDDD) {
+                state = fromDDD;
+                source = "ddd";
+              }
             }
             return {
               ad_account_id: acc.id,
@@ -203,7 +377,9 @@ Deno.serve(async (req) => {
           // Enrich rows still missing state via RD deals (match by email only — rd_deals has no phone column)
           const missing = rows.filter((x) => !x.lead_state && x.email);
           if (missing.length) {
-            const emails = Array.from(new Set(missing.map((m) => m.email!.toLowerCase())));
+            const emails = Array.from(
+              new Set(missing.map((m) => m.email!.toLowerCase())),
+            );
             const rdMap = new Map<string, string>();
             const { data: rd } = await admin
               .from("rd_deals")
@@ -211,20 +387,29 @@ Deno.serve(async (req) => {
               .in("contact_email", emails);
             for (const d of (rd || []) as any[]) {
               const uf = normalizeUF(d.lead_state);
-              if (uf && d.contact_email) rdMap.set(String(d.contact_email).toLowerCase(), uf);
+              if (uf && d.contact_email) {
+                rdMap.set(String(d.contact_email).toLowerCase(), uf);
+              }
             }
             for (const row of missing) {
-              const fromRd = row.email ? rdMap.get(row.email.toLowerCase()) : null;
-              if (fromRd) { row.lead_state = fromRd; row.lead_state_source = "rd"; }
+              const fromRd = row.email
+                ? rdMap.get(row.email.toLowerCase())
+                : null;
+              if (fromRd) {
+                row.lead_state = fromRd;
+                row.lead_state_source = "rd";
+              }
             }
           }
-
 
           for (let i = 0; i < rows.length; i += 500) {
             const chunk = rows.slice(i, i + 500);
             const { error: upErr } = await admin
               .from("meta_leads")
-              .upsert(chunk, { onConflict: "meta_lead_id", ignoreDuplicates: false });
+              .upsert(chunk, {
+                onConflict: "meta_lead_id",
+                ignoreDuplicates: false,
+              });
             if (upErr) {
               formErrors.push(`upsert form ${formId}: ${upErr.message}`);
               break;
@@ -238,7 +423,9 @@ Deno.serve(async (req) => {
           account: acc.name,
           formsFound: formIds.size,
           leads: leadsUpserted,
-          errors: [...discoveryWarnings, ...formErrors].length ? [...discoveryWarnings, ...formErrors] : undefined,
+          errors: [...discoveryWarnings, ...formErrors].length
+            ? [...discoveryWarnings, ...formErrors]
+            : undefined,
         });
       } catch (e) {
         accountResults.push({ account: acc.name, error: (e as Error).message });
@@ -246,8 +433,15 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, upserted: totalUpserted, accounts: accountResults }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        success: true,
+        upserted: totalUpserted,
+        accounts: accountResults,
+        range: exactRange
+          ? { startDate: exactRange.startDate, endDate: exactRange.endDate }
+          : { days },
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {

@@ -52,7 +52,7 @@ export default function DashboardPage() {
           <div className="divide-y divide-[#eeeae4]">
             {activities.map(([source, text, time]) => (
               <div key={text} className="flex items-start gap-3 p-4">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#e3b633]" />
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <div className="min-w-0 grow">
                   <p className="text-xs font-bold">{source}</p>
                   <p className="truncate text-[11px] text-[#77716a]">{text}</p>

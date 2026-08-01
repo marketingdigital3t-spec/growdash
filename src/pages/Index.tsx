@@ -6,8 +6,8 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
-import { useAlerts } from "@/hooks/useAlerts";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
+import { useAlerts } from "@/hooks/useAlerts";
 import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
@@ -22,6 +22,7 @@ import { Pencil } from "lucide-react";
 import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip";
 import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
+import { saleMatchesCampaign } from "@/lib/saleRevenue";
 
 const Index = () => {
   const {
@@ -81,7 +82,7 @@ const Index = () => {
     endDate,
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
   });
-  const { data: alerts = [] } = useAlerts(true);
+  const { data: alerts = [] } = useAlerts();
   const syncMeta = useSyncMeta();
 
   const { data: activeView } = useGlobalView();
@@ -105,9 +106,17 @@ const Index = () => {
   const visiblePickerInsights = useMemo(() => campaignPickerInsights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [campaignPickerInsights, visibleAccountIds]);
   const visibleCampaigns = useMemo(() => campaigns.filter((campaign: any) => visibleAccountIds.has(campaign.ad_account_id)), [campaigns, visibleAccountIds]);
   const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id)), [sales, visibleAccountIds]);
+  const selectedCampaigns = useMemo(
+    () => visibleCampaigns.filter((campaign: any) => selectedCampaignIds.includes(campaign.id)),
+    [selectedCampaignIds, visibleCampaigns],
+  );
   const dashboardSales = useMemo(() => selectedCampaignIds.length
-    ? unitSales.filter((sale) => sale.campaign_ids?.some((campaignId) => selectedCampaignIds.includes(campaignId)))
-    : unitSales, [unitSales, selectedCampaignIds]);
+    ? unitSales.filter((sale) => selectedCampaigns.some((campaign: any) => saleMatchesCampaign(sale, {
+      id: campaign.id,
+      name: campaign.name,
+      adAccountId: campaign.ad_account_id,
+    })))
+    : unitSales, [selectedCampaignIds.length, selectedCampaigns, unitSales]);
   const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id && visibleAccountIds.has(deal.ad_account_id)), [rdDeals, visibleAccountIds]);
   const glassSales = aggregateSales(dashboardSales);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
@@ -116,7 +125,6 @@ const Index = () => {
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
-  const openAlerts = alerts.length;
 
   const handleSync = async () => {
     refetch();
@@ -246,7 +254,7 @@ const Index = () => {
       </MotionItem>
 
       <MotionItem>
-        <div className="flex flex-col gap-3 border-b border-border/60 pb-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 border-b border-border/60 pb-3 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
             <DateFilterBar
               preset={preset}
@@ -285,7 +293,7 @@ const Index = () => {
               size="sm"
               variant="outline"
               onClick={beginDashboardEdit}
-              className="w-full shrink-0 gap-1.5 sm:w-auto"
+              className="w-full shrink-0 gap-1.5 lg:w-auto"
             >
               <Pencil className="h-3.5 w-3.5" />
               Editar dashboard
@@ -294,7 +302,7 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} openAlerts={openAlerts} sales={glassSales.totalQuantity} />
+      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
 
       {(isEditing ? draftView : activeView) && (
         <DashboardProvider

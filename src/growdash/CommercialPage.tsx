@@ -43,7 +43,7 @@ export default function CommercialPage() {
   const ranking = useMemo(() => {
     const map = new Map<string, { seller: string; revenue: number; count: number; commission: number }>();
     for (const row of filtered) {
-      if (row.sale.status !== "confirmed" && row.sale.status !== "pending") continue;
+      if (row.sale.status !== "confirmed") continue;
       const current = map.get(row.seller) || { seller: row.seller, revenue: 0, count: 0, commission: 0 };
       current.revenue += Number(row.sale.net_revenue || 0);
       current.count += Number(row.sale.quantity || 1);

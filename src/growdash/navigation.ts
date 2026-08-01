@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   BarChart3,
   BadgeDollarSign,
-  Bot,
   Building2,
   Cable,
   CalendarDays,
@@ -103,19 +102,6 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "Vendas", value: "42", change: "+11%" },
         ],
         highlights: ["Conversão por etapa", "Principais pontos de abandono", "Canais que mais convertem"],
-      },
-      {
-        label: "IA do Funil",
-        path: "/ia-do-funil",
-        icon: Bot,
-        description: "Receba diagnósticos e recomendações inteligentes para crescer.",
-        metrics: [
-          { label: "Insights ativos", value: "12", change: "+4" },
-          { label: "Ações concluídas", value: "28", change: "+9" },
-          { label: "Impacto estimado", value: "+21%", change: "alto" },
-          { label: "Anomalias", value: "3", change: "revisar" },
-        ],
-        highlights: ["Oportunidades detectadas", "Recomendações prioritárias", "Resumo inteligente da semana"],
       },
       {
         label: "Alertas",

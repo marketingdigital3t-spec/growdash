@@ -2149,6 +2149,68 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_report_pages: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          banner_data: string | null
+          created_at: string
+          date_from: string
+          date_to: string
+          id: string
+          is_public: boolean
+          metrics: string[]
+          payload: Json
+          share_token: string
+          title: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          account_name?: string | null
+          banner_data?: string | null
+          created_at?: string
+          date_from: string
+          date_to: string
+          id?: string
+          is_public?: boolean
+          metrics?: string[]
+          payload?: Json
+          share_token?: string
+          title: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          account_name?: string | null
+          banner_data?: string | null
+          created_at?: string
+          date_from?: string
+          date_to?: string
+          id?: string
+          is_public?: boolean
+          metrics?: string[]
+          payload?: Json
+          share_token?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_report_pages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_breakdown_insights: {
         Row: {
           ad_account_id: string
@@ -3264,6 +3326,8 @@ export type Database = {
           ad_account_id: string | null
           ad_id: string | null
           adset_id: string | null
+          attribution_confidence: number | null
+          attribution_reason: string | null
           business_unit_id: string | null
           campaign_ids: string[] | null
           chargeback_amount: number | null
@@ -3297,6 +3361,9 @@ export type Database = {
           rd_product_name: string | null
           refund_amount: number | null
           sale_date: string
+          source_closed_at: string | null
+          source_provider: string | null
+          source_record_id: string | null
           status: string
           tax_amount: number | null
           updated_at: string
@@ -3312,6 +3379,8 @@ export type Database = {
           ad_account_id?: string | null
           ad_id?: string | null
           adset_id?: string | null
+          attribution_confidence?: number | null
+          attribution_reason?: string | null
           business_unit_id?: string | null
           campaign_ids?: string[] | null
           chargeback_amount?: number | null
@@ -3345,6 +3414,9 @@ export type Database = {
           rd_product_name?: string | null
           refund_amount?: number | null
           sale_date?: string
+          source_closed_at?: string | null
+          source_provider?: string | null
+          source_record_id?: string | null
           status?: string
           tax_amount?: number | null
           updated_at?: string
@@ -3360,6 +3432,8 @@ export type Database = {
           ad_account_id?: string | null
           ad_id?: string | null
           adset_id?: string | null
+          attribution_confidence?: number | null
+          attribution_reason?: string | null
           business_unit_id?: string | null
           campaign_ids?: string[] | null
           chargeback_amount?: number | null
@@ -3393,6 +3467,9 @@ export type Database = {
           rd_product_name?: string | null
           refund_amount?: number | null
           sale_date?: string
+          source_closed_at?: string | null
+          source_provider?: string | null
+          source_record_id?: string | null
           status?: string
           tax_amount?: number | null
           updated_at?: string
@@ -4066,30 +4143,90 @@ export type Database = {
       }
       user_permissions: {
         Row: {
+          can_agents: boolean
+          can_alerts: boolean
+          can_announcements: boolean
+          can_automations: boolean
+          can_brands: boolean
           can_campaigns: boolean
           can_classes: boolean
+          can_commercial: boolean
+          can_crm: boolean
+          can_data_health: boolean
           can_dashboard: boolean
+          can_finance: boolean
+          can_flow: boolean
           can_funnels: boolean
+          can_integrations: boolean
+          can_kanban: boolean
+          can_leads: boolean
+          can_meta_connect: boolean
+          can_products: boolean
+          can_settings: boolean
+          can_social_media: boolean
+          can_storage: boolean
+          can_tickets: boolean
+          can_users: boolean
           created_at: string
           updated_at: string
           user_id: string
           username: string
         }
         Insert: {
+          can_agents?: boolean
+          can_alerts?: boolean
+          can_announcements?: boolean
+          can_automations?: boolean
+          can_brands?: boolean
           can_campaigns?: boolean
           can_classes?: boolean
+          can_commercial?: boolean
+          can_crm?: boolean
+          can_data_health?: boolean
           can_dashboard?: boolean
+          can_finance?: boolean
+          can_flow?: boolean
           can_funnels?: boolean
+          can_integrations?: boolean
+          can_kanban?: boolean
+          can_leads?: boolean
+          can_meta_connect?: boolean
+          can_products?: boolean
+          can_settings?: boolean
+          can_social_media?: boolean
+          can_storage?: boolean
+          can_tickets?: boolean
+          can_users?: boolean
           created_at?: string
           updated_at?: string
           user_id: string
           username: string
         }
         Update: {
+          can_agents?: boolean
+          can_alerts?: boolean
+          can_announcements?: boolean
+          can_automations?: boolean
+          can_brands?: boolean
           can_campaigns?: boolean
           can_classes?: boolean
+          can_commercial?: boolean
+          can_crm?: boolean
+          can_data_health?: boolean
           can_dashboard?: boolean
+          can_finance?: boolean
+          can_flow?: boolean
           can_funnels?: boolean
+          can_integrations?: boolean
+          can_kanban?: boolean
+          can_leads?: boolean
+          can_meta_connect?: boolean
+          can_products?: boolean
+          can_settings?: boolean
+          can_social_media?: boolean
+          can_storage?: boolean
+          can_tickets?: boolean
+          can_users?: boolean
           created_at?: string
           updated_at?: string
           user_id?: string
@@ -4520,6 +4657,10 @@ export type Database = {
         Returns: boolean
       }
       ensure_current_workspace: { Args: never; Returns: string }
+      get_shared_lead_report: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

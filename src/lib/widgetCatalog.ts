@@ -32,6 +32,7 @@ export interface WidgetConfig {
   text?: string;
   hidePrimary?: boolean;
   individualized?: boolean;
+  canonicalLayoutVersion?: number;
 }
 
 export type WidgetType =
@@ -277,22 +278,21 @@ export function getWidgetDef(type: WidgetType) {
   return WIDGET_CATALOG.find((w) => w.type === type);
 }
 
-// Default "Padrão" view: a single full-width block that renders the legacy dashboard.
-// AskAI + budget_bm + campaigns_detail are always appended by the renderer.
+// Default "Padrão" view: the canonical full-width dashboard recovered from the
+// original Growdash project. System widgets are appended by the renderer.
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 3;
+
 export const DEFAULT_VIEW = {
   name: "Padrão",
   layout: [
-    { i: "primary-revenue", x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "primary-spend", x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "primary-roas", x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "primary-profit", x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "default", x: 0, y: 2, w: 12, h: 30, minW: 6, minH: 10 },
+    { i: "default", x: 0, y: 0, w: 12, h: 30, minW: 12, minH: 10 },
   ],
   widgets: [
-    { id: "primary-revenue", type: "kpi" as WidgetType, title: "Faturamento Líquido", config: { metric: "revenue_net" } },
-    { id: "primary-spend", type: "kpi" as WidgetType, title: "Gastos com Anúncios", config: { metric: "spend" } },
-    { id: "primary-roas", type: "kpi" as WidgetType, title: "ROAS", config: { metric: "roas" } },
-    { id: "primary-profit", type: "kpi" as WidgetType, title: "Lucro Líquido", config: { metric: "profit" } },
-    { id: "default", type: "default_block" as WidgetType, title: "Padrão", config: { hidePrimary: true, individualized: true } },
+    {
+      id: "default",
+      type: "default_block" as WidgetType,
+      title: "Padrão",
+      config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION },
+    },
   ],
 };

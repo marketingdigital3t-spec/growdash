@@ -17,6 +17,7 @@ import { useBudgetAnalysis, type BudgetAnalysisItem } from "@/hooks/useBudgetAna
 import { useLastTopUp, useNextTopUpEstimate } from "@/hooks/useCampaignTargets";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { aggregateSales, useSales } from "@/hooks/useSales";
 import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 import { CampaignAttentionPanel } from "@/components/campaigns/CampaignAttentionPanel";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 
 const CampaignsManager = lazy(() => import("@/pages/Campaigns"));
 const validTabs = new Set(["campaigns", "budget", "ai", "funnels", "tools"]);
@@ -43,6 +45,7 @@ export default function TrafficPage() {
   const [params, setParams] = useSearchParams();
   const { toast } = useToast();
   const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
+  const campaignAnalysisMode = activeTab === "campaigns" && ["alerts", "intelligence"].includes(params.get("analise") || "");
   const { adAccountId, setAdAccountId, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
@@ -54,14 +57,16 @@ export default function TrafficPage() {
     <div className={cn(
       "mx-auto w-full max-w-[1920px]",
       activeTab === "campaigns"
-        ? "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
+        ? campaignAnalysisMode
+          ? "space-y-3"
+          : "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
         : "space-y-3",
     )}>
       <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-3 lg:max-w-[1500px] lg:grid-cols-5" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 
-      {activeTab !== "campaigns" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
+      {activeTab !== "campaigns" && activeTab !== "ai" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
         <span className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conta de anúncio</span>
         <Select value={adAccountId} onValueChange={setAdAccountId}><SelectTrigger className="h-9 w-full bg-background sm:max-w-md"><SelectValue placeholder="Selecione uma conta" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as contas da unidade</SelectItem>{visibleAccounts.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[10px] font-bold text-emerald-600"><Check className="h-3 w-3" />Dados sincronizados</span>
@@ -70,7 +75,7 @@ export default function TrafficPage() {
 
       {activeTab === "campaigns" && <Suspense fallback={<Loading />}><CampaignsManager /></Suspense>}
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountId} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
-      {activeTab === "ai" && <AIAndLeadReports accountId={adAccountId} accountName={account?.name} />}
+      {activeTab === "ai" && <AIAndLeadReports accountId={adAccountId} accountName={account?.name} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} onAccountChange={setAdAccountId} />}
       {activeTab === "funnels" && <TrafficFunnels />}
       {activeTab === "tools" && <MetaToolsWorkspace
         providerAccountId={account?.account_id}
@@ -218,19 +223,21 @@ function BudgetAccountCard({ item }: { item: BudgetAnalysisItem }) {
   return <article data-budget-account-severity={item.severity} className={cn("rounded-xl border bg-muted/15 p-4", item.severity === "critical" ? "border-red-500/35" : item.severity === "warning" ? "border-amber-500/35" : "border-emerald-500/25", urgent && "shadow-[0_0_26px_-12px_rgba(239,68,68,.8)]")}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{item.name}</h3><p className="mt-1 text-[10px] text-muted-foreground">{item.summary}</p></div><span className={cn("rounded-full px-2 py-1 text-[9px] font-black uppercase", item.severity === "critical" ? "bg-red-500/10 text-red-500" : item.severity === "warning" ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500")}>{item.severity === "critical" ? "Crítico" : item.severity === "warning" ? "Atenção" : "Saudável"}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3"><SmallMetric label="Orçamento diário (ativos)" value={brl.format(item.dailyBudgetActive)} /><SmallMetric label="Gasto médio/dia" value={brl.format(item.avgDailySpend)} /><SmallMetric label="Saldo restante" value={item.balance == null ? "Não informado" : brl.format(item.balance)} /><SmallMetric label="Saldo dura" value={item.daysBalanceLasts == null ? "Sem estimativa" : `${item.daysBalanceLasts} dia(s)`} /><SmallMetric label={`Previsão próximos ${item.daysUntilMonday} dias`} value={brl.format(item.projectedSpendUntilMonday)} /><SmallMetric label="Folga até segunda" value={mondayBuffer == null ? "Saldo não informado" : brl.format(mondayBuffer)} /></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", use > 100 ? "bg-red-500" : use > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${Math.min(use, 100)}%` }} /></div><div className="mt-4 space-y-2 border-t border-border/60 pt-3 text-[10px] text-muted-foreground"><p>⏱ Próxima recarga: {nextTopUp?.hasEnoughHistory && nextTopUp.estimatedDate ? <b className="text-foreground">~ {format(nextTopUp.estimatedDate, "dd/MM/yyyy")} · {brl.format(nextTopUp.avgAmount)}</b> : <i>histórico insuficiente</i>}</p><p>⊕ Último aporte: {lastTopUp ? <b className="text-foreground">{brl.format(Number(lastTopUp.delta))} em {format(new Date(lastTopUp.event_at), "dd/MM/yyyy")}</b> : <i>nenhum aporte registrado</i>}</p>{item.reasons.length > 0 && <p><CircleAlert className="mr-1 inline h-3.5 w-3.5" />{item.reasons[0]}</p>}</div></article>;
 }
 
-function AIAndLeadReports({ accountId, accountName }: { accountId: string; accountName?: string }) {
+function AIAndLeadReports({ accountId, accountName, accounts, onAccountChange }: { accountId: string; accountName?: string; accounts: Array<{ id: string; name: string }>; onAccountChange: (id: string) => void }) {
   const { startDate, endDate } = useGlobalFilters();
   const single = accountId !== "all" ? accountId : undefined;
   const { data: insights = [], isLoading: loadingMeta } = useInsights({ adAccountId: single, startDate, endDate, enabled: !!single });
   const { data: deals = [], isLoading: loadingRD } = useRDDealsForPeriod({ startDate, endDate, adAccountId: single, enabled: !!single });
+  const { data: sales = [], isLoading: loadingSales } = useSales({ startDate, endDate, adAccountId: single, enabled: !!single });
   const { toast } = useToast();
   const metaLeads = insights.reduce((sum, item) => sum + Number(item.leads || 0), 0);
   const spend = insights.reduce((sum, item) => sum + Number(item.spend || 0), 0);
-  const won = deals.filter((deal) => deal.win).length;
-  const revenue = deals.filter((deal) => deal.win).reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0);
+  const saleTotals = aggregateSales(sales);
+  const won = saleTotals.totalQuantity;
+  const revenue = saleTotals.totalNet;
   const byCampaign = useMemo(() => { const map = new Map<string, { leads: number; spend: number }>(); for (const item of insights) { const name = item.campaign_name || "Sem campanha"; const row = map.get(name) || { leads: 0, spend: 0 }; row.leads += Number(item.leads || 0); row.spend += Number(item.spend || 0); map.set(name, row); } return Array.from(map, ([name, value]) => ({ name, ...value })).sort((a, b) => b.leads - a.leads); }, [insights]);
   const copyReport = async () => { const report = `Relatório de leads — ${accountName || "Conta"}\nPeríodo: ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}\nMeta Ads: ${integer.format(metaLeads)} leads | ${brl.format(spend)} investidos | CPL ${brl.format(metaLeads ? spend / metaLeads : 0)}\nRD Station: ${integer.format(deals.length)} negócios | ${won} vendas | ${brl.format(revenue)} em receita`; await navigator.clipboard.writeText(report); toast({ title: "Relatório copiado" }); };
-  return <div className="space-y-4"><TrafficAIAnalysis accountId={accountId} accountName={accountName} startDate={startDate} endDate={endDate} selectedCampaignIds={[]} />{!single ? <Empty text="Selecione uma conta específica para cruzar Meta Ads e RD Station sem misturar origens." /> : <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Kpi label="Leads Meta Ads" value={loadingMeta ? "Carregando…" : integer.format(metaLeads)} note="Insights do período" /><Kpi label="Investimento" value={brl.format(spend)} note="Meta Ads" /><Kpi label="CPL Meta" value={brl.format(metaLeads ? spend / metaLeads : 0)} note="Investimento ÷ leads" emphasis /><Kpi label="Negócios RD" value={loadingRD ? "Carregando…" : integer.format(deals.length)} note={`${won} venda(s) ganha(s)`} /><Kpi label="Receita RD" value={brl.format(revenue)} note={spend > 0 ? `ROAS atribuído ${(revenue / spend).toFixed(2)}x` : "Sem gasto atribuído"} /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Relatório de leads por campanha</h2><p className="text-xs text-muted-foreground">Meta Ads no período selecionado; negócios e vendas vêm do RD Station.</p></div><Button variant="outline" size="sm" onClick={copyReport} className="sm:ml-auto"><Copy className="mr-2 h-4 w-4" />Copiar relatório diário</Button></header><div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-4 py-3">Campanha</th><th className="px-4 py-3 text-right">Investimento</th><th className="px-4 py-3 text-right">Leads Meta</th><th className="px-4 py-3 text-right">CPL</th></tr></thead><tbody>{byCampaign.map((row) => <tr key={row.name} className="border-t border-border"><td className="px-4 py-3 font-bold">{row.name}</td><td className="px-4 py-3 text-right">{brl.format(row.spend)}</td><td className="px-4 py-3 text-right">{integer.format(row.leads)}</td><td className="px-4 py-3 text-right">{brl.format(row.leads ? row.spend / row.leads : 0)}</td></tr>)}</tbody></table></div></section></>}</div>;
+  return <div className="space-y-4"><TrafficAIAnalysis accountId={accountId} accountName={accountName} startDate={startDate} endDate={endDate} selectedCampaignIds={[]} /><LeadReportStudio accountId={single || "all"} accountName={accountName} accounts={accounts} onAccountChange={onAccountChange} startDate={startDate} endDate={endDate} insights={insights} deals={deals} sales={sales} />{single ? <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Kpi label="Leads Meta Ads" value={loadingMeta ? "Carregando…" : integer.format(metaLeads)} note="Insights do período" /><Kpi label="Investimento" value={brl.format(spend)} note="Meta Ads" /><Kpi label="CPL Meta" value={brl.format(metaLeads ? spend / metaLeads : 0)} note="Investimento ÷ leads" emphasis /><Kpi label="Negócios RD" value={loadingRD ? "Carregando…" : integer.format(deals.length)} note={`${loadingSales ? "…" : won} venda(s) confirmada(s)`} /><Kpi label="Receita RD" value={loadingSales ? "Carregando…" : brl.format(revenue)} note={spend > 0 ? `ROAS atribuído ${(revenue / spend).toFixed(2)}x` : "Sem gasto atribuído"} /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Relatório de leads por campanha</h2><p className="text-xs text-muted-foreground">Meta Ads no período selecionado; negócios vêm do RD e o faturamento das vendas confirmadas.</p></div><Button variant="outline" size="sm" onClick={copyReport} className="sm:ml-auto"><Copy className="mr-2 h-4 w-4" />Copiar relatório diário</Button></header><div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs"><thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-4 py-3">Campanha</th><th className="px-4 py-3 text-right">Investimento</th><th className="px-4 py-3 text-right">Leads Meta</th><th className="px-4 py-3 text-right">CPL</th></tr></thead><tbody>{byCampaign.map((row) => <tr key={row.name} className="border-t border-border"><td className="px-4 py-3 font-bold">{row.name}</td><td className="px-4 py-3 text-right">{brl.format(row.spend)}</td><td className="px-4 py-3 text-right">{integer.format(row.leads)}</td><td className="px-4 py-3 text-right">{brl.format(row.leads ? row.spend / row.leads : 0)}</td></tr>)}</tbody></table></div></section></> : <Empty text="Selecione uma conta específica no relatório acima para carregar Meta Ads, RD Station e vendas sem misturar origens." />}</div>;
 }
 
 function TrafficFunnels() {

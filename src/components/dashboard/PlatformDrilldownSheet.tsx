@@ -48,7 +48,7 @@ export function PlatformDrilldownSheet({ platform, onClose }: Props) {
   const [openSale, setOpenSale] = useState<Sale | null>(null);
 
   const confirmed = useMemo(
-    () => sales.filter((s) => s.status === "confirmed" || s.status === "pending"),
+    () => sales.filter((s) => s.status === "confirmed"),
     [sales]
   );
 

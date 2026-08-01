@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { isMonday, nextMonday, differenceInDays } from "date-fns";
+import { toLocalDateString } from "@/lib/dateRange";
 
 export interface BudgetAnalysisItem {
   id: string;
@@ -26,7 +27,6 @@ export function useBudgetAnalysis() {
   const { data: dailySpendByAccount = [] } = useQuery({
     queryKey: ["daily_spend_by_account"],
     queryFn: async () => {
-      const { toLocalDateString } = await import("@/lib/dateRange");
       const sevenDaysAgo = toLocalDateString(new Date(Date.now() - 7 * 86400000));
 
       const { data, error } = await supabase

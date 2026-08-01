@@ -34,12 +34,26 @@ export interface Sale {
   rd_deal_id: string | null;
   rd_campaign_name: string | null;
   rd_product_name: string | null;
+  rd_funnel_id: string | null;
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
   utm_term: string | null;
   utm_content: string | null;
   manual_platform: string | null;
+  matched_campaign_id: string | null;
+  match_method: string | null;
+  manual_campaign_id: string | null;
+  manual_adset_id: string | null;
+  manual_ad_id: string | null;
+  manual_override: boolean;
+  workspace_id: string | null;
+  business_unit_id: string | null;
+  source_provider: string | null;
+  source_record_id: string | null;
+  source_closed_at: string | null;
+  attribution_confidence: number | null;
+  attribution_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,11 +63,13 @@ interface UseSalesParams {
   endDate?: Date;
   productId?: string;
   adAccountId?: string;
+  enabled?: boolean;
 }
 
 export function useSales(params?: UseSalesParams) {
   return useQuery({
     queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId],
+    enabled: params?.enabled !== false,
     queryFn: async () => {
       let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
 
@@ -73,14 +89,14 @@ export function useSales(params?: UseSalesParams) {
 
       // Paginar para evitar o corte de 1000 linhas do Supabase.
       const PAGE = 1000;
-      const MAX_PAGES = 10;
+      const MAX_PAGES = 50;
       let all: Sale[] = [];
       for (let page = 0; page < MAX_PAGES; page++) {
         const from = page * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await query.range(from, to);
         if (error) throw error;
-        const batch = (data || []) as Sale[];
+        const batch = (data || []).map((row) => ({ ...row, campaign_ids: row.campaign_ids || [] })) as Sale[];
         all = all.concat(batch);
         if (batch.length < PAGE) break;
         if (page === MAX_PAGES - 1) {
@@ -171,7 +187,7 @@ export function useDeleteSale() {
 }
 
 export function aggregateSales(sales: Sale[]) {
-  const confirmed = sales.filter((s) => s.status === "confirmed" || s.status === "pending");
+  const confirmed = sales.filter((s) => s.status === "confirmed");
   const totalGross = confirmed.reduce((sum, s) => sum + s.gross_revenue, 0);
   const totalNet = confirmed.reduce((sum, s) => sum + s.net_revenue, 0);
   const totalTax = confirmed.reduce((sum, s) => sum + s.tax_amount, 0);

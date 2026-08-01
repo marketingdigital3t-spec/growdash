@@ -38,8 +38,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Require an authenticated user — this endpoint calls the AI gateway with
-    // the app's LOVABLE_API_KEY and would otherwise allow unlimited public abuse.
+    // Require an authenticated user because this endpoint consumes the private
+    // AI provider quota and must never be exposed as a public proxy.
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing auth" }), {
@@ -59,8 +59,10 @@ serve(async (req) => {
     }
 
     const { message, history = [] } = await req.json();
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+    const apiKey = Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY");
+    const apiUrl = Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions";
+    const model = Deno.env.get("AI_MODEL") || "gpt-4.1-mini";
+    if (!apiKey) throw new Error("A integração de IA ainda não foi configurada.");
 
     const tools = [
       {
@@ -132,11 +134,11 @@ Regras:
 - Sempre dê um nome curto e descritivo à visualização (ex: "Funil LP Expert X").
 - NÃO inclua os widgets de sistema (ask_ai, budget_bm, campaigns_detail) — eles são adicionados automaticamente.`;
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const resp = await fetch(apiUrl, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model,
         messages: [
           { role: "system", content: systemPrompt },
           ...history,

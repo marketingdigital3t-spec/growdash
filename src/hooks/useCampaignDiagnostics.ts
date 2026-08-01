@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toLocalDateString } from "@/lib/dateRange";
 
 export type DiagSeverity = "critical" | "warning" | "observation" | "initial" | "healthy" | "inactive";
 
@@ -72,7 +73,6 @@ export function useCampaignDiagnostics() {
       (targetRes.data || []).forEach((t: any) => targetMap.set(t.campaign_id, Number(t.target_cpl)));
 
       const now = Date.now();
-      const { toLocalDateString } = await import("@/lib/dateRange");
       const todayStr = toLocalDateString(new Date());
 
 

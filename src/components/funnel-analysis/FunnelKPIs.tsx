@@ -29,9 +29,7 @@ export function FunnelKPIs({ a, cpl, cac }: Props) {
       icon: TrendingUp,
       color: "text-pink-400",
       format: "custom" as const,
-      custom: cpl != null || cac != null
-        ? `${cpl != null ? fmtBRL(cpl) : "—"} / ${cac != null ? fmtBRL(cac) : "—"}`
-        : "Sem dados",
+      custom: `${fmtBRL(cpl ?? 0)} / ${fmtBRL(cac ?? 0)}`,
     },
   ];
 

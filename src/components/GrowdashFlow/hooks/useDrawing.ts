@@ -8,6 +8,11 @@ const DEFAULT_SIZE: Record<string, { width: number; height: number }> = {
   image: { width: 300, height: 200 },
 };
 
+function currentAccentColor() {
+  if (typeof window === "undefined") return "#F5A623";
+  return getComputedStyle(document.documentElement).getPropertyValue("--brand-gold").trim() || "#F5A623";
+}
+
 export function createDrawElement(tool: ToolType, point: Point, layerIndex: number, snapToGrid: boolean): DrawElement | null {
   if (tool === "select" || tool === "hand" || tool === "image") return null;
   const origin = snapPoint(point, snapToGrid);
@@ -24,7 +29,7 @@ export function createDrawElement(tool: ToolType, point: Point, layerIndex: numb
     rotation: 0,
     opacity: 1,
     fillColor: sticky ? "#fbbf24" : text || tool === "line" || tool === "arrow" || tool === "freehand" ? "transparent" : "#211b10",
-    strokeColor: sticky ? "#f59e0b" : "#F5A623",
+    strokeColor: sticky ? "#f59e0b" : currentAccentColor(),
     strokeWidth: 2,
     points: tool === "freehand" ? [{ x: 0, y: 0 }] : undefined,
     text: sticky ? "Digite sua nota…" : text ? "Texto" : undefined,

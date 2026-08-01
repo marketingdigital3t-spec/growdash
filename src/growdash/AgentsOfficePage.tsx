@@ -7,6 +7,7 @@ import {
   Coffee,
   MessageCircle,
   Minimize2,
+  Network,
   Send,
   Sparkles,
   UserCog,
@@ -14,10 +15,12 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { aggregateSales, useSales } from "@/hooks/useSales";
 import { buildAgentAnswer, type AgentMetrics } from "@/lib/agentOffice";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,6 +46,7 @@ export default function AgentsOfficePage() {
     ? accounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : accounts, [accounts, businessUnitId, segment]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
+  const [view, setView] = useState<"map" | "office">("map");
   const [minimized, setMinimized] = useState(false);
   const [input, setInput] = useState("");
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>(() => readStored("growdash:agent-statuses", Object.fromEntries(AGENTS.map((agent) => [agent.id, "working"]))));
@@ -53,6 +57,7 @@ export default function AgentsOfficePage() {
   const account = visibleAccounts.find((item) => item.id === activeAccountId);
   const { data: insights = [], isFetching: loadingInsights } = useInsights({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
   const { data: deals = [], isFetching: loadingDeals } = useRDDealsForPeriod({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
+  const { data: sales = [] } = useSales({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
 
   useEffect(() => { localStorage.setItem("growdash:agent-statuses", JSON.stringify(statuses)); }, [statuses]);
   useEffect(() => { localStorage.setItem("growdash:agent-accounts", JSON.stringify(assignments)); }, [assignments]);
@@ -65,13 +70,14 @@ export default function AgentsOfficePage() {
       clicks: total.clicks + Number(row.clicks || 0),
       leads: total.leads + Number(row.leads || 0),
     }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
+    const confirmed = aggregateSales(sales);
     return {
       ...media,
       rdLeads: deals.length,
-      wonDeals: deals.filter((deal) => deal.win).length,
-      revenue: deals.filter((deal) => deal.win).reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0),
+      wonDeals: confirmed.totalQuantity,
+      revenue: confirmed.totalNet,
     };
-  }, [deals, insights]);
+  }, [deals, insights, sales]);
 
   const updateStatus = (agentId: string, status: AgentStatus) => setStatuses((current) => ({ ...current, [agentId]: status }));
   const openAgent = (agentId: string) => { setActiveAgentId(agentId); setMinimized(false); };
@@ -92,11 +98,11 @@ export default function AgentsOfficePage() {
   return (
     <div className="agents-office-page mx-auto w-full max-w-[1920px]">
       <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div><span className="text-[10px] font-black uppercase tracking-[.2em] text-primary">Growdash AI Office</span><h1 className="mt-1 text-2xl font-black">Escritório dos Agentes</h1><p className="mt-1 text-xs text-muted-foreground">Agentes por conta, dados reais de Meta Ads e RD Station e recomendações acionáveis.</p></div>
-        <div className="flex flex-wrap gap-2 text-[10px]"><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></div>
+        <div><span className="text-[10px] font-black uppercase tracking-[.2em] text-primary">Growdash Intelligence Core</span><h1 className="mt-1 text-2xl font-black">Conhecimento & Agentes</h1><p className="mt-1 text-xs text-muted-foreground">Navegue pela inteligência da operação ou entre no escritório 3D dos agentes.</p></div>
+        <div className="flex flex-wrap items-center gap-2 text-[10px]"><button type="button" onClick={() => setView("map")} className={cn("rounded-lg border px-3 py-2 font-black", view === "map" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><Network className="mr-1 inline h-3.5 w-3.5" />Mapa</button><button type="button" onClick={() => setView("office")} className={cn("rounded-lg border px-3 py-2 font-black", view === "office" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><BriefcaseBusiness className="mr-1 inline h-3.5 w-3.5" />Escritório 3D</button>{view === "office" && <><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></>}</div>
       </header>
 
-      <div className="agent-office-shell relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
+      {view === "map" ? <KnowledgeMap onOpenOffice={() => setView("office")} /> : <div className="agent-office-shell relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
         <div className="office-window"><span /><span /><span /></div>
         <div className="office-wall-sign"><WandSparkles className="h-4 w-4" /> GROWDASH INTELLIGENCE</div>
         <div className="office-floor-grid" />
@@ -145,11 +151,29 @@ export default function AgentsOfficePage() {
             </>}
           </aside>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
 
+const KNOWLEDGE_NODES = [
+  { label: "Tráfego", note: "Campanhas, criativos, orçamento e Meta Ads", href: "/campanhas", angle: -90 },
+  { label: "CRM", note: "Negociações, funil, RD Station e IA do Funil", href: "/crm", angle: -30 },
+  { label: "Comercial", note: "Metas, ranking, receita e conversão", href: "/comercial", angle: 30 },
+  { label: "Financeiro", note: "DRE, caixa, mídia e previsões", href: "/financeiro", angle: 90 },
+  { label: "Experts", note: "Marcas, contas, posicionamento e conteúdo", href: "/marcas", angle: 150 },
+  { label: "Automações", note: "Playbooks, alertas, WhatsApp e webhooks", href: "/automacoes", angle: 210 },
+] as const;
+
+function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
+  return <section className="knowledge-map relative min-h-[680px] overflow-hidden rounded-2xl border border-primary/20 bg-[#050505]">
+    <div className="knowledge-map-grid" />
+    <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 680" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="knowledge-line" x1="0" x2="1"><stop offset="0" stopColor="currentColor" stopOpacity=".08" /><stop offset=".5" stopColor="currentColor" stopOpacity=".7" /><stop offset="1" stopColor="currentColor" stopOpacity=".08" /></linearGradient></defs>{KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 330; const y = 340 + Math.sin(radians) * 245; return <line key={node.label} x1="500" y1="340" x2={x} y2={y} stroke="url(#knowledge-line)" strokeWidth="1.5" strokeDasharray="5 7" />; })}</svg>
+    <button type="button" onClick={onOpenOffice} className="knowledge-core" aria-label="Abrir escritório 3D da Growdash"><span className="knowledge-core-ring" /><Bot className="h-10 w-10" /><b>Growdash</b><small>Intelligence Core</small><em>Clique para entrar no escritório 3D</em></button>
+    {KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; return <NavLink key={node.label} to={node.href} className="knowledge-node" style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 34}%` }}><Sparkles className="h-4 w-4" /><b>{node.label}</b><small>{node.note}</small></NavLink>; })}
+    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-2 text-center text-[9px] text-white/45 backdrop-blur-xl">O núcleo conecta as fontes da operação; cada agente consulta apenas contas e módulos permitidos.</div>
+  </section>;
+}
+
 function StatusLegend({ color, label }: { color: string; label: string }) { return <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1"><i className={cn("h-2 w-2 rounded-full", color)} />{label}</span>; }
 function AgentModeButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) { return <button type="button" onClick={onClick} className={cn("flex min-w-0 items-center justify-center gap-1 rounded-lg border px-2 py-2 text-[9px] font-bold", active ? "border-primary/60 bg-primary/15 text-primary" : "border-white/10 text-white/45 hover:bg-white/5")}><span className="[&>svg]:h-3 [&>svg]:w-3">{icon}</span>{label}</button>; }
-

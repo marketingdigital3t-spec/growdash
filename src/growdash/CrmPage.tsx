@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   CalendarClock,
+  Bot,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
@@ -27,18 +29,20 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useFunnelStages } from "@/hooks/useRDDeals";
 import { classifyLead, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
+import { aggregateSales, useSales } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { MetricCard, PageHeading } from "./shared";
+import CrmAIWorkspace from "./CrmAIWorkspace";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const number = new Intl.NumberFormat("pt-BR");
 const PAGE_SIZE = 50;
 const BOARD_STEP = 50;
 
-type CRMView = "board" | "list";
+type CRMView = "board" | "list" | "ai";
 type StatusFilter = "all" | "open" | "won" | "lost";
 
 type PipelineStage = {
@@ -50,13 +54,18 @@ type PipelineStage = {
 };
 
 export default function CrmPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { adAccountId } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
   const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter);
   const { data: allDeals = [], isLoading: loadingDeals, isFetching } = useRDCRMDeals(accountFilter);
+  const { data: canonicalSales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter });
   const [funnelId, setFunnelId] = useState("all");
-  const [view, setView] = useState<CRMView>(() => window.localStorage.getItem("growdash:crm-view") === "list" ? "list" : "board");
+  const [view, setView] = useState<CRMView>(() => {
+    if (searchParams.get("tab") === "ai") return "ai";
+    return window.localStorage.getItem("growdash:crm-view") === "list" ? "list" : "board";
+  });
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [owner, setOwner] = useState("all");
@@ -78,7 +87,10 @@ export default function CrmPage() {
 
   useEffect(() => {
     window.localStorage.setItem("growdash:crm-view", view);
-  }, [view]);
+    const next = new URLSearchParams(searchParams);
+    if (view === "ai") next.set("tab", "ai"); else next.delete("tab");
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+  }, [view, searchParams, setSearchParams]);
 
   useEffect(() => {
     setPage(1);
@@ -120,15 +132,17 @@ export default function CrmPage() {
     const won = deals.filter((deal) => deal.win);
     const lost = deals.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
     const active = deals.filter((deal) => !deal.win && !lost.includes(deal));
+    const visibleDealIds = new Set(deals.map((deal) => deal.rd_deal_id));
+    const realized = aggregateSales(canonicalSales.filter((sale) => sale.rd_deal_id && visibleDealIds.has(sale.rd_deal_id)));
     return {
       active: active.length,
       openRevenue: active.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0),
       won: won.length,
-      wonRevenue: won.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0),
+      wonRevenue: realized.totalNet,
       lost: lost.length,
       conversion: deals.length ? (won.length / deals.length) * 100 : 0,
     };
-  }, [deals]);
+  }, [canonicalSales, deals]);
 
   const stages = useMemo<PipelineStage[]>(() => {
     const map = new Map<string, PipelineStage>();
@@ -229,6 +243,7 @@ export default function CrmPage() {
             <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1">
               <ViewButton active={view === "board"} onClick={() => changeView("board")} icon={<LayoutGrid />} label="Kanban" />
               <ViewButton active={view === "list"} onClick={() => changeView("list")} icon={<List />} label="Lista" />
+              <ViewButton active={view === "ai"} onClick={() => changeView("ai")} icon={<Bot />} label="IA do Funil" />
             </div>
             <button className="gd-button" onClick={() => void syncRD()} disabled={syncing || loadingFunnels}>
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
@@ -264,14 +279,16 @@ export default function CrmPage() {
         </div>
       </section>
 
-      <div className="gd-auto-grid gap-3">
+      {view !== "ai" && <div className="gd-auto-grid gap-3">
         <MetricCard label="Negociações ativas" value={number.format(stats.active)} change="pipeline" emphasis />
         <MetricCard label="Receita em aberto" value={brl.format(stats.openRevenue)} change="potencial" />
         <MetricCard label="Negócios ganhos" value={number.format(stats.won)} change={brl.format(stats.wonRevenue)} />
         <MetricCard label="Conversão do pipeline" value={`${stats.conversion.toFixed(2)}%`} change={`${stats.lost} perdido(s)`} />
-      </div>
+      </div>}
 
-      {loadingDeals ? <CRMLoading /> : view === "board" ? (
+      {loadingDeals || loadingSales ? <CRMLoading /> : view === "ai" ? (
+        <CrmAIWorkspace deals={deals} sales={canonicalSales} accountId={accountFilter} />
+      ) : view === "board" ? (
         <KanbanBoard
           stages={stages}
           stageDeals={stageDeals}
@@ -291,7 +308,7 @@ export default function CrmPage() {
         />
       )}
 
-      {!loadingDeals && !deals.length && (
+      {!loadingDeals && !deals.length && view !== "ai" && (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
           <div><UsersRound className="mx-auto h-9 w-9 text-primary" /><h2 className="mt-4 font-black">Nenhuma negociação encontrada</h2><p className="mt-2 text-sm text-muted-foreground">Revise os filtros ou sincronize o funil conectado ao RD Station.</p></div>
         </section>

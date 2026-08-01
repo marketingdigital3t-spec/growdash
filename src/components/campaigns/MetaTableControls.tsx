@@ -1,5 +1,5 @@
 /* saved_table_views is available after the additive automation migration. */
-import { Columns3, Layers3, Save, SlidersHorizontal } from "lucide-react";
+import { Columns3, Layers3, Save } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,16 +36,12 @@ export function MetaTableControls({ preset, columns, breakdown, onPreset, onColu
   return <div className="flex flex-wrap items-center gap-2">
     <DropdownMenu>
       <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="meta-toolbar-button"><Columns3 className="h-4 w-4" />Colunas: {selectedPreset.label}</Button></DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto">
+      <DropdownMenuContent align="end" className="max-h-[78vh] w-[360px] overflow-y-auto">
         <DropdownMenuLabel>Predefinições da Meta</DropdownMenuLabel>
         {metaColumnPresets.map((item) => <DropdownMenuItem key={item.id} onSelect={() => selectPreset(item.id)} className="flex-col items-start"><span className="text-xs font-bold">{item.label}</span><span className="text-[10px] text-muted-foreground">{item.description}</span></DropdownMenuItem>)}
         {savedViews.length > 0 && <><DropdownMenuSeparator /><DropdownMenuLabel>Minhas visualizações</DropdownMenuLabel>{savedViews.map((item: any) => <DropdownMenuItem key={item.id} onSelect={() => selectSaved(item)}><span className="text-xs font-bold">{item.name}</span></DropdownMenuItem>)}</>}
-      </DropdownMenuContent>
-    </DropdownMenu>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="meta-toolbar-button"><SlidersHorizontal className="h-4 w-4" />Detalhamento e colunas</Button></DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[75vh] w-[330px] overflow-y-auto">
-        <DropdownMenuLabel>Colunas exibidas</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Personalizar métricas</DropdownMenuLabel>
         {editableCampaignColumns.map((column) => <DropdownMenuCheckboxItem key={column} checked={columns.has(column)} onCheckedChange={(checked) => toggle(column, checked === true)} onSelect={(event) => event.preventDefault()} className="text-xs">{campaignColumnLabels[column]}</DropdownMenuCheckboxItem>)}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="flex items-center gap-2"><Layers3 className="h-3.5 w-3.5" />Detalhamento: {getBreakdownLabel(breakdown)}</DropdownMenuLabel>

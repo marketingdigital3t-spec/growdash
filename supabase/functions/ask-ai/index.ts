@@ -5,7 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
-const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const AI_API_URL = Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions";
+const AI_MODEL = Deno.env.get("AI_MODEL") || "gpt-4.1-mini";
 const DAY = 86_400_000;
 
 type Insight = {
@@ -51,8 +52,8 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) return responseError("LOVABLE_API_KEY missing", 500);
+    const aiKey = Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY");
+    if (!aiKey) return responseError("A integração de IA ainda não foi configurada.", 503);
 
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: userData } = await userClient.auth.getUser();
@@ -220,7 +221,7 @@ ${JSON.stringify(context).slice(0, 90000)}`;
       ...history.slice(-6).map((message: { role?: string; content?: string }) => ({ role: message.role === "assistant" ? "assistant" : "user", content: String(message.content || "") })),
       { role: "user", content: question },
     ];
-    const aiResp = await fetch(LOVABLE_AI_URL, { method: "POST", headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "google/gemini-3-flash-preview", messages, stream: true }) });
+    const aiResp = await fetch(AI_API_URL, { method: "POST", headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: AI_MODEL, messages, stream: true }) });
     if (!aiResp.ok) {
       if (aiResp.status === 429) return responseError("Limite de requisições atingido. Tente novamente em instantes.", 429);
       if (aiResp.status === 402) return responseError("Créditos da IA esgotados. Verifique a franquia do plano.", 402);

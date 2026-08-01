@@ -91,8 +91,10 @@ export function GeoOriginWidget() {
   }));
 
   const insightTop = sortedRows[0];
-  const colorScheme = mode === "leads" ? "brand" : "green";
-  const accentBar = mode === "leads" ? "hsl(142, 71%, 45%)" : "hsl(142, 71%, 45%)";
+  // Geographic visualizations follow the accent selected by the user. Source
+  // semantics remain available in labels, without pinning the UI to green/blue.
+  const colorScheme = "brand" as const;
+  const accentBar = "hsl(var(--primary))";
 
   // Empty / explanation state
   const showLeadsEmpty = mode === "leads" && !isLoading && !hasRegionData && totals.leads === 0;

@@ -190,7 +190,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
       const { data: salesRows, error: e2 } = await salesQ;
       if (e2) throw e2;
       for (const s of (salesRows || []) as any[]) {
-        if (s.status && s.status !== "confirmed" && s.status !== "pending") continue;
+        if (s.status && s.status !== "confirmed") continue;
         if (s.rd_deal_id) seenRdDealIds.add(String(s.rd_deal_id));
         const uf = normalizeStateToUF(s.lead_state);
         if (!uf) continue;

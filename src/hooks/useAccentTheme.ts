@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
 
-export type AccentTheme = "gold" | "purple" | "blue" | "pink";
+export type AccentTheme = "gold" | "purple" | "blue" | "pink" | "sapphire" | "obsidian" | "emerald";
 const STORAGE_KEY = "growdash:accent-theme";
 
 const ACCENT_HEX: Record<AccentTheme, string> = {
-  gold: "#e6ad28",
+  gold: "#b88722",
   blue: "#2f6bf4",
   purple: "#8b5cf6",
   pink: "#ec4899",
+  sapphire: "#0ea5e9",
+  obsidian: "#a8b0bd",
+  emerald: "#10b981",
 };
 
 function readAccent(): AccentTheme {
   if (typeof window === "undefined") return "gold";
   const value = window.localStorage.getItem(STORAGE_KEY);
-  return value === "purple" || value === "blue" || value === "pink" ? value : "gold";
+  return value && value in ACCENT_HEX ? value as AccentTheme : "gold";
 }
 
 export function applyAccent(value: AccentTheme) {

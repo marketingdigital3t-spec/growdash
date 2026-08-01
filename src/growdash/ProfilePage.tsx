@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
 import { useAccentTheme, type AccentTheme } from "@/hooks/useAccentTheme";
+import { AuthenticatorMfaCard } from "@/components/auth/AuthenticatorMfaCard";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -74,6 +75,8 @@ export default function ProfilePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      queryClient.setQueryData(["sidebar-profile", user?.id], { full_name: form.full_name, avatar_url: form.avatar_url });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-profile", user?.id] });
       toast({ title: "Perfil atualizado", description: "Suas informações foram salvas com segurança." });
     },
     onError: (error: Error) => toast({ title: "Não foi possível salvar", description: error.message, variant: "destructive" }),
@@ -156,11 +159,12 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="security" className="gd-panel p-5 sm:p-7">
-          <div className="max-w-xl space-y-5">
+          <div className="max-w-3xl space-y-5">
             <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-500" />Sua sessão usa autenticação segura do Supabase.</div>
             <Field label="E-mail de acesso"><div className="relative"><Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div></Field>
             <Field label="Nova senha"><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 10 caracteres" autoComplete="new-password" /></Field>
             <Button onClick={() => updateAccess.mutate()} disabled={updateAccess.isPending || (!password && email === user?.email)}>{updateAccess.isPending ? "Atualizando…" : "Atualizar acesso"}</Button>
+            <AuthenticatorMfaCard />
           </div>
         </TabsContent>
 
@@ -173,7 +177,7 @@ export default function ProfilePage() {
             <h2 className="font-black">Cor de destaque da plataforma</h2>
             <p className="mt-1 text-xs text-muted-foreground">A cor é aplicada aos botões, seleções, glass do Dashboard e realces, mantendo contraste acessível.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {([['gold', 'Dourado', '#e6ad28'], ['purple', 'Roxo', '#9258ff'], ['blue', 'Azul', '#2f80ff'], ['pink', 'Rosa', '#f04f9a']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
+              {([['gold', 'Dourado', '#e6ad28'], ['purple', 'Ametista', '#9258ff'], ['blue', 'Azul imperial', '#2f80ff'], ['pink', 'Quartzo rosa', '#f04f9a'], ['sapphire', 'Safira', '#0ea5e9'], ['obsidian', 'Obsidiana', '#a8b0bd'], ['emerald', 'Esmeralda', '#10b981']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
                 <button key={value} type="button" onClick={() => setAccent(value)} className={`flex min-h-16 items-center gap-3 rounded-xl border p-3 text-left transition ${accent === value ? "border-primary bg-primary/10 ring-1 ring-primary/35" : "border-border hover:bg-muted/45"}`}>
                   <span className="h-9 w-9 rounded-xl border border-white/20 shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, #ffffff55)` }} />
                   <span><b className="block text-sm">{label}</b><small className="text-[10px] text-muted-foreground">Tema operacional</small></span>

@@ -14,7 +14,7 @@ const NAME_TO_UF: Record<string, string> = {
 };
 const VALID_UF = new Set(Object.values(NAME_TO_UF));
 
-function normalizeUF(raw: string | null | undefined): string {
+export function normalizeUF(raw: string | null | undefined): string {
   if (!raw) return "—";
   const s = String(raw).trim();
   if (!s) return "—";
@@ -112,7 +112,7 @@ export function useRDDeals(params: Params) {
       if (product && product !== "all") query = query.eq("rd_product_name", product);
 
       const PAGE = 1000;
-      const MAX = 10;
+      const MAX = 50;
       let all: RDDeal[] = [];
       for (let p = 0; p < MAX; p++) {
         const from = p * PAGE;
@@ -170,7 +170,7 @@ export function useRDClosedDeals(params: Params) {
       if (product && product !== "all") query = query.eq("rd_product_name", product);
 
       const PAGE = 1000;
-      const MAX = 10;
+      const MAX = 50;
       let all: RDDeal[] = [];
       for (let p = 0; p < MAX; p++) {
         const { data, error } = await query.range(p * PAGE, p * PAGE + PAGE - 1);

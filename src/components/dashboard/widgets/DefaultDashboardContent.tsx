@@ -267,13 +267,13 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
   const roi = adMetrics.totalSpend > 0 ? (profit / adMetrics.totalSpend) * 100 : 0;
   const profitMargin = salesMetrics.totalNet > 0 ? (profit / salesMetrics.totalNet) * 100 : 0;
 
-  const confirmedCount = sales.filter((s) => s.status === "confirmed" || s.status === "pending").length;
+  const confirmedCount = sales.filter((s) => s.status === "confirmed").length;
   const ticketMedio = confirmedCount > 0 ? salesMetrics.totalNet / confirmedCount : 0;
 
   const PLATFORM_COLORS: Record<TopPlatform, string> = {
-    meta: "hsl(221, 83%, 53%)",
-    google: "hsl(38, 92%, 50%)",
-    organic: "hsl(142, 71%, 45%)",
+    meta: "hsl(var(--primary))",
+    google: "hsl(var(--primary) / .66)",
+    organic: "hsl(var(--primary) / .42)",
     unknown: "hsl(var(--muted-foreground))",
   };
 
@@ -367,7 +367,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       acc[p].leads += 1;
     });
     sales.forEach((s) => {
-      if (s.status !== "confirmed" && s.status !== "pending") return;
+      if (s.status !== "confirmed") return;
       const p = inferPlatformWithDealFallback(s, dealsByRdId, platformRules).platform;
       acc[p].sales += 1;
       acc[p].revenue += s.net_revenue;
@@ -539,7 +539,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     <div className="min-w-0 space-y-6">
       {/* 1. KPIs principais. Em layouts novos estes cards são widgets
           independentes para permitir mover, redimensionar e ocultar um a um. */}
-      {!hidePrimary && <div className="gd-auto-grid gap-2 sm:gap-3">
+      {!hidePrimary && <div className="dashboard-primary-kpis gap-2 sm:gap-3">
         <MetricCard title="Faturamento Líquido" value={salesMetrics.totalNet} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
@@ -555,7 +555,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       </div>}
 
       {/* 2. KPIs financeiros */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="dashboard-financial-overview gap-3 sm:gap-4">
         <PaymentChart byPayment={salesMetrics.byPayment} />
 
         <Card>
@@ -728,50 +728,43 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
           </div>
         </div>
 
-        {objectiveInsights.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
-              Nenhuma campanha de {objective === "leads" ? "Leads" : objective === "native_form" ? "Formulário Nativo" : objective === "landing_page" ? "Landing page" : "Mensagens"} encontrada no período.
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <div className="gd-auto-grid-compact gap-2 sm:gap-3">
-              {kpis.map((k) => (
-                <MetricCard
-                  key={k.title}
-                  title={k.title}
-                  value={k.value}
-                  prefix={k.prefix}
-                  suffix={k.suffix}
-                  decimals={k.decimals}
-                  icon={k.icon}
-                  tooltip={k.tooltip}
-                />
-              ))}
-            </div>
-          </>
+        {objectiveInsights.length === 0 && (
+          <p className="mb-3 rounded-lg border border-dashed border-primary/20 bg-primary/[0.025] px-3 py-2 text-xs text-muted-foreground">
+            Nenhuma campanha de {objective === "leads" ? "Leads" : objective === "native_form" ? "Formulário Nativo" : objective === "landing_page" ? "Landing page" : "Mensagens"} encontrada. Os indicadores permanecem disponíveis com valor zero.
+          </p>
         )}
+        <div className="gd-auto-grid-compact gap-2 sm:gap-3">
+          {kpis.map((k) => (
+            <MetricCard
+              key={k.title}
+              title={k.title}
+              value={k.value}
+              prefix={k.prefix}
+              suffix={k.suffix}
+              decimals={k.decimals}
+              icon={k.icon}
+              tooltip={k.tooltip}
+            />
+          ))}
+        </div>
       </div>
 
       {/* 4. Funil de Conversão */}
-      {objectiveInsights.length > 0 && (
-        <CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} />
-      )}
+      <CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} />
 
       {/* 4.1 Origem geográfica (mapa por estado) */}
       <GeoOriginWidget />
 
       <PlatformDrilldownSheet platform={drilldown} onClose={() => setDrilldown(null)} />
-      {dailyData.length > 0 && <PerformanceLineChart data={dailyData} />}
+      <PerformanceLineChart data={dailyData} />
 
       {/* 5. Gráficos diários */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
-        <ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="hsl(221, 83%, 53%)" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
-        <ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="hsl(142, 71%, 45%)" />
-        <ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="hsl(38, 92%, 50%)" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
-        <ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="hsl(262, 83%, 58%)" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
+        <ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="hsl(var(--primary))" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
+        <ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="hsl(var(--primary) / .76)" />
+        <ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="hsl(var(--primary) / .56)" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
+        <ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="hsl(var(--primary) / .38)" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
       </div>
     </div>
   );

@@ -70,7 +70,7 @@ export function BrazilMap({
     return scaleQuantize<string>().domain([0, maxValue]).range(ramp as unknown as string[]);
   }, [data, maxValue, ramp]);
 
-  const accentText = colorScheme === "green" ? "text-emerald-600" : colorScheme === "blue" ? "text-blue-600" : "text-primary";
+  const accentText = colorScheme === "brand" ? "text-primary" : colorScheme === "green" ? "text-emerald-600" : "text-blue-600";
 
   return (
     <Card className="h-full">
@@ -163,7 +163,7 @@ export function BrazilMap({
                         key={geo.rsmKey}
                         geography={geo}
                         fill={fill}
-                        stroke="#ffffff"
+                        stroke="hsl(var(--background))"
                         strokeWidth={0.6}
                         onMouseEnter={(e) => {
                           const rect = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect();
@@ -206,8 +206,8 @@ export function BrazilMap({
                               height={16}
                               rx={8}
                               ry={8}
-                              fill="#ffffff"
-                              stroke="rgba(0,0,0,0.06)"
+                              fill="hsl(var(--card))"
+                              stroke="hsl(var(--border))"
                               strokeWidth={1}
                               style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.12))" }}
                             />

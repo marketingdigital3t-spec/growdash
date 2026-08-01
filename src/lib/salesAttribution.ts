@@ -2,6 +2,7 @@ import type { Sale } from "@/hooks/useSales";
 import type { InsightRow } from "@/hooks/useInsights";
 import type { AccountUtmMapping, UtmField, MatchStrategy } from "@/hooks/useAccountUtmMapping";
 import { DEFAULT_MAPPING } from "@/hooks/useAccountUtmMapping";
+import { isRealizedSale, normalizeAttributionKey } from "@/lib/saleRevenue";
 
 const norm = (s: string | null | undefined) => (s ?? "").toString().trim().toLowerCase();
 // More aggressive: strip brackets, parens, punctuation, separators
@@ -110,7 +111,7 @@ export function attributeSalesToAds(
   };
 
   for (const sale of sales) {
-    if (sale.status !== "confirmed" && sale.status !== "pending") continue;
+    if (!isRealizedSale(sale)) continue;
 
     // L0: manual override
     const manualOverride = (sale as any).manual_override;
@@ -127,12 +128,31 @@ export function attributeSalesToAds(
       continue;
     }
 
+    // A atribuição canônica calculada pelo backend é a fonte primária. Ela já
+    // foi validada dentro da mesma conta de anúncio e não deve ser refeita por
+    // aproximação no navegador.
+    if (sale.matched_campaign_id) {
+      const existsInAccount = insights.some((row) =>
+        row.campaign_id === sale.matched_campaign_id
+        && (!sale.ad_account_id || row.ad_account_id === sale.ad_account_id));
+      if (existsInAccount) {
+        bump(byCampaign, sale.matched_campaign_id, sale);
+        perSale.push({ sale, ad_id: null, adset_id: null, campaign_id: sale.matched_campaign_id, level: "campaign" });
+        continue;
+      }
+    }
+
     const mapping = getMapping(sale.ad_account_id);
 
     // L1: ad_id direto
     const adIdGuess = readField(sale, "ad_id") || sale.ad_id;
     if (adIdGuess && adsByExactId.has(adIdGuess)) {
       const ad = adsByExactId.get(adIdGuess)!;
+      if (sale.ad_account_id && ad.ad_account_id !== sale.ad_account_id) {
+        unmatched.push(sale);
+        perSale.push({ sale, ad_id: null, adset_id: null, campaign_id: null, level: "unmatched", failure_reason: "campaign_not_found", failure_detail: "O anúncio informado pertence a outra conta." });
+        continue;
+      }
       pushAd(ad.ad_id, sale);
       bump(byAd, ad.ad_id, sale);
       if (ad.campaign_id) bump(byCampaign, ad.campaign_id, sale);
@@ -144,19 +164,24 @@ export function attributeSalesToAds(
     const adsetVal = readField(sale, mapping.adset_utm);
     const creativeVal = readField(sale, mapping.creative_utm);
 
-    // Universe: same account first, fall back to all (account may be missing in sale)
+    // Uma venda vinculada a uma conta nunca pode usar campanhas de outra.
     const sameAccount = sale.ad_account_id
       ? insights.filter((r) => r.ad_account_id === sale.ad_account_id)
       : [];
-    const universeAds = sameAccount.length > 0 ? sameAccount : insights;
+    const universeAds = sale.ad_account_id ? sameAccount : insights;
+    const exact = (left: string | null | undefined, right: string | null | undefined) => {
+      const a = normalizeAttributionKey(left);
+      const b = normalizeAttributionKey(right);
+      return !!a && a === b;
+    };
 
     // L2: trio
     if (campVal && adsetVal && creativeVal) {
       const hit = universeAds.find(
         (r) =>
-          matches(r.campaign_name, campVal, mapping.match_strategy) &&
-          matches(r.adset_name, adsetVal, mapping.match_strategy) &&
-          matches(r.ad_name, creativeVal, mapping.match_strategy),
+          exact(r.campaign_name, campVal) &&
+          exact(r.adset_name, adsetVal) &&
+          exact(r.ad_name, creativeVal),
       );
       if (hit) {
         pushAd(hit.ad_id, sale);
@@ -171,8 +196,8 @@ export function attributeSalesToAds(
     if (campVal && creativeVal) {
       const hit = universeAds.find(
         (r) =>
-          matches(r.campaign_name, campVal, mapping.match_strategy) &&
-          matches(r.ad_name, creativeVal, mapping.match_strategy),
+          exact(r.campaign_name, campVal) &&
+          exact(r.ad_name, creativeVal),
       );
       if (hit) {
         pushAd(hit.ad_id, sale);
@@ -185,7 +210,7 @@ export function attributeSalesToAds(
 
     // L4: só campanha
     if (campVal) {
-      const hit = universeAds.find((r) => matches(r.campaign_name, campVal, mapping.match_strategy));
+      const hit = universeAds.find((r) => exact(r.campaign_name, campVal) || exact(r.campaign_id, campVal));
       if (hit?.campaign_id) {
         bump(byCampaign, hit.campaign_id, sale);
         perSale.push({ sale, ad_id: null, adset_id: null, campaign_id: hit.campaign_id, level: "campaign" });

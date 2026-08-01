@@ -32,6 +32,8 @@ import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
+import { useSales } from "@/hooks/useSales";
+import { filterCanonicalFunnelSales, reconcileFunnelRevenue } from "@/lib/funnelRevenue";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -46,6 +48,15 @@ const blockHelp = {
   weekdays: ["Dias que mais convertem", "Compara conversões e receita por dia da semana usando a data dos eventos do RD."],
   hours: ["Melhor período do dia", "Compara manhã, tarde, noite e madrugada; clique em um período para detalhar as vendas por hora."],
 } as const;
+
+function normalizeName(value: string | null | undefined) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 
 function HelpBlock({ help, children, className }: { help: readonly string[]; children: React.ReactNode; className?: string }) {
   return (
@@ -72,7 +83,16 @@ export default function FunnelAnalysis() {
   const syncMeta = useSyncMeta();
 
   const activeFunnels = funnels.filter((f) => f.is_active && f.rd_funnel_id);
-  const selectedFunnelRecord = activeFunnels[0];
+  const selectedAccountName = visibleAccounts.find((account) => account.id === adAccountId)?.name;
+  const normalizedAccountName = normalizeName(selectedAccountName);
+  const selectedFunnelRecord = activeFunnels.find((funnel) => {
+    const normalizedFunnelName = normalizeName(funnel.name);
+    return normalizedAccountName && (
+      normalizedFunnelName === normalizedAccountName
+      || normalizedFunnelName.includes(normalizedAccountName)
+      || normalizedAccountName.includes(normalizedFunnelName)
+    );
+  }) ?? activeFunnels[0];
   const funnelId = selectedFunnelRecord?.id || "";
   const effectiveAdAccountId = adAccountId === "all" ? selectedFunnelRecord?.ad_account_id : adAccountId;
 
@@ -109,6 +129,11 @@ export default function FunnelAnalysis() {
     product: selectedProduct,
     enabled: !!funnelId,
   });
+  const { data: sales = [], isLoading: loadingSales } = useSales({
+    startDate,
+    endDate,
+    adAccountId: effectiveAdAccountId,
+  });
 
   // Para popular filtros, precisamos do superset (sem filtro). Usamos os deals atuais como aproximação.
   const sources = useMemo(() => Array.from(new Set(deals.map((d) => d.utm_source).filter(Boolean) as string[])).sort(), [deals]);
@@ -117,7 +142,23 @@ export default function FunnelAnalysis() {
   const owners = useMemo(() => Array.from(new Set(deals.map((d) => d.deal_owner_name).filter(Boolean) as string[])).sort(), [deals]);
   const products = useMemo(() => Array.from(new Set(deals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [deals]);
 
-  const analytics = useMemo(() => computeFunnelAnalytics(deals, stages, closedDeals), [closedDeals, deals, stages]);
+  const baseAnalytics = useMemo(() => computeFunnelAnalytics(deals, stages, closedDeals), [closedDeals, deals, stages]);
+  const allowedDealIds = useMemo(
+    () => selectedOwner === "all" ? undefined : new Set(deals.map((deal) => deal.rd_deal_id)),
+    [deals, selectedOwner],
+  );
+  const funnelSales = useMemo(() => filterCanonicalFunnelSales(sales, {
+    funnelId,
+    source: selectedSource,
+    campaign: selectedCampaign,
+    state: selectedState,
+    product: selectedProduct,
+    allowedDealIds,
+  }), [allowedDealIds, funnelId, sales, selectedCampaign, selectedProduct, selectedSource, selectedState]);
+  const analytics = useMemo(
+    () => reconcileFunnelRevenue(baseAnalytics, funnelSales),
+    [baseAnalytics, funnelSales],
+  );
 
   const { data: insightRows = [], isLoading: loadingInsights } = useInsights({
     // A análise detalhada sempre representa um funil. Quando o filtro global
@@ -165,6 +206,8 @@ export default function FunnelAnalysis() {
             body: {
               funnel_id: funnel.id,
               analytics_mode: true,
+              start_date: start,
+              end_date: end,
               // A sincronização manual reconcilia o histórico completo do
               // funil. A atualização automática de 15 min continua incremental.
               max_deals: 10000,
@@ -190,6 +233,7 @@ export default function FunnelAnalysis() {
         queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_closed_deals"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] }),
+        queryClient.invalidateQueries({ queryKey: ["sales"] }),
       ]);
       await refetch();
 
@@ -274,44 +318,35 @@ export default function FunnelAnalysis() {
         </div>
       </MotionItem>
 
-      {activeFunnels.length === 0 ? (
-        <MotionItem>
-          <div className="rounded-xl border bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Nenhum funil RD vinculado. Configure em <strong>Configurações → Funis RD</strong>.
-            </p>
-          </div>
-        </MotionItem>
-      ) : loadingFunnels || isLoading || loadingClosedDeals || loadingStages ? (
+      {loadingFunnels || isLoading || loadingClosedDeals || loadingStages || loadingSales ? (
         <MotionItem>
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>
-      ) : noStages ? (
-        <MotionItem>
-          <div className="rounded-xl border bg-card p-8 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Estágios reais do funil ainda não sincronizados. Clique em <strong>Sincronizar do RD</strong> para carregar.
-            </p>
-            <Button onClick={handleSync} disabled={syncing} size="sm">
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-              Sincronizar agora
-            </Button>
-          </div>
-        </MotionItem>
-      ) : deals.length === 0 ? (
-        <MotionItem>
-          <div className="rounded-xl border bg-card p-8 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Ainda não há deals sincronizados para este funil no período selecionado.
-            </p>
-            <Button onClick={handleSync} disabled={syncing} size="sm">
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-              Sincronizar agora
-            </Button>
-          </div>
-        </MotionItem>
       ) : (
         <>
+          {(activeFunnels.length === 0 || noStages || deals.length === 0) && (
+            <MotionItem>
+              <div className="flex flex-col gap-3 rounded-xl border border-dashed border-primary/25 bg-primary/[0.035] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {activeFunnels.length === 0
+                      ? "Nenhum funil RD vinculado para esta conta."
+                      : noStages
+                        ? "Os estágios reais do funil ainda não foram sincronizados."
+                        : "Nenhuma negociação encontrada no período selecionado."}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Todos os indicadores continuam visíveis com valor zero e serão preenchidos automaticamente quando houver dados.
+                  </p>
+                </div>
+                <Button onClick={handleSync} disabled={syncing || (!funnelId && visibleAccounts.length === 0)} size="sm" variant="outline" className="shrink-0">
+                  <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                  {activeFunnels.length === 0 ? "Configurar ou sincronizar" : "Sincronizar agora"}
+                </Button>
+              </div>
+            </MotionItem>
+          )}
+
           <MotionItem><FunnelKPIs a={analytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} /></MotionItem>
 
           <MotionItem>

@@ -82,7 +82,7 @@ export function ResizableHead<T extends string, S extends string>({
       onClick={sortable && sortableKey && onSort ? () => onSort(sortableKey) : undefined}
     >
       <div className={cn("flex items-center gap-1 pr-2 truncate", align === "right" && "justify-end")}>
-        <span className={cn("truncate", isActive && "font-semibold")}>{children}</span>
+        <span className={cn("truncate text-[11px] font-bold", isActive && "text-foreground")}>{children}</span>
         {sortable && (
           isActive ? (
             sortAsc

@@ -21,6 +21,8 @@ interface Props {
   startDate: Date;
   endDate: Date;
   className?: string;
+  /** Aplica atalhos como Hoje/Ontem/7 dias no primeiro clique. */
+  applyPresetOnClick?: boolean;
 }
 
 const PRESET_ORDER: DatePreset[] = [
@@ -56,10 +58,11 @@ export function MetaDateRangePicker({
   startDate,
   endDate,
   className,
+  applyPresetOnClick = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pendingPreset, setPendingPreset] = useState<DatePreset>(preset);
-  const [pendingRange, setPendingRange] = useState<{ from: Date; to: Date }>({
+  const [pendingRange, setPendingRange] = useState<DateRange>({
     from: startDate,
     to: endDate,
   });
@@ -78,20 +81,36 @@ export function MetaDateRangePicker({
     if (p !== "custom") {
       const resolved = resolvePreset(p, customRange);
       setPendingRange({ from: resolved.startDate, to: resolved.endDate });
+      if (applyPresetOnClick) {
+        onPresetChange(p);
+        setOpen(false);
+      }
     }
   };
 
-  const handleCalendarSelect = (range: DateRange | undefined) => {
+  const handleCalendarSelect = (range: DateRange | undefined, selectedDay?: Date) => {
+    if (pendingRange.from && pendingRange.to && selectedDay) {
+      setPendingRange({ from: selectedDay, to: undefined });
+      setPendingPreset("custom");
+      return;
+    }
+
     if (range?.from) {
-      setPendingRange({ from: range.from, to: range.to ?? range.from });
+      // Preserve `to` as undefined while the user starts a new selection.
+      // This lets a completed interval become either a single day (Apply now)
+      // or a new interval (click a second day).
+      setPendingRange(range);
       setPendingPreset("custom");
     }
   };
 
   const handleApply = () => {
     onPresetChange(pendingPreset);
-    if (pendingPreset === "custom") {
-      onCustomRangeChange(pendingRange);
+    if (pendingPreset === "custom" && pendingRange.from) {
+      onCustomRangeChange({
+        from: pendingRange.from,
+        to: pendingRange.to ?? pendingRange.from,
+      });
     }
     setOpen(false);
   };
@@ -148,7 +167,7 @@ export function MetaDateRangePicker({
             <Calendar
               mode="range"
               numberOfMonths={typeof window !== "undefined" && window.innerWidth < 768 ? 1 : 2}
-              selected={{ from: pendingRange.from, to: pendingRange.to }}
+              selected={pendingRange}
               onSelect={handleCalendarSelect}
               locale={ptBR}
               weekStartsOn={1}

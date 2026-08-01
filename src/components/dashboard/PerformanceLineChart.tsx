@@ -17,9 +17,9 @@ interface PerformanceLineChartProps {
 }
 
 const METRICS = [
-  { key: "cpl", label: "CPL", color: "hsl(221, 83%, 53%)", yAxisId: "left", prefix: "R$ " },
-  { key: "spend", label: "Investimento", color: "hsl(262, 83%, 58%)", yAxisId: "left", prefix: "R$ " },
-  { key: "leads", label: "Leads", color: "hsl(142, 71%, 45%)", yAxisId: "right", prefix: "" },
+  { key: "cpl", label: "CPL", color: "hsl(var(--primary))", yAxisId: "left", prefix: "R$ " },
+  { key: "spend", label: "Investimento", color: "hsl(var(--primary) / .70)", yAxisId: "left", prefix: "R$ " },
+  { key: "leads", label: "Leads", color: "hsl(var(--primary) / .42)", yAxisId: "right", prefix: "" },
 ] as const;
 
 export function PerformanceLineChart({ data }: PerformanceLineChartProps) {

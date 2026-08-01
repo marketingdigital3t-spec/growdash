@@ -20,8 +20,18 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
+        // Keep production module URLs neutral. Browser privacy/ad-blocking
+        // extensions can falsely block route chunks named after marketing
+        // concepts (for example `TrafficPage-*.js`), leaving the SPA blank.
+        // Content hashes still provide deterministic cache busting.
+        entryFileNames: "assets/app-[hash].js",
+        chunkFileNames: "assets/chunk-[hash].js",
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
+          // Recharts imports many small CommonJS lodash modules. Keeping them in
+          // their own cacheable chunk prevents the charts bundle from crossing
+          // the browser's 500 kB warning threshold without splitting React.
+          if (id.includes("/node_modules/lodash/")) return "vendor-lodash";
           if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
           if (id.includes("@supabase")) return "vendor-supabase";
           if (id.includes("react-grid-layout") || id.includes("react-resizable") || id.includes("react-resizable-panels")) return "vendor-layout";
