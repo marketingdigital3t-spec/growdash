@@ -9,7 +9,7 @@ export function useAdAccounts() {
     queryFn: async () => {
       // Automatic local alignment: update token when listing accounts to ensure preview maps correctly
       try {
-        const { data: accounts } = await supabase.from("ad_accounts").select("id, access_token");
+        const { data: accounts } = await supabase.from("ad_accounts").select("id");
         if (accounts && accounts.length > 0) {
           const updates = accounts.map(acc =>
             supabase.from("ad_accounts").update({
