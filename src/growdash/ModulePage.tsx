@@ -119,23 +119,222 @@ function AutomationsModule() {
 
 function KanbanModule() {
   const [tab, setTab] = useState("boards");
-  const templates = ["Pipeline comercial", "Onboarding de cliente", "Produção de campanha", "Acompanhamento de leads"];
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: workspace } = useWorkspace();
+  const { toast } = useToast();
+
+  // Fetch Boards
+  const boardsQuery = useQuery({
+    queryKey: ["kanban_boards", workspace?.id],
+    enabled: !!workspace?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("kanban_boards" as any)
+        .select("*")
+        .eq("workspace_id", workspace!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  // Fetch Lists/Columns + Cards for Active Board
+  const boardDetailsQuery = useQuery({
+    queryKey: ["kanban_board_details", selectedBoardId],
+    enabled: !!selectedBoardId,
+    queryFn: async () => {
+      const { data: lists, error: listsError } = await supabase
+        .from("kanban_lists" as any)
+        .select("*")
+        .eq("board_id", selectedBoardId)
+        .order("position");
+      if (listsError) throw listsError;
+
+      const listIds = (lists || []).map((l: any) => l.id);
+      let cards: any[] = [];
+      if (listIds.length > 0) {
+        const { data: cardsRes, error: cardsError } = await supabase
+          .from("kanban_cards" as any)
+          .select("*")
+          .in("list_id", listIds)
+          .order("position");
+        if (cardsError) throw cardsError;
+        cards = cardsRes || [];
+      }
+
+      return { lists: lists || [], cards };
+    }
+  });
+
+  const createBoard = async (name: string, desc = "") => {
+    if (!workspace?.id) return;
+    try {
+      const { data: board, error } = await supabase
+        .from("kanban_boards" as any)
+        .insert({
+          workspace_id: workspace.id,
+          name,
+          description: desc
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      // Default Columns
+      const columns = ["A Fazer", "Em Progresso", "Concluído"];
+      const colInserts = columns.map((colName, index) =>
+        supabase.from("kanban_lists" as any).insert({
+          board_id: board.id,
+          name: colName,
+          position: index
+        })
+      );
+      await Promise.all(colInserts);
+
+      toast({ title: "Quadro criado", description: `O quadro "${name}" foi configurado com sucesso.` });
+      boardsQuery.refetch();
+      setSelectedBoardId(board.id);
+    } catch (e: any) {
+      toast({ title: "Erro ao criar quadro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const createCard = async (listId: string, title: string) => {
+    try {
+      const columnCards = boardDetailsQuery.data?.cards?.filter((c: any) => c.list_id === listId) || [];
+      const newPos = columnCards.length;
+      const { error } = await supabase.from("kanban_cards" as any).insert({
+        list_id: listId,
+        title,
+        position: newPos
+      });
+      if (error) throw error;
+      boardDetailsQuery.refetch();
+    } catch (e: any) {
+      toast({ title: "Erro ao criar cartão", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const deleteBoard = async (boardId: string) => {
+    try {
+      const { error } = await supabase.from("kanban_boards" as any).delete().eq("id", boardId);
+      if (error) throw error;
+      toast({ title: "Quadro excluído" });
+      setSelectedBoardId(null);
+      boardsQuery.refetch();
+    } catch (e: any) {
+      toast({ title: "Erro ao excluir quadro", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const activeBoard = boardsQuery.data?.find((b: any) => b.id === selectedBoardId);
+  const filteredBoards = boardsQuery.data?.filter((b: any) => b.name.toLowerCase().includes(searchQuery.toLowerCase())) || [];
+
+  if (selectedBoardId && activeBoard) {
+    const details = boardDetailsQuery.data || { lists: [], cards: [] };
+    return (
+      <Page title={activeBoard.name} description={activeBoard.description || "Organização ágil de tarefas."} action={
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setSelectedBoardId(null)}>Voltar aos quadros</Button>
+          <Button variant="destructive" size="sm" onClick={() => deleteBoard(activeBoard.id)}>Excluir quadro</Button>
+        </div>
+      }>
+        <div className="mt-4 flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
+          {details.lists.map((list: any) => {
+            const listCards = details.cards.filter((c: any) => c.list_id === list.id);
+            return (
+              <div key={list.id} className="min-w-64 max-w-64 gd-panel p-3 bg-muted/40 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-sm">{list.name}</h3>
+                  <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-black">{listCards.length}</span>
+                </div>
+                <div className="space-y-2 mb-3">
+                  {listCards.map((card: any) => (
+                    <div key={card.id} className="p-3 bg-card border border-border rounded-lg shadow-sm text-xs break-all">
+                      {card.title}
+                    </div>
+                  ))}
+                  {listCards.length === 0 && (
+                    <div className="py-8 text-center text-muted-foreground text-[10px]">Coluna vazia</div>
+                  )}
+                </div>
+                <Button size="sm" variant="ghost" className="w-full text-xs text-primary font-bold" onClick={() => {
+                  const title = prompt("Digite o título da tarefa:");
+                  if (title?.trim()) void createCard(list.id, title.trim());
+                }}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar cartão
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </Page>
+    );
+  }
+
+  const templates = [
+    { name: "Pipeline comercial", desc: "Acompanhe funis e negócios de vendas." },
+    { name: "Onboarding de cliente", desc: "Etapas de implantação de novos SaaS." },
+    { name: "Produção de campanha", desc: "Gestão de criativos, copys e anúncios." },
+    { name: "Acompanhamento de leads", desc: "Rotina de prospecção e triagem diária." }
+  ];
+
   return (
-    <Page title="Quadros" description="Organize vendas e operação em quadros visuais compartilhados." action={<ActionButton primary><Plus className="h-4 w-4" /> Criar quadro</ActionButton>}>
+    <Page title="Quadros" description="Organize vendas e operação em quadros visuais compartilhados." action={
+      <Button primary="true" size="sm" className="gold-action" onClick={() => {
+        const name = prompt("Nome do quadro:");
+        if (name?.trim()) void createBoard(name.trim());
+      }}>
+        <Plus className="h-4 w-4 mr-1" /> Criar quadro
+      </Button>
+    }>
       <Tabs options={[{ id: "boards", label: "Meus quadros" }, { id: "templates", label: "Templates" }]} value={tab} onChange={setTab} />
       {tab === "boards" ? (
         <>
-          <Toolbar left={<SearchField placeholder="Buscar quadro" />} right={<ActionButton><Star className="h-4 w-4" /> Favoritos</ActionButton>} />
-          <EmptyState icon={<LayoutGrid className="h-6 w-6" />} title="Nenhum quadro criado" description="Crie um quadro vazio ou comece por um template. Colunas e cartões poderão ser arrastados sem recarregar a página." action={<ActionButton primary><Plus className="h-4 w-4" /> Criar primeiro quadro</ActionButton>} />
+          <Toolbar left={
+            <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-64">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar quadro" className="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+            </label>
+          } right={null} />
+
+          {filteredBoards.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {filteredBoards.map((board: any) => (
+                <article key={board.id} className="gd-panel p-4 cursor-pointer hover:border-primary/55 hover:shadow-lg transition" onClick={() => setSelectedBoardId(board.id)}>
+                  <LayoutGrid className="h-6 w-6 text-primary mb-3" />
+                  <h3 className="font-bold text-sm mb-1">{board.name}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{board.description || "Sem descrição."}</p>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={<LayoutGrid className="h-6 w-6" />} title="Nenhum quadro criado" description="Crie um quadro vazio ou comece por um template. Colunas e cartões poderão ser arrastados sem recarregar a página." action={
+              <Button primary="true" size="sm" className="gold-action" onClick={() => {
+                const name = prompt("Nome do quadro:");
+                if (name?.trim()) void createBoard(name.trim());
+              }}>
+                <Plus className="h-4 w-4 mr-1" /> Criar primeiro quadro
+              </Button>
+            } />
+          )}
         </>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {templates.map((template, index) => (
-            <article key={template} className="gd-panel overflow-hidden">
+            <article key={template.name} className="gd-panel overflow-hidden">
               <div className="h-28 bg-[radial-gradient(circle_at_top_right,rgba(var(--brand-accent-rgb),.24),transparent_55%),linear-gradient(135deg,#080808,#151515)] p-4">
                 <div className="flex gap-2">{[0, 1, 2].map((item) => <span key={item} className="h-14 flex-1 rounded-lg border border-white/10 bg-white/[.04]" />)}</div>
               </div>
-              <div className="p-4"><span className="text-[9px] font-black uppercase tracking-[.16em] text-primary">Template {index + 1}</span><h2 className="mt-1 font-black">{template}</h2><button type="button" className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary">Usar template <ArrowRight className="h-4 w-4" /></button></div>
+              <div className="p-4">
+                <span className="text-[9px] font-black uppercase tracking-[.16em] text-primary">Template {index + 1}</span>
+                <h2 className="mt-1 font-black text-sm">{template.name}</h2>
+                <p className="text-[11px] text-muted-foreground mt-1 min-h-10 leading-normal">{template.desc}</p>
+                <button type="button" className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary" onClick={() => void createBoard(template.name, template.desc)}>
+                  Usar template <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
             </article>
           ))}
         </div>
