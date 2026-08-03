@@ -1,7 +1,7 @@
--- Create kanban boards table
+-- Create kanban boards table (Support both real UUID and text/legacy workspaces)
 CREATE TABLE IF NOT EXISTS public.kanban_boards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL, -- Changed from UUID REFERENCES public.workspaces(id) to TEXT to support legacy context IDs
   name TEXT NOT NULL,
   description TEXT,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
