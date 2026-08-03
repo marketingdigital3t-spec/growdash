@@ -282,7 +282,7 @@ function KanbanModule() {
 
   return (
     <Page title="Quadros" description="Organize vendas e operação em quadros visuais compartilhados." action={
-      <Button primary="true" size="sm" className="gold-action" onClick={() => {
+      <Button size="sm" className="gold-action" onClick={() => {
         const name = prompt("Nome do quadro:");
         if (name?.trim()) void createBoard(name.trim());
       }}>
@@ -310,8 +310,8 @@ function KanbanModule() {
               ))}
             </div>
           ) : (
-            <EmptyState icon={<LayoutGrid className="h-6 w-6" />} title="Nenhum quadro criado" description="Crie um quadro vazio ou comece por um template. Colunas e cartões poderão ser arrastados sem recarregar a página." action={
-              <Button primary="true" size="sm" className="gold-action" onClick={() => {
+            <EmptyState icon={<LayoutGrid className="h-6 w-6" />} title="Nenum quadro criado" description="Crie um quadro vazio ou comece por um template. Colunas e cartões poderão ser arrastados sem recarregar a página." action={
+              <Button size="sm" className="gold-action" onClick={() => {
                 const name = prompt("Nome do quadro:");
                 if (name?.trim()) void createBoard(name.trim());
               }}>
