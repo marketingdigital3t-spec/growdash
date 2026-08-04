@@ -75,7 +75,7 @@ export function usePermissions() {
   };
 
   return {
-    loading: loadingMaster || loadingWorkspace || isLoading,
+    loading: false, // Force loading false so React Query doesn't keep router locked on loading spinner
     isMaster,
     workspaceRole,
     accessRole: accessRole as "admin" | "editor" | "viewer",
