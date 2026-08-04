@@ -36,7 +36,7 @@ export function useWorkspace() {
   return useQuery({
     queryKey: ["workspace", user?.id],
     enabled: !!user,
-    staleTime: 5 * 60_000,
+    staleTime: 0, // Force real-time updates and bypass local stale caching
     queryFn: async (): Promise<WorkspaceFoundation> => {
       const { data: workspaceId, error: bootstrapError } = await (supabase as any)
         .rpc("ensure_current_workspace");
