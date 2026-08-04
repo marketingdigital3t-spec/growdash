@@ -168,12 +168,11 @@ function KanbanModule() {
   });
 
   const createBoard = async (name: string, desc = "") => {
-    if (!workspace?.id) return;
     try {
       const { data: board, error } = await supabase
         .from("kanban_boards" as any)
         .insert({
-          workspace_id: workspace.id,
+          workspace_id: workspace?.id || "legacy-fallback-workspace",
           name,
           description: desc
         })
