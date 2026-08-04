@@ -121,18 +121,19 @@ function KanbanModule() {
   const [tab, setTab] = useState("boards");
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban"); // "kanban" for Trello, "list" for ClickUp
   const { data: workspace } = useWorkspace();
   const { toast } = useToast();
 
   // Fetch Boards
   const boardsQuery = useQuery({
     queryKey: ["kanban_boards", workspace?.id],
-    enabled: !!workspace?.id,
     queryFn: async () => {
+      const wId = workspace?.id || "legacy-fallback-workspace";
       const { data, error } = await supabase
         .from("kanban_boards" as any)
         .select("*")
-        .eq("workspace_id", workspace!.id)
+        .eq("workspace_id", wId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -235,39 +236,74 @@ function KanbanModule() {
     return (
       <Page title={activeBoard.name} description={activeBoard.description || "Organização ágil de tarefas."} action={
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setViewMode(v => v === "kanban" ? "list" : "kanban")}>
+            {viewMode === "kanban" ? "Ver como Lista (ClickUp)" : "Ver como Quadro (Trello)"}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setSelectedBoardId(null)}>Voltar aos quadros</Button>
           <Button variant="destructive" size="sm" onClick={() => deleteBoard(activeBoard.id)}>Excluir quadro</Button>
         </div>
       }>
-        <div className="mt-4 flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
-          {details.lists.map((list: any) => {
-            const listCards = details.cards.filter((c: any) => c.list_id === list.id);
-            return (
-              <div key={list.id} className="min-w-64 max-w-64 gd-panel p-3 bg-muted/40 rounded-xl">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-sm">{list.name}</h3>
-                  <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-black">{listCards.length}</span>
+        {viewMode === "kanban" ? (
+          <div className="mt-4 flex gap-4 overflow-x-auto pb-4 items-start min-h-[500px]">
+            {details.lists.map((list: any) => {
+              const listCards = details.cards.filter((c: any) => c.list_id === list.id);
+              return (
+                <div key={list.id} className="min-w-64 max-w-64 gd-panel p-3 bg-muted/40 rounded-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-sm">{list.name}</h3>
+                    <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-black">{listCards.length}</span>
+                  </div>
+                  <div className="space-y-2 mb-3">
+                    {listCards.map((card: any) => (
+                      <div key={card.id} className="p-3 bg-card border border-border rounded-lg shadow-sm text-xs break-all">
+                        {card.title}
+                      </div>
+                    ))}
+                    {listCards.length === 0 && (
+                      <div className="py-8 text-center text-muted-foreground text-[10px]">Coluna vazia</div>
+                    )}
+                  </div>
+                  <Button size="sm" variant="ghost" className="w-full text-xs text-primary font-bold" onClick={() => {
+                    const title = prompt("Digite o título da tarefa:");
+                    if (title?.trim()) void createCard(list.id, title.trim());
+                  }}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar cartão
+                  </Button>
                 </div>
-                <div className="space-y-2 mb-3">
-                  {listCards.map((card: any) => (
-                    <div key={card.id} className="p-3 bg-card border border-border rounded-lg shadow-sm text-xs break-all">
-                      {card.title}
-                    </div>
-                  ))}
-                  {listCards.length === 0 && (
-                    <div className="py-8 text-center text-muted-foreground text-[10px]">Coluna vazia</div>
-                  )}
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 gd-panel p-4 space-y-6">
+            {details.lists.map((list: any) => {
+              const listCards = details.cards.filter((c: any) => c.list_id === list.id);
+              return (
+                <div key={list.id} className="space-y-2">
+                  <div className="flex items-center gap-2 border-b border-border pb-1">
+                    <h3 className="font-bold text-sm text-primary">{list.name}</h3>
+                    <span className="text-xs text-muted-foreground">({listCards.length})</span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {listCards.map((card: any) => (
+                      <div key={card.id} className="py-2.5 flex items-center justify-between text-xs">
+                        <span className="font-medium">{card.title}</span>
+                      </div>
+                    ))}
+                    {listCards.length === 0 && (
+                      <div className="py-4 text-muted-foreground text-xs italic">Nenhuma tarefa nesta lista</div>
+                    )}
+                  </div>
+                  <Button size="xs" variant="ghost" className="text-[11px] text-primary font-bold mt-1" onClick={() => {
+                    const title = prompt("Digite o título da tarefa:");
+                    if (title?.trim()) void createCard(list.id, title.trim());
+                  }}>
+                    <Plus className="mr-1 h-3 w-3" /> Adicionar tarefa
+                  </Button>
                 </div>
-                <Button size="sm" variant="ghost" className="w-full text-xs text-primary font-bold" onClick={() => {
-                  const title = prompt("Digite o título da tarefa:");
-                  if (title?.trim()) void createCard(list.id, title.trim());
-                }}>
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Adicionar cartão
-                </Button>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </Page>
     );
   }
