@@ -97,16 +97,20 @@ export function useWorkspaceSubscription(workspaceId?: string) {
     queryKey: ["workspace-subscription", workspaceId],
     enabled: !!workspaceId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("workspace_subscriptions")
-        .select("workspace_id, plan_code, status, trial_ends_at, current_period_ends_at")
-        .eq("workspace_id", workspaceId)
-        .single();
-      if (error) {
-        if (schemaIsPending(error)) return { workspace_id: workspaceId, plan_code: "starter", status: "configuring", trial_ends_at: null, current_period_ends_at: null };
-        throw error;
+      try {
+        const { data, error } = await (supabase as any)
+          .from("workspace_subscriptions")
+          .select("workspace_id, plan_code, status, trial_ends_at, current_period_ends_at")
+          .eq("workspace_id", workspaceId)
+          .single();
+        if (error) {
+          throw error;
+        }
+        return data;
+      } catch (err) {
+        console.warn("Failsafe subscription loaded:", err);
+        return { workspace_id: workspaceId, plan_code: "starter", status: "configuring", trial_ends_at: null, current_period_ends_at: null };
       }
-      return data;
     },
   });
 }
