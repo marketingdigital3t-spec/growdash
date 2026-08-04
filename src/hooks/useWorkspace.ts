@@ -38,10 +38,26 @@ export function useWorkspace() {
     enabled: !!user,
     staleTime: 0, // Force real-time updates and bypass local stale caching
     queryFn: async (): Promise<WorkspaceFoundation> => {
-      const { data: workspaceId, error: bootstrapError } = await (supabase as any)
-        .rpc("ensure_current_workspace");
-      if (bootstrapError) {
-        if (schemaIsPending(bootstrapError)) return {
+      try {
+        const { data: workspaceId, error: bootstrapError } = await (supabase as any)
+          .rpc("ensure_current_workspace");
+        if (bootstrapError) {
+          throw bootstrapError;
+        }
+
+        const [{ data: workspace, error: workspaceError }, { data: membership, error: memberError }, { data: units, error: unitsError }] = await Promise.all([
+          (supabase as any).from("workspaces").select("id, name, currency, timezone").eq("id", workspaceId).single(),
+          (supabase as any).from("workspace_members").select("role").eq("workspace_id", workspaceId).eq("user_id", user!.id).single(),
+          (supabase as any).from("business_units").select("id, workspace_id, kind, name, is_active").eq("workspace_id", workspaceId).eq("is_active", true).order("kind"),
+        ]);
+
+        if (workspaceError) throw workspaceError;
+        if (memberError) throw memberError;
+        if (unitsError) throw unitsError;
+        return { ...workspace, role: membership.role, units: units ?? [] };
+      } catch (err: any) {
+        console.warn("Failsafe bootstrap loaded:", err);
+        return {
           id: `legacy-${user!.id}`,
           name: user!.user_metadata?.full_name || user!.email?.split("@")[0] || "Growdash",
           currency: "BRL",
@@ -52,19 +68,7 @@ export function useWorkspace() {
             { id: "legacy-saas", workspace_id: `legacy-${user!.id}`, kind: "saas", name: "SaaS", is_active: true },
           ],
         };
-        throw bootstrapError;
       }
-
-      const [{ data: workspace, error: workspaceError }, { data: membership, error: memberError }, { data: units, error: unitsError }] = await Promise.all([
-        (supabase as any).from("workspaces").select("id, name, currency, timezone").eq("id", workspaceId).single(),
-        (supabase as any).from("workspace_members").select("role").eq("workspace_id", workspaceId).eq("user_id", user!.id).single(),
-        (supabase as any).from("business_units").select("id, workspace_id, kind, name, is_active").eq("workspace_id", workspaceId).eq("is_active", true).order("kind"),
-      ]);
-
-      if (workspaceError) throw workspaceError;
-      if (memberError) throw memberError;
-      if (unitsError) throw unitsError;
-      return { ...workspace, role: membership.role, units: units ?? [] };
     },
   });
 }
