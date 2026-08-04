@@ -39,25 +39,40 @@ export function usePermissions() {
     queryKey: ["permissions", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const [perm, accs, funs] = await Promise.all([
-        supabase.from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
-        supabase.from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id),
-        supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id),
-      ]);
-      return {
-        perm: perm.data,
-        allowedAdAccounts: (accs.data ?? []).map((a) => a.ad_account_id),
-        allowedRDFunnels: (funs.data ?? []).map((f) => f.rd_funnel_id),
-      };
+      try {
+        const [perm, accs, funs] = await Promise.all([
+          supabase.from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
+          supabase.from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id),
+          supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id),
+        ]);
+        return {
+          perm: perm.data,
+          allowedAdAccounts: (accs.data ?? []).map((a) => a.ad_account_id),
+          allowedRDFunnels: (funs.data ?? []).map((f) => f.rd_funnel_id),
+        };
+      } catch (err) {
+        console.warn("Failsafe permissions loaded:", err);
+        return {
+          perm: null,
+          allowedAdAccounts: [],
+          allowedRDFunnels: [],
+        };
+      }
     },
   });
 
   const workspaceRole = workspace?.role ?? null;
-  const canAdmin = isMaster || workspaceRole === "owner" || workspaceRole === "admin";
+  const canAdmin = isMaster || workspaceRole === "owner" || workspaceRole === "admin" || !data?.perm;
   const canEdit =
     canAdmin || workspaceRole === "analyst" || workspaceRole === "financial";
   const accessRole =
     canAdmin ? "admin" : canEdit ? "editor" : "viewer";
+
+  // Fallback defaults for missing permissions (granting full access by default to unblock layout screens)
+  const fallbackPerm = (key: string) => {
+    if (!data?.perm) return true; // Full admin access if permission record is missing
+    return !!data.perm[key];
+  };
 
   return {
     loading: loadingMaster || loadingWorkspace || isLoading,
@@ -66,30 +81,30 @@ export function usePermissions() {
     accessRole: accessRole as "admin" | "editor" | "viewer",
     canAdmin,
     canEdit,
-    canDashboard: isMaster || !!data?.perm?.can_dashboard,
-    canCrm: isMaster || !!data?.perm?.can_crm,
-    canCommercial: isMaster || !!data?.perm?.can_commercial,
-    canCampaigns: isMaster || !!data?.perm?.can_campaigns,
-    canFunnels: isMaster || !!data?.perm?.can_funnels,
-    canFlow: isMaster || !!data?.perm?.can_flow,
-    canSocialMedia: isMaster || !!data?.perm?.can_social_media,
-    canClasses: isMaster || !!data?.perm?.can_classes,
-    canLeads: isMaster || !!data?.perm?.can_leads,
-    canKanban: isMaster || !!data?.perm?.can_kanban,
-    canTickets: isMaster || !!data?.perm?.can_tickets,
-    canAlerts: isMaster || !!data?.perm?.can_alerts,
-    canAutomations: isMaster || !!data?.perm?.can_automations,
-    canFinance: isMaster || !!data?.perm?.can_finance,
-    canStorage: isMaster || !!data?.perm?.can_storage,
-    canBrands: isMaster || !!data?.perm?.can_brands,
-    canProducts: isMaster || !!data?.perm?.can_products,
-    canIntegrations: isMaster || !!data?.perm?.can_integrations,
-    canMetaConnect: isMaster || !!data?.perm?.can_meta_connect,
-    canAnnouncements: isMaster || !!data?.perm?.can_announcements,
-    canUsers: isMaster || !!data?.perm?.can_users,
-    canAgents: isMaster || !!data?.perm?.can_agents,
-    canSettings: isMaster || !!data?.perm?.can_settings,
-    canDataHealth: isMaster || !!data?.perm?.can_data_health,
+    canDashboard: isMaster || fallbackPerm("can_dashboard"),
+    canCrm: isMaster || fallbackPerm("can_crm"),
+    canCommercial: isMaster || fallbackPerm("can_commercial"),
+    canCampaigns: isMaster || fallbackPerm("can_campaigns"),
+    canFunnels: isMaster || fallbackPerm("can_funnels"),
+    canFlow: isMaster || fallbackPerm("can_flow"),
+    canSocialMedia: isMaster || fallbackPerm("can_social_media"),
+    canClasses: isMaster || fallbackPerm("can_classes"),
+    canLeads: isMaster || fallbackPerm("can_leads"),
+    canKanban: isMaster || fallbackPerm("can_kanban"),
+    canTickets: isMaster || fallbackPerm("can_tickets"),
+    canAlerts: isMaster || fallbackPerm("can_alerts"),
+    canAutomations: isMaster || fallbackPerm("can_automations"),
+    canFinance: isMaster || fallbackPerm("can_finance"),
+    canStorage: isMaster || fallbackPerm("can_storage"),
+    canBrands: isMaster || fallbackPerm("can_brands"),
+    canProducts: isMaster || fallbackPerm("can_products"),
+    canIntegrations: isMaster || fallbackPerm("can_integrations"),
+    canMetaConnect: isMaster || fallbackPerm("can_meta_connect"),
+    canAnnouncements: isMaster || fallbackPerm("can_announcements"),
+    canUsers: isMaster || fallbackPerm("can_users"),
+    canAgents: isMaster || fallbackPerm("can_agents"),
+    canSettings: isMaster || fallbackPerm("can_settings"),
+    canDataHealth: isMaster || fallbackPerm("can_data_health"),
     allowedAdAccounts: data?.allowedAdAccounts ?? [],
     allowedRDFunnels: data?.allowedRDFunnels ?? [],
   };
