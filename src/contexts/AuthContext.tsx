@@ -23,19 +23,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Failsafe timeout to prevent infinite loading state when database connection hangs
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 1200);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
         setLoading(false);
+        clearTimeout(timeout);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+      clearTimeout(timeout);
+    }).catch(() => {
+      setLoading(false);
+      clearTimeout(timeout);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const signOut = async () => {
