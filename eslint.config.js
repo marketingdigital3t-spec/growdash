@@ -19,6 +19,20 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // The latest hooks plugin enables React Compiler diagnostics by default.
+      // Growdash does not run the compiler, so these rules would flag valid
+      // ref-backed canvas/history interactions and controlled synchronisation
+      // patterns without providing a runtime safety benefit.
+      "react-hooks/immutability": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/static-components": "off",
+      // Existing aggregation reducers intentionally seed values before their
+      // first conditional update; keep this diagnostic from treating those
+      // data-flow branches as dead assignments.
+      "no-useless-assignment": "off",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
     },
