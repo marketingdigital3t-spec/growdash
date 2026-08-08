@@ -14,8 +14,8 @@ import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker"
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { cn } from "@/lib/utils";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import type { InsightRow } from "@/hooks/useInsights";
 
-type InsightRow = { date?: string | null; spend?: number | null; leads?: number | null; impressions?: number | null; clicks?: number | null; reach?: number | null; cpm?: number | null; frequency?: number | null; conversion_rate?: number | null };
 export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
 export type ReportTotals = Record<MetricId, number>;
 export type ReportSnapshot = { title: string; accountName: string; dateFrom: string; dateTo: string; metrics: MetricId[]; banner?: string; totals: ReportTotals; daily: Array<{ date: string; leads: number; spend: number }>; weekly: Array<{ week: string; leads: number; spend: number; days: number }> };
@@ -67,8 +67,8 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const filteredInsights = useMemo(() => insights.filter((row) => !row.date || (row.date >= reportFrom && row.date <= reportTo)), [insights, reportFrom, reportTo]);
   const filteredDeals = useMemo(() => deals.filter((row) => !row.lead_created_at || (row.lead_created_at.slice(0, 10) >= reportFrom && row.lead_created_at.slice(0, 10) <= reportTo)), [deals, reportFrom, reportTo]);
   const filteredSales = useMemo(() => sales.filter((row) => row.sale_date >= reportFrom && row.sale_date <= reportTo), [sales, reportFrom, reportTo]);
-  const adIds = useMemo(() => Array.from(new Set(filteredInsights.map((row: any) => row.ad_id).filter(Boolean))), [filteredInsights]);
-  const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row: any) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
+  const adIds = useMemo(() => Array.from(new Set(filteredInsights.map((row) => row.ad_id).filter(Boolean))), [filteredInsights]);
+  const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
   const { data: actionData } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId);
   const conversations = actionData?.totals?.["onsite_conversion.messaging_conversation_started_7d"] || 0;
   const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, conversations), [conversations, filteredDeals, filteredInsights, filteredSales]);

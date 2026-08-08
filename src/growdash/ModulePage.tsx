@@ -416,7 +416,7 @@ function BrandsModule() {
       return data ?? [];
     },
   });
-  const storedCompanies = companiesQuery.data ?? [];
+  const storedCompanies = useMemo(() => companiesQuery.data ?? [], [companiesQuery.data]);
   const brands = useMemo(() => {
     const byMetaId = new Map<string, any>();
     const result = storedCompanies.map((company: any) => {

@@ -2211,6 +2211,99 @@ export type Database = {
           },
         ]
       }
+      kanban_boards: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          description: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kanban_lists: {
+        Row: {
+          id: string
+          board_id: string
+          name: string
+          position: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          board_id: string
+          name: string
+          position?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          board_id?: string
+          name?: string
+          position?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kanban_cards: {
+        Row: {
+          id: string
+          list_id: string
+          title: string
+          description: string | null
+          position: number
+          due_date: string | null
+          priority: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          list_id: string
+          title: string
+          description?: string | null
+          position?: number
+          due_date?: string | null
+          priority?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          list_id?: string
+          title?: string
+          description?: string | null
+          position?: number
+          due_date?: string | null
+          priority?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       meta_breakdown_insights: {
         Row: {
           ad_account_id: string

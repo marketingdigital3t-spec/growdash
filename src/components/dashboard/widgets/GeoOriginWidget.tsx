@@ -47,7 +47,7 @@ export function GeoOriginWidget() {
   const [mode, setMode] = useState<Mode>("leads");
   const [auditOpen, setAuditOpen] = useState(false);
   const { data, isLoading } = useLeadsByState({ startDate, endDate, adAccountId });
-  const rows: StateRow[] = data?.rows || [];
+  const rows: StateRow[] = useMemo(() => data?.rows ?? [], [data?.rows]);
   const hasRegionData = data?.hasRegionData ?? false;
 
   const totals = useMemo(() => {

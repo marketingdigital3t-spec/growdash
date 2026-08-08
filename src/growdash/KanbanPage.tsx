@@ -26,6 +26,10 @@ type BoardTemplate = {
   icon: typeof BriefcaseBusiness;
 };
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Tente novamente em alguns instantes.";
+}
+
 const PRIORITIES = [{ value: "none", label: "Sem prioridade" }, { value: "low", label: "Baixa" }, { value: "medium", label: "Média" }, { value: "high", label: "Alta" }, { value: "urgent", label: "Urgente" }];
 
 const BOARD_TEMPLATES: BoardTemplate[] = [
@@ -98,7 +102,7 @@ export default function KanbanPage() {
     queryKey: ["kanban_boards", workspace?.id],
     enabled: !!workspace?.id,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("kanban_boards").select("id,name,description,created_at").eq("workspace_id", workspace!.id).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("kanban_boards").select("id,name,description,created_at").eq("workspace_id", workspace!.id).order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as Board[];
     },
@@ -108,11 +112,11 @@ export default function KanbanPage() {
     queryKey: ["kanban_board_details", selectedBoardId],
     enabled: !!selectedBoardId,
     queryFn: async () => {
-      const { data: lists, error: listError } = await (supabase as any).from("kanban_lists").select("id,board_id,name,position").eq("board_id", selectedBoardId).order("position");
+      const { data: lists, error: listError } = await supabase.from("kanban_lists").select("id,board_id,name,position").eq("board_id", selectedBoardId).order("position");
       if (listError) throw listError;
       const ids = (lists || []).map((list: KanbanList) => list.id);
       if (!ids.length) return { lists: lists as KanbanList[], cards: [] as KanbanCard[] };
-      const { data: cards, error: cardError } = await (supabase as any).from("kanban_cards").select("id,list_id,title,description,due_date,priority,position").in("list_id", ids).order("position");
+      const { data: cards, error: cardError } = await supabase.from("kanban_cards").select("id,list_id,title,description,due_date,priority,position").in("list_id", ids).order("position");
       if (cardError) throw cardError;
       return { lists: (lists || []) as KanbanList[], cards: (cards || []) as KanbanCard[] };
     },
@@ -129,9 +133,9 @@ export default function KanbanPage() {
     if (!workspace?.id || !boardForm.name.trim()) return;
     try {
       const template = BOARD_TEMPLATES.find((item) => item.id === boardTemplate) ?? BOARD_TEMPLATES[0];
-      const { data: board, error } = await (supabase as any).from("kanban_boards").insert({ workspace_id: workspace.id, name: boardForm.name.trim(), description: boardForm.description.trim() || template.description }).select("id").single();
+      const { data: board, error } = await supabase.from("kanban_boards").insert({ workspace_id: workspace.id, name: boardForm.name.trim(), description: boardForm.description.trim() || template.description }).select("id").single();
       if (error) throw error;
-      const { data: createdLists, error: listError } = await (supabase as any).from("kanban_lists").insert(template.columns.map((name, position) => ({ board_id: board.id, name, position }))).select("id,name");
+      const { data: createdLists, error: listError } = await supabase.from("kanban_lists").insert(template.columns.map((name, position) => ({ board_id: board.id, name, position }))).select("id,name");
       if (listError) throw listError;
       const listByName = new Map((createdLists || []).map((list: { id: string; name: string }) => [list.name, list.id]));
       const starterCards = template.cards.flatMap((card, position) => {
@@ -139,37 +143,37 @@ export default function KanbanPage() {
         return listId ? [{ list_id: listId, title: card.title, description: null, due_date: null, priority: card.priority || "none", position }] : [];
       });
       if (starterCards.length) {
-        const { error: cardError } = await (supabase as any).from("kanban_cards").insert(starterCards);
+        const { error: cardError } = await supabase.from("kanban_cards").insert(starterCards);
         if (cardError) throw cardError;
       }
       setBoardDialog(false); setBoardForm({ name: "", description: "" }); setBoardTemplate("sales"); setSelectedBoardId(board.id); invalidate();
       toast({ title: "Quadro criado" });
-    } catch (error: any) { toast({ title: "Não foi possível criar o quadro", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Não foi possível criar o quadro", description: errorMessage(error), variant: "destructive" }); }
   }
 
   async function createList() {
     if (!selectedBoardId || !listName.trim()) return;
     try {
       const position = details.lists.length ? Math.max(...details.lists.map((list) => list.position)) + 1 : 0;
-      const { error } = await (supabase as any).from("kanban_lists").insert({ board_id: selectedBoardId, name: listName.trim(), position });
+      const { error } = await supabase.from("kanban_lists").insert({ board_id: selectedBoardId, name: listName.trim(), position });
       if (error) throw error;
       setListDialog(false); setListName(""); invalidate();
-    } catch (error: any) { toast({ title: "Não foi possível criar a coluna", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Não foi possível criar a coluna", description: errorMessage(error), variant: "destructive" }); }
   }
 
   async function saveCard() {
     if (!cardDialog || !cardForm.title.trim()) return;
     try {
       if (cardDialog.card) {
-        const { error } = await (supabase as any).from("kanban_cards").update({ title: cardForm.title.trim(), description: cardForm.description.trim() || null, due_date: cardForm.due_date || null, priority: cardForm.priority, updated_at: new Date().toISOString() }).eq("id", cardDialog.card.id);
+        const { error } = await supabase.from("kanban_cards").update({ title: cardForm.title.trim(), description: cardForm.description.trim() || null, due_date: cardForm.due_date || null, priority: cardForm.priority, updated_at: new Date().toISOString() }).eq("id", cardDialog.card.id);
         if (error) throw error;
       } else {
         const position = details.cards.filter((card) => card.list_id === cardDialog.listId).length;
-        const { error } = await (supabase as any).from("kanban_cards").insert({ list_id: cardDialog.listId, title: cardForm.title.trim(), description: cardForm.description.trim() || null, due_date: cardForm.due_date || null, priority: cardForm.priority, position });
+        const { error } = await supabase.from("kanban_cards").insert({ list_id: cardDialog.listId, title: cardForm.title.trim(), description: cardForm.description.trim() || null, due_date: cardForm.due_date || null, priority: cardForm.priority, position });
         if (error) throw error;
       }
       setCardDialog(null); invalidate();
-    } catch (error: any) { toast({ title: "Não foi possível salvar o cartão", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Não foi possível salvar o cartão", description: errorMessage(error), variant: "destructive" }); }
   }
 
   async function moveCard(card: KanbanCard, listId: string, targetPosition?: number) {
@@ -183,23 +187,23 @@ export default function KanbanPage() {
     nextTargetCards.splice(position, 0, { ...card, list_id: listId, position });
     try {
       if (sourceListId !== listId) {
-        const { error } = await (supabase as any).from("kanban_cards").update({ list_id: listId, position, updated_at: new Date().toISOString() }).eq("id", card.id);
+        const { error } = await supabase.from("kanban_cards").update({ list_id: listId, position, updated_at: new Date().toISOString() }).eq("id", card.id);
         if (error) throw error;
       }
       const touched = sourceListId === listId ? nextTargetCards : [...sourceCards, ...nextTargetCards];
       for (const item of touched) {
         const nextPosition = (sourceListId === listId ? nextTargetCards : item.list_id === sourceListId ? sourceCards : nextTargetCards).findIndex((candidate) => candidate.id === item.id);
         if (nextPosition < 0 || (item.id === card.id && sourceListId !== listId)) continue;
-        const { error } = await (supabase as any).from("kanban_cards").update({ list_id: item.list_id, position: nextPosition, updated_at: new Date().toISOString() }).eq("id", item.id);
+        const { error } = await supabase.from("kanban_cards").update({ list_id: item.list_id, position: nextPosition, updated_at: new Date().toISOString() }).eq("id", item.id);
         if (error) throw error;
       }
       invalidate();
-    } catch (error: any) { toast({ title: "Não foi possível mover o cartão", description: error.message, variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Não foi possível mover o cartão", description: errorMessage(error), variant: "destructive" }); }
   }
 
   async function deleteCard(card: KanbanCard) {
     if (!window.confirm(`Excluir o cartão “${card.title}”?`)) return;
-    const { error } = await (supabase as any).from("kanban_cards").delete().eq("id", card.id);
+    const { error } = await supabase.from("kanban_cards").delete().eq("id", card.id);
     if (error) toast({ title: "Não foi possível excluir", description: error.message, variant: "destructive" }); else invalidate();
   }
 

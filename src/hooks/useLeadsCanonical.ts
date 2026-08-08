@@ -72,7 +72,7 @@ export function useLeadsCanonical() {
     },
   });
 
-  const rows = q.data || [];
+  const rows = useMemo(() => q.data ?? [], [q.data]);
 
   return useMemo(() => {
     const total = rows.length;

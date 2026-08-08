@@ -48,7 +48,7 @@ export function LeadsAuditSheet({ open, onOpenChange, adAccountId, startDate, en
   const [ufFilter, setUfFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
 
-  const all = data || [];
+  const all = useMemo(() => data ?? [], [data]);
   const ufs = useMemo(() => {
     const set = new Set<string>();
     all.forEach((r) => r.uf && set.add(r.uf));
