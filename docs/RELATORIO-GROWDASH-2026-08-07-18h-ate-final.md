@@ -172,3 +172,8 @@ Validação desta entrega: TypeScript aprovado, ESLint sem erros (15 avisos anti
 Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos antigos), Vitest 22/61 aprovado e build Vite aprovado. A revisão visual foi feita no ambiente publicado autenticado.
 
 - Ajuste final de perspectiva: o piso e as paredes foram elevados e alongados na projeção isométrica, evitando a sensação de mesas flutuando fora da planta. Nova rodada completa de TypeScript, ESLint, Vitest e build concluída antes da publicação. Commit `c4ca50c` enviado ao GitHub; Cloudflare Pages publicado em `https://b4b48980.growdash.pages.dev`. `growdash.com.br` foi aberto autenticado e confirmou a planta final com as estações centralizadas.
+
+## Identidade no navegador e SEO — 08/08/2026
+
+- O título da página foi reduzido de “Growdash | Growth Intelligence” para somente “Growdash”.
+- Adicionados favicon/mask icon, Apple Touch Icon, canonical do domínio, nome da aplicação, `og:site_name`, URL e imagem Open Graph, imagem Twitter e marcação estruturada `Organization` com a logo oficial Growdash.
