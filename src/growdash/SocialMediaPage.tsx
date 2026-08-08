@@ -13,6 +13,7 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { useToast } from "@/hooks/use-toast";
 import { metricDescription } from "@/lib/metricPresentation";
+import { useAuth } from "@/contexts/AuthContext";
 
 type SocialAccount = {
   id: string;
@@ -59,13 +60,15 @@ function MediaPreview({ media }: { media: SocialMedia }) {
 
 export default function SocialMediaPage() {
   const { startDate, endDate } = useGlobalFilters();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const connectInstagram = useInstagramOAuth();
   const [accountId, setAccountId] = useState("");
 
   const accountsQuery = useQuery({
-    queryKey: ["social_accounts"],
+    queryKey: ["social_accounts", user?.id],
+    enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase.from("social_accounts").select("*").order("created_at", { ascending: false });
       if (error) throw error;
@@ -135,7 +138,7 @@ export default function SocialMediaPage() {
 
       {schemaMissing && <section className="gd-panel border-amber-500/30 p-5"><b className="text-sm text-amber-500">Atualização de banco pendente</b><p className="mt-1 text-xs text-muted-foreground">Aplique a migration 20260715120000 para liberar contas, conteúdos e insights sociais.</p></section>}
 
-      {!accountsQuery.isLoading && !accounts.length && !schemaMissing ? (
+      {accountsQuery.isLoading ? <section className="gd-panel grid min-h-[420px] place-items-center p-8 text-center" role="status" aria-live="polite"><p className="text-sm text-muted-foreground">Verificando perfis conectados…</p></section> : !accounts.length && !schemaMissing ? (
         <section className="gd-panel grid min-h-[420px] place-items-center overflow-hidden p-8 text-center">
           <div className="max-w-lg"><span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#f3c74a] to-[#9b6810] text-[#211706] shadow-[0_18px_60px_-25px_rgba(226,176,44,.9)]"><Instagram className="h-8 w-8" /></span><h2 className="mt-6 text-2xl font-black">Conecte um perfil profissional</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Use o login oficial do Instagram para importar perfil, publicações, Reels e métricas de alcance, salvamentos, compartilhamentos e engajamento. Senhas nunca passam pela Growdash.</p><Button className="mt-6" onClick={() => connectInstagram.mutate()}><Instagram className="mr-2 h-4 w-4" />Continuar com Instagram</Button></div>
         </section>
@@ -143,7 +146,7 @@ export default function SocialMediaPage() {
         <>
           <section className="gd-panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
             <div className="flex min-w-0 items-center gap-3">{selected?.profile_picture_url ? <img src={selected.profile_picture_url} className="h-11 w-11 rounded-xl object-cover" alt="" /> : <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span>}<div className="min-w-0"><b className="block truncate text-sm">{selected?.display_name}</b><span className="text-xs text-muted-foreground">@{selected?.username || "perfil"} · {selected?.connection_status === "connected" ? "conectado" : selected?.connection_status}</span></div></div>
-            <Select value={selectedId} onValueChange={setAccountId}><SelectTrigger className="sm:ml-auto sm:w-72"><SelectValue /></SelectTrigger><SelectContent>{accounts.map((account) => <SelectItem key={account.id} value={account.id}>@{account.username || account.display_name}</SelectItem>)}</SelectContent></Select>
+            <Select value={selectedId} onValueChange={setAccountId}><SelectTrigger aria-label="Selecionar perfil do Instagram" className="sm:ml-auto sm:w-72"><SelectValue /></SelectTrigger><SelectContent>{accounts.map((account) => <SelectItem key={account.id} value={account.id}>@{account.username || account.display_name}</SelectItem>)}</SelectContent></Select>
             <span className="text-[10px] text-muted-foreground">Último sync: {selected?.last_sync_at ? format(new Date(selected.last_sync_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "nunca"}</span>
           </section>
 
