@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { Switch } from "@/components/ui/switch";
 import { SalesGoalSettingsCard } from "@/components/settings/SalesGoalSettingsCard";
+import { SmartAlertSettingsCard } from "@/components/settings/SmartAlertSettingsCard";
 
 const sections = [
   { to: "/perfil", icon: UserRound, title: "Perfil e acesso", description: "Nome, foto, telefone, e-mail, senha e aparência." },
@@ -63,6 +64,8 @@ export default function SettingsPage() {
           <div className="mt-5 flex items-center justify-between rounded-xl border border-border p-4"><span className="text-sm">Alertas críticos por e-mail</span><Switch aria-label="Alertas críticos por e-mail" checked={!!preferences?.email_alerts_enabled} onCheckedChange={(checked) => updateAlerts.mutate(checked)} disabled={updateAlerts.isPending} /></div>
         </section>
       </MotionItem>
+
+      <MotionItem><SmartAlertSettingsCard /></MotionItem>
 
       <MotionItem><SalesGoalSettingsCard /></MotionItem>
 

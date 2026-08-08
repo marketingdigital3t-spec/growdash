@@ -387,7 +387,6 @@ export default function GrowdashLayout() {
           <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
             <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} />
           </div>
-          <NotificationCenter />
           <div className="order-2 ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px] lg:order-none">
             <button
               type="button"
@@ -424,8 +423,9 @@ export default function GrowdashLayout() {
           </div>
         </main>
       </div>
+      <NotificationCenter />
       {!isOnline && (
-        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#080808]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
+        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#080808]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
           Você está offline. Os dados exibidos podem estar desatualizados e nenhuma alteração será enviada até a conexão voltar.
         </div>
       )}
