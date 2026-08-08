@@ -1,6 +1,16 @@
 -- Meta tokens must never be readable by the browser. Authenticated users keep
 -- access to the operational account fields permitted by RLS; service_role
 -- remains able to read the token inside Edge Functions.
+-- These fields are used by the manual/OAuth connectors and must exist before
+-- the column-level grants below. IF NOT EXISTS keeps the migration safe for
+-- projects that already received them through an earlier schema revision.
+ALTER TABLE public.ad_accounts
+  ADD COLUMN IF NOT EXISTS currency text,
+  ADD COLUMN IF NOT EXISTS timezone_name text,
+  ADD COLUMN IF NOT EXISTS timezone_offset_hours_utc integer,
+  ADD COLUMN IF NOT EXISTS provider_account_id text,
+  ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+
 REVOKE SELECT ON TABLE public.ad_accounts FROM anon, authenticated;
 
 GRANT SELECT (
