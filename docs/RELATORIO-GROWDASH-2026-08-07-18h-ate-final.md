@@ -22,6 +22,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 00:26 | `96ea7dc` | Criação de agendamento WhatsApp corrigida para usar `local_time` e `include_metrics`, os nomes reais da tabela. |
 | 08/08 00:30 | `a0159a7` | Migration criada para permitir, por RLS, turmas personalizadas sem conta de anúncio nem funil RD. |
 | 08/08 00:47 | `aeb7cba` | Filtro de período do CRM passa a priorizar `stage_updated_at`, evitando que `closed_at` antigo esconda negócios movimentados no intervalo selecionado. Deploy Cloudflare: `https://b6bdb08d.growdash.pages.dev`. |
+| 08/08 00:56 | `7c8e179` | Corrigida a configuração do Cloudflare Pages Git: build `npm run build` e diretório de saída `dist`. O domínio estava publicando o código-fonte (`/src/main.tsx`), causando a tela de carregamento permanente. Deploy de produção: `https://40a7ba1e.growdash.pages.dev`; `growdash.com.br` e `www.growdash.com.br` passaram a servir o bundle Vite. |
 
 ## Desempenho e carregamento
 
@@ -36,6 +37,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - `https://d9df8425.growdash.pages.dev` — melhoria de carregamento e recuperação de boot.
 - `https://bb88e612.growdash.pages.dev` — correção do agendamento WhatsApp.
 - O domínio `https://growdash.com.br` foi verificado apontando para os bundles publicados mais recentes.
+- O projeto Pages tinha `build_command` e `destination_dir` vazios; a publicação automática do Git entregava o repositório sem build. A configuração foi corrigida via API do Cloudflare e versionada em `wrangler.toml`. Após o novo push, a produção passou a responder com `assets/app-*.js`.
 
 ## Validações executadas
 
@@ -46,6 +48,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Playwright visual: telas de login mobile, tablet e desktop aprovadas; rotas autenticadas requerem credenciais E2E e foram puladas.
 - `npm audit`: nenhuma vulnerabilidade encontrada.
 - Playwright visual após a correção do CRM: 3 testes aprovados e 3 rotas autenticadas puladas por falta de `E2E_EMAIL`/`E2E_PASSWORD`.
+- Após a correção do Pages, `npx tsc --noEmit`, ESLint, Vitest (21 arquivos/56 testes) e Vite build foram executados novamente com sucesso; ESLint manteve apenas 15 warnings antigos de Fast Refresh.
 
 ## Pendências externas e limites de validação
 
