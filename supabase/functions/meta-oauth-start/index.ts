@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     const redirectUri = Deno.env.get("META_OAUTH_REDIRECT_URI")
       ?? `${supabaseUrl}/functions/v1/meta-oauth-callback`;
     const scopes = Deno.env.get("META_OAUTH_SCOPES")
-      ?? "ads_read,ads_management,business_management";
+      ?? "ads_read,ads_management,business_management,leads_retrieval";
 
     const oauthUrl = new URL(`https://www.facebook.com/${graphVersion}/dialog/oauth`);
     oauthUrl.searchParams.set("client_id", appId);
