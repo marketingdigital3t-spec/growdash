@@ -114,12 +114,30 @@ export default function AgentsOfficePage() {
       </header>
 
       {view === "map" ? <KnowledgeMap onOpenOffice={() => setView("office")} /> : <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
+        <div className="office-sim-topbar">
+          <div className="office-sim-brand"><span className="office-sim-brand-mark"><Bot className="h-3.5 w-3.5" /></span><span><b>GROWDASH HQ</b><small>AGENT OPERATIONS</small></span></div>
+          <div className="office-sim-presence" aria-label="Agentes presentes no escritório">
+            {AGENTS.map((agent) => <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-presence-agent", `is-${statuses[agent.id] || "working"}`)} style={{ "--agent-color": agent.color } as React.CSSProperties}><span className="office-presence-avatar"><Bot className="h-3 w-3" /></span><span><b>{agent.name}</b><small>{statuses[agent.id] === "working" ? "online" : statuses[agent.id] === "walking" ? "andando" : "livre"}</small></span><i /></button>)}
+          </div>
+          <div className="office-sim-live"><span className="office-live-dot" /><span><b>Operação ao vivo</b><small>6 agentes conectados</small></span><button type="button" onClick={() => updateStatus("atlas", "walking")} aria-label="Abrir standup da equipe">STANDUP BOARD</button></div>
+        </div>
+        <aside className="office-sim-rail" aria-label="Navegação do escritório">
+          <span className="office-rail-logo"><Sparkles className="h-4 w-4" /></span>
+          <button type="button" className="is-active" aria-label="Escritório"><BriefcaseBusiness className="h-4 w-4" /></button>
+          <button type="button" onClick={() => setView("map")} aria-label="Mapa de inteligência"><Network className="h-4 w-4" /></button>
+          <button type="button" onClick={() => openAgent(activeAgentId || AGENTS[0].id)} aria-label="Chat dos agentes"><MessageCircle className="h-4 w-4" /></button>
+          <button type="button" onClick={() => updateStatus("atlas", "working")} aria-label="Ativar operação"><Activity className="h-4 w-4" /></button>
+          <span className="office-rail-spacer" />
+          <button type="button" onClick={() => setOfficeAngle(0)} aria-label="Recentrar escritório"><RotateCcw className="h-4 w-4" /></button>
+        </aside>
         <div className="office-viewport-toolbar" role="toolbar" aria-label="Controles da câmera do escritório">
           <span className="office-viewport-title"><Rotate3D className="h-3.5 w-3.5" />ESCRITÓRIO 360°</span>
           <span className="office-viewport-hint">Arraste a visão ou use as setas para orbitar</span>
           <div className="office-camera-buttons"><button type="button" onClick={() => setOfficeAngle((value) => Math.max(-28, value - 8))} aria-label="Orbitar para a esquerda"><ArrowLeft className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle(0)} aria-label="Centralizar câmera"><RotateCcw className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle((value) => Math.min(28, value + 8))} aria-label="Orbitar para a direita"><ArrowRight className="h-3.5 w-3.5" /></button></div>
         </div>
         <div className="office-3d-world" style={{ "--office-angle": `${officeAngle}deg` } as React.CSSProperties} onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) return; officeDragStart.current = event.clientX; officeAngleStart.current = officeAngle; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (officeDragStart.current === null) return; setOfficeAngle(Math.max(-28, Math.min(28, officeAngleStart.current + (event.clientX - officeDragStart.current) / 9))); }} onPointerUp={() => { officeDragStart.current = null; }} onPointerCancel={() => { officeDragStart.current = null; }}>
+          <div className="office-room-shell" aria-hidden="true"><span className="room-wall room-wall-back" /><span className="room-wall room-wall-left" /><span className="room-wall room-wall-right" /><span className="room-door room-door-main" /><span className="room-window-strip" /></div>
+          <div className="office-zone zone-war"><b>WAR ROOM</b><small>Planejamento</small></div><div className="office-zone zone-lounge"><b>LOUNGE</b><small>Tempo livre</small></div><div className="office-zone zone-focus"><b>FOCUS PODS</b><small>Execução</small></div>
           <div className="office-window"><span /><span /><span /></div>
           <div className="office-wall-sign"><WandSparkles className="h-4 w-4" /> GROWDASH INTELLIGENCE</div>
           <div className="office-floor-grid" />

@@ -161,3 +161,12 @@ Verificação pós-publicação: `growdash.com.br` e `www.growdash.com.br` respo
 - Removido `@types/react-grid-layout`, stub obsoleto que quebrava o typecheck; `react-grid-layout` de runtime permanece instalado.
 
 Validação desta entrega: TypeScript aprovado, ESLint sem erros (15 avisos antigos de Fast Refresh), Vitest 22 arquivos/61 testes aprovados e build Vite de produção aprovado. O build mantém somente o warning conhecido de chunk acima de 500 kB. Playwright autenticado não foi executado porque não há credenciais E2E/Chromium local disponível. Commit `60d96cf` enviado ao GitHub; Cloudflare Pages publicado em `https://65877d7d.growdash.pages.dev` às 15:47. O chunk da tela de agentes (`chunk-BLgMOm3x.js`) foi confirmado nos três hosts: preview, `growdash.com.br` e `www.growdash.com.br`.
+
+## Refinamento visual do escritório — 08/08/2026 16:00
+
+- A cena foi aproximada da referência enviada: planta isométrica aberta, piso claro em perspectiva, paredes baixas, porta, faixa de janela, áreas WAR ROOM/LOUNGE/FOCUS PODS e mobiliário com aparência de mesa/monitor/cadeira.
+- Adicionada barra superior de presença com avatares, status online/andando/livre e indicador de operação ao vivo, além de rail lateral para trocar contexto, abrir chat e recentrar a câmera.
+- Os NPCs ficaram menores e mais integrados ao ambiente, com etiqueta acima da cabeça e estações distribuídas como um escritório-jogo. Os comandos existentes continuam no rodapé e o clique em qualquer agente abre seu painel.
+- O visual segue sensível à cor de destaque da plataforma e mantém fallback responsivo para tablet/mobile.
+
+Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos antigos), Vitest 22/61 aprovado e build Vite aprovado. A revisão visual foi feita no ambiente publicado autenticado; a publicação deste refinamento ocorrerá após o commit validado.
