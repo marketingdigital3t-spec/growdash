@@ -32,6 +32,7 @@ import { CustomMetricsSection } from "@/components/settings/CustomMetricsSection
 import { AccountConnectionStatus } from "@/components/settings/AccountConnectionStatus";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 const tabs = [
   ["paid", "Tráfego pago"], ["social", "Mídia social"], ["crm", "CRM & Vendas"], ["ai", "IA"], ["messaging", "Mensageria"],
@@ -46,6 +47,7 @@ function relativeDate(value?: string | null) {
 
 export default function IntegrationsPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
@@ -54,13 +56,14 @@ export default function IntegrationsPage() {
   const [accountToDelete, setAccountToDelete] = useState<{ id: string; name: string; account_id: string } | null>(null);
   const { data: adAccounts = [], isLoading: loadingMeta } = useAdAccounts();
   const { data: rdIntegration, isLoading: loadingRD } = useRDIntegration();
-  const { data: rdFunnels = [] } = useRDFunnels();
+  const { data: rdFunnels = [] } = useRDFunnels(undefined, !!rdIntegration?.is_active);
   const connectMeta = useMetaOAuth();
   const connectInstagram = useInstagramOAuth();
   const syncMeta = useSyncMeta();
 
-  const { data: socialAccounts = [] } = useQuery({
-    queryKey: ["social_accounts"],
+  const { data: socialAccounts = [], isLoading: loadingSocial } = useQuery({
+    queryKey: ["social_accounts", user?.id],
+    enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase.from("social_accounts").select("id,username,display_name,connection_status,last_sync_at").order("created_at", { ascending: false });
       if (error) throw error;
@@ -140,7 +143,7 @@ export default function IntegrationsPage() {
             <SectionHeader icon={<Instagram />} title="Instagram profissional" description="Conteúdos, Reels, alcance, interações, salvamentos, compartilhamentos e crescimento de audiência via OAuth oficial." status={socialAccounts.length ? `${socialAccounts.length} conectado(s)` : "Disponível"} connected={socialAccounts.length > 0} />
             <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
               {socialAccounts.map((account) => <article key={account.id} className="rounded-xl border border-border bg-muted/20 p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span><div className="min-w-0"><b className="block truncate text-sm">{account.display_name}</b><p className="truncate text-xs text-muted-foreground">@{account.username || "perfil"}</p></div><CheckCircle2 className="ml-auto h-5 w-5 text-emerald-500" /></div></article>)}
-              {!socialAccounts.length && <EmptyState text="Nenhum perfil profissional conectado." />}
+              {loadingSocial ? <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground" role="status" aria-live="polite">Verificando perfis conectados…</div> : !socialAccounts.length && <EmptyState text="Nenhum perfil profissional conectado." />}
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Abrindo Instagram…" : "Conectar Instagram"}</Button><Button asChild variant="outline"><Link to="/midia-social">Abrir análise de mídia social</Link></Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Somente contas Business ou Creator são suportadas pela API oficial.</span></div>
           </section>
