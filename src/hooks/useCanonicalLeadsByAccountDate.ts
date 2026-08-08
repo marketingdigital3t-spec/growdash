@@ -135,6 +135,7 @@ export function useCanonicalLeadsByAccountDate() {
     // Classify each campaign as native (FORMS) / landing / messages (same rules as the KPI).
     const nativeCampaigns = new Set<string>();
     const landingCampaigns = new Set<string>();
+    const messagesCampaigns = new Set<string>();
     for (const campId of Object.keys(totalsByCampaign).concat(Object.keys(destSetByCampaign))) {
       if (isDeadStatus(campaignStatus[campId])) continue;
       const t = totalsByCampaign[campId] || {};
@@ -143,6 +144,7 @@ export function useCanonicalLeadsByAccountDate() {
       const lpAction = acc ? (lpConfigs as any)[acc]?.action_type : undefined;
       const hasNativeDest = Array.from(ds).some((d) => DEST_NATIVE.has(d));
       const hasLandingDest = Array.from(ds).some((d) => DEST_LANDING.has(d));
+      const hasMessagesDest = Array.from(ds).some((d) => DEST_MESSAGES.has(d));
 
       if ((t[NATIVE_LEAD_GROUPED] || 0) > 0 || hasNativeDest) nativeCampaigns.add(campId);
       if (
@@ -151,6 +153,7 @@ export function useCanonicalLeadsByAccountDate() {
       ) {
         landingCampaigns.add(campId);
       }
+      if ((t[MESSAGE_EVENT] || 0) > 0 || hasMessagesDest) messagesCampaigns.add(campId);
     }
 
     // 4) Walk all action rows, summing only the canonical event per ad's mechanic, per day.
@@ -161,7 +164,8 @@ export function useCanonicalLeadsByAccountDate() {
       const acc = meta.ad_account_id;
       const isNative = nativeCampaigns.has(campId);
       const isLanding = landingCampaigns.has(campId);
-      if (!isNative && !isLanding) continue; // ignore messages-only for now (KPI "Leads" = native + landing)
+      const isMessages = messagesCampaigns.has(campId);
+      if (!isNative && !isLanding && !isMessages) continue;
 
       let counts = false;
       if (isNative && r.action_type === NATIVE_LEAD_GROUPED) counts = true;
@@ -169,6 +173,7 @@ export function useCanonicalLeadsByAccountDate() {
         const lpAction = (lpConfigs as any)[acc]?.action_type;
         if (lpAction && r.action_type === lpAction) counts = true;
       }
+      if (!counts && isMessages && r.action_type === MESSAGE_EVENT) counts = true;
       if (!counts) continue;
 
       const key = `${acc}|${r.date}`;

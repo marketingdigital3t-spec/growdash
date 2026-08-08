@@ -25,6 +25,7 @@ const FullUsers = lazy(() => import("@/pages/Users"));
 const Products = lazy(() => import("@/pages/Products"));
 const Funnelytics = lazy(() => import("@/pages/Funnelytics"));
 const CrmPage = lazy(() => import("@/growdash/CrmPage"));
+const KanbanPage = lazy(() => import("@/growdash/KanbanPage"));
 const CommercialPage = lazy(() => import("@/growdash/CommercialPage"));
 const FinancePage = lazy(() => import("@/growdash/FinancePage"));
 const StoragePage = lazy(() => import("@/growdash/StoragePage"));
@@ -151,7 +152,7 @@ export default function App() {
                     <Route path="integracoes" element={<RequirePage page="integrations"><IntegrationsPage /></RequirePage>} />
                     <Route path="perfil" element={<ProfilePage />} />
                     <Route path="midia-social" element={<RequirePage page="socialMedia">{analytics(<SocialMediaPage />)}</RequirePage>} />
-                    <Route path="kanban" element={<RequirePage page="kanban"><ModulePage /></RequirePage>} />
+                    <Route path="kanban" element={<RequirePage page="kanban"><KanbanPage /></RequirePage>} />
                     <Route path="chamados" element={<RequirePage page="tickets"><ModulePage /></RequirePage>} />
                     <Route path="anuncios" element={<RequirePage page="announcements"><AnnouncementsPage /></RequirePage>} />
                     <Route path="marcas" element={<RequirePage page="brands"><ModulePage /></RequirePage>} />

@@ -186,8 +186,8 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     if (objective === "native_form") return native;
     if (objective === "landing_page") return landing;
     if (objective === "messages") return messages;
-    // "leads" = união de nativo + landing
-    return new Set<string>([...native, ...landing]);
+    // "leads" consolida Forms, site e conversas iniciadas.
+    return new Set<string>([...native, ...landing, ...messages]);
   }, [campaignClassification, objective]);
 
   const objectiveInsights = useMemo(
@@ -314,7 +314,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     if (objective === "messages") return [MESSAGE_EVENT];
     if (objective === "native_form") return nativeEventsForAccount(acc);
     if (objective === "landing_page") return lpEventsForAccount(acc);
-    return Array.from(new Set([...nativeEventsForAccount(acc), ...lpEventsForAccount(acc)]));
+    return Array.from(new Set([...nativeEventsForAccount(acc), ...lpEventsForAccount(acc), MESSAGE_EVENT]));
   };
 
   // Compute totals — separa contagem por classificação para evitar dupla contagem
@@ -339,7 +339,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     if (objective === "messages") tabLeads += accTotals[MESSAGE_EVENT] || 0;
     else if (objective === "native_form") tabLeads += accNative;
     else if (objective === "landing_page") for (const e of lpEvts) tabLeads += accLandingTotals[e] || 0;
-    else tabLeads += accNative + lpEvts.reduce((s, e) => s + (accLandingTotals[e] || 0), 0);
+    else tabLeads += accNative + lpEvts.reduce((s, e) => s + (accLandingTotals[e] || 0), 0) + (accTotals[MESSAGE_EVENT] || 0);
   }
 
   const clickRef = linkClicks > 0 ? linkClicks : totalClicks;
@@ -427,6 +427,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         } else {
           e.leads += native;
           for (const evt of lpEventsForAccount(acc)) e.leads += byAction[evt] || 0;
+          e.leads += byAction[MESSAGE_EVENT] || 0;
         }
       }
     }
@@ -454,14 +455,14 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     ? `Eventos somados: ${lpLeadActionsUsed.join(", ")} · excluindo campanhas apagadas/arquivadas (mesmo critério padrão do Gerenciador).`
     : `Excluindo campanhas apagadas/arquivadas (mesmo critério padrão do Gerenciador).`;
 
-  const tabLeadsTooltip = `Soma de Forms nativo + Landing page por conta (eventos configurados em "Métricas personalizadas").`;
+  const tabLeadsTooltip = `Eventos do período: Forms ${nativeLeads}, site ${lpLeads} e conversas iniciadas ${messages}. Use as abas específicas para auditar cada origem.`;
   const costPerLink = clickRef > 0 ? totalSpend / clickRef : 0;
   const tabConv = clickRef > 0 ? (tabLeads / clickRef) * 100 : 0;
 
   if (objective === "leads") {
     const cpl = tabLeads > 0 ? totalSpend / tabLeads : 0;
     kpis = [
-      { title: "Leads", value: tabLeads, decimals: 0, icon: <Users className="h-4 w-4" />, tooltip: tabLeadsTooltip },
+      { title: "Leads (Forms + site + conversas)", value: tabLeads, decimals: 0, icon: <Users className="h-4 w-4" />, tooltip: tabLeadsTooltip },
       { title: "Custo por Lead", value: cpl, prefix: "R$ ", decimals: 2, icon: <BarChart3 className="h-4 w-4" />, tooltip: tabLeadsTooltip },
       { title: "Custo por Clique no Link", value: costPerLink, prefix: "R$ ", decimals: 2, icon: <MousePointerClick className="h-4 w-4" /> },
       { title: "CTR", value: ctr, suffix: "%", decimals: 2, icon: <MousePointer className="h-4 w-4" /> },

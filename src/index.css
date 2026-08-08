@@ -696,6 +696,15 @@
   .knowledge-core small { font-size: 9px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
   .knowledge-core em { margin-top: 9px; max-width: 145px; font-size: 8px; font-style: normal; line-height: 1.4; color: rgba(255,255,255,.42); }
   .knowledge-core-ring { position: absolute; inset: -14px; border: 1px dashed hsl(var(--primary) / .35); border-radius: 50%; animation: knowledge-spin 22s linear infinite; }
+  .brain-core { overflow: visible; perspective: 900px; }
+  .brain-label { position: relative; z-index: 4; display: grid; place-items: center; pointer-events: none; }
+  .brain-hemisphere { position: absolute; top: 42px; width: 92px; height: 118px; border: 1px solid hsl(var(--primary) / .72); background: radial-gradient(circle at 35% 26%, rgba(255,235,154,.55), transparent 14%), radial-gradient(circle at 62% 60%, hsl(var(--primary) / .48), transparent 58%), linear-gradient(145deg, #ffe8a0, #9d6b13 64%, #2b1e08); box-shadow: inset -10px -14px 24px rgba(0,0,0,.38), 0 0 20px hsl(var(--primary) / .23); transform-style: preserve-3d; animation: brain-orbit 8s ease-in-out infinite alternate; }
+  .brain-left { left: 39px; border-radius: 58% 42% 48% 55% / 52% 46% 55% 48%; transform: rotateY(18deg) rotateZ(-9deg); }
+  .brain-right { right: 39px; border-radius: 42% 58% 55% 48% / 46% 52% 48% 55%; transform: rotateY(-18deg) rotateZ(9deg); animation-delay: -2s; }
+  .brain-hemisphere::before, .brain-hemisphere::after { position: absolute; inset: 17px 16px; border: 2px solid rgba(255,247,202,.38); border-color: rgba(255,247,202,.48) transparent rgba(255,247,202,.35) transparent; border-radius: 50%; content: ""; transform: rotate(25deg); }
+  .brain-hemisphere::after { inset: 46px 12px 26px; transform: rotate(-35deg); opacity: .7; }
+  .brain-synapse { position: absolute; z-index: 3; width: 7px; height: 7px; border-radius: 50%; background: #fff4bd; box-shadow: 0 0 12px 4px hsl(var(--primary) / .8); animation: brain-pulse 1.8s ease-in-out infinite; }
+  .synapse-a { left: 48px; top: 76px; } .synapse-b { right: 50px; top: 96px; animation-delay: -.4s; } .synapse-c { left: 80px; top: 132px; animation-delay: -.9s; } .synapse-d { right: 74px; top: 145px; animation-delay: -1.3s; }
 
   .knowledge-node {
     position: absolute;
@@ -1090,6 +1099,8 @@
 }
 
 @keyframes knowledge-spin { to { transform: rotate(360deg); } }
+@keyframes brain-orbit { 0% { filter: brightness(.92); } 100% { filter: brightness(1.2) drop-shadow(0 0 14px hsl(var(--primary) / .35)); transform: rotateY(7deg) translateZ(7px); } }
+@keyframes brain-pulse { 0%, 100% { opacity: .45; transform: scale(.75); } 50% { opacity: 1; transform: scale(1.35); } }
 
 @media (max-width: 820px) {
   .knowledge-map { display: flex; min-height: 760px; flex-direction: column; align-items: stretch; gap: 10px; padding: 18px; }

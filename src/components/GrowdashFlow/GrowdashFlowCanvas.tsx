@@ -139,6 +139,8 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
 
   const handleElementPointerDown = useCallback((event: React.PointerEvent<SVGGElement>, element: DrawElement) => {
     event.stopPropagation();
+    const canvasElement = event.currentTarget.closest("[data-growdash-flow-canvas]");
+    if (canvasElement instanceof HTMLElement) canvasElement.setPointerCapture(event.pointerId);
     if (editingId) return;
     const point = clientToWorld(event.clientX, event.clientY);
     if (tool === "arrow" || tool === "line") {
@@ -159,6 +161,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     setContextMenu(null);
+    event.currentTarget.setPointerCapture(event.pointerId);
     const point = clientToWorld(event.clientX, event.clientY);
     if (tool === "hand" || spacePressed || event.button === 1 || event.button === 2) {
       interactionRef.current = { kind: "pan", startClient: { x: event.clientX, y: event.clientY }, startPan: canvas.panOffset };
@@ -234,6 +237,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       setSelectedIds((current) => event.shiftKey ? Array.from(new Set([...current, ...hits])) : hits);
       setSelectionBox(null);
     }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     interactionRef.current = null;
   }, [clientToWorld, findTopElement, history]);
 
@@ -293,13 +297,19 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       if (mod && key === "a") { event.preventDefault(); setSelectedIds(history.valueRef.current.map((element) => element.id)); return; }
       if (key === "delete" || key === "backspace") { event.preventDefault(); deleteSelected(); return; }
       if (key === "escape") { setSelectedIds([]); setEditingId(null); setTool("select"); return; }
+      if (!mod && selectedIds.length && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+        const delta = { x: event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0, y: event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0 };
+        history.commit((elements) => elements.map((element) => selectedIds.includes(element.id) ? { ...element, x: element.x + delta.x, y: element.y + delta.y, updatedAt: new Date().toISOString() } : element));
+        return;
+      }
       if (!mod && TOOL_SHORTCUTS[key]) setTool(TOOL_SHORTCUTS[key]!);
     };
     const onKeyUp = (event: KeyboardEvent) => { if (event.code === "Space") setSpacePressed(false); };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); };
-  }, [copySelected, deleteSelected, duplicateSelected, history, paste]);
+  }, [copySelected, deleteSelected, duplicateSelected, history, paste, selectedIds]);
 
   const handleExport = useCallback(async (type: "png" | "svg" | "json") => {
     const data = getFlowData();

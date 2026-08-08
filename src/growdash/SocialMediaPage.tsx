@@ -42,6 +42,9 @@ type SocialMedia = {
   shares: number;
   interactions: number;
   engagement_rate: number;
+  video_views?: number | null;
+  average_watch_time?: number | null;
+  video_retention_rate?: number | null;
 };
 type DailyInsight = { insight_date: string; followers: number; follower_delta: number; reach: number; impressions: number; interactions: number };
 
@@ -113,6 +116,14 @@ export default function SocialMediaPage() {
   const daily = dailyQuery.data ?? [];
   const totals = useMemo(() => media.reduce((sum, item) => ({ reach: sum.reach + Number(item.reach), interactions: sum.interactions + Number(item.interactions), likes: sum.likes + Number(item.likes), comments: sum.comments + Number(item.comments), saves: sum.saves + Number(item.saves), shares: sum.shares + Number(item.shares) }), { reach: 0, interactions: 0, likes: 0, comments: 0, saves: 0, shares: 0 }), [media]);
   const engagement = totals.reach > 0 ? (totals.interactions / totals.reach) * 100 : 0;
+  const followersGained = daily.reduce((sum, row) => sum + Math.max(Number(row.follower_delta || 0), 0), 0);
+  const followersLost = Math.abs(daily.reduce((sum, row) => sum + Math.min(Number(row.follower_delta || 0), 0), 0));
+  const videoRows = media.filter((item) => ["VIDEO", "REELS"].includes(String(item.media_type).toUpperCase()));
+  const videoViews = videoRows.reduce((sum, item) => sum + Number(item.video_views || 0), 0);
+  const retentionSamples = videoRows.filter((item) => Number(item.video_retention_rate || 0) > 0);
+  const videoRetention = retentionSamples.length ? retentionSamples.reduce((sum, item) => sum + Number(item.video_retention_rate || 0), 0) / retentionSamples.length : 0;
+  const watchTimeSamples = videoRows.filter((item) => Number(item.average_watch_time || 0) > 0);
+  const averageWatchTime = watchTimeSamples.length ? watchTimeSamples.reduce((sum, item) => sum + Number(item.average_watch_time || 0), 0) / watchTimeSamples.length : 0;
   const best = [...media].sort((a, b) => b.interactions - a.interactions)[0];
   const chart = daily.map((row) => ({ ...row, label: format(new Date(`${row.insight_date}T12:00:00`), "dd/MM") }));
 
@@ -136,12 +147,14 @@ export default function SocialMediaPage() {
             <span className="text-[10px] text-muted-foreground">Último sync: {selected?.last_sync_at ? format(new Date(selected.last_sync_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "nunca"}</span>
           </section>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             <Kpi icon={<Users />} label="Seguidores" value={number.format(selected?.followers_count ?? 0)} />
+            <Kpi icon={<TrendingUp />} label="Ganhos" value={`+${number.format(followersGained)}`} />
+            <Kpi icon={<TrendingUp />} label="Perdidos" value={`-${number.format(followersLost)}`} />
             <Kpi icon={<Eye />} label="Alcance no período" value={number.format(totals.reach)} />
             <Kpi icon={<Heart />} label="Interações" value={number.format(totals.interactions)} />
             <Kpi icon={<TrendingUp />} label="Engajamento" value={`${engagement.toFixed(2).replace(".", ",")}%`} />
-            <Kpi icon={<BarChart3 />} label="Conteúdos analisados" value={String(media.length)} />
+            <Kpi icon={<BarChart3 />} label="Retenção de vídeo" value={videoRetention ? `${videoRetention.toFixed(1).replace(".", ",")}%` : averageWatchTime ? `${averageWatchTime.toFixed(1).replace(".", ",")} s médios` : videoViews ? "Sem métrica" : "—"} />
           </div>
 
           <Tabs defaultValue="overview" className="space-y-4">
@@ -151,7 +164,7 @@ export default function SocialMediaPage() {
               <section className="gd-panel p-5"><Sparkles className="h-5 w-5 text-primary" /><h3 className="mt-3 font-black">Melhor conteúdo</h3>{best ? <><p className="mt-2 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{best.caption || "Conteúdo sem legenda"}</p><div className="mt-5 grid grid-cols-2 gap-2"><Mini label="Interações" value={number.format(best.interactions)} /><Mini label="Alcance" value={number.format(best.reach)} /><Mini label="Salvos" value={number.format(best.saves)} /><Mini label="Compart." value={number.format(best.shares)} /></div>{best.permalink && <Button asChild variant="outline" className="mt-4 w-full"><a href={best.permalink} target="_blank" rel="noreferrer">Abrir publicação <ExternalLink className="ml-2 h-3 w-3" /></a></Button>}</> : <Empty text="Nenhum conteúdo no período." />}</section>
             </TabsContent>
             <TabsContent value="content"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{media.map((item) => <article key={item.id} className="gd-panel group overflow-hidden"><MediaPreview media={item} /><div className="p-4"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-primary"><span>{item.media_type}</span><span>{item.published_at ? format(new Date(item.published_at), "dd/MM/yyyy") : "—"}</span></div><p className="mt-2 line-clamp-2 min-h-10 text-xs leading-relaxed text-muted-foreground">{item.caption || "Sem legenda"}</p><div className="mt-4 grid grid-cols-3 gap-2"><Mini label="Alcance" value={number.format(item.reach)} /><Mini label="Interações" value={number.format(item.interactions)} /><Mini label="Engaj." value={`${Number(item.engagement_rate).toFixed(1)}%`} /></div></div></article>)}{!media.length && <Empty text="Nenhum conteúdo publicado no período selecionado." />}</div></TabsContent>
-            <TabsContent value="audience"><section className="gd-panel p-6"><h3 className="font-black">Crescimento da audiência</h3><p className="mt-1 text-xs text-muted-foreground">A API oficial disponibiliza demografia apenas quando a conta e a métrica atendem aos critérios mínimos da Meta. A Growdash não estima idade, gênero ou localização ausentes.</p><div className="mt-5 grid gap-3 sm:grid-cols-3"><Mini label="Seguidores atuais" value={number.format(selected?.followers_count ?? 0)} /><Mini label="Variação registrada" value={number.format(daily.reduce((sum, row) => sum + Number(row.follower_delta), 0))} /><Mini label="Publicações" value={number.format(selected?.media_count ?? 0)} /></div></section></TabsContent>
+            <TabsContent value="audience"><section className="gd-panel p-6"><h3 className="font-black">Crescimento da audiência</h3><p className="mt-1 text-xs text-muted-foreground">Ganhos e perdas são somados a partir da série diária oficial. Demografia e retenção só aparecem quando a Meta entrega a métrica para a conta.</p><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Mini label="Seguidores atuais" value={number.format(selected?.followers_count ?? 0)} /><Mini label="Ganhos no período" value={`+${number.format(followersGained)}`} /><Mini label="Perdas no período" value={`-${number.format(followersLost)}`} /><Mini label="Variação líquida" value={number.format(followersGained - followersLost)} /><Mini label="Publicações" value={number.format(selected?.media_count ?? 0)} /></div></section></TabsContent>
             <TabsContent value="recommendations"><section className="grid gap-3 md:grid-cols-2"><Recommendation title="Repita o que gera intenção" text={best ? `O conteúdo líder concentra ${number.format(best.saves + best.shares)} salvamentos e compartilhamentos. Use o mesmo tema em novos formatos.` : "Sincronize conteúdos para identificar temas com maior intenção."} /><Recommendation title="Proteção contra mídia expirada" text="URLs temporárias são atualizadas em cada sincronização e a interface exibe fallback quando a CDN da Meta expira uma prévia." /><Recommendation title="Orgânico ≠ pago" text="Alcance e interação deste módulo nunca são somados às métricas de campanha do Meta Ads." /><Recommendation title="Decisão com contexto" text="Compare pelo menos sete dias e volume suficiente antes de concluir que um formato ou horário venceu." /></section></TabsContent>
           </Tabs>
         </>

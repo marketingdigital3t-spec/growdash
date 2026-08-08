@@ -6,6 +6,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
 import { MetricCard, PageHeading } from "./shared";
+import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -16,7 +17,7 @@ function customValue(sale: Sale, keys: string[]) {
 }
 
 export default function CommercialPage() {
-  const { adAccountId, startDate, endDate } = useGlobalFilters();
+  const { adAccountId, startDate, endDate, preset, setPreset, customRange, setCustomRange } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
   const { data: sales = [], isLoading } = useSales({ startDate, endDate, adAccountId: accountFilter });
   const { data: rdDeals = [] } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter });
@@ -62,6 +63,7 @@ export default function CommercialPage() {
         description="Ranking, vendas e ticket médio calculados com os dados reais do período selecionado."
         actions={(
           <div className="flex flex-wrap gap-2">
+            <MetaDateRangePicker preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} className="min-w-[235px]" />
             <select className="gd-button min-w-40" value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)}><option value="all">Todos os vendedores</option>{sellers.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
             <select className="gd-button min-w-40" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">Todos os produtos</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
           </div>

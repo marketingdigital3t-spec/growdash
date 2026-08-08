@@ -8,8 +8,8 @@ export type MemberType = "student" | "model_patient";
 export interface EventClass {
   id: string;
   user_id: string;
-  ad_account_id: string;
-  rd_funnel_id: string;
+  ad_account_id: string | null;
+  rd_funnel_id: string | null;
   title: string;
   date_start: string;
   date_end: string | null;

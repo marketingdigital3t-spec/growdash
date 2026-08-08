@@ -20,7 +20,7 @@ import {
   UsersRound,
   XCircle,
 } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { endOfDay, format, formatDistanceToNow, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,6 +32,7 @@ import { classifyLead, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDeals
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { MetricCard, PageHeading } from "./shared";
@@ -56,7 +57,7 @@ type PipelineStage = {
 export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { adAccountId } = useGlobalFilters();
+  const { adAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
   const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter);
   const { data: allDeals = [], isLoading: loadingDeals, isFetching } = useRDCRMDeals(accountFilter);
@@ -98,10 +99,19 @@ export default function CrmPage() {
   }, [funnelId, owner, query, status]);
 
   const funnelNames = useMemo(() => new Map(funnels.map((funnel) => [funnel.id, funnel.name])), [funnels]);
-  const dealsInPipeline = useMemo(
-    () => funnelId === "all" ? allDeals : allDeals.filter((deal) => deal.rd_funnel_id === funnelId),
-    [allDeals, funnelId],
-  );
+  const dealsInPipeline = useMemo(() => {
+    const rangeStart = startOfDay(startDate).getTime();
+    const rangeEnd = endOfDay(endDate).getTime();
+    return allDeals.filter((deal) => {
+      if (funnelId !== "all" && deal.rd_funnel_id !== funnelId) return false;
+      // O CRM usa a última movimentação quando ela existe; assim o período
+      // responde ao calendário para negócios antigos que avançaram agora.
+      const relevantDate = deal.closed_at || deal.stage_updated_at || deal.updated_at || deal.lead_created_at;
+      if (!relevantDate) return false;
+      const timestamp = new Date(relevantDate).getTime();
+      return !Number.isNaN(timestamp) && timestamp >= rangeStart && timestamp <= rangeEnd;
+    });
+  }, [allDeals, endDate, funnelId, startDate]);
   const owners = useMemo(
     () => Array.from(new Set(dealsInPipeline.map((deal) => deal.deal_owner_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [dealsInPipeline],
@@ -254,7 +264,7 @@ export default function CrmPage() {
       />
 
       <section className="gd-panel mb-4 p-3 sm:p-4">
-        <div className="grid gap-2 md:grid-cols-[minmax(220px,1.3fr)_minmax(180px,.8fr)_minmax(170px,.7fr)_auto]">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,.8fr)_minmax(170px,.7fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
@@ -267,6 +277,15 @@ export default function CrmPage() {
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
+          <MetaDateRangePicker
+            preset={preset}
+            onPresetChange={setPreset}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+            startDate={startDate}
+            endDate={endDate}
+            className="h-11"
+          />
           <div className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
             {([ ["all", "Todos"], ["open", "Abertos"], ["won", "Ganhos"], ["lost", "Perdidos"] ] as [StatusFilter, string][]).map(([id, label]) => (
               <button key={id} type="button" onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
