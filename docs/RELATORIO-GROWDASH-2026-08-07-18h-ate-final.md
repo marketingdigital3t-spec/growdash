@@ -27,6 +27,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 01:12 | `c543c3a` | KPIs de leads do dashboard passaram a somar conversas iniciadas pelo evento oficial `onsite_conversion.messaging_conversation_started_7d`. O resumo fixo permite clicar em “Leads” para ver Forms, Site, Conversas iniciadas e Total. Deploy: `https://aca494cd.growdash.pages.dev`. |
 | 08/08 01:15 | `6638d12` | Widgets KPI de Leads agora exibem no hover o detalhamento por Forms, Site e Conversas iniciadas, preservando a edição individual do dashboard. Deploy: `https://2c834575.growdash.pages.dev`. |
 | 08/08 01:21 | `4ecbae7` | Growdash Flow agora recarrega elementos, zoom, grade e snap quando outro funil salvo é aberto sem remontar a tela; Kanban mostra erro recuperável e botão de nova tentativa; OAuth Instagram aceita respostas com `id` ou `user_id`; a sincronização classifica vídeos/Reels corretamente para retenção e visualizações. Deploy: `https://94863119.growdash.pages.dev`. |
+| 08/08 01:24 | `ab64bd3` | A edição de dashboard só fecha após confirmar que o banco alterou a visualização. Atualizações bloqueadas por RLS/permissão deixam o rascunho aberto e exibem erro acionável, evitando perda silenciosa de ajustes individuais de KPI. Deploy: `https://57f36f38.growdash.pages.dev`. |
 
 ## Desempenho e carregamento
 
@@ -56,6 +57,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Para a unificação de integrações: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual 3/3 testes executados aprovados (3 rotas autenticadas puladas sem credenciais E2E).
 - Para os KPIs de leads: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual 3/3 testes executados aprovados.
 - Para o commit `4ecbae7`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
+- Para o commit `ab64bd3`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
 
 ## Pendências externas e limites de validação
 
