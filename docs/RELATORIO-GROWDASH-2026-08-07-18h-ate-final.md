@@ -210,3 +210,15 @@ Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos ant
 - Commit funcional `a571c30` e correção de gateway `795049a` enviados ao GitHub. Cloudflare Pages publicado em `https://d469fb96.growdash.pages.dev`; `growdash.com.br` e `www.growdash.com.br` responderam HTTP 200 e serviram `assets/app-BT6hwYhk.js`.
 - A Edge Function `ask-ai` foi publicada no Supabase como versão 11. Após detectar que o primeiro deploy temporário manteve o gateway sem verificação, `supabase/config.toml` passou a declarar explicitamente `verify_jwt = true`; o estado remoto foi conferido com `verify_jwt:true`.
 - Limite de validação: o fluxo autenticado completo de geração/compartilhamento e a resposta real do provedor de IA ainda precisam de teste com credenciais E2E e uma conta com dados. O frontend determinístico funciona sem depender da IA e não usa dados fictícios.
+
+## Alertas inteligentes por conta — 08/08/2026 18:39
+
+- Criado o card **Alerta inteligente** em Configurações, com ativação geral e controles individuais para orçamento baixo, CPL acima do alvo, campanha sem conversão, falha de sincronização e OAuth/token expirado.
+- As preferências são persistidas por usuário no campo existente `profiles.notification_preferences`, preservando compatibilidade com o schema atual e sem criar migração desnecessária.
+- O monitoramento usa apenas as contas devolvidas pelo RLS e as permissões do workspace; administradores recebem as contas do workspace e usuários delegados ficam limitados à sua lista de acesso. O card exibe o escopo monitorado.
+- O sino foi substituído por um dock fixo no canto inferior direito, responsivo para celular, com contador de não lidas, prévia automática de alerta crítico, link direto para correção e ação para marcar tudo como lido. A leitura é particionada por usuário e workspace no navegador.
+- Alertas críticos podem gerar notificação do navegador/celular após permissão explícita. A interface informa corretamente que, nesta entrega, o navegador ou o app instalado precisa estar ativo; push com o aplicativo totalmente fechado ainda depende de service worker, subscriptions, VAPID e uma Edge Function/cron de envio.
+- A detecção de campanhas passou a atualizar a cada cinco minutos, sem refetch em background quando a aba está fechada, reduzindo custo e mantendo os alertas atuais.
+- Validação do commit `0159e10`: `npx tsc --noEmit`, ESLint sem erros, Vitest 24 arquivos/67 testes aprovados, build Vite de produção aprovado e `git diff --check` aprovado. O build mantém apenas o warning conhecido de chunk acima de 500 kB.
+- GitHub: `origin/main` atualizado com `0159e10`. Cloudflare Pages: publicado em `https://41ad2bab.growdash.pages.dev` pelo projeto `growdash`; `growdash.com.br` e `www.growdash.com.br` responderam HTTP 200 com CSP, HSTS, Permissions-Policy, X-Frame-Options e nosniff.
+- Verificação visual autenticada em `https://growdash.com.br/configuracoes`: o card, todos os toggles, as contas acessíveis e o dock inferior direito foram renderizados. O navegador desta sessão está com a permissão de sistema bloqueada, portanto a notificação nativa não foi forçada nem alterada.
