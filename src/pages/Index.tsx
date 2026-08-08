@@ -114,7 +114,7 @@ const Index = () => {
     ? unitSales.filter((sale) => selectedCampaigns.some((campaign: any) => saleMatchesCampaign(sale, {
       id: campaign.id,
       name: campaign.name,
-      adAccountId: campaign.ad_account_id,
+      ad_account_id: campaign.ad_account_id,
     })))
     : unitSales, [selectedCampaignIds.length, selectedCampaigns, unitSales]);
   const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id && visibleAccountIds.has(deal.ad_account_id)), [rdDeals, visibleAccountIds]);

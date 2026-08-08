@@ -18,6 +18,16 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
+    modulePreload: {
+      // The route graph contains heavy, lazy-only dependencies such as
+      // Recharts and the map renderer. Vite otherwise emits modulepreload
+      // links for those dependencies in index.html, making the login shell
+      // wait on hundreds of kilobytes that are not needed yet.
+      resolveDependencies(filename, deps) {
+        if (filename.includes("app-")) return [];
+        return deps;
+      },
+    },
     rollupOptions: {
       output: {
         // Keep production module URLs neutral. Browser privacy/ad-blocking

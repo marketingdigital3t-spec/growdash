@@ -31,12 +31,14 @@ export const metaColumnPresets: { id: MetaColumnPresetKey; label: string; descri
 // colunas estruturais: nunca podem ser ocultadas por um preset do usuário.
 export const editableCampaignColumns = (Object.keys(campaignColumnLabels) as CampaignColumnKey[]).filter((key) => !["check", "delivery", "name"].includes(key));
 
-export const metaBreakdownGroups = [
+type MetaBreakdownItem = { id: string; label: string; supported?: boolean };
+
+export const metaBreakdownGroups: ReadonlyArray<{ label: string; items: ReadonlyArray<MetaBreakdownItem> }> = [
   { label: "Geral", items: [{ id: "none", label: "Sem detalhamento", supported: true }] },
   { label: "Por tempo", items: [{ id: "day", label: "Dia" }, { id: "week", label: "Semana" }, { id: "two_weeks", label: "2 semanas" }, { id: "month", label: "Mês" }] },
   { label: "Por veiculação", items: [{ id: "age", label: "Idade" }, { id: "gender", label: "Gênero" }, { id: "age_gender", label: "Idade e gênero" }, { id: "country", label: "País" }, { id: "region", label: "Região" }, { id: "dma", label: "Área de mercado designada" }, { id: "platform", label: "Plataforma" }, { id: "placement", label: "Posicionamento" }, { id: "device", label: "Dispositivo de impressão" }, { id: "product_id", label: "ID do produto" }, { id: "hour_account", label: "Hora do dia — conta" }, { id: "hour_viewer", label: "Hora do dia — visualizador" }] },
   { label: "Por ação", items: [{ id: "conversion_device", label: "Dispositivo de conversão" }, { id: "destination", label: "Destino" }, { id: "video_view_type", label: "Tipo de visualização do vídeo" }, { id: "carousel_card", label: "Card do carrossel" }, { id: "dynamic_creative", label: "Elemento do criativo dinâmico" }] },
-] as const;
+];
 
 export function getMetaColumnPreset(id: MetaColumnPresetKey) {
   return metaColumnPresets.find((preset) => preset.id === id) ?? metaColumnPresets[0];

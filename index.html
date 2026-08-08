@@ -20,6 +20,16 @@
         Carregando Growdash…
       </div>
     </div>
+    <script>
+      // Keep a broken/blocked entry module from leaving Safari on a permanent
+      // blank loading screen. main.tsx marks the boot as soon as React starts.
+      window.setTimeout(function () {
+        if (window.__GROWDASH_BOOTED__) return;
+        var root = document.getElementById("root");
+        if (!root) return;
+        root.innerHTML = '<div style="display:grid;min-height:100vh;place-items:center;background:#070503;color:#f6c94a;font:600 15px Nunito,system-ui,sans-serif;text-align:center;padding:24px"><div><p style="font-weight:800">A Growdash não conseguiu iniciar.</p><p style="opacity:.72;margin-top:8px">A conexão ou um bloqueador interrompeu o carregamento.</p><button type="button" onclick="location.reload()" style="margin-top:16px;border:0;border-radius:10px;background:#f6c94a;color:#070503;padding:10px 16px;font-weight:800;cursor:pointer">Recarregar</button></div></div>';
+      }, 12000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

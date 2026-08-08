@@ -45,6 +45,7 @@ import { useMetaOAuth } from "@/hooks/useMetaOAuth";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 type TabOption = { id: string; label: string };
 
@@ -184,12 +185,14 @@ function KanbanModule() {
         .select()
         .single();
       if (error) throw error;
+      const boardId = (board as { id?: string } | null)?.id;
+      if (!boardId) throw new Error("O quadro não foi criado corretamente.");
 
       // Default Columns
       const columns = ["A Fazer", "Em Progresso", "Concluído"];
       const colInserts = columns.map((colName, index) =>
         supabase.from("kanban_lists" as any).insert({
-          board_id: board.id,
+          board_id: boardId,
           name: colName,
           position: index
         })
@@ -198,7 +201,7 @@ function KanbanModule() {
 
       toast({ title: "Quadro criado", description: `O quadro "${name}" foi configurado com sucesso.` });
       boardsQuery.refetch();
-      setSelectedBoardId(board.id);
+      setSelectedBoardId(boardId);
     } catch (e: any) {
       toast({ title: "Erro ao criar quadro", description: e.message, variant: "destructive" });
     }
@@ -232,7 +235,7 @@ function KanbanModule() {
     }
   };
 
-  const activeBoard = boardsQuery.data?.find((b: any) => b.id === selectedBoardId);
+  const activeBoard = boardsQuery.data?.find((b: any) => b.id === selectedBoardId) as unknown as { id: string; name: string; description?: string | null } | undefined;
   const filteredBoards = boardsQuery.data?.filter((b: any) => b.name.toLowerCase().includes(searchQuery.toLowerCase())) || [];
 
   if (selectedBoardId && activeBoard) {
@@ -297,7 +300,7 @@ function KanbanModule() {
                       <div className="py-4 text-muted-foreground text-xs italic">Nenhuma tarefa nesta lista</div>
                     )}
                   </div>
-                  <Button size="xs" variant="ghost" className="text-[11px] text-primary font-bold mt-1" onClick={() => {
+                  <Button size="sm" variant="ghost" className="text-[11px] text-primary font-bold mt-1" onClick={() => {
                     const title = prompt("Digite o título da tarefa:");
                     if (title?.trim()) void createCard(list.id, title.trim());
                   }}>

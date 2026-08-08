@@ -103,7 +103,7 @@ export default function IntelligenceCenterPage() {
         timezone: intelligence.context.timezone,
         metrics: ["spend", "leads", "cpl", "ctr", "cpm", "roas", "frequency"],
         next_run_at: new Date(Date.now() + 86_400_000).toISOString(),
-      });
+      } as never);
       if (error) throw error;
       toast.success("Relatório diário agendado");
     } catch (error) {

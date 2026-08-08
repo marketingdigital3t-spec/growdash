@@ -164,7 +164,7 @@ export function useUpdateSale() {
       }
       const { data, error } = await supabase
         .from("sales")
-        .update(payload)
+        .update(payload as any)
         .eq("id", id)
         .select()
         .single();
