@@ -123,7 +123,7 @@ export default function IntegrationsPage() {
       <PageHeading eyebrow="Administração" title="Central de integrações" description="Conecte mídia, CRM, IA, mensageria e dados com credenciais protegidas e saúde monitorada." actions={<Button onClick={() => syncAll.mutate()} disabled={syncAll.isPending || (!metaConnected && !rdConnected)}><RefreshCw className={cn("mr-2 h-4 w-4", syncAll.isPending && "animate-spin")} />{syncAll.isPending ? "Sincronizando…" : "Sincronizar tudo"}</Button>} />
 
       <div className="gd-panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-        <div className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Buscar provedor ou recurso…" /></div>
+        <div className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar provedor ou recurso" value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Buscar provedor ou recurso…" /></div>
         <div className="flex gap-3 text-[10px] text-muted-foreground"><StatusDot tone="connected" label={`${adAccounts.length} conta(s) Meta`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /></div>
       </div>
 
