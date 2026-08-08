@@ -106,7 +106,7 @@ export default function CrmPage() {
       if (funnelId !== "all" && deal.rd_funnel_id !== funnelId) return false;
       // O CRM usa a última movimentação quando ela existe; assim o período
       // responde ao calendário para negócios antigos que avançaram agora.
-      const relevantDate = deal.closed_at || deal.stage_updated_at || deal.updated_at || deal.lead_created_at;
+      const relevantDate = deal.stage_updated_at || deal.closed_at || deal.updated_at || deal.lead_created_at;
       if (!relevantDate) return false;
       const timestamp = new Date(relevantDate).getTime();
       return !Number.isNaN(timestamp) && timestamp >= rangeStart && timestamp <= rangeEnd;
