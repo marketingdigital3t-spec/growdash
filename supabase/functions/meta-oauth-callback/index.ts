@@ -41,7 +41,42 @@ const sha256 = async (value: string) => {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
-type MetaAccount = { id?: string; account_id?: string; name?: string };
+type MetaAccount = {
+  id?: string;
+  account_id?: string;
+  name?: string;
+  currency?: string;
+  timezone_name?: string;
+  timezone_offset_hours_utc?: number;
+};
+
+type MetaPage<T> = {
+  data?: T[];
+  paging?: { cursors?: { after?: string }; next?: string };
+  error?: { code?: number; message?: string };
+};
+
+async function fetchPagedAccounts(graphVersion: string, path: string, accessToken: string) {
+  const accounts: MetaAccount[] = [];
+  let after: string | null = null;
+  for (let page = 0; page < 50; page += 1) {
+    const accountsUrl = new URL(`https://graph.facebook.com/${graphVersion}/${path}`);
+    accountsUrl.searchParams.set("fields", "id,account_id,name,currency,timezone_name,timezone_offset_hours_utc");
+    accountsUrl.searchParams.set("limit", "100");
+    accountsUrl.searchParams.set("access_token", accessToken);
+    if (after) accountsUrl.searchParams.set("after", after);
+
+    const response = await fetch(accountsUrl, { headers: { Accept: "application/json" } });
+    const result = await response.json().catch(() => ({})) as MetaPage<MetaAccount>;
+    if (!response.ok || result.error) {
+      return { accounts, error: result.error?.message || `HTTP ${response.status}` };
+    }
+    accounts.push(...(Array.isArray(result.data) ? result.data : []));
+    after = result.paging?.cursors?.after ?? null;
+    if (!after || !result.paging?.next) break;
+  }
+  return { accounts, error: null as string | null };
+}
 
 Deno.serve(async (req) => {
   if (req.method !== "GET") return resultPage("error", "Método inválido.");
@@ -106,25 +141,46 @@ Deno.serve(async (req) => {
       ? String(longResult.access_token)
       : String(tokenResult.access_token);
 
-    const accounts: MetaAccount[] = [];
-    let after: string | null = null;
-    for (let page = 0; page < 20; page += 1) {
-      const accountsUrl = new URL(`https://graph.facebook.com/${graphVersion}/me/adaccounts`);
-      accountsUrl.searchParams.set("fields", "id,account_id,name");
-      accountsUrl.searchParams.set("limit", "100");
-      accountsUrl.searchParams.set("access_token", accessToken);
-      if (after) accountsUrl.searchParams.set("after", after);
-
-      const accountsResponse = await fetch(accountsUrl, { headers: { Accept: "application/json" } });
-      const accountsResult = await accountsResponse.json().catch(() => ({}));
-      if (!accountsResponse.ok || accountsResult.error) {
-        console.error("Meta ad accounts lookup failed", accountsResult?.error?.code ?? accountsResponse.status);
-        return resultPage("error", "A autorização funcionou, mas a Meta não liberou a lista de contas de anúncio. Verifique as permissões do aplicativo e do usuário.");
-      }
-      accounts.push(...(Array.isArray(accountsResult.data) ? accountsResult.data : []));
-      after = accountsResult?.paging?.cursors?.after ?? null;
-      if (!after || !accountsResult?.paging?.next) break;
+    // `/me/adaccounts` is the canonical endpoint. For Meta Login for
+    // Business, some users only expose assets through their Business Manager;
+    // use the business-owned and client-owned collections as a safe fallback.
+    const direct = await fetchPagedAccounts(graphVersion, "me/adaccounts", accessToken);
+    if (direct.error) {
+      console.error("Meta ad accounts lookup failed", direct.error);
+      return resultPage("error", "A autorização funcionou, mas a Meta não liberou a lista de contas de anúncio. Verifique ads_read, business_management e o acesso do usuário à conta.");
     }
+
+    const accountsById = new Map<string, MetaAccount>();
+    for (const account of direct.accounts) {
+      const key = String(account.account_id ?? account.id ?? "").replace(/^act_/, "");
+      if (key) accountsById.set(key, account);
+    }
+
+    if (accountsById.size === 0) {
+      const businessesResponse = await fetch(
+        `https://graph.facebook.com/${graphVersion}/me/businesses?fields=id&limit=100&access_token=${encodeURIComponent(accessToken)}`,
+        { headers: { Accept: "application/json" } },
+      );
+      const businessesResult = await businessesResponse.json().catch(() => ({})) as MetaPage<{ id?: string }>;
+      if (businessesResponse.ok && !businessesResult.error) {
+        for (const business of businessesResult.data ?? []) {
+          if (!business.id) continue;
+          for (const collection of ["owned_ad_accounts", "client_ad_accounts"]) {
+            const page = await fetchPagedAccounts(graphVersion, `${business.id}/${collection}`, accessToken);
+            if (page.error) {
+              console.warn("Meta business asset lookup skipped", business.id, collection, page.error);
+              continue;
+            }
+            for (const account of page.accounts) {
+              const key = String(account.account_id ?? account.id ?? "").replace(/^act_/, "");
+              if (key) accountsById.set(key, account);
+            }
+          }
+        }
+      }
+    }
+
+    const accounts = Array.from(accountsById.values());
 
     if (accounts.length === 0) {
       return resultPage("error", "Nenhuma conta de anúncio acessível foi encontrada nesse perfil da Meta.");
@@ -138,8 +194,13 @@ Deno.serve(async (req) => {
       const values = {
         user_id: oauthState.user_id,
         account_id: accountId,
+        provider_account_id: rawId,
         name: String(account.name ?? accountId).slice(0, 255),
         access_token: accessToken,
+        currency: account.currency ? String(account.currency).slice(0, 16) : null,
+        timezone_name: account.timezone_name ? String(account.timezone_name).slice(0, 100) : null,
+        timezone_offset_hours_utc: Number.isFinite(Number(account.timezone_offset_hours_utc)) ? Number(account.timezone_offset_hours_utc) : null,
+        metadata: { connection_method: "oauth", connected_at: new Date().toISOString() },
         connection_status: "connected",
         last_sync_error: null,
         last_sync_error_code: null,

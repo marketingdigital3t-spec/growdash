@@ -47,6 +47,27 @@ export function computeKpi(
     }
     case "profit":
       return { value: s.totalNet - ad.totalSpend - s.totalTax, prefix: "R$ ", decimals: 2 };
+    case "profit_margin": {
+      const profit = s.totalNet - ad.totalSpend - s.totalTax;
+      return { value: s.totalNet > 0 ? (profit / s.totalNet) * 100 : 0, suffix: "%", decimals: 2 };
+    }
+    case "receivables":
+      return { value: s.receivables, prefix: "R$ ", decimals: 2 };
+    case "average_ticket":
+      return { value: s.totalQuantity > 0 ? s.totalNet / s.totalQuantity : 0, prefix: "R$ ", decimals: 2 };
+    case "campaign_leads":
+      return { value: ad.totalLeads, decimals: 0 };
+    case "campaign_cpl":
+      return { value: ad.totalLeads > 0 ? ad.totalSpend / ad.totalLeads : 0, prefix: "R$ ", decimals: 2 };
+    case "campaign_cost_per_link":
+      {
+        const clicks = insights.reduce((sum: number, row: any) => sum + Number(row.clicks ?? 0), 0);
+        return { value: clicks > 0 ? ad.totalSpend / clicks : 0, prefix: "R$ ", decimals: 2 };
+      }
+    case "campaign_ctr":
+      return { value: ad.avgCTR, suffix: "%", decimals: 2 };
+    case "campaign_conversion_rate":
+      return { value: ad.conversionRate, suffix: "%", decimals: 2 };
     default:
       return { value: 0, decimals: 2 };
   }
@@ -137,10 +158,10 @@ export function useGroupedSeries(config: WidgetConfig) {
 }
 
 export function formatMetricValue(metric: WidgetMetric, v: number): string {
-  if (["spend", "cpl", "cpm", "revenue_net", "revenue_gross", "profit"].includes(metric)) {
+  if (["spend", "cpl", "cpm", "revenue_net", "revenue_gross", "profit", "receivables", "average_ticket", "campaign_cpl", "campaign_cost_per_link"].includes(metric)) {
     return `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
-  if (["ctr", "conversion_rate", "roi"].includes(metric)) return `${Number(v).toFixed(2)}%`;
+  if (["ctr", "conversion_rate", "roi", "profit_margin", "campaign_ctr", "campaign_conversion_rate"].includes(metric)) return `${Number(v).toFixed(2)}%`;
   if (metric === "roas") return `${Number(v).toFixed(2)}x`;
   if (metric === "frequency") return Number(v).toFixed(2);
   return Number(v).toLocaleString("pt-BR");

@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardGrid, buildWidgetFromDef } from "@/components/dashboard/grid/DashboardGrid";
 import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView, type DashboardView } from "@/hooks/useDashboardViews";
-import { useIsMaster } from "@/hooks/useIsMaster";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Pencil } from "lucide-react";
 import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip";
 import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
@@ -87,10 +87,10 @@ const Index = () => {
   const syncMeta = useSyncMeta();
 
   const { data: activeView } = useGlobalView();
-  const { data: isMaster = false } = useIsMaster();
+  const { canEdit: canEditWorkspace } = usePermissions();
   const saveView = useSaveView();
   const canEditDashboard = Boolean(
-    isMaster && activeView && activeView.id !== FALLBACK_DASHBOARD_VIEW_ID,
+    canEditWorkspace && activeView && activeView.id !== FALLBACK_DASHBOARD_VIEW_ID,
   );
 
   useEffect(() => {

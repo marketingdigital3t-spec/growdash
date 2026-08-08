@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function useAdAccounts() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["ad_accounts"],
+    queryKey: ["ad_accounts", user?.id ?? "anonymous"],
+    enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ad_accounts")

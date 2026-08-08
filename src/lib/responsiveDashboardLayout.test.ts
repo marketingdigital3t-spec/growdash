@@ -45,4 +45,19 @@ describe("responsive dashboard layout", () => {
 
     expect(findDashboardSlot(existing, 3, 2, 12)).toEqual({ x: 6, y: 0 });
   });
+
+  it("preserves the individual position and dimensions saved by the editor", () => {
+    const widgets = [
+      { id: "revenue", type: "kpi" },
+      { id: "leads", type: "kpi" },
+    ];
+    const layout = [
+      { i: "revenue", x: 1, y: 3, w: 5, h: 4, minW: 2, minH: 2 },
+      { i: "leads", x: 7, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+    ];
+
+    const restored = normalizeDesktopDashboardLayout(layout, widgets, 12);
+    expect(restored.find((item) => item.i === "revenue")).toMatchObject(layout[0]);
+    expect(restored.find((item) => item.i === "leads")).toMatchObject(layout[1]);
+  });
 });

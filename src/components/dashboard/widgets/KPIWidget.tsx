@@ -8,8 +8,16 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
   const { insights, sales, leadBreakdown } = useDashboard();
   const metric = (config.metric ?? "leads") as WidgetMetric;
   const k = computeKpi(metric, insights, sales);
-  if (metric === "leads" && leadBreakdown) k.value = leadBreakdown.total;
-  const leadTooltip = metric === "leads" && leadBreakdown
+  const includesConversationLeads = metric === "leads" || metric === "campaign_leads" || metric === "campaign_cpl" || metric === "campaign_conversion_rate";
+  if (leadBreakdown && includesConversationLeads) {
+    if (metric === "leads" || metric === "campaign_leads") k.value = leadBreakdown.total;
+    if (metric === "campaign_cpl") k.value = k.value * (computeKpi("leads", insights, sales).value / Math.max(1, leadBreakdown.total));
+    if (metric === "campaign_conversion_rate") {
+      const clicks = insights.reduce((sum, row) => sum + Number(row.clicks ?? 0), 0);
+      k.value = clicks > 0 ? (leadBreakdown.total / clicks) * 100 : 0;
+    }
+  }
+  const leadTooltip = includesConversationLeads && leadBreakdown
     ? `Forms: ${leadBreakdown.forms} · Site: ${leadBreakdown.site} · Conversas iniciadas: ${leadBreakdown.conversations} · Total: ${leadBreakdown.total}`
     : undefined;
   return (

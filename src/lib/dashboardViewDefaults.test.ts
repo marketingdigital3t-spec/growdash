@@ -33,6 +33,25 @@ describe("ensureDefaultDashboardContent", () => {
     expect(ensureDefaultDashboardContent(migrated)).toBe(migrated);
   });
 
+  it("separa os KPIs do resumo em widgets redimensionáveis", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-kpi-editor",
+      widgets: [{ id: "default", type: "default_block", title: "Padrão", config: { canonicalLayoutVersion: 4 } }],
+      layout: [{ i: "default", x: 0, y: 0, w: 12, h: 30 }],
+    });
+    const expectedIds = [
+      "primary_revenue", "financial_margin", "campaign_leads", "campaign_conversion_rate",
+    ];
+
+    for (const id of expectedIds) {
+      const widget = migrated.widgets.find((item) => item.id === id);
+      const item = migrated.layout.find((entry) => entry.i === id);
+      expect(widget?.type).toBe("kpi");
+      expect(item).toMatchObject({ minW: 2, minH: 2 });
+      expect(item?.w).toBeLessThan(12);
+    }
+  });
+
   it("preserva widgets adicionados depois da migração canônica", () => {
     const view = {
       id: "view-3",

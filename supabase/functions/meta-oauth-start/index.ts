@@ -66,6 +66,7 @@ Deno.serve(async (req) => {
     if (stateError) throw stateError;
 
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
+    const loginConfigId = Deno.env.get("META_LOGIN_CONFIG_ID")?.trim();
     const redirectUri = Deno.env.get("META_OAUTH_REDIRECT_URI")
       ?? `${supabaseUrl}/functions/v1/meta-oauth-callback`;
     const scopes = Deno.env.get("META_OAUTH_SCOPES")
@@ -75,7 +76,10 @@ Deno.serve(async (req) => {
     oauthUrl.searchParams.set("client_id", appId);
     oauthUrl.searchParams.set("redirect_uri", redirectUri);
     oauthUrl.searchParams.set("state", state);
-    oauthUrl.searchParams.set("scope", scopes);
+    // Meta Login for Business uses the permissions configured in config_id.
+    // Keep the scope fallback for legacy Facebook Login applications.
+    if (loginConfigId) oauthUrl.searchParams.set("config_id", loginConfigId);
+    else oauthUrl.searchParams.set("scope", scopes);
     oauthUrl.searchParams.set("response_type", "code");
     oauthUrl.searchParams.set("auth_type", "rerequest");
 

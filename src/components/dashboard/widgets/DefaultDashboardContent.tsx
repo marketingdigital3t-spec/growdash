@@ -54,9 +54,11 @@ const MESSAGE_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 interface Props {
   onEditSale: (s: Sale) => void;
   hidePrimary?: boolean;
+  hideFinancialKpis?: boolean;
+  hideCampaignKpis?: boolean;
 }
 
-export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false }: Props) {
+export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialKpis = false, hideCampaignKpis = false }: Props) {
   const { insights, sales, rdDeals, campaigns, startDate, endDate, adAccountId } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
@@ -702,12 +704,12 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-2 gap-3">
+        {!hideFinancialKpis && <div className="grid grid-cols-2 gap-3">
           <MetricCard title="Margem" value={profitMargin} icon={<Percent className="h-4 w-4" />} suffix="%" decimals={2} colorByValue />
           <MetricCard title="Recebíveis" value={salesMetrics.receivables} icon={<Receipt className="h-4 w-4" />} prefix="R$ " decimals={2} />
           <MetricCard title="Ticket Médio" value={ticketMedio} icon={<BadgeDollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
           <MetricCard title="Lucro" value={profit} icon={<PiggyBank className="h-4 w-4" />} prefix="R$ " decimals={2} colorByValue />
-        </div>
+        </div>}
       </div>
 
       {/* 3. Performance das Campanhas */}
@@ -734,7 +736,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
             Nenhuma campanha de {objective === "leads" ? "Leads" : objective === "native_form" ? "Formulário Nativo" : objective === "landing_page" ? "Landing page" : "Mensagens"} encontrada. Os indicadores permanecem disponíveis com valor zero.
           </p>
         )}
-        <div className="gd-auto-grid-compact gap-2 sm:gap-3">
+        {!hideCampaignKpis && <div className="gd-auto-grid-compact gap-2 sm:gap-3">
           {kpis.map((k) => (
             <MetricCard
               key={k.title}
@@ -747,7 +749,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
               tooltip={k.tooltip}
             />
           ))}
-        </div>
+        </div>}
       </div>
 
       {/* 4. Funil de Conversão */}
