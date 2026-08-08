@@ -4,6 +4,15 @@ Período: 07/08/2026, 18:00 até 08/08/2026, 10:00 (America/Sao_Paulo).
 
 Status: encerrado às 10:00. Todas as alterações registradas abaixo foram versionadas no GitHub e publicadas no Cloudflare Pages após validação.
 
+## Adendo pós-auditoria — 08/08/2026 13:24–13:31
+
+| Horário | Commit / deploy | Entrega |
+| --- | --- | --- |
+| 08/08 13:24 | `8c27783` | Corrigida a causa dos blocos financeiros não editáveis: “Vendas por Pagamento” e “Distribuição por Plataforma” viraram widgets próprios; Margem, Recebíveis, Ticket Médio e Lucro passaram a ser recuperados individualmente nas views antigas. A migração é aditiva, preserva posições/KPIs personalizados e desloca o bloco legado para baixo para evitar sobreposição. |
+| 08/08 13:28 | `8c27783` → `f7e589ff.growdash.pages.dev` | TypeScript, ESLint, Vitest (21 arquivos/59 testes), build Vite e Playwright visual (3 públicos aprovados; 3 rotas autenticadas puladas sem credenciais) passaram. O commit foi enviado ao GitHub e publicado no Cloudflare Pages. |
+
+Verificação pós-publicação: `growdash.com.br` e `www.growdash.com.br` responderam HTML 200 e o bundle de entrada respondeu `application/javascript`. O cache temporário do Playwright foi removido novamente após o teste, recuperando aproximadamente 539 MB.
+
 ## Publicações e correções confirmadas
 
 | Horário | Commit | Entrega |
