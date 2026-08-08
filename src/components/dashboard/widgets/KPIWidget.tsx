@@ -9,6 +9,9 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
   const metric = (config.metric ?? "leads") as WidgetMetric;
   const k = computeKpi(metric, insights, sales);
   if (metric === "leads" && leadBreakdown) k.value = leadBreakdown.total;
+  const leadTooltip = metric === "leads" && leadBreakdown
+    ? `Forms: ${leadBreakdown.forms} · Site: ${leadBreakdown.site} · Conversas iniciadas: ${leadBreakdown.conversations} · Total: ${leadBreakdown.total}`
+    : undefined;
   return (
     <div className="h-full min-w-0">
       <MetricCard
@@ -18,6 +21,7 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
         suffix={k.suffix}
         decimals={k.decimals}
         icon={<Activity className="h-4 w-4" />}
+        tooltip={leadTooltip}
       />
     </div>
   );
@@ -31,6 +35,9 @@ export function KPIGridWidget({ config }: { config: WidgetConfig }) {
       {metrics.map((m) => {
         const k = computeKpi(m, insights, sales);
         if (m === "leads" && leadBreakdown) k.value = leadBreakdown.total;
+        const leadTooltip = m === "leads" && leadBreakdown
+          ? `Forms: ${leadBreakdown.forms} · Site: ${leadBreakdown.site} · Conversas iniciadas: ${leadBreakdown.conversations} · Total: ${leadBreakdown.total}`
+          : undefined;
         return (
           <MetricCard
             key={m}
@@ -40,6 +47,7 @@ export function KPIGridWidget({ config }: { config: WidgetConfig }) {
             suffix={k.suffix}
             decimals={k.decimals}
             icon={<Activity className="h-4 w-4" />}
+            tooltip={leadTooltip}
           />
         );
       })}

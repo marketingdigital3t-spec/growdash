@@ -24,6 +24,8 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 00:47 | `aeb7cba` | Filtro de período do CRM passa a priorizar `stage_updated_at`, evitando que `closed_at` antigo esconda negócios movimentados no intervalo selecionado. Deploy Cloudflare: `https://b6bdb08d.growdash.pages.dev`. |
 | 08/08 00:56 | `7c8e179` | Corrigida a configuração do Cloudflare Pages Git: build `npm run build` e diretório de saída `dist`. O domínio estava publicando o código-fonte (`/src/main.tsx`), causando a tela de carregamento permanente. Deploy de produção: `https://40a7ba1e.growdash.pages.dev`; `growdash.com.br` e `www.growdash.com.br` passaram a servir o bundle Vite. |
 | 08/08 01:04 | `32a9175` | Unificada a navegação Meta Connect com a Central de integrações: o menu duplicado foi removido, `/meta-connect` mantém redirecionamento legado para `integracoes?tab=paid` e permissões antigas `can_meta_connect` continuam autorizando a tela unificada. Deploy: `https://13b4dc2f.growdash.pages.dev`. |
+| 08/08 01:12 | `c543c3a` | KPIs de leads do dashboard passaram a somar conversas iniciadas pelo evento oficial `onsite_conversion.messaging_conversation_started_7d`. O resumo fixo permite clicar em “Leads” para ver Forms, Site, Conversas iniciadas e Total. Deploy: `https://aca494cd.growdash.pages.dev`. |
+| 08/08 01:15 | `pendente` | Widgets KPI de Leads agora exibem no hover o detalhamento por Forms, Site e Conversas iniciadas, preservando a edição individual do dashboard. |
 
 ## Desempenho e carregamento
 
@@ -51,6 +53,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Playwright visual após a correção do CRM: 3 testes aprovados e 3 rotas autenticadas puladas por falta de `E2E_EMAIL`/`E2E_PASSWORD`.
 - Após a correção do Pages, `npx tsc --noEmit`, ESLint, Vitest (21 arquivos/56 testes) e Vite build foram executados novamente com sucesso; ESLint manteve apenas 15 warnings antigos de Fast Refresh.
 - Para a unificação de integrações: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual 3/3 testes executados aprovados (3 rotas autenticadas puladas sem credenciais E2E).
+- Para os KPIs de leads: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual 3/3 testes executados aprovados.
 
 ## Pendências externas e limites de validação
 
