@@ -1,8 +1,8 @@
 # Relatório de estabilização — Growdash
 
-Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria.
+Período: 07/08/2026, 18:00 até 08/08/2026, 10:00 (America/Sao_Paulo).
 
-> Documento em andamento. O fechamento final incluirá as verificações e publicações realizadas após esta atualização.
+Status: encerrado às 10:00. Todas as alterações registradas abaixo foram versionadas no GitHub e publicadas no Cloudflare Pages após validação.
 
 ## Publicações e correções confirmadas
 
@@ -122,9 +122,9 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - A conta Meta continua bloqueada pela Meta Developers; duas conexões no banco estavam desconectadas com erro 200 de acesso bloqueado. Os tokens não foram apagados porque essa exclusão exige autorização específica.
 - A validação visual autenticada e o fluxo real de OAuth dependem de credenciais e da liberação dos provedores externos.
 
-## Próximas verificações
+## Encerramento
 
-1. Aplicar a migration de RLS no Supabase assim que o acesso de deploy estiver configurado.
-2. Testar criação e edição de turma personalizada autenticada.
-3. Prosseguir com a auditoria de campos mascarados por `any`, sobretudo em integrações e registros de criação.
-4. Atualizar este documento no encerramento com o resultado das verificações restantes.
+- Repositório final: `main` e `origin/main` estavam sincronizados no encerramento, com a última entrega funcional em `83c2460` (montagem sob demanda do diálogo de vendas) e seu registro em `0528f59`.
+- Produção: `growdash.com.br` foi recuperado da falha de boot e confirmado na tela de login; os deploys posteriores foram enviados ao Cloudflare Pages.
+- Escopo entregue: correções de carregamento/boot, cache e consultas, Kanban e templates, edição de KPIs, Growdash Flow, filtros de data CRM/Comercial, turmas personalizadas, unificação Meta Connect, métricas de conversas iniciadas, Instagram e acessibilidade.
+- Não foi possível declarar OAuth e as funções Supabase em produção como concluídos: continuam pendentes os secrets dos aplicativos, a aplicação das migrações e uma sessão autenticada de teste. Esses itens exigem credenciais ou liberação externa que não estavam disponíveis e não foram alterados.
