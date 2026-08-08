@@ -876,6 +876,36 @@
      Meta Ads; no celular os mesmos controles viram uma grade previsível, sem
      empurrar o conteúdo para fora da tela ou depender de uma scrollbar. */
   @media (max-width: 767px) {
+    /* Todos os cabeçalhos de módulo usam o mesmo fluxo: ações ocupam a
+       próxima célula disponível, sem deixar uma lacuna quando a quantidade
+       de botões é ímpar. Um único controle continua ocupando a linha inteira. */
+    .page-heading-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+      gap: .5rem;
+    }
+
+    .page-heading-actions > div {
+      display: contents;
+    }
+
+    .page-heading-actions > button,
+    .page-heading-actions > a,
+    .page-heading-actions > select,
+    .page-heading-actions > div > button,
+    .page-heading-actions > div > a,
+    .page-heading-actions > div > select {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .page-heading-actions > :only-child,
+    .page-heading-actions > input[type="file"] + :last-child,
+    .page-heading-actions > div > :last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+
     .campaigns-workspace .campaign-scope-toolbar {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -946,16 +976,9 @@
 
     .campaigns-workspace .campaign-primary-actions,
     .campaigns-workspace .campaign-secondary-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      display: contents;
       min-width: 0;
-      gap: .5rem;
-    }
-
-    .campaigns-workspace .campaign-primary-actions,
-    .campaigns-workspace .campaign-secondary-actions {
-      grid-column: 1 / -1;
-      width: 100%;
+      width: auto;
       margin-left: 0;
     }
 
@@ -983,8 +1006,10 @@
     }
 
     .campaigns-workspace .campaign-columns-control {
-      grid-column: 1 / -1;
-      display: block;
+      grid-column: auto;
+      display: flex;
+      width: 100%;
+      min-width: 0;
     }
 
     .campaigns-workspace .campaign-secondary-actions > span {
