@@ -169,6 +169,6 @@ Validação desta entrega: TypeScript aprovado, ESLint sem erros (15 avisos anti
 - Os NPCs ficaram menores e mais integrados ao ambiente, com etiqueta acima da cabeça e estações distribuídas como um escritório-jogo. Os comandos existentes continuam no rodapé e o clique em qualquer agente abre seu painel.
 - O visual segue sensível à cor de destaque da plataforma e mantém fallback responsivo para tablet/mobile.
 
-Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos antigos), Vitest 22/61 aprovado e build Vite aprovado. A revisão visual foi feita no ambiente publicado autenticado; a publicação deste refinamento ocorrerá após o commit validado.
+Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos antigos), Vitest 22/61 aprovado e build Vite aprovado. A revisão visual foi feita no ambiente publicado autenticado.
 
-- Ajuste final de perspectiva: o piso e as paredes foram elevados e alongados na projeção isométrica, evitando a sensação de mesas flutuando fora da planta. Nova rodada completa de TypeScript, ESLint, Vitest e build concluída antes da publicação.
+- Ajuste final de perspectiva: o piso e as paredes foram elevados e alongados na projeção isométrica, evitando a sensação de mesas flutuando fora da planta. Nova rodada completa de TypeScript, ESLint, Vitest e build concluída antes da publicação. Commit `c4ca50c` enviado ao GitHub; Cloudflare Pages publicado em `https://b4b48980.growdash.pages.dev`. `growdash.com.br` foi aberto autenticado e confirmou a planta final com as estações centralizadas.
