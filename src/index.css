@@ -2098,6 +2098,13 @@
 
 .growdash-core-panel > * { pointer-events: auto; }
 
+/* The account cards are an inspector, not an overlay control. Let pointer
+   events pass through its informational body so the radial area buttons
+   behind it remain reachable while the panel is open. Interactive controls
+   added to the body in the future opt back in explicitly. */
+.growdash-core-panel-body { pointer-events: none; }
+.growdash-core-panel-body :where(button, a, input, select, textarea, [role="button"], [tabindex]) { pointer-events: auto; }
+
 .growdash-core-panel-header {
   display: flex;
   align-items: flex-start;
