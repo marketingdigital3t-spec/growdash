@@ -96,7 +96,10 @@ export default function KanbanPage() {
   const [boardForm, setBoardForm] = useState({ name: "", description: "" });
   const [boardTemplate, setBoardTemplate] = useState("sales");
   const [listName, setListName] = useState("");
-  const [cardForm, setCardForm] = useState({ title: "", description: "", due_date: "", priority: "none" });
+  const [cardForm, setCardForm] = useState({ title: "", description: "", due_date: "", priority: "none", list_id: "" });
+  const [creatingBoard, setCreatingBoard] = useState(false);
+  const [creatingList, setCreatingList] = useState(false);
+  const [savingCard, setSavingCard] = useState(false);
 
   const boardsQuery = useQuery({
     queryKey: ["kanban_boards", workspace?.id],
@@ -124,17 +127,20 @@ export default function KanbanPage() {
   const details = detailsQuery.data || { lists: [], cards: [] };
   const visibleBoards = useMemo(() => (boardsQuery.data || []).filter((board) => board.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [boardsQuery.data, search]);
 
-  function invalidate() {
+  function invalidate(boardId = selectedBoardId) {
     void queryClient.invalidateQueries({ queryKey: ["kanban_boards", workspace?.id] });
-    void queryClient.invalidateQueries({ queryKey: ["kanban_board_details", selectedBoardId] });
+    void queryClient.invalidateQueries({ queryKey: ["kanban_board_details", boardId] });
   }
 
   async function createBoard() {
-    if (!workspace?.id || !boardForm.name.trim()) return;
+    if (!workspace?.id || !boardForm.name.trim() || creatingBoard) return;
+    let createdBoardId: string | null = null;
+    setCreatingBoard(true);
     try {
       const template = BOARD_TEMPLATES.find((item) => item.id === boardTemplate) ?? BOARD_TEMPLATES[0];
       const { data: board, error } = await supabase.from("kanban_boards").insert({ workspace_id: workspace.id, name: boardForm.name.trim(), description: boardForm.description.trim() || template.description }).select("id").single();
       if (error) throw error;
+      createdBoardId = board.id;
       const { data: createdLists, error: listError } = await supabase.from("kanban_lists").insert(template.columns.map((name, position) => ({ board_id: board.id, name, position }))).select("id,name");
       if (listError) throw listError;
       const listByName = new Map((createdLists || []).map((list: { id: string; name: string }) => [list.name, list.id]));
@@ -146,37 +152,54 @@ export default function KanbanPage() {
         const { error: cardError } = await supabase.from("kanban_cards").insert(starterCards);
         if (cardError) throw cardError;
       }
-      setBoardDialog(false); setBoardForm({ name: "", description: "" }); setBoardTemplate("sales"); setSelectedBoardId(board.id); invalidate();
+      setBoardDialog(false); setBoardForm({ name: "", description: "" }); setBoardTemplate("sales"); setSelectedBoardId(board.id); invalidate(board.id);
       toast({ title: "Quadro criado" });
-    } catch (error: unknown) { toast({ title: "Não foi possível criar o quadro", description: errorMessage(error), variant: "destructive" }); }
+    } catch (error: unknown) {
+      if (createdBoardId) {
+        const { error: cleanupError } = await supabase.from("kanban_boards").delete().eq("id", createdBoardId);
+        if (cleanupError) {
+          toast({ title: "O quadro foi criado parcialmente", description: "Não foi possível concluir o template nem removê-lo automaticamente. Atualize a tela e tente novamente.", variant: "destructive" });
+          return;
+        }
+      }
+      toast({ title: "Não foi possível criar o quadro", description: errorMessage(error), variant: "destructive" });
+    } finally { setCreatingBoard(false); }
   }
 
   async function createList() {
-    if (!selectedBoardId || !listName.trim()) return;
+    if (!selectedBoardId || !listName.trim() || creatingList) return;
+    setCreatingList(true);
     try {
       const position = details.lists.length ? Math.max(...details.lists.map((list) => list.position)) + 1 : 0;
       const { error } = await supabase.from("kanban_lists").insert({ board_id: selectedBoardId, name: listName.trim(), position });
       if (error) throw error;
       setListDialog(false); setListName(""); invalidate();
-    } catch (error: unknown) { toast({ title: "Não foi possível criar a coluna", description: errorMessage(error), variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Não foi possível criar a coluna", description: errorMessage(error), variant: "destructive" }); } finally { setCreatingList(false); }
   }
 
   async function saveCard() {
-    if (!cardDialog || !cardForm.title.trim()) return;
+    if (!cardDialog || !cardForm.title.trim() || savingCard) return;
+    setSavingCard(true);
     try {
       if (cardDialog.card) {
-        const { error } = await supabase.from("kanban_cards").update({ title: cardForm.title.trim(), description: cardForm.description.trim() || null, due_date: cardForm.due_date || null, priority: cardForm.priority, updated_at: new Date().toISOString() }).eq("id", cardDialog.card.id);
-        if (error) throw error;
+        const updates = { title: cardForm.title.trim(), description: cardForm.description.trim() || null, due_date: cardForm.due_date || null, priority: cardForm.priority };
+        const targetListId = cardForm.list_id || cardDialog.card.list_id;
+        if (targetListId === cardDialog.card.list_id) {
+          const { error } = await supabase.from("kanban_cards").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", cardDialog.card.id);
+          if (error) throw error;
+        } else if (!await moveCard(cardDialog.card, targetListId, undefined, updates)) {
+          return;
+        }
       } else {
         const position = details.cards.filter((card) => card.list_id === cardDialog.listId).length;
         const { error } = await supabase.from("kanban_cards").insert({ list_id: cardDialog.listId, title: cardForm.title.trim(), description: cardForm.description.trim() || null, due_date: cardForm.due_date || null, priority: cardForm.priority, position });
         if (error) throw error;
       }
       setCardDialog(null); invalidate();
-    } catch (error: unknown) { toast({ title: "Não foi possível salvar o cartão", description: errorMessage(error), variant: "destructive" }); }
+    } catch (error: unknown) { toast({ title: "Não foi possível salvar o cartão", description: errorMessage(error), variant: "destructive" }); } finally { setSavingCard(false); }
   }
 
-  async function moveCard(card: KanbanCard, listId: string, targetPosition?: number) {
+  async function moveCard(card: KanbanCard, listId: string, targetPosition?: number, updates?: Pick<KanbanCard, "title" | "description" | "due_date" | "priority">) {
     const sourceListId = card.list_id;
     const sourceCards = details.cards.filter((item) => item.list_id === sourceListId && item.id !== card.id).sort((a, b) => a.position - b.position);
     const targetCards = sourceListId === listId
@@ -184,21 +207,22 @@ export default function KanbanPage() {
       : details.cards.filter((item) => item.list_id === listId && item.id !== card.id).sort((a, b) => a.position - b.position);
     const position = Math.max(0, Math.min(targetPosition ?? targetCards.length, targetCards.length));
     const nextTargetCards = [...targetCards];
-    nextTargetCards.splice(position, 0, { ...card, list_id: listId, position });
+    nextTargetCards.splice(position, 0, { ...card, ...updates, list_id: listId, position });
     try {
       if (sourceListId !== listId) {
-        const { error } = await supabase.from("kanban_cards").update({ list_id: listId, position, updated_at: new Date().toISOString() }).eq("id", card.id);
+        const { error } = await supabase.from("kanban_cards").update({ ...updates, list_id: listId, position, updated_at: new Date().toISOString() }).eq("id", card.id);
         if (error) throw error;
       }
       const touched = sourceListId === listId ? nextTargetCards : [...sourceCards, ...nextTargetCards];
       for (const item of touched) {
         const nextPosition = (sourceListId === listId ? nextTargetCards : item.list_id === sourceListId ? sourceCards : nextTargetCards).findIndex((candidate) => candidate.id === item.id);
         if (nextPosition < 0 || (item.id === card.id && sourceListId !== listId)) continue;
-        const { error } = await supabase.from("kanban_cards").update({ list_id: item.list_id, position: nextPosition, updated_at: new Date().toISOString() }).eq("id", item.id);
+        const { error } = await supabase.from("kanban_cards").update({ ...(item.id === card.id ? updates : {}), list_id: item.list_id, position: nextPosition, updated_at: new Date().toISOString() }).eq("id", item.id);
         if (error) throw error;
       }
       invalidate();
-    } catch (error: unknown) { toast({ title: "Não foi possível mover o cartão", description: errorMessage(error), variant: "destructive" }); }
+      return true;
+    } catch (error: unknown) { toast({ title: "Não foi possível mover o cartão", description: errorMessage(error), variant: "destructive" }); return false; }
   }
 
   async function deleteCard(card: KanbanCard) {
@@ -209,7 +233,7 @@ export default function KanbanPage() {
 
   function openCard(listId: string, card?: KanbanCard) {
     setCardDialog({ listId, card });
-    setCardForm({ title: card?.title || "", description: card?.description || "", due_date: card?.due_date || "", priority: card?.priority || "none" });
+    setCardForm({ title: card?.title || "", description: card?.description || "", due_date: card?.due_date || "", priority: card?.priority || "none", list_id: card?.list_id || listId });
   }
 
   if (activeBoard) {
@@ -217,13 +241,13 @@ export default function KanbanPage() {
     return <div className="mx-auto max-w-[1700px]">
     <PageHeading eyebrow="Operação visual" title={activeBoard.name} description={activeBoard.description || "Quadro compartilhado para tarefas, CRM e operação."} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setViewMode((mode) => mode === "kanban" ? "list" : "kanban")}><ViewIcon className="mr-2 h-4 w-4" />{viewMode === "kanban" ? "Modo ClickUp" : "Modo Trello"}</Button><Button variant="outline" onClick={() => setSelectedBoardId(null)}><ArrowLeft className="mr-2 h-4 w-4" />Quadros</Button><Button onClick={() => setListDialog(true)}><Plus className="mr-2 h-4 w-4" />Coluna</Button></div>} />
     {detailsQuery.isLoading ? <div className="gd-panel grid min-h-96 place-items-center text-sm text-muted-foreground" role="status" aria-live="polite">Carregando quadro…</div> : detailsQuery.isError ? <div className="gd-panel grid min-h-96 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-destructive" /><h2 className="mt-3 font-black">Não foi possível carregar este quadro</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">{errorMessage(detailsQuery.error)}</p><Button className="mt-4" variant="outline" onClick={() => void detailsQuery.refetch()}>Tentar novamente</Button></div></div> : viewMode === "kanban" ? <div className="flex min-h-[560px] items-start gap-3 overflow-x-auto pb-4">{details.lists.map((list) => <KanbanColumn key={list.id} list={list} cards={details.cards.filter((card) => card.list_id === list.id).sort((a, b) => a.position - b.position)} onDrop={(cardId, targetPosition) => { const card = details.cards.find((item) => item.id === cardId); if (card) void moveCard(card, list.id, targetPosition); }} onAdd={() => openCard(list.id)} onEdit={openCard} onDelete={deleteCard} />)}</div> : <div className="gd-panel overflow-hidden"><div className="divide-y divide-border">{details.lists.map((list) => <section key={list.id} className="p-4"><div className="mb-2 flex items-center gap-2"><Columns3 className="h-4 w-4 text-primary" /><h2 className="font-black">{list.name}</h2><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{details.cards.filter((card) => card.list_id === list.id).length}</span></div>{details.cards.filter((card) => card.list_id === list.id).sort((a, b) => a.position - b.position).map((card) => <button key={card.id} type="button" onClick={() => openCard(list.id, card)} className="flex w-full items-center gap-3 border-t border-border/60 py-3 text-left text-sm hover:bg-muted/30"><span className="min-w-0 grow truncate">{card.title}</span><PriorityBadge priority={card.priority} /><span className="text-[10px] text-muted-foreground">{card.due_date ? format(new Date(`${card.due_date}T12:00:00`), "dd/MM/yyyy") : ""}</span></button>)}</section>)}</div></div>}
-    <CardDialog dialog={cardDialog} form={cardForm} setForm={setCardForm} onClose={() => setCardDialog(null)} onSave={() => void saveCard()} />
-    <Dialog open={listDialog} onOpenChange={setListDialog}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Nova coluna</DialogTitle></DialogHeader><Label>Nome</Label><Input value={listName} onChange={(event) => setListName(event.target.value)} placeholder="Ex.: Em revisão" /><DialogFooter><Button variant="outline" onClick={() => setListDialog(false)}>Cancelar</Button><Button onClick={() => void createList()}>Criar coluna</Button></DialogFooter></DialogContent></Dialog>
+    <CardDialog dialog={cardDialog} form={cardForm} lists={details.lists} saving={savingCard} setForm={setCardForm} onClose={() => setCardDialog(null)} onSave={() => void saveCard()} />
+    <Dialog open={listDialog} onOpenChange={setListDialog}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Nova coluna</DialogTitle></DialogHeader><Label>Nome</Label><Input value={listName} onChange={(event) => setListName(event.target.value)} placeholder="Ex.: Em revisão" /><DialogFooter><Button variant="outline" onClick={() => setListDialog(false)} disabled={creatingList}>Cancelar</Button><Button onClick={() => void createList()} disabled={creatingList || !listName.trim()}>{creatingList ? "Criando…" : "Criar coluna"}</Button></DialogFooter></DialogContent></Dialog>
     </div>;
   }
 
   return <div className="mx-auto max-w-[1500px]"><PageHeading eyebrow="Operação visual" title="Quadros" description="Escolha o modo Trello para fluxo visual ou ClickUp para uma lista operacional." actions={<Button onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Novo quadro</Button>} /><div className="gd-panel mb-4 flex items-center gap-2 p-3"><Search className="h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar quadro" className="border-0 bg-transparent shadow-none focus-visible:ring-0" /></div>{boardsQuery.isLoading ? <div className="gd-panel grid min-h-64 place-items-center text-sm text-muted-foreground">Carregando quadros…</div> : boardsQuery.isError ? <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-destructive" /><h2 className="mt-3 font-black">Não foi possível carregar os quadros</h2><p className="mt-1 text-sm text-muted-foreground">Verifique a conexão e tente novamente.</p><Button className="mt-4" variant="outline" onClick={() => void boardsQuery.refetch()}>Tentar novamente</Button></div></div> : visibleBoards.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleBoards.map((board) => <button key={board.id} type="button" onClick={() => setSelectedBoardId(board.id)} className="gd-panel group p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/50"><LayoutGrid className="h-6 w-6 text-primary" /><h2 className="mt-4 font-black">{board.name}</h2><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{board.description || "Sem descrição."}</p><span className="mt-5 inline-flex items-center gap-1 text-[10px] font-black text-primary">Abrir quadro <ArrowLeft className="h-3 w-3 rotate-180 transition-transform group-hover:translate-x-1" /></span></button>)}</div> : <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 font-black">Nenhum quadro criado</h2><p className="mt-1 text-sm text-muted-foreground">Crie um quadro para começar a organizar sua operação.</p><Button className="mt-4" onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Criar primeiro quadro</Button></div></div>}
-    <Dialog open={boardDialog} onOpenChange={setBoardDialog}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Começar um quadro</DialogTitle></DialogHeader><div className="space-y-5"><div><Label className="text-xs uppercase tracking-[.14em] text-muted-foreground">Escolha um template pronto</Label><div className="mt-2 grid gap-2 sm:grid-cols-2">{BOARD_TEMPLATES.map((template) => { const Icon = template.icon; const selected = boardTemplate === template.id; return <button key={template.id} type="button" aria-pressed={selected} onClick={() => { setBoardTemplate(template.id); setBoardForm((form) => ({ name: form.name.trim() ? form.name : template.name, description: form.description.trim() ? form.description : template.description })); }} className={cn("rounded-xl border p-3 text-left transition", selected ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/.35)]" : "border-border bg-muted/20 hover:border-primary/50")}><div className="flex items-start gap-3"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", selected ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary")}><Icon className="h-4 w-4" /></span><span className="min-w-0"><strong className="block text-sm">{template.name}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{template.description}</span></span></div><span className="mt-2 block text-[10px] font-bold text-primary">{template.columns.length} colunas · {template.cards.length} cartões iniciais</span></button>; })}</div></div><div className="grid gap-3 sm:grid-cols-2"><div><Label>Nome do quadro</Label><Input value={boardForm.name} onChange={(event) => setBoardForm({ ...boardForm, name: event.target.value })} placeholder="Pipeline comercial" /></div><div><Label>Descrição personalizada</Label><Textarea value={boardForm.description} onChange={(event) => setBoardForm({ ...boardForm, description: event.target.value })} placeholder="Como este quadro será usado?" /></div></div></div><DialogFooter><Button variant="outline" onClick={() => setBoardDialog(false)}>Cancelar</Button><Button onClick={() => void createBoard()} disabled={!boardForm.name.trim()}><Plus className="mr-2 h-4 w-4" />Criar quadro com template</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={boardDialog} onOpenChange={setBoardDialog}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Começar um quadro</DialogTitle></DialogHeader><div className="space-y-5"><div><Label className="text-xs uppercase tracking-[.14em] text-muted-foreground">Escolha um template pronto</Label><div className="mt-2 grid gap-2 sm:grid-cols-2">{BOARD_TEMPLATES.map((template) => { const Icon = template.icon; const selected = boardTemplate === template.id; return <button key={template.id} type="button" aria-pressed={selected} onClick={() => { setBoardTemplate(template.id); setBoardForm((form) => ({ name: form.name.trim() ? form.name : template.name, description: form.description.trim() ? form.description : template.description })); }} disabled={creatingBoard} className={cn("rounded-xl border p-3 text-left transition", selected ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/.35)]" : "border-border bg-muted/20 hover:border-primary/50")}><div className="flex items-start gap-3"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", selected ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary")}><Icon className="h-4 w-4" /></span><span className="min-w-0"><strong className="block text-sm">{template.name}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{template.description}</span></span></div><span className="mt-2 block text-[10px] font-bold text-primary">{template.columns.length} colunas · {template.cards.length} cartões iniciais</span></button>; })}</div></div><div className="grid gap-3 sm:grid-cols-2"><div><Label>Nome do quadro</Label><Input value={boardForm.name} onChange={(event) => setBoardForm({ ...boardForm, name: event.target.value })} placeholder="Pipeline comercial" disabled={creatingBoard} /></div><div><Label>Descrição personalizada</Label><Textarea value={boardForm.description} onChange={(event) => setBoardForm({ ...boardForm, description: event.target.value })} placeholder="Como este quadro será usado?" disabled={creatingBoard} /></div></div></div><DialogFooter><Button variant="outline" onClick={() => setBoardDialog(false)} disabled={creatingBoard}>Cancelar</Button><Button onClick={() => void createBoard()} disabled={creatingBoard || !boardForm.name.trim()}><Plus className="mr-2 h-4 w-4" />{creatingBoard ? "Criando quadro…" : "Criar quadro com template"}</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 
@@ -233,6 +257,6 @@ function KanbanColumn({ list, cards, onDrop, onAdd, onEdit, onDelete }: { list: 
 
 function PriorityBadge({ priority }: { priority: string }) { const item = PRIORITIES.find((option) => option.value === priority); return item?.value === "none" ? null : <span className={cn("rounded-full px-2 py-0.5 text-[9px] font-black", item?.value === "urgent" ? "bg-rose-500/15 text-rose-500" : item?.value === "high" ? "bg-amber-500/15 text-amber-500" : item?.value === "medium" ? "bg-blue-500/15 text-blue-500" : "bg-muted text-muted-foreground")}>{item?.label}</span>; }
 
-function CardDialog({ dialog, form, setForm, onClose, onSave }: { dialog: { listId: string; card?: KanbanCard } | null; form: { title: string; description: string; due_date: string; priority: string }; setForm: (form: { title: string; description: string; due_date: string; priority: string }) => void; onClose: () => void; onSave: () => void }) {
-  return <Dialog open={!!dialog} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle>{dialog?.card ? "Editar cartão" : "Novo cartão"}</DialogTitle></DialogHeader><div className="space-y-3"><div><Label>Título</Label><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} autoFocus /></div><div><Label>Descrição</Label><Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={4} /></div><div className="grid grid-cols-2 gap-3"><div><Label>Prazo</Label><Input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} /></div><div><Label>Prioridade</Label><Select value={form.priority} onValueChange={(value) => setForm({ ...form, priority: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PRIORITIES.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div></div></div><DialogFooter><Button variant="outline" onClick={onClose}>Cancelar</Button><Button onClick={onSave}><Check className="mr-2 h-4 w-4" />Salvar cartão</Button></DialogFooter></DialogContent></Dialog>;
+function CardDialog({ dialog, form, lists, saving, setForm, onClose, onSave }: { dialog: { listId: string; card?: KanbanCard } | null; form: { title: string; description: string; due_date: string; priority: string; list_id: string }; lists: KanbanList[]; saving: boolean; setForm: (form: { title: string; description: string; due_date: string; priority: string; list_id: string }) => void; onClose: () => void; onSave: () => void }) {
+  return <Dialog open={!!dialog} onOpenChange={(open) => !open && !saving && onClose()}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle>{dialog?.card ? "Editar cartão" : "Novo cartão"}</DialogTitle></DialogHeader><div className="space-y-3"><div><Label>Título</Label><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} autoFocus disabled={saving} /></div><div><Label>Descrição</Label><Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={4} disabled={saving} /></div><div className="grid grid-cols-2 gap-3"><div><Label>Prazo</Label><Input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} disabled={saving} /></div><div><Label>Prioridade</Label><Select value={form.priority} onValueChange={(value) => setForm({ ...form, priority: value })} disabled={saving}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PRIORITIES.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div></div>{dialog?.card && <div><Label>Mover para coluna</Label><Select value={form.list_id} onValueChange={(value) => setForm({ ...form, list_id: value })} disabled={saving}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{lists.map((list) => <SelectItem key={list.id} value={list.id}>{list.name}</SelectItem>)}</SelectContent></Select></div>}</div><DialogFooter><Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button><Button onClick={onSave} disabled={saving || !form.title.trim()}><Check className="mr-2 h-4 w-4" />{saving ? "Salvando…" : "Salvar cartão"}</Button></DialogFooter></DialogContent></Dialog>;
 }
