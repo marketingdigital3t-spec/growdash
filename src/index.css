@@ -1862,6 +1862,336 @@
   }
 }
 
+/* Growdash neural core v2: a contained, GPU-friendly 3D brain and an
+   in-place operational inspector. The legacy jarvis selectors remain for
+   backwards compatibility, while this scope removes their expensive filters
+   and prevents the map from competing with the rest of the application. */
+.growdash-core-v2 {
+  contain: layout paint;
+  isolation: isolate;
+  --brain-user-x: -6deg;
+  --brain-user-y: 0deg;
+}
+
+.growdash-core-v2 .jarvis-neural-field {
+  opacity: .34;
+  transform: translate3d(var(--jarvis-field-x), var(--jarvis-field-y), 0);
+  will-change: transform;
+}
+
+.growdash-core-v2 .jarvis-neural-field line {
+  filter: none;
+  animation-duration: 6s;
+}
+
+.growdash-core-v2 .jarvis-neural-point {
+  box-shadow: 0 0 7px 1px rgba(var(--brand-accent-rgb), .58);
+}
+
+.growdash-core-v2 .jarvis-neural-point::after {
+  display: none;
+}
+
+.growdash-core-v2 .jarvis-cinematic-tunnel i {
+  box-shadow: inset 0 0 15px rgba(var(--brand-accent-rgb), .12);
+}
+
+.growdash-core-v2 .jarvis-brain {
+  width: 270px;
+  height: 270px;
+  transform: translate(-50%, -50%);
+  transform-style: preserve-3d;
+  perspective: 900px;
+  filter: none;
+  will-change: transform;
+}
+
+.growdash-core-v2 .jarvis-brain:hover:not(:disabled) {
+  transform: translate(-50%, -50%) scale(1.025);
+  filter: none;
+}
+
+.growdash-core-v2.is-core .jarvis-brain {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(.78);
+}
+
+.growdash-core-v2 .jarvis-brain:active .growdash-brain-rotor {
+  animation-play-state: paused;
+}
+
+.growdash-brain-user-rotation,
+.growdash-brain-rotor {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform-style: preserve-3d;
+}
+
+.growdash-brain-user-rotation {
+  transform: rotateX(var(--brain-user-x)) rotateY(var(--brain-user-y));
+  cursor: grab;
+}
+
+.growdash-brain-user-rotation:active {
+  cursor: grabbing;
+}
+
+.growdash-brain-rotor {
+  animation: growdash-brain-360 18s linear infinite;
+}
+
+.growdash-core-v2 .jarvis-cortex {
+  position: absolute;
+  inset: 0;
+  width: 238px;
+  height: 208px;
+  margin: auto;
+  overflow: visible;
+  backface-visibility: hidden;
+  filter: none;
+  transform-style: preserve-3d;
+}
+
+.growdash-core-v2 .jarvis-cortex.is-front {
+  transform: translateZ(16px);
+}
+
+.growdash-core-v2 .jarvis-cortex.is-back {
+  transform: rotateY(180deg) translateZ(13px);
+  opacity: .54;
+}
+
+.growdash-core-v2 .jarvis-cortex.is-front .jarvis-cortex-lobe {
+  fill: url(#cortex-metal-front);
+}
+
+.growdash-core-v2 .jarvis-cortex.is-back .jarvis-cortex-lobe {
+  fill: url(#cortex-metal-back);
+}
+
+.growdash-core-v2 .jarvis-cortex-lobe {
+  animation: growdash-brain-breathe 5.8s ease-in-out infinite alternate;
+}
+
+.growdash-core-v2 .jarvis-cortex-lobe:nth-of-type(2) {
+  animation-delay: -2.4s;
+}
+
+.growdash-core-v2 .jarvis-circuit-trace,
+.growdash-core-v2 .jarvis-cortex-node,
+.growdash-core-v2 .jarvis-cortex-chip {
+  filter: none;
+}
+
+.growdash-core-v2 .jarvis-circuit-trace {
+  animation-duration: 4.8s;
+}
+
+.growdash-core-v2 .jarvis-cortex-node {
+  animation-duration: 2.8s;
+}
+
+.growdash-core-v2 .jarvis-energy-core {
+  box-shadow: 0 0 18px rgba(var(--brand-accent-rgb), .5), inset 0 0 14px rgba(255,255,255,.1);
+  animation-duration: 3.2s;
+}
+
+.growdash-core-v2 .jarvis-energy-core i {
+  animation-duration: 12s;
+}
+
+.growdash-core-v2 .jarvis-brain-copy b {
+  font-size: 13px;
+}
+
+.growdash-core-v2 .jarvis-brain-copy small {
+  max-width: 180px;
+}
+
+.growdash-core-v2 .jarvis-core-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  color: rgba(255,255,255,.52);
+  font-size: 8px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.growdash-core-v2 .jarvis-core-label svg {
+  width: 12px;
+  height: 12px;
+  color: var(--brand-gold-light);
+}
+
+.growdash-core-v2 .jarvis-core-label span {
+  font-size: 8px;
+  letter-spacing: .12em;
+}
+
+.growdash-core-v2 .jarvis-arm {
+  animation: growdash-arm-in .35s ease-out both;
+  will-change: opacity, transform;
+}
+
+.growdash-core-v2 .jarvis-arm-head {
+  box-shadow: 0 10px 24px rgba(0,0,0,.36), inset 0 1px rgba(255,255,255,.1);
+  backdrop-filter: none;
+}
+
+.growdash-core-v2 .jarvis-arm.is-selected .jarvis-arm-head,
+.growdash-core-v2 .jarvis-arm-head:focus-visible {
+  border-color: var(--brand-gold-light);
+  box-shadow: 0 0 0 2px rgba(var(--brand-accent-rgb), .18), 0 12px 30px rgba(0,0,0,.42);
+}
+
+.growdash-core-v2 .jarvis-branch {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.growdash-core-v2 .jarvis-branch.is-selected {
+  color: var(--brand-gold-light);
+}
+
+.growdash-core-v2 .jarvis-links path {
+  animation-duration: 4.6s;
+}
+
+.growdash-core-v2 .jarvis-links .jarvis-node-halo {
+  animation-duration: 4s;
+}
+
+.growdash-core-v2.is-paused *,
+.growdash-core-v2.is-paused *::before,
+.growdash-core-v2.is-paused *::after {
+  animation-play-state: paused !important;
+}
+
+.growdash-core-panel {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  z-index: 30;
+  display: grid;
+  width: min(360px, calc(100% - 36px));
+  max-height: calc(100% - 36px);
+  overflow: hidden;
+  border: 1px solid rgba(var(--brand-accent-rgb), .34);
+  border-radius: 18px;
+  background: rgba(4, 8, 9, .94);
+  box-shadow: 0 22px 60px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.08);
+  color: white;
+}
+
+.growdash-core-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  padding: 16px;
+}
+
+.growdash-core-panel-header h2 { margin-top: 3px; font-size: 20px; font-weight: 950; }
+.growdash-core-panel-header p { margin-top: 3px; color: rgba(255,255,255,.5); font-size: 10px; }
+.growdash-core-panel-header > button { display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 9px; padding: 7px; color: rgba(255,255,255,.65); }
+.growdash-core-panel-header > button:hover { border-color: var(--brand-gold-light); color: var(--brand-gold-light); }
+.growdash-core-kicker { color: var(--brand-gold-light); font-size: 8px; font-weight: 900; letter-spacing: .16em; }
+
+.growdash-core-strategies {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.growdash-core-strategies button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 9px;
+  background: rgba(255,255,255,.035);
+  padding: 7px;
+  color: rgba(255,255,255,.52);
+  font-size: 8px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.growdash-core-strategies button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.growdash-core-strategies button.is-active { border-color: rgba(var(--brand-accent-rgb), .62); background: rgba(var(--brand-accent-rgb), .16); color: var(--brand-gold-light); }
+
+.growdash-core-panel-body { min-height: 0; overflow: auto; padding: 12px; }
+.growdash-core-panel-intro { display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,.55); font-size: 9px; }
+.growdash-core-panel-intro svg { color: var(--brand-gold-light); }
+.growdash-core-account-list { display: grid; gap: 8px; margin-top: 10px; }
+.growdash-core-account-card { border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(255,255,255,.035); padding: 10px; }
+.growdash-core-account-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.growdash-core-account-heading b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.growdash-core-account-heading small { display: block; margin-top: 2px; color: rgba(255,255,255,.45); font-size: 8px; }
+.growdash-core-account-heading > span { flex: 0 0 auto; border-radius: 999px; padding: 3px 6px; font-size: 7px; font-weight: 900; text-transform: uppercase; }
+.growdash-core-account-heading > span.is-healthy { background: rgba(52,211,153,.12); color: #67e8b4; }
+.growdash-core-account-heading > span.is-attention { background: rgba(251,191,36,.12); color: #fcd34d; }
+.growdash-core-account-heading > span.is-critical { background: rgba(248,113,113,.12); color: #fca5a5; }
+.growdash-core-account-heading > span.is-no-data { background: rgba(255,255,255,.08); color: rgba(255,255,255,.52); }
+.growdash-core-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 9px; }
+.growdash-core-metrics div { min-width: 0; }
+.growdash-core-metrics small { display: block; overflow: hidden; color: rgba(255,255,255,.42); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.growdash-core-metrics b { display: block; overflow: hidden; margin-top: 2px; color: #fff5c5; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.growdash-core-account-card p { margin-top: 8px; color: rgba(255,255,255,.52); font-size: 8px; line-height: 1.45; }
+.growdash-core-loading { display: flex; gap: 5px; justify-content: center; padding: 32px 0; }
+.growdash-core-loading i { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-gold-light); animation: growdash-loading-dot 1s ease-in-out infinite; }
+.growdash-core-loading i:nth-child(2) { animation-delay: .14s; }.growdash-core-loading i:nth-child(3) { animation-delay: .28s; }
+.growdash-core-empty { display: grid; place-items: center; gap: 7px; padding: 32px 8px; color: rgba(255,255,255,.45); font-size: 9px; text-align: center; }
+
+@keyframes growdash-brain-360 { from { transform: rotateY(0deg) rotateX(-2deg); } to { transform: rotateY(360deg) rotateX(2deg); } }
+@keyframes growdash-brain-breathe { from { opacity: .72; transform: translateZ(0); } to { opacity: .94; transform: translateZ(5px); } }
+@keyframes growdash-arm-in { from { opacity: 0; transform: translate(-50%, -50%) scale(.92); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes growdash-loading-dot { 0%, 100% { opacity: .35; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+
+@media (max-width: 820px) {
+  .growdash-core-v2 .jarvis-brain { position: relative; left: auto; top: auto; width: 220px; height: 220px; margin: 30px auto 20px; transform: none; }
+  .growdash-core-v2.is-core .jarvis-brain { transform: scale(.82); }
+  .growdash-core-v2 .jarvis-cortex { width: 198px; height: 180px; }
+  .growdash-core-v2 .jarvis-core-label { position: relative; left: auto; top: auto; transform: none; margin: 0 auto 12px; }
+  .growdash-core-v2 .jarvis-arm { position: relative; left: auto !important; top: auto !important; width: 100%; transform: none; }
+  .growdash-core-v2 .jarvis-arm-head:hover { transform: none; }
+  .growdash-core-panel { position: relative; right: auto; top: auto; width: 100%; max-height: none; margin-top: 4px; }
+  .growdash-core-v2.is-core .jarvis-brain { display: grid; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .growdash-brain-rotor,
+  .growdash-core-v2 .jarvis-neural-field line,
+  .growdash-core-v2 .jarvis-neural-point,
+  .growdash-core-v2 .jarvis-cinematic-tunnel,
+  .growdash-core-v2 .jarvis-brain-aura,
+  .growdash-core-v2 .jarvis-cortex-lobe,
+  .growdash-core-v2 .jarvis-circuit-trace,
+  .growdash-core-v2 .jarvis-cortex-node,
+  .growdash-core-v2 .jarvis-energy-core,
+  .growdash-core-v2 .jarvis-energy-core i,
+  .growdash-core-v2 .jarvis-links path,
+  .growdash-core-v2 .jarvis-links .jarvis-node-halo,
+  .growdash-core-v2 .jarvis-arm { animation: none !important; }
+}
+
 @layer utilities {
   .hover-lift {
     transition: all 300ms ease-out;
@@ -2633,3 +2963,17 @@
 }
 
 @keyframes jarvis-reduced-enter { from { opacity: 1; } to { opacity: .08; } }
+
+/* Final precedence for the Growdash core. This block intentionally comes
+   after the historical neural theme so the new 3D center remains visible in
+   the expanded state and old entrance filters cannot reintroduce jank. */
+.growdash-core-v2 .jarvis-brain { width: 270px !important; height: 270px !important; transform: translate(-50%, -50%) !important; opacity: 1 !important; filter: none !important; }
+.growdash-core-v2.is-core .jarvis-brain { display: grid !important; pointer-events: auto !important; transform: translate(-50%, -50%) scale(.78) !important; }
+.growdash-core-v2 .jarvis-arm { animation: growdash-arm-in .35s ease-out both !important; filter: none !important; }
+.growdash-core-v2 .jarvis-arm-head { backdrop-filter: none !important; }
+.growdash-core-v2 .jarvis-core-label { min-width: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; }
+
+@media (max-width: 820px) {
+  .growdash-core-v2 .jarvis-brain { width: 220px !important; height: 220px !important; transform: none !important; }
+  .growdash-core-v2.is-core .jarvis-brain { display: grid !important; transform: scale(.82) !important; }
+}

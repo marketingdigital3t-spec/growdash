@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Activity,
@@ -24,15 +25,17 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { buildAgentAnswer, type AgentMetrics } from "@/lib/agentOffice";
+import { buildCoreAccountSummaries, type CoreAccountInput, type CoreAgentConfig, type CoreAreaId, type CoreSchedule } from "@/lib/agentCore";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
 
 type AgentStatus = "working" | "walking" | "free";
 type ChatMessage = { id: string; role: "agent" | "user"; text: string };
@@ -116,7 +119,12 @@ export default function AgentsOfficePage() {
         <div className="flex flex-wrap items-center gap-2 text-[10px]"><button type="button" onClick={() => setView("map")} className={cn("rounded-lg border px-3 py-2 font-black", view === "map" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><Network className="mr-1 inline h-3.5 w-3.5" />Mapa</button><button type="button" onClick={() => setView("office")} className={cn("rounded-lg border px-3 py-2 font-black", view === "office" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><BriefcaseBusiness className="mr-1 inline h-3.5 w-3.5" />Escritório 3D</button>{view === "office" && <><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></>}</div>
       </header>
 
-      {view === "map" ? <KnowledgeMap onOpenOffice={() => setView("office")} /> : <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
+      {view === "map" ? <KnowledgeMap
+        onOpenOffice={() => setView("office")}
+        accounts={visibleAccounts.map((account) => ({ id: account.id, name: account.name, target_cpl: account.target_cpl }))}
+        startDate={startDate}
+        endDate={endDate}
+      /> : <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
         <div className="office-sim-topbar">
           <div className="office-sim-brand"><span className="office-sim-brand-mark"><Bot className="h-3.5 w-3.5" /></span><span><b>GROWDASH HQ</b><small>AGENT OPERATIONS</small></span></div>
           <div className="office-sim-presence" aria-label="Agentes presentes no escritório">
@@ -199,16 +207,16 @@ export default function AgentsOfficePage() {
   );
 }
 
-const KNOWLEDGE_NODES = [
-  { label: "Tráfego", note: "Mídia, criativos, orçamento e escala", href: "/campanhas", angle: -90, branches: [["Estratégias de mídia", "/campanhas"], ["Criativos & testes", "/campanhas"], ["Alertas de performance", "/saude-dos-dados"]] },
-  { label: "CRM", note: "Pipeline, qualificação e follow-up", href: "/crm", angle: -28, branches: [["Pipeline & etapas", "/crm"], ["Scripts de vendas", "/comercial"], ["Follow-ups", "/automacoes"]] },
-  { label: "Comercial", note: "Metas, conversão e receita", href: "/comercial", angle: 28, branches: [["Metas e ranking", "/comercial"], ["Playbook de vendas", "/comercial"], ["Forecast", "/centro-inteligencia"]] },
-  { label: "Financeiro", note: "Caixa, margem e previsibilidade", href: "/financeiro", angle: 90, branches: [["DRE & caixa", "/financeiro"], ["Margem e custos", "/financeiro"], ["Planejamento", "/centro-inteligencia"]] },
-  { label: "Marca", note: "Posicionamento, conteúdo e confiança", href: "/marcas", angle: 152, branches: [["Posicionamento", "/marcas"], ["Conteúdo estratégico", "/marcas"], ["Reputação", "/marcas"]] },
-  { label: "Automações", note: "Playbooks, WhatsApp e operações", href: "/automacoes", angle: 208, branches: [["Playbooks", "/automacoes"], ["WhatsApp", "/automacoes"], ["Webhooks & rotinas", "/automacoes"]] },
-] as const;
+const KNOWLEDGE_NODES: KnowledgeNode[] = [
+  { id: "traffic", label: "Tráfego", note: "Mídia, criativos, orçamento e escala", angle: -90, strategies: [["Estratégias de mídia", "media"], ["Criativos & testes", "creative"], ["Alertas de performance", "performance"]] },
+  { id: "crm", label: "CRM", note: "Pipeline, qualificação e follow-up", angle: -28, strategies: [["Pipeline & etapas", "pipeline"], ["Scripts de vendas", "scripts"], ["Follow-ups", "followups"]] },
+  { id: "commercial", label: "Comercial", note: "Metas, conversão e receita", angle: 28, strategies: [["Metas e ranking", "ranking"], ["Playbook de vendas", "playbook"], ["Forecast", "forecast"]] },
+  { id: "finance", label: "Financeiro", note: "Caixa, margem e previsibilidade", angle: 90, strategies: [["DRE & caixa", "dre"], ["Margem e custos", "margin"], ["Planejamento", "planning"]] },
+  { id: "brand", label: "Marca", note: "Posicionamento, conteúdo e confiança", angle: 152, strategies: [["Posicionamento", "positioning"], ["Conteúdo estratégico", "content"], ["Reputação", "reputation"]] },
+  { id: "automations", label: "Automações", note: "Playbooks, WhatsApp e operações", angle: 208, strategies: [["Playbooks", "playbooks"], ["WhatsApp", "whatsapp"], ["Webhooks & rotinas", "webhooks"]] },
+];
 
-const NEURAL_POINTS = Array.from({ length: 38 }, (_, index) => ({
+const NEURAL_POINTS = Array.from({ length: 18 }, (_, index) => ({
   id: index,
   x: 4 + ((index * 37) % 92),
   y: 5 + ((index * 53) % 88),
@@ -218,7 +226,7 @@ const NEURAL_POINTS = Array.from({ length: 38 }, (_, index) => ({
   depth: (index % 5) + 1,
 }));
 
-const NEURAL_LINKS = Array.from({ length: 42 }, (_, index) => {
+const NEURAL_LINKS = Array.from({ length: 20 }, (_, index) => {
   const from = index % NEURAL_POINTS.length;
   const to = (index * 7 + 11) % NEURAL_POINTS.length;
   return [from, to] as const;
@@ -236,24 +244,103 @@ const BRAIN_CIRCUITS = [
   "M132 61 V83 H158",
   "M288 61 V83 H262",
   "M112 286 H153 V260 H193",
-  "M308 286 H267 V260 H227",
 ] as const;
 
 const BRAIN_NODES = [
-  [80, 124], [126, 91], [176, 67], [61, 169], [113, 143], [161, 112], [74, 221], [119, 194], [165, 166], [101, 266], [151, 238], [196, 214],
-  [340, 124], [294, 91], [244, 67], [359, 169], [307, 143], [259, 112], [346, 221], [301, 194], [255, 166], [319, 266], [269, 238], [224, 214],
+  [80, 124], [126, 91], [176, 67], [61, 169], [113, 143], [161, 112], [74, 221], [119, 194], [165, 166],
+  [340, 124], [294, 91], [244, 67], [359, 169], [307, 143], [259, 112], [346, 221], [301, 194], [255, 166],
 ] as const;
 
 type CorePhase = "brain" | "entering" | "core";
 
-function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
+type KnowledgeStrategy = readonly [string, string];
+type KnowledgeNode = { id: CoreAreaId; label: string; note: string; angle: number; strategies: readonly KnowledgeStrategy[] };
+
+function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOffice: () => void; accounts: CoreAccountInput[]; startDate: Date; endDate: Date }) {
   const [phase, setPhase] = useState<CorePhase>("brain");
+  const [selectedArea, setSelectedArea] = useState<CoreAreaId | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
+  const [animationsActive, setAnimationsActive] = useState(true);
   const transitionTimer = useRef<number | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
+  const brainRotationRef = useRef<HTMLSpanElement | null>(null);
+  const brainDragRef = useRef({ active: false, startX: 0, startY: 0, baseX: -6, baseY: 0 });
+  const brainMovedRef = useRef(false);
+  const brainFrameRef = useRef<number | null>(null);
+  const parallaxFrameRef = useRef<number | null>(null);
+  const parallaxValuesRef = useRef({ x: 0, y: 0 });
   const isCoreOpen = phase === "core";
+  const selectedNode = KNOWLEDGE_NODES.find((node) => node.id === selectedArea) || null;
+  const needsMedia = selectedArea === "traffic" || selectedArea === "finance" || selectedArea === "brand";
+  const needsDeals = selectedArea === "crm" || selectedArea === "commercial";
+  const needsSales = selectedArea === "commercial" || selectedArea === "finance";
+  const { data: workspace } = useWorkspace();
+  const mediaQuery = useInsights({ startDate, endDate, enabled: isCoreOpen && needsMedia });
+  const dealsQuery = useRDDealsForPeriod({ startDate, endDate, enabled: isCoreOpen && needsDeals });
+  const salesQuery = useSales({ startDate, endDate, enabled: isCoreOpen && needsSales });
+  const schedulesQuery = useQuery<CoreSchedule[]>({
+    queryKey: ["agent-core-schedules", workspace?.id],
+    enabled: isCoreOpen && selectedArea === "automations" && !!workspace?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_report_schedules")
+        .select("id, ad_account_id, name, enabled, next_run_at, last_status")
+        .eq("workspace_id", workspace!.id)
+        .order("next_run_at", { ascending: true, nullsFirst: false });
+      if (error) {
+        console.warn("Growdash core schedules unavailable:", error.message);
+        return [];
+      }
+      return (data || []) as CoreSchedule[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const configsQuery = useQuery<CoreAgentConfig[]>({
+    queryKey: ["agent-core-configs", workspace?.id],
+    enabled: isCoreOpen && !!selectedArea && !!workspace?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("intelligence_agent_configs")
+        .select("id, ad_account_id, specialty, objective, status, last_run_at")
+        .eq("workspace_id", workspace!.id)
+        .order("updated_at", { ascending: false });
+      if (error) {
+        console.warn("Growdash core agent configs unavailable:", error.message);
+        return [];
+      }
+      return (data || []) as CoreAgentConfig[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const summaries = useMemo(() => buildCoreAccountSummaries(selectedArea || "traffic", {
+    accounts,
+    insights: mediaQuery.data,
+    deals: dealsQuery.data,
+    sales: salesQuery.data,
+    schedules: schedulesQuery.data,
+    agentConfigs: configsQuery.data,
+  }), [accounts, configsQuery.data, dealsQuery.data, mediaQuery.data, schedulesQuery.data, selectedArea, salesQuery.data]);
+  const selectedStrategyLabel = selectedNode?.strategies.find(([, id]) => id === selectedStrategy)?.[0] || selectedNode?.strategies[0]?.[0] || "Visão geral";
+  const panelLoading = (needsMedia && mediaQuery.isFetching) || (needsDeals && dealsQuery.isFetching) || (needsSales && salesQuery.isFetching) || (selectedArea === "automations" && (schedulesQuery.isFetching || configsQuery.isFetching));
 
   useEffect(() => () => {
     if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
+    if (brainFrameRef.current !== null) window.cancelAnimationFrame(brainFrameRef.current);
+    if (parallaxFrameRef.current !== null) window.cancelAnimationFrame(parallaxFrameRef.current);
+  }, []);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const updateVisibility = () => setAnimationsActive(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", updateVisibility);
+    if (typeof IntersectionObserver === "undefined") return () => document.removeEventListener("visibilitychange", updateVisibility);
+    const observer = new IntersectionObserver(([entry]) => setAnimationsActive(entry.isIntersecting && document.visibilityState === "visible"), { threshold: 0.08 });
+    observer.observe(stage);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", updateVisibility);
+    };
   }, []);
 
   const enterCore = () => {
@@ -266,29 +353,72 @@ function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
     if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
     transitionTimer.current = null;
     setPhase("brain");
+    setSelectedArea(null);
+    setSelectedStrategy(null);
   };
 
   const updateParallax = (event: React.PointerEvent<HTMLElement>) => {
+    if (window.matchMedia?.("(pointer: coarse)").matches || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - .5) * 2));
     const y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - .5) * 2));
-    event.currentTarget.style.setProperty("--jarvis-bg-x", `${(x * 28).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-bg-y", `${(y * 18).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-grid-x", `${(x * -10).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-grid-y", `${(y * -8).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-field-x", `${(x * 12).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-field-y", `${(y * 9).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-brain-x", `${(x * 7).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-brain-y", `${(y * 5).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-point-x", `${(x * 8).toFixed(2)}px`);
-    event.currentTarget.style.setProperty("--jarvis-point-y", `${(y * 8 - 10).toFixed(2)}px`);
+    parallaxValuesRef.current = { x, y };
+    if (parallaxFrameRef.current !== null) return;
+    parallaxFrameRef.current = window.requestAnimationFrame(() => {
+      parallaxFrameRef.current = null;
+      const values = parallaxValuesRef.current;
+      const target = stageRef.current;
+      if (!target) return;
+      target.style.setProperty("--jarvis-bg-x", `${(values.x * 20).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-bg-y", `${(values.y * 14).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-grid-x", `${(values.x * -7).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-grid-y", `${(values.y * -5).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-field-x", `${(values.x * 8).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-field-y", `${(values.y * 6).toFixed(1)}px`);
+    });
   };
 
   const resetParallax = () => {
-    ["--jarvis-bg-x", "--jarvis-bg-y", "--jarvis-grid-x", "--jarvis-grid-y", "--jarvis-field-x", "--jarvis-field-y", "--jarvis-brain-x", "--jarvis-brain-y", "--jarvis-point-x", "--jarvis-point-y"].forEach((property) => stageRef.current?.style.setProperty(property, "0px"));
+    if (parallaxFrameRef.current !== null) window.cancelAnimationFrame(parallaxFrameRef.current);
+    parallaxFrameRef.current = null;
+    ["--jarvis-bg-x", "--jarvis-bg-y", "--jarvis-grid-x", "--jarvis-grid-y", "--jarvis-field-x", "--jarvis-field-y"].forEach((property) => stageRef.current?.style.setProperty(property, "0px"));
   };
 
-  return <section ref={stageRef} className={cn("jarvis-command-center", `is-${phase}`)} aria-label="Núcleo de inteligência Growdash" onPointerMove={updateParallax} onPointerLeave={resetParallax}>
+  const writeBrainRotation = (rotationX: number, rotationY: number) => {
+    if (brainFrameRef.current !== null) return;
+    brainFrameRef.current = window.requestAnimationFrame(() => {
+      brainFrameRef.current = null;
+      brainRotationRef.current?.style.setProperty("--brain-user-x", `${rotationX.toFixed(1)}deg`);
+      brainRotationRef.current?.style.setProperty("--brain-user-y", `${rotationY.toFixed(1)}deg`);
+    });
+  };
+
+  const startBrainDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
+    brainDragRef.current = { active: true, startX: event.clientX, startY: event.clientY, baseX: Number.parseFloat(brainRotationRef.current?.style.getPropertyValue("--brain-user-x") || "-6") || -6, baseY: Number.parseFloat(brainRotationRef.current?.style.getPropertyValue("--brain-user-y") || "0") || 0 };
+    brainMovedRef.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveBrainDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const drag = brainDragRef.current;
+    if (!drag.active) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 5) brainMovedRef.current = true;
+    writeBrainRotation(Math.max(-24, Math.min(24, drag.baseX - dy * .18)), drag.baseY + dx * .42);
+  };
+
+  const stopBrainDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
+    brainDragRef.current.active = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const openArea = (area: CoreAreaId, strategyId?: string) => {
+    setSelectedArea(area);
+    setSelectedStrategy(strategyId || KNOWLEDGE_NODES.find((node) => node.id === area)?.strategies[0]?.[1] || null);
+  };
+
+  return <section ref={stageRef} className={cn("jarvis-command-center growdash-core-v2", `is-${phase}`, !animationsActive && "is-paused")} aria-label="Núcleo de inteligência Growdash" onPointerMove={updateParallax} onPointerLeave={resetParallax}>
     <div className="knowledge-map-grid" />
     <div className="jarvis-scanline" aria-hidden="true" />
     <div className="jarvis-neural-field" aria-hidden="true">
@@ -302,45 +432,81 @@ function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
 
     {isCoreOpen && <svg className="jarvis-links" viewBox="0 0 1000 760" preserveAspectRatio="none" aria-hidden="true">
       <defs><linearGradient id="jarvis-link" x1="0" x2="1"><stop offset="0" stopColor="currentColor" stopOpacity=".12" /><stop offset=".5" stopColor="currentColor" stopOpacity=".95" /><stop offset="1" stopColor="currentColor" stopOpacity=".16" /></linearGradient></defs>
-      {KNOWLEDGE_NODES.map((node, index) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 335; const y = 380 + Math.sin(radians) * 285; const controlX = 500 + Math.cos(radians) * 170 + Math.sin(radians) * (index % 2 === 0 ? 34 : -34); const controlY = 380 + Math.sin(radians) * 145; return <g key={node.label} style={{ "--link-delay": `${index * -.28}s` } as React.CSSProperties}><path d={`M 500 380 Q ${controlX} ${controlY} ${x} ${y}`} stroke="url(#jarvis-link)" strokeWidth="2" strokeDasharray="7 11" fill="none" /><circle cx={x} cy={y} r="6" fill="currentColor" /><circle className="jarvis-node-halo" cx={x} cy={y} r="15" fill="none" stroke="currentColor" /></g>; })}
+      {KNOWLEDGE_NODES.map((node, index) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 335; const y = 380 + Math.sin(radians) * 285; const controlX = 500 + Math.cos(radians) * 170 + Math.sin(radians) * (index % 2 === 0 ? 34 : -34); const controlY = 380 + Math.sin(radians) * 145; return <g key={node.id} style={{ "--link-delay": `${index * -.28}s` } as React.CSSProperties}><path d={`M 500 380 Q ${controlX} ${controlY} ${x} ${y}`} stroke="url(#jarvis-link)" strokeWidth="2" strokeDasharray="7 11" fill="none" /><circle cx={x} cy={y} r="6" fill="currentColor" /><circle className="jarvis-node-halo" cx={x} cy={y} r="15" fill="none" stroke="currentColor" /></g>; })}
     </svg>}
 
-    <button type="button" onClick={enterCore} className="jarvis-brain" aria-label={isCoreOpen ? "Núcleo Growdash expandido" : "Entrar no núcleo Growdash"} aria-expanded={isCoreOpen} disabled={phase === "entering"}>
+    <button type="button" onClick={() => { if (!brainMovedRef.current) enterCore(); brainMovedRef.current = false; }} className="jarvis-brain" aria-label={isCoreOpen ? "Cérebro Growdash expandido" : "Entrar no cérebro Growdash"} aria-expanded={isCoreOpen} disabled={phase === "entering"}>
       <span className="jarvis-brain-aura" />
       <span className="jarvis-orbit orbit-one" /><span className="jarvis-orbit orbit-two" /><span className="jarvis-orbit orbit-three" />
-      <svg className="jarvis-cortex" viewBox="0 0 420 360" role="img" aria-label="Cérebro eletrônico Growdash">
-        <defs>
-          <linearGradient id="cortex-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brand-gold-light)" /><stop offset=".42" stopColor="var(--brand-gold)" /><stop offset="1" stopColor="var(--brand-bronze)" /></linearGradient>
-          <filter id="cortex-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-        </defs>
-        <path className="jarvis-cortex-lobe" d="M204 45C163 24 116 39 95 73C55 79 41 119 55 151C31 181 45 225 76 240C72 276 109 302 143 291C158 322 197 318 210 288V69C210 56 208 50 204 45Z" />
-        <path className="jarvis-cortex-lobe" d="M216 45C257 24 304 39 325 73C365 79 379 119 365 151C389 181 375 225 344 240C348 276 311 302 277 291C262 322 223 318 210 288V69C210 56 212 50 216 45Z" />
-        <path className="jarvis-cortex-midline" d="M210 65V291M180 300C190 327 184 342 170 354M240 300C230 327 236 342 250 354" />
-        {BRAIN_CIRCUITS.map((path, index) => <path key={path} className="jarvis-circuit-trace" d={path} style={{ "--circuit-delay": `${index * -.17}s` } as React.CSSProperties} />)}
-        <rect className="jarvis-cortex-chip" x="184" y="130" width="52" height="72" rx="8" />
-        <path className="jarvis-cortex-chip-lines" d="M194 143H226M194 155H226M194 167H226M194 179H226M174 143H184M174 160H184M174 177H184M236 143H246M236 160H246M236 177H246" />
-        {BRAIN_NODES.map(([x, y], index) => <circle key={`${x}-${y}`} className="jarvis-cortex-node" cx={x} cy={y} r={index % 3 === 0 ? 5 : 3.5} style={{ "--node-delay": `${index * -.11}s` } as React.CSSProperties} />)}
-      </svg>
+      <span ref={brainRotationRef} className="growdash-brain-user-rotation" onPointerDown={startBrainDrag} onPointerMove={moveBrainDrag} onPointerUp={stopBrainDrag} onPointerCancel={stopBrainDrag}>
+        <span className="growdash-brain-rotor">
+          <BrainSurface back />
+          <BrainSurface />
+        </span>
+      </span>
       <span className="jarvis-energy-core"><Cpu /><i /></span>
-      <span className="jarvis-brain-copy"><BrainCircuit className="h-7 w-7" /><b>JARVIS</b><small>{phase === "entering" ? "Sincronizando conexões…" : "Clique para entrar no núcleo"}</small></span>
+      <span className="jarvis-brain-copy"><BrainCircuit className="h-7 w-7" /><b>GROWDASH</b><small>{phase === "entering" ? "Sincronizando conexões…" : isCoreOpen ? "Núcleo operacional · arraste para orbitar" : "Clique para entrar no cérebro"}</small></span>
     </button>
 
     {isCoreOpen && <>
-      <div className="jarvis-core-label" aria-live="polite"><i className="brand-mark-tint jarvis-core-mark" /><span>GROWDASH</span><b>OPERATIONAL CORE</b><small>Inteligência conectada de ponta a ponta</small><em><Radar />Grafo vivo · {KNOWLEDGE_NODES.length} áreas · {KNOWLEDGE_NODES.reduce((total, node) => total + node.branches.length, 0)} estratégias</em></div>
+      <div className="jarvis-core-label" aria-live="polite"><Radar /><span>Grafo Growdash · {KNOWLEDGE_NODES.length} áreas · {KNOWLEDGE_NODES.reduce((total, node) => total + node.strategies.length, 0)} estratégias</span></div>
       {KNOWLEDGE_NODES.map((node, index) => {
         const radians = node.angle * Math.PI / 180;
-        return <article key={node.label} className="jarvis-arm" style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 37.5}%`, "--arm-delay": `${index * 70}ms` } as React.CSSProperties}>
-          <NavLink to={node.href} className="jarvis-arm-head"><span><Zap className="h-4 w-4" /></span><div><b>{node.label}</b><small>{node.note}</small></div><ChevronRight className="h-4 w-4" /></NavLink>
+        const active = selectedArea === node.id;
+        return <article key={node.id} className={cn("jarvis-arm", active && "is-selected")} style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 37.5}%`, "--arm-delay": `${index * 70}ms` } as React.CSSProperties}>
+          <button type="button" onClick={() => openArea(node.id)} className="jarvis-arm-head" aria-pressed={active}><span><Zap className="h-4 w-4" /></span><div><b>{node.label}</b><small>{node.note}</small></div><ChevronRight className="h-4 w-4" /></button>
           <div className="jarvis-branches" aria-label={`Estratégias de ${node.label}`}>
-            {node.branches.map(([label, href]) => <NavLink key={label} to={href} className="jarvis-branch"><i /><span>{label}</span></NavLink>)}
+            {node.strategies.map(([label, id]) => <button type="button" key={id} onClick={() => openArea(node.id, id)} className={cn("jarvis-branch", selectedStrategy === id && active && "is-selected")}><i /><span>{label}</span></button>)}
           </div>
         </article>;
       })}
       <div className="jarvis-actions"><button type="button" onClick={resetCore}><RotateCcw className="h-3.5 w-3.5" />Visão do cérebro</button><button type="button" onClick={onOpenOffice}><BriefcaseBusiness className="h-3.5 w-3.5" />Entrar no escritório 3D</button></div>
+      {selectedNode && <OperationalAreaPanel node={selectedNode} summaries={summaries} selectedStrategy={selectedStrategyLabel} loading={panelLoading} onClose={() => setSelectedArea(null)} onSelectStrategy={(id) => setSelectedStrategy(id)} />}
     </>}
 
     {!isCoreOpen && <div className="jarvis-intro"><b>Central de comando autônoma</b><span>Entre no cérebro operacional para navegar pelas áreas, conexões e estratégias da Growdash.</span><small><Sparkles />Experiência neural interativa</small></div>}
   </section>;
+}
+
+function BrainSurface({ back = false }: { back?: boolean }) {
+  return <svg className={cn("jarvis-cortex", back ? "is-back" : "is-front")} viewBox="0 0 420 360" role={back ? undefined : "img"} aria-label={back ? undefined : "Cérebro 3D Growdash"} aria-hidden={back}>
+    <defs>
+      <linearGradient id={back ? "cortex-metal-back" : "cortex-metal-front"} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brand-gold-light)" /><stop offset=".42" stopColor="var(--brand-gold)" /><stop offset="1" stopColor="var(--brand-bronze)" /></linearGradient>
+    </defs>
+    <path className="jarvis-cortex-lobe" fill={`url(#${back ? "cortex-metal-back" : "cortex-metal-front"})`} d="M204 45C163 24 116 39 95 73C55 79 41 119 55 151C31 181 45 225 76 240C72 276 109 302 143 291C158 322 197 318 210 288V69C210 56 208 50 204 45Z" />
+    <path className="jarvis-cortex-lobe" fill={`url(#${back ? "cortex-metal-back" : "cortex-metal-front"})`} d="M216 45C257 24 304 39 325 73C365 79 379 119 365 151C389 181 375 225 344 240C348 276 311 302 277 291C262 322 223 318 210 288V69C210 56 212 50 216 45Z" />
+    <path className="jarvis-cortex-midline" d="M210 65V291M180 300C190 327 184 342 170 354M240 300C230 327 236 342 250 354" />
+    {!back && <>
+      {BRAIN_CIRCUITS.map((path, index) => <path key={path} className="jarvis-circuit-trace" d={path} style={{ "--circuit-delay": `${index * -.17}s` } as React.CSSProperties} />)}
+      <rect className="jarvis-cortex-chip" x="184" y="130" width="52" height="72" rx="8" />
+      <path className="jarvis-cortex-chip-lines" d="M194 143H226M194 155H226M194 167H226M194 179H226M174 143H184M174 160H184M174 177H184M236 143H246M236 160H246M236 177H246" />
+      {BRAIN_NODES.map(([x, y], index) => <circle key={`${x}-${y}`} className="jarvis-cortex-node" cx={x} cy={y} r={index % 3 === 0 ? 5 : 3.5} style={{ "--node-delay": `${index * -.11}s` } as React.CSSProperties} />)}
+    </>}
+  </svg>;
+}
+
+function OperationalAreaPanel({ node, summaries, selectedStrategy, loading, onClose, onSelectStrategy }: { node: KnowledgeNode; summaries: ReturnType<typeof buildCoreAccountSummaries>; selectedStrategy: string; loading: boolean; onClose: () => void; onSelectStrategy: (id: string) => void }) {
+  return <aside className="growdash-core-panel" aria-label={`Inteligência de ${node.label}`}>
+    <header className="growdash-core-panel-header"><div><span className="growdash-core-kicker">NÚCLEO GROWDASH · {node.label.toUpperCase()}</span><h2>{node.label}</h2><p>{node.note}</p></div><button type="button" onClick={onClose} aria-label="Fechar análise da área"><X className="h-4 w-4" /></button></header>
+    <div className="growdash-core-strategies" role="tablist" aria-label={`Estratégias de ${node.label}`}>
+      {node.strategies.map(([label, id]) => <button type="button" key={id} role="tab" aria-selected={selectedStrategy === label} onClick={() => onSelectStrategy(id)} className={cn(selectedStrategy === label && "is-active")}><span>{label}</span><ChevronRight className="h-3 w-3" /></button>)}
+    </div>
+    <div className="growdash-core-panel-body">
+      <div className="growdash-core-panel-intro"><Radar className="h-4 w-4" /><span>{loading ? "Sincronizando sinais reais das contas…" : `Estratégia selecionada: ${selectedStrategy}`}</span></div>
+      {loading ? <div className="growdash-core-loading" aria-live="polite"><i /><i /><i /></div> : summaries.length ? <div className="growdash-core-account-list">{summaries.map((summary) => <article key={summary.id} className="growdash-core-account-card"><div className="growdash-core-account-heading"><div><b>{summary.name}</b><small>{summary.strategy}</small></div><span className={`is-${summary.health}`}>{summary.health === "healthy" ? "Em rota" : summary.health === "attention" ? "Atenção" : summary.health === "critical" ? "Risco" : "Sem dados"}</span></div><div className="growdash-core-metrics">{getAreaMetrics(node.id, summary).map((metric) => <div key={metric.label}><small>{metric.label}</small><b>{metric.value}</b></div>)}</div><p>{summary.strategyDetail}</p></article>)}</div> : <div className="growdash-core-empty"><Network className="h-5 w-5" /><p>Nenhuma conta acessível para esta área.</p></div>}
+    </div>
+  </aside>;
+}
+
+function getAreaMetrics(area: CoreAreaId, summary: ReturnType<typeof buildCoreAccountSummaries>[number]) {
+  const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+  const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
+  if (area === "traffic") return [{ label: "Investimento", value: money(summary.spend) }, { label: "Leads", value: integer.format(summary.leads) }, { label: "CPL", value: summary.cpl ? money(summary.cpl) : "—" }, { label: "Campanhas ativas", value: integer.format(summary.activeCampaigns) }];
+  if (area === "crm") return [{ label: "Negócios", value: integer.format(summary.deals) }, { label: "Ganhos", value: integer.format(summary.wonDeals) }, { label: "Pipeline", value: money(summary.pipeline) }, { label: "Rotinas", value: integer.format(summary.schedules) }];
+  if (area === "commercial") return [{ label: "Receita", value: money(summary.revenue) }, { label: "Vendas", value: integer.format(summary.sales) }, { label: "Ticket médio", value: summary.ticket ? money(summary.ticket) : "—" }, { label: "Melhor vendedor", value: summary.topSeller || "Sem atribuição" }];
+  if (area === "finance") return [{ label: "Receita", value: money(summary.revenue) }, { label: "Mídia", value: money(summary.spend) }, { label: "Resultado", value: money(summary.revenue - summary.spend) }, { label: "ROAS", value: summary.roas ? `${summary.roas.toFixed(2).replace(".", ",")}x` : "—" }];
+  if (area === "brand") return [{ label: "Impressões", value: integer.format(summary.impressions) }, { label: "Alcance", value: integer.format(summary.reach) }, { label: "CTR", value: summary.ctr ? `${summary.ctr.toFixed(2).replace(".", ",")}%` : "—" }, { label: "Campanha líder", value: summary.topCampaign || "Sem dados" }];
+  return [{ label: "Rotinas", value: integer.format(summary.schedules) }, { label: "Ativas", value: integer.format(summary.activeSchedules) }, { label: "Última estratégia", value: summary.strategy }, { label: "Execução", value: summary.activeSchedules > 0 ? "Monitorada" : "Pendente" }];
 }
 
 function StatusLegend({ color, label }: { color: string; label: string }) { return <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1"><i className={cn("h-2 w-2 rounded-full", color)} />{label}</span>; }
