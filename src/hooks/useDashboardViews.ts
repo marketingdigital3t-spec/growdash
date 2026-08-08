@@ -57,11 +57,16 @@ export function useSaveView() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, layout, widgets }: { id: string; layout: any[]; widgets: any[] }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("dashboard_views")
         .update({ layout, widgets, updated_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      // Supabase can return a successful empty update when RLS removes access.
+      // Do not close the editor or discard the draft unless the view was really saved.
+      if (!data) throw new Error("O dashboard não foi salvo. Verifique sua permissão e tente novamente.");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dashboard_view_global"] }),
   });

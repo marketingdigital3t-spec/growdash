@@ -24,6 +24,7 @@ import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useToast } from "@/hooks/use-toast";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
@@ -53,6 +54,7 @@ const Index = () => {
   const [draftView, setDraftView] = useState<DashboardView | null>(null);
   const originalViewRef = useRef<DashboardView | null>(null);
   const { setEditor } = useDashboardEditor();
+  const { toast } = useToast();
 
   const { data: adAccounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
@@ -205,8 +207,15 @@ const Index = () => {
         setIsEditing(false);
         setEditor(null);
       },
+      onError: (error) => {
+        toast({
+          title: "Não foi possível salvar o dashboard",
+          description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
+          variant: "destructive",
+        });
+      },
     });
-  }, [canEditDashboard, draftView, saveView, setEditor]);
+  }, [canEditDashboard, draftView, saveView, setEditor, toast]);
 
   const editorItems = useMemo(() => {
     const removable = (draftView?.widgets ?? [])
