@@ -21,6 +21,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 00:00 | `6b6830a` | Removido pré-carregamento indevido de rotas pesadas; recuperação de boot adicionada; TypeScript estabilizado. |
 | 08/08 00:26 | `96ea7dc` | Criação de agendamento WhatsApp corrigida para usar `local_time` e `include_metrics`, os nomes reais da tabela. |
 | 08/08 00:30 | `a0159a7` | Migration criada para permitir, por RLS, turmas personalizadas sem conta de anúncio nem funil RD. |
+| 08/08 00:47 | `aeb7cba` | Filtro de período do CRM passa a priorizar `stage_updated_at`, evitando que `closed_at` antigo esconda negócios movimentados no intervalo selecionado. Deploy Cloudflare: `https://b6bdb08d.growdash.pages.dev`. |
 
 ## Desempenho e carregamento
 
@@ -44,6 +45,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Build Vite: aprovado.
 - Playwright visual: telas de login mobile, tablet e desktop aprovadas; rotas autenticadas requerem credenciais E2E e foram puladas.
 - `npm audit`: nenhuma vulnerabilidade encontrada.
+- Playwright visual após a correção do CRM: 3 testes aprovados e 3 rotas autenticadas puladas por falta de `E2E_EMAIL`/`E2E_PASSWORD`.
 
 ## Pendências externas e limites de validação
 
