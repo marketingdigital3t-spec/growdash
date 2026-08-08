@@ -1907,8 +1907,14 @@
 .office-3d-stage .office-monitor { left: 53px; top: -24px; width: 38px; height: 27px; border-width: 2px; border-color: #454049; background: linear-gradient(135deg, #1d4960, #13212c); color: #bde7df; box-shadow: 0 4px 0 -2px #454049, 0 0 13px rgba(92, 210, 212, .22); }
 .office-3d-stage .office-keyboard { left: 47px; top: 16px; width: 48px; height: 13px; border-color: rgba(84, 62, 45, .6); background: #4b3a2c; }
 .office-3d-stage .office-desk small { bottom: 5px; color: rgba(255, 246, 216, .64); font-size: 6px; }
+.office-3d-stage .station-traffic { left: 25%; top: 42%; }.office-3d-stage .station-finance { right: 25%; top: 42%; }
+.office-3d-stage .station-sales { left: 32%; top: 56%; }.office-3d-stage .station-seo { right: 32%; top: 56%; }
+.office-3d-stage .station-funnel { left: 20%; top: 69%; }.office-3d-stage .station-creative { right: 20%; top: 69%; }
 .office-3d-stage .office-npc { width: 94px; height: 112px; scale: .78; transform-origin: center bottom; }
 .office-3d-stage .office-npc:hover { transform: translateY(-5px); }
+.office-3d-stage .npc-atlas { left: 27%; top: 45%; }.office-3d-stage .npc-fina { right: 27%; top: 45%; }
+.office-3d-stage .npc-dora { left: 35%; top: 59%; }.office-3d-stage .npc-otto { right: 35%; top: 59%; }
+.office-3d-stage .npc-nina { left: 22%; top: 72%; }.office-3d-stage .npc-milo { right: 22%; top: 72%; }
 .office-3d-stage .npc-label { top: -5px; bottom: auto; min-width: 96px; border-radius: 5px; background: rgba(34, 22, 15, .88); padding: 3px 5px; box-shadow: 0 5px 10px rgba(39, 26, 18, .24); }
 .office-3d-stage .npc-label b { font-size: 8px; }.office-3d-stage .npc-label small { font-size: 6px; }.office-3d-stage .npc-label em { font-size: 6px; }
 .office-3d-stage .npc-shadow { background: rgba(55, 40, 24, .34); }.office-3d-stage .npc-shirt { box-shadow: inset -7px 0 rgba(0, 0, 0, .15), 0 2px 0 rgba(255, 246, 216, .25); }
@@ -1931,6 +1937,12 @@
   .office-3d-stage .office-floor-grid { inset: 13% -9% -2%; }
   .office-room-shell { inset: 11% -6% 0; }
   .office-3d-stage .office-desk { scale: .78; }
+  .office-3d-stage .station-traffic { left: 18%; top: 36%; }.office-3d-stage .station-finance { right: 18%; top: 36%; }
+  .office-3d-stage .station-sales { left: 31%; top: 54%; }.office-3d-stage .station-seo { right: 31%; top: 54%; }
+  .office-3d-stage .station-funnel { left: 18%; top: 71%; }.office-3d-stage .station-creative { right: 18%; top: 71%; }
   .office-3d-stage .office-npc { scale: .62; }
+  .office-3d-stage .npc-atlas { left: 20%; top: 38%; }.office-3d-stage .npc-fina { right: 20%; top: 38%; }
+  .office-3d-stage .npc-dora { left: 33%; top: 56%; }.office-3d-stage .npc-otto { right: 33%; top: 56%; }
+  .office-3d-stage .npc-nina { left: 20%; top: 73%; }.office-3d-stage .npc-milo { right: 20%; top: 73%; }
   .office-zone { display: none; }
 }
