@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
@@ -43,6 +43,7 @@ async function invokeSyncFunction(name: string, body: Record<string, unknown>): 
 
 export function useSyncMeta() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: SyncParams) => {
@@ -72,6 +73,14 @@ export function useSyncMeta() {
       };
     },
     onSuccess: (data) => {
+      // Refresh every view that reads the synchronized daily/hourly rows,
+      // including the action totals used by Forms/site/conversation KPIs.
+      void queryClient.invalidateQueries({ queryKey: ["insights"] });
+      void queryClient.invalidateQueries({ queryKey: ["insights_hourly"] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      void queryClient.invalidateQueries({ queryKey: ["campaigns_full"] });
+      void queryClient.invalidateQueries({ queryKey: ["action-totals-by-ads"] });
+      void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
       toast({
         title: "Sincronização concluída!",
         description: `${data.synced} registros diários e ${data.hourly_synced} horários em ${data.accounts} conta(s).${data.errors?.length ? ` ⚠️ ${data.errors.length} aviso(s).` : ""}`,
