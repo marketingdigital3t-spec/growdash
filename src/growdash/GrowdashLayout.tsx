@@ -148,7 +148,6 @@ export default function GrowdashLayout() {
       "/marcas": permissions.canBrands,
       "/produtos": permissions.canProducts,
       "/integracoes": permissions.canIntegrations,
-      "/meta-connect": permissions.canMetaConnect,
       "/anuncios": permissions.canAnnouncements,
       "/usuarios": permissions.canUsers,
       "/agentes": permissions.canAgents,

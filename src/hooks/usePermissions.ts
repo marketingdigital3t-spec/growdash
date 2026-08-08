@@ -98,7 +98,9 @@ export function usePermissions() {
     canStorage: isMaster || fallbackPerm("can_storage"),
     canBrands: isMaster || fallbackPerm("can_brands"),
     canProducts: isMaster || fallbackPerm("can_products"),
-    canIntegrations: isMaster || fallbackPerm("can_integrations"),
+    // Meta Connect now lives in the integrations center. Keep legacy users
+    // with only the old Meta permission able to access the unified screen.
+    canIntegrations: isMaster || fallbackPerm("can_integrations") || fallbackPerm("can_meta_connect"),
     canMetaConnect: isMaster || fallbackPerm("can_meta_connect"),
     canAnnouncements: isMaster || fallbackPerm("can_announcements"),
     canUsers: isMaster || fallbackPerm("can_users"),

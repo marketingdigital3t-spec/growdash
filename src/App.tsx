@@ -216,7 +216,8 @@ export default function App() {
                     <Route path="marcas" element={<RequirePage page="brands"><ModulePage /></RequirePage>} />
                     <Route path="marcas/:brandId" element={<RequirePage page="brands">{analytics(<BrandDiagnosticPage />)}</RequirePage>} />
                     <Route path="marca" element={<Navigate to="/marcas" replace />} />
-                    <Route path="meta-connect" element={<RequirePage page="metaConnect"><ModulePage /></RequirePage>} />
+                    {/* Legacy URL: Meta Connect is now the paid tab in the unified integrations center. */}
+                    <Route path="meta-connect" element={<RequirePage page="integrations"><Navigate to="/integracoes?tab=paid" replace /></RequirePage>} />
                     <Route path="agentes" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
                     <Route path="ia-do-funil" element={<Navigate to="/crm?tab=ai" replace />} />
                     <Route path=":module" element={<ModulePage />} />

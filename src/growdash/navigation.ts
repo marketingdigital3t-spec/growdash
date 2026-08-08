@@ -291,14 +291,6 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: ["Meta Ads", "RD Station CRM", "Google Ads"],
       },
       {
-        label: "Meta Connect",
-        path: "/meta-connect",
-        icon: Cable,
-        description: "Gerencie Facebook, Instagram e contas de anúncio vinculadas ao workspace.",
-        metrics: [],
-        highlights: ["Login Facebook", "Contas de anúncio", "Perfis do Instagram"],
-      },
-      {
         label: "Usuários",
         path: "/usuarios",
         icon: UserCog,
