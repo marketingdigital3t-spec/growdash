@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
 import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
@@ -73,6 +73,39 @@ function LoadingModule() {
   </div>;
 }
 
+type AppErrorBoundaryState = { failed: boolean };
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBoundaryState> {
+  state: AppErrorBoundaryState = { failed: false };
+
+  static getDerivedStateFromError(): AppErrorBoundaryState {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // Keep diagnostic context in the browser without exposing it in the UI.
+    console.error("Growdash render error", error, info.componentStack);
+  }
+
+  retry = () => {
+    this.setState({ failed: false });
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.failed) {
+      return <div className="grid min-h-screen place-items-center bg-background px-4 text-center text-foreground">
+        <div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl">
+          <p className="text-lg font-black">Não foi possível abrir esta tela.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Uma atualização ou conexão instável pode ter interrompido o carregamento. Tente carregar a versão mais recente.</p>
+          <button type="button" onClick={this.retry} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Recarregar Growdash</button>
+        </div>
+      </div>;
+    }
+    return this.props.children;
+  }
+}
+
 function AuthenticatedLayout() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingModule />;
@@ -138,8 +171,9 @@ export default function App() {
           <Router>
             <AuthProvider>
               <AccentInitializer>
-                <Suspense fallback={<LoadingModule />}>
-                  <Routes>
+                <AppErrorBoundary>
+                  <Suspense fallback={<LoadingModule />}>
+                    <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />
@@ -188,8 +222,9 @@ export default function App() {
                     <Route path=":module" element={<ModulePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
-                  </Routes>
-                </Suspense>
+                    </Routes>
+                  </Suspense>
+                </AppErrorBoundary>
               </AccentInitializer>
             </AuthProvider>
           </Router>
