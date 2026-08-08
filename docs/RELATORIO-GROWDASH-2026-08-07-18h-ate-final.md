@@ -10,6 +10,7 @@ Status: encerrado às 10:00. Todas as alterações registradas abaixo foram vers
 | --- | --- | --- |
 | 08/08 13:24 | `8c27783` | Corrigida a causa dos blocos financeiros não editáveis: “Vendas por Pagamento” e “Distribuição por Plataforma” viraram widgets próprios; Margem, Recebíveis, Ticket Médio e Lucro passaram a ser recuperados individualmente nas views antigas. A migração é aditiva, preserva posições/KPIs personalizados e desloca o bloco legado para baixo para evitar sobreposição. |
 | 08/08 13:28 | `8c27783` → `f7e589ff.growdash.pages.dev` | TypeScript, ESLint, Vitest (21 arquivos/59 testes), build Vite e Playwright visual (3 públicos aprovados; 3 rotas autenticadas puladas sem credenciais) passaram. O commit foi enviado ao GitHub e publicado no Cloudflare Pages. |
+| 08/08 13:39 | `3a6cd16` → `1a8982d3.growdash.pages.dev` | A tela Comercial passou a ranquear vendedores separadamente em cada conta de anúncio, incluindo líder, pódio, classificação geral e zona de recuperação. A meta vem de `sales_goals` quando configurada; sem meta, o percentual é participação real na receita da conta. GitHub e Cloudflare publicados; os domínios raiz e `www` responderam com bundle JavaScript 200. |
 
 Verificação pós-publicação: `growdash.com.br` e `www.growdash.com.br` responderam HTML 200 e o bundle de entrada respondeu `application/javascript`. O cache temporário do Playwright foi removido novamente após o teste, recuperando aproximadamente 539 MB.
 
