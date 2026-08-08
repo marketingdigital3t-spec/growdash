@@ -57,7 +57,7 @@ export const Canvas = memo(function Canvas({
 
   return <div
     data-growdash-flow-canvas
-    className="absolute inset-0 touch-none overflow-hidden bg-[#fbfbfd] dark:bg-[#121212]"
+    className="growdash-flow-canvas absolute inset-0 touch-none overflow-hidden"
     style={{ cursor }}
     onPointerDown={onPointerDown}
     onPointerMove={onPointerMove}

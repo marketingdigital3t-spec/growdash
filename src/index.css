@@ -1946,3 +1946,144 @@
   .office-3d-stage .npc-nina { left: 20%; top: 73%; }.office-3d-stage .npc-milo { right: 20%; top: 73%; }
   .office-zone { display: none; }
 }
+
+/* Growdash Flow chrome -----------------------------------------------------
+   The Flow editor is rendered over a canvas, so its controls need their own
+   contrast contract.  These tokens intentionally follow the active theme and
+   accent preset instead of hardcoding slate/white values. */
+.growdash-flow-shell {
+  --flow-chrome-bg: hsl(var(--card) / .96);
+  --flow-chrome-fg: hsl(var(--foreground));
+  --flow-control-fg: hsl(var(--muted-foreground));
+  --flow-control-hover-bg: hsl(var(--accent) / .78);
+  --flow-control-hover-fg: hsl(var(--accent-foreground));
+  --flow-border: hsl(var(--border) / .92);
+  --flow-shadow: 0 18px 48px -26px rgba(0, 0, 0, .42);
+  color: var(--flow-chrome-fg);
+  border: 1px solid var(--flow-border);
+  background: hsl(var(--background));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .16);
+}
+
+.dark .growdash-flow-shell {
+  --flow-chrome-bg: hsl(var(--card) / .94);
+  --flow-chrome-fg: hsl(var(--foreground));
+  --flow-control-fg: hsl(var(--foreground) / .86);
+  --flow-control-hover-bg: hsl(var(--accent) / .9);
+  --flow-control-hover-fg: hsl(var(--accent-foreground));
+  --flow-border: hsl(var(--primary) / .25);
+  --flow-shadow: 0 18px 48px -26px rgba(0, 0, 0, .72);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .38);
+}
+
+.growdash-flow-canvas {
+  background: hsl(var(--background));
+}
+
+.dark .growdash-flow-canvas {
+  background: hsl(var(--background));
+}
+
+.growdash-flow-chrome {
+  color: var(--flow-chrome-fg);
+  border: 1px solid var(--flow-border);
+  background: var(--flow-chrome-bg);
+  box-shadow: var(--flow-shadow);
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.growdash-flow-control,
+.growdash-flow-danger-control,
+.growdash-flow-secondary-action,
+.growdash-flow-danger-action {
+  border: 1px solid transparent;
+  color: var(--flow-control-fg);
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.growdash-flow-control:hover:not(:disabled),
+.growdash-flow-control:focus-visible:not(:disabled) {
+  border-color: hsl(var(--primary) / .42);
+  background: var(--flow-control-hover-bg);
+  color: hsl(var(--primary));
+}
+
+.growdash-flow-control:active:not(:disabled),
+.growdash-flow-secondary-action:active:not(:disabled),
+.growdash-flow-danger-action:active:not(:disabled) {
+  transform: translateY(1px) scale(.98);
+}
+
+.growdash-flow-control:disabled {
+  color: hsl(var(--muted-foreground) / .42);
+}
+
+.growdash-flow-control-active,
+.growdash-flow-control[aria-pressed="true"] {
+  border-color: hsl(var(--primary) / .78) !important;
+  background: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  box-shadow: 0 8px 20px hsl(var(--primary) / .24);
+}
+
+.growdash-flow-danger-control:hover:not(:disabled),
+.growdash-flow-danger-control:focus-visible:not(:disabled),
+.growdash-flow-danger-action:hover:not(:disabled),
+.growdash-flow-danger-action:focus-visible:not(:disabled) {
+  border-color: hsl(var(--destructive) / .42);
+  background: hsl(var(--destructive) / .12);
+  color: hsl(var(--destructive));
+}
+
+.growdash-flow-tooltip {
+  border: 1px solid var(--flow-border);
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+}
+
+.growdash-flow-properties {
+  color: hsl(var(--foreground));
+}
+
+.growdash-flow-label {
+  color: hsl(var(--muted-foreground));
+}
+
+.growdash-flow-input {
+  border-color: hsl(var(--input));
+  background: hsl(var(--background) / .58);
+  color: hsl(var(--foreground));
+}
+
+.growdash-flow-input:hover {
+  border-color: hsl(var(--primary) / .4);
+}
+
+.growdash-flow-input:focus-visible {
+  border-color: hsl(var(--ring));
+  background: hsl(var(--background));
+}
+
+.growdash-flow-color-input {
+  border: 1px solid hsl(var(--input));
+  background: hsl(var(--background) / .58);
+}
+
+.growdash-flow-secondary-action {
+  border-color: hsl(var(--border));
+  background: hsl(var(--secondary) / .76);
+  color: hsl(var(--secondary-foreground));
+}
+
+.growdash-flow-secondary-action:hover:not(:disabled),
+.growdash-flow-secondary-action:focus-visible:not(:disabled) {
+  border-color: hsl(var(--primary) / .42);
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.growdash-flow-danger-action {
+  border-color: hsl(var(--destructive) / .38);
+  background: hsl(var(--destructive) / .08);
+  color: hsl(var(--destructive));
+}
