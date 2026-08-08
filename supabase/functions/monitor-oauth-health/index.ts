@@ -43,7 +43,9 @@ async function checkMetaToken(token: string, appId?: string, appSecret?: string)
 
   const data = payload?.data ?? {};
   const permissions = Array.isArray(data.scopes) ? data.scopes.map(String) : [];
-  const missing = ["ads_read"].filter((permission) => !permissions.includes(permission));
+  // A healthy connection must be able to read both delivery metrics and the
+  // lead/conversation events used by Growdash reports.
+  const missing = ["ads_read", "leads_retrieval"].filter((permission) => !permissions.includes(permission));
   const status: HealthStatus = data.is_valid !== true
     ? "expired"
     : missing.length > 0
