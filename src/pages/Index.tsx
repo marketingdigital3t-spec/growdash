@@ -350,11 +350,11 @@ const Index = () => {
         </DashboardProvider>
       )}
 
-      <SalesDialog
-        open={salesDialogOpen}
-        onOpenChange={(o) => { setSalesDialogOpen(o); if (!o) setEditingSale(null); }}
-        editingSale={editingSale}
-      />
+      {salesDialogOpen && <SalesDialog
+          open
+          onOpenChange={(o) => { setSalesDialogOpen(o); if (!o) setEditingSale(null); }}
+          editingSale={editingSale}
+        />}
     </MotionPage>
   );
 };
