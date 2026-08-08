@@ -5,14 +5,14 @@ import { metricDescription } from "@/lib/metricPresentation";
 
 export function PageHeading({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description: string; actions?: ReactNode }) {
   return (
-    <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div className="page-heading mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div>
         {eyebrow && <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[.2em] text-primary">{eyebrow}</p>}
         <h1 className="text-2xl font-black tracking-tight text-[#171512] dark:text-[#f4f1e9] sm:text-3xl">{title}</h1>
         <p className="mt-1 max-w-2xl text-sm text-[#77716a] dark:text-[#aaa398]">{description}</p>
       </div>
       {actions ? (
-        <div className="flex w-full min-w-0 [&>*]:w-full md:w-auto md:[&>*]:w-auto">{actions}</div>
+        <div className="page-heading-actions flex w-full min-w-0 [&>*]:w-full md:w-auto md:[&>*]:w-auto">{actions}</div>
       ) : (
         <div className="flex w-full flex-col gap-2 min-[420px]:flex-row md:w-auto">
           <button className="gd-button"><CalendarRange className="h-4 w-4" /> Últimos 30 dias</button>

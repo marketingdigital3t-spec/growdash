@@ -33,7 +33,7 @@ export function MetaTableControls({ preset, columns, breakdown, onPreset, onColu
   const selectSaved = (item: any) => { const config = item.config ?? {}; if (config.preset) onPreset(config.preset); if (Array.isArray(config.columns)) onColumns(new Set(config.columns)); if (config.breakdown) onBreakdown(config.breakdown); toast({ title: `Visualização “${item.name}” aplicada` }); };
   const toggle = (column: CampaignColumnKey, checked: boolean) => { const next = new Set(columns); if (checked) next.add(column); else next.delete(column); onColumns(next); };
   const selectedPreset = getMetaColumnPreset(preset);
-  return <div className="flex flex-wrap items-center gap-2">
+  return <div className="campaign-columns-control flex flex-wrap items-center gap-2">
     <DropdownMenu>
       <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="meta-toolbar-button"><Columns3 className="h-4 w-4" />Colunas: {selectedPreset.label}</Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[78vh] w-[360px] overflow-y-auto">

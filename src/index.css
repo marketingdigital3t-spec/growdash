@@ -872,6 +872,128 @@
     z-index: 50;
   }
 
+  /* Barras do gerenciador de campanhas: no desktop preservam a densidade do
+     Meta Ads; no celular os mesmos controles viram uma grade previsível, sem
+     empurrar o conteúdo para fora da tela ou depender de uma scrollbar. */
+  @media (max-width: 767px) {
+    .campaigns-workspace .campaign-scope-toolbar {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+      overflow-x: visible;
+      white-space: normal;
+    }
+
+    .campaigns-workspace .campaign-scope-toolbar > .campaign-scope-action {
+      width: 100%;
+      min-width: 0;
+      justify-content: flex-start;
+      white-space: normal;
+      line-height: 1.15;
+    }
+
+    .campaigns-workspace .campaign-scope-toolbar > .meta-toolbar-primary {
+      grid-column: 1 / -1;
+      margin-left: 0;
+      justify-content: center;
+    }
+
+    .campaigns-workspace .campaign-tabs-header {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      overflow-x: visible;
+    }
+
+    .campaigns-workspace .campaign-tabs-header [role="tablist"] {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .campaigns-workspace .campaign-tabs-header [role="tab"] {
+      width: 100%;
+      min-width: 0;
+      min-height: 3.5rem;
+      padding: .45rem .35rem;
+      white-space: normal;
+      line-height: 1.15;
+      text-align: center;
+    }
+
+    .campaigns-workspace .campaign-date-filter {
+      width: 100%;
+      margin-left: 0;
+      padding: .4rem .75rem .5rem;
+    }
+
+    .campaigns-workspace .campaign-date-filter > div,
+    .campaigns-workspace .campaign-date-filter .gd-filter-strip,
+    .campaigns-workspace .campaign-date-filter .gd-filter-date {
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+
+    .campaigns-workspace .campaign-actions-toolbar {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+      overflow: visible;
+      white-space: normal;
+    }
+
+    .campaigns-workspace .campaign-primary-actions,
+    .campaigns-workspace .campaign-secondary-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      min-width: 0;
+      gap: .5rem;
+    }
+
+    .campaigns-workspace .campaign-primary-actions,
+    .campaigns-workspace .campaign-secondary-actions {
+      grid-column: 1 / -1;
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .campaigns-workspace .campaign-action-button,
+    .campaigns-workspace .campaign-action-select,
+    .campaigns-workspace .campaign-columns-control,
+    .campaigns-workspace .campaign-columns-control > button {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: none;
+    }
+
+    .campaigns-workspace .campaign-action-button {
+      min-height: 2.5rem;
+      height: auto;
+      padding-inline: .55rem;
+      white-space: normal;
+      line-height: 1.15;
+    }
+
+    .campaigns-workspace .campaign-action-select {
+      min-height: 2.5rem;
+      height: auto;
+      white-space: normal;
+    }
+
+    .campaigns-workspace .campaign-columns-control {
+      grid-column: 1 / -1;
+      display: block;
+    }
+
+    .campaigns-workspace .campaign-secondary-actions > span {
+      width: 100%;
+      min-width: 0;
+      grid-column: 1 / -1;
+    }
+  }
+
   .dark .campaign-total-bar {
     border-top-color: rgba(222, 161, 35, .42);
     background:
@@ -1434,6 +1556,27 @@
   }
 
   .growdash-main :where(button, a, input, select, textarea) {
+    max-width: 100%;
+  }
+
+  /* Ações de cabeçalho nunca devem manter min-width herdado de desktop. Cada
+     controle ocupa a largura disponível e pode ser usado com uma só mão. */
+  .page-heading-actions,
+  .page-heading-actions > * {
+    width: 100%;
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  .page-heading-actions > .flex.flex-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .5rem;
+  }
+
+  .page-heading-actions :where(button, select, [role="combobox"]) {
+    width: 100% !important;
+    min-width: 0 !important;
     max-width: 100%;
   }
 

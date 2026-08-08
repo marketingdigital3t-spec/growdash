@@ -79,7 +79,7 @@ export function MetaCampaignCreator({ open, accounts, defaultAccountId, onOpenCh
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="max-h-[min(90dvh,760px)] w-[calc(100vw-1rem)] overflow-y-auto p-4 sm:max-w-xl sm:p-6">
         <DialogHeader>
           <DialogTitle>Criar campanha</DialogTitle>
           <DialogDescription>A campanha será criada pausada. Nada será publicado ou começará a gastar automaticamente.</DialogDescription>

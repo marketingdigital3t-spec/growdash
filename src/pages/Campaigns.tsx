@@ -766,13 +766,13 @@ export default function Campaigns() {
           </div>
         </div>
 
-        <div className="growdash-scrollbar-hidden flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
-          <Button variant="outline" size="sm" className="meta-toolbar-button meta-toolbar-button-active shrink-0"><FolderOpen className="h-3.5 w-3.5" />Todos os anúncios</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Megaphone className="h-3.5 w-3.5" />Anúncios ativos</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0"><ShieldCheck className="h-3.5 w-3.5" />Ações</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Eye className="h-3.5 w-3.5" />Tiveram veiculação</Button>
-          <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-2 text-[11px]"><Plus className="h-3.5 w-3.5" />Ver mais</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-primary ml-auto shrink-0"><SlidersHorizontal className="h-3.5 w-3.5" />Criar visualização</Button>
+        <div className="campaign-scope-toolbar growdash-scrollbar-hidden flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button meta-toolbar-button-active shrink-0"><FolderOpen className="h-3.5 w-3.5" />Todos os anúncios</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Megaphone className="h-3.5 w-3.5" />Anúncios ativos</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0"><ShieldCheck className="h-3.5 w-3.5" />Ações</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Eye className="h-3.5 w-3.5" />Tiveram veiculação</Button>
+          <Button variant="ghost" size="sm" className="campaign-scope-action h-8 shrink-0 gap-2 text-[11px]"><Plus className="h-3.5 w-3.5" />Ver mais</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-primary ml-auto shrink-0"><SlidersHorizontal className="h-3.5 w-3.5" />Criar visualização</Button>
         </div>
 
         <div className="border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
@@ -787,8 +787,8 @@ export default function Campaigns() {
 
       <MotionItem className={cn(!analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn(!analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
-          <div className="growdash-scrollbar-hidden flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
-            <TabsList className="h-auto w-max min-w-0 shrink-0 justify-start rounded-none bg-transparent p-0">
+          <div className="campaign-tabs-header growdash-scrollbar-hidden flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
+            <TabsList className="campaign-tabs-list h-auto w-max min-w-0 shrink-0 justify-start rounded-none bg-transparent p-0">
               <TabsTrigger value="campaigns" className="h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
                 <FolderKanban className="h-3.5 w-3.5" /> Campanhas ({filtered.length})
               </TabsTrigger>
@@ -799,20 +799,20 @@ export default function Campaigns() {
                 <RectangleHorizontal className="h-3.5 w-3.5" /> Anúncios ({selectedAds.length})
               </TabsTrigger>
             </TabsList>
-            <div className="ml-auto flex shrink-0 items-center px-2 py-1.5">
+            <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5">
               <div className="w-[205px] [&_.gd-filter-date]:!w-full [&_.gd-filter-date]:!min-w-0 [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[10px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
             </div>
           </div>
 
-          <div className="growdash-scrollbar-hidden flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
-            <div className="flex shrink-0 items-center gap-2">
-              <Button size="sm" className="h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
-              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
-              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
-              <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
-              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
+          <div className="campaign-actions-toolbar growdash-scrollbar-hidden flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
+            <div className="campaign-primary-actions flex shrink-0 items-center gap-2">
+              <Button size="sm" className="campaign-action-button h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
+              <Button variant="outline" size="sm" className="campaign-action-button meta-toolbar-button" disabled={selectedIds.size === 0}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
+              <Button variant="outline" size="sm" className="campaign-action-button meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
+              <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="campaign-action-select h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
+              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="campaign-action-button meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
             </div>
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="campaign-secondary-actions ml-auto flex shrink-0 items-center gap-2">
               {activeTab === "campaigns" && <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn("meta-toolbar-button", analysisPanel && "meta-toolbar-button-active")}><BarChart3 className="h-3.5 w-3.5" />Análises<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -821,7 +821,7 @@ export default function Campaigns() {
                 </DropdownMenuContent>
               </DropdownMenu>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
-              {activeTab === "campaigns" && <Button variant="outline" size="sm" className={cn("meta-toolbar-button", columnFiltersOpen && "meta-toolbar-button-active")} onClick={() => setColumnFiltersOpen((open) => !open)}><SlidersHorizontal className="h-3.5 w-3.5" />Filtros por coluna{activeColumnFilterCount > 0 && <Badge className="ml-1 h-4 min-w-4 px-1 text-[8px]">{activeColumnFilterCount}</Badge>}</Button>}
+              {activeTab === "campaigns" && <Button variant="outline" size="sm" className={cn("campaign-action-button meta-toolbar-button", columnFiltersOpen && "meta-toolbar-button-active")} onClick={() => setColumnFiltersOpen((open) => !open)}><SlidersHorizontal className="h-3.5 w-3.5" />Filtros por coluna{activeColumnFilterCount > 0 && <Badge className="ml-1 h-4 min-w-4 px-1 text-[8px]">{activeColumnFilterCount}</Badge>}</Button>}
             </div>
           </div>
 
