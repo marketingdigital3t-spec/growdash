@@ -22,7 +22,7 @@ async function graphJson(url: URL) {
 }
 
 async function mediaInsights(base: string, mediaId: string, token: string) {
-  const metrics = ["reach", "saved", "shares", "total_interactions", "views"];
+  const metrics = ["reach", "saved", "shares", "total_interactions", "views", "ig_reels_avg_watch_time", "ig_reels_video_view_total_time", "video_retention_rate"];
   const result: Record<string, number> = {};
   const combined = new URL(`${base}/${mediaId}/insights`);
   combined.searchParams.set("metric", metrics.join(","));
@@ -113,6 +113,8 @@ Deno.serve(async (req) => {
         saves,
         shares,
         video_views: Number(insights.views ?? 0),
+        average_watch_time: Number(insights.ig_reels_avg_watch_time ?? 0) || null,
+        video_retention_rate: Number(insights.video_retention_rate ?? 0) || null,
         interactions,
         engagement_rate: reach > 0 ? (interactions / reach) * 100 : 0,
         raw_metrics: insights,

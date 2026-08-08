@@ -41,6 +41,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import AgentsOfficePage from "./AgentsOfficePage";
 import { useToast } from "@/hooks/use-toast";
+import { useMetaOAuth } from "@/hooks/useMetaOAuth";
+import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
+import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type TabOption = { id: string; label: string };
 
@@ -525,15 +529,20 @@ function BrandsModule() {
 
 function MetaConnectModule() {
   const [tab, setTab] = useState("dashboard");
+  const [manualOpen, setManualOpen] = useState(false);
   const { data: accounts = [], isLoading } = useAdAccounts();
+  const { data: socialAccounts = [] } = useQuery({ queryKey: ["social_accounts"], queryFn: async () => { const { data, error } = await supabase.from("social_accounts").select("id,username,display_name,connection_status,last_sync_at").order("created_at", { ascending: false }); if (error) throw error; return data || []; }, retry: false });
+  const connectMeta = useMetaOAuth();
+  const connectInstagram = useInstagramOAuth();
   const connected = useMemo(() => accounts.filter((account) => account.status !== "disconnected"), [accounts]);
   return (
-    <Page title="Meta Connect" description="Gerencie Facebook, Instagram e contas de anúncio vinculadas à Growdash." action={<Link to="/integracoes" className="gold-action"><Facebook className="h-4 w-4" /> Conectar com Facebook</Link>}>
+    <Page title="Meta Connect" description="Uma conexão única para Facebook, contas de anúncio e Instagram profissional." action={<div className="flex flex-wrap gap-2"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Facebook…" : "Entrar com Facebook"}</Button><Button variant="outline" onClick={() => setManualOpen(true)}>ID e token</Button></div>}>
       <Tabs options={[{ id: "dashboard", label: "Dashboard" }, { id: "accounts", label: "Contas de anúncio" }, { id: "instagram", label: "Instagram" }, { id: "settings", label: "Configurações" }]} value={tab} onChange={setTab} />
-      {tab === "dashboard" && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><ConnectionCard icon={<Facebook />} label="Facebook" value={connected.length ? "Conectado" : "Desconectado"} /><ConnectionCard icon={<Instagram />} label="Perfis Instagram" value="Verificar conexão" /><ConnectionCard icon={<CircleDot />} label="Contas de anúncio" value={isLoading ? "Carregando…" : String(connected.length)} /><ConnectionCard icon={<Clock3 />} label="Última sincronização" value="Consulte Integrações" /></div>}
+      {tab === "dashboard" && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><ConnectionCard icon={<Facebook />} label="Facebook" value={connected.length ? "Conectado" : "Desconectado"} /><ConnectionCard icon={<Instagram />} label="Perfis Instagram" value={socialAccounts.length ? `${socialAccounts.length} conectado(s)` : "Não conectado"} /><ConnectionCard icon={<CircleDot />} label="Contas de anúncio" value={isLoading ? "Carregando…" : String(connected.length)} /><ConnectionCard icon={<Clock3 />} label="Última sincronização" value={connected.length || socialAccounts.length ? "Automática após o login" : "Aguardando conexão"} /></div>}
       {tab === "accounts" && (connected.length ? <div className="grid gap-3 md:grid-cols-2">{connected.map((account) => <article key={account.id} className="gd-panel flex items-center gap-3 p-4"><span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-500/10 text-blue-400"><Facebook className="h-5 w-5" /></span><div className="min-w-0 grow"><b className="block truncate text-sm">{account.name}</b><span className="text-xs text-muted-foreground">{account.account_id}</span></div><span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-black text-emerald-400">Conectada</span></article>)}</div> : <EmptyState icon={<Facebook className="h-6 w-6" />} title="Nenhuma conta Meta conectada" description="Use o login oficial da Meta ou a conexão manual segura disponível em Integrações." action={<Link to="/integracoes" className="gold-action">Abrir integrações <ArrowRight className="h-4 w-4" /></Link>} />)}
-      {tab === "instagram" && <EmptyState icon={<Instagram className="h-6 w-6" />} title="Perfis do Instagram" description="Os perfis comerciais autorizados pela conta Meta aparecerão aqui após a sincronização." action={<Link to="/midia-social" className="gd-button">Abrir Mídia Social <ArrowRight className="h-4 w-4" /></Link>} />}
+      {tab === "instagram" && (socialAccounts.length ? <div className="grid gap-3 md:grid-cols-2">{socialAccounts.map((account: any) => <article key={account.id} className="gd-panel flex items-center gap-3 p-4"><span className="grid h-10 w-10 place-items-center rounded-xl bg-pink-500/10 text-pink-400"><Instagram className="h-5 w-5" /></span><div className="min-w-0 grow"><b className="block truncate text-sm">{account.display_name}</b><span className="text-xs text-muted-foreground">@{account.username || "perfil"} · {account.connection_status}</span></div><Link to="/midia-social" className="gd-button">Analisar</Link></article>)}</div> : <EmptyState icon={<Instagram className="h-6 w-6" />} title="Perfis do Instagram" description="Conecte sua conta profissional para importar seguidores, crescimento, Reels e retenção de vídeo." action={<Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Abrindo Instagram…" : "Conectar Instagram"}</Button>} />)}
       {tab === "settings" && <div className="gd-panel divide-y divide-border"><SettingRow title="Sincronização automática" description="Atualiza contas autorizadas sem expor tokens no navegador." /><SettingRow title="Permissões Meta" description="ads_read, ads_management, business_management e leads_retrieval." /><SettingRow title="Saúde dos tokens" description="Audite expiração, permissões e falhas de acesso." /></div>}
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Conexão manual Meta</DialogTitle></DialogHeader><MetaManualConnectionCard onConnected={() => setManualOpen(false)} /></DialogContent></Dialog>
     </Page>
   );
 }

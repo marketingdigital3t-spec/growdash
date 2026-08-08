@@ -13,15 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { cn } from "@/lib/utils";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 
 type InsightRow = { date?: string | null; spend?: number | null; leads?: number | null; impressions?: number | null; clicks?: number | null; reach?: number | null; cpm?: number | null; frequency?: number | null; conversion_rate?: number | null };
-export type MetricId = "spend" | "leads" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
+export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
 export type ReportTotals = Record<MetricId, number>;
 export type ReportSnapshot = { title: string; accountName: string; dateFrom: string; dateTo: string; metrics: MetricId[]; banner?: string; totals: ReportTotals; daily: Array<{ date: string; leads: number; spend: number }>; weekly: Array<{ week: string; leads: number; spend: number; days: number }> };
 
 const METRICS: Array<{ id: MetricId; label: string; description: string }> = [
   { id: "spend", label: "Investimento", description: "Valor gasto pela Meta no período selecionado." },
-  { id: "leads", label: "Leads Meta", description: "Resultados de lead atribuídos pela Meta Ads." },
+  { id: "leads", label: "Leads Meta", description: "Forms, site e conversas iniciadas atribuídos pela Meta Ads." },
+  { id: "conversations", label: "Conversas iniciadas", description: "Evento onsite_conversion.messaging_conversation_started_7d da Meta Ads." },
   { id: "cpl", label: "CPL", description: "Investimento dividido pelos leads Meta." },
   { id: "impressions", label: "Impressões", description: "Total de vezes que os anúncios foram exibidos." },
   { id: "reach", label: "Alcance", description: "Quantidade estimada de pessoas únicas alcançadas." },
@@ -48,7 +50,7 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { preset, setPreset, customRange, setCustomRange } = useGlobalFilters();
-  const [selected, setSelected] = useState<MetricId[]>(["spend", "leads", "cpl", "impressions", "clicks", "rd", "sales", "revenue"]);
+  const [selected, setSelected] = useState<MetricId[]>(["spend", "leads", "conversations", "cpl", "impressions", "clicks", "rd", "sales", "revenue"]);
   const [presenting, setPresenting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -65,7 +67,11 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const filteredInsights = useMemo(() => insights.filter((row) => !row.date || (row.date >= reportFrom && row.date <= reportTo)), [insights, reportFrom, reportTo]);
   const filteredDeals = useMemo(() => deals.filter((row) => !row.lead_created_at || (row.lead_created_at.slice(0, 10) >= reportFrom && row.lead_created_at.slice(0, 10) <= reportTo)), [deals, reportFrom, reportTo]);
   const filteredSales = useMemo(() => sales.filter((row) => row.sale_date >= reportFrom && row.sale_date <= reportTo), [sales, reportFrom, reportTo]);
-  const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales), [filteredDeals, filteredInsights, filteredSales]);
+  const adIds = useMemo(() => Array.from(new Set(filteredInsights.map((row: any) => row.ad_id).filter(Boolean))), [filteredInsights]);
+  const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row: any) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
+  const { data: actionData } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId);
+  const conversations = actionData?.totals?.["onsite_conversion.messaging_conversation_started_7d"] || 0;
+  const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, conversations), [conversations, filteredDeals, filteredInsights, filteredSales]);
   const daily = useMemo(() => dailyRows(filteredInsights), [filteredInsights]);
   const weekly = useMemo(() => weeklyRows(daily), [daily]);
   const snapshot = useMemo<ReportSnapshot>(() => ({ title: `Relatório de performance — ${accountName || "Conta selecionada"}`, accountName: accountName || "Conta selecionada", dateFrom: reportFrom, dateTo: reportTo, metrics: selected, banner, totals, daily, weekly }), [accountName, banner, daily, reportFrom, reportTo, selected, totals, weekly]);
@@ -152,9 +158,9 @@ export function ReportPresentation({ report, onClose, shareUrl, onCopy }: { repo
   </div>;
 }
 
-function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[]): ReportTotals {
+function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[], conversations = 0): ReportTotals {
   const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-  const leads = insights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+  const leads = insights.reduce((sum, row) => sum + Number(row.leads || 0), 0) + conversations;
   const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
   const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
@@ -165,6 +171,7 @@ function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[]
   return {
     spend,
     leads,
+    conversations,
     cpl: leads ? spend / leads : 0,
     impressions,
     reach,

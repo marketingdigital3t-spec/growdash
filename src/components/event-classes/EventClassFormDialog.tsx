@@ -29,6 +29,7 @@ const STATUS_OPTIONS: { value: EventClassStatus; label: string }[] = [
 
 export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) {
   const { data: accounts } = useAdAccounts();
+  const [sourceMode, setSourceMode] = useState<"rd" | "custom">("rd");
   const [adAccountId, setAdAccountId] = useState<string>("");
   const { data: funnels } = useRDFunnels(adAccountId || undefined);
   const [funnelId, setFunnelId] = useState<string>("");
@@ -54,8 +55,10 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
 
   useEffect(() => {
     if (eventClass) {
-      setAdAccountId(eventClass.ad_account_id);
-      setFunnelId(eventClass.rd_funnel_id);
+      const isCustom = !eventClass.ad_account_id && !eventClass.rd_funnel_id;
+      setSourceMode(isCustom ? "custom" : "rd");
+      setAdAccountId(eventClass.ad_account_id || "");
+      setFunnelId(eventClass.rd_funnel_id || "");
       setModelFunnelId(eventClass.rd_model_patient_funnel_id || "");
       setForm({
         title: eventClass.title,
@@ -71,6 +74,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
         notes: eventClass.notes || "",
       });
     } else if (open) {
+      setSourceMode("rd");
       setAdAccountId(accounts?.[0]?.id || "");
       setFunnelId("");
       setModelFunnelId("");
@@ -90,11 +94,15 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
   };
 
   const handleSubmit = async () => {
-    if (!adAccountId || !funnelId || !form.title || !form.date_start) {
+    if (!form.title || !form.date_start || (sourceMode === "rd" && (!adAccountId || !funnelId))) {
       toast({ title: "Preencha os campos obrigatórios", variant: "destructive" });
       return;
     }
-    if (form.has_model_patients && (!modelFunnelId || form.max_model_patients <= 0)) {
+    if (form.has_model_patients && form.max_model_patients <= 0) {
+      toast({ title: "Informe a quantidade de pacientes-modelo", variant: "destructive" });
+      return;
+    }
+    if (sourceMode === "rd" && form.has_model_patients && !modelFunnelId) {
       toast({ title: "Configure o funil e a quantidade de pacientes-modelo", variant: "destructive" });
       return;
     }
@@ -109,12 +117,12 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
         has_model_patients: form.has_model_patients,
         max_model_patients: form.has_model_patients ? form.max_model_patients : 0,
         status: form.status,
-        allowed_student_stage_ids: form.allowed_student_stage_ids,
-        allowed_model_patient_stage_ids: form.has_model_patients ? form.allowed_model_patient_stage_ids : [],
+        allowed_student_stage_ids: sourceMode === "rd" ? form.allowed_student_stage_ids : [],
+        allowed_model_patient_stage_ids: sourceMode === "rd" && form.has_model_patients ? form.allowed_model_patient_stage_ids : [],
         notes: form.notes || null,
-        ad_account_id: adAccountId,
-        rd_funnel_id: funnelId,
-        rd_model_patient_funnel_id: form.has_model_patients ? modelFunnelId : null,
+        ad_account_id: sourceMode === "rd" ? adAccountId : null,
+        rd_funnel_id: sourceMode === "rd" ? funnelId : null,
+        rd_model_patient_funnel_id: sourceMode === "rd" && form.has_model_patients ? modelFunnelId : null,
       };
       if (eventClass) {
         await update.mutateAsync({ id: eventClass.id, ...payload });
@@ -177,28 +185,36 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Conta de anúncio *</Label>
-              <Select value={adAccountId} onValueChange={(v) => { setAdAccountId(v); setFunnelId(""); setModelFunnelId(""); }}>
-                <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                <SelectContent>
-                  {(accounts || []).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Funil de pessoas (RD) *</Label>
-              <Select value={funnelId} onValueChange={setFunnelId} disabled={!adAccountId}>
-                <SelectTrigger><SelectValue placeholder="Selecionar funil" /></SelectTrigger>
-                <SelectContent>
-                  {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          <div className="rounded-md border border-border p-3">
+            <Label className="mb-2 block">Origem da turma *</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setSourceMode("rd")} className={`rounded-lg border p-3 text-left text-xs transition ${sourceMode === "rd" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"}`}><b className="block">RD Station</b><span className="mt-1 block text-[10px] text-muted-foreground">Vincula pessoas e etapas a um funil.</span></button>
+              <button type="button" onClick={() => { setSourceMode("custom"); setFunnelId(""); setModelFunnelId(""); }} className={`rounded-lg border p-3 text-left text-xs transition ${sourceMode === "custom" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"}`}><b className="block">Personalizado</b><span className="mt-1 block text-[10px] text-muted-foreground">Crie a turma sem conta de anúncio nem funil.</span></button>
             </div>
           </div>
 
-          {funnelId && (stages?.length ?? 0) > 0 && (
+          {sourceMode === "rd" && <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Conta de anúncio *</Label>
+                <Select value={adAccountId} onValueChange={(v) => { setAdAccountId(v); setFunnelId(""); setModelFunnelId(""); }}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    {(accounts || []).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Funil de pessoas (RD) *</Label>
+                <Select value={funnelId} onValueChange={setFunnelId} disabled={!adAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar funil" /></SelectTrigger>
+                  <SelectContent>
+                    {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>}
+
+          {sourceMode === "rd" && funnelId && (stages?.length ?? 0) > 0 && (
             <div>
               <Label className="mb-2 block">Etapas aptas para Pessoas</Label>
               <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto rounded-md border border-border p-3">
@@ -235,7 +251,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
                     <Input type="number" min={1} value={form.max_model_patients}
                       onChange={(e) => setForm({ ...form, max_model_patients: parseInt(e.target.value) || 0 })} />
                   </div>
-                  <div>
+                  {sourceMode === "rd" && <div>
                     <Label>Funil de pacientes-modelo (RD) *</Label>
                     <Select value={modelFunnelId} onValueChange={setModelFunnelId} disabled={!adAccountId}>
                       <SelectTrigger><SelectValue placeholder="Selecionar funil" /></SelectTrigger>
@@ -243,10 +259,11 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
                         {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </div>}
+                  {sourceMode === "custom" && <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">Pacientes-modelo serão controlados manualmente nesta turma personalizada.</div>}
                 </div>
 
-                {modelFunnelId && (modelStages?.length ?? 0) > 0 && (
+                {sourceMode === "rd" && modelFunnelId && (modelStages?.length ?? 0) > 0 && (
                   <div>
                     <Label className="mb-2 block">Etapas aptas para Pacientes-modelo</Label>
                     <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto rounded-md border border-border p-3">

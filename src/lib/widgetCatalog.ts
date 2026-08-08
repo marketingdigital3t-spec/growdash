@@ -280,19 +280,27 @@ export function getWidgetDef(type: WidgetType) {
 
 // Default "Padrão" view: the canonical full-width dashboard recovered from the
 // original Growdash project. System widgets are appended by the renderer.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 3;
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 4;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
   layout: [
-    { i: "default", x: 0, y: 0, w: 12, h: 30, minW: 12, minH: 10 },
+    { i: "primary_revenue", x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "primary_spend", x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "primary_roas", x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "primary_profit", x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "default", x: 0, y: 2, w: 12, h: 30, minW: 12, minH: 10 },
   ],
   widgets: [
+    { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Líquido", config: { metric: "revenue_net" } },
+    { id: "primary_spend", type: "kpi" as WidgetType, title: "Gastos com Anúncios", config: { metric: "spend" } },
+    { id: "primary_roas", type: "kpi" as WidgetType, title: "ROAS", config: { metric: "roas" } },
+    { id: "primary_profit", type: "kpi" as WidgetType, title: "Lucro Líquido", config: { metric: "profit" } },
     {
       id: "default",
       type: "default_block" as WidgetType,
       title: "Padrão",
-      config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION },
+      config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION, hidePrimary: true },
     },
   ],
 };

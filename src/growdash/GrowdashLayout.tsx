@@ -330,17 +330,12 @@ export default function GrowdashLayout() {
             <DropdownMenuItem asChild><NavLink to="/perfil?tab=personal"><UserRound className="mr-2 h-4 w-4" />Perfil e dados</NavLink></DropdownMenuItem>
             <DropdownMenuItem asChild><NavLink to="/perfil?tab=appearance"><Palette className="mr-2 h-4 w-4" />Personalização e metas</NavLink></DropdownMenuItem>
             <DropdownMenuItem asChild><NavLink to="/perfil?tab=plan"><BadgeDollarSign className="mr-2 h-4 w-4" />Planos e assinatura</NavLink></DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void signOut()} className="text-destructive focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />Sair da conta
+            </DropdownMenuItem>
           </DropdownMenuContent>
           </DropdownMenu>
-          {showSidebarLabels && (
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="mt-1 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-[11px] text-white/50 hover:bg-white/[.06] hover:text-white"
-            >
-              <LogOut className="h-4 w-4" /> Sair
-            </button>
-          )}
         </div></>}
       </aside>
 

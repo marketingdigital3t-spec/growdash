@@ -4,7 +4,7 @@ import RGL, { Responsive, WidthProvider } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { WidgetRenderer } from "./WidgetRenderer";
-import { X } from "lucide-react";
+import { Settings2, X } from "lucide-react";
 import type { DashboardView } from "@/hooks/useDashboardViews";
 import { getWidgetDef } from "@/lib/widgetCatalog";
 import type { Sale } from "@/hooks/useSales";
@@ -15,6 +15,7 @@ import {
   normalizeDesktopDashboardLayout,
   type DashboardGridItem,
 } from "@/lib/responsiveDashboardLayout";
+import { DashboardWidgetConfigDialog } from "./DashboardWidgetConfigDialog";
 
 const ResponsiveGrid = WidthProvider(Responsive);
 const GRID_ROW_HEIGHT = 60;
@@ -86,6 +87,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
   const [layout, setLayout] = useState<any[]>(view.layout || []);
   const [widgets, setWidgets] = useState<any[]>(view.widgets || []);
   const [autoHeightRows, setAutoHeightRows] = useState<Record<string, number>>({});
+  const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
 
   useEffect(() => {
     setLayout(view.layout || []);
@@ -150,16 +152,24 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
     onChange(nextLayout, nextWidgets);
   }
 
+  function updateWidget(id: string, patch: { title: string; config: any }) {
+    const nextWidgets = widgets.map((widget) => widget.id === id ? { ...widget, ...patch } : widget);
+    setWidgets(nextWidgets);
+    onChange(layout, nextWidgets);
+  }
+
+  const configuringWidget = widgets.find((widget) => widget.id === configuringWidgetId) || null;
+
   if (isMobile) {
-    return <div className="min-w-0 space-y-4 overflow-x-clip">
+    return <><div className="min-w-0 space-y-4 overflow-x-clip">
       {fullWidgets.map((widget) => {
         const isSystem = widget.id.startsWith("__sys_") || widget.type === "default_block";
         return <section key={widget.id} className="relative min-w-0 max-w-full overflow-hidden rounded-xl">
-          {isEditing && !isSystem && <button onClick={() => removeWidget(widget.id)} className="no-drag absolute right-2 top-2 z-20 grid h-11 w-11 place-items-center rounded-full bg-destructive/90 text-destructive-foreground shadow" aria-label="Remover"><X className="h-4 w-4" /></button>}
+          {isEditing && !isSystem && <div className="no-drag absolute right-2 top-2 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${widget.title}`}><Settings2 className="h-4 w-4" /></button><button onClick={() => removeWidget(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-destructive/90 text-destructive-foreground shadow" aria-label="Remover"><X className="h-4 w-4" /></button></div>}
           <div className="min-w-0 max-w-full overflow-hidden"><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} /></div>
         </section>;
       })}
-    </div>;
+    </div><DashboardWidgetConfigDialog widget={configuringWidget} open={!!configuringWidget} onOpenChange={(open) => !open && setConfiguringWidgetId(null)} onSave={(patch) => { if (configuringWidget) updateWidget(configuringWidget.id, patch); }} /></>;
   }
 
   return (
@@ -186,15 +196,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
           const isSystem = w.id.startsWith("__sys_") || w.type === "default_block";
           return (
             <div key={w.id} className={w.type === "default_block" ? "dashboard-default-static overflow-hidden" : "overflow-hidden"}>
-              {isEditing && !isSystem && (
-                <button
-                  onClick={() => removeWidget(w.id)}
-                  className="no-drag absolute top-1 right-1 z-20 h-6 w-6 rounded-full bg-destructive/90 text-destructive-foreground flex items-center justify-center hover:bg-destructive shadow"
-                  aria-label="Remover"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
+              {isEditing && !isSystem && <div className="no-drag absolute right-1 top-1 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${w.title}`}><Settings2 className="h-3 w-3" /></button><button onClick={() => removeWidget(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground shadow hover:bg-destructive" aria-label="Remover"><X className="h-3 w-3" /></button></div>}
               <div className="h-full w-full no-drag-children">
                 {w.type === "default_block" ? (
                   <AutoHeightWidget widgetId={w.id} onHeightChange={handleAutoHeight}>
@@ -208,6 +210,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
           );
         })}
       </ResponsiveGrid>
+      <DashboardWidgetConfigDialog widget={configuringWidget} open={!!configuringWidget} onOpenChange={(open) => !open && setConfiguringWidgetId(null)} onSave={(patch) => { if (configuringWidget) updateWidget(configuringWidget.id, patch); }} />
     </div>
   );
 }
