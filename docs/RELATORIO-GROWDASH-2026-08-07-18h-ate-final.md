@@ -25,7 +25,8 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 00:56 | `7c8e179` | Corrigida a configuração do Cloudflare Pages Git: build `npm run build` e diretório de saída `dist`. O domínio estava publicando o código-fonte (`/src/main.tsx`), causando a tela de carregamento permanente. Deploy de produção: `https://40a7ba1e.growdash.pages.dev`; `growdash.com.br` e `www.growdash.com.br` passaram a servir o bundle Vite. |
 | 08/08 01:04 | `32a9175` | Unificada a navegação Meta Connect com a Central de integrações: o menu duplicado foi removido, `/meta-connect` mantém redirecionamento legado para `integracoes?tab=paid` e permissões antigas `can_meta_connect` continuam autorizando a tela unificada. Deploy: `https://13b4dc2f.growdash.pages.dev`. |
 | 08/08 01:12 | `c543c3a` | KPIs de leads do dashboard passaram a somar conversas iniciadas pelo evento oficial `onsite_conversion.messaging_conversation_started_7d`. O resumo fixo permite clicar em “Leads” para ver Forms, Site, Conversas iniciadas e Total. Deploy: `https://aca494cd.growdash.pages.dev`. |
-| 08/08 01:15 | `pendente` | Widgets KPI de Leads agora exibem no hover o detalhamento por Forms, Site e Conversas iniciadas, preservando a edição individual do dashboard. |
+| 08/08 01:15 | `6638d12` | Widgets KPI de Leads agora exibem no hover o detalhamento por Forms, Site e Conversas iniciadas, preservando a edição individual do dashboard. Deploy: `https://2c834575.growdash.pages.dev`. |
+| 08/08 01:21 | `4ecbae7` | Growdash Flow agora recarrega elementos, zoom, grade e snap quando outro funil salvo é aberto sem remontar a tela; Kanban mostra erro recuperável e botão de nova tentativa; OAuth Instagram aceita respostas com `id` ou `user_id`; a sincronização classifica vídeos/Reels corretamente para retenção e visualizações. Deploy: `https://94863119.growdash.pages.dev`. |
 
 ## Desempenho e carregamento
 
@@ -54,6 +55,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Após a correção do Pages, `npx tsc --noEmit`, ESLint, Vitest (21 arquivos/56 testes) e Vite build foram executados novamente com sucesso; ESLint manteve apenas 15 warnings antigos de Fast Refresh.
 - Para a unificação de integrações: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual 3/3 testes executados aprovados (3 rotas autenticadas puladas sem credenciais E2E).
 - Para os KPIs de leads: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual 3/3 testes executados aprovados.
+- Para o commit `4ecbae7`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
 
 ## Pendências externas e limites de validação
 
