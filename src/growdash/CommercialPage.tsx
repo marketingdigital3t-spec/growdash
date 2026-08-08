@@ -38,7 +38,7 @@ export default function CommercialPage() {
   const sellers = useMemo(() => Array.from(new Set(enriched.map((row) => row.seller))).sort(), [enriched]);
   const filtered = useMemo(() => enriched.filter((row) => (
     (sellerFilter === "all" || row.seller === sellerFilter)
-    && (productFilter === "all" || row.sale.product_id === productFilter)
+    && (productFilter === "all" || row.sale.product_id === productFilter || (!row.sale.product_id && row.product === productFilter))
   )), [enriched, sellerFilter, productFilter]);
   const totals = useMemo(() => aggregateSales(filtered.map((row) => row.sale)), [filtered]);
   const ranking = useMemo(() => {
@@ -64,8 +64,8 @@ export default function CommercialPage() {
         actions={(
           <div className="flex flex-wrap gap-2">
             <MetaDateRangePicker preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} className="min-w-[235px]" />
-            <select className="gd-button min-w-40" value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)}><option value="all">Todos os vendedores</option>{sellers.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
-            <select className="gd-button min-w-40" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">Todos os produtos</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select>
+            <select aria-label="Filtrar por vendedor" className="gd-button min-w-40" value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)}><option value="all">Todos os vendedores</option>{sellers.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
+            <select aria-label="Filtrar por produto" className="gd-button min-w-40" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">Todos os produtos</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}{Array.from(new Set(enriched.filter((row) => !row.sale.product_id && row.product !== "Não informado").map((row) => row.product))).map((product) => <option key={`rd-${product}`} value={product}>{product}</option>)}</select>
           </div>
         )}
       />
