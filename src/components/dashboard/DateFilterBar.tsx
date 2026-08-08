@@ -57,7 +57,7 @@ export function DateFilterBar({
 
       {adAccounts.length > 0 && (
         <Select value={selectedAccount} onValueChange={onAccountChange}>
-          <SelectTrigger className="gd-filter-control gd-filter-account min-h-11 w-full min-w-0 bg-card sm:h-10 sm:min-h-0 sm:w-[200px]">
+          <SelectTrigger aria-label="Selecionar conta de anúncio" className="gd-filter-control gd-filter-account min-h-11 w-full min-w-0 bg-card sm:h-10 sm:min-h-0 sm:w-[200px]">
             <SelectValue placeholder="Todas as contas" />
           </SelectTrigger>
           <SelectContent>

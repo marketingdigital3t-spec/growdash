@@ -122,6 +122,8 @@ export function MetaDateRangePicker({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
+          type="button"
+          aria-label={`Selecionar período: ${formatTrigger(preset, startDate, endDate)}`}
           className={cn(
             "min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto",
             className,
@@ -141,6 +143,8 @@ export function MetaDateRangePicker({
                 return (
                   <button
                     key={p}
+                    type="button"
+                    aria-pressed={active}
                     onClick={() => handlePresetClick(p)}
                     className={cn(
                       "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors hover:bg-accent",
@@ -189,7 +193,7 @@ export function MetaDateRangePicker({
               {compareEnabled && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Select value={comparePreset} onValueChange={(v) => setComparePreset(v as DatePreset)}>
-                    <SelectTrigger className="w-[160px] h-9">
+                    <SelectTrigger aria-label="Selecionar período de comparação" className="w-[160px] h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -215,10 +219,10 @@ export function MetaDateRangePicker({
                 Fuso horário das datas: Horário de São Paulo
               </span>
               <div className="flex items-center gap-2 ml-auto">
-                <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
-                <Button size="sm" onClick={handleApply}>
+                <Button type="button" size="sm" onClick={handleApply}>
                   Atualizar
                 </Button>
               </div>
