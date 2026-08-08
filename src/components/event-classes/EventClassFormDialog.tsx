@@ -31,7 +31,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
   const { data: accounts } = useAdAccounts();
   const [sourceMode, setSourceMode] = useState<"rd" | "custom">("rd");
   const [adAccountId, setAdAccountId] = useState<string>("");
-  const { data: funnels } = useRDFunnels(adAccountId || undefined);
+  const { data: funnels } = useRDFunnels(adAccountId || undefined, open && sourceMode === "rd");
   const [funnelId, setFunnelId] = useState<string>("");
   const [modelFunnelId, setModelFunnelId] = useState<string>("");
   const { data: stages } = useFunnelStages(funnelId || undefined);
@@ -188,8 +188,8 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
           <div className="rounded-md border border-border p-3">
             <Label className="mb-2 block">Origem da turma *</Label>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setSourceMode("rd")} className={`rounded-lg border p-3 text-left text-xs transition ${sourceMode === "rd" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"}`}><b className="block">RD Station</b><span className="mt-1 block text-[10px] text-muted-foreground">Vincula pessoas e etapas a um funil.</span></button>
-              <button type="button" onClick={() => { setSourceMode("custom"); setFunnelId(""); setModelFunnelId(""); }} className={`rounded-lg border p-3 text-left text-xs transition ${sourceMode === "custom" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"}`}><b className="block">Personalizado</b><span className="mt-1 block text-[10px] text-muted-foreground">Crie a turma sem conta de anúncio nem funil.</span></button>
+              <button type="button" aria-pressed={sourceMode === "rd"} onClick={() => setSourceMode("rd")} className={`rounded-lg border p-3 text-left text-xs transition ${sourceMode === "rd" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"}`}><b className="block">RD Station</b><span className="mt-1 block text-[10px] text-muted-foreground">Vincula pessoas e etapas a um funil.</span></button>
+              <button type="button" aria-pressed={sourceMode === "custom"} onClick={() => { setSourceMode("custom"); setAdAccountId(""); setFunnelId(""); setModelFunnelId(""); }} className={`rounded-lg border p-3 text-left text-xs transition ${sourceMode === "custom" ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"}`}><b className="block">Personalizado</b><span className="mt-1 block text-[10px] text-muted-foreground">Crie a turma sem conta de anúncio nem funil.</span></button>
             </div>
           </div>
 

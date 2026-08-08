@@ -15,9 +15,10 @@ export interface RDFunnel {
   updated_at: string;
 }
 
-export function useRDFunnels(adAccountId?: string) {
+export function useRDFunnels(adAccountId?: string, enabled = true) {
   return useQuery({
     queryKey: ["rd_funnels", adAccountId ?? "all"],
+    enabled,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);

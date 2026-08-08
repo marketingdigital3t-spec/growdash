@@ -107,9 +107,9 @@ export default function EventClasses() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
-      <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas">
-        <button onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" />Datas & Turmas</button>
-        <button onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" />Agenda</button>
+      <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
+        <button type="button" role="tab" aria-selected={activeView === "classes"} onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" aria-hidden="true" />Datas & Turmas</button>
+        <button type="button" role="tab" aria-selected={activeView === "agenda"} onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" aria-hidden="true" />Agenda</button>
       </nav>
 
       {activeView === "classes" ? <>
@@ -143,6 +143,7 @@ export default function EventClasses() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            aria-label="Buscar turma"
             value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar turma por nome, local ou funil..."
             className="pl-9"
