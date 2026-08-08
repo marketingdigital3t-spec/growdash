@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
@@ -45,7 +45,19 @@ const queryClient = new QueryClient({
 });
 
 function LoadingModule() {
-  return <div className="grid min-h-[40vh] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSlow(true), 8000);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  return <div className="grid min-h-[40vh] place-items-center px-4 text-center" role="status" aria-live="polite">
+    {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
+      <p className="font-bold">A Growdash está demorando para responder.</p>
+      <p className="mt-2 text-sm text-muted-foreground">A conexão pode ter sido interrompida. Recarregue para tentar novamente.</p>
+      <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Recarregar Growdash</button>
+    </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
+  </div>;
 }
 
 function AuthenticatedLayout() {

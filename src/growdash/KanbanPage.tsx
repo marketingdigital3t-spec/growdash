@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Check, Columns3, LayoutGrid, List, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CalendarDays, Check, Columns3, Headphones, LayoutGrid, List, ListTodo, Megaphone, Plus, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { PageHeading } from "./shared";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -17,8 +17,67 @@ import { cn } from "@/lib/utils";
 type Board = { id: string; name: string; description: string | null; created_at: string };
 type KanbanList = { id: string; board_id: string; name: string; position: number };
 type KanbanCard = { id: string; list_id: string; title: string; description: string | null; due_date: string | null; priority: string; position: number };
+type BoardTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  columns: string[];
+  cards: Array<{ column: string; title: string; priority?: string }>;
+  icon: typeof BriefcaseBusiness;
+};
 
 const PRIORITIES = [{ value: "none", label: "Sem prioridade" }, { value: "low", label: "Baixa" }, { value: "medium", label: "Média" }, { value: "high", label: "Alta" }, { value: "urgent", label: "Urgente" }];
+
+const BOARD_TEMPLATES: BoardTemplate[] = [
+  {
+    id: "sales",
+    name: "Pipeline comercial",
+    description: "Acompanhe leads, oportunidades e fechamentos em um fluxo comercial.",
+    columns: ["Novos leads", "Contato", "Qualificação", "Proposta", "Ganho"],
+    cards: [
+      { column: "Novos leads", title: "Definir critérios de qualificação", priority: "medium" },
+      { column: "Contato", title: "Agendar primeiro contato", priority: "high" },
+      { column: "Proposta", title: "Enviar proposta comercial", priority: "high" },
+    ],
+    icon: BriefcaseBusiness,
+  },
+  {
+    id: "marketing",
+    name: "Calendário de marketing",
+    description: "Organize o ciclo de produção de campanhas, conteúdos e criativos.",
+    columns: ["Ideias", "Em produção", "Revisão", "Agendado", "Publicado"],
+    cards: [
+      { column: "Ideias", title: "Pauta da próxima campanha", priority: "medium" },
+      { column: "Em produção", title: "Criar briefing do criativo", priority: "high" },
+      { column: "Revisão", title: "Validar copy e CTA", priority: "medium" },
+    ],
+    icon: Megaphone,
+  },
+  {
+    id: "sprint",
+    name: "Sprint de produto",
+    description: "Planeje uma sprint com visão de backlog, execução e entrega.",
+    columns: ["Backlog", "Próxima sprint", "Em andamento", "Em revisão", "Concluído"],
+    cards: [
+      { column: "Backlog", title: "Registrar próxima melhoria", priority: "low" },
+      { column: "Próxima sprint", title: "Definir critério de aceite", priority: "medium" },
+      { column: "Em revisão", title: "Validar entrega com o time", priority: "high" },
+    ],
+    icon: ListTodo,
+  },
+  {
+    id: "support",
+    name: "Atendimento e operação",
+    description: "Controle solicitações, pendências e resoluções da operação.",
+    columns: ["Entrada", "Em atendimento", "Aguardando retorno", "Resolvido"],
+    cards: [
+      { column: "Entrada", title: "Triar novas solicitações", priority: "high" },
+      { column: "Em atendimento", title: "Atualizar responsável e prazo", priority: "medium" },
+      { column: "Aguardando retorno", title: "Fazer follow-up com cliente", priority: "medium" },
+    ],
+    icon: Headphones,
+  },
+];
 
 export default function KanbanPage() {
   const { data: workspace } = useWorkspace();
@@ -31,6 +90,7 @@ export default function KanbanPage() {
   const [cardDialog, setCardDialog] = useState<{ listId: string; card?: KanbanCard } | null>(null);
   const [listDialog, setListDialog] = useState(false);
   const [boardForm, setBoardForm] = useState({ name: "", description: "" });
+  const [boardTemplate, setBoardTemplate] = useState("sales");
   const [listName, setListName] = useState("");
   const [cardForm, setCardForm] = useState({ title: "", description: "", due_date: "", priority: "none" });
 
@@ -68,13 +128,21 @@ export default function KanbanPage() {
   async function createBoard() {
     if (!workspace?.id || !boardForm.name.trim()) return;
     try {
-      const { data: board, error } = await (supabase as any).from("kanban_boards").insert({ workspace_id: workspace.id, name: boardForm.name.trim(), description: boardForm.description.trim() || null }).select("id").single();
+      const template = BOARD_TEMPLATES.find((item) => item.id === boardTemplate) ?? BOARD_TEMPLATES[0];
+      const { data: board, error } = await (supabase as any).from("kanban_boards").insert({ workspace_id: workspace.id, name: boardForm.name.trim(), description: boardForm.description.trim() || template.description }).select("id").single();
       if (error) throw error;
-      for (const [position, name] of ["A Fazer", "Em Progresso", "Concluído"].entries()) {
-        const { error: listError } = await (supabase as any).from("kanban_lists").insert({ board_id: board.id, name, position });
-        if (listError) throw listError;
+      const { data: createdLists, error: listError } = await (supabase as any).from("kanban_lists").insert(template.columns.map((name, position) => ({ board_id: board.id, name, position }))).select("id,name");
+      if (listError) throw listError;
+      const listByName = new Map((createdLists || []).map((list: { id: string; name: string }) => [list.name, list.id]));
+      const starterCards = template.cards.flatMap((card, position) => {
+        const listId = listByName.get(card.column);
+        return listId ? [{ list_id: listId, title: card.title, description: null, due_date: null, priority: card.priority || "none", position }] : [];
+      });
+      if (starterCards.length) {
+        const { error: cardError } = await (supabase as any).from("kanban_cards").insert(starterCards);
+        if (cardError) throw cardError;
       }
-      setBoardDialog(false); setBoardForm({ name: "", description: "" }); setSelectedBoardId(board.id); invalidate();
+      setBoardDialog(false); setBoardForm({ name: "", description: "" }); setBoardTemplate("sales"); setSelectedBoardId(board.id); invalidate();
       toast({ title: "Quadro criado" });
     } catch (error: any) { toast({ title: "Não foi possível criar o quadro", description: error.message, variant: "destructive" }); }
   }
@@ -150,8 +218,8 @@ export default function KanbanPage() {
     </div>;
   }
 
-  return <div className="mx-auto max-w-[1500px]"><PageHeading eyebrow="Operação visual" title="Quadros" description="Escolha o modo Trello para fluxo visual ou ClickUp para uma lista operacional." actions={<Button onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Novo quadro</Button>} /><div className="gd-panel mb-4 flex items-center gap-2 p-3"><Search className="h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar quadro" className="border-0 bg-transparent shadow-none focus-visible:ring-0" /></div>{boardsQuery.isLoading ? <div className="gd-panel grid min-h-64 place-items-center text-sm text-muted-foreground">Carregando quadros…</div> : visibleBoards.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleBoards.map((board) => <button key={board.id} type="button" onClick={() => setSelectedBoardId(board.id)} className="gd-panel group p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/50"><LayoutGrid className="h-6 w-6 text-primary" /><h2 className="mt-4 font-black">{board.name}</h2><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{board.description || "Sem descrição."}</p><span className="mt-5 inline-flex items-center gap-1 text-[10px] font-black text-primary">Abrir quadro <ArrowLeft className="h-3 w-3 rotate-180 transition-transform group-hover:translate-x-1" /></span></button>)}</div> : <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 font-black">Nenhum quadro criado</h2><p className="mt-1 text-sm text-muted-foreground">Crie um quadro para começar a organizar sua operação.</p><Button className="mt-4" onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Criar primeiro quadro</Button></div></div>}
-    <Dialog open={boardDialog} onOpenChange={setBoardDialog}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Novo quadro</DialogTitle></DialogHeader><div className="space-y-3"><div><Label>Nome</Label><Input value={boardForm.name} onChange={(event) => setBoardForm({ ...boardForm, name: event.target.value })} placeholder="Pipeline comercial" /></div><div><Label>Descrição</Label><Textarea value={boardForm.description} onChange={(event) => setBoardForm({ ...boardForm, description: event.target.value })} placeholder="Como este quadro será usado?" /></div></div><DialogFooter><Button variant="outline" onClick={() => setBoardDialog(false)}>Cancelar</Button><Button onClick={() => void createBoard()}>Criar quadro</Button></DialogFooter></DialogContent></Dialog>
+  return <div className="mx-auto max-w-[1500px]"><PageHeading eyebrow="Operação visual" title="Quadros" description="Escolha o modo Trello para fluxo visual ou ClickUp para uma lista operacional." actions={<Button onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Novo quadro</Button>} /><div className="gd-panel mb-4 flex items-center gap-2 p-3"><Search className="h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar quadro" className="border-0 bg-transparent shadow-none focus-visible:ring-0" /></div>{boardsQuery.isLoading ? <div className="gd-panel grid min-h-64 place-items-center text-sm text-muted-foreground">Carregando quadros…</div> : boardsQuery.isError ? <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-destructive" /><h2 className="mt-3 font-black">Não foi possível carregar os quadros</h2><p className="mt-1 text-sm text-muted-foreground">Verifique a conexão e tente novamente.</p><Button className="mt-4" variant="outline" onClick={() => void boardsQuery.refetch()}>Tentar novamente</Button></div></div> : visibleBoards.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleBoards.map((board) => <button key={board.id} type="button" onClick={() => setSelectedBoardId(board.id)} className="gd-panel group p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/50"><LayoutGrid className="h-6 w-6 text-primary" /><h2 className="mt-4 font-black">{board.name}</h2><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{board.description || "Sem descrição."}</p><span className="mt-5 inline-flex items-center gap-1 text-[10px] font-black text-primary">Abrir quadro <ArrowLeft className="h-3 w-3 rotate-180 transition-transform group-hover:translate-x-1" /></span></button>)}</div> : <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 font-black">Nenhum quadro criado</h2><p className="mt-1 text-sm text-muted-foreground">Crie um quadro para começar a organizar sua operação.</p><Button className="mt-4" onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Criar primeiro quadro</Button></div></div>}
+    <Dialog open={boardDialog} onOpenChange={setBoardDialog}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Começar um quadro</DialogTitle></DialogHeader><div className="space-y-5"><div><Label className="text-xs uppercase tracking-[.14em] text-muted-foreground">Escolha um template pronto</Label><div className="mt-2 grid gap-2 sm:grid-cols-2">{BOARD_TEMPLATES.map((template) => { const Icon = template.icon; const selected = boardTemplate === template.id; return <button key={template.id} type="button" aria-pressed={selected} onClick={() => { setBoardTemplate(template.id); setBoardForm((form) => ({ name: form.name.trim() ? form.name : template.name, description: form.description.trim() ? form.description : template.description })); }} className={cn("rounded-xl border p-3 text-left transition", selected ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/.35)]" : "border-border bg-muted/20 hover:border-primary/50")}><div className="flex items-start gap-3"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", selected ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary")}><Icon className="h-4 w-4" /></span><span className="min-w-0"><strong className="block text-sm">{template.name}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{template.description}</span></span></div><span className="mt-2 block text-[10px] font-bold text-primary">{template.columns.length} colunas · {template.cards.length} cartões iniciais</span></button>; })}</div></div><div className="grid gap-3 sm:grid-cols-2"><div><Label>Nome do quadro</Label><Input value={boardForm.name} onChange={(event) => setBoardForm({ ...boardForm, name: event.target.value })} placeholder="Pipeline comercial" /></div><div><Label>Descrição personalizada</Label><Textarea value={boardForm.description} onChange={(event) => setBoardForm({ ...boardForm, description: event.target.value })} placeholder="Como este quadro será usado?" /></div></div></div><DialogFooter><Button variant="outline" onClick={() => setBoardDialog(false)}>Cancelar</Button><Button onClick={() => void createBoard()} disabled={!boardForm.name.trim()}><Plus className="mr-2 h-4 w-4" />Criar quadro com template</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }
 
