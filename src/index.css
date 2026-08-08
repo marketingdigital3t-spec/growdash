@@ -887,7 +887,13 @@
     }
 
     .page-heading-actions > div {
-      display: contents;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+      gap: .5rem;
+      width: 100%;
+      min-width: 0;
+      grid-column: 1 / -1;
     }
 
     .page-heading-actions > button,
@@ -895,9 +901,27 @@
     .page-heading-actions > select,
     .page-heading-actions > div > button,
     .page-heading-actions > div > a,
-    .page-heading-actions > div > select {
+    .page-heading-actions > div > select,
+    .page-heading-actions > div > * {
       width: 100%;
       min-width: 0;
+    }
+
+    .page-heading-actions > div > [role="tablist"] {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      width: 100%;
+      min-width: 0;
+    }
+
+    .page-heading-actions > div > [role="tablist"] > * {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .page-heading-actions > div > [role="tablist"] + button {
+      grid-column: 1 / -1;
     }
 
     .page-heading-actions > :only-child,
@@ -1595,7 +1619,7 @@
 
   .page-heading-actions > .flex.flex-wrap {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: .5rem;
   }
 
