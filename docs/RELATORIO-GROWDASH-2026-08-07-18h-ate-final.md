@@ -74,6 +74,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - A migration `20260808003000_fix_custom_event_class_rls.sql` está versionada no GitHub, mas ainda precisa ser aplicada ao Supabase. Esta máquina não tem `SUPABASE_ACCESS_TOKEN`, projeto vinculado ou banco local ativo.
 - Ainda faltam `META_APP_SECRET` e `INSTAGRAM_APP_SECRET` no Supabase para concluir OAuth Meta/Instagram em produção.
 - O commit `6445d21` contém o código das Edge Functions, mas a publicação delas no Supabase permanece bloqueada pelas mesmas credenciais de deploy ausentes; o deploy do Cloudflare Pages não publica funções Supabase.
+- Health check público das funções Supabase (08/08 01:50): `instagram-oauth-start` responde `503 INSTAGRAM_APP_NOT_CONFIGURED` e `meta-oauth-start` responde `503 META_APP_NOT_CONFIGURED`, confirmando que o bloqueio é configuração de secrets do aplicativo, não falha silenciosa da interface; `social-sync-instagram` exige sessão autenticada (`401 Sessão inválida`).
 - A conta Meta continua bloqueada pela Meta Developers; duas conexões no banco estavam desconectadas com erro 200 de acesso bloqueado. Os tokens não foram apagados porque essa exclusão exige autorização específica.
 - A validação visual autenticada e o fluxo real de OAuth dependem de credenciais e da liberação dos provedores externos.
 
