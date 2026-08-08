@@ -27,6 +27,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useFunnelStages } from "@/hooks/useRDDeals";
 import { classifyLead, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
@@ -59,8 +60,10 @@ export default function CrmPage() {
   const queryClient = useQueryClient();
   const { adAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
-  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter);
-  const { data: allDeals = [], isLoading: loadingDeals, isFetching } = useRDCRMDeals(accountFilter);
+  const { data: rdIntegration, isLoading: loadingRDIntegration } = useRDIntegration();
+  const rdEnabled = rdIntegration?.is_active === true;
+  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter, rdEnabled);
+  const { data: allDeals = [], isLoading: loadingDeals, isFetching } = useRDCRMDeals(accountFilter, rdEnabled);
   const { data: canonicalSales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter });
   const [funnelId, setFunnelId] = useState("all");
   const [view, setView] = useState<CRMView>(() => {
@@ -206,6 +209,10 @@ export default function CrmPage() {
   }
 
   async function syncRD() {
+    if (!rdEnabled) {
+      toast.error("Conecte o RD Station antes de sincronizar as negociações.");
+      return;
+    }
     const selected = funnelId === "all"
       ? funnels.filter((funnel) => funnel.is_active)
       : funnels.filter((funnel) => funnel.id === funnelId && funnel.is_active);
@@ -255,7 +262,7 @@ export default function CrmPage() {
               <ViewButton active={view === "list"} onClick={() => changeView("list")} icon={<List />} label="Lista" />
               <ViewButton active={view === "ai"} onClick={() => changeView("ai")} icon={<Bot />} label="IA do Funil" />
             </div>
-            <button className="gd-button" onClick={() => void syncRD()} disabled={syncing || loadingFunnels}>
+            <button className="gd-button" onClick={() => void syncRD()} disabled={syncing || loadingRDIntegration || loadingFunnels || !rdEnabled}>
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
               {syncing ? "Sincronizando" : "Atualizar RD"}
             </button>
