@@ -51,23 +51,26 @@ Deno.serve(async (req) => {
     const expiresIn = Number(long.expires_in ?? 3600);
     const graphVersion = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
     const profileUrl = new URL(`https://graph.instagram.com/${graphVersion}/me`);
-    profileUrl.searchParams.set("fields", "id,username,name,profile_picture_url,followers_count,media_count,account_type");
+    profileUrl.searchParams.set("fields", "id,user_id,username,name,profile_picture_url,followers_count,media_count,account_type");
     profileUrl.searchParams.set("access_token", token);
     const profileResponse = await fetch(profileUrl);
     const profile = await profileResponse.json().catch(() => ({}));
-    if (!profileResponse.ok || !profile.id) {
+    // Instagram Login has returned both `id` and `user_id` across API versions.
+    // Accept either value so a valid professional account is not rejected after OAuth.
+    const profileId = String(profile.id ?? profile.user_id ?? "").trim();
+    if (!profileResponse.ok || !profileId) {
       console.error("Instagram profile lookup failed", profile?.error?.code ?? profileResponse.status);
       return page("error", instagramError(profile, "A conta foi autorizada, mas o perfil profissional não pôde ser lido. Use uma conta Business ou Creator"));
     }
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-    const integrationValues = { api_token: token, is_active: true, provider_account_id: String(profile.id), token_expires_at: expiresAt, updated_at: new Date().toISOString() };
-    const { data: existing } = await admin.from("integrations").select("id").eq("user_id", oauthState.user_id).eq("provider", "instagram_business").eq("provider_account_id", String(profile.id)).maybeSingle();
+    const integrationValues = { api_token: token, is_active: true, provider_account_id: profileId, token_expires_at: expiresAt, updated_at: new Date().toISOString() };
+    const { data: existing } = await admin.from("integrations").select("id").eq("user_id", oauthState.user_id).eq("provider", "instagram_business").eq("provider_account_id", profileId).maybeSingle();
     const integrationOp = existing
       ? admin.from("integrations").update(integrationValues).eq("id", existing.id)
       : admin.from("integrations").insert({ user_id: oauthState.user_id, provider: "instagram_business", ...integrationValues });
     const { error: integrationError } = await integrationOp;
     if (integrationError) throw integrationError;
-    const { error: accountError } = await admin.from("social_accounts").upsert({ user_id: oauthState.user_id, provider: "instagram", provider_account_id: String(profile.id), username: profile.username ?? null, display_name: profile.name ?? profile.username ?? "Instagram", profile_picture_url: profile.profile_picture_url ?? null, followers_count: Number(profile.followers_count ?? 0), media_count: Number(profile.media_count ?? 0), connection_status: "connected", last_error: null, last_sync_at: new Date().toISOString() }, { onConflict: "user_id,provider,provider_account_id" });
+    const { error: accountError } = await admin.from("social_accounts").upsert({ user_id: oauthState.user_id, provider: "instagram", provider_account_id: profileId, username: profile.username ?? null, display_name: profile.name ?? profile.username ?? "Instagram", profile_picture_url: profile.profile_picture_url ?? null, followers_count: Number(profile.followers_count ?? 0), media_count: Number(profile.media_count ?? 0), connection_status: "connected", last_error: null, last_sync_at: new Date().toISOString() }, { onConflict: "user_id,provider,provider_account_id" });
     if (accountError) throw accountError;
     return page("success", `@${profile.username ?? "perfil"} foi conectado com segurança.`);
   } catch (error) {

@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const version = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
     const base = `https://graph.instagram.com/${version}`;
     const profileUrl = new URL(`${base}/${account.provider_account_id}`);
-    profileUrl.searchParams.set("fields", "id,username,name,profile_picture_url,followers_count,media_count");
+    profileUrl.searchParams.set("fields", "id,user_id,username,name,profile_picture_url,followers_count,media_count");
     profileUrl.searchParams.set("access_token", token);
     const profile = await graphJson(profileUrl);
     const mediaUrl = new URL(`${base}/${account.provider_account_id}/media`);
@@ -97,10 +97,15 @@ Deno.serve(async (req) => {
       const interactions = Number(insights.total_interactions ?? likes + comments + saves + shares);
       totalReach += reach;
       totalInteractions += interactions;
+      const rawMediaType = String(item.media_type ?? "").toUpperCase();
+      const rawProductType = String(item.media_product_type ?? "").toUpperCase();
+      const mediaType = rawMediaType === "VIDEO" || rawProductType === "REELS"
+        ? "reels"
+        : rawMediaType.toLowerCase() || rawProductType.toLowerCase() || "post";
       const { error } = await admin.from("social_media").upsert({
         social_account_id: account.id,
         provider_media_id: String(item.id),
-        media_type: String(item.media_product_type ?? item.media_type ?? "post").toLowerCase(),
+        media_type: mediaType,
         caption: item.caption ?? null,
         permalink: item.permalink ?? null,
         media_url: item.media_url ?? null,

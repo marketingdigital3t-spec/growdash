@@ -55,13 +55,32 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
   const canvas = useCanvas(flow.zoom || 1, flow.panOffset || { x: 0, y: 0 });
   const { moveElements } = useDrawing();
   const { toast } = useToast();
+  const loadedFlowSignature = useMemo(() => JSON.stringify({
+    version: flow.version,
+    elements: flow.elements || [],
+    zoom: flow.zoom || 1,
+    panOffset: flow.panOffset || { x: 0, y: 0 },
+    showGrid: flow.showGrid ?? true,
+    snapToGrid: flow.snapToGrid ?? false,
+  }), [flow.elements, flow.panOffset, flow.showGrid, flow.snapToGrid, flow.version, flow.zoom]);
+  const lastLoadedFlowSignature = useRef<string | null>(null);
 
   useEffect(() => {
+    // The editor can stay mounted while the user opens another saved funnel.
+    // Reset the local history/view only when the persisted input really changed;
+    // this avoids showing the previous canvas and preserves unsaved edits during
+    // ordinary parent re-renders.
+    if (lastLoadedFlowSignature.current === loadedFlowSignature) return;
+    lastLoadedFlowSignature.current = loadedFlowSignature;
+    history.reset(structuredClone(flow.elements || []));
+    setSelectedIds([]);
+    setEditingId(null);
+    setSelectionBox(null);
+    canvas.setZoom(flow.zoom || 1);
+    canvas.setPanOffset(flow.panOffset || { x: 0, y: 0 });
     canvas.setShowGrid(flow.showGrid ?? true);
     canvas.setSnapToGrid(flow.snapToGrid ?? false);
-  // Apenas na carga/troca explícita do quadro.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFlow]);
+  }, [canvas, flow.elements, flow.panOffset, flow.showGrid, flow.snapToGrid, flow.zoom, history, loadedFlowSignature]);
 
   const getFlowData = useCallback((): FlowData => ({
     version: 1,
