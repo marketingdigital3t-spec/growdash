@@ -170,3 +170,5 @@ Validação desta entrega: TypeScript aprovado, ESLint sem erros (15 avisos anti
 - O visual segue sensível à cor de destaque da plataforma e mantém fallback responsivo para tablet/mobile.
 
 Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos antigos), Vitest 22/61 aprovado e build Vite aprovado. A revisão visual foi feita no ambiente publicado autenticado; a publicação deste refinamento ocorrerá após o commit validado.
+
+- Ajuste final de perspectiva: o piso e as paredes foram elevados e alongados na projeção isométrica, evitando a sensação de mesas flutuando fora da planta. Nova rodada completa de TypeScript, ESLint, Vitest e build concluída antes da publicação.
