@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
+import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -356,8 +357,8 @@ export default function Campaigns() {
           adsetBudget += adset.daily_budget ?? 0;
           for (const ad of adset.ads || []) {
             for (const i of ad.insights || []) {
-              if (startDate && i.date < startDate.toISOString().split("T")[0]) continue;
-              if (endDate && i.date > endDate.toISOString().split("T")[0]) continue;
+              if (startDate && i.date < format(startDate, "yyyy-MM-dd")) continue;
+              if (endDate && i.date > format(endDate, "yyyy-MM-dd")) continue;
               spend += i.spend ?? 0;
               leads += i.leads ?? 0;
               clicks += i.clicks ?? 0;

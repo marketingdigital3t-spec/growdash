@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart3, CheckCircle2, ExternalLink, Eye, Heart, ImageOff, Instagram, RefreshCw, Sparkles, TrendingUp, Users } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
@@ -80,7 +80,7 @@ export default function SocialMediaPage() {
     queryKey: ["social_media", selectedId, startDate.toISOString(), endDate.toISOString()],
     enabled: !!selectedId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_media").select("*").eq("social_account_id", selectedId).gte("published_at", startDate.toISOString()).lte("published_at", endDate.toISOString()).order("published_at", { ascending: false });
+      const { data, error } = await supabase.from("social_media").select("*").eq("social_account_id", selectedId).gte("published_at", startDate.toISOString()).lte("published_at", endOfDay(endDate).toISOString()).order("published_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as SocialMedia[];
     },
