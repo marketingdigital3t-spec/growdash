@@ -250,7 +250,7 @@ export default function CrmPage() {
         description="Pipeline operacional sincronizado com os leads e negociações reais do RD Station."
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1">
+            <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Visualização das negociações">
               <ViewButton active={view === "board"} onClick={() => changeView("board")} icon={<LayoutGrid />} label="Kanban" />
               <ViewButton active={view === "list"} onClick={() => changeView("list")} icon={<List />} label="Lista" />
               <ViewButton active={view === "ai"} onClick={() => changeView("ai")} icon={<Bot />} label="IA do Funil" />
@@ -267,13 +267,13 @@ export default function CrmPage() {
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,.8fr)_minmax(170px,.7fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
+            <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
-          <select value={funnelId} onChange={(event) => setFunnelId(event.target.value)} className="gd-button h-11 min-w-0">
+          <select aria-label="Filtrar por funil" value={funnelId} onChange={(event) => setFunnelId(event.target.value)} className="gd-button h-11 min-w-0">
             {view === "list" && <option value="all">Todos os funis conectados</option>}
             {funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}
           </select>
-          <select value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
+          <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
@@ -288,7 +288,7 @@ export default function CrmPage() {
           />
           <div className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
             {([ ["all", "Todos"], ["open", "Abertos"], ["won", "Ganhos"], ["lost", "Perdidos"] ] as [StatusFilter, string][]).map(([id, label]) => (
-              <button key={id} type="button" onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
+              <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
             ))}
           </div>
         </div>
@@ -430,8 +430,8 @@ function DealsList({ deals, funnels, page, pageCount, total, onPage, onOpen }: {
           <thead className="bg-muted/60 text-[10px] font-black uppercase tracking-wide text-muted-foreground"><tr>{["Negociação", "Etapa", "Funil", "Responsável", "Origem/campanha", "Atualização", "Valor", "Status"].map((label) => <th key={label} className="whitespace-nowrap px-4 py-3">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-border">
             {deals.map((deal) => (
-              <tr key={deal.id} onClick={() => onOpen(deal)} className="cursor-pointer transition hover:bg-muted/45">
-                <td className="max-w-64 px-4 py-3"><b className="block truncate">{deal.contact_name || "Contato não informado"}</b><span className="block truncate text-[10px] text-muted-foreground">{deal.contact_email || deal.rd_deal_id}</span></td>
+              <tr key={deal.id} className="transition hover:bg-muted/45">
+                <td className="max-w-64 p-0"><button type="button" onClick={() => onOpen(deal)} className="block w-full px-4 py-3 text-left outline-none focus-visible:bg-primary/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><b className="block truncate">{deal.contact_name || "Contato não informado"}</b><span className="block truncate text-[10px] text-muted-foreground">{deal.contact_email || deal.rd_deal_id}</span><span className="sr-only">Abrir negociação</span></button></td>
                 <td className="px-4 py-3"><span className="inline-flex max-w-48 truncate rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[9px] font-bold text-primary">{deal.rd_stage_name || "Sem etapa"}</span></td>
                 <td className="max-w-48 truncate px-4 py-3" title={deal.rd_funnel_id ? funnels.get(deal.rd_funnel_id) : undefined}>{deal.rd_funnel_id ? funnels.get(deal.rd_funnel_id) || "Funil RD" : "—"}</td>
                 <td className="max-w-44 truncate px-4 py-3">{deal.deal_owner_name || "Não informado"}</td>
@@ -484,7 +484,7 @@ function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; f
 }
 
 function ViewButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
-  return <button type="button" onClick={onClick} className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{<span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>}{label}</button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{<span className="[&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">{icon}</span>}{label}</button>;
 }
 
 function StageDot({ won, lost }: { won: boolean; lost: boolean }) {
@@ -498,7 +498,7 @@ function DealStatus({ deal, compact = false }: { deal: RDDealLite; compact?: boo
 }
 
 function Pagination({ page, pageCount, onPage }: { page: number; pageCount: number; onPage: (page: number) => void }) {
-  return <div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="h-4 w-4" /></Button><span className="min-w-16 text-center text-[10px] font-bold">{page} de {pageCount}</span><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page >= pageCount} onClick={() => onPage(page + 1)}><ChevronRight className="h-4 w-4" /></Button></div>;
+  return <div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button><span className="min-w-16 text-center text-[10px] font-bold" aria-live="polite">{page} de {pageCount}</span><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page >= pageCount} onClick={() => onPage(page + 1)} aria-label="Próxima página"><ChevronRight className="h-4 w-4" /></Button></div>;
 }
 
 function DetailMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
