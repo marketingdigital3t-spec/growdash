@@ -140,3 +140,12 @@ Verificação pós-publicação: `growdash.com.br` e `www.growdash.com.br` respo
 - Produção: `growdash.com.br` foi recuperado da falha de boot e confirmado na tela de login; os deploys posteriores foram enviados ao Cloudflare Pages.
 - Escopo entregue: correções de carregamento/boot, cache e consultas, Kanban e templates, edição de KPIs, Growdash Flow, filtros de data CRM/Comercial, turmas personalizadas, unificação Meta Connect, métricas de conversas iniciadas, Instagram e acessibilidade.
 - Não foi possível declarar OAuth e as funções Supabase em produção como concluídos: continuam pendentes os secrets dos aplicativos, a aplicação das migrações e uma sessão autenticada de teste. Esses itens exigem credenciais ou liberação externa que não estavam disponíveis e não foram alterados.
+
+## Correções de segurança pendentes de aplicação — 08/08/2026 15:04
+
+- Código endurecido para `sync-meta-transactions`, `rd-backfill-touches`, `daily-reconciliation`, `rd-resync-cron` e `rd-discover-fields`: requisições sem sessão passam a receber 401; contas/funis são limitados a proprietário, delegação válida no workspace ativo ou master; os orquestradores globais exigem service role ou segredo de cron.
+- Nova migration `20260808120000_security_hardening_workspace_scope.sql`: escopo de delegações por workspace, remoção de acessos somente no workspace removido, catálogo de permissões por workspace, Kanban exige membro `active`, e visualizadores deixam de alterar agentes e agendamentos WhatsApp.
+- Nova migration `20260808121500_secure_shared_lead_reports.sql`: links públicos ganham expiração padrão de 30 dias, revogação por `is_public` e remoção de campos pessoais comuns do payload retornado.
+- `public/_headers` recebeu CSP, HSTS, Permissions-Policy, anti-frame e política de referrer; os headers só chegam a produção com novo deploy Cloudflare Pages.
+- Validação local: TypeScript, ESLint, Vitest (22 arquivos/61 testes) e build Vite aprovados. O Playwright não executou porque o Chromium local está ausente; não foi baixado para evitar novo consumo relevante de disco.
+- Bloqueio externo: Supabase CLI, Docker/psql e credenciais administrativas não estão disponíveis nesta máquina. As migrations e Edge Functions ainda precisam ser aplicadas/publicadas e validadas com dois usuários e dois workspaces antes de considerar a produção segura.

@@ -36,17 +36,20 @@ export function usePermissions() {
   const { data: workspace, isLoading: loadingWorkspace } = useWorkspace();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["permissions", user?.id],
+    queryKey: ["permissions", user?.id, workspace?.id],
     enabled: !!user,
     queryFn: async () => {
       try {
-        const [perm, accs, funs] = await Promise.all([
+        const scopedPerm = workspace?.id && !workspace.id.startsWith("legacy-")
+          ? await (supabase as any).from("workspace_user_permissions").select("*").eq("workspace_id", workspace.id).eq("user_id", user!.id).maybeSingle()
+          : { data: null, error: null };
+        const [legacyPerm, accs, funs] = await Promise.all([
           supabase.from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
           supabase.from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id),
           supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id),
         ]);
         return {
-          perm: perm.data,
+          perm: scopedPerm.data ?? legacyPerm.data,
           allowedAdAccounts: (accs.data ?? []).map((a) => a.ad_account_id),
           allowedRDFunnels: (funs.data ?? []).map((f) => f.rd_funnel_id),
         };

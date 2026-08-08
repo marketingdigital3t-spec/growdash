@@ -49,6 +49,21 @@ async function runJob(jobName: string, fn: () => Promise<{ processed: number; me
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const authHeader = req.headers.get("Authorization") || "";
+  const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const cronSecret = Deno.env.get("DAILY_RECONCILIATION_CRON_SECRET") || Deno.env.get("CRON_SECRET");
+  const isService = Boolean(bearer && bearer === SERVICE_ROLE);
+  const isCron = Boolean(cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+  if (!isService && !isCron) {
+    console.warn("daily-reconciliation: unauthorized caller", {
+      hasBearer: Boolean(bearer),
+      hasCronSecret: Boolean(req.headers.get("x-cron-secret")),
+    });
+    return new Response(JSON.stringify({ error: "Unauthorized cron request" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const results: unknown[] = [];
 
   // 1) Reconcile sales <-> RD deals (full backfill window)

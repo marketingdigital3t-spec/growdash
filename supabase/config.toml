@@ -38,5 +38,23 @@ verify_jwt = false
 
 [functions.daily-incremental-sync]
 verify_jwt = false
+
+# These jobs perform global server-side work. The functions enforce service-role
+# or rotated cron-secret authentication internally; the gateway must let the
+# cron-secret path reach the function.
+[functions.sync-meta-transactions]
+verify_jwt = false
+
+[functions.rd-backfill-touches]
+verify_jwt = false
+
+[functions.daily-reconciliation]
+verify_jwt = false
+
+[functions.rd-resync-cron]
+verify_jwt = false
+
+[functions.rd-discover-fields]
+verify_jwt = true
 [functions.admin-create-user]
 verify_jwt = false
