@@ -40,13 +40,16 @@ export function useActionTotalsByAds(
   adAccountByAdId?: Record<string, string | null | undefined>,
 ) {
   const sortedIds = [...adIds].sort();
+  const accountMapSignature = adAccountByAdId
+    ? JSON.stringify(Object.entries(adAccountByAdId).sort(([a], [b]) => a.localeCompare(b)))
+    : "";
   return useQuery({
     queryKey: [
       "action-totals-by-ads",
       sortedIds.join(","),
       startDate?.toISOString(),
       endDate?.toISOString(),
-      adAccountByAdId ? Object.keys(adAccountByAdId).length : 0,
+      accountMapSignature,
     ],
     enabled: sortedIds.length > 0,
     queryFn: async (): Promise<ActionTotalsResult> => {
@@ -141,5 +144,8 @@ export function useActionTotalsByAds(
       }
       return { totals, totalsByAccount, dailyByAccount, totalsByAd, valueTotalsByAd, excludedAdCount };
     },
+    staleTime: 120_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
   });
 }
