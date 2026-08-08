@@ -9,9 +9,11 @@ import {
   BriefcaseBusiness,
   Coffee,
   ChevronRight,
+  Cpu,
   MessageCircle,
   Minimize2,
   Network,
+  Radar,
   Rotate3D,
   RotateCcw,
   Send,
@@ -20,6 +22,7 @@ import {
   UsersRound,
   WandSparkles,
   X,
+  Zap,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
@@ -205,11 +208,48 @@ const KNOWLEDGE_NODES = [
   { label: "Automações", note: "Playbooks, WhatsApp e operações", href: "/automacoes", angle: 208, branches: [["Playbooks", "/automacoes"], ["WhatsApp", "/automacoes"], ["Webhooks & rotinas", "/automacoes"]] },
 ] as const;
 
+const NEURAL_POINTS = Array.from({ length: 38 }, (_, index) => ({
+  id: index,
+  x: 4 + ((index * 37) % 92),
+  y: 5 + ((index * 53) % 88),
+  size: 2 + (index % 4),
+  delay: -((index * 0.31) % 4.8),
+  duration: 3.2 + ((index * 7) % 18) / 10,
+  depth: (index % 5) + 1,
+}));
+
+const NEURAL_LINKS = Array.from({ length: 42 }, (_, index) => {
+  const from = index % NEURAL_POINTS.length;
+  const to = (index * 7 + 11) % NEURAL_POINTS.length;
+  return [from, to] as const;
+});
+
+const BRAIN_CIRCUITS = [
+  "M80 124 H126 V91 H176 V67",
+  "M61 169 H113 V143 H161 V112 H194",
+  "M74 221 H119 V194 H165 V166 H202",
+  "M101 266 V238 H151 V214 H196",
+  "M340 124 H294 V91 H244 V67",
+  "M359 169 H307 V143 H259 V112 H226",
+  "M346 221 H301 V194 H255 V166 H218",
+  "M319 266 V238 H269 V214 H224",
+  "M132 61 V83 H158",
+  "M288 61 V83 H262",
+  "M112 286 H153 V260 H193",
+  "M308 286 H267 V260 H227",
+] as const;
+
+const BRAIN_NODES = [
+  [80, 124], [126, 91], [176, 67], [61, 169], [113, 143], [161, 112], [74, 221], [119, 194], [165, 166], [101, 266], [151, 238], [196, 214],
+  [340, 124], [294, 91], [244, 67], [359, 169], [307, 143], [259, 112], [346, 221], [301, 194], [255, 166], [319, 266], [269, 238], [224, 214],
+] as const;
+
 type CorePhase = "brain" | "entering" | "core";
 
 function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
   const [phase, setPhase] = useState<CorePhase>("brain");
   const transitionTimer = useRef<number | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
   const isCoreOpen = phase === "core";
 
   useEffect(() => () => {
@@ -219,41 +259,87 @@ function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
   const enterCore = () => {
     if (phase !== "brain") return;
     setPhase("entering");
-    transitionTimer.current = window.setTimeout(() => setPhase("core"), 720);
+    transitionTimer.current = window.setTimeout(() => setPhase("core"), 1380);
   };
 
-  return <section className={cn("jarvis-command-center", `is-${phase}`)} aria-label="Núcleo de inteligência Growdash">
+  const resetCore = () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
+    transitionTimer.current = null;
+    setPhase("brain");
+  };
+
+  const updateParallax = (event: React.PointerEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - .5) * 2));
+    const y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - .5) * 2));
+    event.currentTarget.style.setProperty("--jarvis-bg-x", `${(x * 28).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-bg-y", `${(y * 18).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-grid-x", `${(x * -10).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-grid-y", `${(y * -8).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-field-x", `${(x * 12).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-field-y", `${(y * 9).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-brain-x", `${(x * 7).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-brain-y", `${(y * 5).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-point-x", `${(x * 8).toFixed(2)}px`);
+    event.currentTarget.style.setProperty("--jarvis-point-y", `${(y * 8 - 10).toFixed(2)}px`);
+  };
+
+  const resetParallax = () => {
+    ["--jarvis-bg-x", "--jarvis-bg-y", "--jarvis-grid-x", "--jarvis-grid-y", "--jarvis-field-x", "--jarvis-field-y", "--jarvis-brain-x", "--jarvis-brain-y", "--jarvis-point-x", "--jarvis-point-y"].forEach((property) => stageRef.current?.style.setProperty(property, "0px"));
+  };
+
+  return <section ref={stageRef} className={cn("jarvis-command-center", `is-${phase}`)} aria-label="Núcleo de inteligência Growdash" onPointerMove={updateParallax} onPointerLeave={resetParallax}>
     <div className="knowledge-map-grid" />
     <div className="jarvis-scanline" aria-hidden="true" />
-    <div className="jarvis-stars" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
+    <div className="jarvis-neural-field" aria-hidden="true">
+      <svg viewBox="0 0 1000 760" preserveAspectRatio="none">
+        {NEURAL_LINKS.map(([from, to], index) => <line key={`${from}-${to}-${index}`} x1={NEURAL_POINTS[from].x * 10} y1={NEURAL_POINTS[from].y * 7.6} x2={NEURAL_POINTS[to].x * 10} y2={NEURAL_POINTS[to].y * 7.6} style={{ "--link-delay": `${-(index % 9) * .24}s` } as React.CSSProperties} />)}
+      </svg>
+      {NEURAL_POINTS.map((point) => <i key={point.id} className="jarvis-neural-point" style={{ left: `${point.x}%`, top: `${point.y}%`, width: `${point.size}px`, height: `${point.size}px`, "--point-delay": `${point.delay}s`, "--point-duration": `${point.duration}s`, "--point-depth": point.depth } as React.CSSProperties} />)}
+    </div>
+    <div className="jarvis-cinematic-tunnel" aria-hidden="true"><i /><i /><i /><i /><span /></div>
+    <div className="jarvis-phase-status sr-only" aria-live="polite">{phase === "brain" ? "Cérebro operacional pronto" : phase === "entering" ? "Entrando no núcleo de inteligência" : "Grafo operacional Growdash aberto"}</div>
 
     {isCoreOpen && <svg className="jarvis-links" viewBox="0 0 1000 760" preserveAspectRatio="none" aria-hidden="true">
-      <defs><linearGradient id="jarvis-link" x1="0" x2="1"><stop offset="0" stopColor="#f4c64d" stopOpacity=".18" /><stop offset=".48" stopColor="#fff4ba" stopOpacity=".92" /><stop offset="1" stopColor="#f4c64d" stopOpacity=".18" /></linearGradient></defs>
-      {KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 335; const y = 380 + Math.sin(radians) * 285; return <g key={node.label}><line x1="500" y1="380" x2={x} y2={y} stroke="url(#jarvis-link)" strokeWidth="2" strokeDasharray="6 10" /><circle cx={x} cy={y} r="5" fill="#ffe9a1" /></g>; })}
+      <defs><linearGradient id="jarvis-link" x1="0" x2="1"><stop offset="0" stopColor="currentColor" stopOpacity=".12" /><stop offset=".5" stopColor="currentColor" stopOpacity=".95" /><stop offset="1" stopColor="currentColor" stopOpacity=".16" /></linearGradient></defs>
+      {KNOWLEDGE_NODES.map((node, index) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 335; const y = 380 + Math.sin(radians) * 285; const controlX = 500 + Math.cos(radians) * 170 + Math.sin(radians) * (index % 2 === 0 ? 34 : -34); const controlY = 380 + Math.sin(radians) * 145; return <g key={node.label} style={{ "--link-delay": `${index * -.28}s` } as React.CSSProperties}><path d={`M 500 380 Q ${controlX} ${controlY} ${x} ${y}`} stroke="url(#jarvis-link)" strokeWidth="2" strokeDasharray="7 11" fill="none" /><circle cx={x} cy={y} r="6" fill="currentColor" /><circle className="jarvis-node-halo" cx={x} cy={y} r="15" fill="none" stroke="currentColor" /></g>; })}
     </svg>}
 
     <button type="button" onClick={enterCore} className="jarvis-brain" aria-label={isCoreOpen ? "Núcleo Growdash expandido" : "Entrar no núcleo Growdash"} aria-expanded={isCoreOpen} disabled={phase === "entering"}>
+      <span className="jarvis-brain-aura" />
       <span className="jarvis-orbit orbit-one" /><span className="jarvis-orbit orbit-two" /><span className="jarvis-orbit orbit-three" />
-      <span className="brain-hemisphere brain-left" /><span className="brain-hemisphere brain-right" />
-      <span className="brain-synapse synapse-a" /><span className="brain-synapse synapse-b" /><span className="brain-synapse synapse-c" /><span className="brain-synapse synapse-d" />
-      <span className="jarvis-brain-copy"><BrainCircuit className="h-7 w-7" /><b>JARVIS</b><small>{phase === "entering" ? "Abrindo núcleo…" : "Clique para entrar"}</small></span>
+      <svg className="jarvis-cortex" viewBox="0 0 420 360" role="img" aria-label="Cérebro eletrônico Growdash">
+        <defs>
+          <linearGradient id="cortex-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brand-gold-light)" /><stop offset=".42" stopColor="var(--brand-gold)" /><stop offset="1" stopColor="var(--brand-bronze)" /></linearGradient>
+          <filter id="cortex-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        </defs>
+        <path className="jarvis-cortex-lobe" d="M204 45C163 24 116 39 95 73C55 79 41 119 55 151C31 181 45 225 76 240C72 276 109 302 143 291C158 322 197 318 210 288V69C210 56 208 50 204 45Z" />
+        <path className="jarvis-cortex-lobe" d="M216 45C257 24 304 39 325 73C365 79 379 119 365 151C389 181 375 225 344 240C348 276 311 302 277 291C262 322 223 318 210 288V69C210 56 212 50 216 45Z" />
+        <path className="jarvis-cortex-midline" d="M210 65V291M180 300C190 327 184 342 170 354M240 300C230 327 236 342 250 354" />
+        {BRAIN_CIRCUITS.map((path, index) => <path key={path} className="jarvis-circuit-trace" d={path} style={{ "--circuit-delay": `${index * -.17}s` } as React.CSSProperties} />)}
+        <rect className="jarvis-cortex-chip" x="184" y="130" width="52" height="72" rx="8" />
+        <path className="jarvis-cortex-chip-lines" d="M194 143H226M194 155H226M194 167H226M194 179H226M174 143H184M174 160H184M174 177H184M236 143H246M236 160H246M236 177H246" />
+        {BRAIN_NODES.map(([x, y], index) => <circle key={`${x}-${y}`} className="jarvis-cortex-node" cx={x} cy={y} r={index % 3 === 0 ? 5 : 3.5} style={{ "--node-delay": `${index * -.11}s` } as React.CSSProperties} />)}
+      </svg>
+      <span className="jarvis-energy-core"><Cpu /><i /></span>
+      <span className="jarvis-brain-copy"><BrainCircuit className="h-7 w-7" /><b>JARVIS</b><small>{phase === "entering" ? "Sincronizando conexões…" : "Clique para entrar no núcleo"}</small></span>
     </button>
 
     {isCoreOpen && <>
-      <div className="jarvis-core-label" aria-live="polite"><span>GROWDASH</span><b>OPERATIONAL CORE</b><small>Inteligência conectada de ponta a ponta</small></div>
-      {KNOWLEDGE_NODES.map((node) => {
+      <div className="jarvis-core-label" aria-live="polite"><i className="brand-mark-tint jarvis-core-mark" /><span>GROWDASH</span><b>OPERATIONAL CORE</b><small>Inteligência conectada de ponta a ponta</small><em><Radar />Grafo vivo · {KNOWLEDGE_NODES.length} áreas · {KNOWLEDGE_NODES.reduce((total, node) => total + node.branches.length, 0)} estratégias</em></div>
+      {KNOWLEDGE_NODES.map((node, index) => {
         const radians = node.angle * Math.PI / 180;
-        return <article key={node.label} className="jarvis-arm" style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 37.5}%` }}>
-          <NavLink to={node.href} className="jarvis-arm-head"><span><Sparkles className="h-4 w-4" /></span><div><b>{node.label}</b><small>{node.note}</small></div><ChevronRight className="h-4 w-4" /></NavLink>
+        return <article key={node.label} className="jarvis-arm" style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 37.5}%`, "--arm-delay": `${index * 70}ms` } as React.CSSProperties}>
+          <NavLink to={node.href} className="jarvis-arm-head"><span><Zap className="h-4 w-4" /></span><div><b>{node.label}</b><small>{node.note}</small></div><ChevronRight className="h-4 w-4" /></NavLink>
           <div className="jarvis-branches" aria-label={`Estratégias de ${node.label}`}>
             {node.branches.map(([label, href]) => <NavLink key={label} to={href} className="jarvis-branch"><i /><span>{label}</span></NavLink>)}
           </div>
         </article>;
       })}
-      <div className="jarvis-actions"><button type="button" onClick={() => setPhase("brain")}><RotateCcw className="h-3.5 w-3.5" />Visão do cérebro</button><button type="button" onClick={onOpenOffice}><BriefcaseBusiness className="h-3.5 w-3.5" />Entrar no escritório 3D</button></div>
+      <div className="jarvis-actions"><button type="button" onClick={resetCore}><RotateCcw className="h-3.5 w-3.5" />Visão do cérebro</button><button type="button" onClick={onOpenOffice}><BriefcaseBusiness className="h-3.5 w-3.5" />Entrar no escritório 3D</button></div>
     </>}
 
-    {!isCoreOpen && <div className="jarvis-intro"><b>Central de comando autônoma</b><span>Clique no cérebro para revelar as operações, seus braços e mini estratégias.</span></div>}
+    {!isCoreOpen && <div className="jarvis-intro"><b>Central de comando autônoma</b><span>Entre no cérebro operacional para navegar pelas áreas, conexões e estratégias da Growdash.</span><small><Sparkles />Experiência neural interativa</small></div>}
   </section>;
 }
 

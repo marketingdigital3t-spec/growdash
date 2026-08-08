@@ -2087,3 +2087,357 @@
   background: hsl(var(--destructive) / .08);
   color: hsl(var(--destructive));
 }
+
+/* JARVIS neural command center --------------------------------------------
+   A lightweight SVG/CSS scene gives the brain circuit detail and an Obsidian-
+   style live graph without shipping a heavy 3D runtime. */
+.jarvis-command-center {
+  --jarvis-bg-x: 0px;
+  --jarvis-bg-y: 0px;
+  --jarvis-grid-x: 0px;
+  --jarvis-grid-y: 0px;
+  --jarvis-field-x: 0px;
+  --jarvis-field-y: 0px;
+  --jarvis-brain-x: 0px;
+  --jarvis-brain-y: 0px;
+  --jarvis-point-x: 0px;
+  --jarvis-point-y: -10px;
+  background:
+    radial-gradient(ellipse at calc(50% + var(--jarvis-bg-x)) calc(48% + var(--jarvis-bg-y)), rgba(var(--brand-accent-rgb), .2), transparent 24rem),
+    radial-gradient(ellipse at 12% 14%, color-mix(in srgb, rgb(var(--brand-accent-rgb)) 38%, #092538), transparent 28rem),
+    linear-gradient(145deg, #010304 0%, #05080b 46%, #090603 100%);
+}
+
+.jarvis-command-center::before {
+  border-color: rgba(var(--brand-accent-rgb), .3);
+  box-shadow: 0 0 34px rgba(var(--brand-accent-rgb), .06);
+}
+
+.jarvis-command-center .knowledge-map-grid {
+  opacity: .72;
+  transform: translate3d(var(--jarvis-grid-x), var(--jarvis-grid-y), 0) scale(1.04);
+  transition: transform .5s ease-out;
+}
+
+.jarvis-neural-field {
+  position: absolute;
+  inset: -4%;
+  z-index: 3;
+  transform: translate3d(var(--jarvis-field-x), var(--jarvis-field-y), 0);
+  transition: transform .65s cubic-bezier(.2,.8,.2,1);
+  pointer-events: none;
+}
+
+.jarvis-neural-field svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.jarvis-neural-field line {
+  stroke: rgba(var(--brand-accent-rgb), .22);
+  stroke-width: 1.1;
+  stroke-dasharray: 2 14;
+  stroke-linecap: round;
+  animation: jarvis-neural-flow 3.8s linear infinite;
+  animation-delay: var(--link-delay);
+  filter: drop-shadow(0 0 3px rgba(var(--brand-accent-rgb), .32));
+}
+
+.jarvis-neural-point {
+  position: absolute;
+  display: block;
+  border: 1px solid color-mix(in srgb, var(--brand-gold-light) 74%, transparent);
+  border-radius: 50%;
+  background: var(--brand-gold-light);
+  box-shadow: 0 0 8px 2px rgba(var(--brand-accent-rgb), .66), 0 0 22px rgba(var(--brand-accent-rgb), .26);
+  opacity: .72;
+  animation: jarvis-neural-float var(--point-duration) ease-in-out infinite alternate;
+  animation-delay: var(--point-delay);
+}
+
+.jarvis-neural-point::after {
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgba(var(--brand-accent-rgb), .23);
+  border-radius: inherit;
+  content: "";
+  animation: jarvis-neural-pulse 2.4s ease-in-out infinite;
+  animation-delay: var(--point-delay);
+}
+
+.jarvis-cinematic-tunnel {
+  position: absolute;
+  inset: 0;
+  z-index: 26;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.jarvis-cinematic-tunnel i {
+  position: absolute;
+  width: 22%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(var(--brand-accent-rgb), .72);
+  border-radius: 50%;
+  box-shadow: 0 0 30px rgba(var(--brand-accent-rgb), .2), inset 0 0 22px rgba(var(--brand-accent-rgb), .14);
+  transform: scale(.1);
+}
+
+.jarvis-cinematic-tunnel i:nth-child(2) { width: 42%; }
+.jarvis-cinematic-tunnel i:nth-child(3) { width: 66%; }
+.jarvis-cinematic-tunnel i:nth-child(4) { width: 94%; }
+.jarvis-cinematic-tunnel span { width: 12px; height: 12px; border-radius: 50%; background: var(--brand-gold-light); box-shadow: 0 0 80px 28px rgba(var(--brand-accent-rgb), .92); }
+
+.jarvis-command-center.is-entering .jarvis-neural-field {
+  animation: jarvis-neural-warp 1.38s cubic-bezier(.16,.82,.24,1) both;
+}
+
+.jarvis-command-center.is-entering .jarvis-cinematic-tunnel {
+  animation: jarvis-tunnel-enter 1.38s cubic-bezier(.16,.82,.24,1) both;
+}
+
+.jarvis-command-center.is-entering .jarvis-neural-field line {
+  animation-duration: .48s;
+}
+
+.jarvis-command-center.is-core .jarvis-neural-field {
+  opacity: .44;
+  transform: translate3d(var(--jarvis-field-x), var(--jarvis-field-y), 0) scale(1.04);
+}
+
+.jarvis-brain {
+  width: 320px;
+  height: 300px;
+  transform: translate(-50%, -50%) translate3d(var(--jarvis-brain-x), var(--jarvis-brain-y), 0);
+  transition: transform .42s cubic-bezier(.2,.8,.2,1), filter .32s ease, opacity .38s ease;
+}
+
+.jarvis-brain:hover:not(:disabled) {
+  transform: translate(-50%, -50%) translate3d(var(--jarvis-brain-x), var(--jarvis-brain-y), 0) scale(1.035);
+}
+
+.jarvis-brain-aura {
+  position: absolute;
+  inset: 12%;
+  border: 1px solid rgba(var(--brand-accent-rgb), .28);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--brand-accent-rgb), .2), transparent 67%);
+  box-shadow: 0 0 75px rgba(var(--brand-accent-rgb), .34), inset 0 0 50px rgba(var(--brand-accent-rgb), .12);
+  animation: jarvis-aura-breathe 3.8s ease-in-out infinite;
+}
+
+.jarvis-cortex {
+  position: relative;
+  z-index: 3;
+  width: 310px;
+  height: 270px;
+  overflow: visible;
+  filter: drop-shadow(0 0 20px rgba(var(--brand-accent-rgb), .34));
+}
+
+.jarvis-cortex-lobe {
+  fill: url(#cortex-metal);
+  fill-opacity: .88;
+  stroke: color-mix(in srgb, var(--brand-gold-light) 86%, transparent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  animation: jarvis-cortex-breathe 4.4s ease-in-out infinite alternate;
+}
+
+.jarvis-cortex-lobe:nth-of-type(2) { animation-delay: -1.9s; }
+
+.jarvis-cortex-midline,
+.jarvis-cortex-chip-lines {
+  fill: none;
+  stroke: var(--brand-gold-light);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .8;
+}
+
+.jarvis-cortex-midline { stroke-width: 2; stroke-dasharray: 4 8; }
+.jarvis-cortex-chip { fill: rgba(var(--brand-accent-rgb), .34); stroke: var(--brand-gold-light); stroke-width: 2; filter: url(#cortex-glow); }
+.jarvis-cortex-chip-lines { stroke-width: 1.2; opacity: .54; }
+
+.jarvis-circuit-trace {
+  fill: none;
+  stroke: var(--brand-gold-light);
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 4 7;
+  stroke-dashoffset: 0;
+  opacity: .74;
+  filter: url(#cortex-glow);
+  animation: jarvis-circuit-flow 2.9s linear infinite;
+  animation-delay: var(--circuit-delay);
+}
+
+.jarvis-cortex-node {
+  fill: var(--brand-gold-light);
+  stroke: rgba(var(--brand-accent-rgb), .82);
+  stroke-width: 2;
+  filter: url(#cortex-glow);
+  animation: jarvis-cortex-node-pulse 1.8s ease-in-out infinite;
+  animation-delay: var(--node-delay);
+}
+
+.jarvis-energy-core {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  width: 55px;
+  height: 55px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--brand-gold-light) 74%, transparent);
+  border-radius: 17px;
+  background: radial-gradient(circle, rgba(var(--brand-accent-rgb), .62), rgba(var(--brand-accent-rgb), .14));
+  color: var(--brand-gold-light);
+  box-shadow: 0 0 30px rgba(var(--brand-accent-rgb), .7), inset 0 0 18px rgba(255,255,255,.14);
+  transform: translateY(3px);
+  animation: jarvis-energy-pulse 2.2s ease-in-out infinite;
+}
+
+.jarvis-energy-core svg { width: 22px; height: 22px; }
+.jarvis-energy-core i { position: absolute; inset: -11px; border: 1px dashed rgba(var(--brand-accent-rgb), .58); border-radius: 21px; animation: jarvis-energy-spin 8s linear infinite; }
+
+.jarvis-brain-copy { z-index: 8; gap: 3px; }
+.jarvis-brain-copy b { letter-spacing: .34em; }
+.jarvis-brain-copy small { max-width: 150px; text-align: center; }
+
+.jarvis-command-center.is-entering .jarvis-brain {
+  animation: jarvis-cinematic-zoom 1.38s cubic-bezier(.16,.82,.24,1) both;
+}
+
+.jarvis-command-center.is-core .jarvis-brain {
+  opacity: .1;
+  transform: translate(-50%, -50%) scale(.46);
+}
+
+.jarvis-links path {
+  stroke-dashoffset: 0;
+  animation: jarvis-graph-flow 2.6s linear infinite;
+  animation-delay: var(--link-delay);
+}
+
+.jarvis-links .jarvis-node-halo {
+  stroke-width: 1.5;
+  opacity: .42;
+  animation: jarvis-graph-node-pulse 2.5s ease-in-out infinite;
+  animation-delay: var(--link-delay);
+}
+
+.jarvis-core-label {
+  gap: 2px;
+  min-width: 220px;
+  padding: 10px 14px;
+  border: 1px solid rgba(var(--brand-accent-rgb), .34);
+  border-radius: 20px;
+  background: rgba(2, 7, 8, .76);
+  box-shadow: 0 0 44px rgba(var(--brand-accent-rgb), .14), inset 0 0 24px rgba(var(--brand-accent-rgb), .06);
+  backdrop-filter: blur(14px);
+}
+
+.jarvis-core-mark {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 0 10px rgba(var(--brand-accent-rgb), .65));
+}
+
+.jarvis-core-label em {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--brand-gold-light);
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.jarvis-core-label em svg { width: 11px; height: 11px; }
+
+.jarvis-arm {
+  width: 224px;
+  animation-delay: var(--arm-delay);
+}
+
+.jarvis-arm-head {
+  border-color: rgba(var(--brand-accent-rgb), .54);
+  box-shadow: 0 16px 40px rgba(0,0,0,.5), 0 0 20px rgba(var(--brand-accent-rgb), .1), inset 0 1px rgba(255,255,255,.12);
+}
+
+.jarvis-arm-head > span {
+  color: var(--brand-gold-light);
+  box-shadow: 0 0 14px rgba(var(--brand-accent-rgb), .24);
+}
+
+.jarvis-branch i { background: var(--brand-gold-light); box-shadow: 0 0 9px rgba(var(--brand-accent-rgb), .92); }
+
+.jarvis-intro small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 12px;
+  color: rgba(255,255,255,.38);
+  font-size: 8px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.jarvis-intro small svg { width: 11px; height: 11px; color: var(--brand-gold-light); }
+
+@keyframes jarvis-neural-flow { to { stroke-dashoffset: -42; } }
+@keyframes jarvis-neural-float { 0% { opacity: .3; transform: translate3d(0, 0, 0) scale(.72); } 50% { opacity: .9; } 100% { opacity: .58; transform: translate3d(var(--jarvis-point-x), var(--jarvis-point-y), 0) scale(1.18); } }
+@keyframes jarvis-neural-pulse { 0%, 100% { opacity: .12; transform: scale(.75); } 50% { opacity: .7; transform: scale(1.65); } }
+@keyframes jarvis-neural-warp { 0% { opacity: .72; transform: scale(1); filter: blur(0); } 44% { opacity: 1; filter: blur(.3px); } 100% { opacity: 0; transform: scale(1.8); filter: blur(5px); } }
+@keyframes jarvis-tunnel-enter { 0% { opacity: 0; } 18% { opacity: .9; } 66% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes jarvis-cinematic-zoom { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: brightness(1); } 42% { opacity: 1; transform: translate(-50%, -50%) scale(1.48); filter: brightness(1.9) drop-shadow(0 0 65px rgba(var(--brand-accent-rgb), .95)); } 76% { opacity: .68; transform: translate(-50%, -50%) scale(2.8); filter: brightness(2.3) blur(1px); } 100% { opacity: .1; transform: translate(-50%, -50%) scale(3.6); filter: brightness(1.5) blur(5px); } }
+@keyframes jarvis-aura-breathe { 0%, 100% { opacity: .45; transform: scale(.94); } 50% { opacity: .9; transform: scale(1.08); } }
+@keyframes jarvis-cortex-breathe { 0% { transform: translateZ(0) rotateY(-1deg); } 100% { transform: translateZ(8px) rotateY(2deg); } }
+@keyframes jarvis-circuit-flow { to { stroke-dashoffset: -44; } }
+@keyframes jarvis-cortex-node-pulse { 0%, 100% { opacity: .45; transform: scale(.72); } 50% { opacity: 1; transform: scale(1.18); } }
+@keyframes jarvis-energy-pulse { 0%, 100% { filter: brightness(.92); transform: translateY(3px) scale(.94); } 50% { filter: brightness(1.28); transform: translateY(3px) scale(1.06); } }
+@keyframes jarvis-energy-spin { to { rotate: 360deg; } }
+@keyframes jarvis-graph-flow { to { stroke-dashoffset: -36; } }
+@keyframes jarvis-graph-node-pulse { 0%, 100% { opacity: .22; transform: scale(.76); } 50% { opacity: .72; transform: scale(1.25); } }
+
+@media (max-width: 820px) {
+  .jarvis-neural-field { inset: -7% -14%; opacity: .8; }
+  .jarvis-brain { width: 224px; height: 220px; margin-top: 26px; }
+  .jarvis-cortex { width: 225px; height: 205px; }
+  .jarvis-energy-core { width: 42px; height: 42px; border-radius: 13px; }
+  .jarvis-energy-core svg { width: 17px; height: 17px; }
+  .jarvis-core-label { margin-top: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jarvis-neural-field,
+  .jarvis-neural-field line,
+  .jarvis-neural-point,
+  .jarvis-neural-point::after,
+  .jarvis-cinematic-tunnel,
+  .jarvis-brain-aura,
+  .jarvis-cortex-lobe,
+  .jarvis-circuit-trace,
+  .jarvis-cortex-node,
+  .jarvis-energy-core,
+  .jarvis-energy-core i,
+  .jarvis-links path,
+  .jarvis-links .jarvis-node-halo {
+    animation: none !important;
+  }
+
+  .jarvis-command-center.is-entering .jarvis-brain { animation: jarvis-reduced-enter .2s ease-out both !important; }
+}
+
+@keyframes jarvis-reduced-enter { from { opacity: 1; } to { opacity: .08; } }
