@@ -63,7 +63,7 @@ const Index = () => {
   const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
-  const { data: insights = [], isLoading, refetch } = useInsights({
+  const { data: insights = [], isLoading } = useInsights({
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
     campaignIds: selectedCampaignIds.length > 0 ? selectedCampaignIds : undefined,
     startDate,
@@ -139,15 +139,15 @@ const Index = () => {
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
 
-  const handleSync = async () => {
-    refetch();
-    syncMeta
-      .mutateAsync({
-        adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-        startDate: format(startDate, "yyyy-MM-dd"),
-        endDate: format(endDate, "yyyy-MM-dd"),
-      })
-      .then(() => refetch());
+  const handleSync = () => {
+    // A mutation já invalida as consultas de insights ao terminar. Refazer a
+    // consulta antes e depois da sincronização só competia por rede e fazia o
+    // dashboard trocar desnecessariamente para estado de carregamento.
+    syncMeta.mutate({
+      adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+      startDate: format(startDate, "yyyy-MM-dd"),
+      endDate: format(endDate, "yyyy-MM-dd"),
+    });
   };
 
   const cloneView = useCallback((view: DashboardView): DashboardView => ({

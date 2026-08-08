@@ -79,8 +79,8 @@ export function DateFilterBar({
       )}
 
       {onRefresh && (
-        <Button variant="outline" size="icon" onClick={onRefresh} disabled={isRefreshing} className="gd-filter-refresh min-h-11 w-full bg-card sm:h-10 sm:min-h-0 sm:w-10">
-          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+        <Button variant="outline" size="icon" onClick={onRefresh} disabled={isRefreshing} aria-label="Atualizar dados da Meta" className="gd-filter-refresh min-h-11 w-full bg-card sm:h-10 sm:min-h-0 sm:w-10">
+          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
         </Button>
       )}
 
