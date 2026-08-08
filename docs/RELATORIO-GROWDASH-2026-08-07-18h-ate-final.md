@@ -35,6 +35,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 01:49 | `4ed0988` | O `_headers` do Pages passou a aplicar `no-store/no-cache` a todo o shell HTML, mantendo cache imutável apenas nos assets. Isso reduz a recorrência do carregamento infinito causado por HTML antigo no URL de um bundle. GitHub publicado; Pages publicado em `https://79bcc6d6.growdash.pages.dev`. |
 | 08/08 01:55 | `2e4a421` | Kanban ganhou semântica acessível nas colunas e cartões (`aria-label`, `role=list/listitem`) e o botão de exclusão deixa de ficar invisível ao receber foco de teclado. GitHub publicado; Pages publicado em `https://ffeb8894.growdash.pages.dev`. |
 | 08/08 02:03 | `5a3d492` | A consulta da visualização global do dashboard passou a particionar o cache do React Query por usuário autenticado e a só consultar após a sessão existir. Isso evita que uma troca de conta reapresente momentaneamente o layout de outro usuário. GitHub publicado; Pages publicado em `https://5a4f472a.growdash.pages.dev`. |
+| 08/08 02:06 | `e1c6185` | O logout e a troca de sessão agora limpam o cache do React Query. Consultas compartilhadas por módulo não podem mais exibir dados da conta anterior durante a entrada de outro usuário. GitHub publicado; Pages publicado em `https://cb575b32.growdash.pages.dev`. |
 
 ## Desempenho e carregamento
 
@@ -72,6 +73,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Para o commit `4ed0988`: build Vite aprovado (o mesmo conjunto de TypeScript, lint e Vitest do commit imediatamente anterior permanece verde); o Pages foi publicado em `https://79bcc6d6.growdash.pages.dev`. Após a propagação, os domínios raiz e `www` responderam com HTML 200, `Cache-Control: no-store` e o bundle atual `app-GjzS_RGo.js` em `application/javascript` (assets com `public, max-age=31536000, immutable`).
 - Para o commit `2e4a421`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 telas públicas aprovadas e 3 rotas autenticadas puladas sem credenciais E2E. Após a propagação da publicação Git, `growdash.com.br` e `www.growdash.com.br` responderam 200 e o bundle `app-DDZXpoJz.js` respondeu `application/javascript` em ambos.
 - Para o commit `5a3d492`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 telas públicas aprovadas e 3 rotas autenticadas puladas sem credenciais E2E. O preview `5a4f472a.growdash.pages.dev` e, após a propagação, os dois domínios personalizados responderam 200 com o bundle `app-C7ISG2zA.js` em `application/javascript`.
+- Para o commit `e1c6185`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 telas públicas aprovadas e 3 rotas autenticadas puladas sem credenciais E2E. O preview `cb575b32.growdash.pages.dev`, `growdash.com.br` e `www.growdash.com.br` responderam 200 com bundle JavaScript válido.
 
 ## Pendências externas e limites de validação
 
