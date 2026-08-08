@@ -63,16 +63,11 @@ const Index = () => {
   const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
-  const { data: insights = [], isLoading } = useInsights({
-    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-    campaignIds: selectedCampaignIds.length > 0 ? selectedCampaignIds : undefined,
-    startDate,
-    endDate,
-    enabled: true,
-  });
   // Universo estável de campanhas com veiculação no período/conta — não muda quando
   // o usuário marca/desmarca campanhas, para que o popover continue listando todas.
-  const { data: campaignPickerInsights = [] } = useInsights({
+  // O filtro por campanha é aplicado em memória porque este universo completo já é
+  // obrigatório para o seletor; assim evitamos uma segunda consulta idêntica ao banco.
+  const { data: allInsights = [], isLoading } = useInsights({
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
     startDate,
     endDate,
@@ -108,8 +103,10 @@ const Index = () => {
     }
   }, [visibleAccounts, selectedAccount, setSelectedAccount]);
 
-  const dashboardInsights = useMemo(() => insights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [insights, visibleAccountIds]);
-  const visiblePickerInsights = useMemo(() => campaignPickerInsights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [campaignPickerInsights, visibleAccountIds]);
+  const visiblePickerInsights = useMemo(() => allInsights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [allInsights, visibleAccountIds]);
+  const dashboardInsights = useMemo(() => selectedCampaignIds.length
+    ? visiblePickerInsights.filter((row) => selectedCampaignIds.includes(row.campaign_id))
+    : visiblePickerInsights, [selectedCampaignIds, visiblePickerInsights]);
   const visibleCampaigns = useMemo(() => campaigns.filter((campaign: any) => visibleAccountIds.has(campaign.ad_account_id)), [campaigns, visibleAccountIds]);
   const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id)), [sales, visibleAccountIds]);
   const selectedCampaigns = useMemo(
