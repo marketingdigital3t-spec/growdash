@@ -29,6 +29,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 01:21 | `4ecbae7` | Growdash Flow agora recarrega elementos, zoom, grade e snap quando outro funil salvo é aberto sem remontar a tela; Kanban mostra erro recuperável e botão de nova tentativa; OAuth Instagram aceita respostas com `id` ou `user_id`; a sincronização classifica vídeos/Reels corretamente para retenção e visualizações. Deploy: `https://94863119.growdash.pages.dev`. |
 | 08/08 01:24 | `ab64bd3` | A edição de dashboard só fecha após confirmar que o banco alterou a visualização. Atualizações bloqueadas por RLS/permissão deixam o rascunho aberto e exibem erro acionável, evitando perda silenciosa de ajustes individuais de KPI. Deploy: `https://57f36f38.growdash.pages.dev`. |
 | 08/08 01:28 | `6c727c2` | Filtros de CRM/comercial e relatórios RD agora expandem o limite final até o fim do dia local. Intervalos personalizados deixam de perder negócios criados no próprio último dia selecionado. Deploy: `https://fb95e47d.growdash.pages.dev`. |
+| 08/08 01:31 | `e04ca27` | Corrigida a publicação do domínio raiz `growdash.com.br`: o edge havia guardado uma resposta HTML no URL do JavaScript principal com cache imutável, recriando a tela de carregamento. Foi publicado o build validado diretamente no Pages (`https://dc4ae050.growdash.pages.dev`); raiz e `www` agora devolvem `application/javascript` para o bundle de entrada. |
 
 ## Desempenho e carregamento
 
@@ -60,6 +61,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Para o commit `4ecbae7`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
 - Para o commit `ab64bd3`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
 - Para o commit `6c727c2`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
+- Verificação HTTP pós-publicação: `growdash.com.br`, `www.growdash.com.br` e a URL de produção do Pages respondem com HTML 200 e seus respectivos bundles de entrada respondem 200 como JavaScript. Antes da correção, apenas o domínio raiz devolvia HTML para o arquivo `.js`; a tentativa de purge seletivo foi recusada porque o token local não possui escopo de purge de cache, por isso o build validado foi republicado com hash novo.
 
 ## Pendências externas e limites de validação
 
