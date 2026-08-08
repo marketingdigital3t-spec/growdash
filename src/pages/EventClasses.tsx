@@ -41,12 +41,12 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: stri
 
 export default function EventClasses() {
   const { data: classes, isLoading } = useEventClasses();
-  const { data: funnels } = useRDFunnels(undefined, activeView === "classes");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [funnelFilter, setFunnelFilter] = useState<string>("all");
   const [formOpen, setFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<"classes" | "agenda">("classes");
+  const { data: funnels } = useRDFunnels(undefined, activeView === "classes");
 
   const filtered = useMemo(() => {
     const list = classes || [];

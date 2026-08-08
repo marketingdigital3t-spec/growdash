@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   BrainCircuit,
   Bot,
   BriefcaseBusiness,
@@ -10,6 +12,7 @@ import {
   MessageCircle,
   Minimize2,
   Network,
+  Rotate3D,
   RotateCcw,
   Send,
   Sparkles,
@@ -32,10 +35,12 @@ type AgentStatus = "working" | "walking" | "free";
 type ChatMessage = { id: string; role: "agent" | "user"; text: string };
 
 const AGENTS = [
-  { id: "atlas", name: "Atlas", role: "Gestor de tráfego", color: "#e9b72d", desk: "desk-a", position: "npc-a" },
-  { id: "nina", name: "Nina", role: "Analista de funil", color: "#38bdf8", desk: "desk-b", position: "npc-b" },
-  { id: "milo", name: "Milo", role: "Especialista em criativos", color: "#a78bfa", desk: "desk-c", position: "npc-c" },
-  { id: "luna", name: "Luna", role: "Revenue & CRM", color: "#34d399", desk: "desk-d", position: "npc-d" },
+  { id: "atlas", name: "Atlas", role: "Gestor de tráfego", specialty: "Mídia & escala", task: "Otimizando campanhas", color: "#e9b72d", desk: "station-traffic", position: "npc-atlas" },
+  { id: "fina", name: "Fina", role: "Gestora financeira", specialty: "Caixa & margem", task: "Conciliando receita", color: "#34d399", desk: "station-finance", position: "npc-fina" },
+  { id: "dora", name: "Dora", role: "Gestora comercial", specialty: "Vendas & CRM", task: "Revisando pipeline", color: "#fb7185", desk: "station-sales", position: "npc-dora" },
+  { id: "otto", name: "Otto", role: "Especialista SEO", specialty: "Busca & conteúdo", task: "Mapeando oportunidades", color: "#38bdf8", desk: "station-seo", position: "npc-otto" },
+  { id: "nina", name: "Nina", role: "Analista de funil", specialty: "Jornadas & conversão", task: "Investigando gargalos", color: "#a78bfa", desk: "station-funnel", position: "npc-nina" },
+  { id: "milo", name: "Milo", role: "Diretor de criativos", specialty: "Criativos & testes", task: "Avaliando criativos", color: "#f97316", desk: "station-creative", position: "npc-milo" },
 ] as const;
 
 function readStored<T>(key: string, fallback: T): T {
@@ -50,6 +55,9 @@ export default function AgentsOfficePage() {
     : accounts, [accounts, businessUnitId, segment]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [view, setView] = useState<"map" | "office">("map");
+  const [officeAngle, setOfficeAngle] = useState(0);
+  const officeDragStart = useRef<number | null>(null);
+  const officeAngleStart = useRef(0);
   const [minimized, setMinimized] = useState(false);
   const [input, setInput] = useState("");
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>(() => readStored("growdash:agent-statuses", Object.fromEntries(AGENTS.map((agent) => [agent.id, "working"]))));
@@ -105,28 +113,39 @@ export default function AgentsOfficePage() {
         <div className="flex flex-wrap items-center gap-2 text-[10px]"><button type="button" onClick={() => setView("map")} className={cn("rounded-lg border px-3 py-2 font-black", view === "map" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><Network className="mr-1 inline h-3.5 w-3.5" />Mapa</button><button type="button" onClick={() => setView("office")} className={cn("rounded-lg border px-3 py-2 font-black", view === "office" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><BriefcaseBusiness className="mr-1 inline h-3.5 w-3.5" />Escritório 3D</button>{view === "office" && <><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></>}</div>
       </header>
 
-      {view === "map" ? <KnowledgeMap onOpenOffice={() => setView("office")} /> : <div className="agent-office-shell relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
-        <div className="office-window"><span /><span /><span /></div>
-        <div className="office-wall-sign"><WandSparkles className="h-4 w-4" /> GROWDASH INTELLIGENCE</div>
-        <div className="office-floor-grid" />
-        <div className="office-rug"><Bot className="h-8 w-8" /><span>AI<br />HUB</span></div>
-        <div className="office-plant plant-a"><i /><b /></div><div className="office-plant plant-b"><i /><b /></div>
-        {AGENTS.map((agent) => <div key={agent.id} className={cn("office-desk", agent.desk)}><span className="office-monitor"><Activity /></span><span className="office-keyboard" /></div>)}
+      {view === "map" ? <KnowledgeMap onOpenOffice={() => setView("office")} /> : <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
+        <div className="office-viewport-toolbar" role="toolbar" aria-label="Controles da câmera do escritório">
+          <span className="office-viewport-title"><Rotate3D className="h-3.5 w-3.5" />ESCRITÓRIO 360°</span>
+          <span className="office-viewport-hint">Arraste a visão ou use as setas para orbitar</span>
+          <div className="office-camera-buttons"><button type="button" onClick={() => setOfficeAngle((value) => Math.max(-28, value - 8))} aria-label="Orbitar para a esquerda"><ArrowLeft className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle(0)} aria-label="Centralizar câmera"><RotateCcw className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle((value) => Math.min(28, value + 8))} aria-label="Orbitar para a direita"><ArrowRight className="h-3.5 w-3.5" /></button></div>
+        </div>
+        <div className="office-3d-world" style={{ "--office-angle": `${officeAngle}deg` } as React.CSSProperties} onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) return; officeDragStart.current = event.clientX; officeAngleStart.current = officeAngle; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (officeDragStart.current === null) return; setOfficeAngle(Math.max(-28, Math.min(28, officeAngleStart.current + (event.clientX - officeDragStart.current) / 9))); }} onPointerUp={() => { officeDragStart.current = null; }} onPointerCancel={() => { officeDragStart.current = null; }}>
+          <div className="office-window"><span /><span /><span /></div>
+          <div className="office-wall-sign"><WandSparkles className="h-4 w-4" /> GROWDASH INTELLIGENCE</div>
+          <div className="office-floor-grid" />
+          <div className="office-rug"><Bot className="h-8 w-8" /><span>AI<br />HUB</span></div>
+          <div className="office-plant plant-a"><i /><b /></div><div className="office-plant plant-b"><i /><b /></div>
+          <div className="office-room-label room-label-lounge"><Coffee className="h-3 w-3" /> Lounge</div><div className="office-room-label room-label-war"><Sparkles className="h-3 w-3" /> War room</div>
+          {AGENTS.map((agent) => <div key={agent.id} className={cn("office-desk", agent.desk)}><span className="office-monitor"><Activity /></span><span className="office-keyboard" /><small>{agent.specialty}</small></div>)}
+          <div className="office-lounge"><Coffee className="h-5 w-5" /><span>PAUSA</span></div>
+          <div className="office-whiteboard"><b>OPERATIONAL BOARD</b><span>Prioridades · alertas · próximos passos</span><i /><i /><i /></div>
 
-        {AGENTS.map((agent) => {
-          const status = statuses[agent.id] || "working";
-          const assigned = visibleAccounts.find((item) => item.id === assignments[agent.id]);
-          return (
-            <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-npc", agent.position, `is-${status}`)} style={{ "--agent-color": agent.color } as React.CSSProperties} aria-label={`Conversar com ${agent.name}`}>
-              <span className="npc-shadow" /><span className="npc-body"><i className="npc-head" /><i className="npc-shirt" /><i className="npc-legs" /></span>
-              <span className="npc-plumbob" />
-              <span className="npc-label"><b>{agent.name}</b><small>{assigned?.name || agent.role}</small></span>
-            </button>
-          );
-        })}
+          {AGENTS.map((agent, index) => {
+            const status = statuses[agent.id] || "working";
+            const assigned = visibleAccounts.find((item) => item.id === assignments[agent.id]);
+            return (
+              <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-npc office-3d-npc", agent.position, `is-${status}`)} style={{ "--agent-color": agent.color, "--npc-delay": `${index * -0.7}s` } as React.CSSProperties} aria-label={`Abrir estação de ${agent.name}, ${agent.role}`}>
+                <span className="npc-shadow" /><span className="npc-body"><i className="npc-head" /><i className="npc-hair" /><i className="npc-shirt" /><i className="npc-arm npc-arm-left" /><i className="npc-arm npc-arm-right" /><i className="npc-legs" /></span>
+                <span className="npc-plumbob" /><span className="npc-task-light" />
+                <span className="npc-label"><b>{agent.name}</b><small>{assigned?.name || agent.role}</small><em>{status === "working" ? agent.task : status === "walking" ? "Em movimento" : "Tempo livre"}</em></span>
+              </button>
+            );
+          })}
+        </div>
 
-        <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/65 p-2 backdrop-blur-xl">
-          {AGENTS.map((agent) => <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className="flex min-w-[150px] flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-white transition hover:bg-white/10"><span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: `${agent.color}22`, color: agent.color }}><Bot className="h-4 w-4" /></span><span className="min-w-0"><b className="block truncate text-xs">{agent.name}</b><small className="block truncate text-[9px] text-white/45">{statuses[agent.id] === "working" ? "Trabalhando" : statuses[agent.id] === "walking" ? "Caminhando" : "Tempo livre"}</small></span></button>)}
+        <div className="office-command-bar" aria-label="Comandos dos agentes">
+          <div className="office-command-copy"><b>Comando do escritório</b><small>Escolha o que cada NPC deve fazer agora.</small></div>
+          {AGENTS.map((agent) => <div key={agent.id} className="office-agent-command"><button type="button" onClick={() => openAgent(agent.id)} className="office-agent-identity" style={{ "--agent-color": agent.color } as React.CSSProperties}><span className="office-agent-avatar"><Bot className="h-3.5 w-3.5" /></span><span><b>{agent.name}</b><small>{agent.role}</small></span></button><div className="office-agent-modes"><AgentModeButton active={statuses[agent.id] === "working"} onClick={() => updateStatus(agent.id, "working")} icon={<BriefcaseBusiness />} label="Trabalhar" /><AgentModeButton active={statuses[agent.id] === "walking"} onClick={() => updateStatus(agent.id, "walking")} icon={<UsersRound />} label="Andar" /><AgentModeButton active={statuses[agent.id] === "free"} onClick={() => updateStatus(agent.id, "free")} icon={<Coffee />} label="Livre" /></div></div>)}
         </div>
 
         {activeAgent && (

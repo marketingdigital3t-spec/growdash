@@ -150,3 +150,14 @@ Verificação pós-publicação: `growdash.com.br` e `www.growdash.com.br` respo
 - Validação local: TypeScript, ESLint, Vitest (22 arquivos/61 testes) e build Vite aprovados. O Playwright não executou porque o Chromium local está ausente; não foi baixado para evitar novo consumo relevante de disco.
 - Bloqueio externo: Supabase CLI, Docker/psql e credenciais administrativas não estão disponíveis nesta máquina. As migrations e Edge Functions ainda precisam ser aplicadas/publicadas e validadas com dois usuários e dois workspaces antes de considerar a produção segura.
 - 08/08 15:07: commit `0c21f67` validado e enviado para `origin/main`; preview Cloudflare `56ed3bad.growdash.pages.dev` confirmou os headers; publicação de produção `3fa9092b.growdash.pages.dev` foi concluída às 15:08 e `growdash.com.br`/`www.growdash.com.br` responderam 200 com CSP, HSTS, Permissions-Policy, X-Frame-Options e nosniff.
+
+## Escritório 3D de agentes — 08/08/2026 15:46
+
+- `src/growdash/AgentsOfficePage.tsx`: a área de agentes ganhou um escritório operacional com seis NPCs (tráfego, financeiro, comercial, SEO, funil e criativos), estação individual, lounge, war room, tarefa atual, conta vinculada e abertura de chat por agente.
+- Cada NPC possui comandos Trabalhar, Andar e Livre. O estado continua salvo no `localStorage`; os estados de trabalho exibem animação de digitação/braços, caminhada orbital e tempo livre.
+- A câmera usa uma cena CSS 3D leve: arraste horizontal, setas para orbitar e botão de centralização. A solução preserva o carregamento do produto sem adicionar modelos 3D pesados ou dependências novas.
+- `src/index.css`: adicionada perspectiva, piso em grade, janelas, mesas, monitores, quadro branco, iluminação por cor do tema, caminhos de caminhada, responsividade e suporte a `prefers-reduced-motion`.
+- `src/pages/EventClasses.tsx`: corrigida ordem de declaração de `activeView`, evitando uso antes da inicialização.
+- Removido `@types/react-grid-layout`, stub obsoleto que quebrava o typecheck; `react-grid-layout` de runtime permanece instalado.
+
+Validação desta entrega: TypeScript aprovado, ESLint sem erros (15 avisos antigos de Fast Refresh), Vitest 22 arquivos/61 testes aprovados e build Vite de produção aprovado. O build mantém somente o warning conhecido de chunk acima de 500 kB. Playwright autenticado não foi executado porque não há credenciais E2E/Chromium local disponível.
