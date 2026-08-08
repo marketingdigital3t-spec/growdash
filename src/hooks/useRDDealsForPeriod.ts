@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { endOfDay, format, startOfDay } from "date-fns";
 
 export interface RDDealLite {
   id: string;
@@ -55,6 +55,11 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
     ],
     enabled,
     queryFn: async () => {
+      // Calendar selections are local-midnight dates. Expand the bounds to the
+      // complete local days before comparing timestamptz columns; otherwise a
+      // custom interval silently drops every deal created later on its end date.
+      const rangeStart = startOfDay(startDate).toISOString();
+      const rangeEnd = endOfDay(endDate).toISOString();
       const PAGE = 1000;
       const MAX = 10;
       let all: RDDealLite[] = [];
@@ -62,8 +67,8 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
         let q = supabase
           .from("rd_deals")
           .select(FIELDS)
-          .gte("lead_created_at", startDate.toISOString())
-          .lte("lead_created_at", endDate.toISOString())
+          .gte("lead_created_at", rangeStart)
+          .lte("lead_created_at", rangeEnd)
           .order("lead_created_at", { ascending: false });
         if (adAccountId) q = q.eq("ad_account_id", adAccountId);
         const from = p * PAGE;
