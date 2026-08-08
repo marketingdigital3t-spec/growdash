@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   Activity,
+  BrainCircuit,
   Bot,
   BriefcaseBusiness,
   Coffee,
+  ChevronRight,
   MessageCircle,
   Minimize2,
   Network,
+  RotateCcw,
   Send,
   Sparkles,
   UserCog,
@@ -157,21 +160,63 @@ export default function AgentsOfficePage() {
 }
 
 const KNOWLEDGE_NODES = [
-  { label: "Tráfego", note: "Campanhas, criativos, orçamento e Meta Ads", href: "/campanhas", angle: -90 },
-  { label: "CRM", note: "Negociações, funil, RD Station e IA do Funil", href: "/crm", angle: -30 },
-  { label: "Comercial", note: "Metas, ranking, receita e conversão", href: "/comercial", angle: 30 },
-  { label: "Financeiro", note: "DRE, caixa, mídia e previsões", href: "/financeiro", angle: 90 },
-  { label: "Experts", note: "Marcas, contas, posicionamento e conteúdo", href: "/marcas", angle: 150 },
-  { label: "Automações", note: "Playbooks, alertas, WhatsApp e webhooks", href: "/automacoes", angle: 210 },
+  { label: "Tráfego", note: "Mídia, criativos, orçamento e escala", href: "/campanhas", angle: -90, branches: [["Estratégias de mídia", "/campanhas"], ["Criativos & testes", "/campanhas"], ["Alertas de performance", "/saude-dos-dados"]] },
+  { label: "CRM", note: "Pipeline, qualificação e follow-up", href: "/crm", angle: -28, branches: [["Pipeline & etapas", "/crm"], ["Scripts de vendas", "/comercial"], ["Follow-ups", "/automacoes"]] },
+  { label: "Comercial", note: "Metas, conversão e receita", href: "/comercial", angle: 28, branches: [["Metas e ranking", "/comercial"], ["Playbook de vendas", "/comercial"], ["Forecast", "/centro-inteligencia"]] },
+  { label: "Financeiro", note: "Caixa, margem e previsibilidade", href: "/financeiro", angle: 90, branches: [["DRE & caixa", "/financeiro"], ["Margem e custos", "/financeiro"], ["Planejamento", "/centro-inteligencia"]] },
+  { label: "Marca", note: "Posicionamento, conteúdo e confiança", href: "/marcas", angle: 152, branches: [["Posicionamento", "/marcas"], ["Conteúdo estratégico", "/marcas"], ["Reputação", "/marcas"]] },
+  { label: "Automações", note: "Playbooks, WhatsApp e operações", href: "/automacoes", angle: 208, branches: [["Playbooks", "/automacoes"], ["WhatsApp", "/automacoes"], ["Webhooks & rotinas", "/automacoes"]] },
 ] as const;
 
+type CorePhase = "brain" | "entering" | "core";
+
 function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
-  return <section className="knowledge-map relative min-h-[680px] overflow-hidden rounded-2xl border border-primary/20 bg-[#050505]">
+  const [phase, setPhase] = useState<CorePhase>("brain");
+  const transitionTimer = useRef<number | null>(null);
+  const isCoreOpen = phase === "core";
+
+  useEffect(() => () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
+  }, []);
+
+  const enterCore = () => {
+    if (phase !== "brain") return;
+    setPhase("entering");
+    transitionTimer.current = window.setTimeout(() => setPhase("core"), 720);
+  };
+
+  return <section className={cn("jarvis-command-center", `is-${phase}`)} aria-label="Núcleo de inteligência Growdash">
     <div className="knowledge-map-grid" />
-    <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 680" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="knowledge-line" x1="0" x2="1"><stop offset="0" stopColor="currentColor" stopOpacity=".08" /><stop offset=".5" stopColor="currentColor" stopOpacity=".7" /><stop offset="1" stopColor="currentColor" stopOpacity=".08" /></linearGradient></defs>{KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 330; const y = 340 + Math.sin(radians) * 245; return <line key={node.label} x1="500" y1="340" x2={x} y2={y} stroke="url(#knowledge-line)" strokeWidth="1.5" strokeDasharray="5 7" />; })}</svg>
-    <button type="button" onClick={onOpenOffice} className="knowledge-core brain-core" aria-label="Abrir escritório 3D da Growdash"><span className="knowledge-core-ring" /><span className="brain-hemisphere brain-left" /><span className="brain-hemisphere brain-right" /><span className="brain-synapse synapse-a" /><span className="brain-synapse synapse-b" /><span className="brain-synapse synapse-c" /><span className="brain-synapse synapse-d" /><span className="brain-label"><Bot className="h-6 w-6" /><b>Growdash</b><small>Intelligence Core</small><em>Clique para entrar no escritório 3D</em></span></button>
-    {KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; return <NavLink key={node.label} to={node.href} className="knowledge-node" style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 34}%` }}><Sparkles className="h-4 w-4" /><b>{node.label}</b><small>{node.note}</small></NavLink>; })}
-    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-2 text-center text-[9px] text-white/45 backdrop-blur-xl">O núcleo conecta as fontes da operação; cada agente consulta apenas contas e módulos permitidos.</div>
+    <div className="jarvis-scanline" aria-hidden="true" />
+    <div className="jarvis-stars" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
+
+    {isCoreOpen && <svg className="jarvis-links" viewBox="0 0 1000 760" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="jarvis-link" x1="0" x2="1"><stop offset="0" stopColor="#f4c64d" stopOpacity=".18" /><stop offset=".48" stopColor="#fff4ba" stopOpacity=".92" /><stop offset="1" stopColor="#f4c64d" stopOpacity=".18" /></linearGradient></defs>
+      {KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 335; const y = 380 + Math.sin(radians) * 285; return <g key={node.label}><line x1="500" y1="380" x2={x} y2={y} stroke="url(#jarvis-link)" strokeWidth="2" strokeDasharray="6 10" /><circle cx={x} cy={y} r="5" fill="#ffe9a1" /></g>; })}
+    </svg>}
+
+    <button type="button" onClick={enterCore} className="jarvis-brain" aria-label={isCoreOpen ? "Núcleo Growdash expandido" : "Entrar no núcleo Growdash"} aria-expanded={isCoreOpen} disabled={phase === "entering"}>
+      <span className="jarvis-orbit orbit-one" /><span className="jarvis-orbit orbit-two" /><span className="jarvis-orbit orbit-three" />
+      <span className="brain-hemisphere brain-left" /><span className="brain-hemisphere brain-right" />
+      <span className="brain-synapse synapse-a" /><span className="brain-synapse synapse-b" /><span className="brain-synapse synapse-c" /><span className="brain-synapse synapse-d" />
+      <span className="jarvis-brain-copy"><BrainCircuit className="h-7 w-7" /><b>JARVIS</b><small>{phase === "entering" ? "Abrindo núcleo…" : "Clique para entrar"}</small></span>
+    </button>
+
+    {isCoreOpen && <>
+      <div className="jarvis-core-label" aria-live="polite"><span>GROWDASH</span><b>OPERATIONAL CORE</b><small>Inteligência conectada de ponta a ponta</small></div>
+      {KNOWLEDGE_NODES.map((node) => {
+        const radians = node.angle * Math.PI / 180;
+        return <article key={node.label} className="jarvis-arm" style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 37.5}%` }}>
+          <NavLink to={node.href} className="jarvis-arm-head"><span><Sparkles className="h-4 w-4" /></span><div><b>{node.label}</b><small>{node.note}</small></div><ChevronRight className="h-4 w-4" /></NavLink>
+          <div className="jarvis-branches" aria-label={`Estratégias de ${node.label}`}>
+            {node.branches.map(([label, href]) => <NavLink key={label} to={href} className="jarvis-branch"><i /><span>{label}</span></NavLink>)}
+          </div>
+        </article>;
+      })}
+      <div className="jarvis-actions"><button type="button" onClick={() => setPhase("brain")}><RotateCcw className="h-3.5 w-3.5" />Visão do cérebro</button><button type="button" onClick={onOpenOffice}><BriefcaseBusiness className="h-3.5 w-3.5" />Entrar no escritório 3D</button></div>
+    </>}
+
+    {!isCoreOpen && <div className="jarvis-intro"><b>Central de comando autônoma</b><span>Clique no cérebro para revelar as operações, seus braços e mini estratégias.</span></div>}
   </section>;
 }
 
