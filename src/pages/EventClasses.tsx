@@ -41,7 +41,7 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: stri
 
 export default function EventClasses() {
   const { data: classes, isLoading } = useEventClasses();
-  const { data: funnels } = useRDFunnels();
+  const { data: funnels } = useRDFunnels(undefined, activeView === "classes");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [funnelFilter, setFunnelFilter] = useState<string>("all");
@@ -150,13 +150,13 @@ export default function EventClasses() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+          <SelectTrigger aria-label="Filtrar turmas por status" className="w-full sm:w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={funnelFilter} onValueChange={setFunnelFilter}>
-          <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Funil RD" /></SelectTrigger>
+          <SelectTrigger aria-label="Filtrar turmas por funil RD" className="w-full sm:w-56"><SelectValue placeholder="Funil RD" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os funis</SelectItem>
             {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}

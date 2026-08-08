@@ -177,7 +177,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
             <div>
               <Label>Status</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as EventClassStatus })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Status da turma"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
@@ -197,7 +197,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
               <div>
                 <Label>Conta de anúncio *</Label>
                 <Select value={adAccountId} onValueChange={(v) => { setAdAccountId(v); setFunnelId(""); setModelFunnelId(""); }}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectTrigger aria-label="Selecionar conta de anúncio" id="event-class-ad-account"><SelectValue placeholder="Selecionar" /></SelectTrigger>
                   <SelectContent>
                     {(accounts || []).map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
@@ -206,7 +206,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
               <div>
                 <Label>Funil de pessoas (RD) *</Label>
                 <Select value={funnelId} onValueChange={setFunnelId} disabled={!adAccountId}>
-                  <SelectTrigger><SelectValue placeholder="Selecionar funil" /></SelectTrigger>
+                  <SelectTrigger aria-label="Selecionar funil de pessoas RD" id="event-class-funnel"><SelectValue placeholder="Selecionar funil" /></SelectTrigger>
                   <SelectContent>
                     {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                   </SelectContent>
@@ -254,7 +254,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
                   {sourceMode === "rd" && <div>
                     <Label>Funil de pacientes-modelo (RD) *</Label>
                     <Select value={modelFunnelId} onValueChange={setModelFunnelId} disabled={!adAccountId}>
-                      <SelectTrigger><SelectValue placeholder="Selecionar funil" /></SelectTrigger>
+                    <SelectTrigger aria-label="Selecionar funil de pacientes-modelo RD" id="event-class-model-funnel"><SelectValue placeholder="Selecionar funil" /></SelectTrigger>
                       <SelectContent>
                         {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                       </SelectContent>
