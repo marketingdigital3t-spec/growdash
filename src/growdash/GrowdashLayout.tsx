@@ -66,6 +66,7 @@ export default function GrowdashLayout() {
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const [loadBackgroundData, setLoadBackgroundData] = useState(false);
   const { editor } = useDashboardEditor();
   const { pathname, search } = useLocation();
   const { theme, setTheme } = useTheme();
@@ -100,8 +101,9 @@ export default function GrowdashLayout() {
     startDate: startOfMonth(new Date()),
     endDate: endOfMonth(new Date()),
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
+    enabled: loadBackgroundData,
   });
-  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(new Date());
+  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(new Date(), { enabled: loadBackgroundData });
   const goalRevenue = useMemo(() => aggregateSales(monthlySales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id) && (adAccountId === "all" || sale.ad_account_id === adAccountId))).totalNet, [adAccountId, monthlySales, visibleAccountIds]);
   const goalTarget = useMemo(() => (goalData?.rows ?? []).filter((goal) => visibleAccountIds.has(goal.ad_account_id) && (adAccountId === "all" || goal.ad_account_id === adAccountId)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0), [adAccountId, goalData?.rows, visibleAccountIds]);
   const goalAccountLabel = adAccountId === "all"
@@ -110,7 +112,7 @@ export default function GrowdashLayout() {
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
-  useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId });
+  useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId, enabled: loadBackgroundData });
 
   const displayName = sidebarProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const avatarUrl = sidebarProfile?.avatar_url || user?.user_metadata?.avatar_url || "";
@@ -160,6 +162,20 @@ export default function GrowdashLayout() {
     .filter((section) => section.items.length > 0);
 
   useEffect(() => setMobileOpen(false), [pathname]);
+  useEffect(() => {
+    const idleWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const enableBackgroundData = () => setLoadBackgroundData(true);
+    const idleHandle = idleWindow.requestIdleCallback?.(enableBackgroundData, { timeout: 2_500 });
+    const timeoutHandle = idleHandle === undefined ? window.setTimeout(enableBackgroundData, 1_500) : undefined;
+
+    return () => {
+      if (idleHandle !== undefined) idleWindow.cancelIdleCallback?.(idleHandle);
+      if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
+    };
+  }, []);
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
   }, [collapsed]);

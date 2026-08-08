@@ -88,7 +88,9 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
 
   useEffect(() => {
     if (!enabled) return;
-    const initial = window.setTimeout(() => void refresh(false), 650);
+    // A primeira pintura deve mostrar o cache local. A sincronização com Meta/RD
+    // só entra depois que a tela já ficou utilizável.
+    const initial = window.setTimeout(() => void refresh(false), 4_000);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => {
       invalidateLiveQueries();

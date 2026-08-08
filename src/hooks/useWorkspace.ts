@@ -36,7 +36,10 @@ export function useWorkspace() {
   return useQuery({
     queryKey: ["workspace", user?.id],
     enabled: !!user,
-    staleTime: 0, // Force real-time updates and bypass local stale caching
+    // A fundação do workspace não muda durante a navegação normal. Cachear evita
+    // reexecutar o bootstrap e três consultas a cada troca de módulo.
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async (): Promise<WorkspaceFoundation> => {
       try {
         const { data: workspaceId, error: bootstrapError } = await (supabase as any)

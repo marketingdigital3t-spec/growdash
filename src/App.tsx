@@ -7,11 +7,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
-import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
-import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
+
+// O shell autenticado reúne navegação, notificações e consultas de dados. Mantê-lo
+// fora do bundle inicial deixa a tela de acesso pronta sem baixar a plataforma toda.
+const GrowdashLayout = lazy(() => import("@/growdash/GrowdashLayout"));
+const MfaChallengeGate = lazy(() =>
+  import("@/components/auth/MfaChallengeGate").then((module) => ({ default: module.MfaChallengeGate })),
+);
 
 const FullDashboard = lazy(() => import("@/pages/Index"));
 const TrafficPage = lazy(() => import("@/growdash/TrafficPage"));
@@ -41,7 +46,15 @@ const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const SharedLeadReport = lazy(() => import("@/pages/SharedLeadReport"));
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 120_000,
+      gcTime: 30 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  },
 });
 
 function LoadingModule() {
@@ -64,7 +77,7 @@ function AuthenticatedLayout() {
   const { user, loading } = useAuth();
   if (loading) return <LoadingModule />;
   if (!user) return <Navigate to="/auth" replace />;
-  return <MfaChallengeGate><DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider></MfaChallengeGate>;
+  return <MfaChallengeGate><GlobalFiltersProvider><DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider></GlobalFiltersProvider></MfaChallengeGate>;
 }
 
 function AccentInitializer({ children }: { children: ReactNode }) {
@@ -124,8 +137,7 @@ export default function App() {
           <Sonner />
           <Router>
             <AuthProvider>
-              <GlobalFiltersProvider>
-                <AccentInitializer>
+              <AccentInitializer>
                 <Suspense fallback={<LoadingModule />}>
                   <Routes>
                   <Route path="/auth" element={<Auth />} />
@@ -178,8 +190,7 @@ export default function App() {
                   </Route>
                   </Routes>
                 </Suspense>
-                </AccentInitializer>
-              </GlobalFiltersProvider>
+              </AccentInitializer>
             </AuthProvider>
           </Router>
         </TooltipProvider>
