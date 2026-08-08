@@ -30,6 +30,7 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 | 08/08 01:24 | `ab64bd3` | A edição de dashboard só fecha após confirmar que o banco alterou a visualização. Atualizações bloqueadas por RLS/permissão deixam o rascunho aberto e exibem erro acionável, evitando perda silenciosa de ajustes individuais de KPI. Deploy: `https://57f36f38.growdash.pages.dev`. |
 | 08/08 01:28 | `6c727c2` | Filtros de CRM/comercial e relatórios RD agora expandem o limite final até o fim do dia local. Intervalos personalizados deixam de perder negócios criados no próprio último dia selecionado. Deploy: `https://fb95e47d.growdash.pages.dev`. |
 | 08/08 01:31 | `e04ca27` | Corrigida a publicação do domínio raiz `growdash.com.br`: o edge havia guardado uma resposta HTML no URL do JavaScript principal com cache imutável, recriando a tela de carregamento. Foi publicado o build validado diretamente no Pages (`https://dc4ae050.growdash.pages.dev`); raiz e `www` agora devolvem `application/javascript` para o bundle de entrada. |
+| 08/08 01:42 | `6445d21` | Leitura de perfil do Instagram OAuth e sincronização passaram a tentar separadamente os campos compatíveis `id` e `user_id`. Isso evita rejeitar uma autorização válida quando a versão da API aceita somente uma das variantes. GitHub publicado; Pages validado em `https://a8603b2f.growdash.pages.dev`. |
 
 ## Desempenho e carregamento
 
@@ -62,11 +63,13 @@ Período: 07/08/2026, 18:00 (America/Sao_Paulo) até o encerramento da auditoria
 - Para o commit `ab64bd3`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
 - Para o commit `6c727c2`: TypeScript aprovado, ESLint sem erros (15 warnings antigos), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual com 3 testes executados aprovados e 3 rotas autenticadas puladas por falta de credenciais E2E.
 - Verificação HTTP pós-publicação: `growdash.com.br`, `www.growdash.com.br` e a URL de produção do Pages respondem com HTML 200 e seus respectivos bundles de entrada respondem 200 como JavaScript. Antes da correção, apenas o domínio raiz devolvia HTML para o arquivo `.js`; a tentativa de purge seletivo foi recusada porque o token local não possui escopo de purge de cache, por isso o build validado foi republicado com hash novo.
+- Para o commit `6445d21`: TypeScript aprovado, ESLint sem erros (15 warnings antigos de Fast Refresh), Vitest 21/56 aprovado, build Vite aprovado e Playwright visual 3/3 telas públicas aprovado (3 rotas autenticadas continuam puladas sem credenciais E2E). A checagem Deno das Edge Functions ficou indisponível porque o executável `deno` não está instalado nesta máquina. O Pages foi publicado manualmente e os hosts `growdash.com.br`, `www.growdash.com.br` e `a8603b2f.growdash.pages.dev` devolvem 200; o bundle `app-BcdILXXN.js` devolve `application/javascript` em todos eles.
 
 ## Pendências externas e limites de validação
 
 - A migration `20260808003000_fix_custom_event_class_rls.sql` está versionada no GitHub, mas ainda precisa ser aplicada ao Supabase. Esta máquina não tem `SUPABASE_ACCESS_TOKEN`, projeto vinculado ou banco local ativo.
 - Ainda faltam `META_APP_SECRET` e `INSTAGRAM_APP_SECRET` no Supabase para concluir OAuth Meta/Instagram em produção.
+- O commit `6445d21` contém o código das Edge Functions, mas a publicação delas no Supabase permanece bloqueada pelas mesmas credenciais de deploy ausentes; o deploy do Cloudflare Pages não publica funções Supabase.
 - A conta Meta continua bloqueada pela Meta Developers; duas conexões no banco estavam desconectadas com erro 200 de acesso bloqueado. Os tokens não foram apagados porque essa exclusão exige autorização específica.
 - A validação visual autenticada e o fluxo real de OAuth dependem de credenciais e da liberação dos provedores externos.
 
