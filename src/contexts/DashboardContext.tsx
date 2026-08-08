@@ -15,6 +15,12 @@ export interface DashboardContextValue {
   adAccounts: any[];
   products: any[];
   isLoading: boolean;
+  leadBreakdown?: {
+    forms: number;
+    site: number;
+    conversations: number;
+    total: number;
+  };
 }
 
 const Ctx = createContext<DashboardContextValue | null>(null);

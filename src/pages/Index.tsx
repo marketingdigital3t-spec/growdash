@@ -23,6 +23,10 @@ import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip"
 import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+
+const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
+const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
 
 const Index = () => {
   const {
@@ -120,7 +124,14 @@ const Index = () => {
   const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id && visibleAccountIds.has(deal.ad_account_id)), [rdDeals, visibleAccountIds]);
   const glassSales = aggregateSales(dashboardSales);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-  const glassLeads = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+  const glassLeadsFromInsights = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+  const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
+  const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
+  const { data: dashboardActionData } = useActionTotalsByAds(dashboardActionAdIds, startDate, endDate, dashboardActionAccountMap);
+  const glassConversations = dashboardActionData?.totals?.[MESSAGING_CONVERSATION_EVENT] || 0;
+  const glassForms = Math.min(glassLeadsFromInsights, dashboardActionData?.totals?.[NATIVE_FORM_LEAD_EVENT] || 0);
+  const leadBreakdown = useMemo(() => ({ forms: glassForms, site: Math.max(0, glassLeadsFromInsights - glassForms), conversations: glassConversations, total: glassLeadsFromInsights + glassConversations }), [glassConversations, glassForms, glassLeadsFromInsights]);
+  const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
@@ -302,7 +313,7 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
+      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
 
       {(isEditing ? draftView : activeView) && (
         <DashboardProvider
@@ -318,6 +329,7 @@ const Index = () => {
             adAccounts: visibleAccounts,
             products,
             isLoading,
+            leadBreakdown,
           }}
         >
           <DashboardGrid

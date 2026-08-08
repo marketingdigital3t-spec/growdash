@@ -5,9 +5,10 @@ import { METRIC_LABELS, type WidgetConfig, type WidgetMetric } from "@/lib/widge
 import { Activity } from "lucide-react";
 
 export function KPIWidget({ title, config }: { title: string; config: WidgetConfig }) {
-  const { insights, sales } = useDashboard();
+  const { insights, sales, leadBreakdown } = useDashboard();
   const metric = (config.metric ?? "leads") as WidgetMetric;
   const k = computeKpi(metric, insights, sales);
+  if (metric === "leads" && leadBreakdown) k.value = leadBreakdown.total;
   return (
     <div className="h-full min-w-0">
       <MetricCard
@@ -23,12 +24,13 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
 }
 
 export function KPIGridWidget({ config }: { config: WidgetConfig }) {
-  const { insights, sales } = useDashboard();
+  const { insights, sales, leadBreakdown } = useDashboard();
   const metrics = (config.metrics ?? ["spend", "leads", "cpl", "ctr"]) as WidgetMetric[];
   return (
     <div className="gd-auto-grid-compact h-full gap-2">
       {metrics.map((m) => {
         const k = computeKpi(m, insights, sales);
+        if (m === "leads" && leadBreakdown) k.value = leadBreakdown.total;
         return (
           <MetricCard
             key={m}
