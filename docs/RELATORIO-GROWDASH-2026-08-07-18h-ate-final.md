@@ -177,3 +177,4 @@ Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos ant
 
 - O título da página foi reduzido de “Growdash | Growth Intelligence” para somente “Growdash”.
 - Adicionados favicon/mask icon, Apple Touch Icon, canonical do domínio, nome da aplicação, `og:site_name`, URL e imagem Open Graph, imagem Twitter e marcação estruturada `Organization` com a logo oficial Growdash.
+- TypeScript, ESLint, Vitest (22 arquivos/61 testes) e build Vite aprovados. Commit `87a077c` enviado ao GitHub; Cloudflare Pages publicado em `https://b1e345b6.growdash.pages.dev`. Preview, `growdash.com.br` e `www.growdash.com.br` foram confirmados com `<title>Growdash</title>`, imagens sociais e favicon SVG válidos.
