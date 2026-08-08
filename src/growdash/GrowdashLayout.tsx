@@ -211,7 +211,7 @@ export default function GrowdashLayout() {
             {showSidebarLabels ? (
               <BrandLogo eager className="h-[66px] w-[178px] shrink-0" />
             ) : (
-              <BrandMark className="h-10 w-10 shrink-0 drop-shadow-[0_0_12px_rgba(255,193,45,.3)]" />
+              <BrandMark className="brand-mark-premium h-10 w-10 shrink-0" />
             )}
           </NavLink>
           <button
@@ -227,7 +227,7 @@ export default function GrowdashLayout() {
         {editor ? (
           <div className="flex min-h-0 grow flex-col">
             <div className="border-b border-white/10 px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[.18em] text-[#e8bd4f]">Editor do dashboard</p>
+              <p className="text-[10px] font-black uppercase tracking-[.18em] text-primary">Editor do dashboard</p>
               <h2 className="mt-1 truncate text-sm font-black">{editor.title}</h2>
               <p className="mt-1 text-[10px] leading-relaxed text-white/48">Mostre ou oculte métricas. No conteúdo, arraste e redimensione pelos cantos.</p>
             </div>
@@ -374,7 +374,7 @@ export default function GrowdashLayout() {
             <Menu className="h-5 w-5" />
           </button>
           <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex lg:hidden">
-            <BrandMark className="h-7 w-7 drop-shadow-[0_0_10px_rgba(255,193,45,.25)]" />
+            <BrandMark className="brand-mark-premium h-7 w-7" />
           </NavLink>
           <button
             type="button"
@@ -392,14 +392,14 @@ export default function GrowdashLayout() {
             <button
               type="button"
               onClick={() => setSegment("infoproduto")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(242,197,72,.2)]" : "text-white/55")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "premium-glow bg-primary text-primary-foreground" : "text-white/55")}
             >
               Infoproduto
             </button>
             <button
               type="button"
               onClick={() => setSegment("saas")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(242,197,72,.2)]" : "text-white/55")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "premium-glow bg-primary text-primary-foreground" : "text-white/55")}
             >
               SaaS
             </button>
