@@ -1,4 +1,5 @@
 import { DASHBOARD_CANONICAL_LAYOUT_VERSION, DEFAULT_VIEW } from "@/lib/widgetCatalog";
+import { findDashboardSlot } from "@/lib/responsiveDashboardLayout";
 
 interface DashboardViewShape {
   layout: any[];
@@ -20,15 +21,43 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   const layout = Array.isArray(view.layout) ? view.layout : [];
   const existingDefault = widgets.find((widget) => widget.id === defaultWidget.id || widget.type === "default_block");
   const currentVersion = Number(existingDefault?.config?.canonicalLayoutVersion || 0);
-  const hasDefaultLayout = layout.some((item) => item.i === defaultLayout.i);
+  const defaultId = existingDefault?.id || defaultWidget.id;
+  const hasDefaultLayout = layout.some((item) => item.i === defaultId);
 
   if (currentVersion >= DASHBOARD_CANONICAL_LAYOUT_VERSION) {
     if (hasDefaultLayout) return view;
 
     return {
       ...view,
-      layout: [{ ...defaultLayout }, ...layout.filter((item) => item.i !== defaultLayout.i)],
+      layout: [{ ...defaultLayout, i: defaultId }, ...layout.filter((item) => item.i !== defaultId)],
     };
+  }
+
+  // Version 6 separates the two financial charts and every financial KPI from
+  // the static default block. Upgrade version 5 views additively: placements
+  // already edited by the user are kept, missing widgets receive free slots,
+  // and the default block is moved below them to prevent overlap.
+  if (currentVersion >= 5 && existingDefault) {
+    const canonicalWidgets = DEFAULT_VIEW.widgets.filter((widget) => widget.type !== "default_block");
+    const existingIds = new Set(widgets.map((widget) => widget.id));
+    const nextWidgets = widgets
+      .map((widget) => widget.id !== existingDefault.id ? widget : {
+        ...widget,
+        config: { ...widget.config, ...defaultWidget.config },
+      });
+    const nextLayout = layout.filter((item) => item.i !== defaultId);
+
+    for (const canonicalWidget of canonicalWidgets) {
+      if (existingIds.has(canonicalWidget.id)) continue;
+      const canonicalLayout = DEFAULT_VIEW.layout.find((item) => item.i === canonicalWidget.id)!;
+      const slot = findDashboardSlot(nextLayout, canonicalLayout.w, canonicalLayout.h, 12);
+      nextWidgets.push({ ...canonicalWidget, config: { ...canonicalWidget.config } });
+      nextLayout.push({ ...canonicalLayout, x: slot.x, y: slot.y });
+    }
+
+    const maxY = nextLayout.reduce((maximum, item) => Math.max(maximum, Number(item.y || 0) + Number(item.h || 1)), 0);
+    nextLayout.push({ ...defaultLayout, i: defaultId, y: Math.max(defaultLayout.y, maxY) });
+    return { ...view, widgets: nextWidgets, layout: nextLayout };
   }
 
   return {

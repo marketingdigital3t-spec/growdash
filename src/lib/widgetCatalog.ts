@@ -39,6 +39,7 @@ export interface WidgetConfig {
   comparePeriod?: boolean;
   text?: string;
   hidePrimary?: boolean;
+  hideFinancialOverview?: boolean;
   hideFinancialKpis?: boolean;
   hideCampaignKpis?: boolean;
   individualized?: boolean;
@@ -48,6 +49,8 @@ export interface WidgetConfig {
 export type WidgetType =
   | "kpi"
   | "kpi_grid"
+  | "payment_chart"
+  | "platform_distribution"
   | "line_chart"
   | "bar_chart"
   | "pie_chart"
@@ -123,6 +126,22 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     description: "Vários KPIs lado a lado",
     defaultLayout: { w: 12, h: 2, minW: 4, minH: 2 },
     defaultConfig: { metrics: ["spend", "leads", "cpl", "ctr"] },
+  },
+  {
+    type: "payment_chart",
+    title: "Vendas por Pagamento",
+    category: "Gráfico",
+    description: "Distribuição da receita por forma de pagamento",
+    defaultLayout: { w: 4, h: 5, minW: 3, minH: 4 },
+    defaultConfig: {},
+  },
+  {
+    type: "platform_distribution",
+    title: "Distribuição por Plataforma",
+    category: "Análise",
+    description: "Leads, receita e conversão por plataforma de origem",
+    defaultLayout: { w: 5, h: 5, minW: 4, minH: 4 },
+    defaultConfig: {},
   },
   {
     type: "line_chart",
@@ -298,7 +317,7 @@ export function getWidgetDef(type: WidgetType) {
 
 // Default "Padrão" view: the canonical full-width dashboard recovered from the
 // original Growdash project. System widgets are appended by the renderer.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 5;
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 6;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
@@ -307,22 +326,26 @@ export const DEFAULT_VIEW = {
     { i: "primary_spend", x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "primary_roas", x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "primary_profit", x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "financial_margin", x: 0, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "financial_receivables", x: 3, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "financial_ticket", x: 6, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "financial_profit", x: 9, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_leads", x: 0, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_cpl", x: 3, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_cost_per_link", x: 6, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_ctr", x: 9, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_conversion_rate", x: 0, y: 6, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "default", x: 0, y: 8, w: 12, h: 30, minW: 6, minH: 10 },
+    { i: "payment_chart", x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
+    { i: "platform_distribution", x: 4, y: 2, w: 5, h: 5, minW: 4, minH: 4 },
+    { i: "financial_margin", x: 9, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "financial_receivables", x: 9, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "financial_ticket", x: 9, y: 6, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "financial_profit", x: 9, y: 8, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_leads", x: 0, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_cpl", x: 3, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_cost_per_link", x: 6, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_ctr", x: 0, y: 9, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_conversion_rate", x: 3, y: 9, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "default", x: 0, y: 11, w: 12, h: 30, minW: 6, minH: 10 },
   ],
   widgets: [
     { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Líquido", config: { metric: "revenue_net" } },
     { id: "primary_spend", type: "kpi" as WidgetType, title: "Gastos com Anúncios", config: { metric: "spend" } },
     { id: "primary_roas", type: "kpi" as WidgetType, title: "ROAS", config: { metric: "roas" } },
     { id: "primary_profit", type: "kpi" as WidgetType, title: "Lucro Líquido", config: { metric: "profit" } },
+    { id: "payment_chart", type: "payment_chart" as WidgetType, title: "Vendas por Pagamento", config: {} },
+    { id: "platform_distribution", type: "platform_distribution" as WidgetType, title: "Distribuição por Plataforma", config: {} },
     { id: "financial_margin", type: "kpi" as WidgetType, title: "Margem", config: { metric: "profit_margin" } },
     { id: "financial_receivables", type: "kpi" as WidgetType, title: "Recebíveis", config: { metric: "receivables" } },
     { id: "financial_ticket", type: "kpi" as WidgetType, title: "Ticket Médio", config: { metric: "average_ticket" } },
@@ -339,6 +362,7 @@ export const DEFAULT_VIEW = {
       config: {
         canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
         hidePrimary: true,
+        hideFinancialOverview: true,
         hideFinancialKpis: true,
         hideCampaignKpis: true,
       },

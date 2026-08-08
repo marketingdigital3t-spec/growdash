@@ -54,11 +54,12 @@ const MESSAGE_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 interface Props {
   onEditSale: (s: Sale) => void;
   hidePrimary?: boolean;
+  hideFinancialOverview?: boolean;
   hideFinancialKpis?: boolean;
   hideCampaignKpis?: boolean;
 }
 
-export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialKpis = false, hideCampaignKpis = false }: Props) {
+export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false }: Props) {
   const { insights, sales, rdDeals, campaigns, startDate, endDate, adAccountId } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
@@ -557,8 +558,8 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         />
       </div>}
 
-      {/* 2. KPIs financeiros */}
-      <div className="dashboard-financial-overview gap-3 sm:gap-4">
+      {/* 2. Visão financeira legada. Nas visualizações novas cada bloco é um widget do grid. */}
+      {!hideFinancialOverview && <div className="dashboard-financial-overview gap-3 sm:gap-4">
         <PaymentChart byPayment={salesMetrics.byPayment} />
 
         <Card>
@@ -710,7 +711,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
           <MetricCard title="Ticket Médio" value={ticketMedio} icon={<BadgeDollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
           <MetricCard title="Lucro" value={profit} icon={<PiggyBank className="h-4 w-4" />} prefix="R$ " decimals={2} colorByValue />
         </div>}
-      </div>
+      </div>}
 
       {/* 3. Performance das Campanhas */}
       <div>

@@ -52,6 +52,43 @@ describe("ensureDefaultDashboardContent", () => {
     }
   });
 
+  it("migra uma visão v5 sem apagar os ajustes e separa a visão financeira em widgets", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-financial-editor",
+      widgets: [
+        { id: "primary_revenue", type: "kpi", title: "Minha receita", config: { metric: "revenue_net" } },
+        { id: "default", type: "default_block", title: "Padrão", config: { canonicalLayoutVersion: 5 } },
+        { id: "custom", type: "kpi", title: "Meu KPI", config: { metric: "clicks" } },
+      ],
+      layout: [
+        { i: "primary_revenue", x: 0, y: 0, w: 6, h: 3 },
+        { i: "default", x: 0, y: 4, w: 12, h: 30 },
+        { i: "custom", x: 6, y: 0, w: 3, h: 2 },
+      ],
+    });
+    const expectedIds = [
+      "payment_chart", "platform_distribution", "financial_margin",
+      "financial_receivables", "financial_ticket", "financial_profit",
+    ];
+
+    expect(migrated.widgets.find((widget) => widget.id === "primary_revenue")?.title).toBe("Minha receita");
+    expect(migrated.widgets.find((widget) => widget.id === "custom")?.title).toBe("Meu KPI");
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+      hideFinancialOverview: true,
+    });
+    for (const id of expectedIds) {
+      expect(migrated.widgets.some((widget) => widget.id === id)).toBe(true);
+      expect(migrated.layout.some((item) => item.i === id)).toBe(true);
+    }
+
+    const defaultLayout = migrated.layout.find((item) => item.i === "default")!;
+    const highestEditableRow = migrated.layout
+      .filter((item) => item.i !== "default")
+      .reduce((max, item) => Math.max(max, item.y + item.h), 0);
+    expect(defaultLayout.y).toBeGreaterThanOrEqual(highestEditableRow);
+  });
+
   it("preserva widgets adicionados depois da migração canônica", () => {
     const view = {
       id: "view-3",
