@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
-import { DASHBOARD_CANONICAL_LAYOUT_VERSION } from "@/lib/widgetCatalog";
+import { DASHBOARD_CANONICAL_LAYOUT_VERSION, DEFAULT_VIEW } from "@/lib/widgetCatalog";
 
 describe("ensureDefaultDashboardContent", () => {
   it("restaura o dashboard original e remove o catálogo duplicado de uma view legada", () => {
@@ -12,13 +12,11 @@ describe("ensureDefaultDashboardContent", () => {
 
     const restored = ensureDefaultDashboardContent(view);
 
-    expect(restored.widgets.map((widget) => widget.id)).toEqual(["default"]);
-    expect(restored.widgets[0].config).toMatchObject({
+    expect(restored.widgets.map((widget) => widget.id)).toEqual(DEFAULT_VIEW.widgets.map((widget) => widget.id));
+    expect(restored.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
       canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
     });
-    expect(restored.layout).toEqual([
-      expect.objectContaining({ i: "default", x: 0, y: 0, w: 12, minW: 12 }),
-    ]);
+    expect(restored.layout).toEqual(DEFAULT_VIEW.layout);
   });
 
   it("migra uma vez o bloco legado e estabiliza a visualização", () => {
