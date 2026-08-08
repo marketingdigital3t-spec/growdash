@@ -9,6 +9,25 @@ const instagramError = (payload: any, fallback: string) => {
   const message = String(payload?.error_message ?? payload?.error_description ?? payload?.error?.message ?? payload?.message ?? "").trim();
   return message ? `${fallback}: ${message}` : fallback;
 };
+async function fetchProfile(url: URL, token: string) {
+  let lastResponse: Response | null = null;
+  let lastPayload: any = {};
+  // Instagram Login and older Basic Display-compatible accounts expose
+  // different identifier field names. Retry with the alternate field set
+  // instead of rejecting a valid OAuth callback on a field validation error.
+  for (const fields of [
+    "id,username,name,profile_picture_url,followers_count,media_count,account_type",
+    "user_id,username,name,profile_picture_url,followers_count,media_count,account_type",
+  ]) {
+    const attempt = new URL(url);
+    attempt.searchParams.set("fields", fields);
+    attempt.searchParams.set("access_token", token);
+    lastResponse = await fetch(attempt);
+    lastPayload = await lastResponse.json().catch(() => ({}));
+    if (lastResponse.ok && (lastPayload.id || lastPayload.user_id)) return { response: lastResponse, payload: lastPayload };
+  }
+  return { response: lastResponse, payload: lastPayload };
+}
 const page = (status: "success" | "error", message: string) => {
   const payload = JSON.stringify({ type: "growdash-instagram-oauth", status, message }).replaceAll("<", "\\u003c");
   return new Response(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Growdash · Instagram</title><style>body{margin:0;background:#090806;color:#f8f4e8;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}main{max-width:520px;border:1px solid #604a17;border-radius:20px;background:#15120b;padding:32px;text-align:center;box-shadow:0 24px 70px #000a}h1{color:${status === "success" ? "#f2c94c" : "#ff7474"}}p{color:#c9c1ae;line-height:1.6}button{border:0;border-radius:11px;background:#f2c94c;color:#211806;padding:12px 20px;font-weight:800}</style></head><body><main><h1>${status === "success" ? "Instagram conectado" : "Conexão não concluída"}</h1><p>${escapeHtml(message)}</p><button onclick="window.close()">Voltar para a Growdash</button></main><script>try{if(window.opener)window.opener.postMessage(${payload},'*')}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1600)" : ""}</script></body></html>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'" } });
@@ -51,15 +70,12 @@ Deno.serve(async (req) => {
     const expiresIn = Number(long.expires_in ?? 3600);
     const graphVersion = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
     const profileUrl = new URL(`https://graph.instagram.com/${graphVersion}/me`);
-    profileUrl.searchParams.set("fields", "id,user_id,username,name,profile_picture_url,followers_count,media_count,account_type");
-    profileUrl.searchParams.set("access_token", token);
-    const profileResponse = await fetch(profileUrl);
-    const profile = await profileResponse.json().catch(() => ({}));
+    const { response: profileResponse, payload: profile } = await fetchProfile(profileUrl, token);
     // Instagram Login has returned both `id` and `user_id` across API versions.
     // Accept either value so a valid professional account is not rejected after OAuth.
     const profileId = String(profile.id ?? profile.user_id ?? "").trim();
-    if (!profileResponse.ok || !profileId) {
-      console.error("Instagram profile lookup failed", profile?.error?.code ?? profileResponse.status);
+    if (!profileResponse?.ok || !profileId) {
+      console.error("Instagram profile lookup failed", profile?.error?.code ?? profileResponse?.status);
       return page("error", instagramError(profile, "A conta foi autorizada, mas o perfil profissional não pôde ser lido. Use uma conta Business ou Creator"));
     }
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
