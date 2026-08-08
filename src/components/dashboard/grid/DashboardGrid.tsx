@@ -185,7 +185,11 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
         preventCollision={false}
         isDraggable={isEditing && breakpoint === "lg"}
         isResizable={isEditing && breakpoint === "lg"}
-        isBounded={true}
+        // Com containerPadding implícito igual à margem, o RGL subtrai 12px
+        // do primeiro delta quando isBounded=true. Isso fazia o widget saltar
+        // para a esquerda e para cima ao iniciar qualquer arraste. O próprio
+        // cálculo de x/y do grid continua limitando a posição ao soltar.
+        isBounded={false}
         useCSSTransforms={true}
         onLayoutChange={onLayoutChange}
         onBreakpointChange={setBreakpoint}
