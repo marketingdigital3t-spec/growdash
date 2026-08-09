@@ -250,8 +250,15 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(pointer, camera);
-      if (raycaster.ray.intersectPlane(floorPlane, mouseFloorPoint)) intendedTarget.lerp(mouseFloorPoint, .28);
-      orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * .014, 9, 34); updateCamera();
+      const previousRadius = orbit.radius;
+      const nextRadius = THREE.MathUtils.clamp(previousRadius + event.deltaY * .014, 9, 34);
+      // Cursor-anchored dolly: the floor point under the pointer stays under
+      // the pointer while zooming, rather than zooming only around screen center.
+      if (raycaster.ray.intersectPlane(floorPlane, mouseFloorPoint)) {
+        const anchorShift = 1 - nextRadius / previousRadius;
+        intendedTarget.addScaledVector(mouseFloorPoint.clone().sub(intendedTarget), anchorShift);
+      }
+      orbit.radius = nextRadius; updateCamera();
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "-"].includes(event.key)) event.preventDefault();
