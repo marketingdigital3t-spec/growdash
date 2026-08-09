@@ -60,8 +60,8 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#020a0f");
-    scene.fog = new THREE.Fog("#020a0f", 15, 39);
+    scene.background = new THREE.Color("#102431");
+    scene.fog = new THREE.Fog("#102431", 22, 48);
     const camera = new THREE.PerspectiveCamera(44, 1, .1, 100);
     const target = new THREE.Vector3(0, 1.4, 0);
     const intendedTarget = target.clone();
@@ -81,18 +81,18 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     };
     updateCamera();
 
-    const hemi = new THREE.HemisphereLight("#9eeeff", "#06101a", 1.15);
+    const hemi = new THREE.HemisphereLight("#e8f8ff", "#203f4d", 2.25);
     scene.add(hemi);
-    const key = new THREE.DirectionalLight("#dffaff", 2.2);
+    const key = new THREE.DirectionalLight("#ffffff", 3.8);
     key.position.set(-7, 12, 6);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.left = -16; key.shadow.camera.right = 16; key.shadow.camera.top = 16; key.shadow.camera.bottom = -16;
     scene.add(key);
-    const rim = new THREE.PointLight("#29c8ff", 18, 18, 2);
+    const rim = new THREE.PointLight("#63d9ff", 28, 22, 2);
     rim.position.set(0, 4.8, -5.6);
     scene.add(rim);
-    const gold = new THREE.PointLight("#d8a83f", 10, 13, 2);
+    const gold = new THREE.PointLight("#ffd873", 18, 16, 2);
     gold.position.set(-7, 2.5, 4);
     scene.add(gold);
 
@@ -106,7 +106,7 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     };
     const wallMaterial = new THREE.MeshStandardMaterial({ color: "#102837", roughness: .68, metalness: .32 });
     const trimMaterial = new THREE.MeshStandardMaterial({ color: "#1d607a", emissive: "#0a2735", emissiveIntensity: 1.2, roughness: .32, metalness: .72 });
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: "#07151d", roughness: .42, metalness: .72 });
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: "#1c3944", roughness: .38, metalness: .45 });
     const darkMaterial = new THREE.MeshStandardMaterial({ color: "#091017", roughness: .65, metalness: .45 });
     const glassMaterial = new THREE.MeshStandardMaterial({ color: "#13516a", emissive: "#0f5a78", emissiveIntensity: 1.5, roughness: .12, metalness: .55, transparent: true, opacity: .7 });
     const lightMaterial = new THREE.MeshStandardMaterial({ color: "#dfffff", emissive: "#83e9ff", emissiveIntensity: 4 });
@@ -155,16 +155,29 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     for (const x of [-5.4, -2.7, 0, 2.7, 5.4]) { const bar = new THREE.Mesh(new THREE.BoxGeometry(.12, 3.45, .16), frameMaterial); bar.position.set(x, 3.25, -8.5); windowFrame.add(bar); }
     scene.add(windowFrame);
 
-    const deskPositions = [new THREE.Vector3(-6.6, 0, -3.6), new THREE.Vector3(0, 0, -3.7), new THREE.Vector3(6.6, 0, -3.6), new THREE.Vector3(-3.3, 0, 3.7), new THREE.Vector3(3.3, 0, 3.7)];
+    const deskPositions = [new THREE.Vector3(-7.8, 0, -3.9), new THREE.Vector3(-2.6, 0, -3.9), new THREE.Vector3(2.6, 0, -3.9), new THREE.Vector3(-4.5, 0, 4.1), new THREE.Vector3(4.5, 0, 4.1)];
+    const workAreas = ["TRÁFEGO", "FINANÇAS", "COMERCIAL", "SEO", "FUNIL"];
+    const monitorBars: THREE.Mesh[] = [];
     const createDesk = (position: THREE.Vector3, accent: string, index: number) => {
       const group = new THREE.Group(); group.position.copy(position); group.rotation.y = index < 3 ? Math.PI : 0;
       const deskMaterial = new THREE.MeshStandardMaterial({ color: "#183847", roughness: .38, metalness: .68 });
       const top = new THREE.Mesh(new THREE.BoxGeometry(3.2, .2, 1.45), deskMaterial); top.position.y = 1.48; top.castShadow = true; top.receiveShadow = true; group.add(top);
       for (const [x, z] of [[-1.35, -.52], [1.35, -.52], [-1.35, .52], [1.35, .52]]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(.13, 1.48, .13), darkMaterial); leg.position.set(x, .74, z); leg.castShadow = true; group.add(leg); }
-      const screen = new THREE.Mesh(new THREE.BoxGeometry(1.35, .86, .1), new THREE.MeshStandardMaterial({ color: "#09202c", emissive: accent, emissiveIntensity: .9, metalness: .8, roughness: .15 })); screen.position.set(0, 2.08, -.38); group.add(screen);
+      const screen = new THREE.Mesh(new THREE.BoxGeometry(1.35, .86, .1), new THREE.MeshStandardMaterial({ color: "#153a4c", emissive: accent, emissiveIntensity: 1.45, metalness: .55, roughness: .15 })); screen.position.set(0, 2.08, -.38); group.add(screen);
+      for (let line = 0; line < 3; line++) { const bar = new THREE.Mesh(new THREE.BoxGeometry(.7 + line * .12, .055, .025), new THREE.MeshBasicMaterial({ color: "#e7fbff" })); bar.position.set(-.17 + line * .08, 2.25 - line * .2, -.445); group.add(bar); monitorBars.push(bar); }
       const stem = new THREE.Mesh(new THREE.BoxGeometry(.12, .6, .12), darkMaterial); stem.position.set(0, 1.72, -.38); group.add(stem);
       const keyboard = new THREE.Mesh(new THREE.BoxGeometry(1.2, .06, .42), darkMaterial); keyboard.position.set(0, 1.62, .28); group.add(keyboard);
-      const chair = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.25, .28), new THREE.MeshStandardMaterial({ color: "#132b38", roughness: .55, metalness: .45 })); chair.position.set(0, .9, 1.15); chair.rotation.x = -.12; group.add(chair);
+      // Full office chair: seat, high back, arm rests and five-star base remain
+      // legible from the isometric camera instead of looking like a thin slab.
+      const chairMaterial = new THREE.MeshStandardMaterial({ color: "#315a6b", roughness: .45, metalness: .48 });
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.18, .18, 1.05), chairMaterial); seat.position.set(0, .82, 1.12); seat.castShadow = true; group.add(seat);
+      const chairBack = new THREE.Mesh(new THREE.BoxGeometry(1.16, 1.25, .2), chairMaterial); chairBack.position.set(0, 1.48, 1.56); chairBack.rotation.x = -.15; chairBack.castShadow = true; group.add(chairBack);
+      for (const armX of [-.64, .64]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(.1, .5, .62), chairMaterial); arm.position.set(armX, 1.12, 1.1); group.add(arm); }
+      const chairStem = new THREE.Mesh(new THREE.CylinderGeometry(.09, .12, .72, 10), darkMaterial); chairStem.position.set(0, .38, 1.12); group.add(chairStem);
+      for (let spoke = 0; spoke < 5; spoke++) { const angle = (spoke / 5) * Math.PI * 2; const base = new THREE.Mesh(new THREE.BoxGeometry(.72, .07, .1), darkMaterial); base.position.set(Math.cos(angle) * .3, .07, 1.12 + Math.sin(angle) * .3); base.rotation.y = -angle; group.add(base); }
+      const labelCanvas = document.createElement("canvas"); labelCanvas.width = 512; labelCanvas.height = 128; const context = labelCanvas.getContext("2d");
+      if (context) { context.clearRect(0, 0, 512, 128); context.fillStyle = "rgba(4, 18, 27, .9)"; context.fillRect(0, 0, 512, 128); context.fillStyle = accent; context.fillRect(0, 0, 10, 128); context.fillStyle = "#e9fbff"; context.font = "bold 48px Arial"; context.fillText(workAreas[index], 32, 75); }
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(labelCanvas), transparent: true, depthTest: false })); label.scale.set(2.2, .55, 1); label.position.set(0, 2.9, .15); group.add(label);
       const deskLight = new THREE.PointLight(accent, 2.4, 4.5, 2); deskLight.position.set(0, 2.2, .15); group.add(deskLight);
       scene.add(group);
     };
@@ -205,7 +218,7 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     };
     agentsRef.current.forEach(createNpc);
 
-    const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
+    const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); const mouseFloorPoint = new THREE.Vector3();
     let pointerDown: { x: number; y: number; moved: boolean } | null = null;
     const onPointerDown = (event: PointerEvent) => { pointerDown = { x: event.clientX, y: event.clientY, moved: false }; renderer.domElement.setPointerCapture(event.pointerId); };
     const onPointerMove = (event: PointerEvent) => {
@@ -229,7 +242,14 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       pointerDown = null;
       if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
     };
-    const onWheel = (event: WheelEvent) => { event.preventDefault(); orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * .014, 11, 28); updateCamera(); };
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(pointer, camera);
+      if (raycaster.ray.intersectPlane(floorPlane, mouseFloorPoint)) intendedTarget.lerp(mouseFloorPoint, .28);
+      orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * .014, 9, 34); updateCamera();
+    };
     const onKeyDown = (event: KeyboardEvent) => {
       if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "-"].includes(event.key)) event.preventDefault();
       if (event.key === "ArrowLeft") orbit.azimuth += .16;
@@ -271,6 +291,7 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
         material.opacity = THREE.MathUtils.lerp(material.opacity, opacity, .16);
         material.depthWrite = material.opacity > .97;
       }
+      monitorBars.forEach((bar, index) => { bar.scale.x = .75 + Math.sin(elapsed * 3 + index) * .25; });
       for (const [index, agent] of agentsRef.current.entries()) {
         const npc = npcObjects.get(agent.id); if (!npc) continue;
         const phase = elapsed * .9 + index * .7;
