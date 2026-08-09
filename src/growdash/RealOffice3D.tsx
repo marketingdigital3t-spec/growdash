@@ -25,6 +25,7 @@ type NpcObject = {
   body: THREE.Group;
   leftArm: THREE.Group;
   rightArm: THREE.Group;
+  legs: THREE.Mesh[];
   base: THREE.Vector3;
 };
 
@@ -65,7 +66,7 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     const camera = new THREE.PerspectiveCamera(44, 1, .1, 100);
     const target = new THREE.Vector3(0, 1.4, 0);
     const intendedTarget = target.clone();
-    const orbit = { azimuth: .66, polar: 1.03, radius: 19 };
+    const orbit = { azimuth: .66, polar: 1.03, radius: 25 };
     const updateCamera = () => {
       const sin = Math.sin(orbit.polar);
       camera.position.set(
@@ -202,7 +203,9 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     const npcObjects = new Map<string, NpcObject>();
     const pickables: THREE.Object3D[] = [];
     const createNpc = (agent: OfficeNpc, index: number) => {
-      const root = new THREE.Group(); root.name = agent.id; root.position.copy(deskPositions[index]).add(new THREE.Vector3(0, 0, index < 3 ? -.4 : .45));
+      const root = new THREE.Group(); root.name = agent.id;
+      // The working pose starts on the actual chair axis, not inside the desk.
+      root.position.copy(deskPositions[index]).add(new THREE.Vector3(0, 0, index < 3 ? -1.02 : 1.02));
       const body = new THREE.Group(); body.position.y = 1.15; root.add(body);
       const shirt = new THREE.Mesh(new THREE.CylinderGeometry(.35, .43, .9, 14), new THREE.MeshStandardMaterial({ color: agent.color, roughness: .55, metalness: .15 })); shirt.castShadow = true; body.add(shirt);
       const neck = new THREE.Mesh(new THREE.CylinderGeometry(.12, .13, .18, 10), new THREE.MeshStandardMaterial({ color: "#d99872", roughness: .8 })); neck.position.y = .54; body.add(neck);
@@ -210,11 +213,11 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       const hair = new THREE.Mesh(new THREE.SphereGeometry(.35, 16, 12, 0, Math.PI * 2, 0, Math.PI * .58), new THREE.MeshStandardMaterial({ color: "#1b1720", roughness: .82 })); hair.position.set(0, .94, .02); hair.scale.set(1.02, .75, 1); body.add(hair);
       const leftArm = new THREE.Group(); leftArm.position.set(-.42, .32, 0); const leftMesh = new THREE.Mesh(new THREE.CapsuleGeometry(.1, .52, 4, 10), new THREE.MeshStandardMaterial({ color: agent.color, roughness: .6 })); leftMesh.rotation.z = -.45; leftMesh.position.y = -.28; leftArm.add(leftMesh); body.add(leftArm);
       const rightArm = new THREE.Group(); rightArm.position.set(.42, .32, 0); const rightMesh = leftMesh.clone(); rightMesh.rotation.z = .45; rightMesh.position.y = -.28; rightArm.add(rightMesh); body.add(rightArm);
-      const legMaterial = new THREE.MeshStandardMaterial({ color: "#111d29", roughness: .72 });
-      for (const x of [-.16, .16]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(.16, .65, .19), legMaterial); leg.position.set(x, -.7, 0); body.add(leg); }
+      const legMaterial = new THREE.MeshStandardMaterial({ color: "#111d29", roughness: .72 }); const legs: THREE.Mesh[] = [];
+      for (const x of [-.16, .16]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(.16, .65, .19), legMaterial); leg.position.set(x, -.7, 0); body.add(leg); legs.push(leg); }
       const halo = new THREE.Mesh(new THREE.RingGeometry(.42, .58, 32), new THREE.MeshBasicMaterial({ color: agent.color, transparent: true, opacity: .78, side: THREE.DoubleSide })); halo.rotation.x = -Math.PI / 2; halo.position.y = .02; root.add(halo);
       root.traverse((object) => { if (object instanceof THREE.Mesh) { object.userData.npcId = agent.id; pickables.push(object); } });
-      scene.add(root); npcObjects.set(agent.id, { root, body, leftArm, rightArm, base: root.position.clone() });
+      scene.add(root); npcObjects.set(agent.id, { root, body, leftArm, rightArm, legs, base: root.position.clone() });
     };
     agentsRef.current.forEach(createNpc);
 
@@ -295,9 +298,17 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       for (const [index, agent] of agentsRef.current.entries()) {
         const npc = npcObjects.get(agent.id); if (!npc) continue;
         const phase = elapsed * .9 + index * .7;
-        if (agent.status === "walking") { npc.root.position.set(npc.base.x + Math.sin(phase) * 1.15, npc.base.y, npc.base.z + Math.cos(phase * .8) * .86); npc.root.rotation.y = Math.atan2(Math.cos(phase), -Math.sin(phase * .8)); npc.body.position.y = 1.15 + Math.abs(Math.sin(phase * 2)) * .07; npc.leftArm.rotation.x = Math.sin(phase * 2) * .55; npc.rightArm.rotation.x = -Math.sin(phase * 2) * .55; }
-        else if (agent.status === "free") { npc.root.position.lerp(new THREE.Vector3(-7.6 + index * .12, 0, 5.0 + index * .08), .025); npc.root.rotation.y = .4; npc.body.position.y = 1.13 + Math.sin(phase) * .025; npc.leftArm.rotation.x = .18; npc.rightArm.rotation.x = -.18; }
-        else { npc.root.position.lerp(npc.base, .08); npc.root.rotation.y = index < 3 ? Math.PI : 0; npc.body.position.y = 1.15 + Math.sin(phase) * .015; npc.leftArm.rotation.x = -.5 + Math.sin(phase * 5) * .22; npc.rightArm.rotation.x = -.5 - Math.sin(phase * 5) * .22; }
+        if (agent.status === "walking") { npc.root.position.set(npc.base.x + Math.sin(phase) * 1.15, npc.base.y, npc.base.z + Math.cos(phase * .8) * .86); npc.root.rotation.y = Math.atan2(Math.cos(phase), -Math.sin(phase * .8)); npc.body.position.y = 1.15 + Math.abs(Math.sin(phase * 2)) * .07; npc.leftArm.rotation.x = Math.sin(phase * 2) * .55; npc.rightArm.rotation.x = -Math.sin(phase * 2) * .55; npc.legs.forEach((leg, legIndex) => { leg.rotation.x = Math.sin(phase * 2 + legIndex * Math.PI) * .45; leg.position.z = 0; }); }
+        else if (agent.status === "free") { npc.root.position.lerp(new THREE.Vector3(-7.6 + index * .12, 0, 5.0 + index * .08), .025); npc.root.rotation.y = .4; npc.body.position.y = 1.13 + Math.sin(phase) * .025; npc.leftArm.rotation.x = .18; npc.rightArm.rotation.x = -.18; npc.legs.forEach((leg) => { leg.rotation.x = 0; leg.position.z = 0; }); }
+        else {
+          // Working means seated: lower the torso onto the chair and keep both
+          // forearms over the keyboard. Walking/free use the standing pose.
+          npc.root.position.lerp(npc.base, .08); npc.root.rotation.y = index < 3 ? Math.PI : 0;
+          npc.body.position.y = .72 + Math.sin(phase) * .012;
+          npc.leftArm.rotation.x = -.72 + Math.sin(phase * 5) * .18;
+          npc.rightArm.rotation.x = -.72 - Math.sin(phase * 5) * .18;
+          npc.legs.forEach((leg) => { leg.rotation.x = Math.PI / 2; leg.position.z = .22; });
+        }
       }
       renderer.render(scene, camera);
     };
