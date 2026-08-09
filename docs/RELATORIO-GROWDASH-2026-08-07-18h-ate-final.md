@@ -286,3 +286,14 @@ Validação do refinamento: TypeScript aprovado, ESLint sem erros (15 avisos ant
 - Validação local: TypeScript (`tsc -p tsconfig.app.json --noEmit`) aprovado; ESLint completo com **0 erros / 15 avisos antigos**; Vitest **26 arquivos / 77 testes** aprovado; build Vite aprovado; `git diff --check` aprovado.
 - Validação autenticada em `https://growdash.com.br/`: bundle `app-BSFSrFoV.js` carregado, dashboard normal renderizado, `Radar Growdash`, `Torre de controle`, `Inbox de exceções` e `Health Score` ausentes do DOM, Glass Strip e demais relatórios presentes, sem overflow horizontal (`scrollWidth === clientWidth`). Console sem erro novo; permanece apenas o aviso preexistente de `near-realtime-sync`.
 - Commit `855777e` enviado ao GitHub. Cloudflare Pages publicado em `https://3b5a95cf.growdash.pages.dev`; `growdash.com.br` e `www.growdash.com.br` convergiram para `assets/app-BSFSrFoV.js` e `assets/index-C9uAo_jk.css`, mantendo os headers de segurança.
+
+## Growdash Life dentro de Agentes — 08/08/2026 22:32
+
+- O prompt mestre de simulador estilo The Sims foi aplicado como uma vertical slice leve dentro de **Agentes → Escritório 3D**, preservando o cérebro/grafo e sem adicionar uma dependência pesada de WebGL ao carregamento inicial.
+- Os seis NPCs agora são personagens femininas com identidade visual distinta (pele, cabelo, roupa e paleta): Ágata (tráfego), Bianca (financeiro), Camila (comercial), Júlia (SEO), Natália (funil) e Marina (criativos). Os IDs técnicos antigos foram mantidos somente para não quebrar posições e preferências locais existentes.
+- Criado `src/lib/agentLife.ts` com estados `IDLE`, `MOVER`, `TRABALHAR` e `INTERAGIR`, necessidades de fome, energia, social, diversão, higiene e conforto, relógio simulado e transições determinísticas. O loop usa um único timer e refs para evitar recriar o intervalo a cada render.
+- O HUD inferior/overlay recebeu relógio, pausa, velocidades 1×/2×/3×, modo Vida/Construir, fundos simulados claramente rotulados e botão de autonomia. O inspetor da agente selecionada apresenta o estado atual e as seis necessidades com barras acessíveis.
+- Os monitores das mesas alternam suavemente entre desligado, trabalhando e interação com o computador. Divisórias de vidro, zonas do escritório e variações CSS dos NPCs reforçam a referência isométrica enviada.
+- Testes adicionados em `src/lib/agentLife.test.ts` cobrindo alternância de fases, movimento/descanso, limites das necessidades e relógio.
+- Validação local: TypeScript, ESLint (0 erros), Vitest **27 arquivos / 80 testes**, build Vite e `git diff --check` aprovados. O build manteve apenas o aviso conhecido de chunk de gráficos acima de 500 kB.
+- Limite explícito: modelos GLB de alta densidade, rigging/skinning e animações corporais realistas ainda dependem de assets 3D licenciados; o código atual mantém um placeholder CSS performático e um contrato de estados pronto para receber esses assets sem reescrever a UI.
