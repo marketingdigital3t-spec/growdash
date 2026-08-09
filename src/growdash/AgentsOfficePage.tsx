@@ -346,7 +346,7 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
   const enterCore = () => {
     if (phase !== "brain") return;
     setPhase("entering");
-    transitionTimer.current = window.setTimeout(() => setPhase("core"), 1380);
+    transitionTimer.current = window.setTimeout(() => setPhase("core"), 1140);
   };
 
   const resetCore = () => {
@@ -440,8 +440,7 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
       <span className="jarvis-orbit orbit-one" /><span className="jarvis-orbit orbit-two" /><span className="jarvis-orbit orbit-three" />
       <span ref={brainRotationRef} className="growdash-brain-user-rotation" onPointerDown={startBrainDrag} onPointerMove={moveBrainDrag} onPointerUp={stopBrainDrag} onPointerCancel={stopBrainDrag}>
         <span className="growdash-brain-rotor">
-          <BrainSurface back />
-          <BrainSurface />
+          <BrainVolume />
         </span>
       </span>
       <span className="jarvis-energy-core"><Cpu /><i /></span>
@@ -468,15 +467,38 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
   </section>;
 }
 
-function BrainSurface({ back = false }: { back?: boolean }) {
-  return <svg className={cn("jarvis-cortex", back ? "is-back" : "is-front")} viewBox="0 0 420 360" role={back ? undefined : "img"} aria-label={back ? undefined : "Cérebro 3D Growdash"} aria-hidden={back}>
+const BRAIN_DEPTHS = [-28, -21, -14, -7, 0, 7, 14, 21, 28] as const;
+
+const BRAIN_SYNAPSES = [
+  [113, 91, 52, 44], [78, 122, 23, 96], [58, 174, 12, 166], [72, 227, 21, 258], [116, 278, 72, 312],
+  [151, 310, 124, 343], [306, 91, 368, 43], [342, 122, 397, 91], [362, 174, 411, 165], [348, 227, 398, 257],
+  [304, 278, 348, 311], [269, 310, 296, 343], [162, 72, 153, 27], [258, 72, 267, 26],
+] as const;
+
+function BrainVolume() {
+  return <span className="growdash-brain-volume">
+    <svg className="growdash-brain-synapses" viewBox="0 0 420 360" aria-hidden="true">
+      {BRAIN_SYNAPSES.map(([x1, y1, x2, y2], index) => <g key={`${x1}-${y1}-${index}`} style={{ "--synapse-delay": `${-(index % 7) * .37}s` } as React.CSSProperties}><path d={`M ${x1} ${y1} Q ${(x1 + x2) / 2 + (index % 2 ? 6 : -6)} ${(y1 + y2) / 2 - 12} ${x2} ${y2}`} /><circle cx={x2} cy={y2} r={index % 3 === 0 ? 4 : 2.5} /></g>)}
+    </svg>
+    <BrainSurface back depth={-34} />
+    {BRAIN_DEPTHS.map((depth, index) => <BrainSurface key={depth} depth={depth} layer="slice" sliceIndex={index} />)}
+    <BrainSurface depth={34} />
+    <span className="growdash-brain-depth-shine" aria-hidden="true" />
+  </span>;
+}
+
+function BrainSurface({ back = false, depth = 0, layer = "surface", sliceIndex = 0 }: { back?: boolean; depth?: number; layer?: "surface" | "slice"; sliceIndex?: number }) {
+  const detailed = layer === "surface";
+  const suffix = back ? "back" : "front";
+  const gradientId = `cortex-metal-${suffix}-${layer}-${sliceIndex}`;
+  return <svg className={cn("jarvis-cortex", "growdash-brain-surface", back ? "is-back" : "is-front", layer === "slice" && "is-slice")} style={{ "--brain-depth": `${depth}px`, "--slice-index": sliceIndex } as React.CSSProperties} viewBox="0 0 420 360" role={detailed && !back ? "img" : undefined} aria-label={detailed && !back ? "Cérebro 3D Growdash" : undefined} aria-hidden={!detailed || back}>
     <defs>
-      <linearGradient id={back ? "cortex-metal-back" : "cortex-metal-front"} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brand-gold-light)" /><stop offset=".42" stopColor="var(--brand-gold)" /><stop offset="1" stopColor="var(--brand-bronze)" /></linearGradient>
+      <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brain-cyan-light)" /><stop offset=".42" stopColor="var(--brain-cyan)" /><stop offset="1" stopColor="var(--brain-cyan-deep)" /></linearGradient>
     </defs>
-    <path className="jarvis-cortex-lobe" fill={`url(#${back ? "cortex-metal-back" : "cortex-metal-front"})`} d="M204 45C163 24 116 39 95 73C55 79 41 119 55 151C31 181 45 225 76 240C72 276 109 302 143 291C158 322 197 318 210 288V69C210 56 208 50 204 45Z" />
-    <path className="jarvis-cortex-lobe" fill={`url(#${back ? "cortex-metal-back" : "cortex-metal-front"})`} d="M216 45C257 24 304 39 325 73C365 79 379 119 365 151C389 181 375 225 344 240C348 276 311 302 277 291C262 322 223 318 210 288V69C210 56 212 50 216 45Z" />
+    <path className="jarvis-cortex-lobe" fill={layer === "slice" ? "var(--brain-volume-fill)" : `url(#${gradientId})`} d="M204 45C163 24 116 39 95 73C55 79 41 119 55 151C31 181 45 225 76 240C72 276 109 302 143 291C158 322 197 318 210 288V69C210 56 208 50 204 45Z" />
+    <path className="jarvis-cortex-lobe" fill={layer === "slice" ? "var(--brain-volume-fill)" : `url(#${gradientId})`} d="M216 45C257 24 304 39 325 73C365 79 379 119 365 151C389 181 375 225 344 240C348 276 311 302 277 291C262 322 223 318 210 288V69C210 56 212 50 216 45Z" />
     <path className="jarvis-cortex-midline" d="M210 65V291M180 300C190 327 184 342 170 354M240 300C230 327 236 342 250 354" />
-    {!back && <>
+    {detailed && <>
       {BRAIN_CIRCUITS.map((path, index) => <path key={path} className="jarvis-circuit-trace" d={path} style={{ "--circuit-delay": `${index * -.17}s` } as React.CSSProperties} />)}
       <rect className="jarvis-cortex-chip" x="184" y="130" width="52" height="72" rx="8" />
       <path className="jarvis-cortex-chip-lines" d="M194 143H226M194 155H226M194 167H226M194 179H226M174 143H184M174 160H184M174 177H184M236 143H246M236 160H246M236 177H246" />
