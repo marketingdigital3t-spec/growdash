@@ -193,11 +193,17 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     const meetingTop = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.25, .16, 32), new THREE.MeshStandardMaterial({ color: "#214958", roughness: .35, metalness: .72 })); meetingTop.scale.z = .58; meetingTop.position.y = 1.25; meetingTop.castShadow = true; meeting.add(meetingTop);
     const meetingBase = new THREE.Mesh(new THREE.CylinderGeometry(.42, .62, 1.2, 16), darkMaterial); meetingBase.position.y = .6; meeting.add(meetingBase);
     for (let seat = 0; seat < 5; seat++) { const angle = (seat / 5) * Math.PI * 2; const chair = new THREE.Mesh(new THREE.BoxGeometry(.72, .92, .68), couchMaterial); chair.position.set(Math.cos(angle) * 2.25, .65, Math.sin(angle) * 1.28); chair.rotation.y = -angle; chair.castShadow = true; meeting.add(chair); }
-    const board = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.9, .09), new THREE.MeshStandardMaterial({ color: "#103f50", emissive: "#11657d", emissiveIntensity: .85, roughness: .22, metalness: .5 })); board.position.set(0, 2.75, -2.2); meeting.add(board); scene.add(meeting);
+    // A slim transparent display, kept at the meeting-room edge so it never
+    // becomes a dark wall in front of desks from the overview camera.
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.25, 1.1), new THREE.MeshBasicMaterial({ color: "#7ae8ff", transparent: true, opacity: .42, side: THREE.DoubleSide, depthWrite: false })); board.position.set(0, 2.55, 1.95); board.rotation.y = Math.PI; meeting.add(board); scene.add(meeting);
     const ceoOffice = new THREE.Group(); ceoOffice.position.set(8.75, 0, 5.25);
     const executiveDesk = new THREE.Mesh(new THREE.BoxGeometry(3.6, .24, 1.7), new THREE.MeshStandardMaterial({ color: "#62491d", roughness: .36, metalness: .58 })); executiveDesk.position.y = 1.35; executiveDesk.castShadow = true; ceoOffice.add(executiveDesk);
     const executiveMonitor = new THREE.Mesh(new THREE.BoxGeometry(1.75, 1.05, .1), new THREE.MeshStandardMaterial({ color: "#071b25", emissive: "#d8a83f", emissiveIntensity: .75 })); executiveMonitor.position.set(0, 2.05, -.35); ceoOffice.add(executiveMonitor);
-    const bookshelf = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.6, .42), darkMaterial); bookshelf.position.set(0, 1.3, 2.35); ceoOffice.add(bookshelf); scene.add(ceoOffice);
+    // Open shelving instead of a solid block: it reads as furniture without
+    // occluding the whole office when the camera is low.
+    for (const shelfY of [.5, 1.22, 1.94]) { const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.35, .1, .32), new THREE.MeshStandardMaterial({ color: "#8b6c31", roughness: .5, metalness: .35 })); shelf.position.set(0, shelfY, 2.35); ceoOffice.add(shelf); }
+    for (const shelfX of [-1.1, 1.1]) { const side = new THREE.Mesh(new THREE.BoxGeometry(.1, 2.3, .32), darkMaterial); side.position.set(shelfX, 1.2, 2.35); ceoOffice.add(side); }
+    scene.add(ceoOffice);
     const plant = new THREE.Group(); plant.position.set(9.5, 0, 5.8); const pot = new THREE.Mesh(new THREE.CylinderGeometry(.42, .54, .62, 14), new THREE.MeshStandardMaterial({ color: "#a67541", roughness: .8 })); pot.position.y = .31; plant.add(pot); for (let i = 0; i < 7; i++) { const leaf = new THREE.Mesh(new THREE.SphereGeometry(.34, 12, 8), new THREE.MeshStandardMaterial({ color: "#1c754f", roughness: .75 })); leaf.position.set(Math.sin(i * .9) * .43, 1.05 + (i % 2) * .23, Math.cos(i * .9) * .43); leaf.scale.set(.55, 1.6, .55); plant.add(leaf); } scene.add(plant);
 
     const npcObjects = new Map<string, NpcObject>();
