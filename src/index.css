@@ -2996,6 +2996,7 @@
   --brain-cyan: #61d7ff;
   --brain-cyan-deep: #1268a8;
   --brain-volume-fill: rgba(54, 161, 220, .2);
+  --brain-core-scale: .78;
 }
 
 .growdash-core-v2 .jarvis-brain {
@@ -3116,9 +3117,9 @@
 .growdash-core-v2.is-entering .jarvis-neural-field line { animation-duration: 1.7s !important; }
 
 @keyframes growdash-smooth-enter {
-  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  44% { opacity: 1; transform: translate(-50%, -50%) scale(1.22); }
-  100% { opacity: 1; transform: translate(-50%, -50%) scale(.78); }
+  0% { opacity: 1; scale: 1; }
+  44% { opacity: 1; scale: 1.22; }
+  100% { opacity: 1; scale: var(--brain-core-scale); }
 }
 
 @keyframes growdash-neural-enter {
@@ -3136,6 +3137,7 @@
 @keyframes growdash-synapse-pulse { 0%, 100% { opacity: .55; transform: scale(.78); transform-origin: center; } 50% { opacity: 1; transform: scale(1.18); transform-origin: center; } }
 
 @media (max-width: 820px) {
+  .growdash-core-v2 { --brain-core-scale: .82; }
   .growdash-core-v2 .growdash-brain-surface { width: 198px; height: 180px; }
   .growdash-core-v2 .growdash-brain-synapses { inset: -18px; width: calc(100% + 36px); height: calc(100% + 36px); }
 }
