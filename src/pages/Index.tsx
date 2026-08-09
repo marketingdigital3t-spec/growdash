@@ -8,7 +8,6 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useAlerts } from "@/hooks/useAlerts";
-import { useCampaignDiagnostics } from "@/hooks/useCampaignDiagnostics";
 import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
@@ -26,7 +25,6 @@ import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useToast } from "@/hooks/use-toast";
-import { ControlTowerRadar } from "@/components/dashboard/ControlTowerRadar";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
@@ -86,7 +84,6 @@ const Index = () => {
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
   });
   const { data: alerts = [] } = useAlerts();
-  const { data: campaignDiagnostics = [], isLoading: diagnosticsLoading, isError: diagnosticsError } = useCampaignDiagnostics();
   const syncMeta = useSyncMeta();
 
   const { data: activeView } = useGlobalView();
@@ -320,24 +317,6 @@ const Index = () => {
             </Button>
           )}
         </div>
-      </MotionItem>
-
-      <MotionItem>
-        <ControlTowerRadar
-          accounts={visibleAccounts.map((account: any) => ({
-            id: account.id,
-            name: account.name,
-            remaining_balance: account.remaining_balance,
-            daily_budget: account.daily_budget,
-            connection_status: account.connection_status,
-            last_sync_error: account.last_sync_error,
-            oauth_health_status: account.oauth_health_status,
-          }))}
-          diagnostics={campaignDiagnostics}
-          sales={unitSales.map((sale) => ({ ad_account_id: sale.ad_account_id, net_revenue: sale.net_revenue, status: sale.status }))}
-          isLoading={diagnosticsLoading}
-          isError={diagnosticsError}
-        />
       </MotionItem>
 
       <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
