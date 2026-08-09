@@ -111,18 +111,23 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     const glassMaterial = new THREE.MeshStandardMaterial({ color: "#13516a", emissive: "#0f5a78", emissiveIntensity: 1.5, roughness: .12, metalness: .55, transparent: true, opacity: .7 });
     const lightMaterial = new THREE.MeshStandardMaterial({ color: "#dfffff", emissive: "#83e9ff", emissiveIntensity: 4 });
 
+    const occludingWalls: THREE.Mesh[] = [];
+    const addOccludingWall = (geometry: THREE.BufferGeometry, position: THREE.Vector3) => {
+      const material = wallMaterial.clone(); material.transparent = true; material.opacity = 1; material.depthWrite = true;
+      const wall = addMesh(geometry, material, position, false); occludingWalls.push(wall); return wall;
+    };
     addMesh(new THREE.BoxGeometry(25, .35, 18), floorMaterial, new THREE.Vector3(0, -.2, 0), false);
-    addMesh(new THREE.BoxGeometry(25, .24, 18), wallMaterial, new THREE.Vector3(0, 5.9, 0), false);
-    addMesh(new THREE.BoxGeometry(25, 6.2, .28), wallMaterial, new THREE.Vector3(0, 2.8, -8.9), false);
-    addMesh(new THREE.BoxGeometry(.28, 6.2, 18), wallMaterial, new THREE.Vector3(-12.35, 2.8, 0), false);
-    addMesh(new THREE.BoxGeometry(.28, 6.2, 18), wallMaterial, new THREE.Vector3(12.35, 2.8, 0), false);
+    // No ceiling: the whole office is visible from an isometric/top-down view.
+    addOccludingWall(new THREE.BoxGeometry(25, 6.2, .28), new THREE.Vector3(0, 2.8, -8.9));
+    addOccludingWall(new THREE.BoxGeometry(.28, 6.2, 18), new THREE.Vector3(-12.35, 2.8, 0));
+    addOccludingWall(new THREE.BoxGeometry(.28, 6.2, 18), new THREE.Vector3(12.35, 2.8, 0));
 
     // The partitions make this an office with rooms, rather than a single decorative box.
     // Door gaps are intentionally left open so the camera keeps visual continuity between zones.
-    addMesh(new THREE.BoxGeometry(6.4, 3.25, .18), wallMaterial, new THREE.Vector3(-8.9, 1.63, 1.55), false);
-    addMesh(new THREE.BoxGeometry(.18, 3.25, 4.2), wallMaterial, new THREE.Vector3(-5.8, 1.63, 5.35), false);
-    addMesh(new THREE.BoxGeometry(5.8, 3.25, .18), wallMaterial, new THREE.Vector3(8.7, 1.63, 1.55), false);
-    addMesh(new THREE.BoxGeometry(.18, 3.25, 4.2), wallMaterial, new THREE.Vector3(5.9, 1.63, 5.35), false);
+    addOccludingWall(new THREE.BoxGeometry(6.4, 3.25, .18), new THREE.Vector3(-8.9, 1.63, 1.55));
+    addOccludingWall(new THREE.BoxGeometry(.18, 3.25, 4.2), new THREE.Vector3(-5.8, 1.63, 5.35));
+    addOccludingWall(new THREE.BoxGeometry(5.8, 3.25, .18), new THREE.Vector3(8.7, 1.63, 1.55));
+    addOccludingWall(new THREE.BoxGeometry(.18, 3.25, 4.2), new THREE.Vector3(5.9, 1.63, 5.35));
 
     for (let x = -10; x <= 10; x += 4) {
       addMesh(new THREE.BoxGeometry(.08, .03, 17), trimMaterial, new THREE.Vector3(x, .02, 0), false);
@@ -253,6 +258,19 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       if (!visible) return;
       const elapsed = clock.getElapsedTime();
       target.lerp(intendedTarget, .09); updateCamera();
+      // Sims-style cutaway: only the wall currently between the camera and the
+      // operational floor fades, preserving the room while never hiding an NPC.
+      const sightLine = target.clone().sub(camera.position);
+      const sightDistance = sightLine.length();
+      raycaster.set(camera.position, sightLine.normalize());
+      const hiddenWalls = new Set(raycaster.intersectObjects(occludingWalls, false)
+        .filter((hit) => hit.distance < sightDistance - .4).map((hit) => hit.object));
+      for (const wall of occludingWalls) {
+        const material = wall.material as THREE.MeshStandardMaterial;
+        const opacity = hiddenWalls.has(wall) ? .12 : 1;
+        material.opacity = THREE.MathUtils.lerp(material.opacity, opacity, .16);
+        material.depthWrite = material.opacity > .97;
+      }
       for (const [index, agent] of agentsRef.current.entries()) {
         const npc = npcObjects.get(agent.id); if (!npc) continue;
         const phase = elapsed * .9 + index * .7;
