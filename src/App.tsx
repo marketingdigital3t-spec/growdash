@@ -85,11 +85,26 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Keep diagnostic context in the browser without exposing it in the UI.
     console.error("Growdash render error", error, info.componentStack);
+    // A Pages release replaces hashed lazy chunks. Safari can retain the old
+    // shell briefly and then fail a dynamic import. Retry exactly once against
+    // a cache-busting URL before showing the manual recovery screen.
+    const isChunkError = /dynamically imported module|loading chunk|importing a module script|failed to fetch/i.test(error.message);
+    const retryKey = "growdash:chunk-retry";
+    if (isChunkError && sessionStorage.getItem(retryKey) !== "1") {
+      sessionStorage.setItem(retryKey, "1");
+      const url = new URL(window.location.href);
+      url.searchParams.set("gd_reload", String(Date.now()));
+      window.location.replace(url.toString());
+      return;
+    }
+    sessionStorage.removeItem(retryKey);
   }
 
   retry = () => {
     this.setState({ failed: false });
-    window.location.reload();
+    const url = new URL(window.location.href);
+    url.searchParams.set("gd_reload", String(Date.now()));
+    window.location.replace(url.toString());
   };
 
   render() {
