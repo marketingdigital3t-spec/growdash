@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -40,6 +40,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 type AgentStatus = "working" | "walking" | "free";
 type ChatMessage = { id: string; role: "agent" | "user"; text: string };
+
+const RealOffice3D = lazy(() => import("@/growdash/RealOffice3D").then((module) => ({ default: module.RealOffice3D })));
 
 const AGENTS = [
   { id: "atlas", name: "Ágata", role: "Gestora de tráfego", specialty: "Mídia & escala", task: "Otimizando campanhas", color: "#e9b72d", desk: "station-traffic", position: "npc-atlas", look: "look-a", skin: "#c88b68", hair: "#291c19", outfit: "#b87924", pants: "#25252b" },
@@ -169,7 +171,15 @@ export default function AgentsOfficePage() {
         accounts={visibleAccounts.map((account) => ({ id: account.id, name: account.name, target_cpl: account.target_cpl }))}
         startDate={startDate}
         endDate={endDate}
-      /> : <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
+      /> : <>
+        <Suspense fallback={<div className="grid min-h-[620px] place-items-center rounded-2xl border border-primary/25 bg-[#061017] text-sm text-cyan-100">Carregando ambiente 3D…</div>}>
+          <RealOffice3D
+            agents={AGENTS.slice(0, 5).map((agent) => ({ ...agent, status: statuses[agent.id] || "working" }))}
+            onSelectAgent={openAgent}
+            onStatusChange={updateStatus}
+          />
+        </Suspense>
+        {false && <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
         <div className="office-sim-topbar">
           <div className="office-sim-brand"><span className="office-sim-brand-mark"><Bot className="h-3.5 w-3.5" /></span><span><b>GROWDASH LIFE</b><small>AGENT OPERATIONS</small></span></div>
           <div className="office-sim-presence" aria-label="Agentes presentes no escritório">
@@ -277,7 +287,7 @@ export default function AgentsOfficePage() {
             </>}
           </aside>
         )}
-      </div>}
+        </div>}</>}
     </div>
   );
 }
