@@ -189,15 +189,23 @@ export default function AgentsOfficePage() {
         <div className="office-viewport-toolbar" role="toolbar" aria-label="Controles da câmera do escritório">
           <span className="office-viewport-title"><Rotate3D className="h-3.5 w-3.5" />ESCRITÓRIO 360°</span>
           <span className="office-viewport-hint">Arraste a visão ou use as setas para orbitar</span>
-          <div className="office-camera-buttons"><button type="button" onClick={() => setOfficeAngle((value) => Math.max(-28, value - 8))} aria-label="Orbitar para a esquerda"><ArrowLeft className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle(0)} aria-label="Centralizar câmera"><RotateCcw className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle((value) => Math.min(28, value + 8))} aria-label="Orbitar para a direita"><ArrowRight className="h-3.5 w-3.5" /></button></div>
+          <div className="office-camera-buttons"><button type="button" onClick={() => setOfficeAngle((value) => value - 18)} aria-label="Orbitar para a esquerda"><ArrowLeft className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle(0)} aria-label="Centralizar câmera"><RotateCcw className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle((value) => value + 18)} aria-label="Orbitar para a direita"><ArrowRight className="h-3.5 w-3.5" /></button></div>
         </div>
-        <div className="office-3d-world" style={{ "--office-angle": `${officeAngle}deg` } as React.CSSProperties} onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) return; officeDragStart.current = event.clientX; officeAngleStart.current = officeAngle; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (officeDragStart.current === null) return; setOfficeAngle(Math.max(-28, Math.min(28, officeAngleStart.current + (event.clientX - officeDragStart.current) / 9))); }} onPointerUp={() => { officeDragStart.current = null; }} onPointerCancel={() => { officeDragStart.current = null; }}>
+        <div className="office-3d-world" style={{ "--office-angle": `${officeAngle}deg` } as React.CSSProperties} onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) return; officeDragStart.current = event.clientX; officeAngleStart.current = officeAngle; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (officeDragStart.current === null) return; setOfficeAngle(Math.max(-180, Math.min(180, officeAngleStart.current + (event.clientX - officeDragStart.current) / 4.5))); }} onPointerUp={() => { officeDragStart.current = null; }} onPointerCancel={() => { officeDragStart.current = null; }}>
           <div className="office-life-hud" aria-label="Controles do Growdash Life">
             <div className="office-life-clock"><span className="office-life-clock-icon">◷</span><span><b>{gameClock}</b><small>{timeSpeed === 0 ? "Pausado" : `Velocidade ${timeSpeed}x`}</small></span></div>
             <div className="office-life-mode" role="group" aria-label="Modo do escritório"><button type="button" className={cn(lifeMode === "life" && "is-active")} onClick={() => setLifeMode("life")}>◈ Vida</button><button type="button" className={cn(lifeMode === "build" && "is-active")} onClick={() => setLifeMode("build")}>▦ Construir</button></div>
             <div className="office-life-speed" role="group" aria-label="Velocidade do tempo"><button type="button" className={cn(timeSpeed === 0 && "is-active")} onClick={() => setTimeSpeed(0)} aria-label="Pausar tempo">Ⅱ</button>{([1, 2, 3] as const).map((speed) => <button key={speed} type="button" className={cn(timeSpeed === speed && "is-active")} onClick={() => setTimeSpeed(speed)} aria-label={`Velocidade ${speed}x`}>{speed}×</button>)}</div>
             <div className="office-life-funds"><span>§</span><b>{fundsLabel}</b></div>
             <button type="button" className={cn("office-life-autonomy", autonomyEnabled && "is-active")} onClick={() => setAutonomyEnabled((value) => !value)} aria-pressed={autonomyEnabled}><span className="office-live-dot" /> Autonomia</button>
+          </div>
+          <div className="office-architecture" aria-hidden="true">
+            <span className="office-ceiling-plane"><i /><i /><i /><b>GROWDASH HQ · LIVE INTELLIGENCE FLOOR</b></span>
+            <span className="office-architecture-wall office-architecture-wall-back"><i /><i /><i /><b>CONTROL ROOM 01</b></span>
+            <span className="office-architecture-wall office-architecture-wall-left"><i /><i /></span>
+            <span className="office-architecture-wall office-architecture-wall-right"><i /><i /></span>
+            <span className="office-light-beam office-light-beam-a" /><span className="office-light-beam office-light-beam-b" /><span className="office-light-beam office-light-beam-c" />
+            <span className="office-ceiling-spot spot-a" /><span className="office-ceiling-spot spot-b" /><span className="office-ceiling-spot spot-c" />
           </div>
           <div className="office-room-shell" aria-hidden="true"><span className="room-wall room-wall-back" /><span className="room-wall room-wall-left" /><span className="room-wall room-wall-right" /><span className="room-door room-door-main" /><span className="room-window-strip" /></div>
           <div className="office-glass-divider divider-a" aria-hidden="true"><i /><i /><i /></div><div className="office-glass-divider divider-b" aria-hidden="true"><i /><i /><i /></div>
@@ -211,7 +219,11 @@ export default function AgentsOfficePage() {
           {AGENTS.map((agent) => {
             const phase = lifeStates[agent.id]?.phase || "TRABALHAR";
             const monitorOn = phase === "TRABALHAR" || phase === "INTERAGIR";
-            return <div key={agent.id} className={cn("office-desk", agent.desk, monitorOn && "is-monitor-on")}><span className={cn("office-monitor", monitorOn ? "is-on" : "is-off")} aria-label={monitorOn ? "Computador ligado" : "Computador desligado"}><Activity /></span><span className="office-keyboard" /><small>{agent.specialty}</small></div>;
+            return <div key={agent.id} className={cn("office-desk", agent.desk, monitorOn && "is-monitor-on")}>
+              <span className="office-desk-top" /><span className="office-desk-leg desk-leg-left" /><span className="office-desk-leg desk-leg-right" />
+              <span className="office-monitor-shell"><span className={cn("office-monitor", monitorOn ? "is-on" : "is-off")} aria-label={monitorOn ? "Computador ligado" : "Computador desligado"}><Activity /></span><i className="office-monitor-reflection" /></span>
+              <span className="office-keyboard" /><span className="office-desk-lamp"><i /><b /></span><span className="office-chair"><i /><b /></span><small>{agent.specialty}</small>
+            </div>;
           })}
           <div className="office-lounge"><Coffee className="h-5 w-5" /><span>PAUSA</span></div>
           <div className="office-whiteboard"><b>OPERATIONAL BOARD</b><span>Prioridades · alertas · próximos passos</span><i /><i /><i /></div>
@@ -222,7 +234,7 @@ export default function AgentsOfficePage() {
             const assigned = visibleAccounts.find((item) => item.id === assignments[agent.id]);
             return (
               <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-npc office-3d-npc", agent.position, agent.look, `is-${status}`, `phase-${lifeState.phase.toLowerCase()}`, lifeState.phase === "IDLE" && "is-resting")} style={{ "--agent-color": agent.color, "--npc-delay": `${index * -0.7}s`, "--npc-skin": agent.skin, "--npc-hair": agent.hair, "--npc-outfit": agent.outfit, "--npc-pants": agent.pants } as React.CSSProperties} aria-label={`Abrir estação de ${agent.name}, ${agent.role}`}>
-                <span className="npc-shadow" /><span className="npc-body"><i className="npc-head" /><i className="npc-hair" /><i className="npc-shirt" /><i className="npc-arm npc-arm-left" /><i className="npc-arm npc-arm-right" /><i className="npc-legs" /></span>
+                <span className="npc-shadow" /><span className="npc-ground-light" /><span className="npc-chair-back" /><span className="npc-body"><i className="npc-head" /><i className="npc-hair" /><i className="npc-neck" /><i className="npc-shirt" /><i className="npc-arm npc-arm-left" /><i className="npc-arm npc-arm-right" /><i className="npc-legs" /><i className="npc-shoe npc-shoe-left" /><i className="npc-shoe npc-shoe-right" /></span>
                 <span className="npc-plumbob" /><span className="npc-task-light" />
                 <span className="npc-label"><b>{agent.name}</b><small>{assigned?.name || agent.role}</small><em>{lifeState.phase === "IDLE" && status === "working" ? "Pausa automática" : getAgentPhaseLabel(lifeState.phase)}</em></span>
               </button>
@@ -312,6 +324,19 @@ const BRAIN_CIRCUITS = [
 const BRAIN_NODES = [
   [80, 124], [126, 91], [176, 67], [61, 169], [113, 143], [161, 112], [74, 221], [119, 194], [165, 166],
   [340, 124], [294, 91], [244, 67], [359, 169], [307, 143], [259, 112], [346, 221], [301, 194], [255, 166],
+] as const;
+
+const BRAIN_FOLDS = [
+  "M73 106C105 80 143 92 170 75C181 68 193 64 205 72",
+  "M57 139C91 119 120 137 148 118C164 107 180 107 204 119",
+  "M53 176C89 160 112 177 142 158C164 145 184 151 204 165",
+  "M63 214C95 198 119 220 148 198C166 185 184 189 203 207",
+  "M82 250C109 232 133 255 156 238C174 225 190 233 204 247",
+  "M347 106C315 80 277 92 250 75C239 68 227 64 215 72",
+  "M363 139C329 119 300 137 272 118C256 107 240 107 216 119",
+  "M367 176C331 160 308 177 278 158C256 145 236 151 216 165",
+  "M357 214C325 198 301 220 272 198C254 185 236 189 217 207",
+  "M338 250C311 232 287 255 264 238C246 225 230 233 216 247",
 ] as const;
 
 type CorePhase = "brain" | "entering" | "core";
@@ -530,7 +555,7 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
   </section>;
 }
 
-const BRAIN_DEPTHS = [-28, -21, -14, -7, 0, 7, 14, 21, 28] as const;
+const BRAIN_DEPTHS = [-52, -44, -36, -28, -20, -12, -4, 4, 12, 20, 28, 36, 44, 52] as const;
 
 const BRAIN_SYNAPSES = [
   [113, 91, 52, 44], [78, 122, 23, 96], [58, 174, 12, 166], [72, 227, 21, 258], [116, 278, 72, 312],
@@ -540,13 +565,15 @@ const BRAIN_SYNAPSES = [
 
 function BrainVolume() {
   return <span className="growdash-brain-volume">
+    <span className="growdash-brain-reactor" aria-hidden="true"><i /><i /><i /><b /></span>
     <svg className="growdash-brain-synapses" viewBox="0 0 420 360" aria-hidden="true">
       {BRAIN_SYNAPSES.map(([x1, y1, x2, y2], index) => <g key={`${x1}-${y1}-${index}`} style={{ "--synapse-delay": `${-(index % 7) * .37}s` } as React.CSSProperties}><path d={`M ${x1} ${y1} Q ${(x1 + x2) / 2 + (index % 2 ? 6 : -6)} ${(y1 + y2) / 2 - 12} ${x2} ${y2}`} /><circle cx={x2} cy={y2} r={index % 3 === 0 ? 4 : 2.5} /></g>)}
     </svg>
     <BrainSurface back depth={-34} />
     {BRAIN_DEPTHS.map((depth, index) => <BrainSurface key={depth} depth={depth} layer="slice" sliceIndex={index} />)}
-    <BrainSurface depth={34} />
+    <BrainSurface depth={56} />
     <span className="growdash-brain-depth-shine" aria-hidden="true" />
+    <span className="growdash-brain-particle particle-a" aria-hidden="true" /><span className="growdash-brain-particle particle-b" aria-hidden="true" /><span className="growdash-brain-particle particle-c" aria-hidden="true" />
   </span>;
 }
 
@@ -562,6 +589,7 @@ function BrainSurface({ back = false, depth = 0, layer = "surface", sliceIndex =
     <path className="jarvis-cortex-lobe" fill={layer === "slice" ? "var(--brain-volume-fill)" : `url(#${gradientId})`} d="M216 45C257 24 304 39 325 73C365 79 379 119 365 151C389 181 375 225 344 240C348 276 311 302 277 291C262 322 223 318 210 288V69C210 56 212 50 216 45Z" />
     <path className="jarvis-cortex-midline" d="M210 65V291M180 300C190 327 184 342 170 354M240 300C230 327 236 342 250 354" />
     {detailed && <>
+      {BRAIN_FOLDS.map((path, index) => <path key={`fold-${index}`} className="jarvis-cortex-fold" d={path} style={{ "--fold-delay": `${index * -.22}s` } as React.CSSProperties} />)}
       {BRAIN_CIRCUITS.map((path, index) => <path key={path} className="jarvis-circuit-trace" d={path} style={{ "--circuit-delay": `${index * -.17}s` } as React.CSSProperties} />)}
       <rect className="jarvis-cortex-chip" x="184" y="130" width="52" height="72" rx="8" />
       <path className="jarvis-cortex-chip-lines" d="M194 143H226M194 155H226M194 167H226M194 179H226M174 143H184M174 160H184M174 177H184M236 143H246M236 160H246M236 177H246" />
