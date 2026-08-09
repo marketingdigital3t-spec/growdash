@@ -74,14 +74,14 @@ export default function AgentsOfficePage() {
   const [lifeMode, setLifeMode] = useState<"life" | "build">("life");
   const [autonomyEnabled, setAutonomyEnabled] = useState(true);
   const [lifeStates, setLifeStates] = useState<Record<string, AgentLifeState>>(() => INITIAL_LIFE_STATES);
+  const [statuses, setStatuses] = useState<Record<string, AgentStatus>>(() => readStored("growdash:agent-statuses", Object.fromEntries(AGENTS.map((agent) => [agent.id, "working"]))));
+  const [assignments, setAssignments] = useState<Record<string, string>>(() => readStored("growdash:agent-accounts", {}));
+  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(() => Object.fromEntries(AGENTS.map((agent) => [agent.id, [{ id: `${agent.id}-welcome`, role: "agent", text: `Olá, eu sou ${agent.name}. Vincule uma conta e pergunte sobre tráfego, leads, funil ou escala.` }]])));
   const gameMinutesRef = useRef(gameMinutes);
   const statusesRef = useRef(statuses);
   const timeSpeedRef = useRef(timeSpeed);
   const autonomyRef = useRef(autonomyEnabled);
   const lifeStatesRef = useRef(lifeStates);
-  const [statuses, setStatuses] = useState<Record<string, AgentStatus>>(() => readStored("growdash:agent-statuses", Object.fromEntries(AGENTS.map((agent) => [agent.id, "working"]))));
-  const [assignments, setAssignments] = useState<Record<string, string>>(() => readStored("growdash:agent-accounts", {}));
-  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(() => Object.fromEntries(AGENTS.map((agent) => [agent.id, [{ id: `${agent.id}-welcome`, role: "agent", text: `Olá, eu sou ${agent.name}. Vincule uma conta e pergunte sobre tráfego, leads, funil ou escala.` }]])));
   const activeAgent = AGENTS.find((agent) => agent.id === activeAgentId) || null;
   const activeAccountId = activeAgent ? assignments[activeAgent.id] : undefined;
   const account = visibleAccounts.find((item) => item.id === activeAccountId);
