@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { Box, ChevronLeft, ChevronRight, MousePointer2, Rotate3D, UsersRound } from "lucide-react";
+import { Box, ChevronLeft, ChevronRight, MousePointer2, Presentation, Rotate3D, UserRound, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type OfficeNpcStatus = "working" | "walking" | "free";
@@ -29,8 +29,6 @@ type NpcObject = {
 };
 
 const OFFICE_AGENT_LIMIT = 5;
-
-function color(value: string) { return new THREE.Color(value); }
 
 export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -66,6 +64,7 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     scene.fog = new THREE.Fog("#020a0f", 15, 39);
     const camera = new THREE.PerspectiveCamera(44, 1, .1, 100);
     const target = new THREE.Vector3(0, 1.4, 0);
+    const intendedTarget = target.clone();
     const orbit = { azimuth: .66, polar: 1.03, radius: 19 };
     const updateCamera = () => {
       const sin = Math.sin(orbit.polar);
@@ -75,6 +74,10 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
         target.z + orbit.radius * sin * Math.cos(orbit.azimuth),
       );
       camera.lookAt(target);
+    };
+    const focus = (position: THREE.Vector3, radius = 12) => {
+      intendedTarget.copy(position);
+      orbit.radius = THREE.MathUtils.clamp(radius, 11, 28);
     };
     updateCamera();
 
@@ -113,6 +116,13 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     addMesh(new THREE.BoxGeometry(25, 6.2, .28), wallMaterial, new THREE.Vector3(0, 2.8, -8.9), false);
     addMesh(new THREE.BoxGeometry(.28, 6.2, 18), wallMaterial, new THREE.Vector3(-12.35, 2.8, 0), false);
     addMesh(new THREE.BoxGeometry(.28, 6.2, 18), wallMaterial, new THREE.Vector3(12.35, 2.8, 0), false);
+
+    // The partitions make this an office with rooms, rather than a single decorative box.
+    // Door gaps are intentionally left open so the camera keeps visual continuity between zones.
+    addMesh(new THREE.BoxGeometry(6.4, 3.25, .18), wallMaterial, new THREE.Vector3(-8.9, 1.63, 1.55), false);
+    addMesh(new THREE.BoxGeometry(.18, 3.25, 4.2), wallMaterial, new THREE.Vector3(-5.8, 1.63, 5.35), false);
+    addMesh(new THREE.BoxGeometry(5.8, 3.25, .18), wallMaterial, new THREE.Vector3(8.7, 1.63, 1.55), false);
+    addMesh(new THREE.BoxGeometry(.18, 3.25, 4.2), wallMaterial, new THREE.Vector3(5.9, 1.63, 5.35), false);
 
     for (let x = -10; x <= 10; x += 4) {
       addMesh(new THREE.BoxGeometry(.08, .03, 17), trimMaterial, new THREE.Vector3(x, .02, 0), false);
@@ -160,6 +170,15 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
     const couch = new THREE.Mesh(new THREE.BoxGeometry(3.7, .72, 1.35), couchMaterial); couch.position.y = .72; couch.castShadow = true; lounge.add(couch);
     const back = new THREE.Mesh(new THREE.BoxGeometry(3.7, 1.25, .25), couchMaterial); back.position.set(0, 1.3, .54); lounge.add(back);
     scene.add(lounge);
+    const meeting = new THREE.Group(); meeting.position.set(-8.85, 0, 5.45);
+    const meetingTop = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.25, .16, 32), new THREE.MeshStandardMaterial({ color: "#214958", roughness: .35, metalness: .72 })); meetingTop.scale.z = .58; meetingTop.position.y = 1.25; meetingTop.castShadow = true; meeting.add(meetingTop);
+    const meetingBase = new THREE.Mesh(new THREE.CylinderGeometry(.42, .62, 1.2, 16), darkMaterial); meetingBase.position.y = .6; meeting.add(meetingBase);
+    for (let seat = 0; seat < 5; seat++) { const angle = (seat / 5) * Math.PI * 2; const chair = new THREE.Mesh(new THREE.BoxGeometry(.72, .92, .68), couchMaterial); chair.position.set(Math.cos(angle) * 2.25, .65, Math.sin(angle) * 1.28); chair.rotation.y = -angle; chair.castShadow = true; meeting.add(chair); }
+    const board = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.9, .09), new THREE.MeshStandardMaterial({ color: "#103f50", emissive: "#11657d", emissiveIntensity: .85, roughness: .22, metalness: .5 })); board.position.set(0, 2.75, -2.2); meeting.add(board); scene.add(meeting);
+    const ceoOffice = new THREE.Group(); ceoOffice.position.set(8.75, 0, 5.25);
+    const executiveDesk = new THREE.Mesh(new THREE.BoxGeometry(3.6, .24, 1.7), new THREE.MeshStandardMaterial({ color: "#62491d", roughness: .36, metalness: .58 })); executiveDesk.position.y = 1.35; executiveDesk.castShadow = true; ceoOffice.add(executiveDesk);
+    const executiveMonitor = new THREE.Mesh(new THREE.BoxGeometry(1.75, 1.05, .1), new THREE.MeshStandardMaterial({ color: "#071b25", emissive: "#d8a83f", emissiveIntensity: .75 })); executiveMonitor.position.set(0, 2.05, -.35); ceoOffice.add(executiveMonitor);
+    const bookshelf = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.6, .42), darkMaterial); bookshelf.position.set(0, 1.3, 2.35); ceoOffice.add(bookshelf); scene.add(ceoOffice);
     const plant = new THREE.Group(); plant.position.set(9.5, 0, 5.8); const pot = new THREE.Mesh(new THREE.CylinderGeometry(.42, .54, .62, 14), new THREE.MeshStandardMaterial({ color: "#a67541", roughness: .8 })); pot.position.y = .31; plant.add(pot); for (let i = 0; i < 7; i++) { const leaf = new THREE.Mesh(new THREE.SphereGeometry(.34, 12, 8), new THREE.MeshStandardMaterial({ color: "#1c754f", roughness: .75 })); leaf.position.set(Math.sin(i * .9) * .43, 1.05 + (i % 2) * .23, Math.cos(i * .9) * .43); leaf.scale.set(.55, 1.6, .55); plant.add(leaf); } scene.add(plant);
 
     const npcObjects = new Map<string, NpcObject>();
@@ -188,8 +207,8 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       if (!pointerDown) return;
       const dx = event.clientX - pointerDown.x; const dy = event.clientY - pointerDown.y;
       if (Math.abs(dx) + Math.abs(dy) > 2) pointerDown.moved = true;
-      orbit.azimuth -= dx * .008;
-      orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * .007, .45, 1.45);
+      if (event.buttons === 2) { intendedTarget.x -= dx * .018; intendedTarget.z += dy * .018; }
+      else { orbit.azimuth -= dx * .008; orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * .007, .45, 1.45); }
       pointerDown.x = event.clientX; pointerDown.y = event.clientY; updateCamera();
     };
     const onPointerUp = (event: PointerEvent) => {
@@ -200,7 +219,7 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
         raycaster.setFromCamera(pointer, camera);
         const selected = raycaster.intersectObjects(pickables, false).find((hit) => hit.object.userData.npcId);
         const id = selected?.object.userData.npcId as string | undefined;
-        if (id) { setSelectedId(id); selectRef.current(id); }
+        if (id) { setSelectedId(id); selectRef.current(id); const npc = npcObjects.get(id); if (npc) focus(npc.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 8.8); }
       }
       pointerDown = null;
       if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
@@ -214,6 +233,12 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       if (event.key === "ArrowDown") orbit.polar = THREE.MathUtils.clamp(orbit.polar + .1, .45, 1.45);
       if (event.key === "+") orbit.radius = Math.max(11, orbit.radius - 1);
       if (event.key === "-") orbit.radius = Math.min(28, orbit.radius + 1);
+      const agentIndex = Number(event.key) - 1;
+      if (agentIndex >= 0 && agentIndex < agentsRef.current.length) { const npc = npcObjects.get(agentsRef.current[agentIndex].id); if (npc) focus(npc.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 8.8); }
+      if (event.key.toLowerCase() === "r") focus(new THREE.Vector3(-8.85, 1.1, 5.45), 9.5);
+      if (event.key.toLowerCase() === "c") focus(new THREE.Vector3(8.75, 1.1, 5.25), 9.5);
+      if (event.key.toLowerCase() === "g") { orbit.polar = .48; focus(new THREE.Vector3(0, 0, 0), 23); }
+      if (event.key === "Escape") { setSelectedId(null); focus(new THREE.Vector3(0, 1.4, 0), 19); }
       updateCamera();
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown); renderer.domElement.addEventListener("pointermove", onPointerMove); renderer.domElement.addEventListener("pointerup", onPointerUp); renderer.domElement.addEventListener("wheel", onWheel, { passive: false }); renderer.domElement.addEventListener("keydown", onKeyDown);
@@ -227,6 +252,7 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
       frame = requestAnimationFrame(animate);
       if (!visible) return;
       const elapsed = clock.getElapsedTime();
+      target.lerp(intendedTarget, .09); updateCamera();
       for (const [index, agent] of agentsRef.current.entries()) {
         const npc = npcObjects.get(agent.id); if (!npc) continue;
         const phase = elapsed * .9 + index * .7;
@@ -248,14 +274,14 @@ export function RealOffice3D({ agents, onSelectAgent, onStatusChange }: Props) {
   const displayedAgents = agents.slice(0, OFFICE_AGENT_LIMIT);
   const selected = displayedAgents.find((agent) => agent.id === selectedId);
   return <section className="real-office-shell" aria-label="Escritório 3D Growdash Life">
-    <div ref={hostRef} className="real-office-canvas" tabIndex={0} aria-label="Cena 3D navegável. Arraste para orbitar, use a roda para aproximar e as setas do teclado para mover a câmera." />
+    <div ref={hostRef} className="real-office-canvas" tabIndex={0} aria-label="Cena 3D navegável. Arraste para orbitar, arraste com o botão direito para mover, use a roda para aproximar e as setas do teclado para mover a câmera." onContextMenu={(event) => event.preventDefault()} />
     {!webglAvailable && <div className="real-office-fallback">Seu navegador não liberou WebGL. Atualize o navegador ou habilite a aceleração gráfica para abrir a cena 3D.</div>}
-    <header className="real-office-hud"><span><Box /> GROWdash LIFE · ESCRITÓRIO 3D</span><small><Rotate3D /> 360° real · arraste ou use as setas</small></header>
+    <header className="real-office-hud"><span><Box /> GROWdash LIFE · ESCRITÓRIO 3D</span><small><Rotate3D /> 360° real · reunião, CEO e operações</small></header>
     <div className="real-office-camera" role="group" aria-label="Câmera da cena"><ChevronLeft /><span>Arraste para orbitar</span><ChevronRight /></div>
     <button type="button" className="real-office-help" onClick={() => setHelpOpen((value) => !value)} aria-expanded={helpOpen}><MousePointer2 /> Como navegar</button>
-    {helpOpen && <aside className="real-office-help-card"><b>Uma cena, não uma imagem</b><span>O chão, paredes, teto, mesas, cadeiras e NPCs possuem profundidade. Clique em um NPC para abrir sua operação.</span></aside>}
+    {helpOpen && <aside className="real-office-help-card"><b>Uma cena, não uma imagem</b><span>O chão, paredes, teto, mesas, sala de reunião e escritório executivo possuem profundidade. Clique em um NPC para focar sua operação; 1–5 focam pessoas, R reunião, C direção e G abre a visão geral.</span></aside>}
     <aside className="real-office-roster" aria-label="NPCs do escritório">{displayedAgents.map((agent) => <button key={agent.id} type="button" className={cn(selectedId === agent.id && "is-selected")} onClick={() => { setSelectedId(agent.id); onSelectAgent(agent.id); }}><i style={{ background: agent.color }} /><span><b>{agent.name}</b><small>{agent.status === "working" ? "Trabalhando" : agent.status === "walking" ? "Caminhando" : "Em pausa"}</small></span></button>)}</aside>
-    <footer className="real-office-controls"><div><UsersRound /><span><b>5 NPCs ativos</b><small>Selecione um agente e defina sua atividade.</small></span></div>{displayedAgents.map((agent) => <div className="real-office-agent-control" key={agent.id}><span style={{ "--npc-color": agent.color } as React.CSSProperties}>{agent.name}</span><button type="button" className={cn(agent.status === "working" && "is-active")} onClick={() => onStatusChange(agent.id, "working")}>Trabalhar</button><button type="button" className={cn(agent.status === "walking" && "is-active")} onClick={() => onStatusChange(agent.id, "walking")}>Andar</button><button type="button" className={cn(agent.status === "free" && "is-active")} onClick={() => onStatusChange(agent.id, "free")}>Pausa</button></div>)}</footer>
+    <footer className="real-office-controls"><div><UsersRound /><span><b>5 NPCs ativos</b><small>Selecione um agente e defina sua atividade.</small></span></div><div className="real-office-zone-guide"><Presentation /><span>Sala de reunião</span><UserRound /><span>Diretoria</span></div>{displayedAgents.map((agent) => <div className="real-office-agent-control" key={agent.id}><span style={{ "--npc-color": agent.color } as React.CSSProperties}>{agent.name}</span><button type="button" className={cn(agent.status === "working" && "is-active")} onClick={() => onStatusChange(agent.id, "working")}>Trabalhar</button><button type="button" className={cn(agent.status === "walking" && "is-active")} onClick={() => onStatusChange(agent.id, "walking")}>Andar</button><button type="button" className={cn(agent.status === "free" && "is-active")} onClick={() => onStatusChange(agent.id, "free")}>Pausa</button></div>)}</footer>
     {selected && <div className="real-office-selection"><i style={{ background: selected.color }} /><span><b>{selected.name}</b><small>{selected.role} · {selected.specialty}</small></span></div>}
   </section>;
 }
