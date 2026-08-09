@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     url.searchParams.set("client_id", appId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", Deno.env.get("INSTAGRAM_OAUTH_SCOPES") ?? "instagram_business_basic,instagram_business_manage_insights");
+    url.searchParams.set("scope", Deno.env.get("INSTAGRAM_OAUTH_SCOPES") ?? "instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_comments,instagram_business_manage_messages");
     url.searchParams.set("state", state);
     url.searchParams.set("enable_fb_login", "0");
     url.searchParams.set("force_authentication", "1");

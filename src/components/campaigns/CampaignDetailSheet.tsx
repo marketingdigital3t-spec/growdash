@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronRight, ChevronDown, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, History, Target, Pencil, PauseCircle, PlayCircle, Layers3, Minus, Maximize2, Minimize2 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
-import { format, parseISO } from "date-fns";
+import { addDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useCampaignTarget, useSetCampaignTarget, useCampaignChanges } from "@/hooks/useCampaignTargets";
 import { useCampaignBreakdowns, type BreakdownSegment } from "@/hooks/useCampaignBreakdowns";
@@ -47,6 +47,8 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   campaign: CampaignDetail | null;
+  startDate?: Date;
+  endDate?: Date;
   onEdit?: (campaign: CampaignDetail) => void;
   onViewAds?: (campaign: CampaignDetail) => void;
 }
@@ -76,7 +78,7 @@ function aggregate(insights: Insight[]) {
   return { spend, leads, clicks, impressions, cpl, ctr, conv, freq };
 }
 
-export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onViewAds }: Props) {
+export function CampaignDetailSheet({ open, onOpenChange, campaign, startDate, endDate, onEdit, onViewAds }: Props) {
   const { toast } = useToast();
   const { data: targetData } = useCampaignTarget(campaign?.id);
   const setTarget = useSetCampaignTarget();
@@ -86,22 +88,36 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
   const { data: customMetrics = [] } = useCustomMetrics();
   const [targetInput, setTargetInput] = useState("");
   const [panelSize, setPanelSize] = useState<"compact" | "normal" | "maximized">("normal");
+  const [collapsed, setCollapsed] = useState({ daily: false, insights: false, diagnosis: false });
 
   useEffect(() => {
     setTargetInput(targetData?.target_cpl != null ? String(targetData.target_cpl) : "");
   }, [targetData?.target_cpl, campaign?.id]);
 
   useEffect(() => {
-    if (open) setPanelSize("normal");
+    if (open) {
+      setPanelSize("normal");
+      setCollapsed({ daily: false, insights: false, diagnosis: false });
+    }
   }, [open, campaign?.id]);
 
   const allInsights: Insight[] = useMemo(() => {
     if (!campaign) return [];
-    return (campaign.adsets || []).flatMap(s => (s.ads || []).flatMap(a => a.insights || []));
-  }, [campaign]);
+    const from = startDate ? format(startDate, "yyyy-MM-dd") : null;
+    const to = endDate ? format(endDate, "yyyy-MM-dd") : null;
+    return (campaign.adsets || []).flatMap(s => (s.ads || []).flatMap(a => a.insights || []))
+      .filter((insight) => (!from || insight.date >= from) && (!to || insight.date <= to));
+  }, [campaign, endDate, startDate]);
 
   const dailyData = useMemo(() => {
     const map = new Map<string, { date: string; spend: number; leads: number; cpl: number }>();
+    if (startDate && endDate) {
+      const last = format(endDate, "yyyy-MM-dd");
+      for (let cursor = startDate; format(cursor, "yyyy-MM-dd") <= last; cursor = addDays(cursor, 1)) {
+        const date = format(cursor, "yyyy-MM-dd");
+        map.set(date, { date, spend: 0, leads: 0, cpl: 0 });
+      }
+    }
     for (const i of allInsights) {
       const ex = map.get(i.date) || { date: i.date, spend: 0, leads: 0, cpl: 0 };
       ex.spend += i.spend ?? 0;
@@ -111,7 +127,7 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
     return Array.from(map.values())
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(d => ({ ...d, cpl: d.leads > 0 ? d.spend / d.leads : 0 }));
-  }, [allInsights]);
+  }, [allInsights, endDate, startDate]);
 
   const insights = useMemo(() => {
     if (!campaign || dailyData.length === 0) return [];
@@ -195,6 +211,7 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
 
   const worstAdset = tree.length > 1 ? tree[tree.length - 1] : null;
   const bestAdset = tree.length > 0 ? tree[0] : null;
+  const actionEventTotal = actionTotals.reduce((sum, item) => sum + Number(item.total || 0), 0);
 
   if (!campaign) return null;
 
@@ -243,12 +260,25 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
           ))}
         </div>
 
+        <button
+          type="button"
+          className="mt-3 flex w-full items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-left transition hover:border-primary/45 hover:bg-primary/10"
+          onClick={() => document.getElementById("campaign-meta-events")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+          title={actionTotals.length ? actionTotals.map((item) => `${friendlyActionLabel(item.action_type)}: ${Number(item.total || 0).toLocaleString("pt-BR")}`).join("\n") : "Nenhum evento detalhado foi sincronizado neste período."}
+        >
+          <span><b className="block text-xs">Resultados e eventos da campanha</b><small className="text-[10px] text-muted-foreground">Passe o mouse para ver o resumo ou clique para abrir o detalhamento.</small></span>
+          <span className="shrink-0 rounded-full border border-primary/30 bg-background px-2 py-1 text-[10px] font-black text-primary">{actionEventTotal.toLocaleString("pt-BR")} eventos</span>
+        </button>
+
         {/* Daily mini chart */}
-        {dailyData.length > 1 && (
+        {dailyData.length > 0 && (
           <Card className="mt-4">
             <CardContent className="p-3">
-              <p className="text-xs font-medium mb-2 flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" /> Evolução diária — CPL e Leads</p>
-              <div className="h-[160px]">
+              <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setCollapsed((current) => ({ ...current, daily: !current.daily }))} aria-expanded={!collapsed.daily}>
+                <span className="flex items-center gap-1.5 text-xs font-medium"><TrendingUp className="h-3.5 w-3.5" /> Evolução diária — CPL e Leads</span>
+                {collapsed.daily ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
+              {!collapsed.daily && <div className="mt-2 h-[160px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dailyData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
@@ -267,17 +297,18 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
                     <Line yAxisId="r" type="monotone" dataKey="leads" stroke="hsl(142, 71%, 45%)" strokeWidth={2} dot={false} name="Leads" />
                   </LineChart>
                 </ResponsiveContainer>
-              </div>
+              </div>}
             </CardContent>
           </Card>
         )}
 
         {/* Insights / alerts */}
         <div className="mt-4 space-y-2">
-          <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide flex items-center gap-1.5">
-            <Lightbulb className="h-3.5 w-3.5" /> Insights automáticos
-          </p>
-          {insights.length === 0 ? (
+          <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setCollapsed((current) => ({ ...current, insights: !current.insights }))} aria-expanded={!collapsed.insights}>
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Lightbulb className="h-3.5 w-3.5" /> Insights automáticos</span>
+            {collapsed.insights ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          {!collapsed.insights && (insights.length === 0 ? (
             <p className="text-xs text-muted-foreground">Sem dados suficientes para gerar insights.</p>
           ) : insights.map((it, i) => (
             <div
@@ -293,13 +324,17 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
               <span>{it.text}</span>
             </div>
-          ))}
+          )))}
         </div>
 
         {/* Diagnostic tree */}
         {tree.length > 0 && (
           <div className="mt-5 space-y-2">
-            <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Diagnóstico — Conjuntos & Anúncios</p>
+            <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setCollapsed((current) => ({ ...current, diagnosis: !current.diagnosis }))} aria-expanded={!collapsed.diagnosis}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diagnóstico — Conjuntos & Anúncios</span>
+              {collapsed.diagnosis ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+            {!collapsed.diagnosis && <>
             {worstAdset && bestAdset && worstAdset.id !== bestAdset.id && worstAdset.cpl > bestAdset.cpl * 1.5 && (
               <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs text-amber-700 dark:text-amber-400">
                 Conjunto <strong>{worstAdset.name}</strong> está puxando o desempenho para baixo (CPL {fmt(worstAdset.cpl, "R$ ")} vs melhor {fmt(bestAdset.cpl, "R$ ")}).
@@ -353,21 +388,24 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, onEdit, onVi
                 );
               })}
             </div>
+            </>}
           </div>
         )}
 
         {/* Métricas personalizadas + eventos brutos detectados */}
-        <CustomMetricsBlock
-          campaignId={campaign?.id || null}
-          totals={{
-            spend: campaign?.spend || 0,
-            impressions: campaign?.impressions || 0,
-            clicks: campaign?.clicks || 0,
-            actions: Object.fromEntries(actionTotals.map((a) => [a.action_type, a.total])),
-          }}
-          metrics={customMetrics}
-          actionTotals={actionTotals}
-        />
+        <div id="campaign-meta-events">
+          <CustomMetricsBlock
+            campaignId={campaign?.id || null}
+            totals={{
+              spend: campaign?.spend || 0,
+              impressions: campaign?.impressions || 0,
+              clicks: campaign?.clicks || 0,
+              actions: Object.fromEntries(actionTotals.map((a) => [a.action_type, a.total])),
+            }}
+            metrics={customMetrics}
+            actionTotals={actionTotals}
+          />
+        </div>
 
         {/* Breakdowns: idade, gênero, plataforma, posicionamento */}
         <BreakdownsSection breakdowns={breakdowns} />

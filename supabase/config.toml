@@ -24,6 +24,12 @@ verify_jwt = true
 [functions.instagram-oauth-callback]
 verify_jwt = false
 
+[functions.instagram-automation-run]
+verify_jwt = false
+
+[functions.instagram-automation-webhook]
+verify_jwt = false
+
 [functions.social-sync-instagram]
 verify_jwt = true
 

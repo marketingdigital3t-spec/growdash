@@ -83,6 +83,8 @@ export type InsightRecommendation = {
   evidence: string;
   recommendation: string;
   priority: "Alta" | "Média" | "Baixa";
+  /** Passos operacionais verificáveis, exibidos no relatório executivo. */
+  steps?: string[];
 };
 
 export type TwoMonthAnalysis = {
@@ -237,8 +239,8 @@ function weeklyPerformance(
   };
 }
 
-function recommendation(title: string, evidence: string, text: string, priority: InsightRecommendation["priority"] = "Média"): InsightRecommendation {
-  return { title, evidence, recommendation: text, priority };
+function recommendation(title: string, evidence: string, text: string, priority: InsightRecommendation["priority"] = "Média", steps?: string[]): InsightRecommendation {
+  return { title, evidence, recommendation: text, priority, ...(steps?.length ? { steps } : {}) };
 }
 
 function buildRecommendations(current: MonthlyPerformance, previous: MonthlyPerformance, comparisons: MetricComparison[]) {
@@ -257,7 +259,12 @@ function buildRecommendations(current: MonthlyPerformance, previous: MonthlyPerf
   if (!current.metrics.spend && !current.metrics.leads && !previous.metrics.spend && !previous.metrics.leads) {
     const evidence = "Não há investimento ou leads registrados nos dois meses analisados.";
     risks.push(recommendation("Dados insuficientes", evidence, "Confirme a sincronização da conta Meta e o intervalo de atribuição antes de tomar decisões.", "Alta"));
-    actions.push(recommendation("Validar a origem dos dados", evidence, "Atualize a sincronização Meta, confirme a conta selecionada e revise o período; só depois reavalie campanhas.", "Alta"));
+    actions.push(recommendation("Validar a origem dos dados", evidence, "Atualize a sincronização Meta, confirme a conta selecionada e revise o período; só depois reavalie campanhas.", "Alta", [
+      "Atualize a sincronização da conta Meta e aguarde o último horário de sucesso.",
+      "Confirme que a conta e o intervalo exibidos são os mesmos do relatório.",
+      "Revise permissões, token e janela de atribuição se os dados continuarem vazios.",
+      "Só tome decisões de orçamento depois que a amostra aparecer no painel.",
+    ]));
     return { wins, risks, actions };
   }
 
@@ -277,10 +284,33 @@ function buildRecommendations(current: MonthlyPerformance, previous: MonthlyPerf
   if (revenue?.assessment === "negative" && previous.metrics.revenue > 0) risks.push(recommendation("Receita atribuída caiu", `Receita foi de ${previous.metrics.revenue.toFixed(2)} para ${current.metrics.revenue.toFixed(2)}.`, "Revise o rastreamento de vendas, UTMs e a correspondência entre RD e conta Meta.", "Alta"));
   if (current.daysWithData < 3 || current.metrics.clicks < 20) risks.push(recommendation("Amostra ainda pequena", `O mês atual tem ${current.daysWithData} dia(s) com dados e ${current.metrics.clicks} cliques.`, "Evite pausar ou escalar por enquanto; acumule volume mínimo para uma leitura confiável.", "Alta"));
 
-  if (spend && spend.variationPercent != null && spend.variationPercent > 10 && leads?.assessment === "negative") actions.push(recommendation("Revisar alocação de verba", `Investimento subiu ${spend.variationPercent}% enquanto os leads caíram ${Math.abs(leads.variationPercent ?? 0)}%.`, "Redistribua verba para campanhas com CPL e cobertura RD melhores; mantenha alterações graduais e auditáveis.", "Alta"));
-  if (current.metrics.conversations > 0 && current.metrics.rd === 0) actions.push(recommendation("Fechar o ciclo das conversas", `${current.metrics.conversations} conversas iniciadas foram registradas, mas nenhum negócio RD foi criado no período.`, "Revise webhook/UTM, fila de atendimento e o evento de criação de negócio para não perder atribuição.", "Alta"));
-  if (current.metrics.sales === 0 && current.metrics.leads > 0) actions.push(recommendation("Acompanhar qualidade até a venda", `${current.metrics.leads} leads foram gerados, mas não há vendas confirmadas no mês atual.`, "Compare estágios do RD, tempo médio de fechamento e vendedor responsável antes de mexer no orçamento.", "Média"));
-  if (!actions.length) actions.push(recommendation("Manter monitoramento semanal", `O mês atual tem ${current.metrics.leads} leads e ${current.metrics.spend.toFixed(2)} investidos.`, "Compare semanalmente CPL, conversas, negócios RD e vendas; registre cada mudança de orçamento ou criativo.", "Baixa"));
+  if (spend && spend.variationPercent != null && spend.variationPercent > 10 && leads?.assessment === "negative") actions.push(recommendation("Revisar alocação de verba", `Investimento subiu ${spend.variationPercent}% enquanto os leads caíram ${Math.abs(leads.variationPercent ?? 0)}%.`, "Redistribua verba para campanhas com CPL e cobertura RD melhores; mantenha alterações graduais e auditáveis.", "Alta", [
+    "Abra a aba Campanhas e ordene por CPL e cobertura RD.",
+    "Compare os últimos 7 dias com os 7 dias anteriores para separar oscilação de tendência.",
+    "Reduza no máximo 20% da verba dos conjuntos sem conversão comprovada.",
+    "Aumente em ciclos de 10% a 20% somente nas campanhas com CPL menor e negócio RD criado.",
+    "Acompanhe por 72 horas e registre a alteração no histórico antes de repetir o ajuste.",
+  ]));
+  if (current.metrics.conversations > 0 && current.metrics.rd === 0) actions.push(recommendation("Fechar o ciclo das conversas", `${current.metrics.conversations} conversas iniciadas foram registradas, mas nenhum negócio RD foi criado no período.`, "Revise webhook/UTM, fila de atendimento e o evento de criação de negócio para não perder atribuição.", "Alta", [
+    "Teste uma conversa iniciada e confirme que o evento recebe UTMs e identificador da campanha.",
+    "Verifique se o webhook está ativo e se o lead entra na fila comercial correta.",
+    "Crie um negócio de teste no RD e confira a associação com a origem Meta.",
+    "Corrija duplicidades ou falhas de permissão e faça uma nova sincronização.",
+    "Monitore a cobertura RD diariamente até voltar a registrar negócios.",
+  ]));
+  if (current.metrics.sales === 0 && current.metrics.leads > 0) actions.push(recommendation("Acompanhar qualidade até a venda", `${current.metrics.leads} leads foram gerados, mas não há vendas confirmadas no mês atual.`, "Compare estágios do RD, tempo médio de fechamento e vendedor responsável antes de mexer no orçamento.", "Média", [
+    "Filtre os leads do período por estágio e vendedor responsável no CRM.",
+    "Identifique onde o maior volume está parado e defina um próximo contato.",
+    "Compare tempo médio de fechamento e taxa de avanço por vendedor.",
+    "Ajuste script, oferta ou follow-up antes de aumentar investimento.",
+    "Reavalie vendas e CAC depois de uma nova janela de 7 dias.",
+  ]));
+  if (!actions.length) actions.push(recommendation("Manter monitoramento semanal", `O mês atual tem ${current.metrics.leads} leads e ${current.metrics.spend.toFixed(2)} investidos.`, "Compare semanalmente CPL, conversas, negócios RD e vendas; registre cada mudança de orçamento ou criativo.", "Baixa", [
+    "Toda segunda-feira, compare CPL, conversas, negócios RD, vendas e ROAS.",
+    "Ordene campanhas e criativos pelo resultado antes de alterar qualquer orçamento.",
+    "Registre a hipótese e a mudança no histórico da conta.",
+    "Aguarde pelo menos 72 horas antes de concluir se o ajuste funcionou.",
+  ]));
   return { wins: wins.slice(0, 4), risks: risks.slice(0, 4), actions: actions.slice(0, 5) };
 }
 

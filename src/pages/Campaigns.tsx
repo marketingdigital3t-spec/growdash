@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -75,6 +75,7 @@ import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierar
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
+import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -402,6 +403,7 @@ export default function Campaigns() {
   const { data: actionData } = useActionTotalsByAds(campaignAdIds, startDate, endDate);
   const campaigns = useMemo(() => campaignBaseRows.map((campaign: any) => {
     const actionMetrics = { linkClicks: 0, landingPageViews: 0, checkouts: 0, purchases: 0, purchaseValue: 0 };
+    const actionEventTotals: Record<string, number> = {};
     for (const currentAdset of campaign.adsets || []) {
       for (const currentAd of currentAdset.ads || []) {
         const resolved = resolveMetaActionMetrics(actionData?.totalsByAd[currentAd.id], actionData?.valueTotalsByAd[currentAd.id]);
@@ -410,6 +412,9 @@ export default function Campaigns() {
         actionMetrics.checkouts += resolved.checkouts;
         actionMetrics.purchases += resolved.purchases;
         actionMetrics.purchaseValue += resolved.purchaseValue;
+        for (const [actionType, value] of Object.entries(actionData?.totalsByAd[currentAd.id] || {})) {
+          actionEventTotals[actionType] = (actionEventTotals[actionType] || 0) + Number(value || 0);
+        }
       }
     }
 
@@ -425,6 +430,7 @@ export default function Campaigns() {
       metaPurchases: actionMetrics.purchases,
       metaCostPerPurchase: actionMetrics.purchases > 0 ? campaign.spend / actionMetrics.purchases : 0,
       metaPurchaseRoas: campaign.spend > 0 ? actionMetrics.purchaseValue / campaign.spend : 0,
+      actionEvents: Object.entries(actionEventTotals).map(([actionType, value]) => ({ actionType, value })).sort((a, b) => b.value - a.value),
     };
   }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignBaseRows]);
 
@@ -613,18 +619,24 @@ export default function Campaigns() {
   const totalMetaPurchaseRoas = totals.spend > 0 ? totals.metaPurchaseValue / totals.spend : 0;
   const totalResultRate = totals.clicks > 0 ? totals.leads / totals.clicks * 100 : 0;
   const intelligenceSeries = useMemo(() => {
-    const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number }>();
+    const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number; hasData: boolean }>();
+    const lastDate = formatApiDate(endDate);
+    for (let cursor = startDate; formatApiDate(cursor) <= lastDate; cursor = addDays(cursor, 1)) {
+      const date = formatApiDate(cursor);
+      byDate.set(date, { date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false });
+    }
     for (const campaign of filtered) {
       for (const currentAdset of campaign.adsets || []) {
         for (const currentAd of currentAdset.ads || []) {
           for (const insight of currentAd.insights || []) {
             if (!insight.date) continue;
             if (insight.date < formatApiDate(startDate) || insight.date > formatApiDate(endDate)) continue;
-            const current = byDate.get(insight.date) ?? { date: insight.date, spend: 0, impressions: 0, clicks: 0, leads: 0 };
+            const current = byDate.get(insight.date) ?? { date: insight.date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
             current.spend += Number(insight.spend || 0);
             current.impressions += Number(insight.impressions || 0);
             current.clicks += Number(insight.clicks || 0);
             current.leads += Number(insight.leads || 0);
+            current.hasData = true;
             byDate.set(insight.date, current);
           }
         }
@@ -1041,7 +1053,18 @@ export default function Campaigns() {
                             {showColumn("uniqueLinkCtr") && <TableCell style={cellW("uniqueLinkCtr")} className={cn("text-right tabular-nums text-sm", sortBg("uniqueLinkCtr"))}><AnimatedNumber value={c.uniqueLinkCtr} suffix="%" decimals={2} /></TableCell>}
                             {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))}><AnimatedNumber value={c.leads} decimals={0} /><span className="block text-[8px] text-muted-foreground">Leads na Meta</span></TableCell>}
+                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))} onClick={(event) => event.stopPropagation()}>
+                              <button
+                                type="button"
+                                className="ml-auto block rounded-md px-1 py-0.5 text-right transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                onClick={() => setDetailCampaignId(c.id)}
+                                title={c.actionEvents?.length ? c.actionEvents.map((event: any) => `${friendlyActionLabel(event.actionType)}: ${Number(event.value).toLocaleString("pt-BR")}`).join("\n") : "Nenhum evento detalhado foi sincronizado para esta campanha no período."}
+                                aria-label={`Abrir todos os eventos de ${c.name}`}
+                              >
+                                <AnimatedNumber value={c.leads} decimals={0} />
+                                <span className="block text-[8px] text-muted-foreground">{c.actionEvents?.length ? `${c.actionEvents.length} tipo(s) de evento · ver todos` : "Leads na Meta"}</span>
+                              </button>
+                            </TableCell>}
                             {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("landingPageViews") && <TableCell style={cellW("landingPageViews")} className={cn("text-right tabular-nums text-sm", sortBg("landingPageViews"))}><AnimatedNumber value={c.landingPageViews} decimals={0} /></TableCell>}
@@ -1271,6 +1294,8 @@ export default function Campaigns() {
         open={!!detailCampaignId}
         onOpenChange={(v) => !v && setDetailCampaignId(null)}
         campaign={detailCampaignId ? (campaigns.find((c: any) => c.id === detailCampaignId) || null) : null}
+        startDate={startDate}
+        endDate={endDate}
         onEdit={(campaign) => { setDetailCampaignId(null); setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: (campaign as any).daily_budget ?? (campaign as any).budget }); }}
         onViewAds={(campaign) => { setSelectedIds(new Set([campaign.id])); setActiveTab("ads"); setDetailCampaignId(null); }}
       />
@@ -1351,6 +1376,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
     { id: "actions", label: "IA e ações" },
   ] as const;
   const showMetrics = view === "overview" || view === "metrics";
+  const daysWithData = useMemo(() => series.filter((item) => item.hasData).length, [series]);
   return (
     <section className="campaign-analysis-shell border-b border-primary/20" data-analysis-content="intelligence">
       <header className="campaign-analysis-header flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1360,7 +1386,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
         </div>
         <div className="flex items-center gap-2">
           <a href="/inteligencia" className="gd-button h-8 px-3 text-[10px]"><Sparkles className="h-3.5 w-3.5" />10 automações IA</a>
-          <Badge variant="outline" className="w-fit">{series.length} dia(s) com dados</Badge>
+          <Badge variant="outline" className="w-fit">{daysWithData} de {series.length} dia(s) com dados</Badge>
         </div>
       </header>
 
@@ -1395,7 +1421,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
       </div>
 
         <div className="relative grid gap-3 border-t border-border p-3 xl:grid-cols-2">
-          {series.length === 0 && <span className="absolute right-5 top-5 z-10 rounded-full border border-border bg-background/90 px-2 py-1 text-[9px] font-bold text-muted-foreground">Sem dados no período · exibindo estrutura zerada</span>}
+          {daysWithData === 0 && <span className="absolute right-5 top-5 z-10 rounded-full border border-border bg-background/90 px-2 py-1 text-[9px] font-bold text-muted-foreground">Sem dados no período · exibindo todos os dias zerados</span>}
           <ChartPanel title="Investimento × leads" description="Evolução diária com duas escalas para não distorcer volume e custo.">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={safeSeries} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
@@ -1443,29 +1469,52 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
   );
 }
 
+type CreativeSort = "leads" | "cpl" | "ctr" | "clicks" | "conversion" | "spend";
+
 function CreativeIntelligenceGallery({ ads }: { ads: any[] }) {
+  const [sortBy, setSortBy] = useState<CreativeSort>("leads");
   const creatives = useMemo(() => ads.map((ad) => ({
     ...ad,
     mediaUrl: ad.thumbnail_url || ad.media_url || ad.video_url || null,
-  })).sort((a, b) => Number(b.spend || 0) - Number(a.spend || 0)), [ads]);
+    spend: Number(ad.spend || 0),
+    leads: Number(ad.leads || 0),
+    clicks: Number(ad.clicks || ad.linkClicks || 0),
+    ctr: Number(ad.ctr || 0),
+    cpl: Number(ad.leads || 0) > 0 ? Number(ad.spend || 0) / Number(ad.leads || 0) : 0,
+    conversion: Number(ad.clicks || ad.linkClicks || 0) > 0 ? Number(ad.leads || 0) / Number(ad.clicks || ad.linkClicks || 0) * 100 : 0,
+  })).sort((a, b) => {
+    if (sortBy === "cpl") {
+      if (a.leads === 0 && b.leads === 0) return b.spend - a.spend;
+      if (a.leads === 0) return 1;
+      if (b.leads === 0) return -1;
+      return a.cpl - b.cpl;
+    }
+    return Number(b[sortBy] || 0) - Number(a[sortBy] || 0);
+  }), [ads, sortBy]);
 
   return <section className="border-t border-border p-3">
-    <div className="mb-3"><h3 className="text-xs font-black">Galeria de criativos</h3><p className="mt-1 text-[9px] text-muted-foreground">Imagem ou vídeo original disponível na Meta, sem desfoque e com identificação do anúncio.</p></div>
+    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div><h3 className="text-xs font-black">Galeria de criativos</h3><p className="mt-1 text-[9px] text-muted-foreground">Compare as peças pelo resultado real dentro do período e dos filtros selecionados.</p></div>
+      <label className="grid gap-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground"><span>Ordenar criativos</span><Select value={sortBy} onValueChange={(value) => setSortBy(value as CreativeSort)}><SelectTrigger className="h-9 min-w-52 bg-background text-xs normal-case tracking-normal text-foreground"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="leads">Mais resultados</SelectItem><SelectItem value="cpl">Menor custo por resultado</SelectItem><SelectItem value="ctr">Maior CTR</SelectItem><SelectItem value="clicks">Mais cliques</SelectItem><SelectItem value="conversion">Maior conversão</SelectItem><SelectItem value="spend">Maior investimento</SelectItem></SelectContent></Select></label>
+    </div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {creatives.length > 0 ? creatives.map((ad) => {
-        const isVideo = typeof ad.mediaUrl === "string" && /\.(mp4|webm|mov|m4v)(?:\?|$)/i.test(ad.mediaUrl);
         return <article key={ad.id} className="overflow-hidden rounded-xl border border-border bg-background">
-          <div className="grid aspect-video place-items-center overflow-hidden bg-black">
-            {ad.mediaUrl ? isVideo
-              ? <video src={ad.mediaUrl} controls preload="metadata" className="h-full w-full object-contain" aria-label={`Vídeo do criativo ${ad.name || "sem nome"}`} />
-              : <img src={ad.mediaUrl} alt={`Criativo ${ad.name || "sem nome"}`} loading="lazy" className="h-full w-full object-contain" />
-              : <div className="px-4 text-center text-[10px] text-white/55"><RectangleHorizontal className="mx-auto mb-2 h-7 w-7" />Prévia ainda não sincronizada</div>}
-          </div>
-          <div className="p-3"><h4 className="truncate text-[11px] font-black" title={ad.name || "Sem nome"}>{ad.name || "Sem nome"}</h4><p className="mt-1 truncate text-[9px] text-muted-foreground">{ad.campaignName || "Campanha não identificada"}</p><div className="mt-3 grid grid-cols-3 gap-2"><IssueMetric label="Investido" value={Number(ad.spend || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Leads" value={Number(ad.leads || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} /><IssueMetric label="CTR" value={`${Number(ad.ctr || 0).toFixed(2).replace(".", ",")}%`} /></div></div>
+          <CreativeMediaPreview mediaUrl={ad.mediaUrl} name={ad.name} />
+          <div className="p-3"><div className="flex items-center justify-between gap-2"><h4 className="truncate text-[11px] font-black" title={ad.name || "Sem nome"}>{ad.name || "Sem nome"}</h4><Badge variant="outline" className="shrink-0 text-[8px]">{ad.leads > 0 ? `${ad.leads.toLocaleString("pt-BR")} resultado(s)` : "Sem resultado"}</Badge></div><p className="mt-1 truncate text-[9px] text-muted-foreground">{ad.campaignName || "Campanha não identificada"}</p><div className="mt-3 grid grid-cols-3 gap-2"><IssueMetric label="Resultados" value={ad.leads.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} /><IssueMetric label="Custo/result." value={ad.leads > 0 ? ad.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"} /><IssueMetric label="Conversão" value={`${ad.conversion.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Cliques" value={ad.clicks.toLocaleString("pt-BR")} /><IssueMetric label="CTR" value={`${ad.ctr.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Investido" value={ad.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>
         </article>;
       }) : <div className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">Nenhum criativo sincronizado para os filtros atuais.</div>}
     </div>
   </section>;
+}
+
+function CreativeMediaPreview({ mediaUrl, name }: { mediaUrl: string | null; name?: string }) {
+  const [failed, setFailed] = useState(false);
+  const isVideo = typeof mediaUrl === "string" && /\.(mp4|webm|mov|m4v)(?:\?|$)/i.test(mediaUrl);
+  if (!mediaUrl || failed) return <div className="grid aspect-video place-items-center bg-black px-4 text-center text-[10px] text-white/55"><span><RectangleHorizontal className="mx-auto mb-2 h-7 w-7" />{failed ? "Prévia expirada — sincronize a Meta novamente" : "Prévia ainda não sincronizada"}</span></div>;
+  return <div className="grid aspect-video place-items-center overflow-hidden bg-black">{isVideo
+    ? <video src={mediaUrl} controls preload="metadata" className="h-full w-full object-contain" aria-label={`Vídeo do criativo ${name || "sem nome"}`} onError={() => setFailed(true)} />
+    : <img src={mediaUrl} alt={`Criativo ${name || "sem nome"}`} loading="lazy" className="h-full w-full object-contain" onError={() => setFailed(true)} />}</div>;
 }
 
 function EntityIntelligenceTable({ title, nameLabel, entities }: { title: string; nameLabel: string; entities: any[] }) {

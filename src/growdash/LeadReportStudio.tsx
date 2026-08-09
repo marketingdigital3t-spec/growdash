@@ -288,6 +288,12 @@ function RecommendationGrid({ title, icon, tone, items, empty }: { title: string
       <div className="flex items-start justify-between gap-3"><h3 className="text-sm font-black text-white">{item.title}</h3><span className={cn("rounded-full border border-current/25 px-2 py-1 text-[9px] font-black uppercase", textTone)}>{item.priority}</span></div>
       <p className="mt-3 text-xs leading-relaxed text-white/65"><b className="text-white">Evidência:</b> {item.evidence}</p>
       <p className="mt-2 text-xs leading-relaxed text-white/80"><b className="text-white">Direcionamento:</b> {item.recommendation}</p>
+      {item.steps?.length ? <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
+        <p className="text-[10px] font-black uppercase tracking-[.14em] text-white/55">Plano de ação</p>
+        <ol className="mt-2 space-y-2 text-xs leading-relaxed text-white/75">
+          {item.steps.map((step, index) => <li key={`${item.title}-step-${index}`} className="flex gap-2"><span className={cn("grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px] font-black", textTone, "border-current/30")}>{index + 1}</span><span>{step}</span></li>)}
+        </ol>
+      </div> : null}
     </article>) : <div className="rounded-xl border border-white/10 p-4 text-xs text-white/45">{empty}</div>}</div>
   </section>;
 }

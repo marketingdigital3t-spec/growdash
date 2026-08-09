@@ -40,6 +40,19 @@ describe("buildTwoMonthAnalysis", () => {
     expect(report.currentMonth.metrics.leads).toBe(0);
     expect(report.risks[0].title).toBe("Dados insuficientes");
     expect(report.actions[0].recommendation).toContain("sincronização");
+    expect(report.actions[0].steps?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("entrega um plano operacional quando conversas não chegam ao RD", () => {
+    const report = buildTwoMonthAnalysis({
+      analysisFrom: new Date("2026-07-01T12:00:00"),
+      analysisTo: new Date("2026-08-08T12:00:00"),
+      insights: [{ date: "2026-08-03", spend: 100, clicks: 80, impressions: 1000, leads: 2 }],
+      deals: [],
+      sales: [],
+      conversationsByDate: { "2026-08-03": 5 },
+    });
+    const action = report.actions.find((item) => item.title === "Fechar o ciclo das conversas");
+    expect(action?.steps).toEqual(expect.arrayContaining([expect.stringContaining("webhook"), expect.stringContaining("negócio")]));
   });
 });
-

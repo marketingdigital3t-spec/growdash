@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   Bot,
@@ -20,6 +20,8 @@ import {
   MessageSquareText,
   MoreHorizontal,
   MoveRight,
+  PauseCircle,
+  PlayCircle,
   Plus,
   Search,
   Settings2,
@@ -46,6 +48,11 @@ import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/contexts/AuthContext";
 
 type TabOption = { id: string; label: string };
 
@@ -88,38 +95,175 @@ function ActionButton({ children, primary = false }: { children: ReactNode; prim
   return <button type="button" className={primary ? "gold-action" : "gd-button"}>{children}</button>;
 }
 
+type AutomationRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  trigger_type: "instagram_comment" | "instagram_message" | "new_lead" | "campaign_underperforming" | "manual";
+  trigger_config: Record<string, any>;
+  actions: Array<Record<string, any>>;
+  status: "draft" | "active" | "paused" | "error";
+  run_count: number;
+  last_run_at: string | null;
+  last_error: string | null;
+  updated_at: string;
+};
+
+const automationTriggerLabel: Record<AutomationRow["trigger_type"], string> = {
+  instagram_comment: "Comentário no Instagram",
+  instagram_message: "Mensagem no Instagram",
+  new_lead: "Novo lead",
+  campaign_underperforming: "Campanha perdeu performance",
+  manual: "Execução manual",
+};
+
+const emptyAutomationDraft = {
+  name: "",
+  description: "",
+  triggerType: "instagram_comment" as AutomationRow["trigger_type"],
+  socialAccountId: "",
+  keyword: "",
+  actionType: "instagram_reply" as "instagram_reply" | "webhook" | "audit_only",
+  response: "",
+  webhookUrl: "",
+};
+
 function AutomationsModule() {
   const [tab, setTab] = useState("mine");
+  const [search, setSearch] = useState("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draft, setDraft] = useState(emptyAutomationDraft);
+  const { data: workspace } = useWorkspace();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const connectInstagram = useInstagramOAuth();
+  const workspaceReady = !!workspace?.id && !workspace.id.startsWith("legacy-");
+
   const templates = [
-    { title: "Novo lead recebido", description: "Dispare uma mensagem e atribua um responsável quando um lead entrar no funil.", icon: Zap },
-    { title: "Follow-up sem resposta", description: "Aguarde o intervalo configurado e retome o contato com o lead automaticamente.", icon: Clock3 },
-    { title: "Negociação ganha", description: "Avise o time, registre a conversão e inicie a rotina de pós-venda.", icon: CheckCircle2 },
+    { title: "Palavra-chave no comentário", description: "Quando alguém comentar a palavra configurada, responda automaticamente pelo perfil profissional conectado.", icon: Instagram, triggerType: "instagram_comment" as const, actionType: "instagram_reply" as const, keyword: "quero" },
+    { title: "Mensagem recebida no Instagram", description: "Crie uma resposta inicial para novas conversas e registre cada execução no histórico do workspace.", icon: MessageSquareText, triggerType: "instagram_message" as const, actionType: "instagram_reply" as const, keyword: "" },
+    { title: "Enviar para outro sistema", description: "Encaminhe o evento para um webhook HTTPS de CRM, atendimento ou automação externa.", icon: Zap, triggerType: "instagram_comment" as const, actionType: "webhook" as const, keyword: "" },
   ];
 
+  const accountsQuery = useQuery({
+    queryKey: ["automation-social-accounts", workspace?.id, user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("social_accounts").select("id,username,display_name,connection_status,workspace_id").eq("provider", "instagram").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    retry: false,
+  });
+  const automationsQuery = useQuery({
+    queryKey: ["growdash-automations", workspace?.id],
+    enabled: workspaceReady,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("growdash_automations").select("*").eq("workspace_id", workspace!.id).order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as AutomationRow[];
+    },
+    retry: false,
+  });
+  const schemaMissing = automationsQuery.error && /growdash_automations|schema cache|relation/i.test((automationsQuery.error as Error).message);
+
+  const saveAutomation = useMutation({
+    mutationFn: async ({ activate }: { activate: boolean }) => {
+      if (!workspaceReady || !user) throw new Error("O workspace ainda não está pronto para salvar automações.");
+      if (!draft.name.trim()) throw new Error("Dê um nome para a automação.");
+      if (draft.triggerType.startsWith("instagram") && !draft.socialAccountId) throw new Error("Selecione o perfil do Instagram.");
+      if (draft.actionType === "instagram_reply" && !draft.response.trim()) throw new Error("Escreva a resposta automática.");
+      if (draft.actionType === "webhook" && !/^https:\/\//i.test(draft.webhookUrl.trim())) throw new Error("Use uma URL HTTPS válida para o webhook.");
+      const account = (accountsQuery.data ?? []).find((item: any) => item.id === draft.socialAccountId);
+      if (account && account.workspace_id !== workspace!.id) {
+        const { error: accountError } = await (supabase as any).from("social_accounts").update({ workspace_id: workspace!.id }).eq("id", account.id);
+        if (accountError) throw accountError;
+      }
+      const action = draft.actionType === "instagram_reply"
+        ? { type: "instagram_reply", message: draft.response.trim() }
+        : draft.actionType === "webhook"
+          ? { type: "webhook", url: draft.webhookUrl.trim() }
+          : { type: "audit_only" };
+      const { error } = await (supabase as any).from("growdash_automations").insert({
+        workspace_id: workspace!.id,
+        created_by: user.id,
+        name: draft.name.trim(),
+        description: draft.description.trim() || null,
+        trigger_type: draft.triggerType,
+        trigger_config: { social_account_id: draft.socialAccountId || null, keyword: draft.keyword.trim().toLocaleLowerCase("pt-BR"), match: draft.keyword.trim() ? "contains" : "any" },
+        actions: [action],
+        status: activate ? "active" : "draft",
+      });
+      if (error) throw error;
+    },
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["growdash-automations", workspace?.id] });
+      setEditorOpen(false);
+      setDraft(emptyAutomationDraft);
+      toast({ title: variables.activate ? "Automação ativada" : "Rascunho salvo", description: variables.activate ? "O fluxo está pronto para receber eventos do webhook do Instagram." : "Revise e ative quando estiver pronto." });
+    },
+    onError: (error: Error) => toast({ title: "Não foi possível salvar", description: error.message, variant: "destructive" }),
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: AutomationRow["status"] }) => {
+      const { error } = await (supabase as any).from("growdash_automations").update({ status, last_error: null }).eq("id", id).eq("workspace_id", workspace!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["growdash-automations", workspace?.id] }),
+    onError: (error: Error) => toast({ title: "Falha ao alterar automação", description: error.message, variant: "destructive" }),
+  });
+
+  const validateFlow = useMutation({
+    mutationFn: async (automationId: string) => {
+      const { data, error } = await supabase.functions.invoke("instagram-automation-run", { body: { automation_id: automationId, trigger_event: { source: "growdash_editor", text: "teste de validação" }, dry_run: true } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["growdash-automations", workspace?.id] });
+      toast({ title: "Fluxo validado", description: `${data?.actions_executed?.length ?? 0} ação(ões) verificadas sem enviar mensagem real.` });
+    },
+    onError: (error: Error) => toast({ title: "Validação falhou", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteAutomation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("growdash_automations").delete().eq("id", id).eq("workspace_id", workspace!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["growdash-automations", workspace?.id] }),
+  });
+
+  const openEditor = (template?: typeof templates[number]) => {
+    setDraft({ ...emptyAutomationDraft, ...(template ? { name: template.title, description: template.description, triggerType: template.triggerType, actionType: template.actionType, keyword: template.keyword } : {}), socialAccountId: accountsQuery.data?.[0]?.id || "" });
+    setEditorOpen(true);
+  };
+  const automations = (automationsQuery.data ?? []).filter((item) => !search.trim() || item.name.toLocaleLowerCase("pt-BR").includes(search.trim().toLocaleLowerCase("pt-BR")) || automationTriggerLabel[item.trigger_type].toLocaleLowerCase("pt-BR").includes(search.trim().toLocaleLowerCase("pt-BR")));
+
   return (
-    <Page title="Automações" description="Crie regras, sequências e fluxos para executar rotinas sem trabalho manual." action={<ActionButton primary><Plus className="h-4 w-4" /> Nova automação</ActionButton>}>
-      <Tabs options={[{ id: "mine", label: "Minhas Automações" }, { id: "basic", label: "Básico" }, { id: "sequences", label: "Sequências" }]} value={tab} onChange={setTab} />
-      {tab === "mine" ? (
-        <>
-          <Toolbar left={<><SearchField placeholder="Buscar automação" /><ActionButton><FolderPlus className="h-4 w-4" /> Nova pasta</ActionButton></>} right={<><ActionButton><ListFilter className="h-4 w-4" /> Gatilho</ActionButton><ActionButton><LayoutGrid className="h-4 w-4" /> Grade</ActionButton></>} />
-          <EmptyState icon={<Workflow className="h-6 w-6" />} title="Nenhuma automação criada" description="Crie seu primeiro fluxo ou use um modelo seguro. Rascunhos não executam ações até serem publicados." action={<ActionButton primary><Plus className="h-4 w-4" /> Criar automação</ActionButton>} />
-        </>
-      ) : tab === "basic" ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {templates.map(({ title, description, icon: Icon }) => (
-            <article key={title} className="gd-panel p-5">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
-              <h2 className="mt-4 font-black">{title}</h2>
-              <p className="mt-2 min-h-16 text-xs leading-relaxed text-muted-foreground">{description}</p>
-              <button type="button" className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary">Configurar <ArrowRight className="h-4 w-4" /></button>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <EmptyState icon={<MessageSquareText className="h-6 w-6" />} title="Nenhuma sequência ativa" description="Monte cadências de contato com espera, condição, mensagem e saída segura." action={<ActionButton primary><Plus className="h-4 w-4" /> Nova sequência</ActionButton>} />
-      )}
+    <Page title="Automações" description="Crie gatilhos, condições e respostas usando os perfis profissionais conectados à Growdash." action={<Button className="gold-action" onClick={() => openEditor()}><Plus className="mr-2 h-4 w-4" /> Nova automação</Button>}>
+      <Tabs options={[{ id: "mine", label: "Minhas Automações" }, { id: "basic", label: "Templates Instagram" }, { id: "sequences", label: "Como funciona" }]} value={tab} onChange={setTab} />
+      {schemaMissing && <section className="gd-panel mb-4 border-amber-500/30 p-4"><b className="text-sm text-amber-500">Migration de automações pendente</b><p className="mt-1 text-xs text-muted-foreground">Aplique `20260809100000_instagram_automation_foundation.sql` no Supabase antes de ativar os fluxos.</p></section>}
+      {tab === "mine" ? <>
+        <Toolbar left={<label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-72"><Search className="h-4 w-4 text-muted-foreground" /><input aria-label="Buscar automação" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar automação" className="min-w-0 grow bg-transparent text-sm outline-none" /></label>} right={<Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button>} />
+        {!accountsQuery.data?.length && <section className="gd-panel mb-4 flex flex-col gap-4 border-pink-500/20 p-5 sm:flex-row sm:items-center"><span className="grid h-12 w-12 place-items-center rounded-xl bg-pink-500/10 text-pink-500"><Instagram className="h-6 w-6" /></span><div className="grow"><b className="text-sm">Conecte o Instagram do expert</b><p className="mt-1 text-xs text-muted-foreground">A mesma conta usada na análise de posts será usada nos gatilhos e respostas da automação.</p></div><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}>Conectar agora</Button></section>}
+        {automations.length ? <div className="grid gap-3 lg:grid-cols-2">{automations.map((automation) => {
+          const account = (accountsQuery.data ?? []).find((item: any) => item.id === automation.trigger_config?.social_account_id);
+          const active = automation.status === "active";
+          return <article key={automation.id} className="gd-panel p-5"><div className="flex items-start gap-3"><span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl", active ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground")}><Workflow className="h-5 w-5" /></span><div className="min-w-0 grow"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-sm font-black">{automation.name}</h2><Badge variant="outline" className={cn("text-[9px]", active && "border-emerald-500/35 text-emerald-500")}>{active ? "Ativa" : automation.status === "draft" ? "Rascunho" : automation.status === "paused" ? "Pausada" : "Com erro"}</Badge></div><p className="mt-1 text-[10px] text-muted-foreground">{automationTriggerLabel[automation.trigger_type]}{account ? ` · @${account.username || account.display_name}` : ""}</p></div></div><div className="mt-4 rounded-xl border border-border bg-muted/20 p-3 text-xs"><b>SE</b> {automation.trigger_config?.keyword ? `contiver “${automation.trigger_config.keyword}”` : "receber qualquer evento compatível"}<br /><b>ENTÃO</b> {automation.actions?.[0]?.type === "instagram_reply" ? `responder “${automation.actions[0].message}”` : automation.actions?.[0]?.type === "webhook" ? "enviar para webhook HTTPS" : "registrar no histórico"}</div>{automation.last_error && <p className="mt-3 rounded-lg bg-destructive/10 p-2 text-[10px] text-destructive">{automation.last_error}</p>}<div className="mt-4 flex flex-wrap items-center gap-2"><Button size="sm" variant={active ? "outline" : "default"} onClick={() => updateStatus.mutate({ id: automation.id, status: active ? "paused" : "active" })}>{active ? <PauseCircle className="mr-2 h-3.5 w-3.5" /> : <PlayCircle className="mr-2 h-3.5 w-3.5" />}{active ? "Pausar" : "Ativar"}</Button><Button size="sm" variant="outline" onClick={() => validateFlow.mutate(automation.id)} disabled={validateFlow.isPending}><CheckCircle2 className="mr-2 h-3.5 w-3.5" />Validar fluxo</Button><Button size="sm" variant="ghost" className="ml-auto text-destructive hover:text-destructive" onClick={() => { if (window.confirm(`Excluir a automação “${automation.name}”?`)) deleteAutomation.mutate(automation.id); }}><Trash2 className="h-3.5 w-3.5" /></Button><span className="w-full text-[9px] text-muted-foreground">{automation.run_count} execução(ões){automation.last_run_at ? ` · última em ${new Date(automation.last_run_at).toLocaleString("pt-BR")}` : ""}</span></div></article>;
+        })}</div> : !automationsQuery.isLoading && !schemaMissing ? <EmptyState icon={<Workflow className="h-6 w-6" />} title="Nenhuma automação criada" description="Comece por um fluxo de palavra-chave, mensagem ou webhook. Somente automações ativas processam eventos reais." action={<Button className="gold-action" onClick={() => openEditor()}><Plus className="mr-2 h-4 w-4" /> Criar automação</Button>} /> : null}
+      </> : tab === "basic" ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{templates.map((template) => <article key={template.title} className="gd-panel p-5"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><template.icon className="h-5 w-5" /></span><h2 className="mt-4 font-black">{template.title}</h2><p className="mt-2 min-h-16 text-xs leading-relaxed text-muted-foreground">{template.description}</p><button type="button" onClick={() => openEditor(template)} className="mt-4 inline-flex items-center gap-2 text-xs font-black text-primary">Configurar <ArrowRight className="h-4 w-4" /></button></article>)}</div> : <section className="grid gap-4 lg:grid-cols-3"><AutomationStep number="1" title="Conecte o perfil" text="Use o login oficial do Instagram Business/Creator. A Growdash reutiliza essa conexão para métricas e automações." /><AutomationStep number="2" title="Defina gatilho e ação" text="Escolha comentário, mensagem, palavra-chave, resposta ou webhook. O rascunho não executa ações." /><AutomationStep number="3" title="Ative e acompanhe" text="Eventos aceitos pelo webhook são auditados. Falhas e quantidade de execuções aparecem em cada fluxo." /></section>}
+
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}><DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>Editor de automação Instagram</DialogTitle></DialogHeader><div className="grid gap-4"><label className="grid gap-1.5 text-xs font-bold">Nome<Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Ex: Enviar material pelo comentário QUERO" /></label><label className="grid gap-1.5 text-xs font-bold">Descrição<Textarea value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Objetivo e contexto do fluxo" /></label><div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-bold">Gatilho<Select value={draft.triggerType} onValueChange={(value) => setDraft((current) => ({ ...current, triggerType: value as AutomationRow["trigger_type"] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="instagram_comment">Comentário no Instagram</SelectItem><SelectItem value="instagram_message">Mensagem no Instagram</SelectItem><SelectItem value="new_lead">Novo lead</SelectItem><SelectItem value="campaign_underperforming">Campanha perdeu performance</SelectItem><SelectItem value="manual">Manual/API</SelectItem></SelectContent></Select></label><label className="grid gap-1.5 text-xs font-bold">Perfil do Instagram<Select value={draft.socialAccountId} onValueChange={(value) => setDraft((current) => ({ ...current, socialAccountId: value }))}><SelectTrigger><SelectValue placeholder="Selecione o perfil" /></SelectTrigger><SelectContent>{(accountsQuery.data ?? []).map((account: any) => <SelectItem key={account.id} value={account.id}>@{account.username || account.display_name}</SelectItem>)}</SelectContent></Select></label></div>{draft.triggerType.startsWith("instagram") && <label className="grid gap-1.5 text-xs font-bold">Palavra-chave opcional<Input value={draft.keyword} onChange={(event) => setDraft((current) => ({ ...current, keyword: event.target.value }))} placeholder="Ex: quero, ebook, preço" /><small className="font-normal text-muted-foreground">Vazio aceita qualquer evento compatível; com texto, exige correspondência sem diferenciar maiúsculas.</small></label>}<label className="grid gap-1.5 text-xs font-bold">Ação<Select value={draft.actionType} onValueChange={(value) => setDraft((current) => ({ ...current, actionType: value as typeof draft.actionType }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="instagram_reply">Responder no Instagram</SelectItem><SelectItem value="webhook">Enviar webhook HTTPS</SelectItem><SelectItem value="audit_only">Somente registrar</SelectItem></SelectContent></Select></label>{draft.actionType === "instagram_reply" && <label className="grid gap-1.5 text-xs font-bold">Resposta automática<Textarea value={draft.response} onChange={(event) => setDraft((current) => ({ ...current, response: event.target.value }))} placeholder="Mensagem que será enviada" /><small className="font-normal text-muted-foreground">O envio real exige as permissões `instagram_business_manage_comments` ou `instagram_business_manage_messages` aprovadas no app Meta.</small></label>}{draft.actionType === "webhook" && <label className="grid gap-1.5 text-xs font-bold">Webhook HTTPS<Input type="url" value={draft.webhookUrl} onChange={(event) => setDraft((current) => ({ ...current, webhookUrl: event.target.value }))} placeholder="https://seu-crm.com/webhooks/growdash" /></label>}<div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => saveAutomation.mutate({ activate: false })} disabled={saveAutomation.isPending}>Salvar rascunho</Button><Button className="gold-action" onClick={() => saveAutomation.mutate({ activate: true })} disabled={saveAutomation.isPending}>{saveAutomation.isPending ? "Salvando…" : "Salvar e ativar"}</Button></div></div></DialogContent></Dialog>
     </Page>
   );
+}
+
+function AutomationStep({ number, title, text }: { number: string; title: string; text: string }) {
+  return <article className="gd-panel p-5"><span className="grid h-9 w-9 place-items-center rounded-full border border-primary/35 bg-primary/10 text-sm font-black text-primary">{number}</span><h2 className="mt-4 font-black">{title}</h2><p className="mt-2 text-xs leading-relaxed text-muted-foreground">{text}</p></article>;
 }
 
 function KanbanModule() {
