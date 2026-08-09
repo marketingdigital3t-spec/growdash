@@ -3141,3 +3141,10 @@
   .growdash-core-v2 .growdash-brain-surface { width: 198px; height: 180px; }
   .growdash-core-v2 .growdash-brain-synapses { inset: -18px; width: calc(100% + 36px); height: calc(100% + 36px); }
 }
+
+@media (min-width: 821px) {
+  .growdash-core-v2 .jarvis-core-label {
+    top: 7.5%;
+    transform: translateX(-50%);
+  }
+}
