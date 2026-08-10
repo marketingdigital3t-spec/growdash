@@ -118,6 +118,16 @@ export default function FunnelAnalysis() {
     product: selectedProduct,
     enabled: !!funnelId,
   });
+  // Os filtros precisam vir do conjunto completo do período. Usar `deals`
+  // aqui fazia uma opção desaparecer depois que outro filtro era aplicado.
+  // Quando todos os filtros estão em "all", o React Query reutiliza esta
+  // mesma consulta e não há uma segunda requisição.
+  const { data: filterDeals = [], isLoading: loadingFilterDeals } = useRDDeals({
+    funnelId,
+    startDate,
+    endDate,
+    enabled: !!funnelId,
+  });
   const { data: closedDeals = [], isLoading: loadingClosedDeals } = useRDClosedDeals({
     funnelId,
     startDate,
@@ -135,12 +145,20 @@ export default function FunnelAnalysis() {
     adAccountId: effectiveAdAccountId,
   });
 
-  // Para popular filtros, precisamos do superset (sem filtro). Usamos os deals atuais como aproximação.
-  const sources = useMemo(() => Array.from(new Set(deals.map((d) => d.utm_source).filter(Boolean) as string[])).sort(), [deals]);
-  const campaigns = useMemo(() => Array.from(new Set(deals.map((d) => d.utm_campaign).filter(Boolean) as string[])).sort(), [deals]);
-  const states = useMemo(() => Array.from(new Set(deals.map((d) => d.lead_state).filter(Boolean) as string[])).sort(), [deals]);
-  const owners = useMemo(() => Array.from(new Set(deals.map((d) => d.deal_owner_name).filter(Boolean) as string[])).sort(), [deals]);
-  const products = useMemo(() => Array.from(new Set(deals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [deals]);
+  const sources = useMemo(() => Array.from(new Set(filterDeals.map((d) => d.utm_source).filter(Boolean) as string[])).sort(), [filterDeals]);
+  const campaigns = useMemo(() => Array.from(new Set(filterDeals.map((d) => d.utm_campaign).filter(Boolean) as string[])).sort(), [filterDeals]);
+  const states = useMemo(() => Array.from(new Set(filterDeals.map((d) => d.lead_state).filter(Boolean) as string[])).sort(), [filterDeals]);
+  const owners = useMemo(() => Array.from(new Set(filterDeals.map((d) => d.deal_owner_name).filter(Boolean) as string[])).sort(), [filterDeals]);
+  const products = useMemo(() => Array.from(new Set(filterDeals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [filterDeals]);
+
+  useEffect(() => {
+    if (loadingFilterDeals) return;
+    if (selectedSource !== "all" && !sources.includes(selectedSource)) setSelectedSource("all");
+    if (selectedCampaign !== "all" && !campaigns.includes(selectedCampaign)) setSelectedCampaign("all");
+    if (selectedState !== "all" && !states.includes(selectedState)) setSelectedState("all");
+    if (selectedOwner !== "all" && !owners.includes(selectedOwner)) setSelectedOwner("all");
+    if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
+  }, [campaigns, loadingFilterDeals, owners, products, selectedCampaign, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
 
   const baseAnalytics = useMemo(() => computeFunnelAnalytics(deals, stages, closedDeals), [closedDeals, deals, stages]);
   const allowedDealIds = useMemo(
@@ -170,16 +188,16 @@ export default function FunnelAnalysis() {
     enabled: visibleAccounts.length > 0,
   });
 
-  const scopedInsights = useMemo(() => {
-    if (selectedCampaign === "all") return insightRows;
+  const { scopedInsights, campaignWithoutMediaMatch } = useMemo(() => {
+    if (selectedCampaign === "all") return { scopedInsights: insightRows, campaignWithoutMediaMatch: false };
     const campaign = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
     const matches = insightRows.filter((row) => {
       const metaName = row.campaign_name.trim().toLocaleLowerCase("pt-BR");
       return metaName === campaign || metaName.includes(campaign) || campaign.includes(metaName);
     });
-    // UTMs nem sempre repetem o nome da campanha da Meta. Não zeramos a mídia
-    // silenciosamente quando não existe correspondência segura.
-    return matches.length > 0 ? matches : insightRows;
+    // UTMs e campanhas Meta podem ter nomes diferentes. Exibir todas as
+    // campanhas neste caso distorce investimento, CPL e ROAS do funil.
+    return { scopedInsights: matches, campaignWithoutMediaMatch: matches.length === 0 };
   }, [insightRows, selectedCampaign]);
 
   const mediaMetrics = useMemo(
@@ -193,7 +211,9 @@ export default function FunnelAnalysis() {
     try {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
-      const funnelsToSync = activeFunnels;
+      const funnelsToSync = effectiveAdAccountId
+        ? activeFunnels.filter((funnel) => funnel.ad_account_id === effectiveAdAccountId)
+        : activeFunnels;
 
       const [metaResult, ...rdResults] = await Promise.allSettled([
         syncMeta.mutateAsync({
@@ -284,7 +304,10 @@ export default function FunnelAnalysis() {
         {loadingInsights ? (
           <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Carregando métricas da Meta…</div>
         ) : (
-          <HelpBlock help={blockHelp.media}><FunnelMediaOverview metrics={mediaMetrics} /></HelpBlock>
+          <>
+            <HelpBlock help={blockHelp.media}><FunnelMediaOverview metrics={mediaMetrics} /></HelpBlock>
+            {campaignWithoutMediaMatch && <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-muted-foreground"><b className="text-amber-600 dark:text-amber-400">Campanha sem correspondência segura na Meta.</b><p className="mt-1">A mídia foi mantida em zero para não misturar campanhas. Ajuste o nome/UTM da campanha ou selecione “Todas as campanhas” para ver o total da conta.</p></div>}
+          </>
         )}
       </MotionItem>
 
