@@ -2791,6 +2791,23 @@
   color: hsl(var(--popover-foreground));
 }
 
+/* Recharts renders its tooltip outside the component tree and gives the
+   label/item inline dark defaults.  Those defaults become unreadable on the
+   dark gold preset, and inverse presets have the opposite issue.  Keep the
+   tooltip bound to the semantic popover tokens in every theme. */
+.recharts-default-tooltip {
+  background: hsl(var(--popover)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: .5rem !important;
+  color: hsl(var(--popover-foreground)) !important;
+  box-shadow: 0 12px 28px hsl(var(--foreground) / .16);
+}
+
+.recharts-default-tooltip .recharts-tooltip-label,
+.recharts-default-tooltip .recharts-tooltip-item {
+  color: hsl(var(--popover-foreground)) !important;
+}
+
 .growdash-flow-properties {
   color: hsl(var(--foreground));
 }
