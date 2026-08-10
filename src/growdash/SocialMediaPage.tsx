@@ -51,6 +51,40 @@ type DailyInsight = { insight_date: string; followers: number; follower_delta: n
 
 const number = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 
+// Preview-only data. It never reaches Supabase, never triggers a sync and is
+// deliberately marked in the UI so it cannot be mistaken for a real account.
+const DEMO_ACCOUNT: SocialAccount = {
+  id: "growdash-demo-instagram",
+  provider: "instagram",
+  username: "studio.growdash_demo",
+  display_name: "Studio Growdash · demonstração",
+  profile_picture_url: null,
+  followers_count: 12840,
+  media_count: 86,
+  connection_status: "demo",
+  last_sync_at: null,
+  last_error: null,
+};
+
+const DEMO_MEDIA: SocialMedia[] = [
+  { id: "demo-reel-1", media_type: "REELS", caption: "3 ajustes que aumentaram a qualidade dos leads nesta semana.", permalink: null, media_url: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=800&q=80", thumbnail_url: null, published_at: "2026-08-08T15:00:00.000Z", reach: 18420, impressions: 22110, likes: 1286, comments: 74, saves: 318, shares: 142, interactions: 1820, engagement_rate: 9.88, video_views: 16200, average_watch_time: 13.8, video_retention_rate: 47.2 },
+  { id: "demo-post-1", media_type: "CAROUSEL_ALBUM", caption: "Checklist para uma campanha começar bem antes da decolagem.", permalink: null, media_url: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=800&q=80", thumbnail_url: null, published_at: "2026-08-05T14:00:00.000Z", reach: 9230, impressions: 10780, likes: 692, comments: 38, saves: 226, shares: 87, interactions: 1043, engagement_rate: 11.30, video_views: 0, average_watch_time: null, video_retention_rate: null },
+  { id: "demo-reel-2", media_type: "VIDEO", caption: "Bastidores de uma reunião de performance com foco em decisões.", permalink: null, media_url: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=800&q=80", thumbnail_url: null, published_at: "2026-08-02T13:00:00.000Z", reach: 6750, impressions: 8010, likes: 413, comments: 21, saves: 96, shares: 44, interactions: 574, engagement_rate: 8.50, video_views: 5840, average_watch_time: 10.4, video_retention_rate: 39.6 },
+];
+
+const DEMO_DAILY: DailyInsight[] = Array.from({ length: 14 }, (_, index) => {
+  const day = new Date(Date.UTC(2026, 7, index + 1));
+  const followerDelta = [18, 26, -4, 31, 24, 39, 12, -7, 42, 28, 36, 19, 47, 33][index];
+  return {
+    insight_date: format(day, "yyyy-MM-dd"),
+    followers: 12496 + [18, 44, 40, 71, 95, 134, 146, 139, 181, 209, 245, 264, 311, 344][index],
+    follower_delta: followerDelta,
+    reach: 2400 + index * 260 + (index % 3) * 520,
+    impressions: 3000 + index * 330 + (index % 3) * 610,
+    interactions: 180 + index * 22 + (index % 4) * 36,
+  };
+});
+
 function MediaPreview({ media }: { media: SocialMedia }) {
   const [failed, setFailed] = useState(false);
   const source = media.thumbnail_url || media.media_url;
@@ -65,6 +99,7 @@ export default function SocialMediaPage() {
   const queryClient = useQueryClient();
   const connectInstagram = useInstagramOAuth();
   const [accountId, setAccountId] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
   const [contentSort, setContentSort] = useState<"interactions" | "reach" | "engagement_rate" | "saves" | "shares" | "comments" | "video_views">("interactions");
 
   const accountsQuery = useQuery({
@@ -76,13 +111,14 @@ export default function SocialMediaPage() {
       return (data ?? []) as SocialAccount[];
     },
   });
-  const accounts = accountsQuery.data ?? [];
-  const selectedId = accountId || accounts[0]?.id || "";
+  const liveAccounts = accountsQuery.data ?? [];
+  const accounts = demoMode ? [DEMO_ACCOUNT] : liveAccounts;
+  const selectedId = demoMode ? DEMO_ACCOUNT.id : accountId || accounts[0]?.id || "";
   const selected = accounts.find((account) => account.id === selectedId);
 
   const mediaQuery = useQuery({
     queryKey: ["social_media", selectedId, startDate.toISOString(), endDate.toISOString()],
-    enabled: !!selectedId,
+    enabled: !!selectedId && !demoMode,
     queryFn: async () => {
       const { data, error } = await supabase.from("social_media").select("*").eq("social_account_id", selectedId).gte("published_at", startDate.toISOString()).lte("published_at", endOfDay(endDate).toISOString()).order("published_at", { ascending: false });
       if (error) throw error;
@@ -91,7 +127,7 @@ export default function SocialMediaPage() {
   });
   const dailyQuery = useQuery({
     queryKey: ["social_insights_daily", selectedId, startDate.toISOString(), endDate.toISOString()],
-    enabled: !!selectedId,
+    enabled: !!selectedId && !demoMode,
     queryFn: async () => {
       const { data, error } = await supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date");
       if (error) throw error;
@@ -116,9 +152,9 @@ export default function SocialMediaPage() {
     onError: (error: Error) => toast({ title: "Falha na sincronização", description: error.message, variant: "destructive" }),
   });
 
-  const media = useMemo(() => mediaQuery.data ?? [], [mediaQuery.data]);
+  const media = useMemo(() => demoMode ? DEMO_MEDIA : mediaQuery.data ?? [], [demoMode, mediaQuery.data]);
   const sortedMedia = useMemo(() => [...media].sort((a, b) => Number(b[contentSort] || 0) - Number(a[contentSort] || 0)), [contentSort, media]);
-  const daily = dailyQuery.data ?? [];
+  const daily = demoMode ? DEMO_DAILY : dailyQuery.data ?? [];
   const totals = useMemo(() => media.reduce((sum, item) => ({ reach: sum.reach + Number(item.reach), interactions: sum.interactions + Number(item.interactions), likes: sum.likes + Number(item.likes), comments: sum.comments + Number(item.comments), saves: sum.saves + Number(item.saves), shares: sum.shares + Number(item.shares) }), { reach: 0, interactions: 0, likes: 0, comments: 0, saves: 0, shares: 0 }), [media]);
   const engagement = totals.reach > 0 ? (totals.interactions / totals.reach) * 100 : 0;
   const followersGained = daily.reduce((sum, row) => sum + Math.max(Number(row.follower_delta || 0), 0), 0);
@@ -132,24 +168,24 @@ export default function SocialMediaPage() {
   const best = [...media].sort((a, b) => b.interactions - a.interactions)[0];
   const chart = daily.map((row) => ({ ...row, label: format(new Date(`${row.insight_date}T12:00:00`), "dd/MM") }));
 
-  const schemaMissing = accountsQuery.error && /social_accounts|schema cache|relation/i.test((accountsQuery.error as Error).message);
+  const schemaMissing = !demoMode && accountsQuery.error && /social_accounts|schema cache|relation/i.test((accountsQuery.error as Error).message);
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <PageHeading eyebrow="Inteligência de conteúdo" title="Análise de Mídia Social" description="Métricas orgânicas oficiais por perfil e por conteúdo, sem misturar resultados pagos do Meta Ads." actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button><Button onClick={() => sync.mutate()} disabled={!selectedId || sync.isPending}><RefreshCw className={`mr-2 h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} />Atualizar dados</Button></div>} />
+      <PageHeading eyebrow="Inteligência de conteúdo" title="Análise de Mídia Social" description="Métricas orgânicas oficiais por perfil e por conteúdo, sem misturar resultados pagos do Meta Ads." actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setDemoMode((current) => !current)}>{demoMode ? "Sair da demonstração" : "Ver demonstração"}</Button><Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button><Button onClick={() => sync.mutate()} disabled={demoMode || !selectedId || sync.isPending}><RefreshCw className={`mr-2 h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} />Atualizar dados</Button></div>} />
 
       {schemaMissing && <section className="gd-panel border-amber-500/30 p-5"><b className="text-sm text-amber-500">Atualização de banco pendente</b><p className="mt-1 text-xs text-muted-foreground">Aplique a migration 20260715120000 para liberar contas, conteúdos e insights sociais.</p></section>}
 
       {accountsQuery.isLoading ? <section className="gd-panel grid min-h-[420px] place-items-center p-8 text-center" role="status" aria-live="polite"><p className="text-sm text-muted-foreground">Verificando perfis conectados…</p></section> : !accounts.length && !schemaMissing ? (
         <section className="gd-panel grid min-h-[420px] place-items-center overflow-hidden p-8 text-center">
-          <div className="max-w-lg"><span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#f3c74a] to-[#9b6810] text-[#211706] shadow-[0_18px_60px_-25px_rgba(226,176,44,.9)]"><Instagram className="h-8 w-8" /></span><h2 className="mt-6 text-2xl font-black">Conecte um perfil profissional</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Use o login oficial do Instagram para importar perfil, publicações, Reels e métricas de alcance, salvamentos, compartilhamentos e engajamento. Senhas nunca passam pela Growdash.</p><Button className="mt-6" onClick={() => connectInstagram.mutate()}><Instagram className="mr-2 h-4 w-4" />Continuar com Instagram</Button></div>
+          <div className="max-w-lg"><span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#f3c74a] to-[#9b6810] text-[#211706] shadow-[0_18px_60px_-25px_rgba(226,176,44,.9)]"><Instagram className="h-8 w-8" /></span><h2 className="mt-6 text-2xl font-black">Conecte um perfil profissional</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Use o login oficial do Instagram para importar perfil, publicações, Reels e métricas de alcance, salvamentos, compartilhamentos e engajamento. Senhas nunca passam pela Growdash.</p><div className="mt-6 flex flex-wrap justify-center gap-2"><Button onClick={() => connectInstagram.mutate()}><Instagram className="mr-2 h-4 w-4" />Continuar com Instagram</Button><Button variant="outline" onClick={() => setDemoMode(true)}>Ver dados demonstrativos</Button></div></div>
         </section>
       ) : accounts.length > 0 ? (
         <>
           <section className="gd-panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
             <div className="flex min-w-0 items-center gap-3">{selected?.profile_picture_url ? <img src={selected.profile_picture_url} className="h-11 w-11 rounded-xl object-cover" alt="" /> : <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span>}<div className="min-w-0"><b className="block truncate text-sm">{selected?.display_name}</b><span className="text-xs text-muted-foreground">@{selected?.username || "perfil"} · {selected?.connection_status === "connected" ? "conectado" : selected?.connection_status}</span></div></div>
             <Select value={selectedId} onValueChange={setAccountId}><SelectTrigger aria-label="Selecionar perfil do Instagram" className="sm:ml-auto sm:w-72"><SelectValue /></SelectTrigger><SelectContent>{accounts.map((account) => <SelectItem key={account.id} value={account.id}>@{account.username || account.display_name}</SelectItem>)}</SelectContent></Select>
-            <span className="text-[10px] text-muted-foreground">Último sync: {selected?.last_sync_at ? format(new Date(selected.last_sync_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "nunca"}</span>
+            <span className={demoMode ? "rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-500" : "text-[10px] text-muted-foreground"}>{demoMode ? "Demonstração — dados não oficiais" : `Último sync: ${selected?.last_sync_at ? format(new Date(selected.last_sync_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "nunca"}`}</span>
           </section>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
