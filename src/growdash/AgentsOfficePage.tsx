@@ -5,12 +5,10 @@ import {
   Activity,
   ArrowLeft,
   ArrowRight,
-  BrainCircuit,
   Bot,
   BriefcaseBusiness,
   Coffee,
   ChevronRight,
-  Cpu,
   MessageCircle,
   Minimize2,
   Network,
@@ -37,6 +35,7 @@ import { AGENT_NEED_META, advanceAgentLifeState, createInitialAgentLifeStates, f
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { NeuralCommandCore3D } from "@/growdash/NeuralCommandCore3D";
 
 type AgentStatus = "working" | "walking" | "free";
 type ChatMessage = { id: string; role: "agent" | "user"; text: string };
@@ -317,38 +316,6 @@ const NEURAL_LINKS = Array.from({ length: 20 }, (_, index) => {
   return [from, to] as const;
 });
 
-const BRAIN_CIRCUITS = [
-  "M80 124 H126 V91 H176 V67",
-  "M61 169 H113 V143 H161 V112 H194",
-  "M74 221 H119 V194 H165 V166 H202",
-  "M101 266 V238 H151 V214 H196",
-  "M340 124 H294 V91 H244 V67",
-  "M359 169 H307 V143 H259 V112 H226",
-  "M346 221 H301 V194 H255 V166 H218",
-  "M319 266 V238 H269 V214 H224",
-  "M132 61 V83 H158",
-  "M288 61 V83 H262",
-  "M112 286 H153 V260 H193",
-] as const;
-
-const BRAIN_NODES = [
-  [80, 124], [126, 91], [176, 67], [61, 169], [113, 143], [161, 112], [74, 221], [119, 194], [165, 166],
-  [340, 124], [294, 91], [244, 67], [359, 169], [307, 143], [259, 112], [346, 221], [301, 194], [255, 166],
-] as const;
-
-const BRAIN_FOLDS = [
-  "M73 106C105 80 143 92 170 75C181 68 193 64 205 72",
-  "M57 139C91 119 120 137 148 118C164 107 180 107 204 119",
-  "M53 176C89 160 112 177 142 158C164 145 184 151 204 165",
-  "M63 214C95 198 119 220 148 198C166 185 184 189 203 207",
-  "M82 250C109 232 133 255 156 238C174 225 190 233 204 247",
-  "M347 106C315 80 277 92 250 75C239 68 227 64 215 72",
-  "M363 139C329 119 300 137 272 118C256 107 240 107 216 119",
-  "M367 176C331 160 308 177 278 158C256 145 236 151 216 165",
-  "M357 214C325 198 301 220 272 198C254 185 236 189 217 207",
-  "M338 250C311 232 287 255 264 238C246 225 230 233 216 247",
-] as const;
-
 type CorePhase = "brain" | "entering" | "core";
 
 type KnowledgeStrategy = readonly [string, string];
@@ -361,10 +328,6 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
   const [animationsActive, setAnimationsActive] = useState(true);
   const transitionTimer = useRef<number | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
-  const brainRotationRef = useRef<HTMLSpanElement | null>(null);
-  const brainDragRef = useRef({ active: false, startX: 0, startY: 0, baseX: -6, baseY: 0 });
-  const brainMovedRef = useRef(false);
-  const brainFrameRef = useRef<number | null>(null);
   const parallaxFrameRef = useRef<number | null>(null);
   const parallaxValuesRef = useRef({ x: 0, y: 0 });
   const isCoreOpen = phase === "core";
@@ -423,7 +386,6 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
 
   useEffect(() => () => {
     if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
-    if (brainFrameRef.current !== null) window.cancelAnimationFrame(brainFrameRef.current);
     if (parallaxFrameRef.current !== null) window.cancelAnimationFrame(parallaxFrameRef.current);
   }, []);
 
@@ -482,35 +444,6 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
     ["--jarvis-bg-x", "--jarvis-bg-y", "--jarvis-grid-x", "--jarvis-grid-y", "--jarvis-field-x", "--jarvis-field-y"].forEach((property) => stageRef.current?.style.setProperty(property, "0px"));
   };
 
-  const writeBrainRotation = (rotationX: number, rotationY: number) => {
-    if (brainFrameRef.current !== null) return;
-    brainFrameRef.current = window.requestAnimationFrame(() => {
-      brainFrameRef.current = null;
-      brainRotationRef.current?.style.setProperty("--brain-user-x", `${rotationX.toFixed(1)}deg`);
-      brainRotationRef.current?.style.setProperty("--brain-user-y", `${rotationY.toFixed(1)}deg`);
-    });
-  };
-
-  const startBrainDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
-    brainDragRef.current = { active: true, startX: event.clientX, startY: event.clientY, baseX: Number.parseFloat(brainRotationRef.current?.style.getPropertyValue("--brain-user-x") || "-6") || -6, baseY: Number.parseFloat(brainRotationRef.current?.style.getPropertyValue("--brain-user-y") || "0") || 0 };
-    brainMovedRef.current = false;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const moveBrainDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
-    const drag = brainDragRef.current;
-    if (!drag.active) return;
-    const dx = event.clientX - drag.startX;
-    const dy = event.clientY - drag.startY;
-    if (Math.abs(dx) + Math.abs(dy) > 5) brainMovedRef.current = true;
-    writeBrainRotation(Math.max(-24, Math.min(24, drag.baseX - dy * .18)), drag.baseY + dx * .42);
-  };
-
-  const stopBrainDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
-    brainDragRef.current.active = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-  };
-
   const openArea = (area: CoreAreaId, strategyId?: string) => {
     setSelectedArea(area);
     setSelectedStrategy(strategyId || KNOWLEDGE_NODES.find((node) => node.id === area)?.strategies[0]?.[1] || null);
@@ -533,17 +466,7 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
       {KNOWLEDGE_NODES.map((node, index) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 335; const y = 380 + Math.sin(radians) * 285; const controlX = 500 + Math.cos(radians) * 170 + Math.sin(radians) * (index % 2 === 0 ? 34 : -34); const controlY = 380 + Math.sin(radians) * 145; return <g key={node.id} style={{ "--link-delay": `${index * -.28}s` } as React.CSSProperties}><path d={`M 500 380 Q ${controlX} ${controlY} ${x} ${y}`} stroke="url(#jarvis-link)" strokeWidth="2" strokeDasharray="7 11" fill="none" /><circle cx={x} cy={y} r="6" fill="currentColor" /><circle className="jarvis-node-halo" cx={x} cy={y} r="15" fill="none" stroke="currentColor" /></g>; })}
     </svg>}
 
-    <button type="button" onClick={() => { if (!brainMovedRef.current) enterCore(); brainMovedRef.current = false; }} className="jarvis-brain" aria-label={isCoreOpen ? "Cérebro Growdash expandido" : "Entrar no cérebro Growdash"} aria-expanded={isCoreOpen} disabled={phase === "entering"}>
-      <span className="jarvis-brain-aura" />
-      <span className="jarvis-orbit orbit-one" /><span className="jarvis-orbit orbit-two" /><span className="jarvis-orbit orbit-three" />
-      <span ref={brainRotationRef} className="growdash-brain-user-rotation" onPointerDown={startBrainDrag} onPointerMove={moveBrainDrag} onPointerUp={stopBrainDrag} onPointerCancel={stopBrainDrag}>
-        <span className="growdash-brain-rotor">
-          <BrainVolume />
-        </span>
-      </span>
-      <span className="jarvis-energy-core"><Cpu /><i /></span>
-      <span className="jarvis-brain-copy"><BrainCircuit className="h-7 w-7" /><b>GROWDASH</b><small>{phase === "entering" ? "Sincronizando conexões…" : isCoreOpen ? "Núcleo operacional · arraste para orbitar" : "Clique para entrar no cérebro"}</small></span>
-    </button>
+    <NeuralCommandCore3D expanded={isCoreOpen} entering={phase === "entering"} onEnter={enterCore} />
 
     {isCoreOpen && <>
       <div className="jarvis-core-label" aria-live="polite"><Radar /><span>Grafo Growdash · {KNOWLEDGE_NODES.length} áreas · {KNOWLEDGE_NODES.reduce((total, node) => total + node.strategies.length, 0)} estratégias</span></div>
@@ -563,49 +486,6 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
 
     {!isCoreOpen && <div className="jarvis-intro"><b>Central de comando autônoma</b><span>Entre no cérebro operacional para navegar pelas áreas, conexões e estratégias da Growdash.</span><small><Sparkles />Experiência neural interativa</small></div>}
   </section>;
-}
-
-const BRAIN_DEPTHS = [-52, -44, -36, -28, -20, -12, -4, 4, 12, 20, 28, 36, 44, 52] as const;
-
-const BRAIN_SYNAPSES = [
-  [113, 91, 52, 44], [78, 122, 23, 96], [58, 174, 12, 166], [72, 227, 21, 258], [116, 278, 72, 312],
-  [151, 310, 124, 343], [306, 91, 368, 43], [342, 122, 397, 91], [362, 174, 411, 165], [348, 227, 398, 257],
-  [304, 278, 348, 311], [269, 310, 296, 343], [162, 72, 153, 27], [258, 72, 267, 26],
-] as const;
-
-function BrainVolume() {
-  return <span className="growdash-brain-volume">
-    <span className="growdash-brain-reactor" aria-hidden="true"><i /><i /><i /><b /></span>
-    <svg className="growdash-brain-synapses" viewBox="0 0 420 360" aria-hidden="true">
-      {BRAIN_SYNAPSES.map(([x1, y1, x2, y2], index) => <g key={`${x1}-${y1}-${index}`} style={{ "--synapse-delay": `${-(index % 7) * .37}s` } as React.CSSProperties}><path d={`M ${x1} ${y1} Q ${(x1 + x2) / 2 + (index % 2 ? 6 : -6)} ${(y1 + y2) / 2 - 12} ${x2} ${y2}`} /><circle cx={x2} cy={y2} r={index % 3 === 0 ? 4 : 2.5} /></g>)}
-    </svg>
-    <BrainSurface back depth={-34} />
-    {BRAIN_DEPTHS.map((depth, index) => <BrainSurface key={depth} depth={depth} layer="slice" sliceIndex={index} />)}
-    <BrainSurface depth={56} />
-    <span className="growdash-brain-depth-shine" aria-hidden="true" />
-    <span className="growdash-brain-particle particle-a" aria-hidden="true" /><span className="growdash-brain-particle particle-b" aria-hidden="true" /><span className="growdash-brain-particle particle-c" aria-hidden="true" />
-  </span>;
-}
-
-function BrainSurface({ back = false, depth = 0, layer = "surface", sliceIndex = 0 }: { back?: boolean; depth?: number; layer?: "surface" | "slice"; sliceIndex?: number }) {
-  const detailed = layer === "surface";
-  const suffix = back ? "back" : "front";
-  const gradientId = `cortex-metal-${suffix}-${layer}-${sliceIndex}`;
-  return <svg className={cn("jarvis-cortex", "growdash-brain-surface", back ? "is-back" : "is-front", layer === "slice" && "is-slice")} style={{ "--brain-depth": `${depth}px`, "--slice-index": sliceIndex } as React.CSSProperties} viewBox="0 0 420 360" role={detailed && !back ? "img" : undefined} aria-label={detailed && !back ? "Cérebro 3D Growdash" : undefined} aria-hidden={!detailed || back}>
-    <defs>
-      <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--brain-cyan-light)" /><stop offset=".42" stopColor="var(--brain-cyan)" /><stop offset="1" stopColor="var(--brain-cyan-deep)" /></linearGradient>
-    </defs>
-    <path className="jarvis-cortex-lobe" fill={layer === "slice" ? "var(--brain-volume-fill)" : `url(#${gradientId})`} d="M204 45C163 24 116 39 95 73C55 79 41 119 55 151C31 181 45 225 76 240C72 276 109 302 143 291C158 322 197 318 210 288V69C210 56 208 50 204 45Z" />
-    <path className="jarvis-cortex-lobe" fill={layer === "slice" ? "var(--brain-volume-fill)" : `url(#${gradientId})`} d="M216 45C257 24 304 39 325 73C365 79 379 119 365 151C389 181 375 225 344 240C348 276 311 302 277 291C262 322 223 318 210 288V69C210 56 212 50 216 45Z" />
-    <path className="jarvis-cortex-midline" d="M210 65V291M180 300C190 327 184 342 170 354M240 300C230 327 236 342 250 354" />
-    {detailed && <>
-      {BRAIN_FOLDS.map((path, index) => <path key={`fold-${index}`} className="jarvis-cortex-fold" d={path} style={{ "--fold-delay": `${index * -.22}s` } as React.CSSProperties} />)}
-      {BRAIN_CIRCUITS.map((path, index) => <path key={path} className="jarvis-circuit-trace" d={path} style={{ "--circuit-delay": `${index * -.17}s` } as React.CSSProperties} />)}
-      <rect className="jarvis-cortex-chip" x="184" y="130" width="52" height="72" rx="8" />
-      <path className="jarvis-cortex-chip-lines" d="M194 143H226M194 155H226M194 167H226M194 179H226M174 143H184M174 160H184M174 177H184M236 143H246M236 160H246M236 177H246" />
-      {BRAIN_NODES.map(([x, y], index) => <circle key={`${x}-${y}`} className="jarvis-cortex-node" cx={x} cy={y} r={index % 3 === 0 ? 5 : 3.5} style={{ "--node-delay": `${index * -.11}s` } as React.CSSProperties} />)}
-    </>}
-  </svg>;
 }
 
 function OperationalAreaPanel({ node, summaries, selectedStrategy, loading, onClose, onSelectStrategy }: { node: KnowledgeNode; summaries: ReturnType<typeof buildCoreAccountSummaries>; selectedStrategy: string; loading: boolean; onClose: () => void; onSelectStrategy: (id: string) => void }) {
