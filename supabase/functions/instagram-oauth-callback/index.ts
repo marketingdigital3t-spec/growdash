@@ -40,9 +40,11 @@ Deno.serve(async (req) => {
   if (!state) return page("error", "O retorno não contém o estado de segurança.");
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const appId = Deno.env.get("INSTAGRAM_APP_ID") ?? Deno.env.get("META_APP_ID");
-    const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET") ?? Deno.env.get("META_APP_SECRET");
-    if (!appId || !appSecret) return page("error", "Credenciais do Instagram não configuradas.");
+    // Do not use META_APP_* here: Facebook Login credentials are not accepted
+    // by Instagram Login and surface as the opaque "Invalid platform app".
+    const appId = Deno.env.get("INSTAGRAM_APP_ID");
+    const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET");
+    if (!appId || !appSecret) return page("error", "Credenciais próprias do Instagram Login não configuradas. Habilite o produto Instagram API with Instagram Login no app Meta e cadastre INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET.");
     const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const stateHash = await sha256(state);
     const { data: oauthState } = await admin.from("instagram_oauth_states").select("state_hash,user_id,expires_at").eq("state_hash", stateHash).maybeSingle();
