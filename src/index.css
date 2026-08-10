@@ -105,17 +105,17 @@
   }
 
   html[data-accent="purple"] {
-    --primary: 258 90% 66%;
-    --ring: 258 94% 72%;
-    --accent: 268 44% 18%;
-    --accent-foreground: 270 100% 87%;
-    --sidebar-primary: 258 90% 66%;
-    --sidebar-icon-active: 258 90% 66%;
-    --sidebar-ring: 258 94% 72%;
-    --brand-gold: #8b5cf6;
-    --brand-gold-light: #c4b5fd;
-    --brand-bronze: #6d3de0;
-    --brand-accent-rgb: 139, 92, 246;
+    --primary: 258 77% 62%;
+    --ring: 258 84% 70%;
+    --accent: 258 42% 17%;
+    --accent-foreground: 258 100% 90%;
+    --sidebar-primary: 258 77% 62%;
+    --sidebar-icon-active: 258 77% 62%;
+    --sidebar-ring: 258 84% 70%;
+    --brand-gold: #7c5ce7;
+    --brand-gold-light: #d7ceff;
+    --brand-bronze: #4934a3;
+    --brand-accent-rgb: 124, 92, 231;
   }
 
   html[data-accent="blue"] {
@@ -205,6 +205,21 @@
     background: linear-gradient(135deg, #6b430d 0%, #b88722 25%, #f3df9b 49%, #946718 69%, #d4ad4c 100%);
   }
 
+  html[data-accent="gold"] {
+    --primary: 42 78% 46%;
+    --primary-foreground: 42 100% 97%;
+    --ring: 42 90% 57%;
+    --accent: 42 47% 16%;
+    --accent-foreground: 44 100% 83%;
+    --sidebar-primary: 42 78% 46%;
+    --sidebar-icon-active: 42 90% 57%;
+    --sidebar-ring: 42 90% 57%;
+    --brand-gold: #c58a22;
+    --brand-gold-light: #ffe0a0;
+    --brand-bronze: #70400b;
+    --brand-accent-rgb: 197, 138, 34;
+  }
+
   .brand-mark-tint {
     -webkit-mask-image: url('/growdash-mark-gold.svg');
     mask-image: url('/growdash-mark-gold.svg');
@@ -251,22 +266,22 @@
   }
 
   .dark .analytics-module {
-    --background: 36 18% 2.7%;
-    --foreground: 40 18% 94%;
-    --card: 35 14% 5.2%;
-    --card-foreground: 40 18% 94%;
-    --popover: 35 13% 5.8%;
-    --popover-foreground: 40 18% 94%;
-    --secondary: 35 10% 8%;
-    --secondary-foreground: 40 12% 91%;
-    --muted: 35 9% 9%;
-    --muted-foreground: 36 8% 62%;
-    --accent: 39 38% 14%;
-    --accent-foreground: 43 100% 76%;
-    --border: 37 12% 15%;
-    --input: 37 12% 15%;
-    --primary-foreground: 42 65% 98%;
-    --ring: 41 88% 55%;
+    --background: 222 42% 6%;
+    --foreground: 210 40% 96%;
+    --card: 220 34% 9%;
+    --card-foreground: 210 40% 96%;
+    --popover: 220 32% 11%;
+    --popover-foreground: 210 40% 96%;
+    --secondary: 220 25% 13%;
+    --secondary-foreground: 210 26% 92%;
+    --muted: 220 21% 14%;
+    --muted-foreground: 215 15% 65%;
+    --accent: 198 52% 15%;
+    --accent-foreground: 190 100% 83%;
+    --border: 216 24% 19%;
+    --input: 216 24% 19%;
+    --primary-foreground: 218 45% 8%;
+    --ring: 196 96% 60%;
     color-scheme: dark;
   }
 
