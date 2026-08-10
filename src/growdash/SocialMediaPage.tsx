@@ -6,6 +6,7 @@ import { BarChart3, CheckCircle2, ExternalLink, Eye, Heart, ImageOff, Instagram,
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import { PageHeading } from "./shared";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,6 +101,7 @@ export default function SocialMediaPage() {
   const connectInstagram = useInstagramOAuth();
   const [accountId, setAccountId] = useState("");
   const [demoMode, setDemoMode] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<SocialMedia | null>(null);
   const [contentSort, setContentSort] = useState<"interactions" | "reach" | "engagement_rate" | "saves" | "shares" | "comments" | "video_views">("interactions");
 
   const accountsQuery = useQuery({
@@ -204,10 +206,11 @@ export default function SocialMediaPage() {
               <section className="gd-panel p-5"><h3 className="font-black">Evolução do perfil</h3><p className="text-xs text-muted-foreground">Seguidores, alcance e interações dentro do período global.</p><div className="mt-5 h-72">{chart.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart}><CartesianGrid strokeDasharray="3 3" opacity={0.15} /><XAxis dataKey="label" fontSize={11} /><YAxis fontSize={11} /><ChartTooltip contentStyle={{ background: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 12 }} /><Line type="monotone" dataKey="followers" stroke="#e0ad2d" strokeWidth={2.5} dot={false} /><Line type="monotone" dataKey="reach" stroke="#3da46d" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer> : <Empty text="Sincronize a conta para formar a série histórica diária." />}</div></section>
               <section className="gd-panel p-5"><Sparkles className="h-5 w-5 text-primary" /><h3 className="mt-3 font-black">Melhor conteúdo</h3>{best ? <><p className="mt-2 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{best.caption || "Conteúdo sem legenda"}</p><div className="mt-5 grid grid-cols-2 gap-2"><Mini label="Interações" value={number.format(best.interactions)} /><Mini label="Alcance" value={number.format(best.reach)} /><Mini label="Salvos" value={number.format(best.saves)} /><Mini label="Compart." value={number.format(best.shares)} /></div>{best.permalink && <Button asChild variant="outline" className="mt-4 w-full"><a href={best.permalink} target="_blank" rel="noreferrer">Abrir publicação <ExternalLink className="ml-2 h-3 w-3" /></a></Button>}</> : <Empty text="Nenhum conteúdo no período." />}</section>
             </TabsContent>
-            <TabsContent value="content"><div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between"><div><b className="text-sm">Posts, Reels e vídeos</b><p className="text-[10px] text-muted-foreground">Todas as métricas oficiais disponíveis para cada conteúdo no período.</p></div><Select value={contentSort} onValueChange={(value) => setContentSort(value as typeof contentSort)}><SelectTrigger className="sm:w-60" aria-label="Ordenar conteúdos do Instagram"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="interactions">Mais interações</SelectItem><SelectItem value="reach">Maior alcance</SelectItem><SelectItem value="engagement_rate">Maior engajamento</SelectItem><SelectItem value="saves">Mais salvamentos</SelectItem><SelectItem value="shares">Mais compartilhamentos</SelectItem><SelectItem value="comments">Mais comentários</SelectItem><SelectItem value="video_views">Mais visualizações</SelectItem></SelectContent></Select></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{sortedMedia.map((item) => <article key={item.id} className="gd-panel group overflow-hidden"><MediaPreview media={item} /><div className="p-4"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-primary"><span>{item.media_type}</span><span>{item.published_at ? format(new Date(item.published_at), "dd/MM/yyyy") : "—"}</span></div><p className="mt-2 line-clamp-2 min-h-10 text-xs leading-relaxed text-muted-foreground">{item.caption || "Sem legenda"}</p><div className="mt-4 grid grid-cols-3 gap-2"><Mini label="Alcance" value={number.format(item.reach)} /><Mini label="Impressões" value={number.format(item.impressions)} /><Mini label="Interações" value={number.format(item.interactions)} /><Mini label="Curtidas" value={number.format(item.likes)} /><Mini label="Comentários" value={number.format(item.comments)} /><Mini label="Salvos" value={number.format(item.saves)} /><Mini label="Compart." value={number.format(item.shares)} /><Mini label="Engaj." value={`${Number(item.engagement_rate).toFixed(1)}%`} /><Mini label="Views" value={number.format(Number(item.video_views || 0))} /></div>{item.video_retention_rate || item.average_watch_time ? <div className="mt-2 grid grid-cols-2 gap-2"><Mini label="Retenção" value={item.video_retention_rate ? `${Number(item.video_retention_rate).toFixed(1)}%` : "—"} /><Mini label="Tempo médio" value={item.average_watch_time ? `${Number(item.average_watch_time).toFixed(1)} s` : "—"} /></div> : null}{item.permalink && <Button asChild variant="outline" size="sm" className="mt-3 w-full"><a href={item.permalink} target="_blank" rel="noreferrer">Abrir post <ExternalLink className="ml-2 h-3 w-3" /></a></Button>}</div></article>)}{!media.length && <Empty text="Nenhum conteúdo publicado no período selecionado." />}</div></TabsContent>
+            <TabsContent value="content"><div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between"><div><b className="text-sm">Posts, Reels e vídeos</b><p className="text-[10px] text-muted-foreground">Clique em uma publicação para abrir a análise detalhada.</p></div><Select value={contentSort} onValueChange={(value) => setContentSort(value as typeof contentSort)}><SelectTrigger className="sm:w-60" aria-label="Ordenar conteúdos do Instagram"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="interactions">Mais interações</SelectItem><SelectItem value="reach">Maior alcance</SelectItem><SelectItem value="engagement_rate">Maior engajamento</SelectItem><SelectItem value="saves">Mais salvamentos</SelectItem><SelectItem value="shares">Mais compartilhamentos</SelectItem><SelectItem value="comments">Mais comentários</SelectItem><SelectItem value="video_views">Mais visualizações</SelectItem></SelectContent></Select></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{sortedMedia.map((item) => <article key={item.id} role="button" tabIndex={0} aria-label={`Ver detalhes da publicação ${item.caption?.slice(0, 60) || item.media_type}`} onClick={() => setSelectedMedia(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedMedia(item); } }} className="gd-panel group cursor-pointer overflow-hidden outline-none transition hover:-translate-y-0.5 hover:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"><MediaPreview media={item} /><div className="p-4"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-primary"><span>{item.media_type}</span><span>{item.published_at ? format(new Date(item.published_at), "dd/MM/yyyy") : "—"}</span></div><p className="mt-2 line-clamp-2 min-h-10 text-xs leading-relaxed text-muted-foreground">{item.caption || "Sem legenda"}</p><div className="mt-4 grid grid-cols-3 gap-2"><Mini label="Alcance" value={number.format(item.reach)} /><Mini label="Impressões" value={number.format(item.impressions)} /><Mini label="Interações" value={number.format(item.interactions)} /><Mini label="Curtidas" value={number.format(item.likes)} /><Mini label="Comentários" value={number.format(item.comments)} /><Mini label="Salvos" value={number.format(item.saves)} /><Mini label="Compart." value={number.format(item.shares)} /><Mini label="Engaj." value={`${Number(item.engagement_rate).toFixed(1)}%`} /><Mini label="Views" value={number.format(Number(item.video_views || 0))} /></div>{item.video_retention_rate || item.average_watch_time ? <div className="mt-2 grid grid-cols-2 gap-2"><Mini label="Retenção" value={item.video_retention_rate ? `${Number(item.video_retention_rate).toFixed(1)}%` : "—"} /><Mini label="Tempo médio" value={item.average_watch_time ? `${Number(item.average_watch_time).toFixed(1)} s` : "—"} /></div> : null}{item.permalink && <Button asChild variant="outline" size="sm" className="mt-3 w-full"><a href={item.permalink} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Abrir post <ExternalLink className="ml-2 h-3 w-3" /></a></Button>}</div></article>)}{!media.length && <Empty text="Nenhum conteúdo publicado no período selecionado." />}</div></TabsContent>
             <TabsContent value="audience"><section className="gd-panel p-6"><h3 className="font-black">Crescimento da audiência</h3><p className="mt-1 text-xs text-muted-foreground">Ganhos e perdas são somados a partir da série diária oficial. Demografia e retenção só aparecem quando a Meta entrega a métrica para a conta.</p><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Mini label="Seguidores atuais" value={number.format(selected?.followers_count ?? 0)} /><Mini label="Ganhos no período" value={`+${number.format(followersGained)}`} /><Mini label="Perdas no período" value={`-${number.format(followersLost)}`} /><Mini label="Variação líquida" value={number.format(followersGained - followersLost)} /><Mini label="Publicações" value={number.format(selected?.media_count ?? 0)} /></div></section></TabsContent>
             <TabsContent value="recommendations"><section className="grid gap-3 md:grid-cols-2"><Recommendation title="Repita o que gera intenção" text={best ? `O conteúdo líder concentra ${number.format(best.saves + best.shares)} salvamentos e compartilhamentos. Use o mesmo tema em novos formatos.` : "Sincronize conteúdos para identificar temas com maior intenção."} /><Recommendation title="Proteção contra mídia expirada" text="URLs temporárias são atualizadas em cada sincronização e a interface exibe fallback quando a CDN da Meta expira uma prévia." /><Recommendation title="Orgânico ≠ pago" text="Alcance e interação deste módulo nunca são somados às métricas de campanha do Meta Ads." /><Recommendation title="Decisão com contexto" text="Compare pelo menos sete dias e volume suficiente antes de concluir que um formato ou horário venceu." /></section></TabsContent>
           </Tabs>
+          <SocialMediaDetailSheet media={selectedMedia} onOpenChange={(open) => { if (!open) setSelectedMedia(null); }} demoMode={demoMode} />
         </>
       ) : null}
     </div>
@@ -218,3 +221,65 @@ function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; val
 function Mini({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-border bg-muted/20 p-3"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">{label}</span><b className="mt-1 block text-sm tabular-nums">{value}</b></div>; }
 function Empty({ text }: { text: string }) { return <div className="grid min-h-32 place-items-center rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{text}</div>; }
 function Recommendation({ title, text }: { title: string; text: string }) { return <article className="gd-panel p-5"><div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /><b className="text-sm">{title}</b></div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">{text}</p></article>; }
+
+function SocialMediaDetailSheet({ media, onOpenChange, demoMode }: { media: SocialMedia | null; onOpenChange: (open: boolean) => void; demoMode: boolean }) {
+  if (!media) return null;
+
+  const engagement = Number(media.engagement_rate || 0);
+  const savesAndShares = Number(media.saves || 0) + Number(media.shares || 0);
+  const diagnosis = engagement >= 8
+    ? "Este conteúdo gerou engajamento acima de 8%. Avalie repetir o tema, formato e gancho em uma nova publicação."
+    : savesAndShares > Number(media.comments || 0) * 3
+      ? "Salvamentos e compartilhamentos são o principal sinal deste conteúdo. O tema parece útil para a audiência e pode render uma sequência."
+      : "Use esta leitura junto ao período e ao volume de alcance antes de decidir por mudanças no conteúdo.";
+
+  return <Sheet open={!!media} onOpenChange={onOpenChange}>
+    <SheetContent className="w-full overflow-y-auto border-l border-primary/15 bg-background p-5 sm:max-w-xl">
+      <SheetHeader className="pr-8">
+        <SheetTitle className="text-xl font-black">Detalhes da publicação</SheetTitle>
+        <SheetDescription>{demoMode ? "Demonstração — dados não oficiais" : "Métricas oficiais disponíveis para este conteúdo"}</SheetDescription>
+      </SheetHeader>
+
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-muted/20">
+        <div className="aspect-video bg-muted"><MediaPreview media={media} /></div>
+        <div className="p-4">
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wider text-primary">
+            <span className="rounded-full bg-primary/10 px-2 py-1">{media.media_type}</span>
+            <span className="text-muted-foreground">{media.published_at ? format(new Date(media.published_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Data indisponível"}</span>
+          </div>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{media.caption || "Esta publicação não possui legenda."}</p>
+          {media.permalink && <Button asChild variant="outline" size="sm" className="mt-4"><a href={media.permalink} target="_blank" rel="noreferrer">Abrir publicação <ExternalLink className="ml-2 h-3.5 w-3.5" /></a></Button>}
+        </div>
+      </div>
+
+      <section className="mt-5">
+        <div className="flex items-baseline justify-between gap-3"><h3 className="font-black">Desempenho</h3><span className="text-xs text-muted-foreground">Por publicação</span></div>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Mini label="Alcance" value={number.format(Number(media.reach || 0))} />
+          <Mini label="Impressões" value={number.format(Number(media.impressions || 0))} />
+          <Mini label="Interações" value={number.format(Number(media.interactions || 0))} />
+          <Mini label="Engajamento" value={`${engagement.toFixed(2).replace(".", ",")}%`} />
+          <Mini label="Curtidas" value={number.format(Number(media.likes || 0))} />
+          <Mini label="Comentários" value={number.format(Number(media.comments || 0))} />
+          <Mini label="Salvamentos" value={number.format(Number(media.saves || 0))} />
+          <Mini label="Compartilhamentos" value={number.format(Number(media.shares || 0))} />
+          <Mini label="Visualizações" value={media.video_views == null ? "Não disponível" : number.format(Number(media.video_views))} />
+        </div>
+      </section>
+
+      {media.video_views != null || media.average_watch_time != null || media.video_retention_rate != null ? <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+        <h3 className="font-black">Leitura do vídeo</h3>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Mini label="Visualizações" value={number.format(Number(media.video_views || 0))} />
+          <Mini label="Retenção" value={media.video_retention_rate == null ? "Não disponível" : `${Number(media.video_retention_rate).toFixed(1).replace(".", ",")}%`} />
+          <Mini label="Tempo médio" value={media.average_watch_time == null ? "Não disponível" : `${Number(media.average_watch_time).toFixed(1).replace(".", ",")} s`} />
+        </div>
+      </section> : null}
+
+      <section className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+        <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /><h3 className="font-black">Leitura Growdash</h3></div>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{diagnosis}</p>
+      </section>
+    </SheetContent>
+  </Sheet>;
+}
