@@ -58,6 +58,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
 import { EditableMetaEntity, MetaEntityEditor } from "@/components/campaigns/MetaEntityEditor";
 import { MetaCampaignCreator } from "@/components/campaigns/MetaCampaignCreator";
@@ -76,6 +77,7 @@ import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
+import { resolveCampaignResults } from "@/lib/campaignResultEvents";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -110,6 +112,8 @@ const CAMPAIGN_COLUMN_FILTERS: Array<{ key: string; label: string; column?: Camp
 
 function campaignColumnValue(campaign: any, key: string) {
   if (key === "status" || key === "deliveryStatus") return `${getStatusBadge(campaign.status).label} ${campaign.status || ""}`;
+  if (key === "leads") return String(campaign.results?.total ?? campaign.leads ?? 0);
+  if (key === "cpl") return String(campaign.costPerResult ?? campaign.cpl ?? 0);
   return String(campaign[key] ?? "");
 }
 
@@ -419,6 +423,7 @@ export default function Campaigns() {
     }
 
     const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
+    const results = resolveCampaignResults(campaign.leads, actionEventTotals);
     return {
       ...campaign,
       linkClicks,
@@ -431,6 +436,8 @@ export default function Campaigns() {
       metaCostPerPurchase: actionMetrics.purchases > 0 ? campaign.spend / actionMetrics.purchases : 0,
       metaPurchaseRoas: campaign.spend > 0 ? actionMetrics.purchaseValue / campaign.spend : 0,
       actionEvents: Object.entries(actionEventTotals).map(([actionType, value]) => ({ actionType, value })).sort((a, b) => b.value - a.value),
+      results,
+      costPerResult: results.total > 0 ? campaign.spend / results.total : 0,
     };
   }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignBaseRows]);
 
@@ -540,7 +547,7 @@ export default function Campaigns() {
     let result = campaigns;
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter((c: any) => [c.name, c.id, c.objective, c.status, c.spend, c.leads, c.cpl, c.ctr, c.roas]
+      result = result.filter((c: any) => [c.name, c.id, c.objective, c.status, c.spend, c.results?.total ?? c.leads, c.costPerResult ?? c.cpl, c.ctr, c.roas]
         .some((value) => String(value ?? "").toLowerCase().includes(q)));
     }
     if (statusFilter !== "all") {
@@ -564,7 +571,8 @@ export default function Campaigns() {
         return sortAsc ? difference : -difference;
       }
 
-      const av = a[sortKey], bv = b[sortKey];
+      const av = sortKey === "leads" ? (a.results?.total ?? a.leads) : sortKey === "cpl" ? (a.costPerResult ?? a.cpl) : a[sortKey];
+      const bv = sortKey === "leads" ? (b.results?.total ?? b.leads) : sortKey === "cpl" ? (b.costPerResult ?? b.cpl) : b[sortKey];
       if (typeof av === "string" && typeof bv === "string") {
         return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       }
@@ -595,7 +603,7 @@ export default function Campaigns() {
 
   const totals = useMemo(() => filtered.reduce(
     (acc: any, c: any) => ({
-      budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads,
+      budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads, results: acc.results + (c.results?.total ?? c.leads),
       salesCount: acc.salesCount + c.salesCount, revenue: acc.revenue + c.revenue,
       profit: acc.profit + c.profit, impressions: acc.impressions + c.impressions, clicks: acc.clicks + c.clicks,
       reach: acc.reach + c.reach, linkClicks: acc.linkClicks + c.linkClicks,
@@ -604,12 +612,12 @@ export default function Campaigns() {
       checkouts: acc.checkouts + c.checkouts, metaPurchases: acc.metaPurchases + c.metaPurchases,
       metaPurchaseValue: acc.metaPurchaseValue + (c.metaPurchaseRoas * c.spend),
     }),
-    { budget: 0, spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0, linkClicks: 0, uniqueLinkClicks: 0, landingPageViews: 0, checkouts: 0, metaPurchases: 0, metaPurchaseValue: 0 }
+    { budget: 0, spend: 0, leads: 0, results: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0, linkClicks: 0, uniqueLinkClicks: 0, landingPageViews: 0, checkouts: 0, metaPurchases: 0, metaPurchaseValue: 0 }
   ), [filtered]);
   const totalCtr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
   const totalCpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : 0;
-  const totalCpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
+  const totalCpl = totals.results > 0 ? totals.spend / totals.results : 0;
   const totalRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
   const totalLinkCpc = totals.linkClicks > 0 ? totals.spend / totals.linkClicks : 0;
   const totalUniqueLinkCtr = totals.reach > 0 ? totals.uniqueLinkClicks / totals.reach * 100 : 0;
@@ -617,7 +625,7 @@ export default function Campaigns() {
   const totalCostPerCheckout = totals.checkouts > 0 ? totals.spend / totals.checkouts : 0;
   const totalMetaCostPerPurchase = totals.metaPurchases > 0 ? totals.spend / totals.metaPurchases : 0;
   const totalMetaPurchaseRoas = totals.spend > 0 ? totals.metaPurchaseValue / totals.spend : 0;
-  const totalResultRate = totals.clicks > 0 ? totals.leads / totals.clicks * 100 : 0;
+  const totalResultRate = totals.clicks > 0 ? totals.results / totals.clicks * 100 : 0;
   const intelligenceSeries = useMemo(() => {
     const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number; hasData: boolean }>();
     const lastDate = formatApiDate(endDate);
@@ -1053,19 +1061,8 @@ export default function Campaigns() {
                             {showColumn("uniqueLinkCtr") && <TableCell style={cellW("uniqueLinkCtr")} className={cn("text-right tabular-nums text-sm", sortBg("uniqueLinkCtr"))}><AnimatedNumber value={c.uniqueLinkCtr} suffix="%" decimals={2} /></TableCell>}
                             {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))} onClick={(event) => event.stopPropagation()}>
-                              <button
-                                type="button"
-                                className="ml-auto block rounded-md px-1 py-0.5 text-right transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                                onClick={() => setDetailCampaignId(c.id)}
-                                title={c.actionEvents?.length ? c.actionEvents.map((event: any) => `${friendlyActionLabel(event.actionType)}: ${Number(event.value).toLocaleString("pt-BR")}`).join("\n") : "Nenhum evento detalhado foi sincronizado para esta campanha no período."}
-                                aria-label={`Abrir todos os eventos de ${c.name}`}
-                              >
-                                <AnimatedNumber value={c.leads} decimals={0} />
-                                <span className="block text-[8px] text-muted-foreground">{c.actionEvents?.length ? `${c.actionEvents.length} tipo(s) de evento · ver todos` : "Leads na Meta"}</span>
-                              </button>
-                            </TableCell>}
-                            {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))} onClick={(event) => event.stopPropagation()}><CampaignResultCell campaign={c} onOpen={() => setDetailCampaignId(c.id)} /></TableCell>}
+                            {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.costPerResult ?? c.cpl} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("landingPageViews") && <TableCell style={cellW("landingPageViews")} className={cn("text-right tabular-nums text-sm", sortBg("landingPageViews"))}><AnimatedNumber value={c.landingPageViews} decimals={0} /></TableCell>}
                             {showColumn("costPerLandingPageView") && <TableCell style={cellW("costPerLandingPageView")} className={cn("text-right tabular-nums text-sm", sortBg("costPerLandingPageView"))}><AnimatedNumber value={c.costPerLandingPageView} prefix="R$ " decimals={2} /></TableCell>}
@@ -1113,7 +1110,7 @@ export default function Campaigns() {
                         {showColumn("uniqueLinkCtr") && <CampaignTotalCell width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
                         {showColumn("cpm") && <CampaignTotalCell width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por 1.000 impressões" />}
                         {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Orçamento somado" />}
-                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.leads.toLocaleString("pt-BR")} label="Resultados" />}
+                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.results.toLocaleString("pt-BR")} label="Forms + site + conversas" />}
                         {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado" />}
                         {showColumn("spend") && <CampaignTotalCell width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total usado" />}
                         {showColumn("landingPageViews") && <CampaignTotalCell width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}
@@ -1559,6 +1556,27 @@ function ChartPanel({ title, description, children }: { title: string; descripti
   return <article className="campaign-analysis-card min-w-0 p-4"><h3 className="text-xs font-black">{title}</h3><p className="mt-1 text-[9px] text-muted-foreground">{description}</p><div className="mt-4 h-[260px] min-w-0">{children}</div></article>;
 }
 
+function CampaignResultCell({ campaign, onOpen }: { campaign: any; onOpen: () => void }) {
+  const total = Number(campaign.results?.total ?? campaign.leads ?? 0);
+  const breakdown = campaign.results?.breakdown ?? (Number(campaign.leads || 0) > 0 ? [{ label: "Leads Meta", value: Number(campaign.leads) }] : []);
+  const events = (campaign.actionEvents ?? []).slice(0, 8);
+  return <Tooltip>
+    <TooltipTrigger asChild>
+      <button type="button" className="ml-auto block rounded-md px-1 py-0.5 text-right transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={onOpen} aria-label={`Abrir resultado e eventos de ${campaign.name}`}>
+        <AnimatedNumber value={total} decimals={0} />
+        <span className="block text-[8px] text-muted-foreground">{breakdown.length ? `${breakdown.length} origem(ns) · passar o mouse` : "Sem resultado no período"}</span>
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="left" align="end" className="max-w-80 border-primary/25 bg-popover p-3 text-popover-foreground shadow-xl">
+      <p className="text-[10px] font-black uppercase tracking-wider text-primary">Resultados da campanha</p>
+      <p className="mt-1 text-xs font-bold">{total.toLocaleString("pt-BR")} resultado(s) no período</p>
+      {breakdown.length > 0 ? <div className="mt-2 space-y-1 border-t border-border pt-2 text-[11px]">{breakdown.map((item: any) => <div key={item.label} className="flex justify-between gap-4"><span className="text-muted-foreground">{item.label}</span><b>{Number(item.value).toLocaleString("pt-BR")}</b></div>)}</div> : <p className="mt-2 text-[11px] text-muted-foreground">A Meta não registrou leads nem conversas iniciadas neste período.</p>}
+      {events.length > 0 ? <div className="mt-3 border-t border-border pt-2"><p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Eventos sincronizados</p><div className="mt-1 space-y-1 text-[11px]">{events.map((event: any) => <div key={event.actionType} className="flex justify-between gap-4"><span className="truncate" title={friendlyActionLabel(event.actionType)}>{friendlyActionLabel(event.actionType)}</span><b>{Number(event.value).toLocaleString("pt-BR")}</b></div>)}</div></div> : null}
+      <p className="mt-3 text-[10px] text-muted-foreground">Clique para abrir o detalhamento completo.</p>
+    </TooltipContent>
+  </Tooltip>;
+}
+
 function CampaignTotalCell({ width, value, label, align = "right", stickyLeft, strongDivider = false }: { width: number; value?: string; label?: string; align?: "left" | "right"; stickyLeft?: number; strongDivider?: boolean }) {
   return <TableCell
     style={{ width, minWidth: width, maxWidth: width, ...(stickyLeft !== undefined ? { left: stickyLeft } : {}) }}
@@ -1597,8 +1615,8 @@ function AnalysisCampaignAlert({ campaign, health, targetCpl, accountName, onOpe
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <IssueMetric label="Investido" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-        <IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} />
-        <IssueMetric label="Custo/resultado" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+        <IssueMetric label="Resultados" value={(campaign.results?.total ?? campaign.leads).toLocaleString("pt-BR")} />
+        <IssueMetric label="Custo/resultado" value={(campaign.costPerResult ?? campaign.cpl).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
         <IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} />
       </div>
     </button>
@@ -1611,7 +1629,7 @@ function IssueMetric({ label, value }: { label: string; value: string }) {
 
 function CampaignMobileCard({ campaign, selected, health, onSelect, onOpen, onEdit }: { campaign: any; selected: boolean; health: CampaignHealth; onSelect: () => void; onOpen: () => void; onEdit: () => void }) {
   const healthOption = HEALTH_OPTIONS.find((item) => item.id === health)!;
-  return <article className={cn("rounded-xl border bg-card p-3", selected ? "border-primary bg-primary/5" : "border-border")}><div className="flex items-start gap-3"><Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`Selecionar ${campaign.name}`} /><button type="button" onClick={onOpen} className="min-w-0 grow text-left"><span className="block truncate text-sm font-black">{campaign.name}</span><span className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase text-muted-foreground"><span className={cn("h-2 w-2 rounded-full", healthOption.dot)} />{healthOption.label} · {getStatusBadge(campaign.status).label}</span></button><Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onEdit}><Pencil className="h-4 w-4" /></Button></div><button type="button" onClick={onOpen} className="mt-3 grid w-full grid-cols-2 gap-2 text-left"><IssueMetric label="Investimento" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} /><IssueMetric label="CPL" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></button></article>;
+  return <article className={cn("rounded-xl border bg-card p-3", selected ? "border-primary bg-primary/5" : "border-border")}><div className="flex items-start gap-3"><Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`Selecionar ${campaign.name}`} /><button type="button" onClick={onOpen} className="min-w-0 grow text-left"><span className="block truncate text-sm font-black">{campaign.name}</span><span className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase text-muted-foreground"><span className={cn("h-2 w-2 rounded-full", healthOption.dot)} />{healthOption.label} · {getStatusBadge(campaign.status).label}</span></button><Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onEdit}><Pencil className="h-4 w-4" /></Button></div><button type="button" onClick={onOpen} className="mt-3 grid w-full grid-cols-2 gap-2 text-left"><IssueMetric label="Investimento" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Resultados" value={(campaign.results?.total ?? campaign.leads).toLocaleString("pt-BR")} /><IssueMetric label="CPL" value={(campaign.costPerResult ?? campaign.cpl).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></button></article>;
 }
 
 function LevelMobileCard({ entity, onOpen }: { entity: MetaDetailEntity; onOpen: () => void }) {
