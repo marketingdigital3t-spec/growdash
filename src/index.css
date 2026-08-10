@@ -266,22 +266,20 @@
   }
 
   .dark .analytics-module {
-    --background: 222 42% 6%;
-    --foreground: 210 40% 96%;
-    --card: 220 34% 9%;
-    --card-foreground: 210 40% 96%;
-    --popover: 220 32% 11%;
-    --popover-foreground: 210 40% 96%;
-    --secondary: 220 25% 13%;
-    --secondary-foreground: 210 26% 92%;
-    --muted: 220 21% 14%;
-    --muted-foreground: 215 15% 65%;
-    --accent: 198 52% 15%;
-    --accent-foreground: 190 100% 83%;
-    --border: 216 24% 19%;
-    --input: 216 24% 19%;
-    --primary-foreground: 218 45% 8%;
-    --ring: 196 96% 60%;
+    --background: 36 18% 2.7%;
+    --foreground: 40 18% 94%;
+    --card: 35 14% 5.2%;
+    --card-foreground: 40 18% 94%;
+    --popover: 35 13% 5.8%;
+    --popover-foreground: 40 18% 94%;
+    --secondary: 35 10% 8%;
+    --secondary-foreground: 40 12% 91%;
+    --muted: 35 9% 9%;
+    --muted-foreground: 36 8% 62%;
+    --accent: 39 38% 14%;
+    --accent-foreground: 43 100% 76%;
+    --border: 37 12% 15%;
+    --input: 37 12% 15%;
     color-scheme: dark;
   }
 
