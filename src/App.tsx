@@ -102,6 +102,9 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
 
   retry = () => {
     this.setState({ failed: false });
+    // A manual retry happens after a deploy may have finished propagating.
+    // Clear the automatic-retry guard so this retry can load the new chunks.
+    sessionStorage.removeItem("growdash:chunk-retry");
     const url = new URL(window.location.href);
     url.searchParams.set("gd_reload", String(Date.now()));
     window.location.replace(url.toString());
