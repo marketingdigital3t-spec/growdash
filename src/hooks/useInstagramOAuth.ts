@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 export function useInstagramOAuth() {
   const popupRef = useRef<Window | null>(null);
@@ -19,8 +20,8 @@ export function useInstagramOAuth() {
       if (error || !data?.authUrl) {
         popup.close();
         popupRef.current = null;
-        const action = data?.action ? ` ${data.action}` : "";
-        throw new Error(`${data?.error || error?.message || "Não foi possível iniciar o login do Instagram."}${action}`);
+        if (data?.error) throw new Error(`${data.error}${data.action ? ` ${data.action}` : ""}`);
+        throw new Error(await getEdgeFunctionErrorMessage(error, "Não foi possível iniciar o login do Instagram."));
       }
       popup.location.replace(data.authUrl);
     },

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 export function useMetaOAuth() {
   const { user } = useAuth();
@@ -27,8 +28,8 @@ export function useMetaOAuth() {
       if (error || !data?.authUrl) {
         popup.close();
         oauthPopup.current = null;
-        const action = data?.action ? ` ${data.action}` : "";
-        throw new Error(`${data?.error || error?.message || "Não foi possível iniciar a conexão com a Meta."}${action}`);
+        if (data?.error) throw new Error(`${data.error}${data.action ? ` ${data.action}` : ""}`);
+        throw new Error(await getEdgeFunctionErrorMessage(error, "Não foi possível iniciar a conexão com a Meta."));
       }
 
       popup.location.replace(data.authUrl);
