@@ -11,6 +11,7 @@ type NeuralCommandCore3DProps = {
 export function NeuralCommandCore3D({ expanded, entering = false, onEnter }: NeuralCommandCore3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onEnterRef = useRef(onEnter);
+  const draggedRef = useRef(false);
   const [available, setAvailable] = useState(true);
   useEffect(() => { onEnterRef.current = onEnter; }, [onEnter]);
 
@@ -61,9 +62,9 @@ export function NeuralCommandCore3D({ expanded, entering = false, onEnter }: Neu
     const resize = () => { const width = host.clientWidth; const height = host.clientHeight; if (!width || !height) return; renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix(); };
     const observer = new ResizeObserver(resize); observer.observe(host); resize();
     let pointer: { x: number; y: number; moved: boolean } | null = null;
-    const down = (event: PointerEvent) => { pointer = { x: event.clientX, y: event.clientY, moved: false }; renderer.domElement.setPointerCapture(event.pointerId); };
-    const move = (event: PointerEvent) => { if (!pointer) return; const dx = event.clientX - pointer.x; const dy = event.clientY - pointer.y; pointer.moved ||= Math.abs(dx) + Math.abs(dy) > 4; orbit.azimuth -= dx * .009; orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * .008, .46, 2.45); pointer.x = event.clientX; pointer.y = event.clientY; updateCamera(); };
-    const up = (event: PointerEvent) => { const clicked = pointer && !pointer.moved; pointer = null; if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId); if (clicked) onEnterRef.current(); };
+    const down = (event: PointerEvent) => { draggedRef.current = false; pointer = { x: event.clientX, y: event.clientY, moved: false }; renderer.domElement.setPointerCapture(event.pointerId); };
+    const move = (event: PointerEvent) => { if (!pointer) return; const dx = event.clientX - pointer.x; const dy = event.clientY - pointer.y; pointer.moved ||= Math.abs(dx) + Math.abs(dy) > 4; draggedRef.current = pointer.moved; orbit.azimuth -= dx * .009; orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * .008, .46, 2.45); pointer.x = event.clientX; pointer.y = event.clientY; updateCamera(); };
+    const up = (event: PointerEvent) => { pointer = null; if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId); };
     const wheel = (event: WheelEvent) => { event.preventDefault(); orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * .009, 6.5, 14); updateCamera(); };
     renderer.domElement.addEventListener("pointerdown", down); renderer.domElement.addEventListener("pointermove", move); renderer.domElement.addEventListener("pointerup", up); renderer.domElement.addEventListener("wheel", wheel, { passive: false });
     let frame = 0; let raf = 0;
@@ -73,5 +74,5 @@ export function NeuralCommandCore3D({ expanded, entering = false, onEnter }: Neu
   }, []);
 
   if (!available) return <button type="button" className="neural-core-fallback" onClick={onEnter}>Abrir inteligência Growdash</button>;
-  return <div className={`neural-command-core ${expanded ? "is-expanded" : ""} ${entering ? "is-entering" : ""}`}><div ref={hostRef} className="neural-command-core-canvas" role="button" tabIndex={0} aria-label={expanded ? "Cérebro Growdash expandido" : "Entrar no cérebro Growdash"} aria-expanded={expanded} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEnter(); } }} /><div className="neural-command-core-hud" aria-hidden="true"><b>GROWDASH</b><span>{entering ? "Sincronizando conexões…" : expanded ? "Núcleo operacional ativo" : "Arraste para orbitar · clique para entrar"}</span></div></div>;
+  return <div className={`neural-command-core ${expanded ? "is-expanded" : ""} ${entering ? "is-entering" : ""}`}><div ref={hostRef} className="neural-command-core-canvas" role="button" tabIndex={0} aria-label={expanded ? "Cérebro Growdash expandido" : "Entrar no cérebro Growdash"} aria-expanded={expanded} onClick={() => { if (!draggedRef.current) onEnter(); draggedRef.current = false; }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onEnter(); } }} /><div className="neural-command-core-hud" aria-hidden="true"><b>GROWDASH</b><span>{entering ? "Sincronizando conexões…" : expanded ? "Núcleo operacional ativo" : "Arraste para orbitar · clique para entrar"}</span></div></div>;
 }

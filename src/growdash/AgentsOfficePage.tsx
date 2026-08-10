@@ -65,6 +65,7 @@ export default function AgentsOfficePage() {
     : accounts, [accounts, businessUnitId, segment]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [view, setView] = useState<"map" | "office">("map");
+  const showLegacyOfficePreview = window.location.hash === "#legacy-office";
   const [officeAngle, setOfficeAngle] = useState(0);
   const officeDragStart = useRef<number | null>(null);
   const officeAngleStart = useRef(0);
@@ -178,7 +179,7 @@ export default function AgentsOfficePage() {
             onStatusChange={updateStatus}
           />
         </Suspense>
-        {false && <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
+        {showLegacyOfficePreview && <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
         <div className="office-sim-topbar">
           <div className="office-sim-brand"><span className="office-sim-brand-mark"><Bot className="h-3.5 w-3.5" /></span><span><b>GROWDASH LIFE</b><small>AGENT OPERATIONS</small></span></div>
           <div className="office-sim-presence" aria-label="Agentes presentes no escritório">
