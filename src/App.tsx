@@ -90,11 +90,22 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
     // a cache-busting URL before showing the manual recovery screen.
     const isChunkError = /dynamically imported module|loading chunk|importing a module script|failed to fetch/i.test(error.message);
     const retryKey = "growdash:chunk-retry";
-    if (isChunkError && sessionStorage.getItem(retryKey) !== "1") {
-      sessionStorage.setItem(retryKey, "1");
+    let retry = { attempts: 0, startedAt: 0 };
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(retryKey) || "null");
+      if (stored && typeof stored.attempts === "number" && typeof stored.startedAt === "number") retry = stored;
+    } catch {
+      // A malformed recovery marker must never prevent a safe reload.
+    }
+    const activeRecovery = Date.now() - retry.startedAt < 30_000;
+    const attempts = activeRecovery ? retry.attempts : 0;
+    if (isChunkError && attempts < 3) {
+      sessionStorage.setItem(retryKey, JSON.stringify({ attempts: attempts + 1, startedAt: activeRecovery ? retry.startedAt : Date.now() }));
       const url = new URL(window.location.href);
       url.searchParams.set("gd_reload", String(Date.now()));
-      window.location.replace(url.toString());
+      // Pages can expose the HTML a few seconds before every new lazy chunk
+      // reaches the custom domain. A short backoff avoids a false failure UI.
+      window.setTimeout(() => window.location.replace(url.toString()), (attempts + 1) * 1_500);
       return;
     }
     sessionStorage.removeItem(retryKey);
