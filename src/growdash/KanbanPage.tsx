@@ -35,8 +35,8 @@ const PRIORITIES = [{ value: "none", label: "Sem prioridade" }, { value: "low", 
 const BOARD_TEMPLATES: BoardTemplate[] = [
   {
     id: "sales",
-    name: "Pipeline comercial",
-    description: "Acompanhe leads, oportunidades e fechamentos em um fluxo comercial.",
+    name: "Comercial e vendas",
+    description: "Acompanhe leads, oportunidades, propostas, follow-ups e fechamentos.",
     columns: ["Novos leads", "Contato", "Qualificação", "Proposta", "Ganho"],
     cards: [
       { column: "Novos leads", title: "Definir critérios de qualificação", priority: "medium" },
@@ -44,6 +44,32 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
       { column: "Proposta", title: "Enviar proposta comercial", priority: "high" },
     ],
     icon: BriefcaseBusiness,
+  },
+  {
+    id: "paid-traffic",
+    name: "Operação de tráfego pago",
+    description: "Organize alertas, otimizações, criativos e validações de cada conta de anúncio.",
+    columns: ["Radar e alertas", "Diagnóstico", "Em otimização", "Aguardando dados", "Validado"],
+    cards: [
+      { column: "Radar e alertas", title: "Verificar campanhas com CPL acima da meta", priority: "high" },
+      { column: "Diagnóstico", title: "Analisar criativos e frequência da campanha", priority: "medium" },
+      { column: "Em otimização", title: "Testar variação de criativo e copy", priority: "high" },
+      { column: "Aguardando dados", title: "Aguardar janela mínima de aprendizado", priority: "low" },
+    ],
+    icon: Megaphone,
+  },
+  {
+    id: "management",
+    name: "Gestão da operação",
+    description: "Centralize prioridades, responsáveis, reuniões e entregas do time.",
+    columns: ["Prioridades", "Esta semana", "Em andamento", "Bloqueado", "Concluído"],
+    cards: [
+      { column: "Prioridades", title: "Revisar saúde e riscos das contas", priority: "high" },
+      { column: "Esta semana", title: "Definir responsáveis e prazos", priority: "medium" },
+      { column: "Em andamento", title: "Acompanhar plano de ação da operação", priority: "high" },
+      { column: "Bloqueado", title: "Registrar dependência externa", priority: "medium" },
+    ],
+    icon: ListTodo,
   },
   {
     id: "marketing",
@@ -91,6 +117,7 @@ export default function KanbanPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [search, setSearch] = useState("");
   const [boardDialog, setBoardDialog] = useState(false);
+  const [boardToDelete, setBoardToDelete] = useState<Board | null>(null);
   const [cardDialog, setCardDialog] = useState<{ listId: string; card?: KanbanCard } | null>(null);
   const [listDialog, setListDialog] = useState(false);
   const [boardForm, setBoardForm] = useState({ name: "", description: "" });
@@ -98,6 +125,7 @@ export default function KanbanPage() {
   const [listName, setListName] = useState("");
   const [cardForm, setCardForm] = useState({ title: "", description: "", due_date: "", priority: "none", list_id: "" });
   const [creatingBoard, setCreatingBoard] = useState(false);
+  const [deletingBoard, setDeletingBoard] = useState(false);
   const [creatingList, setCreatingList] = useState(false);
   const [savingCard, setSavingCard] = useState(false);
 
@@ -177,6 +205,35 @@ export default function KanbanPage() {
     } catch (error: unknown) { toast({ title: "Não foi possível criar a coluna", description: errorMessage(error), variant: "destructive" }); } finally { setCreatingList(false); }
   }
 
+  async function deleteBoard() {
+    if (!workspace?.id || !boardToDelete || deletingBoard) return;
+    setDeletingBoard(true);
+    try {
+      // O filtro do workspace é uma segunda barreira no cliente. O banco ainda
+      // aplica RLS; se ele não devolver a linha, não escondemos uma falha de
+      // permissão como se a exclusão tivesse funcionado.
+      const { data, error } = await supabase
+        .from("kanban_boards")
+        .delete()
+        .eq("id", boardToDelete.id)
+        .eq("workspace_id", workspace.id)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Você não tem permissão para excluir este quadro ou ele já foi removido.");
+      const removedId = boardToDelete.id;
+      setBoardToDelete(null);
+      if (selectedBoardId === removedId) setSelectedBoardId(null);
+      queryClient.removeQueries({ queryKey: ["kanban_board_details", removedId] });
+      invalidate();
+      toast({ title: "Projeto excluído", description: "As colunas e cartões vinculados também foram removidos." });
+    } catch (error: unknown) {
+      toast({ title: "Não foi possível excluir o projeto", description: errorMessage(error), variant: "destructive" });
+    } finally {
+      setDeletingBoard(false);
+    }
+  }
+
   async function saveCard() {
     if (!cardDialog || !cardForm.title.trim() || savingCard) return;
     setSavingCard(true);
@@ -239,16 +296,22 @@ export default function KanbanPage() {
   if (activeBoard) {
     const ViewIcon = viewMode === "kanban" ? List : LayoutGrid;
     return <div className="mx-auto max-w-[1700px]">
-    <PageHeading eyebrow="Operação visual" title={activeBoard.name} description={activeBoard.description || "Quadro compartilhado para tarefas, CRM e operação."} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setViewMode((mode) => mode === "kanban" ? "list" : "kanban")}><ViewIcon className="mr-2 h-4 w-4" />{viewMode === "kanban" ? "Modo ClickUp" : "Modo Trello"}</Button><Button variant="outline" onClick={() => setSelectedBoardId(null)}><ArrowLeft className="mr-2 h-4 w-4" />Quadros</Button><Button onClick={() => setListDialog(true)}><Plus className="mr-2 h-4 w-4" />Coluna</Button></div>} />
+    <PageHeading eyebrow="Operação visual" title={activeBoard.name} description={activeBoard.description || "Quadro compartilhado para tarefas, CRM e operação."} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setViewMode((mode) => mode === "kanban" ? "list" : "kanban")}><ViewIcon className="mr-2 h-4 w-4" />{viewMode === "kanban" ? "Modo ClickUp" : "Modo Trello"}</Button><Button variant="outline" onClick={() => setSelectedBoardId(null)}><ArrowLeft className="mr-2 h-4 w-4" />Quadros</Button><Button onClick={() => setListDialog(true)}><Plus className="mr-2 h-4 w-4" />Coluna</Button><Button variant="destructive" onClick={() => setBoardToDelete(activeBoard)}><Trash2 className="mr-2 h-4 w-4" />Excluir projeto</Button></div>} />
     {detailsQuery.isLoading ? <div className="gd-panel grid min-h-96 place-items-center text-sm text-muted-foreground" role="status" aria-live="polite">Carregando quadro…</div> : detailsQuery.isError ? <div className="gd-panel grid min-h-96 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-destructive" /><h2 className="mt-3 font-black">Não foi possível carregar este quadro</h2><p className="mt-1 max-w-md text-sm text-muted-foreground">{errorMessage(detailsQuery.error)}</p><Button className="mt-4" variant="outline" onClick={() => void detailsQuery.refetch()}>Tentar novamente</Button></div></div> : viewMode === "kanban" ? <div className="flex min-h-[560px] items-start gap-3 overflow-x-auto pb-4">{details.lists.map((list) => <KanbanColumn key={list.id} list={list} cards={details.cards.filter((card) => card.list_id === list.id).sort((a, b) => a.position - b.position)} onDrop={(cardId, targetPosition) => { const card = details.cards.find((item) => item.id === cardId); if (card) void moveCard(card, list.id, targetPosition); }} onAdd={() => openCard(list.id)} onEdit={openCard} onDelete={deleteCard} />)}</div> : <div className="gd-panel overflow-hidden"><div className="divide-y divide-border">{details.lists.map((list) => <section key={list.id} className="p-4"><div className="mb-2 flex items-center gap-2"><Columns3 className="h-4 w-4 text-primary" /><h2 className="font-black">{list.name}</h2><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{details.cards.filter((card) => card.list_id === list.id).length}</span></div>{details.cards.filter((card) => card.list_id === list.id).sort((a, b) => a.position - b.position).map((card) => <button key={card.id} type="button" onClick={() => openCard(list.id, card)} className="flex w-full items-center gap-3 border-t border-border/60 py-3 text-left text-sm hover:bg-muted/30"><span className="min-w-0 grow truncate">{card.title}</span><PriorityBadge priority={card.priority} /><span className="text-[10px] text-muted-foreground">{card.due_date ? format(new Date(`${card.due_date}T12:00:00`), "dd/MM/yyyy") : ""}</span></button>)}</section>)}</div></div>}
     <CardDialog dialog={cardDialog} form={cardForm} lists={details.lists} saving={savingCard} setForm={setCardForm} onClose={() => setCardDialog(null)} onSave={() => void saveCard()} />
     <Dialog open={listDialog} onOpenChange={setListDialog}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Nova coluna</DialogTitle></DialogHeader><Label htmlFor="kanban-list-name">Nome</Label><Input id="kanban-list-name" value={listName} onChange={(event) => setListName(event.target.value)} placeholder="Ex.: Em revisão" /><DialogFooter><Button variant="outline" onClick={() => setListDialog(false)} disabled={creatingList}>Cancelar</Button><Button onClick={() => void createList()} disabled={creatingList || !listName.trim()}>{creatingList ? "Criando…" : "Criar coluna"}</Button></DialogFooter></DialogContent></Dialog>
+    <BoardDeleteDialog board={boardToDelete} deleting={deletingBoard} onClose={() => !deletingBoard && setBoardToDelete(null)} onConfirm={() => void deleteBoard()} />
     </div>;
   }
 
-  return <div className="mx-auto max-w-[1500px]"><PageHeading eyebrow="Operação visual" title="Quadros" description="Escolha o modo Trello para fluxo visual ou ClickUp para uma lista operacional." actions={<Button onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Novo quadro</Button>} /><div className="gd-panel mb-4 flex items-center gap-2 p-3"><Search className="h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar quadro" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar quadro" className="border-0 bg-transparent shadow-none focus-visible:ring-0" /></div>{boardsQuery.isLoading ? <div className="gd-panel grid min-h-64 place-items-center text-sm text-muted-foreground">Carregando quadros…</div> : boardsQuery.isError ? <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-destructive" /><h2 className="mt-3 font-black">Não foi possível carregar os quadros</h2><p className="mt-1 text-sm text-muted-foreground">Verifique a conexão e tente novamente.</p><Button className="mt-4" variant="outline" onClick={() => void boardsQuery.refetch()}>Tentar novamente</Button></div></div> : visibleBoards.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleBoards.map((board) => <button key={board.id} type="button" onClick={() => setSelectedBoardId(board.id)} className="gd-panel group p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/50"><LayoutGrid className="h-6 w-6 text-primary" /><h2 className="mt-4 font-black">{board.name}</h2><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{board.description || "Sem descrição."}</p><span className="mt-5 inline-flex items-center gap-1 text-[10px] font-black text-primary">Abrir quadro <ArrowLeft className="h-3 w-3 rotate-180 transition-transform group-hover:translate-x-1" /></span></button>)}</div> : <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 font-black">Nenhum quadro criado</h2><p className="mt-1 text-sm text-muted-foreground">Crie um quadro para começar a organizar sua operação.</p><Button className="mt-4" onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Criar primeiro quadro</Button></div></div>}
+  return <div className="mx-auto max-w-[1500px]"><PageHeading eyebrow="Operação visual" title="Quadros" description="Escolha o modo Trello para fluxo visual ou ClickUp para uma lista operacional." actions={<Button onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Novo quadro</Button>} /><div className="gd-panel mb-4 flex items-center gap-2 p-3"><Search className="h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar quadro" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar quadro" className="border-0 bg-transparent shadow-none focus-visible:ring-0" /></div>{boardsQuery.isLoading ? <div className="gd-panel grid min-h-64 place-items-center text-sm text-muted-foreground">Carregando quadros…</div> : boardsQuery.isError ? <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-destructive" /><h2 className="mt-3 font-black">Não foi possível carregar os quadros</h2><p className="mt-1 text-sm text-muted-foreground">Verifique a conexão e tente novamente.</p><Button className="mt-4" variant="outline" onClick={() => void boardsQuery.refetch()}>Tentar novamente</Button></div></div> : visibleBoards.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{visibleBoards.map((board) => <article key={board.id} className="gd-panel group relative p-5 text-left transition hover:-translate-y-0.5 hover:border-primary/50"><button type="button" onClick={() => setSelectedBoardId(board.id)} className="block w-full text-left"><LayoutGrid className="h-6 w-6 text-primary" /><h2 className="mt-4 pr-8 font-black">{board.name}</h2><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{board.description || "Sem descrição."}</p><span className="mt-5 inline-flex items-center gap-1 text-[10px] font-black text-primary">Abrir quadro <ArrowLeft className="h-3 w-3 rotate-180 transition-transform group-hover:translate-x-1" /></span></button><Button variant="ghost" size="icon" className="absolute right-3 top-3 h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Excluir projeto ${board.name}`} title={`Excluir projeto ${board.name}`} onClick={() => setBoardToDelete(board)}><Trash2 className="h-4 w-4" /></Button></article>)}</div> : <div className="gd-panel grid min-h-64 place-items-center p-8 text-center"><div><LayoutGrid className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 font-black">Nenhum quadro criado</h2><p className="mt-1 text-sm text-muted-foreground">Crie um quadro para começar a organizar sua operação.</p><Button className="mt-4" onClick={() => setBoardDialog(true)}><Plus className="mr-2 h-4 w-4" />Criar primeiro quadro</Button></div></div>}
     <Dialog open={boardDialog} onOpenChange={setBoardDialog}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Começar um quadro</DialogTitle></DialogHeader><div className="space-y-5"><div><Label className="text-xs uppercase tracking-[.14em] text-muted-foreground">Escolha um template pronto</Label><div className="mt-2 grid gap-2 sm:grid-cols-2">{BOARD_TEMPLATES.map((template) => { const Icon = template.icon; const selected = boardTemplate === template.id; return <button key={template.id} type="button" aria-pressed={selected} onClick={() => { setBoardTemplate(template.id); setBoardForm((form) => ({ name: form.name.trim() ? form.name : template.name, description: form.description.trim() ? form.description : template.description })); }} disabled={creatingBoard} className={cn("rounded-xl border p-3 text-left transition", selected ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/.35)]" : "border-border bg-muted/20 hover:border-primary/50")}><div className="flex items-start gap-3"><span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg", selected ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary")}><Icon className="h-4 w-4" /></span><span className="min-w-0"><strong className="block text-sm">{template.name}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{template.description}</span></span></div><span className="mt-2 block text-[10px] font-bold text-primary">{template.columns.length} colunas · {template.cards.length} cartões iniciais</span></button>; })}</div></div><div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="kanban-board-name">Nome do quadro</Label><Input id="kanban-board-name" value={boardForm.name} onChange={(event) => setBoardForm({ ...boardForm, name: event.target.value })} placeholder="Pipeline comercial" disabled={creatingBoard} /></div><div><Label htmlFor="kanban-board-description">Descrição personalizada</Label><Textarea id="kanban-board-description" value={boardForm.description} onChange={(event) => setBoardForm({ ...boardForm, description: event.target.value })} placeholder="Como este quadro será usado?" disabled={creatingBoard} /></div></div></div><DialogFooter><Button variant="outline" onClick={() => setBoardDialog(false)} disabled={creatingBoard}>Cancelar</Button><Button onClick={() => void createBoard()} disabled={creatingBoard || !boardForm.name.trim()}><Plus className="mr-2 h-4 w-4" />{creatingBoard ? "Criando quadro…" : "Criar quadro com template"}</Button></DialogFooter></DialogContent></Dialog>
+    <BoardDeleteDialog board={boardToDelete} deleting={deletingBoard} onClose={() => !deletingBoard && setBoardToDelete(null)} onConfirm={() => void deleteBoard()} />
   </div>;
+}
+
+function BoardDeleteDialog({ board, deleting, onClose, onConfirm }: { board: Board | null; deleting: boolean; onClose: () => void; onConfirm: () => void }) {
+  return <Dialog open={!!board} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-md"><DialogHeader><DialogTitle>Excluir projeto?</DialogTitle></DialogHeader><p className="text-sm leading-6 text-muted-foreground">Você está prestes a excluir <b className="text-foreground">{board?.name}</b>. As colunas e cartões vinculados serão removidos permanentemente.</p><DialogFooter><Button variant="outline" onClick={onClose} disabled={deleting}>Cancelar</Button><Button variant="destructive" onClick={onConfirm} disabled={deleting}>{deleting ? "Excluindo…" : "Excluir projeto"}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function KanbanColumn({ list, cards, onDrop, onAdd, onEdit, onDelete }: { list: KanbanList; cards: KanbanCard[]; onDrop: (cardId: string, targetPosition?: number) => void; onAdd: () => void; onEdit: (listId: string, card: KanbanCard) => void; onDelete: (card: KanbanCard) => void }) {
