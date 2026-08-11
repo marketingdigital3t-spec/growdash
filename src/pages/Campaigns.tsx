@@ -176,6 +176,18 @@ const CAMP_DEFAULTS: Record<CampColKey, number> = {
   metaPurchases: 100, metaCostPerPurchase: 140, metaPurchaseRoas: 100,
   videoViews: 130, actions: 90,
 };
+// Evita que uma largura salva muito pequena faça os títulos se sobreporem.
+// Cada coluna ainda pode ser ampliada livremente pelo usuário.
+const CAMP_MIN_WIDTHS: Record<CampColKey, number> = {
+  check: 40, delivery: 92, name: 250, deliveryStatus: 110, actions: 82,
+  objective: 105, budget: 105, spend: 105, impressions: 90, reach: 90,
+  frequency: 82, cpm: 76, clicks: 78, linkClicks: 108, linkCpc: 132,
+  uniqueLinkCtr: 140, cpc: 86, ctr: 80, leads: 122, cpl: 112,
+  conversion: 105, sales: 84, cpa: 98, revenue: 112, roas: 80,
+  profit: 108, roi: 78, landingPageViews: 160, costPerLandingPageView: 178,
+  checkouts: 160, costPerCheckout: 178, metaPurchases: 94,
+  metaCostPerPurchase: 128, metaPurchaseRoas: 94, videoViews: 120,
+};
 const ADSET_DEFAULTS: Record<AdsetColKey, number> = {
   name: 260, campaign: 220, budget: 130, spend: 120, leads: 90, cpl: 110, clicks: 100, ctr: 90,
   cpc: 100, impressions: 120, reach: 110, frequency: 100, cpm: 110,
@@ -298,7 +310,8 @@ export default function Campaigns() {
 
   const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount });
 
-  const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v3");
+  // v4 descarta preferências antigas que permitiam salvar larguras ilegíveis.
+  const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v4", CAMP_MIN_WIDTHS);
   const adset = useColWidths<AdsetColKey>(ADSET_DEFAULTS, "campaigns-adset-cols-v1");
   const ad = useColWidths<AdColKey>(AD_DEFAULTS, "campaigns-ad-cols-v1");
 

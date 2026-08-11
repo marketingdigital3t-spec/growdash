@@ -6,13 +6,23 @@ import { getStatusBadge } from "@/lib/status";
 
 export function useColWidths<T extends string>(
   defaults: Record<T, number>,
-  storageKey: string
+  storageKey: string,
+  minimums?: Partial<Record<T, number>>,
 ) {
+  const normalizeWidths = (candidate: Partial<Record<T, number>>) => Object.fromEntries(
+    Object.entries(defaults).map(([key, defaultWidth]) => {
+      const column = key as T;
+      const requested = Number(candidate[column]);
+      const minimum = minimums?.[column] ?? 70;
+      return [column, Number.isFinite(requested) && requested > 0 ? Math.max(minimum, requested) : defaultWidth];
+    }),
+  ) as Record<T, number>;
+
   const [colWidths, setColWidths] = useState<Record<T, number>>(() => {
     if (typeof window === "undefined") return defaults;
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) return { ...defaults, ...JSON.parse(raw) };
+      if (raw) return normalizeWidths(JSON.parse(raw));
     } catch {}
     return defaults;
   });
@@ -30,7 +40,7 @@ export function useColWidths<T extends string>(
     const onMove = (ev: MouseEvent) => {
       const r = resizingRef.current;
       if (!r) return;
-      const next = Math.max(70, r.startW + (ev.clientX - r.startX));
+      const next = Math.max(minimums?.[r.key] ?? 70, r.startW + (ev.clientX - r.startX));
       setColWidths((w) => ({ ...w, [r.key]: next }));
     };
     const onUp = () => {
