@@ -7,6 +7,16 @@ type LifeMode = "live" | "build" | "buy";
 type GridPoint = { x: number; z: number };
 type WallBlueprint = { id: string; start: GridPoint; end: GridPoint };
 
+const DEFAULT_OFFICE_PLAN: WallBlueprint[] = [
+  { id: "north", start: { x: -10, z: -8 }, end: { x: 10, z: -8 } },
+  { id: "west", start: { x: -10, z: -8 }, end: { x: -10, z: 8 } },
+  { id: "east", start: { x: 10, z: -8 }, end: { x: 10, z: 8 } },
+  { id: "traffic-divider", start: { x: -3, z: -8 }, end: { x: -3, z: -1 } },
+  { id: "finance-divider", start: { x: 3, z: -8 }, end: { x: 3, z: -1 } },
+  { id: "meeting-divider", start: { x: -10, z: 2 }, end: { x: -4, z: 2 } },
+  { id: "strategy-divider", start: { x: 4, z: 2 }, end: { x: 10, z: 2 } },
+];
+
 const MODE_COPY: Record<LifeMode, { label: string; hint: string; icon: typeof Eye }> = {
   live: { label: "Viver", hint: "Navegue pelo escritório e acompanhe a operação em tempo real.", icon: Eye },
   build: { label: "Construir", hint: "Arraste na grade para erguer paredes. Tudo encaixa em 1 metro.", icon: Hammer },
@@ -21,12 +31,12 @@ const wallKey = (wall: WallBlueprint) => `${wall.start.x}:${wall.start.z}:${wall
 export default function LifeSimPage() {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const modeRef = useRef<LifeMode>("live");
-  const historyRef = useRef<WallBlueprint[][]>([[]]);
+  const historyRef = useRef<WallBlueprint[][]>([DEFAULT_OFFICE_PLAN]);
   const historyIndexRef = useRef(0);
   const [mode, setMode] = useState<LifeMode>("live");
   const [webglAvailable, setWebglAvailable] = useState(true);
-  const [walls, setWalls] = useState<WallBlueprint[]>([]);
-  const [history, setHistory] = useState<WallBlueprint[][]>([[]]);
+  const [walls, setWalls] = useState<WallBlueprint[]>(DEFAULT_OFFICE_PLAN);
+  const [history, setHistory] = useState<WallBlueprint[][]>([DEFAULT_OFFICE_PLAN]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const selectMode = (next: LifeMode) => { modeRef.current = next; setMode(next); };
   const commitWalls = (next: WallBlueprint[]) => {
@@ -54,7 +64,7 @@ export default function LifeSimPage() {
     const floorEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(22, .32, 22)), new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: .45 })); floorEdges.position.y = -.18; scene.add(floorEdges);
     const wallLayer = new THREE.Group(); scene.add(wallLayer);
     const preview = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: .5, transparent: true, opacity: .38 })); preview.visible = false; preview.castShadow = true; scene.add(preview);
-    const wallMaterial = new THREE.MeshStandardMaterial({ color: "#292114", roughness: .5, metalness: .4, emissive: "#151006", emissiveIntensity: .4 });
+    const wallMaterial = new THREE.MeshStandardMaterial({ color: "#292114", roughness: .5, metalness: .4, emissive: "#151006", emissiveIntensity: .4, transparent: true, opacity: .84 });
     const renderWalls = (blueprints: WallBlueprint[]) => { while (wallLayer.children.length) { const child = wallLayer.children.pop()!; child.traverse((part) => { if (part instanceof THREE.Mesh) { part.geometry.dispose(); (part.material as THREE.Material).dispose(); } }); } blueprints.forEach((wall) => { const start = new THREE.Vector3(wall.start.x, 1.5, wall.start.z); const end = new THREE.Vector3(wall.end.x, 1.5, wall.end.z); const length = start.distanceTo(end); if (!length) return; const mesh = new THREE.Mesh(new THREE.BoxGeometry(.18, 3, length), wallMaterial.clone()); mesh.position.copy(start).lerp(end, .5); mesh.rotation.y = Math.atan2(end.x - start.x, end.z - start.z); mesh.castShadow = true; mesh.receiveShadow = true; wallLayer.add(mesh); const trim = new THREE.Mesh(new THREE.BoxGeometry(.24, .09, length + .04), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: .55, metalness: .7, roughness: .25 })); trim.position.copy(mesh.position); trim.position.y = 3.04; trim.rotation.y = mesh.rotation.y; wallLayer.add(trim); }); };
     let wallsCurrent: WallBlueprint[] = [];
     const applyWalls = (next: WallBlueprint[]) => { wallsCurrent = next; renderWalls(next); };
