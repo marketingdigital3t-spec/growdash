@@ -489,7 +489,7 @@ export default function Campaigns() {
     queryFn: async () => {
       let query = supabase
         .from("ads")
-        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,ad_account_id))")
+        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,objective,ad_account_id))")
         .order("name", { ascending: true });
       if (selectedAccount !== "all") query = query.eq("adsets.campaigns.ad_account_id", selectedAccount);
       else {
@@ -751,9 +751,22 @@ export default function Campaigns() {
         const currentAdset = firstRelation(currentAd.adsets);
         const campaign = firstRelation(currentAdset?.campaigns);
         const metrics = aggregateInsights([embeddedAdsById.get(currentAd.id)].filter(Boolean), startDate, endDate);
+        // A tabela de insights guarda leads, mas as campanhas de mensagem da
+        // Meta registram o resultado em insight_actions. Sem esta composição,
+        // os criativos exibiam cliques e investimento corretos, porém zero
+        // resultados apesar de a campanha ter conversas iniciadas.
+        const results = resolveCampaignResults(metrics.leads, actionData?.totalsByAd[currentAd.id] || {});
+        const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results);
         return {
           ...currentAd,
           ...metrics,
+          leads: primaryResult.value,
+          results,
+          resultLabel: primaryResult.label,
+          costPerResult: primaryResult.value > 0 ? metrics.spend / primaryResult.value : 0,
+          actionEvents: Object.entries(actionData?.totalsByAd[currentAd.id] || {})
+            .map(([actionType, value]) => ({ actionType, value: Number(value || 0) }))
+            .sort((a, b) => b.value - a.value),
           campaignId: currentAdset?.campaign_id,
           adsetName: currentAdset?.name || "Conjunto sem nome",
           campaignName: campaign?.name || "Campanha sem nome",
@@ -763,7 +776,7 @@ export default function Campaigns() {
       .filter((currentAd: any) => statusFilter === "all" || normalizeStatus(currentAd.status) === statusFilter)
       .filter((currentAd: any) => !query || currentAd.name.toLowerCase().includes(query) || currentAd.adsetName.toLowerCase().includes(query) || currentAd.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adSortKey, adSortAsc);
-  }, [accountAds, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
+  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
@@ -1499,6 +1512,7 @@ function CreativeIntelligenceGallery({ ads }: { ads: any[] }) {
     mediaUrl: ad.thumbnail_url || ad.media_url || ad.video_url || null,
     spend: Number(ad.spend || 0),
     leads: Number(ad.leads || 0),
+    resultLabel: ad.resultLabel || "Resultados",
     clicks: Number(ad.clicks || ad.linkClicks || 0),
     ctr: Number(ad.ctr || 0),
     cpl: Number(ad.leads || 0) > 0 ? Number(ad.spend || 0) / Number(ad.leads || 0) : 0,
@@ -1522,7 +1536,7 @@ function CreativeIntelligenceGallery({ ads }: { ads: any[] }) {
       {creatives.length > 0 ? creatives.map((ad) => {
         return <article key={ad.id} className="overflow-hidden rounded-xl border border-border bg-background">
           <CreativeMediaPreview mediaUrl={ad.mediaUrl} name={ad.name} />
-          <div className="p-3"><div className="flex items-center justify-between gap-2"><h4 className="truncate text-[11px] font-black" title={ad.name || "Sem nome"}>{ad.name || "Sem nome"}</h4><Badge variant="outline" className="shrink-0 text-[8px]">{ad.leads > 0 ? `${ad.leads.toLocaleString("pt-BR")} resultado(s)` : "Sem resultado"}</Badge></div><p className="mt-1 truncate text-[9px] text-muted-foreground">{ad.campaignName || "Campanha não identificada"}</p><div className="mt-3 grid grid-cols-3 gap-2"><IssueMetric label="Resultados" value={ad.leads.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} /><IssueMetric label="Custo/result." value={ad.leads > 0 ? ad.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"} /><IssueMetric label="Conversão" value={`${ad.conversion.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Cliques" value={ad.clicks.toLocaleString("pt-BR")} /><IssueMetric label="CTR" value={`${ad.ctr.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Investido" value={ad.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>
+          <div className="p-3"><div className="flex items-center justify-between gap-2"><h4 className="truncate text-[11px] font-black" title={ad.name || "Sem nome"}>{ad.name || "Sem nome"}</h4><Badge variant="outline" className="shrink-0 text-[8px]">{ad.leads > 0 ? `${ad.leads.toLocaleString("pt-BR")} ${ad.resultLabel.toLocaleLowerCase()}` : "Sem resultado"}</Badge></div><p className="mt-1 truncate text-[9px] text-muted-foreground">{ad.campaignName || "Campanha não identificada"}</p><div className="mt-3 grid grid-cols-3 gap-2"><IssueMetric label={ad.resultLabel} value={ad.leads.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} /><IssueMetric label="Custo/result." value={ad.leads > 0 ? ad.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"} /><IssueMetric label="Conversão" value={`${ad.conversion.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Cliques" value={ad.clicks.toLocaleString("pt-BR")} /><IssueMetric label="CTR" value={`${ad.ctr.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Investido" value={ad.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>
         </article>;
       }) : <div className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">Nenhum criativo sincronizado para os filtros atuais.</div>}
     </div>
