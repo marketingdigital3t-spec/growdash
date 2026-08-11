@@ -51,7 +51,7 @@ export default function CommercialPage() {
       ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
       : adAccounts;
     return accounts;
-  }, [accountFilter, adAccounts, businessUnitId, segment]);
+  }, [adAccounts, businessUnitId, segment]);
   const visibleAccounts = useMemo(() => accountFilter ? accessibleAccounts.filter((account) => account.id === accountFilter) : accessibleAccounts, [accessibleAccounts, accountFilter]);
   const accountOptions = useMemo(() => accessibleAccounts.map((account) => ({ id: account.id, name: account.name })), [accessibleAccounts]);
   const rankingAccountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: account.name })), [visibleAccounts]);

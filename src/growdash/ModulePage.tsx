@@ -769,7 +769,7 @@ export default function ModulePage() {
   if (pathname === "/chamados") return <TicketsModule />;
   if (pathname === "/marcas") return <BrandsModule />;
   if (pathname === "/meta-connect") return <MetaConnectModule />;
-  if (pathname === "/agentes") return <AgentsOfficePage />;
+  if (pathname === "/agentes" || pathname === "/neural-core") return <AgentsOfficePage />;
   if (pathname === "/ia-do-funil") return <FunnelAIModule />;
   return <Navigate to="/" replace />;
 }

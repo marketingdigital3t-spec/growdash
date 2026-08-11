@@ -34,21 +34,31 @@ export function NeuralCommandCore3D({ expanded, entering = false, onEnter }: Neu
       camera.lookAt(target);
     };
     updateCamera();
-    scene.add(new THREE.AmbientLight("#59d9ff", 1.5));
-    const key = new THREE.PointLight("#c7f5ff", 15, 18, 2); key.position.set(-3, 4, 5); scene.add(key);
-    const rim = new THREE.PointLight("#00b7ff", 20, 15, 2); rim.position.set(4, -1, -4); scene.add(rim);
+    const readPalette = () => {
+      const styles = getComputedStyle(document.documentElement);
+      return {
+        accent: styles.getPropertyValue("--brand-gold").trim() || "#b57a20",
+        light: styles.getPropertyValue("--brand-gold-light").trim() || "#f1c76b",
+      };
+    };
+    const palette = readPalette();
+    const ambient = new THREE.AmbientLight(palette.accent, 1.35); scene.add(ambient);
+    const key = new THREE.PointLight(palette.light, 15, 18, 2); key.position.set(-3, 4, 5); scene.add(key);
+    const rim = new THREE.PointLight(palette.accent, 20, 15, 2); rim.position.set(4, -1, -4); scene.add(rim);
     const core = new THREE.Group(); scene.add(core);
-    const cortexMaterial = new THREE.MeshPhysicalMaterial({ color: "#075b7c", emissive: "#009bd3", emissiveIntensity: .8, roughness: .3, metalness: .56, transparent: true, opacity: .7, transmission: .08, side: THREE.DoubleSide });
-    const wireMaterial = new THREE.MeshBasicMaterial({ color: "#85edff", transparent: true, opacity: .23, wireframe: true });
+    const cortexMaterial = new THREE.MeshPhysicalMaterial({ color: palette.accent, emissive: palette.accent, emissiveIntensity: .76, roughness: .3, metalness: .56, transparent: true, opacity: .7, transmission: .08, side: THREE.DoubleSide });
+    const wireMaterial = new THREE.MeshBasicMaterial({ color: palette.light, transparent: true, opacity: .23, wireframe: true });
     const hemiGeometry = new THREE.IcosahedronGeometry(1.72, 3);
     for (const side of [-1, 1]) {
       const hemisphere = new THREE.Mesh(hemiGeometry, cortexMaterial); hemisphere.position.x = side * .82; hemisphere.scale.set(1, .82, .9); core.add(hemisphere);
       const wire = new THREE.Mesh(hemiGeometry, wireMaterial); wire.position.copy(hemisphere.position); wire.scale.copy(hemisphere.scale).multiplyScalar(1.012); core.add(wire);
     }
-    const central = new THREE.Mesh(new THREE.TorusGeometry(.52, .05, 12, 48), new THREE.MeshBasicMaterial({ color: "#d9faff" })); central.rotation.x = Math.PI / 2; core.add(central);
-    const reactor = new THREE.Mesh(new THREE.SphereGeometry(.22, 24, 16), new THREE.MeshBasicMaterial({ color: "#dffcff" })); core.add(reactor);
+    const centralMaterial = new THREE.MeshBasicMaterial({ color: palette.light });
+    const central = new THREE.Mesh(new THREE.TorusGeometry(.52, .05, 12, 48), centralMaterial); central.rotation.x = Math.PI / 2; core.add(central);
+    const reactorMaterial = new THREE.MeshBasicMaterial({ color: palette.light });
+    const reactor = new THREE.Mesh(new THREE.SphereGeometry(.22, 24, 16), reactorMaterial); core.add(reactor);
     const nodes: THREE.Vector3[] = [];
-    const nodeMaterial = new THREE.MeshBasicMaterial({ color: "#b9f7ff" });
+    const nodeMaterial = new THREE.MeshBasicMaterial({ color: palette.light });
     for (let i = 0; i < 52; i++) {
       const side = i % 2 ? 1 : -1; const theta = (i * 2.399) % (Math.PI * 2); const radius = .42 + (i % 7) * .12;
       const p = new THREE.Vector3(side * (.5 + Math.abs(Math.cos(theta)) * .88), Math.sin(theta) * radius * 1.55, Math.cos(theta) * radius * .72);
@@ -56,9 +66,20 @@ export function NeuralCommandCore3D({ expanded, entering = false, onEnter }: Neu
     }
     const linePositions: number[] = [];
     nodes.forEach((node, index) => { for (const offset of [1, 7]) { const next = nodes[(index + offset) % nodes.length]; if (node.distanceTo(next) < 1.25) linePositions.push(node.x, node.y, node.z, next.x, next.y, next.z); } });
-    const lines = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3)), new THREE.LineBasicMaterial({ color: "#45dcff", transparent: true, opacity: .42 })); core.add(lines);
+    const linesMaterial = new THREE.LineBasicMaterial({ color: palette.light, transparent: true, opacity: .42 });
+    const lines = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3)), linesMaterial); core.add(lines);
     const rings = new THREE.Group(); scene.add(rings);
-    [2.25, 2.75, 3.28].forEach((radius, index) => { const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, .018, 8, 96), new THREE.MeshBasicMaterial({ color: index === 1 ? "#f4c94f" : "#47dcff", transparent: true, opacity: .55 })); ring.rotation.set(index === 0 ? .95 : 1.57, index === 1 ? .28 : .62, index * .65); rings.add(ring); });
+    const ringMaterials: THREE.MeshBasicMaterial[] = [];
+    [2.25, 2.75, 3.28].forEach((radius, index) => { const material = new THREE.MeshBasicMaterial({ color: index === 1 ? palette.light : palette.accent, transparent: true, opacity: .55 }); ringMaterials.push(material); const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, .018, 8, 96), material); ring.rotation.set(index === 0 ? .95 : 1.57, index === 1 ? .28 : .62, index * .65); rings.add(ring); });
+    const applyPalette = () => {
+      const next = readPalette();
+      ambient.color.set(next.accent); key.color.set(next.light); rim.color.set(next.accent);
+      cortexMaterial.color.set(next.accent); cortexMaterial.emissive.set(next.accent); wireMaterial.color.set(next.light);
+      centralMaterial.color.set(next.light); reactorMaterial.color.set(next.light); nodeMaterial.color.set(next.light); linesMaterial.color.set(next.light);
+      ringMaterials.forEach((material, index) => material.color.set(index === 1 ? next.light : next.accent));
+    };
+    const themeObserver = new MutationObserver(applyPalette);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });
     const resize = () => { const width = host.clientWidth; const height = host.clientHeight; if (!width || !height) return; renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix(); };
     const observer = new ResizeObserver(resize); observer.observe(host); resize();
     let pointer: { x: number; y: number; moved: boolean } | null = null;
@@ -70,7 +91,7 @@ export function NeuralCommandCore3D({ expanded, entering = false, onEnter }: Neu
     let frame = 0; let raf = 0;
     const render = () => { raf = requestAnimationFrame(render); frame += .008; core.rotation.y += .0021; core.rotation.z = Math.sin(frame * .7) * .035; rings.rotation.y -= .003; rings.rotation.z += .001; reactor.scale.setScalar(1 + Math.sin(frame * 3) * .15); renderer.render(scene, camera); };
     render();
-    return () => { cancelAnimationFrame(raf); observer.disconnect(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointermove", move); renderer.domElement.removeEventListener("pointerup", up); renderer.domElement.removeEventListener("wheel", wheel); scene.traverse((object) => { const mesh = object as THREE.Mesh; mesh.geometry?.dispose(); const material = mesh.material; if (Array.isArray(material)) material.forEach((entry) => entry.dispose()); else material?.dispose(); }); renderer.dispose(); renderer.domElement.remove(); };
+    return () => { cancelAnimationFrame(raf); observer.disconnect(); themeObserver.disconnect(); renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointermove", move); renderer.domElement.removeEventListener("pointerup", up); renderer.domElement.removeEventListener("wheel", wheel); scene.traverse((object) => { const mesh = object as THREE.Mesh; mesh.geometry?.dispose(); const material = mesh.material; if (Array.isArray(material)) material.forEach((entry) => entry.dispose()); else material?.dispose(); }); renderer.dispose(); renderer.domElement.remove(); };
   }, []);
 
   if (!available) return <button type="button" className="neural-core-fallback" onClick={onEnter}>Abrir inteligência Growdash</button>;

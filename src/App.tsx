@@ -252,6 +252,7 @@ export default function App() {
                     {/* Legacy URL: Meta Connect is now the paid tab in the unified integrations center. */}
                     <Route path="meta-connect" element={<RequirePage page="integrations"><Navigate to="/integracoes?tab=paid" replace /></RequirePage>} />
                     <Route path="agentes" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
+                    <Route path="neural-core" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
                     <Route path="ia-do-funil" element={<Navigate to="/crm?tab=ai" replace />} />
                     <Route path=":module" element={<ModulePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
