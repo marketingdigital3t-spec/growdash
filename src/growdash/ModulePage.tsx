@@ -42,6 +42,7 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import AgentsOfficePage from "./AgentsOfficePage";
+import LifeSimPage from "./LifeSimPage";
 import { useToast } from "@/hooks/use-toast";
 import { useMetaOAuth } from "@/hooks/useMetaOAuth";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
@@ -770,6 +771,7 @@ export default function ModulePage() {
   if (pathname === "/marcas") return <BrandsModule />;
   if (pathname === "/meta-connect") return <MetaConnectModule />;
   if (pathname === "/agentes" || pathname === "/neural-core") return <AgentsOfficePage />;
+  if (pathname === "/life-sim") return <LifeSimPage />;
   if (pathname === "/ia-do-funil") return <FunnelAIModule />;
   return <Navigate to="/" replace />;
 }
