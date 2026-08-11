@@ -45,8 +45,10 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
     date_end: "",
     location: "",
     max_people: 20,
+    manual_student_count: 0,
     has_model_patients: false,
     max_model_patients: 0,
+    manual_model_patient_count: 0,
     status: "open" as EventClassStatus,
     allowed_student_stage_ids: [] as string[],
     allowed_model_patient_stage_ids: [] as string[],
@@ -66,8 +68,10 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
         date_end: eventClass.date_end || "",
         location: eventClass.location || "",
         max_people: eventClass.max_people || eventClass.max_students || 0,
+        manual_student_count: Number(eventClass.manual_student_count || 0),
         has_model_patients: eventClass.has_model_patients,
         max_model_patients: eventClass.max_model_patients,
+        manual_model_patient_count: Number(eventClass.manual_model_patient_count || 0),
         status: eventClass.status,
         allowed_student_stage_ids: eventClass.allowed_student_stage_ids,
         allowed_model_patient_stage_ids: eventClass.allowed_model_patient_stage_ids,
@@ -80,7 +84,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
       setModelFunnelId("");
       setForm({
         title: "", date_start: "", date_end: "", location: "",
-        max_people: 20, has_model_patients: false, max_model_patients: 0, status: "open",
+        max_people: 20, manual_student_count: 0, has_model_patients: false, max_model_patients: 0, manual_model_patient_count: 0, status: "open",
         allowed_student_stage_ids: [], allowed_model_patient_stage_ids: [], notes: "",
       });
     }
@@ -114,8 +118,10 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
         location: form.location || null,
         max_people: form.max_people,
         max_students: form.max_people, // mantém legado em sincronia
+        manual_student_count: form.manual_student_count,
         has_model_patients: form.has_model_patients,
         max_model_patients: form.has_model_patients ? form.max_model_patients : 0,
+        manual_model_patient_count: form.has_model_patients ? form.manual_model_patient_count : 0,
         status: form.status,
         allowed_student_stage_ids: sourceMode === "rd" ? form.allowed_student_stage_ids : [],
         allowed_model_patient_stage_ids: sourceMode === "rd" && form.has_model_patients ? form.allowed_model_patient_stage_ids : [],
@@ -168,7 +174,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
               placeholder="Alphaville - SP" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label>Quantidade de pessoas *</Label>
               <Input type="number" min={0} value={form.max_people}
@@ -183,6 +189,13 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="rounded-md border border-dashed border-border bg-muted/20 p-3">
+            <Label htmlFor="event-class-manual-students">Vagas preenchidas manualmente — alunas/pessoas</Label>
+            <Input id="event-class-manual-students" type="number" min={0} value={form.manual_student_count}
+              onChange={(e) => setForm({ ...form, manual_student_count: parseInt(e.target.value) || 0 })} />
+            <p className="mt-1.5 text-xs text-muted-foreground">Somado às pessoas vinculadas via RD. Use para matrículas sem vínculo no funil.</p>
           </div>
 
           <div className="rounded-md border border-border p-3">
@@ -261,6 +274,13 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
                     </Select>
                   </div>}
                   {sourceMode === "custom" && <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">Pacientes-modelo serão controlados manualmente nesta turma personalizada.</div>}
+                </div>
+
+                <div className="rounded-md border border-dashed border-border bg-muted/20 p-3">
+                  <Label htmlFor="event-class-manual-model-patients">Vagas preenchidas manualmente — pacientes-modelo</Label>
+                  <Input id="event-class-manual-model-patients" type="number" min={0} value={form.manual_model_patient_count}
+                    onChange={(e) => setForm({ ...form, manual_model_patient_count: parseInt(e.target.value) || 0 })} />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Somado aos pacientes vinculados via RD. Use para pacientes adicionados fora do funil.</p>
                 </div>
 
                 {sourceMode === "rd" && modelFunnelId && (modelStages?.length ?? 0) > 0 && (

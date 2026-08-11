@@ -17,6 +17,9 @@ export interface EventClass {
   max_students: number;
   max_people: number;
   max_model_patients: number;
+  /** Occupancy registered outside RD Station (walk-ins, spreadsheets, etc.). */
+  manual_student_count: number;
+  manual_model_patient_count: number;
   has_model_patients: boolean;
   rd_model_patient_funnel_id: string | null;
   status: EventClassStatus;
@@ -38,6 +41,11 @@ export interface EventClassMember {
 }
 
 export interface EventClassWithCounts extends EventClass {
+  /** People linked to RD deals only. */
+  linkedStudentCount: number;
+  /** Model patients linked to RD deals only. */
+  linkedModelPatientCount: number;
+  /** Total occupied slots: RD links plus the manual occupancy. */
   studentCount: number;
   modelPatientCount: number;
   rd_funnel_name?: string;
@@ -81,8 +89,10 @@ export function useEventClasses() {
 
       return list.map((c) => ({
         ...c,
-        studentCount: countMap.get(c.id)?.s ?? 0,
-        modelPatientCount: countMap.get(c.id)?.p ?? 0,
+        linkedStudentCount: countMap.get(c.id)?.s ?? 0,
+        linkedModelPatientCount: countMap.get(c.id)?.p ?? 0,
+        studentCount: (countMap.get(c.id)?.s ?? 0) + Number(c.manual_student_count || 0),
+        modelPatientCount: (countMap.get(c.id)?.p ?? 0) + Number(c.manual_model_patient_count || 0),
         rd_funnel_name: funnelMap.get(c.rd_funnel_id) as string | undefined,
         rd_model_patient_funnel_name: c.rd_model_patient_funnel_id
           ? (funnelMap.get(c.rd_model_patient_funnel_id) as string | undefined)

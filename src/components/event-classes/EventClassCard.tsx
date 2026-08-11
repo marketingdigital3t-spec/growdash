@@ -96,6 +96,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                 <span className="font-medium">{ec.studentCount}/{peopleCap}</span>
               </div>
               <Progress value={Math.min(studentPct, 100)} className="h-1.5" />
+              {ec.manual_student_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedStudentCount} · Manual: {ec.manual_student_count}</p>}
             </div>
             {ec.has_model_patients && (
               <div className="space-y-1">
@@ -104,6 +105,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                   <span className="font-medium">{ec.modelPatientCount}/{ec.max_model_patients}</span>
                 </div>
                 <Progress value={Math.min(patientPct, 100)} className="h-1.5" />
+                {ec.manual_model_patient_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedModelPatientCount} · Manual: {ec.manual_model_patient_count}</p>}
               </div>
             )}
           </div>
