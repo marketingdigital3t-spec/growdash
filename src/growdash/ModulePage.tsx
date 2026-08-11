@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -544,11 +544,26 @@ function TicketsModule() {
 
 function BrandsModule() {
   const [search, setSearch] = useState("");
+  const [brandOrder, setBrandOrder] = useState<"pinned" | "updated" | "name-asc" | "name-desc">(() => {
+    try {
+      const saved = localStorage.getItem("growdash:brands-order");
+      return saved === "updated" || saved === "name-asc" || saved === "name-desc" || saved === "pinned" ? saved : "pinned";
+    } catch { return "pinned"; }
+  });
+  const [pinnedBrandKeys, setPinnedBrandKeys] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("growdash:pinned-brands") || "[]")); } catch { return new Set(); }
+  });
   const [syncing, setSyncing] = useState(false);
   const [uploadingBrand, setUploadingBrand] = useState<string | null>(null);
   const { toast } = useToast();
   const { data: workspace } = useWorkspace();
   const { data: accounts = [] } = useAdAccounts();
+  useEffect(() => {
+    try { localStorage.setItem("growdash:brands-order", brandOrder); } catch { /* preferência apenas nesta sessão */ }
+  }, [brandOrder]);
+  useEffect(() => {
+    try { localStorage.setItem("growdash:pinned-brands", JSON.stringify([...pinnedBrandKeys])); } catch { /* preferência apenas nesta sessão */ }
+  }, [pinnedBrandKeys]);
   const companiesQuery = useQuery({
     queryKey: ["companies", workspace?.id],
     enabled: !!workspace?.id && !workspace.id.startsWith("legacy-"),
@@ -581,10 +596,31 @@ function BrandsModule() {
       });
     }
     const query = search.trim().toLocaleLowerCase("pt-BR");
+    const preferenceKey = (brand: any) => String(brand.metadata?.meta_account_id || brand.metadata?.ad_account_id || brand.id);
     return result
       .filter((brand: any) => !query || brand.name.toLocaleLowerCase("pt-BR").includes(query) || String(brand.metadata?.meta_account_id || "").includes(query))
-      .sort((a: any, b: any) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [accounts, search, storedCompanies]);
+      .sort((a: any, b: any) => {
+        if (brandOrder === "pinned") {
+          const pinnedDifference = Number(pinnedBrandKeys.has(preferenceKey(b))) - Number(pinnedBrandKeys.has(preferenceKey(a)));
+          if (pinnedDifference) return pinnedDifference;
+        }
+        if (brandOrder === "updated") {
+          const dateDifference = new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime();
+          if (dateDifference) return dateDifference;
+        }
+        const byName = a.name.localeCompare(b.name, "pt-BR");
+        return brandOrder === "name-desc" ? -byName : byName;
+      });
+  }, [accounts, brandOrder, pinnedBrandKeys, search, storedCompanies]);
+
+  const togglePinnedBrand = (brand: any) => {
+    const key = String(brand.metadata?.meta_account_id || brand.metadata?.ad_account_id || brand.id);
+    setPinnedBrandKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const syncBrands = async () => {
     if (!workspace?.id || workspace.id.startsWith("legacy-") || accounts.length === 0) return;
@@ -650,13 +686,14 @@ function BrandsModule() {
     <Page title="Marcas" description="Cada conta de anúncio integrada gera automaticamente uma marca com diagnóstico e histórico próprios." action={<Link to="/integracoes" className="gold-action"><Plus className="h-4 w-4" /> Integrar conta</Link>}>
       <Toolbar
         left={<label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar marca" placeholder="Buscar marca ou ID da conta" className="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-muted-foreground" /></label>}
-        right={<button type="button" onClick={syncBrands} disabled={syncing || accounts.length === 0} className="gd-button disabled:cursor-not-allowed disabled:opacity-50"><Zap className={cn("h-4 w-4", syncing && "animate-pulse")} /> {syncing ? "Sincronizando…" : "Sincronizar marcas"}</button>}
+        right={<><Select value={brandOrder} onValueChange={(value) => setBrandOrder(value as typeof brandOrder)}><SelectTrigger aria-label="Ordenar marcas" className="h-10 w-full bg-background sm:w-52"><ListFilter className="mr-2 h-4 w-4 text-muted-foreground" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pinned">Favoritas primeiro</SelectItem><SelectItem value="updated">Última alteração</SelectItem><SelectItem value="name-asc">Nome: A a Z</SelectItem><SelectItem value="name-desc">Nome: Z a A</SelectItem></SelectContent></Select><button type="button" onClick={syncBrands} disabled={syncing || accounts.length === 0} className="gd-button disabled:cursor-not-allowed disabled:opacity-50"><Zap className={cn("h-4 w-4", syncing && "animate-pulse")} /> {syncing ? "Sincronizando…" : "Sincronizar marcas"}</button></>}
       />
       {brands.length > 0 ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {brands.map((brand: any) => <article key={brand.id} className="gd-panel group overflow-hidden">
           <div className="relative h-32 border-b border-border bg-[radial-gradient(circle_at_18%_12%,hsl(var(--primary)/.28),transparent_36%),radial-gradient(circle_at_85%_20%,hsl(var(--primary)/.12),transparent_42%),linear-gradient(145deg,#050505,#11100d)] bg-cover bg-center" style={brand.metadata?.banner_url ? { backgroundImage: `linear-gradient(90deg,rgba(0,0,0,.62),rgba(0,0,0,.08)),url(${brand.metadata.banner_url})` } : undefined}>
             <span className="absolute left-4 top-4 grid h-11 w-11 place-items-center rounded-2xl border border-primary/25 bg-black/55 text-primary shadow-[0_0_24px_hsl(var(--primary)/.15)]"><UsersRound className="h-5 w-5" /></span>
             <span className="absolute right-4 top-4 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase text-emerald-400">Integrada</span>
+            <button type="button" onClick={() => togglePinnedBrand(brand)} aria-label={pinnedBrandKeys.has(String(brand.metadata?.meta_account_id || brand.metadata?.ad_account_id || brand.id)) ? `Remover ${brand.name} do início` : `Deixar ${brand.name} no início`} title={pinnedBrandKeys.has(String(brand.metadata?.meta_account_id || brand.metadata?.ad_account_id || brand.id)) ? "Remover do início" : "Deixar no início"} className={cn("absolute bottom-3 left-3 grid h-8 w-8 place-items-center rounded-lg border border-white/20 bg-black/70 text-white backdrop-blur-md transition hover:bg-black/85", pinnedBrandKeys.has(String(brand.metadata?.meta_account_id || brand.metadata?.ad_account_id || brand.id)) && "border-primary/65 bg-primary text-primary-foreground")}><Star className="h-3.5 w-3.5" fill={pinnedBrandKeys.has(String(brand.metadata?.meta_account_id || brand.metadata?.ad_account_id || brand.id)) ? "currentColor" : "none"} /></button>
             <label className="absolute bottom-3 right-3 inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-white/20 bg-black/70 px-2.5 text-[9px] font-black text-white backdrop-blur-md transition hover:bg-black/85">
               <ImageUp className="h-3.5 w-3.5" />{uploadingBrand === brand.id ? "Enviando…" : "Alterar banner"}
               <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingBrand === brand.id} className="sr-only" onChange={(event) => { void uploadBanner(brand, event.target.files?.[0]); event.currentTarget.value = ""; }} />
