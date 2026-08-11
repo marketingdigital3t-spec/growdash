@@ -13,6 +13,7 @@ import type { DrawElement, FlowData, Point, ResizeHandle, ToolType } from "./typ
 import { EMPTY_FLOW } from "./types";
 import { boundsFromPoints, boundsIntersect, createId, getElementBounds, nearestAnchor, normalizeBounds, pointInElement, snapPoint } from "./utils/geometry";
 import { exportFlowJson, exportFlowPng, exportFlowSvg } from "./utils/export";
+import { createAcquisitionFunnelTemplate } from "./utils/templates";
 
 export type GrowdashFlowCanvasHandle = {
   save: () => Promise<void>;
@@ -369,7 +370,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
 
     <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[25%] items-center gap-2"><div className="growdash-flow-chrome pointer-events-auto flex min-w-0 items-center gap-2 rounded-xl p-1.5 pr-3">{onBack && <Button variant="ghost" size="icon" className="growdash-flow-control h-8 w-8 shrink-0" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>}<div className="hidden min-w-0 xl:block"><span className="block truncate text-[10px] font-black uppercase tracking-[.16em] text-primary">Growdash Flow</span><strong className="block truncate text-xs text-foreground">{title}</strong></div></div></div>
     <Toolbar tool={tool} onToolChange={setTool} onImage={() => fileInputRef.current?.click()} />
-    <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
+    <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onApplyAcquisitionTemplate={() => { const template = createAcquisitionFunnelTemplate(); history.commit(template); setSelectedIds([]); canvas.setZoom(0.72); canvas.setPanOffset({ x: 48, y: 30 }); toast({ title: "Estratégia inserida", description: "O funil de aquisição está pronto para você editar." }); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
     {primarySelected && <PropertiesPanel element={primarySelected} selectionCount={selectedIds.length} onChange={changeSelected} onDuplicate={duplicateSelected} onDelete={deleteSelected} onFront={() => moveLayer("front")} onBack={() => moveLayer("back")} onClose={() => setSelectedIds([])} />}
 
     {contextMenu && <div className="absolute z-50 min-w-44 rounded-xl border border-white/10 bg-[#17130e]/96 p-1.5 text-xs text-white shadow-2xl backdrop-blur-xl" style={{ left: Math.min(contextMenu.client.x, rootRect().width - 190), top: Math.min(contextMenu.client.y, rootRect().height - 190) }}>

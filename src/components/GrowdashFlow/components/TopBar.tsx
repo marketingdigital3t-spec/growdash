@@ -1,4 +1,4 @@
-import { Download, Grid3X3, Redo2, RotateCcw, Save, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { Download, Grid3X3, LayoutTemplate, Redo2, RotateCcw, Save, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +33,7 @@ export function TopBar({
   onToggleGrid,
   onToggleSnap,
   onClear,
+  onApplyAcquisitionTemplate,
   onSave,
   onExport,
 }: {
@@ -49,6 +50,7 @@ export function TopBar({
   onToggleGrid: () => void;
   onToggleSnap: () => void;
   onClear: () => void;
+  onApplyAcquisitionTemplate: () => void;
   onSave: () => void;
   onExport: (type: "png" | "svg" | "json") => void;
 }) {
@@ -61,6 +63,10 @@ export function TopBar({
         <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="growdash-flow-danger-control h-9 w-9 shrink-0" title="Limpar quadro"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar todo o quadro?</AlertDialogTitle><AlertDialogDescription>Todos os elementos serão removidos. Você ainda poderá usar Desfazer enquanto permanecer nesta tela.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={onClear}>Limpar tudo</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="growdash-flow-control h-9 shrink-0 gap-1.5" title="Inserir estratégia pronta"><LayoutTemplate className="h-4 w-4" /><span className="hidden 2xl:inline">Estratégias</span></Button></DropdownMenuTrigger>
+        <DropdownMenuContent align="end"><DropdownMenuItem onClick={onApplyAcquisitionTemplate}>Funil de aquisição — 5 etapas</DropdownMenuItem></DropdownMenuContent>
+      </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="growdash-flow-control h-9 shrink-0 gap-1.5"><Download className="h-4 w-4" /><span className="hidden 2xl:inline">Exportar</span></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end"><DropdownMenuItem onClick={() => onExport("png")}>Exportar PNG</DropdownMenuItem><DropdownMenuItem onClick={() => onExport("svg")}>Exportar SVG</DropdownMenuItem><DropdownMenuItem onClick={() => onExport("json")}>Exportar JSON</DropdownMenuItem></DropdownMenuContent>
