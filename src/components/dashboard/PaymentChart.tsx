@@ -29,7 +29,7 @@ export function PaymentChart({ byPayment }: PaymentChartProps) {
 
   if (total === 0) {
     return (
-      <Card className="h-full">
+      <Card className="dashboard-glass-card h-full">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
         </CardHeader>
@@ -41,7 +41,7 @@ export function PaymentChart({ byPayment }: PaymentChartProps) {
   }
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="dashboard-glass-card flex h-full flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
       </CardHeader>

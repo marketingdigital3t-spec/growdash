@@ -201,7 +201,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
           return (
             <div key={w.id} className={w.type === "default_block" ? "dashboard-default-static overflow-hidden" : "overflow-hidden"}>
               {isEditing && !isSystem && <div className="no-drag absolute right-1 top-1 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${w.title}`}><Settings2 className="h-3 w-3" /></button><button onClick={() => removeWidget(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground shadow hover:bg-destructive" aria-label="Remover"><X className="h-3 w-3" /></button></div>}
-              <div className="h-full w-full no-drag-children">
+              <div className="dashboard-widget-shell h-full w-full no-drag-children">
                 {w.type === "default_block" ? (
                   <AutoHeightWidget widgetId={w.id} onHeightChange={handleAutoHeight}>
                     <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />

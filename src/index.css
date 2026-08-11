@@ -3497,3 +3497,56 @@
 .neural-core-fallback { position: absolute; z-index: 9; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 1px solid rgba(108,222,255,.55); border-radius: 999px; padding: 14px 20px; background: #062333; color: #e7fcff; }
 @media (max-width: 720px) { .neural-command-core { position: relative; left: auto; top: auto; width: min(82vw, 340px); margin: 34px auto 46px; transform: none; } .neural-command-core.is-entering, .neural-command-core.is-expanded { transform: scale(.82); } }
 @media (prefers-reduced-motion: reduce) { .neural-command-core { transition: none; } }
+
+/* Dashboard glass — warm black/gold depth inspired by iOS glass surfaces.
+   Scoped to grid widgets so the rest of the product keeps its own hierarchy. */
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+.dashboard-widget-shell .rounded-lg.border.bg-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: rgba(225, 178, 79, .30);
+  background:
+    linear-gradient(118deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.035) 22%, transparent 48%),
+    radial-gradient(circle at 92% 8%, rgba(222, 172, 69, .18), transparent 33%),
+    rgba(19, 16, 10, .72);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.15),
+    inset 0 -1px 0 rgba(0,0,0,.34),
+    0 24px 54px -42px rgba(0,0,0,.95),
+    0 0 0 1px rgba(231, 188, 83, .035);
+  backdrop-filter: blur(24px) saturate(128%);
+  -webkit-backdrop-filter: blur(24px) saturate(128%);
+}
+
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card)::before,
+.dashboard-widget-shell .rounded-lg.border.bg-card::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(130deg, rgba(255,255,255,.13), transparent 24%, transparent 72%, rgba(214,160,52,.07));
+  content: "";
+  pointer-events: none;
+}
+
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card):hover,
+.dashboard-widget-shell .rounded-lg.border.bg-card:hover {
+  border-color: rgba(240, 199, 105, .55);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.20), inset 0 -1px 0 rgba(0,0,0,.35), 0 26px 58px -42px rgba(0,0,0,.98), 0 0 28px rgba(211, 159, 50, .12);
+}
+
+:not(.dark) .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
+  border-color: rgba(143, 101, 27, .20);
+  background:
+    linear-gradient(118deg, rgba(255,255,255,.74) 0%, rgba(255,255,255,.28) 30%, transparent 60%),
+    radial-gradient(circle at 92% 8%, rgba(202, 155, 56, .14), transparent 36%),
+    rgba(250, 247, 239, .72);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 22px 48px -40px rgba(70, 45, 8, .30);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+  .dashboard-widget-shell .rounded-lg.border.bg-card { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}

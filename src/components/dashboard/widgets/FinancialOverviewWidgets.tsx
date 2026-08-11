@@ -92,7 +92,7 @@ export function PlatformDistributionWidget() {
       : `Conv. média ${averageConversion.toFixed(2)}%`;
 
   return <>
-    <Card className="h-full min-w-0 overflow-hidden">
+    <Card className="dashboard-glass-card h-full min-w-0 overflow-hidden">
       <CardHeader className="space-y-3 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base"><Globe2 className="h-4 w-4" />Distribuição por Plataforma</CardTitle>
