@@ -1602,7 +1602,7 @@ function CampaignResultCell({ campaign, onOpen }: { campaign: any; onOpen: () =>
     <TooltipTrigger asChild>
       <button type="button" className="ml-auto block rounded-md px-1 py-0.5 text-right transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={onOpen} aria-label={`Abrir resultado e eventos de ${campaign.name}`}>
         <AnimatedNumber value={primary.value} decimals={0} />
-        <span className="block text-[8px] text-muted-foreground">{primary.value > 0 ? primary.label : "Sem resultado no período"}</span>
+        <span className="block text-[11px] font-medium leading-tight text-muted-foreground">{primary.value > 0 ? primary.label : "Sem resultado no período"}</span>
       </button>
     </TooltipTrigger>
     <TooltipContent side="left" align="end" className="max-w-80 border-primary/25 bg-popover p-3 text-popover-foreground shadow-xl">

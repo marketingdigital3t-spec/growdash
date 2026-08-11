@@ -40,7 +40,7 @@ describe("ensureDefaultDashboardContent", () => {
       layout: [{ i: "default", x: 0, y: 0, w: 12, h: 30 }],
     });
     const expectedIds = [
-      "primary_revenue", "financial_margin", "financial_receivables", "campaign_conversion_rate",
+      "primary_revenue", "campaign_ctr", "campaign_conversion_rate",
     ];
 
     for (const id of expectedIds) {
@@ -67,7 +67,7 @@ describe("ensureDefaultDashboardContent", () => {
       ],
     });
     const expectedIds = [
-      "payment_chart", "platform_distribution", "financial_margin", "financial_receivables",
+      "payment_chart", "platform_distribution", "campaign_ctr", "campaign_conversion_rate",
     ];
 
     expect(migrated.widgets.find((widget) => widget.id === "primary_revenue")?.title).toBe("Minha receita");
@@ -109,7 +109,7 @@ describe("ensureDefaultDashboardContent", () => {
     expect(ensureDefaultDashboardContent(view)).toBe(view);
   });
 
-  it("reduz uma visão v7 aos quatro KPIs ao lado da distribuição por plataforma", () => {
+  it("reduz uma visão v7 aos dois KPIs ao lado da distribuição por plataforma", () => {
     const migrated = ensureDefaultDashboardContent({
       id: "view-v6-layout",
       widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
@@ -127,8 +127,8 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
       canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
     });
-    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 8 });
-    expect(migrated.layout.find((item) => item.i === "financial_margin")).toMatchObject({ x: 9, y: 6 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "financial_margin")).toBeUndefined();
     expect(migrated.layout.find((item) => item.i === "campaign_ctr")).toMatchObject({ x: 9, y: 2, w: 3 });
     expect(migrated.widgets.some((widget) => widget.id === "financial_ticket")).toBe(false);
     expect(migrated.widgets.some((widget) => widget.id === "campaign_cpl")).toBe(false);
@@ -152,11 +152,37 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
       canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
     });
-    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ x: 0, y: 2, w: 4, h: 8 });
-    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 8 });
+    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ x: 0, y: 2, w: 4, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 4 });
     expect(migrated.layout.find((item) => item.i === "campaign_conversion_rate")).toMatchObject({ x: 9, y: 4, w: 3, h: 2 });
-    expect(migrated.layout.find((item) => item.i === "financial_margin")).toMatchObject({ x: 9, y: 6, w: 3, h: 2 });
-    expect(migrated.layout.find((item) => item.i === "financial_receivables")).toMatchObject({ x: 9, y: 8, w: 3, h: 2 });
-    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 10, w: 12 });
+    expect(migrated.layout.find((item) => item.i === "financial_margin")).toBeUndefined();
+    expect(migrated.layout.find((item) => item.i === "financial_receivables")).toBeUndefined();
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 6, w: 12 });
+  });
+
+  it("remove Margem e Recebíveis de uma visualização v9 e alinha a faixa", () => {
+    const legacyV9 = {
+      id: "view-v9-financial-kpis",
+      widgets: [
+        ...DEFAULT_VIEW.widgets,
+        { id: "financial_margin", type: "kpi", title: "Margem", config: { metric: "profit_margin" } },
+        { id: "financial_receivables", type: "kpi", title: "Recebíveis", config: { metric: "receivables" } },
+      ].map((widget) => widget.id === "default"
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 9 } }
+        : widget),
+      layout: [
+        ...DEFAULT_VIEW.layout.map((item) => ({ ...item, h: item.i === "payment_chart" || item.i === "platform_distribution" ? 8 : item.h, y: item.i === "default" ? 10 : item.y })),
+        { i: "financial_margin", x: 9, y: 6, w: 3, h: 2 },
+        { i: "financial_receivables", x: 9, y: 8, w: 3, h: 2 },
+      ],
+    };
+
+    const migrated = ensureDefaultDashboardContent(legacyV9);
+
+    expect(migrated.widgets.some((widget) => widget.id === "financial_margin")).toBe(false);
+    expect(migrated.widgets.some((widget) => widget.id === "financial_receivables")).toBe(false);
+    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ y: 2, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ y: 2, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ y: 6 });
   });
 });

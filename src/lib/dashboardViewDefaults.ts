@@ -33,6 +33,45 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // A versão 10 retira Margem e Recebíveis da faixa inicial e reduz os dois
+  // gráficos para a altura exata dos dois KPIs restantes. Só são removidos os
+  // IDs padrão; cards financeiros adicionados manualmente pelo usuário ficam
+  // intactos porque possuem identificadores próprios.
+  if (currentVersion >= 9 && existingDefault) {
+    const retiredIds = new Set(["financial_margin", "financial_receivables"]);
+    const hasRetiredStandardWidget = widgets.some((widget) => retiredIds.has(widget.id));
+    if (!hasRetiredStandardWidget) {
+      return {
+        ...view,
+        widgets: widgets.map((widget) => widget.id === defaultId
+          ? { ...widget, config: { ...widget.config, ...defaultWidget.config } }
+          : widget),
+      };
+    }
+
+    const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
+    const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
+    const customWidgets = widgets.filter((widget) => !canonicalIds.has(widget.id) && !retiredIds.has(widget.id));
+    const canonicalWidgets = DEFAULT_VIEW.widgets.map((widget) => {
+      const existing = widget.type === "default_block"
+        ? existingDefault
+        : widgets.find((candidate) => candidate.id === widget.id);
+      if (!existing) return { ...widget, config: { ...widget.config } };
+      return widget.type === "default_block"
+        ? { ...existing, id: defaultId, config: { ...existing.config, ...defaultWidget.config } }
+        : existing;
+    });
+    let customY = canonicalLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
+    const customLayout = layout
+      .filter((item) => !canonicalIds.has(item.i) && !retiredIds.has(item.i))
+      .map((item) => {
+        const next = { ...item, x: 0, y: customY, w: Math.min(12, Math.max(2, item.w || 3)) };
+        customY += Math.max(2, item.h || 2);
+        return next;
+      });
+    return { ...view, widgets: [...canonicalWidgets, ...customWidgets], layout: [...canonicalLayout, ...customLayout] };
+  }
+
   // Algumas views v8 foram gravadas antes de os quatro cards laterais serem
   // inseridos. Elas conservavam CTR e Taxa de Conversão, mas não Margem nem
   // Recebíveis; o bloco padrão ficava abaixo de uma área vazia. Como faltam
@@ -86,7 +125,7 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   // preserving widgets deliberately added by the user below it.
   if (currentVersion === 7 && existingDefault) {
     const retiredIds = new Set([
-      "financial_ticket", "financial_profit", "campaign_leads", "campaign_cpl", "campaign_cost_per_link",
+      "financial_ticket", "financial_profit", "financial_margin", "financial_receivables", "campaign_leads", "campaign_cpl", "campaign_cost_per_link",
     ]);
     const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
     const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
