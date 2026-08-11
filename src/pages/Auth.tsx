@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, BrainCircuit, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, Radar, ShieldCheck, Sparkles, UserRound, Zap } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -60,29 +60,25 @@ export default function Auth() {
 
   return <main className="auth-premium-shell">
     <div className="auth-ambient-grid" aria-hidden="true" /><div className="auth-ambient-glow auth-glow-a" aria-hidden="true" /><div className="auth-ambient-glow auth-glow-b" aria-hidden="true" />
-    <section className="auth-hero-panel" aria-label="Posicionamento da Growdash">
-      <div className="auth-hero-kicker"><Radar className="h-3.5 w-3.5" /> GROWdash intelligence network</div>
+    <section className="auth-hero-panel" aria-label="Growdash">
       <BrandLogo eager className="auth-hero-logo" />
-      <p className="auth-hero-tagline">Mantenha todas as suas campanhas no ar.<br /><span>Nenhuma cai sem você saber.</span></p>
-      <div className="auth-hero-orb" aria-hidden="true"><span className="auth-orb-core"><BrainCircuit /></span><i className="orb-ring ring-a" /><i className="orb-ring ring-b" /><i className="orb-ring ring-c" />{Array.from({ length: 12 }, (_, index) => <b key={index} style={{ "--orb-angle": `${index * 30}deg`, "--orb-delay": `${-(index * .32)}s` } as React.CSSProperties} />)}</div>
-      <div className="auth-hero-points"><span><CheckCircle2 /> Visão total multi-conta</span><span><Zap /> Alertas antes do desvio</span><span><ShieldCheck /> Dados protegidos por workspace</span></div>
-      <small className="auth-hero-foot"><Sparkles /> Torre de controle do crescimento</small>
+      <p className="auth-hero-tagline">Sua operação.<br /><span>No controle.</span></p>
     </section>
     <motion.section initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .5, ease: "easeOut" }} className="auth-card-premium">
-      <div className="auth-card-top"><div><span className="auth-card-kicker">ACESSO SEGURO</span><h1>{mode === "login" ? "Entre na sua operação" : "Abra sua torre de controle"}</h1><p>{mode === "login" ? "Continue exatamente de onde sua equipe parou." : "Centralize campanhas, vendas e decisões em um só lugar."}</p></div><span className="auth-status-pill"><i /> Online</span></div>
+      <div className="auth-card-top"><div><span className="auth-card-kicker">GROWDASH</span><h1>{mode === "login" ? "Entrar" : "Criar conta"}</h1><p>{mode === "login" ? "Use seus dados para acessar a plataforma." : "Crie o acesso da sua operação."}</p></div></div>
       <div className="auth-mode-switch" role="tablist" aria-label="Tipo de acesso"><button type="button" role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")} className={cn(mode === "login" && "is-active")}>Entrar</button><button type="button" role="tab" aria-selected={mode === "register"} onClick={() => setMode("register")} className={cn(mode === "register" && "is-active")}>Cadastrar</button></div>
       <form onSubmit={handleSubmit} className="auth-form-premium">
         {mode === "register" && <GoldInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />}
         <GoldInput icon={<Mail />} type="text" value={identifier} onChange={setIdentifier} placeholder="Email" autoComplete="username" />
         <GoldInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="Senha" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
         {mode === "register" && <GoldInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
-        {mode === "login" && <div className="auth-forgot-row"><span>Primeiro acesso?</span><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link">Esqueci minha senha</button></div>}
+        {mode === "login" && <div className="auth-forgot-row"><span /><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link">Esqueci minha senha</button></div>}
         {forgotOpen && <div className="auth-recovery-box"><p>Enviaremos um link seguro para criar uma nova senha.</p><div className="auth-recovery-row"><input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} placeholder="seu@email.com" /><button type="button" onClick={recover}>Enviar link</button></div></div>}
         <button type="submit" disabled={loading} className="auth-submit-button group">{loading ? "Sincronizando…" : mode === "login" ? "Entrar na Growdash" : "Criar minha conta"}<ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></button>
       </form>
       <div className="auth-divider"><span />ou continue com<span /></div>
       <div className="auth-social-grid"><button type="button" onClick={() => social("google")}><span className="auth-google-mark">G</span> Google</button><button type="button" onClick={() => social("apple")}><span className="auth-apple-mark" aria-hidden="true"></span> Apple</button></div>
-      <div className="auth-card-footer"><ShieldCheck className="h-3.5 w-3.5" /> Criptografia e permissões por workspace</div>
+      <div className="auth-card-footer"><ShieldCheck className="h-3.5 w-3.5" /> Acesso seguro</div>
     </motion.section>
   </main>;
 }
