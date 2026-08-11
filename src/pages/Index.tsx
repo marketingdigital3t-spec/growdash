@@ -56,7 +56,7 @@ const Index = () => {
   const { setEditor } = useDashboardEditor();
   const { toast } = useToast();
 
-  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
@@ -98,17 +98,26 @@ const Index = () => {
   }, [selectedCampaignIds]);
 
   useEffect(() => {
+    // A lista fica vazia antes da primeira resposta. Não transforme essa fase
+    // transitória em "Todas as contas", pois isso troca a base de cálculo do
+    // dashboard e da previsão sem uma ação do usuário.
+    if (loadingAdAccounts || visibleAccounts.length === 0) return;
     if (selectedAccount !== "all" && !visibleAccounts.some((a) => a.id === selectedAccount)) {
       setSelectedAccount("all");
     }
-  }, [visibleAccounts, selectedAccount, setSelectedAccount]);
+  }, [loadingAdAccounts, visibleAccounts, selectedAccount, setSelectedAccount]);
 
   const visiblePickerInsights = useMemo(() => allInsights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [allInsights, visibleAccountIds]);
   const dashboardInsights = useMemo(() => selectedCampaignIds.length
     ? visiblePickerInsights.filter((row) => selectedCampaignIds.includes(row.campaign_id))
     : visiblePickerInsights, [selectedCampaignIds, visiblePickerInsights]);
   const visibleCampaigns = useMemo(() => campaigns.filter((campaign: any) => visibleAccountIds.has(campaign.ad_account_id)), [campaigns, visibleAccountIds]);
-  const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id)), [sales, visibleAccountIds]);
+  // useSales preserva a última resposta durante uma troca de conta para evitar
+  // um flash de zero. Reaplique o escopo aqui: enquanto a nova resposta não
+  // chega, nenhuma venda da conta anterior pode entrar nos KPIs ou previsão.
+  const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id
+    && visibleAccountIds.has(sale.ad_account_id)
+    && (selectedAccount === "all" || sale.ad_account_id === selectedAccount)), [sales, selectedAccount, visibleAccountIds]);
   const selectedCampaigns = useMemo(
     () => visibleCampaigns.filter((campaign: any) => selectedCampaignIds.includes(campaign.id)),
     [selectedCampaignIds, visibleCampaigns],
@@ -120,7 +129,9 @@ const Index = () => {
       ad_account_id: campaign.ad_account_id,
     })))
     : unitSales, [selectedCampaignIds.length, selectedCampaigns, unitSales]);
-  const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id && visibleAccountIds.has(deal.ad_account_id)), [rdDeals, visibleAccountIds]);
+  const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id
+    && visibleAccountIds.has(deal.ad_account_id)
+    && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [rdDeals, selectedAccount, visibleAccountIds]);
   const glassSales = aggregateSales(dashboardSales);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const glassLeadsFromInsights = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
