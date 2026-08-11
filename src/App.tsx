@@ -100,7 +100,11 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
     const activeRecovery = Date.now() - retry.startedAt < 30_000;
     const attempts = activeRecovery ? retry.attempts : 0;
     if (isChunkError && attempts < 3) {
-      sessionStorage.setItem(retryKey, JSON.stringify({ attempts: attempts + 1, startedAt: activeRecovery ? retry.startedAt : Date.now() }));
+      try {
+        sessionStorage.setItem(retryKey, JSON.stringify({ attempts: attempts + 1, startedAt: activeRecovery ? retry.startedAt : Date.now() }));
+      } catch {
+        // Storage pode estar desabilitado; ainda é seguro tentar a nova versão uma vez.
+      }
       const url = new URL(window.location.href);
       url.searchParams.set("gd_reload", String(Date.now()));
       // Pages can expose the HTML a few seconds before every new lazy chunk
@@ -108,14 +112,14 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
       window.setTimeout(() => window.location.replace(url.toString()), (attempts + 1) * 1_500);
       return;
     }
-    sessionStorage.removeItem(retryKey);
+    try { sessionStorage.removeItem(retryKey); } catch { /* sem storage, nada para limpar */ }
   }
 
   retry = () => {
     this.setState({ failed: false });
     // A manual retry happens after a deploy may have finished propagating.
     // Clear the automatic-retry guard so this retry can load the new chunks.
-    sessionStorage.removeItem("growdash:chunk-retry");
+    try { sessionStorage.removeItem("growdash:chunk-retry"); } catch { /* sem storage, nada para limpar */ }
     const url = new URL(window.location.href);
     url.searchParams.set("gd_reload", String(Date.now()));
     window.location.replace(url.toString());

@@ -45,8 +45,12 @@ const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
 
 function getInitialSidebarState() {
   if (typeof window === "undefined") return false;
-  const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
-  if (saved !== null) return saved === "true";
+  try {
+    const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (saved !== null) return saved === "true";
+  } catch {
+    // O menu usa o padrão responsivo quando o navegador bloqueia storage.
+  }
   return window.innerWidth >= 768 && window.innerWidth < 1024;
 }
 
@@ -176,10 +180,10 @@ export default function GrowdashLayout() {
     };
   }, []);
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+    try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed)); } catch { /* preferência apenas nesta sessão */ }
   }, [collapsed]);
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_SECTIONS_STORAGE_KEY, JSON.stringify(openSections));
+    try { window.localStorage.setItem(SIDEBAR_SECTIONS_STORAGE_KEY, JSON.stringify(openSections)); } catch { /* preferência apenas nesta sessão */ }
   }, [openSections]);
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

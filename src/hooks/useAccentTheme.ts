@@ -15,8 +15,12 @@ const ACCENT_HEX: Record<AccentTheme, string> = {
 
 function readAccent(): AccentTheme {
   if (typeof window === "undefined") return "gold";
-  const value = window.localStorage.getItem(STORAGE_KEY);
-  return value && value in ACCENT_HEX ? value as AccentTheme : "gold";
+  try {
+    const value = window.localStorage.getItem(STORAGE_KEY);
+    return value && value in ACCENT_HEX ? value as AccentTheme : "gold";
+  } catch {
+    return "gold";
+  }
 }
 
 export function applyAccent(value: AccentTheme) {
@@ -48,7 +52,11 @@ export function useAccentTheme() {
   useEffect(() => applyAccent(accent), [accent]);
 
   const setAccent = (value: AccentTheme) => {
-    window.localStorage.setItem(STORAGE_KEY, value);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, value);
+    } catch {
+      // A preferência continua válida nesta sessão quando o navegador bloqueia storage.
+    }
     applyAccent(value);
     setAccentState(value);
   };
