@@ -1,29 +1,16 @@
 import { useEffect, useState } from "react";
 
-export type AccentTheme = "gold" | "purple" | "blue" | "pink" | "sapphire" | "obsidian" | "emerald";
+export type AccentTheme = "gold";
 const STORAGE_KEY = "growdash:accent-theme";
 
-const ACCENT_HEX: Record<AccentTheme, string> = {
-  gold: "#b88722",
-  blue: "#2f6bf4",
-  purple: "#8b5cf6",
-  pink: "#ec4899",
-  sapphire: "#0ea5e9",
-  obsidian: "#a8b0bd",
-  emerald: "#10b981",
-};
+const ACCENT_HEX: Record<AccentTheme, string> = { gold: "#b57a20" };
 
 function readAccent(): AccentTheme {
-  if (typeof window === "undefined") return "gold";
-  try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
-    return value && value in ACCENT_HEX ? value as AccentTheme : "gold";
-  } catch {
-    return "gold";
-  }
+  return "gold";
 }
 
-export function applyAccent(value: AccentTheme) {
+export function applyAccent(_value: AccentTheme) {
+  const value: AccentTheme = "gold";
   document.documentElement.dataset.accent = value;
 
   const color = ACCENT_HEX[value];
@@ -51,14 +38,14 @@ export function useAccentTheme() {
 
   useEffect(() => applyAccent(accent), [accent]);
 
-  const setAccent = (value: AccentTheme) => {
+  const setAccent = (_value: AccentTheme) => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, value);
+      window.localStorage.setItem(STORAGE_KEY, "gold");
     } catch {
       // A preferência continua válida nesta sessão quando o navegador bloqueia storage.
     }
-    applyAccent(value);
-    setAccentState(value);
+    applyAccent("gold");
+    setAccentState("gold");
   };
 
   return { accent, setAccent };

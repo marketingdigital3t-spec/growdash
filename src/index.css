@@ -46,7 +46,7 @@
     --warning-foreground: 35 50% 12%;
     --border: 39 28% 84%;
     --input: 39 28% 84%;
-    --primary: 40 66% 37%;
+    --primary: 36 70% 42%;
     --primary-foreground: 42 65% 98%;
     --primary-soft: 42 86% 90%;
     --accent-pink: 5 70% 60%;
@@ -67,11 +67,11 @@
     --sidebar-ring: 40 66% 37%;
     --brand-black: #070503;
     --brand-surface: #120d07;
-    --brand-gold: #b88722;
-    --brand-gold-light: #f3df9b;
-    --brand-bronze: #6b430d;
+    --brand-gold: #b57a20;
+    --brand-gold-light: #f1c76b;
+    --brand-bronze: #653708;
     --brand-ivory: #f7f0e2;
-    --brand-accent-rgb: 184, 135, 34;
+    --brand-accent-rgb: 181, 122, 32;
     --gd-page-gutter: clamp(.7rem, 1.05vw, 1.15rem);
   }
 
@@ -90,7 +90,7 @@
     --accent-foreground: 43 100% 76%;
     --border: 37 12% 15%;
     --input: 37 12% 15%;
-    --primary: 38 76% 39%;
+    --primary: 36 70% 42%;
     --primary-foreground: 42 65% 98%;
     --ring: 42 100% 58%;
     --sidebar-background: 36 45% 2%;
@@ -202,22 +202,39 @@
 
   html[data-accent="gold"] .brand-mark-tint,
   html[data-accent="gold"] .brand-logo-tint {
-    background: linear-gradient(135deg, #6b430d 0%, #b88722 25%, #f3df9b 49%, #946718 69%, #d4ad4c 100%);
+    background: linear-gradient(135deg, #5b3005 0%, #a96b18 24%, #efc269 49%, #7a4509 68%, #c78b2b 100%);
   }
 
   html[data-accent="gold"] {
-    --primary: 42 78% 46%;
+    --primary: 36 70% 42%;
     --primary-foreground: 42 100% 97%;
-    --ring: 42 90% 57%;
-    --accent: 42 47% 16%;
-    --accent-foreground: 44 100% 83%;
-    --sidebar-primary: 42 78% 46%;
-    --sidebar-icon-active: 42 90% 57%;
-    --sidebar-ring: 42 90% 57%;
-    --brand-gold: #c58a22;
-    --brand-gold-light: #ffe0a0;
-    --brand-bronze: #70400b;
-    --brand-accent-rgb: 197, 138, 34;
+    --ring: 39 74% 54%;
+    --accent: 35 48% 14%;
+    --accent-foreground: 39 84% 78%;
+    --sidebar-primary: 36 70% 42%;
+    --sidebar-icon-active: 39 74% 54%;
+    --sidebar-ring: 39 74% 54%;
+    --brand-gold: #b57a20;
+    --brand-gold-light: #f1c76b;
+    --brand-bronze: #653708;
+    --brand-accent-rgb: 181, 122, 32;
+  }
+
+  /* The Growdash visual system has one intentional accent: metallic gold.
+     This also neutralizes an older accent stored in the browser. */
+  html[data-accent] {
+    --primary: 36 70% 42%;
+    --primary-foreground: 42 100% 97%;
+    --ring: 39 74% 54%;
+    --accent: 35 48% 14%;
+    --accent-foreground: 39 84% 78%;
+    --sidebar-primary: 36 70% 42%;
+    --sidebar-icon-active: 39 74% 54%;
+    --sidebar-ring: 39 74% 54%;
+    --brand-gold: #b57a20;
+    --brand-gold-light: #f1c76b;
+    --brand-bronze: #653708;
+    --brand-accent-rgb: 181, 122, 32;
   }
 
   .brand-mark-tint {
@@ -234,32 +251,32 @@
      Keeping the scope lets charts/components use tokens without creating a
      second blue/dark theme inside the platform. */
   .analytics-module {
-    --background: 215 34% 97%;
-    --foreground: 222 34% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 34% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 34% 12%;
-    --primary-foreground: 200 100% 98%;
-    --secondary: 216 27% 93%;
-    --secondary-foreground: 222 27% 16%;
-    --muted: 215 25% 94%;
-    --muted-foreground: 217 12% 42%;
-    --accent: 197 85% 92%;
-    --accent-foreground: 210 80% 20%;
+    --background: 42 34% 96%;
+    --foreground: 34 32% 8%;
+    --card: 42 45% 99%;
+    --card-foreground: 34 32% 8%;
+    --popover: 42 45% 99%;
+    --popover-foreground: 34 32% 8%;
+    --primary-foreground: 42 100% 97%;
+    --secondary: 40 28% 91%;
+    --secondary-foreground: 34 28% 12%;
+    --muted: 40 24% 92%;
+    --muted-foreground: 34 10% 40%;
+    --accent: 42 56% 89%;
+    --accent-foreground: 34 62% 13%;
     --destructive: 4 68% 50%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 48% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 40 88% 50%;
     --warning-foreground: 35 50% 12%;
-    --border: 216 24% 85%;
-    --input: 216 24% 85%;
-    --ring: 196 96% 56%;
-    --chart-1: 196 96% 52%;
-    --chart-2: 145 35% 46%;
-    --chart-3: 258 86% 66%;
-    --chart-4: 30 96% 59%;
+    --border: 39 28% 84%;
+    --input: 39 28% 84%;
+    --ring: 39 74% 54%;
+    --chart-1: 36 70% 42%;
+    --chart-2: 42 58% 36%;
+    --chart-3: 32 55% 28%;
+    --chart-4: 40 66% 52%;
     --chart-5: 4 68% 50%;
     color-scheme: light;
     font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;

@@ -177,7 +177,7 @@ export default function ProfilePage() {
             <h2 className="font-black">Cor de destaque da plataforma</h2>
             <p className="mt-1 text-xs text-muted-foreground">A cor é aplicada aos botões, seleções, glass do Dashboard e realces, mantendo contraste acessível.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {([['gold', 'Dourado', '#e6ad28'], ['purple', 'Ametista', '#9258ff'], ['blue', 'Azul imperial', '#2f80ff'], ['pink', 'Quartzo rosa', '#f04f9a'], ['sapphire', 'Safira', '#0ea5e9'], ['obsidian', 'Obsidiana', '#a8b0bd'], ['emerald', 'Esmeralda', '#10b981']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
+              {([['gold', 'Ouro metálico', '#b57a20']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
                 <button key={value} type="button" onClick={() => setAccent(value)} className={`flex min-h-16 items-center gap-3 rounded-xl border p-3 text-left transition ${accent === value ? "border-primary bg-primary/10 ring-1 ring-primary/35" : "border-border hover:bg-muted/45"}`}>
                   <span className="h-9 w-9 rounded-xl border border-white/20 shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, #ffffff55)` }} />
                   <span><b className="block text-sm">{label}</b><small className="text-[10px] text-muted-foreground">Tema operacional</small></span>

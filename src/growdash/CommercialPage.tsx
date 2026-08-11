@@ -118,7 +118,7 @@ export default function CommercialPage() {
         <MetricCard label="Líderes identificados" value={isLoading ? "Carregando…" : String(accountRankings.filter((account) => !!account.leader).length)} change="por conta de anúncio" />
       </div>
 
-      <section className="gd-panel overflow-hidden border-[#c49b2e]/40 bg-gradient-to-br from-[#0b1328] via-[#10182e] to-[#080d1b] text-white shadow-[0_20px_80px_-35px_rgba(45,86,170,.65)] dark:border-[#c49b2e]/40">
+      <section className="gd-panel overflow-hidden border-[#b57a20]/45 bg-gradient-to-br from-[#241607] via-[#110b04] to-[#060402] text-white shadow-[0_20px_80px_-35px_rgba(104,62,9,.72)] dark:border-[#b57a20]/45">
         <div className="flex flex-col gap-3 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#e1b832]">Líderes de vendas</p><h2 className="mt-1 text-xl font-black tracking-tight">Melhor vendedor por conta de anúncio</h2><p className="mt-1 text-xs text-white/55">A classificação usa somente a receita líquida confirmada no intervalo selecionado.</p></div>
           <div className="flex items-center gap-2 rounded-full border border-[#e1b832]/30 bg-[#e1b832]/10 px-3 py-2 text-xs font-bold text-[#f1cc55]"><Crown className="h-4 w-4" />{accountRankings.length} conta(s) analisada(s)</div>
@@ -129,9 +129,9 @@ export default function CommercialPage() {
             {!accountRankings.length && <EmptyRanking text="Nenhuma conta de anúncio encontrada para os filtros atuais." />}
           </div>
           <div className="space-y-5">
-            <section className="rounded-2xl border border-[#2e5ba5]/55 bg-[#0b1225]/75 p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-[#b8c5e2]">Classificação geral</p><h3 className="mt-1 text-lg font-black">Todos os vendedores</h3></div><BarChart3 className="h-5 w-5 text-[#62a0ff]" /></div>
-              <div className="mt-4 space-y-2">{overallRanking.map((item, index) => <div key={item.seller} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-white/8 bg-white/[.035] p-3"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#2c5eb5]/25 text-sm font-black text-[#80adff]">{index + 1}</span><span className="min-w-0"><b className="block truncate text-sm">{item.seller}</b><small className="text-[10px] text-white/45">{item.count} venda(s) confirmada(s)</small></span><b className="text-sm tabular-nums text-[#dce8ff]">{brl.format(item.revenue)}</b></div>)}{!overallRanking.length && <p className="py-6 text-center text-xs text-white/45">Nenhuma venda confirmada no período.</p>}</div>
+            <section className="rounded-2xl border border-[#b57a20]/45 bg-[#171006]/75 p-4">
+              <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-[#d9b86c]">Classificação geral</p><h3 className="mt-1 text-lg font-black">Todos os vendedores</h3></div><BarChart3 className="h-5 w-5 text-[#d8a63a]" /></div>
+              <div className="mt-4 space-y-2">{overallRanking.map((item, index) => <div key={item.seller} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-white/8 bg-white/[.035] p-3"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#9e6815]/25 text-sm font-black text-[#e7c776]">{index + 1}</span><span className="min-w-0"><b className="block truncate text-sm">{item.seller}</b><small className="text-[10px] text-white/45">{item.count} venda(s) confirmada(s)</small></span><b className="text-sm tabular-nums text-[#f4dfaa]">{brl.format(item.revenue)}</b></div>)}{!overallRanking.length && <p className="py-6 text-center text-xs text-white/45">Nenhuma venda confirmada no período.</p>}</div>
             </section>
             <section className="rounded-2xl border border-rose-400/35 bg-rose-950/20 p-4">
               <div className="flex items-center gap-2 text-rose-300"><AlertTriangle className="h-4 w-4" /><p className="text-[10px] font-black uppercase tracking-[.2em]">Zona de recuperação</p></div>
