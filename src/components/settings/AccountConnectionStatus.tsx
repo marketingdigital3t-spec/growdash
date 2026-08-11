@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, HelpCircle, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -50,7 +50,7 @@ export function AccountConnectionStatus({
   retrying,
 }: Props) {
   const isConnected = status === "connected";
-  const isDisconnected = status === "disconnected";
+  const needsReconnect = !isConnected;
   const lastSuccess = fmtDate(lastSuccessAt);
   const lastAttempt = fmtDate(lastAttemptAt);
 
@@ -59,18 +59,16 @@ export function AccountConnectionStatus({
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
         isConnected && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-        isDisconnected && "bg-destructive/15 text-destructive",
-        !isConnected && !isDisconnected && "bg-muted text-muted-foreground"
+        needsReconnect && "bg-destructive/15 text-destructive",
       )}
     >
       {isConnected && <CheckCircle2 className="h-3 w-3" />}
-      {isDisconnected && <AlertTriangle className="h-3 w-3" />}
-      {!isConnected && !isDisconnected && <HelpCircle className="h-3 w-3" />}
-      {isConnected ? "Conectada" : isDisconnected ? "Desconectada" : "Nunca sincronizada"}
+      {needsReconnect && <AlertTriangle className="h-3 w-3" />}
+      {isConnected ? "Conectada" : "Reconexão necessária"}
     </span>
   );
 
-  if (!isDisconnected) {
+  if (!needsReconnect) {
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {badge}
@@ -94,7 +92,7 @@ export function AccountConnectionStatus({
           <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
           <div className="space-y-1 min-w-0">
             <p className="text-sm font-medium text-destructive">
-              Conta desconectada da Meta
+              Conexão da Meta precisa de atenção
             </p>
             {errorMessage && (
               <p className="text-xs text-destructive/90 break-words">
@@ -114,7 +112,7 @@ export function AccountConnectionStatus({
         <div className="flex flex-wrap gap-2 pt-1">
           {onReconnect && (
             <Button size="sm" variant="default" onClick={onReconnect}>
-              Atualizar Token
+              Tentar último token
             </Button>
           )}
           {onRetry && (
