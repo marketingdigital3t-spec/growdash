@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.meta-connect-token]
 verify_jwt = true
 
+[functions.meta-reconnect-stored-token]
+verify_jwt = true
+
 [functions.rd-test-connection]
 verify_jwt = true
 
