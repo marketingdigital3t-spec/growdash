@@ -24,8 +24,10 @@ export function DashboardGoalProgress({ realized, target, accountLabel, schemaRe
 }
 
 export function TopbarMonthlyGoal({ realized, target, accountLabel, schemaReady, loading }: Props) {
-  const percentage = target > 0 ? realized / target * 100 : 0;
-  const remaining = Math.max(target - realized, 0);
+  const safeRealized = Number.isFinite(realized) ? realized : 0;
+  const safeTarget = Number.isFinite(target) ? target : 0;
+  const percentage = safeTarget > 0 ? safeRealized / safeTarget * 100 : 0;
+  const remaining = Math.max(safeTarget - safeRealized, 0);
   return (
     <section className="min-w-0 grow" aria-label={accountLabel}>
       <div className="flex min-w-0 items-center gap-2">
@@ -33,15 +35,15 @@ export function TopbarMonthlyGoal({ realized, target, accountLabel, schemaReady,
         <div className="min-w-0 grow">
           <div className="flex min-w-0 items-center justify-between gap-2 text-[9px]">
             <span className="truncate font-black uppercase tracking-[.1em] text-primary" title={accountLabel}>{accountLabel}</span>
-            {target > 0 ? <span className="shrink-0 font-black text-white">{percentage.toFixed(1)}%</span> : <Link to="/configuracoes#sales-goals" className="shrink-0 font-black text-primary hover:underline">Configurar</Link>}
+            {safeTarget > 0 ? <span className="shrink-0 font-black text-white">{percentage.toFixed(1)}%</span> : <Link to="/configuracoes#sales-goals" className="shrink-0 font-black text-primary hover:underline">Configurar</Link>}
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full border border-white/5 bg-white/[.08]">
-            {target > 0 && <div className="gold-meter h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.min(Math.max(percentage, 0), 100)}%` }} />}
+            {safeTarget > 0 && <div className="gold-meter h-full rounded-full motion-reduce:transition-none transition-[width] duration-300 ease-out" style={{ width: `${Math.min(Math.max(percentage, 0), 100)}%` }} />}
           </div>
         </div>
         <div className="hidden shrink-0 text-right text-[9px] sm:block">
-          <span className="block text-white/50">{loading ? "Calculando…" : target > 0 ? `${brl.format(realized)} de ${brl.format(target)}` : schemaReady ? "Meta não configurada" : "Migration pendente"}</span>
-          {target > 0 && <span className="block text-white/75">{remaining > 0 ? `${brl.format(remaining)} restantes` : `${brl.format(realized - target)} acima`}</span>}
+          <span className="block text-white/50">{loading && safeTarget <= 0 ? "Calculando…" : safeTarget > 0 ? `${brl.format(safeRealized)} de ${brl.format(safeTarget)}` : schemaReady ? "Meta não configurada" : "Migration pendente"}</span>
+          {safeTarget > 0 && <span className="block text-white/75">{remaining > 0 ? `${brl.format(remaining)} restantes` : `${brl.format(safeRealized - safeTarget)} acima`}</span>}
         </div>
       </div>
     </section>

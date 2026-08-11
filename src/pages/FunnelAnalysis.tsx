@@ -96,15 +96,11 @@ export default function FunnelAnalysis() {
   const funnelId = selectedFunnelRecord?.id || "";
   const effectiveAdAccountId = adAccountId === "all" ? selectedFunnelRecord?.ad_account_id : adAccountId;
 
-  // A análise de etapas precisa representar uma conta/funil real. Antes, a
-  // opção "Todas as contas" exibia silenciosamente apenas o primeiro funil,
-  // o que fazia os totais parecerem incorretos. Selecionamos essa conta de
-  // forma explícita para que filtro, RD e Meta permaneçam reconciliados.
-  useEffect(() => {
-    if (adAccountId === "all" && selectedFunnelRecord?.ad_account_id) {
-      setAdAccountId(selectedFunnelRecord.ad_account_id);
-    }
-  }, [adAccountId, selectedFunnelRecord?.ad_account_id, setAdAccountId]);
+  // "Todas as contas" é uma escolha válida e não pode ser regravada pelo
+  // carregamento de funis. Alterar o filtro global aqui fazia o Select alternar
+  // entre "Todas" e a primeira conta retornada, reiniciando as consultas e
+  // causando o piscar relatado. A conta efetiva é usada apenas para reconciliar
+  // a análise detalhada com o funil encontrado, sem mudar a escolha do usuário.
 
   const { data: stages = [], isLoading: loadingStages } = useFunnelStages(funnelId);
   const { data: deals = [], isLoading, refetch } = useRDDeals({

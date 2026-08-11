@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toLocalDateString } from "@/lib/dateRange";
@@ -70,6 +70,9 @@ export function useSales(params?: UseSalesParams) {
   return useQuery({
     queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId],
     enabled: params?.enabled !== false,
+    // Evita um valor zero transitório nos KPIs ao trocar conta ou período.
+    // O resultado anterior permanece visível até a resposta da nova consulta.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
 

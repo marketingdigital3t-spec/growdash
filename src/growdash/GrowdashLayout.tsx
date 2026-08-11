@@ -86,7 +86,7 @@ export default function GrowdashLayout() {
   });
   const { data: isMaster = false } = useIsMaster();
   const permissions = usePermissions();
-  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const {
     adAccountId,
     setAdAccountId,
@@ -101,13 +101,20 @@ export default function GrowdashLayout() {
     [adAccounts, businessUnitId, segment],
   );
   const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
+  // Mantém a mesma referência de mês durante toda a sessão do layout. Assim,
+  // atualizações de UI não criam novas chaves de consulta para a meta mensal.
+  const currentMonth = useMemo(() => new Date(), []);
+  const monthlyRange = useMemo(() => ({
+    startDate: startOfMonth(currentMonth),
+    endDate: endOfMonth(currentMonth),
+  }), [currentMonth]);
   const { data: monthlySales = [] } = useSales({
-    startDate: startOfMonth(new Date()),
-    endDate: endOfMonth(new Date()),
+    startDate: monthlyRange.startDate,
+    endDate: monthlyRange.endDate,
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
     enabled: loadBackgroundData,
   });
-  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(new Date(), { enabled: loadBackgroundData });
+  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(currentMonth, { enabled: loadBackgroundData });
   const goalRevenue = useMemo(() => aggregateSales(monthlySales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id) && (adAccountId === "all" || sale.ad_account_id === adAccountId))).totalNet, [adAccountId, monthlySales, visibleAccountIds]);
   const goalTarget = useMemo(() => (goalData?.rows ?? []).filter((goal) => visibleAccountIds.has(goal.ad_account_id) && (adAccountId === "all" || goal.ad_account_id === adAccountId)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0), [adAccountId, goalData?.rows, visibleAccountIds]);
   const goalAccountLabel = adAccountId === "all"
@@ -196,10 +203,14 @@ export default function GrowdashLayout() {
     };
   }, []);
   useEffect(() => {
+    // Durante o carregamento/refetch a lista pode ficar vazia por um instante.
+    // Não trate esse estado transitório como remoção de acesso, pois isso faz o
+    // seletor global e a meta mensal saltarem para "todas as contas".
+    if (loadingAdAccounts || visibleAccounts.length === 0) return;
     if (adAccountId !== "all" && businessUnitId && !visibleAccounts.some((account) => account.id === adAccountId)) {
       setAdAccountId("all");
     }
-  }, [adAccountId, businessUnitId, setAdAccountId, visibleAccounts]);
+  }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);
 
   return (
     <div className="brand-shell min-h-screen max-w-full overflow-x-clip text-foreground transition-colors">
