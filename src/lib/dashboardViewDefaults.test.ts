@@ -40,7 +40,7 @@ describe("ensureDefaultDashboardContent", () => {
       layout: [{ i: "default", x: 0, y: 0, w: 12, h: 30 }],
     });
     const expectedIds = [
-      "primary_revenue", "financial_margin", "campaign_leads", "campaign_conversion_rate",
+      "primary_revenue", "financial_margin", "financial_receivables", "campaign_conversion_rate",
     ];
 
     for (const id of expectedIds) {
@@ -67,8 +67,7 @@ describe("ensureDefaultDashboardContent", () => {
       ],
     });
     const expectedIds = [
-      "payment_chart", "platform_distribution", "financial_margin",
-      "financial_receivables", "financial_ticket", "financial_profit",
+      "payment_chart", "platform_distribution", "financial_margin", "financial_receivables",
     ];
 
     expect(migrated.widgets.find((widget) => widget.id === "primary_revenue")?.title).toBe("Minha receita");
@@ -110,20 +109,28 @@ describe("ensureDefaultDashboardContent", () => {
     expect(ensureDefaultDashboardContent(view)).toBe(view);
   });
 
-  it("reorganiza uma visão v6 sem deixar uma coluna isolada de KPIs", () => {
+  it("reduz uma visão v7 aos quatro KPIs ao lado da distribuição por plataforma", () => {
     const migrated = ensureDefaultDashboardContent({
       id: "view-v6-layout",
       widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
-        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 6 } }
-        : { ...widget }),
-      layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 11 : item.y })),
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 7 } }
+        : { ...widget }).concat([
+          { id: "financial_ticket", type: "kpi", title: "Ticket Médio", config: {} },
+          { id: "campaign_cpl", type: "kpi", title: "CPL", config: {} },
+        ]),
+      layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 11 : item.y })).concat([
+        { i: "financial_ticket", x: 0, y: 7, w: 3, h: 2 },
+        { i: "campaign_cpl", x: 3, y: 7, w: 3, h: 2 },
+      ]),
     });
 
     expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
       canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
     });
-    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 8 });
-    expect(migrated.layout.find((item) => item.i === "financial_margin")).toMatchObject({ x: 0, y: 7 });
-    expect(migrated.layout.find((item) => item.i === "campaign_ctr")).toMatchObject({ x: 0, y: 11, w: 6 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 8 });
+    expect(migrated.layout.find((item) => item.i === "financial_margin")).toMatchObject({ x: 9, y: 6 });
+    expect(migrated.layout.find((item) => item.i === "campaign_ctr")).toMatchObject({ x: 9, y: 2, w: 3 });
+    expect(migrated.widgets.some((widget) => widget.id === "financial_ticket")).toBe(false);
+    expect(migrated.widgets.some((widget) => widget.id === "campaign_cpl")).toBe(false);
   });
 });
