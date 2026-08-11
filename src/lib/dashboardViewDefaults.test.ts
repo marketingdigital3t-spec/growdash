@@ -109,4 +109,21 @@ describe("ensureDefaultDashboardContent", () => {
 
     expect(ensureDefaultDashboardContent(view)).toBe(view);
   });
+
+  it("reorganiza uma visão v6 sem deixar uma coluna isolada de KPIs", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-v6-layout",
+      widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 6 } }
+        : { ...widget }),
+      layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 11 : item.y })),
+    });
+
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+    });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 8 });
+    expect(migrated.layout.find((item) => item.i === "financial_margin")).toMatchObject({ x: 0, y: 7 });
+    expect(migrated.layout.find((item) => item.i === "campaign_ctr")).toMatchObject({ x: 0, y: 11, w: 6 });
+  });
 });

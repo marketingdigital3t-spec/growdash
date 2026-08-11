@@ -33,6 +33,34 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // Version 7 fixes the visual hierarchy of the standard dashboard: charts
+  // occupy one balanced row and the financial/acquisition KPIs use full rows
+  // instead of an isolated right rail. Preserve widgets added by the user,
+  // but reposition the canonical widgets once so legacy v6 views are fixed.
+  if (currentVersion === 6 && existingDefault) {
+    const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
+    const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
+    const customWidgets = widgets.filter((widget) => !canonicalIds.has(widget.id));
+    const canonicalWidgets = DEFAULT_VIEW.widgets.map((widget) => {
+      const existing = widget.type === "default_block"
+        ? existingDefault
+        : widgets.find((candidate) => candidate.id === widget.id);
+      if (!existing) return { ...widget, config: { ...widget.config } };
+      return widget.type === "default_block"
+        ? { ...existing, id: defaultId, config: { ...existing.config, ...defaultWidget.config } }
+        : existing;
+    });
+    let customY = canonicalLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
+    const customLayout = layout
+      .filter((item) => !canonicalIds.has(item.i))
+      .map((item) => {
+        const next = { ...item, x: 0, y: customY, w: Math.min(12, Math.max(2, item.w || 3)) };
+        customY += Math.max(2, item.h || 2);
+        return next;
+      });
+    return { ...view, widgets: [...canonicalWidgets, ...customWidgets], layout: [...canonicalLayout, ...customLayout] };
+  }
+
   // Version 6 separates the two financial charts and every financial KPI from
   // the static default block. Upgrade version 5 views additively: placements
   // already edited by the user are kept, missing widgets receive free slots,

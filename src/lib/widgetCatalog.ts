@@ -317,7 +317,7 @@ export function getWidgetDef(type: WidgetType) {
 
 // Default "Padrão" view: the canonical full-width dashboard recovered from the
 // original Growdash project. System widgets are appended by the renderer.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 6;
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 7;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
@@ -327,17 +327,17 @@ export const DEFAULT_VIEW = {
     { i: "primary_roas", x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "primary_profit", x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "payment_chart", x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
-    { i: "platform_distribution", x: 4, y: 2, w: 5, h: 5, minW: 4, minH: 4 },
-    { i: "financial_margin", x: 9, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "financial_receivables", x: 9, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "financial_ticket", x: 9, y: 6, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "financial_profit", x: 9, y: 8, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_leads", x: 0, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_cpl", x: 3, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_cost_per_link", x: 6, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_ctr", x: 0, y: 9, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_conversion_rate", x: 3, y: 9, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "default", x: 0, y: 11, w: 12, h: 30, minW: 6, minH: 10 },
+    { i: "platform_distribution", x: 4, y: 2, w: 8, h: 5, minW: 4, minH: 4 },
+    { i: "financial_margin", x: 0, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "financial_receivables", x: 3, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "financial_ticket", x: 6, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "financial_profit", x: 9, y: 7, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_leads", x: 0, y: 9, w: 4, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_cpl", x: 4, y: 9, w: 4, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_cost_per_link", x: 8, y: 9, w: 4, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_ctr", x: 0, y: 11, w: 6, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_conversion_rate", x: 6, y: 11, w: 6, h: 2, minW: 2, minH: 2 },
+    { i: "default", x: 0, y: 13, w: 12, h: 30, minW: 6, minH: 10 },
   ],
   widgets: [
     { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Líquido", config: { metric: "revenue_net" } },
