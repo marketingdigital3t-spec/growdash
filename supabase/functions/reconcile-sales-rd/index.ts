@@ -41,8 +41,9 @@ function firstString(...values: unknown[]): string | null {
 function asArray(v: unknown): any[] { return Array.isArray(v) ? v : []; }
 function isWon(d: any) {
   if (d?.win === true) return true;
-  const s = (d?.deal_stage?.name || "").toLowerCase();
-  return s.includes("venda real") || s.includes("ganho") || s.includes("won") || s.includes("fechado");
+  const s = (d?.deal_stage?.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_-]+/g, " ").trim();
+  if (!s || /\b(pre|pos) venda\b/.test(s)) return false;
+  return /^(venda|vendas|sale|sales)$/.test(s) || /\b(venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(s);
 }
 function bucketFromStage(stageName: string | null | undefined, win: boolean, lost: boolean) {
   if (win) return "client";

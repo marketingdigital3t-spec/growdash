@@ -142,7 +142,7 @@ export default function CrmPage() {
   }), [dealsInPipeline, normalizedQuery, owner, status]);
 
   const stats = useMemo(() => {
-    const won = deals.filter((deal) => deal.win);
+    const won = deals.filter((deal) => classifyLead(deal) === "won");
     const lost = deals.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
     const active = deals.filter((deal) => !deal.win && !lost.includes(deal));
     const visibleDealIds = new Set(deals.map((deal) => deal.rd_deal_id));
@@ -175,7 +175,7 @@ export default function CrmPage() {
           id,
           name: deal.rd_stage_name || "Sem etapa",
           order: deal.rd_stage_order ?? 9_999,
-          won: deal.win,
+          won: classifyLead(deal) === "won",
           lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified",
         });
       }

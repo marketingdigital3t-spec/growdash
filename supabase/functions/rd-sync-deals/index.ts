@@ -204,12 +204,16 @@ function asArray(value: unknown): any[] {
 
 function isWonDeal(d: any): boolean {
   if (d.win === true) return true;
-  const stage = (d.deal_stage?.name || "").toLowerCase();
+  const stage = (d.deal_stage?.name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\s_-]+/g, " ")
+    .trim();
+  if (!stage || /\b(pre|pos) venda\b/.test(stage)) return false;
   return (
-    stage.includes("venda realizada") ||
-    stage.includes("ganho") ||
-    stage.includes("won") ||
-    stage.includes("fechado")
+    /^(venda|vendas|sale|sales)$/.test(stage) ||
+    /\b(venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(stage)
   );
 }
 
@@ -518,11 +522,8 @@ Deno.serve(async (req) => {
           const isWon =
             Boolean(s?.win ?? s?.is_won ?? s?.won) ||
             lname.includes("ganho") ||
-            lname.includes("venda real") ||
-            lname.includes("venda concl") ||
-            lname.includes("fechado ganho") ||
-            lname.includes("won") ||
-            lname.includes("cliente");
+            /^(venda|vendas|sale|sales)$/.test(lname) ||
+            /\b(venda real|venda concl|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(lname);
           const isLost =
             Boolean(s?.loss ?? s?.is_lost ?? s?.lost) ||
             lname.includes("perdido") ||

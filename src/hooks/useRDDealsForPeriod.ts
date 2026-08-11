@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { endOfDay, format, startOfDay } from "date-fns";
+import { isWonRDStageName } from "@/lib/rdDealStatus";
 
 export interface RDDealLite {
   id: string;
@@ -140,7 +141,7 @@ const DISQUALIFIED_KEYWORDS = ["desqualif", "não qualif", "nao qualif", "unqual
 const QUALIFIED_BUCKETS = new Set(["sql", "opportunity", "client"]);
 
 export function classifyLead(deal: RDDealLite): LeadBucket {
-  if (deal.win) return "won";
+  if (deal.win || isWonRDStageName(deal.rd_stage_name)) return "won";
   const stageName = (deal.rd_stage_name || "").toLowerCase();
   const reason = (deal.lost_reason || "").toLowerCase();
   const isDisqualified =
