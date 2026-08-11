@@ -77,7 +77,7 @@ import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
-import { resolveCampaignResults } from "@/lib/campaignResultEvents";
+import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -118,10 +118,10 @@ function campaignColumnValue(campaign: any, key: string) {
 }
 
 function campaignPrimaryResult(campaign: any) {
-  const conversations = Math.max(0, Number(campaign.results?.conversations || 0));
-  if (conversations > 0) return { value: conversations, label: "Conversas iniciadas" };
-  const leads = Math.max(0, Number((campaign.results?.leadCount ?? campaign.results?.total ?? campaign.leads) || 0));
-  return { value: leads, label: leads > 0 ? "Leads Meta" : "Sem resultado" };
+  return resolveCampaignPrimaryResult(campaign.objective, {
+    leadCount: Math.max(0, Number((campaign.results?.leadCount ?? campaign.leads) || 0)),
+    conversations: Math.max(0, Number(campaign.results?.conversations || 0)),
+  });
 }
 
 function formatApiDate(date: Date) {
@@ -431,7 +431,7 @@ export default function Campaigns() {
 
     const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
     const results = resolveCampaignResults(campaign.leads, actionEventTotals);
-    const primaryResult = results.conversations > 0 ? results.conversations : results.leadCount;
+    const primaryResult = resolveCampaignPrimaryResult(campaign.objective, results).value;
     return {
       ...campaign,
       linkClicks,
@@ -614,7 +614,7 @@ export default function Campaigns() {
 
   const totals = useMemo(() => filtered.reduce(
     (acc: any, c: any) => ({
-      budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads, results: acc.results + (c.results?.total ?? c.leads),
+      budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads, results: acc.results + (c.primaryResult ?? 0),
       salesCount: acc.salesCount + c.salesCount, revenue: acc.revenue + c.revenue,
       profit: acc.profit + c.profit, impressions: acc.impressions + c.impressions, clicks: acc.clicks + c.clicks,
       reach: acc.reach + c.reach, linkClicks: acc.linkClicks + c.linkClicks,
@@ -1121,7 +1121,7 @@ export default function Campaigns() {
                         {showColumn("uniqueLinkCtr") && <CampaignTotalCell width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
                         {showColumn("cpm") && <CampaignTotalCell width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por 1.000 impressões" />}
                         {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Orçamento somado" />}
-                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.results.toLocaleString("pt-BR")} label="Forms + site + conversas" />}
+                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.results.toLocaleString("pt-BR")} label="Resultado principal por campanha" />}
                         {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado" />}
                         {showColumn("spend") && <CampaignTotalCell width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total usado" />}
                         {showColumn("landingPageViews") && <CampaignTotalCell width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}

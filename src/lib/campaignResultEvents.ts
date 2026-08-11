@@ -1,4 +1,5 @@
 export type CampaignResultBreakdown = { label: string; value: number };
+export type CampaignPrimaryResult = { label: "Leads" | "Conversas iniciadas"; value: number };
 
 const LEAD_ACTION_TYPES = [
   "lead",
@@ -37,4 +38,22 @@ export function resolveCampaignResults(insightLeads: number, actionTotals: Recor
   if (conversations > 0) breakdown.push({ label: "Conversas iniciadas", value: conversations });
 
   return { total: leadCount + conversations, leadCount, conversations, breakdown };
+}
+
+/**
+ * A campaign table must show the result it was configured to pursue, rather
+ * than adding unrelated Meta events together. Lead campaigns show leads;
+ * message/other campaigns show only conversations started. The full event
+ * breakdown remains available in the campaign detail tooltip.
+ */
+export function resolveCampaignPrimaryResult(
+  objective: string | null | undefined,
+  results: Pick<ReturnType<typeof resolveCampaignResults>, "leadCount" | "conversations">,
+): CampaignPrimaryResult {
+  const normalizedObjective = String(objective || "").toUpperCase();
+  const isLeadCampaign = normalizedObjective.includes("LEAD");
+
+  return isLeadCampaign
+    ? { label: "Leads", value: results.leadCount }
+    : { label: "Conversas iniciadas", value: results.conversations };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveCampaignResults } from "./campaignResultEvents";
+import { resolveCampaignPrimaryResult, resolveCampaignResults } from "./campaignResultEvents";
 
 describe("resolveCampaignResults", () => {
   it("combina leads Meta e conversas iniciadas sem contar cliques", () => {
@@ -23,5 +23,15 @@ describe("resolveCampaignResults", () => {
       leadCount: 3,
       conversations: 0,
     });
+  });
+
+  it("mostra apenas leads para campanha de geração de leads", () => {
+    const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 4 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Leads", value: 12 });
+  });
+
+  it("mostra apenas conversas iniciadas para campanha que não é de leads", () => {
+    const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 4 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_ENGAGEMENT", results)).toEqual({ label: "Conversas iniciadas", value: 4 });
   });
 });
