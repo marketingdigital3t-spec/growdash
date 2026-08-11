@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BarChart3, Crown, Sparkles, Target, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
@@ -46,13 +46,19 @@ export default function CommercialPage() {
   const [sellerFilter, setSellerFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
 
-  const visibleAccounts = useMemo(() => {
+  const accessibleAccounts = useMemo(() => {
     const accounts = businessUnitId
       ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
       : adAccounts;
-    return accountFilter ? accounts.filter((account) => account.id === accountFilter) : accounts;
+    return accounts;
   }, [accountFilter, adAccounts, businessUnitId, segment]);
-  const accountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: account.name })), [visibleAccounts]);
+  const visibleAccounts = useMemo(() => accountFilter ? accessibleAccounts.filter((account) => account.id === accountFilter) : accessibleAccounts, [accessibleAccounts, accountFilter]);
+  const accountOptions = useMemo(() => accessibleAccounts.map((account) => ({ id: account.id, name: account.name })), [accessibleAccounts]);
+  const rankingAccountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: account.name })), [visibleAccounts]);
+
+  useEffect(() => {
+    if (adAccountId !== "all" && accessibleAccounts.length && !accessibleAccounts.some((account) => account.id === adAccountId)) setAdAccountId("all");
+  }, [accessibleAccounts, adAccountId, setAdAccountId]);
   const productNames = useMemo(() => new Map(products.map((product) => [product.id, product.name])), [products]);
   const dealOwners = useMemo(() => new Map(rdDeals.map((deal) => [deal.rd_deal_id, deal.deal_owner_name || "Não informado"])), [rdDeals]);
   const enriched = useMemo<CommercialSaleRow[]>(() => sales.map((sale) => {
@@ -75,7 +81,7 @@ export default function CommercialPage() {
   )), [enriched, productFilter, sellerFilter]);
   const goals = useMemo(() => new Map((goalData?.rows ?? []).map((goal) => [goal.ad_account_id, Number(goal.target_revenue)])), [goalData?.rows]);
   const rankingDeals = useMemo(() => sellerFilter === "all" ? rdDeals : rdDeals.filter((deal) => deal.deal_owner_name === sellerFilter), [rdDeals, sellerFilter]);
-  const accountRankings = useMemo(() => buildCommercialAccountRankings({ sales: filtered, deals: rankingDeals, accounts: accountOptions, goals }), [accountOptions, filtered, goals, rankingDeals]);
+  const accountRankings = useMemo(() => buildCommercialAccountRankings({ sales: filtered, deals: rankingDeals, accounts: rankingAccountOptions, goals }), [filtered, goals, rankingAccountOptions, rankingDeals]);
   const totals = useMemo(() => aggregateSales(filtered.map((row) => row.sale)), [filtered]);
   const overallRanking = useMemo(() => {
     const map = new Map<string, { seller: string; revenue: number; count: number; commission: number }>();

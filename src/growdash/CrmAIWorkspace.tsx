@@ -16,7 +16,9 @@ type Props = { deals: RDDealLite[]; sales: Sale[]; accountId?: string };
 
 export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
   const { startDate, endDate } = useGlobalFilters();
-  const { data: insights = [] } = useInsights({ adAccountId: accountId, startDate, endDate, enabled: !!accountId });
+  // Sem uma conta específica, a IA deve analisar todas as contas liberadas ao
+  // usuário — o seletor "Todas as contas" não pode transformar Meta em zero.
+  const { data: insights = [] } = useInsights({ adAccountId: accountId, startDate, endDate, enabled: true });
   const [monitored, setMonitored] = useState(() => window.localStorage.getItem("growdash:crm-ai-monitored") === "true");
   const analytics = useMemo(() => analyze(deals, insights, sales), [deals, insights, sales]);
 

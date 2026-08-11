@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useFunnelStages } from "@/hooks/useRDDeals";
@@ -58,8 +59,13 @@ type PipelineStage = {
 export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { adAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
+  const { adAccountId, setAdAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
+  const { data: adAccounts = [] } = useAdAccounts();
+  const availableAccounts = useMemo(() => businessUnitId
+    ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccounts, businessUnitId, segment]);
+  const availableAccountIds = useMemo(() => new Set(availableAccounts.map((account) => account.id)), [availableAccounts]);
   const { data: rdIntegration, isLoading: loadingRDIntegration } = useRDIntegration();
   const rdEnabled = rdIntegration?.is_active === true;
   const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter, rdEnabled);
@@ -77,6 +83,13 @@ export default function CrmPage() {
   const [syncing, setSyncing] = useState(false);
   const [page, setPage] = useState(1);
   const [stageLimits, setStageLimits] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (adAccountId !== "all" && availableAccounts.length && !availableAccountIds.has(adAccountId)) setAdAccountId("all");
+  }, [adAccountId, availableAccountIds, availableAccounts.length, setAdAccountId]);
+
+  const scopedDeals = useMemo(() => allDeals.filter((deal) => !deal.ad_account_id || availableAccountIds.has(deal.ad_account_id)), [allDeals, availableAccountIds]);
+  const scopedSales = useMemo(() => canonicalSales.filter((sale) => !sale.ad_account_id || availableAccountIds.has(sale.ad_account_id)), [availableAccountIds, canonicalSales]);
 
   const selectedFunnelId = funnelId === "all" ? undefined : funnelId;
   const { data: storedStages = [] } = useFunnelStages(selectedFunnelId);
@@ -105,7 +118,7 @@ export default function CrmPage() {
   const dealsInPipeline = useMemo(() => {
     const rangeStart = startOfDay(startDate).getTime();
     const rangeEnd = endOfDay(endDate).getTime();
-    return allDeals.filter((deal) => {
+    return scopedDeals.filter((deal) => {
       if (funnelId !== "all" && deal.rd_funnel_id !== funnelId) return false;
       // O CRM usa a última movimentação quando ela existe; assim o período
       // responde ao calendário para negócios antigos que avançaram agora.
@@ -114,7 +127,7 @@ export default function CrmPage() {
       const timestamp = new Date(relevantDate).getTime();
       return !Number.isNaN(timestamp) && timestamp >= rangeStart && timestamp <= rangeEnd;
     });
-  }, [allDeals, endDate, funnelId, startDate]);
+  }, [endDate, funnelId, scopedDeals, startDate]);
   const owners = useMemo(
     () => Array.from(new Set(dealsInPipeline.map((deal) => deal.deal_owner_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [dealsInPipeline],
@@ -146,7 +159,7 @@ export default function CrmPage() {
     const lost = deals.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
     const active = deals.filter((deal) => !deal.win && !lost.includes(deal));
     const visibleDealIds = new Set(deals.map((deal) => deal.rd_deal_id));
-    const realized = aggregateSales(canonicalSales.filter((sale) => sale.rd_deal_id && visibleDealIds.has(sale.rd_deal_id)));
+    const realized = aggregateSales(scopedSales.filter((sale) => sale.rd_deal_id && visibleDealIds.has(sale.rd_deal_id)));
     return {
       active: active.length,
       openRevenue: active.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0),
@@ -155,7 +168,7 @@ export default function CrmPage() {
       lost: lost.length,
       conversion: deals.length ? (won.length / deals.length) * 100 : 0,
     };
-  }, [canonicalSales, deals]);
+  }, [deals, scopedSales]);
 
   const stages = useMemo<PipelineStage[]>(() => {
     const map = new Map<string, PipelineStage>();
@@ -196,9 +209,9 @@ export default function CrmPage() {
   }, [deals, stages]);
 
   const lastUpdatedAt = useMemo(() => {
-    const timestamps = allDeals.map((deal) => deal.updated_at || deal.stage_updated_at).filter(Boolean) as string[];
+    const timestamps = scopedDeals.map((deal) => deal.updated_at || deal.stage_updated_at).filter(Boolean) as string[];
     return timestamps.sort().at(-1) || null;
-  }, [allDeals]);
+  }, [scopedDeals]);
 
   const pageCount = Math.max(1, Math.ceil(deals.length / PAGE_SIZE));
   const visibleList = deals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -271,7 +284,7 @@ export default function CrmPage() {
       />
 
       <section className="gd-panel mb-4 p-3 sm:p-4">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,.8fr)_minmax(170px,.7fr)_minmax(235px,.95fr)_auto]">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
@@ -279,6 +292,10 @@ export default function CrmPage() {
           <select aria-label="Filtrar por funil" value={funnelId} onChange={(event) => setFunnelId(event.target.value)} className="gd-button h-11 min-w-0">
             {view === "list" && <option value="all">Todos os funis conectados</option>}
             {funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}
+          </select>
+          <select aria-label="Filtrar por conta de anúncio" value={adAccountId} onChange={(event) => setAdAccountId(event.target.value)} className="gd-button h-11 min-w-0">
+            <option value="all">Todas as contas</option>
+            {availableAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
           <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
@@ -313,7 +330,7 @@ export default function CrmPage() {
       </div>}
 
       {loadingDeals || loadingSales ? <CRMLoading /> : view === "ai" ? (
-        <CrmAIWorkspace deals={deals} sales={canonicalSales} accountId={accountFilter} />
+        <CrmAIWorkspace deals={deals} sales={scopedSales} accountId={accountFilter} />
       ) : view === "board" ? (
         <KanbanBoard
           stages={stages}
