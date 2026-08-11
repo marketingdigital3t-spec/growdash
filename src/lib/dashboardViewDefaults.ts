@@ -33,6 +33,54 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // Algumas views v8 foram gravadas antes de os quatro cards laterais serem
+  // inseridos. Elas conservavam CTR e Taxa de Conversão, mas não Margem nem
+  // Recebíveis; o bloco padrão ficava abaixo de uma área vazia. Como faltam
+  // widgets canônicos (e não é apenas uma preferência de posição), é seguro
+  // reconstruir somente a faixa inicial, preservando widgets personalizados.
+  if (currentVersion >= 8 && existingDefault) {
+    const requiredSecondaryIds = [
+      "campaign_ctr",
+      "campaign_conversion_rate",
+      "financial_margin",
+      "financial_receivables",
+    ];
+    const hasIncompleteSecondaryColumn = requiredSecondaryIds.some(
+      (id) => !widgets.some((widget) => widget.id === id),
+    );
+
+    if (!hasIncompleteSecondaryColumn) {
+      return {
+        ...view,
+        widgets: widgets.map((widget) => widget.id === defaultId
+          ? { ...widget, config: { ...widget.config, ...defaultWidget.config } }
+          : widget),
+      };
+    }
+
+    const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
+    const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
+    const customWidgets = widgets.filter((widget) => !canonicalIds.has(widget.id));
+    const canonicalWidgets = DEFAULT_VIEW.widgets.map((widget) => {
+      const existing = widget.type === "default_block"
+        ? existingDefault
+        : widgets.find((candidate) => candidate.id === widget.id);
+      if (!existing) return { ...widget, config: { ...widget.config } };
+      return widget.type === "default_block"
+        ? { ...existing, id: defaultId, config: { ...existing.config, ...defaultWidget.config } }
+        : existing;
+    });
+    let customY = canonicalLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
+    const customLayout = layout
+      .filter((item) => !canonicalIds.has(item.i))
+      .map((item) => {
+        const next = { ...item, x: 0, y: customY, w: Math.min(12, Math.max(2, item.w || 3)) };
+        customY += Math.max(2, item.h || 2);
+        return next;
+      });
+    return { ...view, widgets: [...canonicalWidgets, ...customWidgets], layout: [...canonicalLayout, ...customLayout] };
+  }
+
   // Version 8 keeps only the four actionable secondary KPIs beside platform
   // distribution. Remove redundant cards from the standard view once, while
   // preserving widgets deliberately added by the user below it.

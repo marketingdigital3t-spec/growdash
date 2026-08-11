@@ -133,4 +133,30 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.widgets.some((widget) => widget.id === "financial_ticket")).toBe(false);
     expect(migrated.widgets.some((widget) => widget.id === "campaign_cpl")).toBe(false);
   });
+
+  it("recompõe a coluna lateral incompleta de uma visualização v8", () => {
+    const legacyV8 = {
+      id: "view-v8-gap",
+      widgets: DEFAULT_VIEW.widgets
+        .filter((widget) => !["financial_margin", "financial_receivables"].includes(widget.id))
+        .map((widget) => widget.id === "default"
+          ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 8 } }
+          : { ...widget }),
+      layout: DEFAULT_VIEW.layout
+        .filter((item) => !["financial_margin", "financial_receivables"].includes(item.i))
+        .map((item) => ({ ...item, y: item.i === "default" ? 14 : item.y })),
+    };
+
+    const migrated = ensureDefaultDashboardContent(legacyV8);
+
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+    });
+    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ x: 0, y: 2, w: 4, h: 8 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 8 });
+    expect(migrated.layout.find((item) => item.i === "campaign_conversion_rate")).toMatchObject({ x: 9, y: 4, w: 3, h: 2 });
+    expect(migrated.layout.find((item) => item.i === "financial_margin")).toMatchObject({ x: 9, y: 6, w: 3, h: 2 });
+    expect(migrated.layout.find((item) => item.i === "financial_receivables")).toMatchObject({ x: 9, y: 8, w: 3, h: 2 });
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 10, w: 12 });
+  });
 });

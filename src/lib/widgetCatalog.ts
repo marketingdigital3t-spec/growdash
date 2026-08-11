@@ -317,7 +317,9 @@ export function getWidgetDef(type: WidgetType) {
 
 // Default "Padrão" view: the canonical full-width dashboard recovered from the
 // original Growdash project. System widgets are appended by the renderer.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 8;
+// v9 corrige visualizações já salvas que ainda mantinham a antiga coluna com
+// apenas CTR e conversão, deixando um vão antes do detalhamento de campanhas.
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 9;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
