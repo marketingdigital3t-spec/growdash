@@ -43,7 +43,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {cards.map(({ label, value, detail, icon: Icon }) => (
             <MetricHelpTooltip key={label} title={label} description={metricDescription(label)} detail={`Fonte e contexto: ${detail}.`} className="h-full" showHint>
-              <div className="gd-metric-card h-full min-w-0 cursor-default rounded-xl border border-border/50 bg-background/70 p-3">
+              <div className="gd-metric-card gd-funnel-media-kpi h-full min-w-0 cursor-default rounded-xl border border-border/50 bg-background/70 p-3">
                 <div className="flex items-start justify-between gap-2 pr-5">
                   <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
                   <Icon className="h-4 w-4 shrink-0 text-primary" />

@@ -39,7 +39,7 @@ export function FunnelKPIs({ a, cpl, cac }: Props) {
         const Icon = c.icon;
         return (
           <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} className="h-full" showHint>
-            <Card className="gd-metric-card h-full cursor-default bg-card/75 border-border/60 backdrop-blur">
+            <Card className="gd-metric-card gd-funnel-kpi h-full cursor-default bg-card/75 border-border/60 backdrop-blur">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2 pr-5">
                   <span className="text-xs text-muted-foreground">{c.label}</span>
