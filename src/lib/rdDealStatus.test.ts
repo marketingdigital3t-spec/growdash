@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isWonRDStageName } from "./rdDealStatus";
 
 describe("isWonRDStageName", () => {
-  it.each(["Venda", "Vendas", "Venda realizada", "Venda concluída", "Fechado ganho", "Cliente"]) ("recognizes %s as won", (stage) => {
+  it.each(["Venda", "Vendas", "Venda realizada", "Vendas realizadas", "Venda concluída", "Fechado ganho", "Cliente"]) ("recognizes %s as won", (stage) => {
     expect(isWonRDStageName(stage)).toBe(true);
   });
 

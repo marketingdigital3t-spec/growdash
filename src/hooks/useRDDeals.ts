@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { endOfDay } from "date-fns";
+import { isWonRDStageName } from "@/lib/rdDealStatus";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -157,7 +158,6 @@ export function useRDClosedDeals(params: Params) {
         .from("rd_deals")
         .select(DEAL_FIELDS)
         .eq("rd_funnel_id", funnelId!)
-        .eq("win", true)
         .not("closed_at", "is", null)
         .order("closed_at", { ascending: false });
 
@@ -179,7 +179,10 @@ export function useRDClosedDeals(params: Params) {
         all = all.concat(batch);
         if (batch.length < PAGE) break;
       }
-      return all;
+      // Alguns pipelines do RD mantêm a etapa final como “Vendas realizadas”
+      // antes de preencher o booleano técnico `win`. Não descartamos essas
+      // vendas reais por causa da ordem de sincronização.
+      return all.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
@@ -290,6 +293,11 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
 
   // Sequência (sem perdido) para taxas de avanço
   const sequence = sortedStages.filter((s) => !s.is_lost);
+  const wonStageIds = new Set(sortedStages.filter((stage) => stage.is_won).map((stage) => stage.rd_stage_id));
+  const confirmedClosedDeals = Array.from(new Map(
+    [...closedDeals, ...deals.filter((deal) => deal.win || wonStageIds.has(deal.rd_stage_id || "") || isWonRDStageName(deal.rd_stage_name))]
+      .map((deal) => [deal.rd_deal_id, deal]),
+  ).values());
 
   // Mapa: stage_id -> índice na sequência
   const indexInSeq = new Map<string, number>();
@@ -302,10 +310,10 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   const daysCountByStage = new Map<string, number>();
 
   let qualifiedLeads = 0;
-  const conversions = closedDeals.length;
+  const conversions = confirmedClosedDeals.length;
   let lostDeals = 0;
-  const revenue = closedDeals.reduce((sum, deal) => sum + (deal.amount_total || 0), 0);
-  const wonAmounts: number[] = closedDeals.map((deal) => deal.amount_total || 0);
+  const revenue = confirmedClosedDeals.reduce((sum, deal) => sum + (deal.amount_total || 0), 0);
+  const wonAmounts: number[] = confirmedClosedDeals.map((deal) => deal.amount_total || 0);
 
   const now = Date.now();
   for (const d of deals) {
@@ -398,7 +406,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   const avgTicket = wonAmounts.length > 0 ? wonAmounts.reduce((a, b) => a + b, 0) / wonAmounts.length : 0;
 
   // Tempo médio até conversão
-  const wonWithDates = closedDeals.filter((d) => d.lead_created_at && d.closed_at);
+  const wonWithDates = confirmedClosedDeals.filter((d) => d.lead_created_at && d.closed_at);
   const avgDaysToConvert =
     wonWithDates.length > 0
       ? wonWithDates.reduce((s, d) => {
@@ -421,7 +429,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
       evoMap.set(day, cur);
     }
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     if (!d.closed_at) continue;
     const day = d.closed_at.slice(0, 10);
     const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
@@ -435,7 +443,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   // Aging — leads não fechados parados há X dias (baseado em stage_updated_at)
   const agingBuckets = { gt3: 0, gt7: 0, gt15: 0 };
   for (const d of deals) {
-    if (d.win || d.stage_bucket === "lost") continue;
+    if (d.win || wonStageIds.has(d.rd_stage_id || "") || isWonRDStageName(d.rd_stage_name) || d.stage_bucket === "lost") continue;
     const ref = d.stage_updated_at || d.lead_created_at;
     if (!ref) continue;
     const days = (now - new Date(ref).getTime()) / 86400000;
@@ -456,7 +464,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     cur.leads += 1;
     srcMap.set(k, cur);
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     const k = d.utm_source || "Não informado";
     const cur = srcMap.get(k) || { leads: 0, sales: 0, revenue: 0 };
     cur.sales += 1;
@@ -494,7 +502,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     cur.leads += 1;
     stateMap.set(k, cur);
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     const k = normalizeUF(d.lead_state);
     const cur = stateMap.get(k) || { leads: 0, conversions: 0 };
     cur.conversions += 1;
@@ -519,7 +527,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
       cur.leads += 1;
     }
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     if (!d.closed_at) continue;
     const wd = new Date(d.closed_at).getDay();
     const cur = wdMap.get(wd)!;
@@ -552,7 +560,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
       hourMap.get(h)!.leads += 1;
     }
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     if (!d.closed_at) continue;
     const h = new Date(d.closed_at).getHours();
     const p = periodOfHour(h);
@@ -583,7 +591,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     const k = d.deal_owner_name || "Não atribuído";
     const cur = ownerMap.get(k) || { deals: 0, wins: 0 };
     cur.deals += 1;
-    if (d.win) cur.wins += 1;
+    if (d.win || wonStageIds.has(d.rd_stage_id || "") || isWonRDStageName(d.rd_stage_name)) cur.wins += 1;
     ownerMap.set(k, cur);
   }
   const ownerBreakdown = Array.from(ownerMap.entries())
