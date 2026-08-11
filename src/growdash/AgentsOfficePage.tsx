@@ -333,9 +333,12 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
   const parallaxValuesRef = useRef({ x: 0, y: 0 });
   const isCoreOpen = phase === "core";
   const selectedNode = KNOWLEDGE_NODES.find((node) => node.id === selectedArea) || null;
-  const needsMedia = selectedArea === "traffic" || selectedArea === "finance" || selectedArea === "brand";
-  const needsDeals = selectedArea === "crm" || selectedArea === "commercial";
-  const needsSales = selectedArea === "commercial" || selectedArea === "finance";
+  // Load the shared operational signals once the user enters the core. The
+  // graph and its health state then use the same real data without a request
+  // per node or fabricated placeholders.
+  const needsMedia = isCoreOpen;
+  const needsDeals = isCoreOpen;
+  const needsSales = isCoreOpen;
   const { data: workspace } = useWorkspace();
   const mediaQuery = useInsights({ startDate, endDate, enabled: isCoreOpen && needsMedia });
   const dealsQuery = useRDDealsForPeriod({ startDate, endDate, enabled: isCoreOpen && needsDeals });
@@ -382,6 +385,16 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
     schedules: schedulesQuery.data,
     agentConfigs: configsQuery.data,
   }), [accounts, configsQuery.data, dealsQuery.data, mediaQuery.data, schedulesQuery.data, selectedArea, salesQuery.data]);
+  const neuralHealth = useMemo(() => {
+    const measured = summaries.filter((summary) => summary.health !== "no-data");
+    if (!measured.length) return { status: "no-data" as const, score: null };
+    const values = { healthy: 100, attention: 60, critical: 25 } as const;
+    const score = Math.round(measured.reduce((total, summary) => total + values[summary.health], 0) / measured.length);
+    return {
+      status: score < 45 ? "critical" as const : score < 80 ? "attention" as const : "healthy" as const,
+      score,
+    };
+  }, [summaries]);
   const selectedStrategyLabel = selectedNode?.strategies.find(([, id]) => id === selectedStrategy)?.[0] || selectedNode?.strategies[0]?.[0] || "Visão geral";
   const panelLoading = (needsMedia && mediaQuery.isFetching) || (needsDeals && dealsQuery.isFetching) || (needsSales && salesQuery.isFetching) || (selectedArea === "automations" && (schedulesQuery.isFetching || configsQuery.isFetching));
 
@@ -467,7 +480,7 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
       {KNOWLEDGE_NODES.map((node, index) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 335; const y = 380 + Math.sin(radians) * 285; const controlX = 500 + Math.cos(radians) * 170 + Math.sin(radians) * (index % 2 === 0 ? 34 : -34); const controlY = 380 + Math.sin(radians) * 145; return <g key={node.id} style={{ "--link-delay": `${index * -.28}s` } as React.CSSProperties}><path d={`M 500 380 Q ${controlX} ${controlY} ${x} ${y}`} stroke="url(#jarvis-link)" strokeWidth="2" strokeDasharray="7 11" fill="none" /><circle cx={x} cy={y} r="6" fill="currentColor" /><circle className="jarvis-node-halo" cx={x} cy={y} r="15" fill="none" stroke="currentColor" /></g>; })}
     </svg>}
 
-    <NeuralCommandCore3D expanded={isCoreOpen} entering={phase === "entering"} onEnter={enterCore} />
+    <NeuralCommandCore3D expanded={isCoreOpen} entering={phase === "entering"} onEnter={enterCore} health={neuralHealth.status} healthScore={neuralHealth.score} />
 
     {isCoreOpen && <>
       <div className="jarvis-core-label" aria-live="polite"><Radar /><span>Grafo Growdash · {KNOWLEDGE_NODES.length} áreas · {KNOWLEDGE_NODES.reduce((total, node) => total + node.strategies.length, 0)} estratégias</span></div>
