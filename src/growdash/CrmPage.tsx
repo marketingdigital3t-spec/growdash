@@ -13,6 +13,7 @@ import {
   Mail,
   MapPin,
   RefreshCw,
+  Save,
   Search,
   Target,
   Trophy,
@@ -26,6 +27,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
@@ -34,6 +36,7 @@ import { classifyLead, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDeals
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -60,6 +63,7 @@ type PipelineStage = {
 export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { adAccountId, setAdAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
   const { data: adAccounts = [] } = useAdAccounts();
@@ -358,7 +362,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} onClose={() => setSelectedDeal(null)} />
+      <DealDetails deal={selectedDeal} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} userId={user?.id} onClose={() => setSelectedDeal(null)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }); queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }); toast.success("Negociação atualizada na Growdash"); }} />
     </div>
   );
 }
@@ -474,7 +478,7 @@ function DealsList({ deals, funnels, page, pageCount, total, onPage, onOpen }: {
   );
 }
 
-function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; funnelName?: string; onClose: () => void }) {
+function DealDetails({ deal, funnelName, userId, onClose, onSaved }: { deal: RDDealLite | null; funnelName?: string; userId?: string; onClose: () => void; onSaved: () => void }) {
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
   return (
@@ -490,6 +494,7 @@ function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; f
           <DetailMetric icon={<UserRound />} label="Responsável" value={deal.deal_owner_name || "Não informado"} />
           <DetailMetric icon={deal.win ? <Trophy /> : <XCircle />} label="Situação" value={statusLabel(deal)} />
         </div>
+        <DealEditor deal={deal} userId={userId} onSaved={onSaved} />
         <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
           <DetailRow icon={<Columns3 />} label="Funil" value={funnelName || "Funil RD"} />
           <DetailRow icon={<Mail />} label="E-mail" value={deal.contact_email || "Não informado"} />
@@ -506,6 +511,54 @@ function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; f
       </SheetContent>
     </Sheet>
   );
+}
+
+function DealEditor({ deal, userId, onSaved }: { deal: RDDealLite; userId?: string; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(() => ({
+    amount: String(deal.amount_total_manual ?? getRDDealAmount(deal) ?? ""),
+    reason: deal.manual_override_reason ?? "Correção manual no CRM Growdash",
+    contactName: deal.contact_name ?? "",
+    contactEmail: deal.contact_email ?? "",
+    owner: deal.deal_owner_name ?? "",
+    product: deal.rd_product_name ?? "",
+    source: deal.utm_source ?? "",
+    campaign: deal.utm_campaign ?? "",
+    lostReason: deal.lost_reason ?? "",
+  }));
+
+  async function save() {
+    const amount = Number(form.amount.replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(amount) || amount < 0) return toast.error("Informe um valor de venda válido.");
+    setSaving(true);
+    const { error } = await supabase.from("rd_deals").update({
+      amount_total_manual: amount || null,
+      manual_override_enabled: amount > 0,
+      manual_override_reason: amount > 0 ? form.reason.trim() || "Correção manual no CRM Growdash" : null,
+      manual_override_at: amount > 0 ? new Date().toISOString() : null,
+      manual_override_by: amount > 0 ? userId ?? null : null,
+      contact_name: form.contactName.trim() || null,
+      contact_email: form.contactEmail.trim() || null,
+      deal_owner_name: form.owner.trim() || null,
+      rd_product_name: form.product.trim() || null,
+      utm_source: form.source.trim() || null,
+      utm_campaign: form.campaign.trim() || null,
+      lost_reason: form.lostReason.trim() || null,
+    }).eq("id", deal.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    setEditing(false);
+    onSaved();
+  }
+
+  if (!editing) return <section className="mt-5 rounded-2xl border border-primary/25 bg-primary/[.04] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-black">Editar negociação</h3><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Ajuste valor, contato, responsável, produto e atribuição diretamente na Growdash.</p></div><Button type="button" size="sm" onClick={() => setEditing(true)}>Editar</Button></div>{deal.manual_override_enabled && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-[10px] font-semibold text-amber-600">Valor manual ativo: {brl.format(getRDDealAmount(deal))}. Ele prevalece sobre o valor recebido do RD.</p>}</section>;
+
+  return <section className="mt-5 rounded-2xl border border-primary/35 bg-primary/[.05] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">O valor manual é preservado pela Growdash mesmo quando o RD sincronizar novamente.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><EditField label="Valor da venda realizada" value={form.amount} onChange={(value) => setForm({ ...form, amount: value })} inputMode="decimal" /><EditField label="Motivo do ajuste" value={form.reason} onChange={(value) => setForm({ ...form, reason: value })} /><EditField label="Nome do contato" value={form.contactName} onChange={(value) => setForm({ ...form, contactName: value })} /><EditField label="E-mail" value={form.contactEmail} onChange={(value) => setForm({ ...form, contactEmail: value })} type="email" /><EditField label="Responsável" value={form.owner} onChange={(value) => setForm({ ...form, owner: value })} /><EditField label="Produto" value={form.product} onChange={(value) => setForm({ ...form, product: value })} /><EditField label="Origem / UTM source" value={form.source} onChange={(value) => setForm({ ...form, source: value })} /><EditField label="Campanha / UTM campaign" value={form.campaign} onChange={(value) => setForm({ ...form, campaign: value })} /></div><label className="mt-3 grid gap-1.5 text-xs font-bold">Motivo de perda <Textarea value={form.lostReason} onChange={(event) => setForm({ ...form, lostReason: event.target.value })} rows={2} /></label><div className="mt-4 flex justify-end"><Button type="button" onClick={() => void save()} disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? "Salvando…" : "Salvar alterações"}</Button></div></section>;
+}
+
+function EditField({ label, value, onChange, type = "text", inputMode }: { label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }) {
+  return <label className="grid gap-1.5 text-xs font-bold">{label}<Input type={type} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function ViewButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
