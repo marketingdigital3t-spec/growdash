@@ -52,6 +52,22 @@ type DailyInsight = { insight_date: string; followers: number; follower_delta: n
 
 // Métricas de conteúdo precisam preservar a leitura exata: 1.542, nunca “1,5 mil”.
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+const SOCIAL_QUERY_TIMEOUT_MS = 15_000;
+
+async function socialQuery<T>(run: (signal: AbortSignal) => PromiseLike<{ data: T | null; error: { message: string } | null }>) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), SOCIAL_QUERY_TIMEOUT_MS);
+  try {
+    const { data, error } = await run(controller.signal);
+    if (error) throw error;
+    return data ?? [] as T;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("A consulta demorou mais que o esperado. Verifique a conexão e tente novamente.");
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 // Preview-only data. It never reaches Supabase, never triggers a sync and is
 // deliberately marked in the UI so it cannot be mistaken for a real account.
@@ -109,9 +125,7 @@ export default function SocialMediaPage() {
     queryKey: ["social_accounts", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_accounts").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as SocialAccount[];
+      return socialQuery((signal) => supabase.from("social_accounts").select("*").order("created_at", { ascending: false }).abortSignal(signal)) as Promise<SocialAccount[]>;
     },
   });
   const liveAccounts = accountsQuery.data ?? [];
@@ -120,21 +134,17 @@ export default function SocialMediaPage() {
   const selected = accounts.find((account) => account.id === selectedId);
 
   const mediaQuery = useQuery({
-    queryKey: ["social_media", selectedId, startDate.toISOString(), endDate.toISOString()],
+    queryKey: ["social_media", selectedId],
     enabled: !!selectedId && !demoMode,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_media").select("*").eq("social_account_id", selectedId).gte("published_at", startDate.toISOString()).lte("published_at", endOfDay(endDate).toISOString()).order("published_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as SocialMedia[];
+      return socialQuery((signal) => supabase.from("social_media").select("*").eq("social_account_id", selectedId).order("published_at", { ascending: false }).limit(100).abortSignal(signal)) as Promise<SocialMedia[]>;
     },
   });
   const dailyQuery = useQuery({
     queryKey: ["social_insights_daily", selectedId, startDate.toISOString(), endDate.toISOString()],
     enabled: !!selectedId && !demoMode,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date");
-      if (error) throw error;
-      return (data ?? []) as DailyInsight[];
+      return socialQuery((signal) => supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date").abortSignal(signal)) as Promise<DailyInsight[]>;
     },
   });
 
@@ -155,7 +165,13 @@ export default function SocialMediaPage() {
     onError: (error: Error) => toast({ title: "Falha na sincronização", description: error.message, variant: "destructive" }),
   });
 
-  const media = useMemo(() => demoMode ? DEMO_MEDIA : mediaQuery.data ?? [], [demoMode, mediaQuery.data]);
+  const allMedia = useMemo(() => demoMode ? DEMO_MEDIA : mediaQuery.data ?? [], [demoMode, mediaQuery.data]);
+  const periodMedia = useMemo(() => allMedia.filter((item) => !item.published_at || (new Date(item.published_at) >= startDate && new Date(item.published_at) <= endOfDay(endDate))), [allMedia, endDate, startDate]);
+  // Do not make a connected profile look empty only because the global
+  // dashboard interval excludes its latest publication. Period metrics still
+  // use periodMedia; the content gallery falls back to the latest real posts.
+  const media = periodMedia.length ? periodMedia : allMedia;
+  const showingOutsidePeriod = !demoMode && periodMedia.length === 0 && allMedia.length > 0;
   const sortedMedia = useMemo(() => [...media].sort((a, b) => Number(b[contentSort] || 0) - Number(a[contentSort] || 0)), [contentSort, media]);
   const daily = demoMode ? DEMO_DAILY : dailyQuery.data ?? [];
   const totals = useMemo(() => media.reduce((sum, item) => ({ reach: sum.reach + Number(item.reach), interactions: sum.interactions + Number(item.interactions), likes: sum.likes + Number(item.likes), comments: sum.comments + Number(item.comments), saves: sum.saves + Number(item.saves), shares: sum.shares + Number(item.shares) }), { reach: 0, interactions: 0, likes: 0, comments: 0, saves: 0, shares: 0 }), [media]);
@@ -179,7 +195,7 @@ export default function SocialMediaPage() {
 
       {schemaMissing && <section className="gd-panel border-amber-500/30 p-5"><b className="text-sm text-amber-500">Atualização de banco pendente</b><p className="mt-1 text-xs text-muted-foreground">Aplique a migration 20260715120000 para liberar contas, conteúdos e insights sociais.</p></section>}
 
-      {accountsQuery.isLoading ? <section className="gd-panel grid min-h-[420px] place-items-center p-8 text-center" role="status" aria-live="polite"><p className="text-sm text-muted-foreground">Verificando perfis conectados…</p></section> : !accounts.length && !schemaMissing ? (
+      {accountsQuery.isLoading ? <section className="gd-panel grid min-h-[420px] place-items-center p-8 text-center" role="status" aria-live="polite"><p className="text-sm text-muted-foreground">Verificando perfis conectados…</p></section> : accountsQuery.isError ? <section className="gd-panel grid min-h-[420px] place-items-center p-8 text-center"><div className="max-w-md"><h2 className="text-lg font-black">Não foi possível carregar o Instagram</h2><p className="mt-2 text-sm text-muted-foreground">{(accountsQuery.error as Error).message}</p><Button className="mt-5" variant="outline" onClick={() => void accountsQuery.refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></section> : !accounts.length && !schemaMissing ? (
         <section className="gd-panel grid min-h-[420px] place-items-center overflow-hidden p-8 text-center">
           <div className="max-w-lg"><span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#f3c74a] to-[#9b6810] text-[#211706] shadow-[0_18px_60px_-25px_rgba(226,176,44,.9)]"><Instagram className="h-8 w-8" /></span><h2 className="mt-6 text-2xl font-black">Conecte um perfil profissional</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Use o login oficial do Instagram para importar perfil, publicações, Reels e métricas de alcance, salvamentos, compartilhamentos e engajamento. Senhas nunca passam pela Growdash.</p><div className="mt-6 flex flex-wrap justify-center gap-2"><Button onClick={() => connectInstagram.mutate()}><Instagram className="mr-2 h-4 w-4" />Continuar com Instagram</Button><Button variant="outline" onClick={() => setDemoMode(true)}>Ver dados demonstrativos</Button></div></div>
         </section>
@@ -225,9 +241,11 @@ export default function SocialMediaPage() {
 
               <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between"><div><b className="text-sm">Publicações</b><p className="text-[11px] text-muted-foreground">Selecione um conteúdo para ver a análise completa à direita.</p></div><Select value={contentSort} onValueChange={(value) => setContentSort(value as typeof contentSort)}><SelectTrigger className="sm:w-60" aria-label="Ordenar conteúdos do Instagram"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="interactions">Mais interações</SelectItem><SelectItem value="reach">Maior alcance</SelectItem><SelectItem value="engagement_rate">Maior engajamento</SelectItem><SelectItem value="saves">Mais salvamentos</SelectItem><SelectItem value="shares">Mais compartilhamentos</SelectItem><SelectItem value="comments">Mais comentários</SelectItem><SelectItem value="video_views">Mais visualizações</SelectItem></SelectContent></Select></div>
 
+              {showingOutsidePeriod && <p className="rounded-xl border border-border bg-muted/25 px-3 py-2 text-[11px] text-muted-foreground">Não há publicações no período global selecionado. Abaixo estão os conteúdos reais mais recentes do perfil.</p>}
+
               <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
                 {sortedMedia.map((item) => <button key={item.id} type="button" onClick={() => setSelectedMedia(item)} className="group relative aspect-square overflow-hidden bg-muted text-left outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" aria-label={`Abrir análise da publicação ${item.caption?.slice(0, 60) || item.media_type}`}><MediaPreview media={item} /><span className="absolute inset-0 flex items-end bg-gradient-to-t from-black/75 via-black/10 to-transparent p-3 opacity-0 transition duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"><span className="w-full"><b className="block text-xs text-white">{number.format(item.interactions)} interações</b><span className="mt-0.5 block text-[10px] text-white/75">{item.media_type} · {item.published_at ? format(new Date(item.published_at), "dd/MM/yyyy") : "—"}</span></span></span></button>)}
-                {!media.length && <div className="col-span-full"><Empty text="Nenhum conteúdo publicado no período selecionado." action={!demoMode && !!selectedId ? <Button size="sm" variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}><RefreshCw className={`mr-2 h-3.5 w-3.5 ${sync.isPending ? "animate-spin" : ""}`} />{sync.isPending ? "Atualizando…" : "Atualizar publicações"}</Button> : undefined} /></div>}
+                {mediaQuery.isLoading && !demoMode ? <div className="col-span-full"><Empty text="Carregando publicações…" /></div> : mediaQuery.isError && !demoMode ? <div className="col-span-full"><Empty text={(mediaQuery.error as Error).message} action={<Button size="sm" variant="outline" onClick={() => void mediaQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar novamente</Button>} /></div> : !media.length && <div className="col-span-full"><Empty text="Nenhuma publicação foi sincronizada ainda." action={!demoMode && !!selectedId ? <Button size="sm" variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}><RefreshCw className={`mr-2 h-3.5 w-3.5 ${sync.isPending ? "animate-spin" : ""}`} />{sync.isPending ? "Atualizando…" : "Atualizar publicações"}</Button> : undefined} /></div>}
               </div>
             </TabsContent>
             <TabsContent value="audience"><section className="gd-panel p-6"><h3 className="font-black">Crescimento da audiência</h3><p className="mt-1 text-xs text-muted-foreground">Ganhos e perdas são somados a partir da série diária oficial. Demografia e retenção só aparecem quando a Meta entrega a métrica para a conta.</p><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Mini label="Seguidores atuais" value={number.format(selected?.followers_count ?? 0)} /><Mini label="Ganhos no período" value={`+${number.format(followersGained)}`} /><Mini label="Perdas no período" value={`-${number.format(followersLost)}`} /><Mini label="Variação líquida" value={number.format(followersGained - followersLost)} /><Mini label="Publicações" value={number.format(selected?.media_count ?? 0)} /></div></section></TabsContent>

@@ -50,20 +50,11 @@ async function mediaInsights(base: string, mediaId: string, token: string) {
     for (const item of payload.data ?? []) result[item.name] = Number(item.values?.[0]?.value ?? item.value ?? 0);
     return result;
   } catch {
-    // Media types support different metric sets. A failed metric must not make
-    // the entire content sync fail, so retry individually and keep what exists.
-    for (const metric of metrics) {
-      const url = new URL(`${base}/${mediaId}/insights`);
-      url.searchParams.set("metric", metric);
-      url.searchParams.set("access_token", token);
-      try {
-        const payload = await graphJson(url);
-        const item = payload.data?.[0];
-        if (item) result[metric] = Number(item.values?.[0]?.value ?? item.value ?? 0);
-      } catch {
-        result[metric] = 0;
-      }
-    }
+    // Instagram exposes different insight sets for posts, reels and older
+    // media. Retrying every unsupported metric individually could turn one
+    // profile sync into hundreds of Graph calls and time out before posts were
+    // saved. Preserve the publication and leave unavailable metrics at zero;
+    // the next sync can enrich it when Meta makes them available.
     return result;
   }
 }
