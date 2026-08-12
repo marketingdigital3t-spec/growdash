@@ -1,12 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Link } from "react-router-dom";
 import {
   Activity,
   ArrowLeft,
   ArrowRight,
-  Box,
   Bot,
   BriefcaseBusiness,
   Coffee,
@@ -42,7 +40,7 @@ import { NeuralCommandCore3D } from "@/growdash/NeuralCommandCore3D";
 type AgentStatus = "working" | "walking" | "free";
 type ChatMessage = { id: string; role: "agent" | "user"; text: string };
 
-const RealOffice3D = lazy(() => import("@/growdash/RealOffice3D").then((module) => ({ default: module.RealOffice3D })));
+const LifeSimPage = lazy(() => import("@/growdash/LifeSimPage"));
 
 const AGENTS = [
   { id: "atlas", name: "Ágata", role: "Gestora de tráfego", specialty: "Mídia & escala", task: "Otimizando campanhas", color: "#e9b72d", desk: "station-traffic", position: "npc-atlas", look: "look-a", skin: "#c88b68", hair: "#291c19", outfit: "#b87924", pants: "#25252b" },
@@ -165,7 +163,7 @@ export default function AgentsOfficePage() {
     <div className="agents-office-page mx-auto w-full max-w-[1920px]">
       <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div><span className="text-[10px] font-black uppercase tracking-[.2em] text-primary">Growdash Intelligence Core</span><h1 className="mt-1 text-2xl font-black">Conhecimento & Agentes</h1><p className="mt-1 text-xs text-muted-foreground">Navegue pela inteligência da operação ou entre no escritório 3D dos agentes.</p></div>
-        <div className="flex flex-wrap items-center gap-2 text-[10px]"><button type="button" onClick={() => setView("map")} className={cn("rounded-lg border px-3 py-2 font-black", view === "map" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><Network className="mr-1 inline h-3.5 w-3.5" />Mapa</button><button type="button" onClick={() => setView("office")} className={cn("rounded-lg border px-3 py-2 font-black", view === "office" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><BriefcaseBusiness className="mr-1 inline h-3.5 w-3.5" />Escritório 3D</button><Link to="/life-sim" className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-2 font-black text-primary"><Box className="mr-1 inline h-3.5 w-3.5" />Growdash Life</Link>{view === "office" && <><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></>}</div>
+        <div className="flex flex-wrap items-center gap-2 text-[10px]"><button type="button" onClick={() => setView("map")} className={cn("rounded-lg border px-3 py-2 font-black", view === "map" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><Network className="mr-1 inline h-3.5 w-3.5" />Núcleo neural</button><button type="button" onClick={() => setView("office")} className={cn("rounded-lg border px-3 py-2 font-black", view === "office" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><BriefcaseBusiness className="mr-1 inline h-3.5 w-3.5" />Escritório 3D</button>{view === "office" && <><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></>}</div>
       </header>
 
       {view === "map" ? <KnowledgeMap
@@ -174,12 +172,8 @@ export default function AgentsOfficePage() {
         startDate={startDate}
         endDate={endDate}
       /> : <>
-        <Suspense fallback={<div className="grid min-h-[620px] place-items-center rounded-2xl border border-primary/25 bg-[#061017] text-sm text-cyan-100">Carregando ambiente 3D…</div>}>
-          <RealOffice3D
-            agents={AGENTS.slice(0, 5).map((agent) => ({ ...agent, status: statuses[agent.id] || "working" }))}
-            onSelectAgent={openAgent}
-            onStatusChange={updateStatus}
-          />
+        <Suspense fallback={<div className="grid min-h-[620px] place-items-center rounded-2xl border border-primary/25 bg-[#161108] text-sm text-primary">Carregando escritório 3D…</div>}>
+          <LifeSimPage />
         </Suspense>
         {showLegacyOfficePreview && <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
         <div className="office-sim-topbar">
