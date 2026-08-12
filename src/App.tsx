@@ -58,57 +58,20 @@ const queryClient = new QueryClient({
   },
 });
 
-function reloadFreshBuild() {
-  const retryKey = "growdash:loading-retry";
-  let attempts = 0;
-  try { attempts = Number(sessionStorage.getItem(retryKey) || "0"); } catch { /* storage is optional */ }
-  // One automatic refresh is enough to recover a stale Pages shell. Repeating
-  // it can hide a real network/CDN failure behind an endless spinner.
-  if (attempts >= 1) return false;
-  try { sessionStorage.setItem(retryKey, String(attempts + 1)); } catch { /* a cache-busted reload is still safe */ }
-  const url = new URL(window.location.href);
-  url.searchParams.set("gd_reload", String(Date.now()));
-  window.location.replace(url.toString());
-  return true;
-}
-
-function LoadingModule({ recover = false }: { recover?: boolean }) {
+function LoadingModule() {
   const [slow, setSlow] = useState(false);
-  const [recovering, setRecovering] = useState(false);
   useEffect(() => {
     const timeout = window.setTimeout(() => setSlow(true), 8000);
     return () => window.clearTimeout(timeout);
   }, []);
 
-  useEffect(() => {
-    if (!recover) return;
-    // A lazy chunk can remain pending forever after a Pages rollout if a
-    // browser holds an old HTML shell. Recover once automatically instead of
-    // leaving the person on an endless spinner. If it already recovered once,
-    // the visible recovery state stays available rather than retrying forever.
-    const timeout = window.setTimeout(() => {
-      if (reloadFreshBuild()) setRecovering(true);
-      else setSlow(true);
-    }, 10_000);
-    return () => window.clearTimeout(timeout);
-  }, [recover]);
-
   return <div className="grid min-h-[40vh] place-items-center px-4 text-center" role="status" aria-live="polite">
     {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
       <p className="font-bold">A Growdash está demorando para responder.</p>
-      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. Esta tela não continuará tentando sozinha.</p>
-      <button type="button" onClick={() => { try { sessionStorage.removeItem("growdash:loading-retry"); } catch { /* storage is optional */ } window.location.reload(); }} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar novamente</button>
-    </div> : recovering ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl"><p className="font-bold">Atualizando a Growdash…</p><p className="mt-2 text-sm text-muted-foreground">Estamos buscando a versão mais recente para recuperar o carregamento.</p></div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
+      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. A página não será recarregada automaticamente.</p>
+      <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar novamente</button>
+    </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
   </div>;
-}
-
-function ClearLoadingRecovery() {
-  useEffect(() => {
-    // This component only commits after the lazy route tree was actually
-    // rendered. Clearing the guard earlier reintroduced an infinite retry.
-    try { sessionStorage.removeItem("growdash:loading-retry"); } catch { /* storage is optional */ }
-  }, []);
-  return null;
 }
 
 function MarkApplicationBooted() {
@@ -255,7 +218,7 @@ export default function App() {
               <AccentInitializer>
                 <MarkApplicationBooted />
                 <AppErrorBoundary>
-                  <Suspense fallback={<LoadingModule recover />}>
+                  <Suspense fallback={<LoadingModule />}>
                     <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
@@ -310,7 +273,6 @@ export default function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
                     </Routes>
-                    <ClearLoadingRecovery />
                   </Suspense>
                 </AppErrorBoundary>
               </AccentInitializer>

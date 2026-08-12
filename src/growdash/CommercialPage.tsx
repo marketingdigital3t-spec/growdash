@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BarChart3, Crown, Filter, Search, Sparkles, Target, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useProducts } from "@/hooks/useProducts";
