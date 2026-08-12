@@ -24,6 +24,10 @@
   50% { opacity: .8; transform: scale(1.04); }
 }
 
+@keyframes monochrome-edge-flash {
+  to { transform: rotate(1turn); }
+}
+
 @layer base {
   :root {
     --background: 40 34% 96%;
@@ -379,6 +383,70 @@
   canvas {
     max-width: 100%;
   }
+}
+
+/*
+ * Growdash Mono — the application has one intentional material language:
+ * black, charcoal, smoke and white. We keep semantic success/warning/error
+ * colors for data states, but navigation, surfaces and actions never inherit
+ * a blue, purple or gold accent saved in an older browser session.
+ */
+html,
+html[data-accent],
+html[data-accent="gold"],
+html[data-accent="purple"],
+html[data-accent="blue"],
+html[data-accent="pink"],
+html[data-accent="sapphire"],
+html[data-accent="emerald"],
+html[data-accent="obsidian"] {
+  --primary: 0 0% 92%;
+  --primary-foreground: 0 0% 7%;
+  --primary-soft: 0 0% 85%;
+  --ring: 0 0% 100%;
+  --accent: 0 0% 17%;
+  --accent-foreground: 0 0% 98%;
+  --sidebar-primary: 0 0% 92%;
+  --sidebar-primary-foreground: 0 0% 7%;
+  --sidebar-icon-active: 0 0% 100%;
+  --sidebar-ring: 0 0% 100%;
+  --brand-black: #050505;
+  --brand-surface: #111111;
+  --brand-gold: #d7d7d7;
+  --brand-gold-light: #ffffff;
+  --brand-bronze: #4a4a4a;
+  --brand-ivory: #ffffff;
+  --brand-accent-rgb: 226, 226, 226;
+}
+
+html:not(.dark) {
+  --background: 0 0% 94%;
+  --foreground: 0 0% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 8%;
+  --secondary: 0 0% 89%;
+  --secondary-foreground: 0 0% 11%;
+  --muted: 0 0% 91%;
+  --muted-foreground: 0 0% 37%;
+  --border: 0 0% 80%;
+  --input: 0 0% 76%;
+}
+
+.dark {
+  --background: 0 0% 3%;
+  --foreground: 0 0% 95%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 95%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 95%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 93%;
+  --muted: 0 0% 13%;
+  --muted-foreground: 0 0% 63%;
+  --border: 0 0% 19%;
+  --input: 0 0% 21%;
 }
 
 @layer components {
@@ -3562,6 +3630,108 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
     rgba(250, 247, 239, .72);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.78), 0 22px 48px -40px rgba(70, 45, 8, .30);
 }
+
+/* Final monochrome glass pass. It intentionally comes after historical
+   dashboard rules so old warm-blue-gold declarations cannot leak back in. */
+.brand-shell {
+  background:
+    radial-gradient(ellipse at 86% -14%, rgba(255,255,255,.065), transparent 30rem),
+    radial-gradient(ellipse at 8% 48%, rgba(255,255,255,.03), transparent 27rem),
+    linear-gradient(135deg, #050505, #0c0c0c 48%, #050505);
+}
+.brand-shell::before { background-image: linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px); }
+.brand-sidebar { border-color: rgba(255,255,255,.10); background: linear-gradient(180deg, rgba(255,255,255,.045), transparent 13rem), #050505; }
+.brand-topbar { border-color: rgba(255,255,255,.11); background: linear-gradient(90deg, rgba(255,255,255,.035), transparent 28%), rgba(7,7,7,.94); }
+
+.gd-panel,
+.dark .gd-panel {
+  border-color: rgba(255,255,255,.12);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.09), transparent 28%, rgba(255,255,255,.018) 72%),
+    rgba(18,18,18,.72);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.11), inset 0 -1px 0 rgba(0,0,0,.32), 0 24px 68px -48px rgba(0,0,0,.96);
+  backdrop-filter: blur(24px) saturate(110%);
+  -webkit-backdrop-filter: blur(24px) saturate(110%);
+}
+.gd-panel::before { background: linear-gradient(90deg, transparent, rgba(255,255,255,.52), transparent); }
+.gd-panel::after { background: radial-gradient(circle, rgba(255,255,255,.075), transparent 68%); }
+
+.gd-metric-card,
+.dark .gd-metric-card,
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+.dashboard-widget-shell .rounded-lg.border.bg-card {
+  border-color: rgba(255,255,255,.14) !important;
+  background:
+    linear-gradient(118deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.045) 24%, transparent 52%),
+    radial-gradient(circle at 88% 5%, rgba(255,255,255,.075), transparent 34%),
+    rgba(20,20,20,.68) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.34), 0 24px 54px -42px rgba(0,0,0,.98) !important;
+  backdrop-filter: blur(28px) saturate(110%);
+  -webkit-backdrop-filter: blur(28px) saturate(110%);
+}
+.gd-metric-card:hover,
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card):hover,
+.dashboard-widget-shell .rounded-lg.border.bg-card:hover {
+  border-color: rgba(255,255,255,.42) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -1px 0 rgba(0,0,0,.36), 0 28px 60px -43px rgba(0,0,0,1), 0 0 28px rgba(255,255,255,.075) !important;
+}
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card)::before,
+.dashboard-widget-shell .rounded-lg.border.bg-card::before { background: linear-gradient(130deg, rgba(255,255,255,.18), transparent 24%, transparent 72%, rgba(255,255,255,.04)); }
+
+.dashboard-video-glass,
+.dark .dashboard-video-glass {
+  border-color: rgba(255,255,255,.18) !important;
+  background: linear-gradient(112deg, rgba(255,255,255,.12), transparent 24%, rgba(255,255,255,.03) 58%, transparent 84%), rgba(14,14,14,.72) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 20px 52px -38px rgba(0,0,0,.96) !important;
+}
+.dashboard-video-glass::before { background: radial-gradient(circle at 12% 0%, rgba(255,255,255,.09), transparent 28%), linear-gradient(90deg, transparent, rgba(255,255,255,.025), transparent); }
+
+/* White flash orbit: applied to action buttons without colouring the UI. */
+.premium-button,
+.gd-button,
+.meta-toolbar-button,
+.meta-toolbar-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: rgba(255,255,255,.18) !important;
+}
+.premium-button::after,
+.gd-button::before,
+.meta-toolbar-button::before,
+.meta-toolbar-primary::before {
+  position: absolute;
+  inset: -150%;
+  z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0 39%, rgba(255,255,255,.92) 47%, transparent 55% 100%);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+}
+.premium-button:hover:not(:disabled)::after,
+.premium-button:focus-visible:not(:disabled)::after,
+.gd-button:hover:not(:disabled)::before,
+.gd-button:focus-visible:not(:disabled)::before,
+.meta-toolbar-button:hover:not(:disabled)::before,
+.meta-toolbar-primary:hover:not(:disabled)::before {
+  animation: monochrome-edge-flash 1.3s linear infinite;
+  opacity: .62;
+}
+.premium-button,
+.meta-toolbar-primary {
+  background: linear-gradient(140deg, #fafafa, #d7d7d7 48%, #a9a9a9) !important;
+  color: #0b0b0b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 12px 32px -22px rgba(255,255,255,.36) !important;
+}
+.gd-button,
+.meta-toolbar-button { background: rgba(255,255,255,.035) !important; color: hsl(var(--foreground)) !important; }
+.premium-button:hover:not(:disabled), .gd-button:hover:not(:disabled), .meta-toolbar-button:hover:not(:disabled), .meta-toolbar-primary:hover:not(:disabled) { border-color: rgba(255,255,255,.55) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 0 30px rgba(255,255,255,.12) !important; }
+
+html:not(.dark) .brand-shell { background: radial-gradient(ellipse at 84% -14%, rgba(255,255,255,.9), transparent 30rem), linear-gradient(135deg, #dedede, #f4f4f4 48%, #d7d7d7); }
+html:not(.dark) .gd-panel,
+html:not(.dark) .gd-metric-card,
+html:not(.dark) .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card { border-color: rgba(0,0,0,.13) !important; background: linear-gradient(130deg, rgba(255,255,255,.92), rgba(255,255,255,.50) 36%, rgba(235,235,235,.64)), rgba(255,255,255,.72) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 24px 50px -42px rgba(0,0,0,.38) !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),

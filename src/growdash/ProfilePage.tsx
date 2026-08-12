@@ -174,13 +174,13 @@ export default function ProfilePage() {
             <AppearanceCard active={theme === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setTheme("light")} />
           </div>
           <div className="mt-7 border-t border-border pt-6">
-            <h2 className="font-black">Cor de destaque da plataforma</h2>
-            <p className="mt-1 text-xs text-muted-foreground">A cor é aplicada aos botões, seleções, glass do Dashboard e realces, mantendo contraste acessível.</p>
+            <h2 className="font-black">Acabamento da plataforma</h2>
+            <p className="mt-1 text-xs text-muted-foreground">A Growdash usa acabamento monocromático: preto, carvão, cinza e branco, com reflexos de vidro e contraste acessível.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {([['gold', 'Ouro metálico', '#b57a20']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
+              {([['gold', 'Monocromático premium', '#e5e5e5']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
                 <button key={value} type="button" onClick={() => setAccent(value)} className={`flex min-h-16 items-center gap-3 rounded-xl border p-3 text-left transition ${accent === value ? "border-primary bg-primary/10 ring-1 ring-primary/35" : "border-border hover:bg-muted/45"}`}>
                   <span className="h-9 w-9 rounded-xl border border-white/20 shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, #ffffff55)` }} />
-                  <span><b className="block text-sm">{label}</b><small className="text-[10px] text-muted-foreground">Tema operacional</small></span>
+                  <span><b className="block text-sm">{label}</b><small className="text-[10px] text-muted-foreground">Vidro, carvão e reflexo branco</small></span>
                 </button>
               ))}
             </div>
