@@ -3923,6 +3923,21 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
 .gd-metric-card [class*="text-primary"],
 .dashboard-video-glass [class*="text-primary"] { color: #fff !important; }
 
+/* The read-only Expert dashboard can be rendered outside the operational
+   shell. Its KPI cards still use the dark glass material, so explicitly bind
+   their typography to the dark-surface contrast contract in either theme. */
+.expert-dashboard .gd-metric-card {
+  color: #f7f7f7 !important;
+}
+
+.expert-dashboard .gd-metric-card :is(p, span, b, strong) {
+  color: inherit;
+}
+
+.expert-dashboard .gd-metric-card .text-muted-foreground {
+  color: rgba(255,255,255,.62) !important;
+}
+
 .dashboard-video-glass,
 .dark .dashboard-video-glass,
 html:not(.dark) .dashboard-video-glass {

@@ -36,7 +36,7 @@ export default function ExpertDashboard() {
   const isLoading = loadingAccounts || loadingInsights;
 
   return (
-    <MotionPage className="min-w-0 space-y-4 sm:space-y-6">
+    <MotionPage className="expert-dashboard min-w-0 space-y-4 sm:space-y-6">
       <MotionItem>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
