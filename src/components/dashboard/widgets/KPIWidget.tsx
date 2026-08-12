@@ -5,13 +5,13 @@ import { METRIC_LABELS, type WidgetConfig, type WidgetMetric } from "@/lib/widge
 import { Activity } from "lucide-react";
 
 export function KPIWidget({ title, config }: { title: string; config: WidgetConfig }) {
-  const { insights, sales, leadBreakdown } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown } = useDashboard();
   const metric = (config.metric ?? "leads") as WidgetMetric;
-  const k = computeKpi(metric, insights, sales);
+  const k = computeKpi(metric, insights, sales, revenueDeals);
   const includesConversationLeads = metric === "leads" || metric === "campaign_leads" || metric === "campaign_cpl" || metric === "campaign_conversion_rate";
   if (leadBreakdown && includesConversationLeads) {
     if (metric === "leads" || metric === "campaign_leads") k.value = leadBreakdown.total;
-    if (metric === "campaign_cpl") k.value = k.value * (computeKpi("leads", insights, sales).value / Math.max(1, leadBreakdown.total));
+    if (metric === "campaign_cpl") k.value = k.value * (computeKpi("leads", insights, sales, revenueDeals).value / Math.max(1, leadBreakdown.total));
     if (metric === "campaign_conversion_rate") {
       const clicks = insights.reduce((sum, row) => sum + Number(row.clicks ?? 0), 0);
       k.value = clicks > 0 ? (leadBreakdown.total / clicks) * 100 : 0;
@@ -36,12 +36,12 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
 }
 
 export function KPIGridWidget({ config }: { config: WidgetConfig }) {
-  const { insights, sales, leadBreakdown } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown } = useDashboard();
   const metrics = (config.metrics ?? ["spend", "leads", "cpl", "ctr"]) as WidgetMetric[];
   return (
     <div className="gd-auto-grid-compact h-full gap-2">
       {metrics.map((m) => {
-        const k = computeKpi(m, insights, sales);
+        const k = computeKpi(m, insights, sales, revenueDeals);
         if (m === "leads" && leadBreakdown) k.value = leadBreakdown.total;
         const leadTooltip = m === "leads" && leadBreakdown
           ? `Forms: ${leadBreakdown.forms} · Site: ${leadBreakdown.site} · Conversas iniciadas: ${leadBreakdown.conversations} · Total: ${leadBreakdown.total}`

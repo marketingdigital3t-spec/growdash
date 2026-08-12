@@ -2,16 +2,18 @@ import { useMemo } from "react";
 import { useDashboard } from "@/contexts/DashboardContext";
 import type { WidgetConfig, WidgetMetric, WidgetGroupBy } from "@/lib/widgetCatalog";
 import { aggregateMetrics } from "@/lib/metrics";
-import { aggregateSales } from "@/hooks/useSales";
+import { aggregateRevenueSources } from "@/lib/revenueAggregation";
+import type { RDRevenueDeal } from "@/lib/revenueAggregation";
 import { format, parseISO } from "date-fns";
 
 export function computeKpi(
   metric: WidgetMetric,
   insights: any[],
   sales: any[],
+  rdDeals: RDRevenueDeal[] = [],
 ): { value: number; prefix?: string; suffix?: string; decimals: number } {
   const ad = aggregateMetrics(insights);
-  const s = aggregateSales(sales);
+  const s = aggregateRevenueSources(sales, rdDeals);
   switch (metric) {
     case "spend":
       return { value: ad.totalSpend, prefix: "R$ ", decimals: 2 };
@@ -38,7 +40,7 @@ export function computeKpi(
     case "revenue_gross":
       return { value: s.totalGross, prefix: "R$ ", decimals: 2 };
     case "sales_count":
-      return { value: sales.length, decimals: 0 };
+      return { value: s.confirmedSalesCount, decimals: 0 };
     case "roas":
       return { value: ad.totalSpend > 0 ? s.totalNet / ad.totalSpend : 0, suffix: "x", decimals: 2 };
     case "roi": {

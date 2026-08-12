@@ -10,6 +10,7 @@ export interface DashboardContextValue {
   insights: InsightRow[];
   sales: Sale[];
   rdDeals: RDDealLite[];
+  revenueDeals?: RDDealLite[];
   alerts: any[];
   campaigns: any[];
   adAccounts: any[];

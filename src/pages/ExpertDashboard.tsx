@@ -10,7 +10,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useDateFilter } from "@/hooks/useDateFilter";
 import { useInsights } from "@/hooks/useInsights";
 import { useSales } from "@/hooks/useSales";
-import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 
 /**
  * Deliberately separate from the editable operational dashboard. The page only
@@ -32,6 +32,7 @@ export default function ExpertDashboard() {
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, startDate, endDate });
   const { data: sales = [] } = useSales({ adAccountId: selectedId, startDate, endDate });
   const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, startDate, endDate });
+  const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, startDate, endDate });
   const permittedAccounts = useMemo(() => accounts.map((account) => ({ id: account.id, name: account.name })), [accounts]);
   const isLoading = loadingAccounts || loadingInsights;
 
@@ -63,7 +64,7 @@ export default function ExpertDashboard() {
         />
       </MotionItem>
 
-      <DashboardProvider value={{ startDate, endDate, adAccountId: selectedId, insights, sales, rdDeals, alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading }}>
+      <DashboardProvider value={{ startDate, endDate, adAccountId: selectedId, insights, sales, rdDeals, revenueDeals, alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading }}>
         <MotionItem>
           <section aria-label="Indicadores de performance" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             <KPIWidget title="Faturamento líquido" config={{ metric: "revenue_net" }} />

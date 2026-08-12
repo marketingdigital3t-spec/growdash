@@ -92,6 +92,45 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
 }
 
 /**
+ * Base de faturamento do RD: negócio ganho pertence ao período em que foi
+ * fechado. Para integrações antigas que ainda não preenchem `closed_at`, a
+ * última alteração de etapa é o fallback para não ocultar vendas reais.
+ */
+export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, enabled = true }: Params) {
+  return useQuery({
+    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), adAccountId ?? "all"],
+    enabled,
+    queryFn: async () => {
+      const rangeStart = startOfDay(startDate).toISOString();
+      const rangeEnd = endOfDay(endDate).toISOString();
+      const PAGE = 1000;
+      const MAX = 10;
+      let all: RDDealLite[] = [];
+      for (let p = 0; p < MAX; p += 1) {
+        let query = supabase
+          .from("rd_deals")
+          .select(FIELDS)
+          .or(`and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
+          .order("closed_at", { ascending: false, nullsFirst: false });
+        if (adAccountId) query = query.eq("ad_account_id", adAccountId);
+        const { data, error } = await query.range(p * PAGE, (p + 1) * PAGE - 1);
+        if (error) throw error;
+        const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
+          ...deal,
+          rd_campaign_name: deal.last_touch_utm_campaign ?? deal.first_touch_utm_campaign ?? deal.utm_campaign ?? null,
+        }));
+        all = all.concat(batch);
+        if (batch.length < PAGE) break;
+      }
+      return all.filter((deal) => classifyLead(deal) === "won");
+    },
+    staleTime: 15 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
  * Base operacional do CRM. Diferente dos relatórios, ela não corta negócios
  * pela data de criação: um lead antigo que continua aberto precisa permanecer
  * visível no pipeline, exatamente como no RD Station.

@@ -8,9 +8,10 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useAlerts } from "@/hooks/useAlerts";
-import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
+import { useSales, type Sale } from "@/hooks/useSales";
+import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { useProducts } from "@/hooks/useProducts";
-import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { differenceInCalendarDays, format } from "date-fns";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,11 @@ const Index = () => {
     endDate,
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
   });
+  const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
+    startDate,
+    endDate,
+    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+  });
   const { data: alerts = [] } = useAlerts();
   const syncMeta = useSyncMeta();
 
@@ -132,7 +138,10 @@ const Index = () => {
   const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id
     && visibleAccountIds.has(deal.ad_account_id)
     && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [rdDeals, selectedAccount, visibleAccountIds]);
-  const glassSales = aggregateSales(dashboardSales);
+  const dashboardRevenueDeals = useMemo(() => rdWonDeals.filter((deal) => !!deal.ad_account_id
+    && visibleAccountIds.has(deal.ad_account_id)
+    && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [rdWonDeals, selectedAccount, visibleAccountIds]);
+  const glassSales = aggregateRevenueSources(dashboardSales, dashboardRevenueDeals);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const glassLeadsFromInsights = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
   const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
@@ -341,6 +350,7 @@ const Index = () => {
             insights: dashboardInsights,
             sales: dashboardSales,
             rdDeals: dashboardDeals,
+            revenueDeals: dashboardRevenueDeals,
             alerts,
             campaigns: visibleCampaigns,
             adAccounts: visibleAccounts,
