@@ -3733,6 +3733,47 @@ html:not(.dark) .gd-metric-card,
 html:not(.dark) .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
 html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card { border-color: rgba(0,0,0,.13) !important; background: linear-gradient(130deg, rgba(255,255,255,.92), rgba(255,255,255,.50) 36%, rgba(235,235,235,.64)), rgba(255,255,255,.72) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 24px 50px -42px rgba(0,0,0,.38) !important; }
 
+/* Account selector is an intentional high-contrast control: it stays white
+   even in dark mode, while a subtle moving highlight travels around its edge. */
+.gd-filter-strip .gd-filter-account {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: rgba(255,255,255,.82) !important;
+  background: linear-gradient(135deg, #ffffff, #f2f2f2 48%, #d8d8d8) !important;
+  color: #0b0b0b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,.12), 0 12px 28px -20px rgba(255,255,255,.38) !important;
+}
+.gd-filter-strip .gd-filter-account > span,
+.gd-filter-strip .gd-filter-account > svg { position: relative; z-index: 1; color: #0b0b0b !important; opacity: .78; }
+.gd-filter-strip .gd-filter-account::before {
+  position: absolute;
+  inset: -135%;
+  z-index: 0;
+  background: conic-gradient(from 0deg, transparent 0 40%, rgba(255,255,255,1) 47%, rgba(92,92,92,.88) 50%, transparent 57% 100%);
+  content: "";
+  animation: monochrome-edge-flash 2.8s linear infinite;
+  pointer-events: none;
+}
+.gd-filter-strip .gd-filter-account::after {
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: calc(var(--radius) - 1px);
+  background: linear-gradient(135deg, #ffffff, #f1f1f1 48%, #d6d6d6);
+  content: "";
+  pointer-events: none;
+}
+.gd-filter-strip .gd-filter-account:hover,
+.gd-filter-strip .gd-filter-account:focus-visible,
+.gd-filter-strip .gd-filter-account[data-state="open"] {
+  border-color: #ffffff !important;
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(255,255,255,.72), 0 0 32px rgba(255,255,255,.34) !important;
+}
+.gd-filter-strip .gd-filter-account:hover::before,
+.gd-filter-strip .gd-filter-account:focus-visible::before,
+.gd-filter-strip .gd-filter-account[data-state="open"]::before { animation-duration: 1.1s; }
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
   .dashboard-widget-shell .rounded-lg.border.bg-card { backdrop-filter: none; -webkit-backdrop-filter: none; }
