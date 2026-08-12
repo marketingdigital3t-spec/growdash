@@ -28,7 +28,8 @@ export type PagePermission =
   | "users"
   | "agents"
   | "settings"
-  | "dataHealth";
+  | "dataHealth"
+  | "expertDashboard";
 
 export function usePermissions() {
   const { user } = useAuth();
@@ -45,8 +46,12 @@ export function usePermissions() {
           : { data: null, error: null };
         const [legacyPerm, accs, funs] = await Promise.all([
           supabase.from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
-          supabase.from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id),
-          supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id),
+          workspace?.id && !workspace.id.startsWith("legacy-")
+            ? supabase.from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id).eq("workspace_id", workspace.id)
+            : supabase.from("user_ad_account_access").select("ad_account_id").eq("user_id", user!.id).is("workspace_id", null),
+          workspace?.id && !workspace.id.startsWith("legacy-")
+            ? supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id).eq("workspace_id", workspace.id)
+            : supabase.from("user_rd_funnel_access").select("rd_funnel_id").eq("user_id", user!.id).is("workspace_id", null),
         ]);
         return {
           perm: scopedPerm.data ?? legacyPerm.data,
@@ -110,6 +115,7 @@ export function usePermissions() {
     canAgents: isMaster || fallbackPerm("can_agents"),
     canSettings: isMaster || fallbackPerm("can_settings"),
     canDataHealth: isMaster || fallbackPerm("can_data_health"),
+    canExpertDashboard: isMaster || fallbackPerm("can_expert_dashboard"),
     allowedAdAccounts: data?.allowedAdAccounts ?? [],
     allowedRDFunnels: data?.allowedRDFunnels ?? [],
   };
@@ -117,6 +123,7 @@ export function usePermissions() {
 
 export function firstAllowedPath(p: ReturnType<typeof usePermissions>): string {
   if (p.canDashboard) return "/";
+  if (p.canExpertDashboard) return "/painel-expert";
   if (p.canCrm) return "/crm";
   if (p.canCommercial) return "/comercial";
   if (p.canCampaigns) return "/campanhas";

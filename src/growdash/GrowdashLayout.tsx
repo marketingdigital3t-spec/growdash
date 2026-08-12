@@ -142,6 +142,7 @@ export default function GrowdashLayout() {
     const pathnameOnly = path.split("?")[0];
     const guarded: Record<string, boolean> = {
       "/": permissions.canDashboard,
+      "/painel-expert": permissions.canExpertDashboard,
       "/crm": permissions.canCrm,
       "/comercial": permissions.canCommercial,
       "/campanhas": permissions.canCampaigns,

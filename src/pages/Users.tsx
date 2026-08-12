@@ -19,6 +19,7 @@ import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 
 const PAGES = [
+  { key: "can_expert_dashboard", label: "Painel do Expert (somente leitura)" },
   { key: "can_dashboard", label: "Dashboard" },
   { key: "can_crm", label: "CRM" },
   { key: "can_commercial", label: "Comercial" },

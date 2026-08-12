@@ -52,6 +52,14 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: [],
       },
       {
+        label: "Painel do Expert",
+        path: "/painel-expert",
+        icon: BarChart3,
+        description: "Resultados autorizados para acompanhamento do expert.",
+        metrics: [],
+        highlights: [],
+      },
+      {
         label: "CRM",
         path: "/crm",
         icon: ShieldCheck,

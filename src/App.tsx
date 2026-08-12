@@ -44,6 +44,7 @@ const IntelligenceCenterPage = lazy(() => import("@/growdash/IntelligenceCenterP
 const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const SharedLeadReport = lazy(() => import("@/pages/SharedLeadReport"));
+const ExpertDashboard = lazy(() => import("@/pages/ExpertDashboard"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,6 +180,7 @@ function RequirePage({ page, children }: { page: PagePermission | "master"; chil
     agents: permissions.canAgents,
     settings: permissions.canSettings,
     dataHealth: permissions.canDataHealth,
+    expertDashboard: permissions.canExpertDashboard,
   };
   const allowed = page === "master" ? permissions.isMaster : allowedByPage[page];
 
@@ -212,6 +214,7 @@ export default function App() {
                   <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />
                   <Route element={<AuthenticatedLayout />}>
                     <Route index element={<RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage>} />
+                    <Route path="painel-expert" element={<RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
                     <Route path="crm" element={<RequirePage page="crm"><CrmPage /></RequirePage>} />
