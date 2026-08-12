@@ -37,7 +37,6 @@ import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
-import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { supabase } from "@/integrations/supabase/client";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
@@ -439,7 +438,6 @@ export default function GrowdashLayout() {
           </div>
         </main>
       </div>
-      <NotificationCenter />
       {!isOnline && (
         <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#080808]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
           Você está offline. Os dados exibidos podem estar desatualizados e nenhuma alteração será enviada até a conexão voltar.
