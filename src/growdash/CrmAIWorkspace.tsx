@@ -7,6 +7,7 @@ import type { RDDealLite } from "@/hooks/useRDDealsForPeriod";
 import type { Sale } from "@/hooks/useSales";
 import { realizedSales } from "@/lib/saleRevenue";
 import { Button } from "@/components/ui/button";
+import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { cn } from "@/lib/utils";
 
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -72,7 +73,7 @@ function analyze(deals: RDDealLite[], insights: Array<{ leads?: number | null }>
   const difference = metaLeads ? Math.abs(deals.length - metaLeads) / metaLeads * 100 : deals.length ? 100 : 0;
   const missingUtm = deals.filter((deal) => !deal.utm_source || !deal.utm_campaign);
   const stagesMap = new Map<string, { count: number; total: number; order: number }>();
-  deals.forEach((deal) => { const name = deal.rd_stage_name || "Sem etapa"; const row = stagesMap.get(name) || { count: 0, total: 0, order: deal.rd_stage_order ?? 999 }; row.count += 1; row.total += Number(deal.amount_total || 0); stagesMap.set(name, row); });
+  deals.forEach((deal) => { const name = deal.rd_stage_name || "Sem etapa"; const row = stagesMap.get(name) || { count: 0, total: 0, order: deal.rd_stage_order ?? 999 }; row.count += 1; row.total += getRDDealAmount(deal); stagesMap.set(name, row); });
   const sortedStages = Array.from(stagesMap, ([name, row]) => ({ name, ...row })).sort((a, b) => a.order - b.order);
   const denominator = Math.max(1, sortedStages.length - 1);
   const stages = sortedStages.map((stage, index) => { const probability = Math.min(.95, Math.max(.08, index / denominator)); return { ...stage, probability, weighted: stage.total * probability }; });

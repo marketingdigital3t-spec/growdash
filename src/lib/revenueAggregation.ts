@@ -1,4 +1,5 @@
 import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { getRDDealAmount } from "@/lib/rdDealAmount";
 
 export interface RevenueSale {
   status: string;
@@ -15,6 +16,7 @@ export interface RevenueSale {
 export interface RDRevenueDeal {
   rd_deal_id: string;
   amount_total: number | null;
+  amount_total_effective?: number | null;
   win: boolean;
   rd_stage_name: string | null;
 }
@@ -52,14 +54,14 @@ export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenue
   const includedDealIds = new Set<string>();
   const rdOnlyWonDeals = rdDeals.filter((deal) => {
     const dealId = deal.rd_deal_id?.trim();
-    const amount = Number(deal.amount_total ?? 0);
+    const amount = getRDDealAmount(deal);
     if (!dealId || !Number.isFinite(amount) || amount <= 0) return false;
     if (!deal.win && !isWonRDStageName(deal.rd_stage_name)) return false;
     if (realizedSaleDealIds.has(dealId) || includedDealIds.has(dealId)) return false;
     includedDealIds.add(dealId);
     return true;
   });
-  const rdOnlyRevenue = rdOnlyWonDeals.reduce((total, deal) => total + Number(deal.amount_total), 0);
+  const rdOnlyRevenue = rdOnlyWonDeals.reduce((total, deal) => total + getRDDealAmount(deal), 0);
   const rdOnlyCount = rdOnlyWonDeals.length;
   return {
     ...salesTotals,

@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { MetricCard, PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 
@@ -162,7 +163,7 @@ export default function CrmPage() {
     const realized = aggregateSales(scopedSales.filter((sale) => sale.rd_deal_id && visibleDealIds.has(sale.rd_deal_id)));
     return {
       active: active.length,
-      openRevenue: active.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0),
+      openRevenue: active.reduce((sum, deal) => sum + getRDDealAmount(deal), 0),
       won: won.length,
       wonRevenue: realized.totalNet,
       lost: lost.length,
@@ -379,7 +380,7 @@ function KanbanBoard({ stages, stageDeals, stageLimits, onLoadMore, onOpen }: {
         <div className="flex min-h-[520px] min-w-max items-start gap-3">
           {stages.map((stage) => {
             const deals = stageDeals.get(stage.id) || [];
-            const total = deals.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0);
+            const total = deals.reduce((sum, deal) => sum + getRDDealAmount(deal), 0);
             const limit = stageLimits[stage.id] || BOARD_STEP;
             return (
               <div key={stage.id} className="w-[286px] shrink-0 overflow-hidden rounded-2xl border border-border bg-muted/25">
@@ -413,7 +414,7 @@ function DealCard({ deal, onOpen }: { deal: RDDealLite; onOpen: (deal: RDDealLit
         <DealStatus deal={deal} compact />
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-2.5">
-        <span className="text-xs font-black text-foreground">{brl.format(Number(deal.amount_total || 0))}</span>
+        <span className="text-xs font-black text-foreground">{brl.format(getRDDealAmount(deal))}</span>
         <span className="max-w-[125px] truncate text-[9px] text-muted-foreground" title={deal.deal_owner_name || "Sem responsável"}>{deal.deal_owner_name || "Sem responsável"}</span>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-muted-foreground">
@@ -444,7 +445,7 @@ function DealsList({ deals, funnels, page, pageCount, total, onPage, onOpen }: {
         {deals.map((deal) => (
           <button key={deal.id} type="button" className="grid w-full gap-2 p-4 text-left" onClick={() => onOpen(deal)}>
             <div className="flex items-start justify-between gap-2"><div className="min-w-0"><b className="block truncate text-sm">{deal.contact_name || deal.contact_email || "Contato não informado"}</b><span className="text-[10px] text-muted-foreground">{deal.rd_stage_name || "Sem etapa"}</span></div><DealStatus deal={deal} /></div>
-            <div className="flex items-center justify-between gap-2 text-xs"><span className="truncate text-muted-foreground">{deal.deal_owner_name || "Sem responsável"}</span><b>{brl.format(Number(deal.amount_total || 0))}</b></div>
+            <div className="flex items-center justify-between gap-2 text-xs"><span className="truncate text-muted-foreground">{deal.deal_owner_name || "Sem responsável"}</span><b>{brl.format(getRDDealAmount(deal))}</b></div>
           </button>
         ))}
       </div>
@@ -461,7 +462,7 @@ function DealsList({ deals, funnels, page, pageCount, total, onPage, onOpen }: {
                 <td className="max-w-44 truncate px-4 py-3">{deal.deal_owner_name || "Não informado"}</td>
                 <td className="max-w-56 px-4 py-3"><span className="block truncate">{deal.rd_campaign_name || deal.utm_campaign || deal.utm_source || "Não atribuída"}</span><span className="text-[9px] text-muted-foreground">{deal.rd_product_name || "Sem produto"}</span></td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{relativeDate(deal.stage_updated_at || deal.updated_at || deal.lead_created_at)}</td>
-                <td className="whitespace-nowrap px-4 py-3 font-black">{brl.format(Number(deal.amount_total || 0))}</td>
+                <td className="whitespace-nowrap px-4 py-3 font-black">{brl.format(getRDDealAmount(deal))}</td>
                 <td className="px-4 py-3"><DealStatus deal={deal} /></td>
               </tr>
             ))}
@@ -484,7 +485,7 @@ function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; f
           <SheetDescription>Negociação sincronizada do RD Station CRM</SheetDescription>
         </SheetHeader>
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <DetailMetric icon={<CircleDollarSign />} label="Valor" value={brl.format(Number(deal.amount_total || 0))} />
+          <DetailMetric icon={<CircleDollarSign />} label="Valor" value={brl.format(getRDDealAmount(deal))} />
           <DetailMetric icon={<Target />} label="Etapa" value={deal.rd_stage_name || "Sem etapa"} />
           <DetailMetric icon={<UserRound />} label="Responsável" value={deal.deal_owner_name || "Não informado"} />
           <DetailMetric icon={deal.win ? <Trophy /> : <XCircle />} label="Situação" value={statusLabel(deal)} />
