@@ -4044,3 +4044,54 @@ html:not(.dark) .growdash-main :is(input, select, textarea)::placeholder { color
 html:not(.dark) .growdash-main .text-emerald-600 { color: #167a43 !important; }
 html:not(.dark) .growdash-main .text-red-500 { color: #b42323 !important; }
 html:not(.dark) .growdash-main .text-primary { color: #242424 !important; }
+
+/* Dashboard theme contract -------------------------------------------------
+   Widgets were still inheriting several historical all-theme dark rules.
+   Scope the material explicitly at the dashboard boundary, including tabs,
+   chart cards and the editable-grid card variant, so light/dark can never
+   borrow foreground or surfaces from one another. */
+.dashboard-widget-shell {
+  color: #f5f5f5;
+}
+
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card, .rounded-lg.border.bg-card) {
+  color: #f5f5f5 !important;
+  border-color: rgba(255,255,255,.16) !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.035) 33%, transparent 62%),
+    radial-gradient(circle at 88% 8%, rgba(255,255,255,.075), transparent 32%),
+    rgba(23,23,23,.88) !important;
+}
+
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card, .rounded-lg.border.bg-card) :is(h1, h2, h3, h4, p, span, b, strong, td, th, label) { color: inherit; }
+.dashboard-widget-shell :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: rgba(255,255,255,.58) !important; }
+.dashboard-widget-shell [role="tablist"] { border-color: rgba(255,255,255,.14) !important; background: rgba(0,0,0,.34) !important; }
+.dashboard-widget-shell [role="tab"] { color: rgba(255,255,255,.70) !important; }
+.dashboard-widget-shell [role="tab"][data-state="active"] { color: #fff !important; background: rgba(255,255,255,.14) !important; box-shadow: none !important; }
+
+html:not(.dark) .dashboard-widget-shell {
+  color: #171717;
+}
+
+html:not(.dark) .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card, .rounded-lg.border.bg-card) {
+  color: #171717 !important;
+  border-color: rgba(0,0,0,.13) !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.99), rgba(255,255,255,.77) 48%, rgba(232,232,232,.78)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(0,0,0,.055), 0 16px 35px -31px rgba(0,0,0,.32) !important;
+}
+
+html:not(.dark) .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card, .rounded-lg.border.bg-card) :is(h1, h2, h3, h4, p, span, b, strong, td, th, label) { color: inherit; }
+html:not(.dark) .dashboard-widget-shell :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: #666 !important; }
+html:not(.dark) .dashboard-widget-shell [role="tablist"] { border-color: rgba(0,0,0,.10) !important; background: rgba(0,0,0,.07) !important; }
+html:not(.dark) .dashboard-widget-shell [role="tab"] { color: #575757 !important; }
+html:not(.dark) .dashboard-widget-shell [role="tab"][data-state="active"] { color: #111 !important; background: rgba(255,255,255,.94) !important; box-shadow: 0 1px 3px rgba(0,0,0,.10) !important; }
+html:not(.dark) .dashboard-widget-shell [class*="bg-primary/"] { background-color: rgba(0,0,0,.065) !important; }
+html:not(.dark) .dashboard-widget-shell [class*="text-primary"] { color: #242424 !important; }
+
+html:not(.dark) .expert-dashboard .gd-metric-card {
+  color: #171717 !important;
+  border-color: rgba(0,0,0,.13) !important;
+  background: linear-gradient(135deg, #fff, #eeeeee) !important;
+}
+html:not(.dark) .expert-dashboard .gd-metric-card .text-muted-foreground { color: #666 !important; }
