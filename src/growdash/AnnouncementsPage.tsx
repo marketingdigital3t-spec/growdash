@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, Eye, ImagePlus, Megaphone, Power, Trash2 } from "lucide-react";
+import { CalendarClock, Check, Eye, ImagePlus, Megaphone, Power, Sparkles, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { PageHeading } from "./shared";
 import type { PlatformAnnouncement } from "@/lib/platformAnnouncements";
+import { ANNOUNCEMENT_TEMPLATES, type AnnouncementTemplate } from "@/lib/announcementTemplates";
 
 const PAGE_TARGETS = [
   ["/", "Dashboard"], ["/campanhas", "Campanhas"], ["/crm", "CRM"], ["/comercial", "Comercial"],
@@ -114,6 +115,16 @@ export default function AnnouncementsPage() {
     setTargetPaths((current) => checked ? [...current.filter((item) => item !== "*"), path] : current.filter((item) => item !== path));
   }
 
+  function applyTemplate(template: AnnouncementTemplate) {
+    setTitle(template.title);
+    setAlt(template.alt);
+    setImageData(template.imageDataUrl);
+    setTargetPaths(template.targetPaths);
+    setLinkUrl(template.linkUrl);
+    setPriority(template.id === "rd-station" ? 20 : 10);
+    toast({ title: "Modelo aplicado", description: "Revise o período e publique quando estiver pronto." });
+  }
+
   return <div className="mx-auto max-w-[1500px] space-y-5">
     <PageHeading eyebrow="Comunicação global" title="Anúncios da plataforma" description="Publique banners no topo das telas escolhidas, com período, prioridade e controle de descarte." />
 
@@ -125,14 +136,15 @@ export default function AnnouncementsPage() {
 
     <div className="grid gap-5 xl:grid-cols-[.85fr_1.15fr]">
       <section className="gd-panel space-y-5 p-5">
-        <div><h2 className="font-black">Novo anúncio</h2><p className="text-xs text-muted-foreground">A imagem é exibida responsivamente sem ultrapassar a área de conteúdo.</p></div>
+        <div><h2 className="font-black">Novo anúncio</h2><p className="text-xs text-muted-foreground">Escolha um modelo pronto ou envie sua própria imagem. A prévia abaixo é exatamente o que o usuário verá.</p></div>
+        <div><Label className="flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-primary" />Modelos prontos</Label><div className="mt-2 grid gap-2 sm:grid-cols-3">{ANNOUNCEMENT_TEMPLATES.map((template) => <button key={template.id} type="button" onClick={() => applyTemplate(template)} className="group overflow-hidden rounded-xl border border-border bg-background text-left transition hover:-translate-y-0.5 hover:border-primary/60"><img src={template.imageDataUrl} alt="" className="h-20 w-full object-cover opacity-80 transition group-hover:opacity-100" /><span className="block p-2"><b className="block text-[11px]">{template.id === "rd-station" ? "Preencha o RD Station" : template.title}</b><small className="mt-1 block line-clamp-2 text-[9px] leading-relaxed text-muted-foreground">{template.description}</small></span></button>)}</div></div>
         <div className="grid gap-4 sm:grid-cols-2"><Field label="Título interno"><Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Campanha de lançamento" /></Field><Field label="Texto alternativo"><Input value={alt} onChange={(event) => setAlt(event.target.value)} placeholder="Descrição acessível da imagem" /></Field></div>
         <div><Label>Imagem do banner</Label><input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(event) => { selectImage(event.target.files?.[0]); event.target.value = ""; }} /><button type="button" onClick={() => fileInput.current?.click()} className="mt-2 grid min-h-40 w-full place-items-center overflow-hidden rounded-xl border border-dashed border-primary/35 bg-primary/[.025] text-sm text-muted-foreground transition hover:bg-primary/5">{imageData ? <img src={imageData} alt={alt || title || "Pré-visualização"} className="max-h-56 w-full object-contain" /> : <span className="flex flex-col items-center gap-2"><ImagePlus className="h-7 w-7 text-primary" />Selecionar imagem (até 4 MB)</span>}</button></div>
         <div><Label>Telas de exibição</Label><div className="mt-2 grid gap-2 sm:grid-cols-2"><TargetOption label="Todas as telas" checked={targetPaths.includes("*")} onChange={(checked) => toggleTarget("*", checked)} />{PAGE_TARGETS.map(([path, label]) => <TargetOption key={path} label={label} checked={targetPaths.includes(path)} disabled={targetPaths.includes("*")} onChange={(checked) => toggleTarget(path, checked)} />)}</div></div>
         <div className="grid gap-4 sm:grid-cols-2"><Field label="Início"><Input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></Field><Field label="Término"><Input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></Field></div>
         <div className="grid gap-4 sm:grid-cols-[1fr_120px]"><Field label="Link opcional"><Input type="url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://..." /></Field><Field label="Prioridade"><Input type="number" min={0} max={100} value={priority} onChange={(event) => setPriority(Number(event.target.value))} /></Field></div>
         <TargetOption label="Permitir que o usuário feche este anúncio" checked={dismissible} onChange={setDismissible} />
-        <Button className="w-full" onClick={() => createAnnouncement.mutate()} disabled={createAnnouncement.isPending}>{createAnnouncement.isPending ? "Publicando…" : "Publicar anúncio"}</Button>
+        <Button className="w-full" onClick={() => createAnnouncement.mutate()} disabled={createAnnouncement.isPending}>{createAnnouncement.isPending ? "Publicando…" : <><Check className="mr-2 h-4 w-4" />Publicar anúncio</>}</Button>
       </section>
 
       <section className="gd-panel overflow-hidden">
@@ -149,4 +161,3 @@ export default function AnnouncementsPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
 function TargetOption({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled?: boolean; onChange: (checked: boolean) => void }) { return <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs"><Checkbox checked={checked} disabled={disabled} onCheckedChange={(value) => onChange(value === true)} /><span>{label}</span></label>; }
 function Kpi({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) { return <div className="gd-panel p-5"><div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</span><span className="text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</span></div><p className="mt-4 text-2xl font-black">{value}</p></div>; }
-

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, X } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { selectAnnouncementForPath, type PlatformAnnouncement } from "@/lib/platformAnnouncements";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,11 @@ function safeExternalUrl(value?: string | null) {
   } catch {
     return null;
   }
+}
+
+function safeInternalPath(value?: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
 }
 
 export function GlobalAnnouncementBanner() {
@@ -46,12 +51,13 @@ export function GlobalAnnouncementBanner() {
   }, [announcements, dismissVersion, pathname, user?.id]);
 
   if (!selected) return null;
-  const link = safeExternalUrl(selected.link_url);
+  const externalLink = safeExternalUrl(selected.link_url);
+  const internalPath = safeInternalPath(selected.link_url);
   const picture = <img src={selected.image_data_url} alt={selected.alt || selected.title || "Anúncio Growdash"} className="max-h-[260px] w-full object-cover object-center sm:max-h-[300px]" />;
 
   return (
     <aside className="relative mb-4 overflow-hidden rounded-2xl border border-primary/30 bg-card shadow-[0_18px_50px_-36px_hsl(var(--primary)/.75)]" aria-label={selected.title || "Anúncio da plataforma"}>
-      {link ? <a href={link} target="_blank" rel="noopener noreferrer" className="group block">{picture}<span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-md">Abrir <ExternalLink className="h-3 w-3" /></span></a> : picture}
+      {externalLink ? <a href={externalLink} target="_blank" rel="noopener noreferrer" className="group block">{picture}<span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-md">Abrir <ExternalLink className="h-3 w-3" /></span></a> : internalPath ? <Link to={internalPath} className="group block">{picture}<span className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-md">Abrir <ExternalLink className="h-3 w-3" /></span></Link> : picture}
       {selected.dismissible !== false && <button type="button" onClick={() => { window.localStorage.setItem(`growdash:announcement-dismissed:${user?.id || "anonymous"}:${selected.id}`, selected.updated_at || selected.id); setDismissVersion((value) => value + 1); }} className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-black/70 text-white shadow-lg backdrop-blur-md transition hover:bg-black/85" aria-label="Fechar anúncio"><X className="h-4 w-4" /></button>}
     </aside>
   );
