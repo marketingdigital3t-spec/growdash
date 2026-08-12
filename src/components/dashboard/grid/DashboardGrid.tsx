@@ -16,6 +16,7 @@ import {
   type DashboardGridItem,
 } from "@/lib/responsiveDashboardLayout";
 import { DashboardWidgetConfigDialog } from "./DashboardWidgetConfigDialog";
+import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
 
 const ResponsiveGrid = WidthProvider(Responsive);
 const GRID_ROW_HEIGHT = 60;
@@ -166,7 +167,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
         const isSystem = widget.id.startsWith("__sys_") || widget.type === "default_block";
         return <section key={widget.id} className="relative min-w-0 max-w-full overflow-hidden rounded-xl">
           {isEditing && !isSystem && <div className="no-drag absolute right-2 top-2 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${widget.title}`}><Settings2 className="h-4 w-4" /></button><button onClick={() => removeWidget(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-destructive/90 text-destructive-foreground shadow" aria-label="Remover"><X className="h-4 w-4" /></button></div>}
-          <div className="min-w-0 max-w-full overflow-hidden"><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} /></div>
+          <DashboardWidgetHelp type={widget.type} title={widget.title} className="min-w-0 max-w-full overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} /></DashboardWidgetHelp>
         </section>;
       })}
     </div><DashboardWidgetConfigDialog widget={configuringWidget} open={!!configuringWidget} onOpenChange={(open) => !open && setConfiguringWidgetId(null)} onSave={(patch) => { if (configuringWidget) updateWidget(configuringWidget.id, patch); }} /></>;
@@ -201,7 +202,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
           return (
             <div key={w.id} className={w.type === "default_block" ? "dashboard-default-static overflow-hidden" : "overflow-hidden"}>
               {isEditing && !isSystem && <div className="no-drag absolute right-1 top-1 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${w.title}`}><Settings2 className="h-3 w-3" /></button><button onClick={() => removeWidget(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground shadow hover:bg-destructive" aria-label="Remover"><X className="h-3 w-3" /></button></div>}
-              <div className="dashboard-widget-shell h-full w-full no-drag-children">
+              <DashboardWidgetHelp type={w.type} title={w.title} className="dashboard-widget-shell h-full w-full no-drag-children outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                 {w.type === "default_block" ? (
                   <AutoHeightWidget widgetId={w.id} onHeightChange={handleAutoHeight}>
                     <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
@@ -209,7 +210,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
                 ) : (
                   <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
                 )}
-              </div>
+              </DashboardWidgetHelp>
             </div>
           );
         })}

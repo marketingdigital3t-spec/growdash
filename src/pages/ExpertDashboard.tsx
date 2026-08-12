@@ -11,6 +11,7 @@ import { useDateFilter } from "@/hooks/useDateFilter";
 import { useInsights } from "@/hooks/useInsights";
 import { useSales } from "@/hooks/useSales";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
 
 /**
  * Deliberately separate from the editable operational dashboard. The page only
@@ -76,23 +77,17 @@ export default function ExpertDashboard() {
       <DashboardProvider value={{ startDate, endDate, adAccountId: selectedId, insights, sales: permittedSales, rdDeals, revenueDeals, alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading }}>
         <MotionItem>
           <section aria-label="Indicadores de performance" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-            <KPIWidget title="Faturamento líquido" config={{ metric: "revenue_net" }} />
-            <KPIWidget title="Investimento" config={{ metric: "spend" }} />
-            <KPIWidget title="Leads" config={{ metric: "leads" }} />
-            <KPIWidget title="CPL" config={{ metric: "cpl" }} />
-            <KPIWidget title="ROAS" config={{ metric: "roas" }} />
-            <KPIWidget title="Lucro" config={{ metric: "profit" }} />
-            <KPIWidget title="Margem" config={{ metric: "profit_margin" }} />
-            <KPIWidget title="Recebíveis" config={{ metric: "receivables" }} />
-            <KPIWidget title="CTR" config={{ metric: "ctr" }} />
-            <KPIWidget title="Taxa de conversão" config={{ metric: "conversion_rate" }} />
+            {[
+              ["Faturamento líquido", "revenue_net"], ["Investimento", "spend"], ["Leads", "leads"], ["CPL", "cpl"], ["ROAS", "roas"],
+              ["Lucro", "profit"], ["Margem", "profit_margin"], ["Recebíveis", "receivables"], ["CTR", "ctr"], ["Taxa de conversão", "conversion_rate"],
+            ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
           </section>
         </MotionItem>
 
         <MotionItem>
           <section className="grid min-w-0 gap-4 xl:grid-cols-2">
-            <PaymentChartWidget />
-            <PlatformDistributionWidget />
+            <DashboardWidgetHelp type="payment_chart" title="Vendas por Pagamento" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PaymentChartWidget /></DashboardWidgetHelp>
+            <DashboardWidgetHelp type="platform_distribution" title="Distribuição por Plataforma" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PlatformDistributionWidget /></DashboardWidgetHelp>
           </section>
         </MotionItem>
       </DashboardProvider>
