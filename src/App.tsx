@@ -58,18 +58,39 @@ const queryClient = new QueryClient({
   },
 });
 
-function LoadingModule() {
+function reloadFreshBuild() {
+  const retryKey = "growdash:loading-retry";
+  let attempts = 0;
+  try { attempts = Number(sessionStorage.getItem(retryKey) || "0"); } catch { /* storage is optional */ }
+  if (attempts >= 2) return false;
+  try { sessionStorage.setItem(retryKey, String(attempts + 1)); } catch { /* a cache-busted reload is still safe */ }
+  const url = new URL(window.location.href);
+  url.searchParams.set("gd_reload", String(Date.now()));
+  window.location.replace(url.toString());
+  return true;
+}
+
+function LoadingModule({ recover = false }: { recover?: boolean }) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const timeout = window.setTimeout(() => setSlow(true), 8000);
     return () => window.clearTimeout(timeout);
   }, []);
 
+  useEffect(() => {
+    if (!recover) return;
+    // A lazy chunk can remain pending forever after a Pages rollout if a
+    // browser holds an old HTML shell. Recover once automatically instead of
+    // leaving the person on an endless spinner.
+    const timeout = window.setTimeout(() => { void reloadFreshBuild(); }, 10_000);
+    return () => window.clearTimeout(timeout);
+  }, [recover]);
+
   return <div className="grid min-h-[40vh] place-items-center px-4 text-center" role="status" aria-live="polite">
     {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
       <p className="font-bold">A Growdash está demorando para responder.</p>
-      <p className="mt-2 text-sm text-muted-foreground">A conexão pode ter sido interrompida. Recarregue para tentar novamente.</p>
-      <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Recarregar Growdash</button>
+      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização pode ter sido interrompida. A versão mais recente será tentada automaticamente.</p>
+      <button type="button" onClick={() => { if (!reloadFreshBuild()) window.location.reload(); }} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar novamente</button>
     </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
   </div>;
 }
@@ -149,6 +170,11 @@ function AuthenticatedLayout() {
 
 function AccentInitializer({ children }: { children: ReactNode }) {
   useAccentTheme();
+  useEffect(() => {
+    // A successful render clears the cache-recovery guard, so a future real
+    // deployment can use its own bounded recovery attempt.
+    try { sessionStorage.removeItem("growdash:loading-retry"); } catch { /* storage is optional */ }
+  }, []);
   return <>{children}</>;
 }
 
@@ -207,7 +233,7 @@ export default function App() {
             <AuthProvider>
               <AccentInitializer>
                 <AppErrorBoundary>
-                  <Suspense fallback={<LoadingModule />}>
+                  <Suspense fallback={<LoadingModule recover />}>
                     <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
