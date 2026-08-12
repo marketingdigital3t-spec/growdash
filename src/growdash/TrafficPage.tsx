@@ -64,7 +64,7 @@ export default function TrafficPage() {
         : "space-y-3",
     )}>
       <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-3 lg:max-w-[1500px] lg:grid-cols-5" aria-label="Áreas de Tráfego Pago">
-        {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
+        {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("traffic-area-tab flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 
       {activeTab !== "campaigns" && activeTab !== "ai" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">

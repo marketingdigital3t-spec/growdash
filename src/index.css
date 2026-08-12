@@ -3746,6 +3746,13 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
 .meta-toolbar-button { background: rgba(255,255,255,.035) !important; color: hsl(var(--foreground)) !important; }
 .premium-button:hover:not(:disabled), .gd-button:hover:not(:disabled), .meta-toolbar-button:hover:not(:disabled), .meta-toolbar-primary:hover:not(:disabled) { border-color: rgba(255,255,255,.55) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 0 30px rgba(255,255,255,.12) !important; }
 
+/* Active tabs use a light surface.  Do not inherit a stale light foreground
+   from a previously selected accent preset: label and icon must stay dark. */
+.traffic-area-tab-active,
+.traffic-area-tab-active > svg {
+  color: #0b0b0b !important;
+}
+
 html:not(.dark) .brand-shell { background: radial-gradient(ellipse at 84% -14%, rgba(255,255,255,.9), transparent 30rem), linear-gradient(135deg, #dedede, #f4f4f4 48%, #d7d7d7); }
 html:not(.dark) .gd-panel,
 html:not(.dark) .gd-metric-card,
