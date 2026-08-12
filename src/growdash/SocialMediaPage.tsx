@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { BarChart3, CheckCircle2, ExternalLink, Eye, Heart, ImageOff, Instagram, RefreshCw, Sparkles, TrendingUp, Users } from "lucide-react";
+import { BarChart3, Bookmark, CheckCircle2, ExternalLink, Eye, Heart, ImageOff, Instagram, MessageCircle, RefreshCw, Send, Sparkles, TrendingUp, Users } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import { PageHeading } from "./shared";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,8 @@ type SocialMedia = {
 };
 type DailyInsight = { insight_date: string; followers: number; follower_delta: number; reach: number; impressions: number; interactions: number };
 
-const number = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
+// Métricas de conteúdo precisam preservar a leitura exata: 1.542, nunca “1,5 mil”.
+const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 
 // Preview-only data. It never reaches Supabase, never triggers a sync and is
 // deliberately marked in the UI so it cannot be mistaken for a real account.
@@ -224,7 +225,7 @@ export default function SocialMediaPage() {
 
               <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between"><div><b className="text-sm">Publicações</b><p className="text-[11px] text-muted-foreground">Selecione um conteúdo para ver a análise completa à direita.</p></div><Select value={contentSort} onValueChange={(value) => setContentSort(value as typeof contentSort)}><SelectTrigger className="sm:w-60" aria-label="Ordenar conteúdos do Instagram"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="interactions">Mais interações</SelectItem><SelectItem value="reach">Maior alcance</SelectItem><SelectItem value="engagement_rate">Maior engajamento</SelectItem><SelectItem value="saves">Mais salvamentos</SelectItem><SelectItem value="shares">Mais compartilhamentos</SelectItem><SelectItem value="comments">Mais comentários</SelectItem><SelectItem value="video_views">Mais visualizações</SelectItem></SelectContent></Select></div>
 
-              <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
                 {sortedMedia.map((item) => <button key={item.id} type="button" onClick={() => setSelectedMedia(item)} className="group relative aspect-square overflow-hidden bg-muted text-left outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" aria-label={`Abrir análise da publicação ${item.caption?.slice(0, 60) || item.media_type}`}><MediaPreview media={item} /><span className="absolute inset-0 flex items-end bg-gradient-to-t from-black/75 via-black/10 to-transparent p-3 opacity-0 transition duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"><span className="w-full"><b className="block text-xs text-white">{number.format(item.interactions)} interações</b><span className="mt-0.5 block text-[10px] text-white/75">{item.media_type} · {item.published_at ? format(new Date(item.published_at), "dd/MM/yyyy") : "—"}</span></span></span></button>)}
                 {!media.length && <div className="col-span-full"><Empty text="Nenhum conteúdo publicado no período selecionado." action={!demoMode && !!selectedId ? <Button size="sm" variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}><RefreshCw className={`mr-2 h-3.5 w-3.5 ${sync.isPending ? "animate-spin" : ""}`} />{sync.isPending ? "Atualizando…" : "Atualizar publicações"}</Button> : undefined} /></div>}
               </div>
@@ -248,7 +249,15 @@ function SocialMediaDetailSheet({ media, onOpenChange, demoMode }: { media: Soci
   if (!media) return null;
 
   const engagement = Number(media.engagement_rate || 0);
+  const reach = Number(media.reach || 0);
+  const impressions = Number(media.impressions || 0);
+  const interactions = Number(media.interactions || 0);
+  const likes = Number(media.likes || 0);
+  const comments = Number(media.comments || 0);
+  const saves = Number(media.saves || 0);
+  const shares = Number(media.shares || 0);
   const savesAndShares = Number(media.saves || 0) + Number(media.shares || 0);
+  const intentRate = reach > 0 ? (savesAndShares / reach) * 100 : 0;
   const diagnosis = engagement >= 8
     ? "Este conteúdo gerou engajamento acima de 8%. Avalie repetir o tema, formato e gancho em uma nova publicação."
     : savesAndShares > Number(media.comments || 0) * 3
@@ -258,8 +267,8 @@ function SocialMediaDetailSheet({ media, onOpenChange, demoMode }: { media: Soci
   return <Sheet open={!!media} onOpenChange={onOpenChange}>
     <SheetContent className="w-full overflow-y-auto border-l border-primary/15 bg-background p-5 sm:max-w-xl">
       <SheetHeader className="pr-8">
-        <SheetTitle className="text-xl font-black">Detalhes da publicação</SheetTitle>
-        <SheetDescription>{demoMode ? "Demonstração — dados não oficiais" : "Métricas oficiais disponíveis para este conteúdo"}</SheetDescription>
+        <SheetTitle className="text-xl font-black">Insights do conteúdo</SheetTitle>
+        <SheetDescription>{demoMode ? "Demonstração — dados não oficiais" : "Dados oficiais disponíveis para esta publicação"}</SheetDescription>
       </SheetHeader>
 
       <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-muted/20">
@@ -274,29 +283,55 @@ function SocialMediaDetailSheet({ media, onOpenChange, demoMode }: { media: Soci
         </div>
       </div>
 
-      <section className="mt-5">
-        <div className="flex items-baseline justify-between gap-3"><h3 className="font-black">Desempenho</h3><span className="text-xs text-muted-foreground">Por publicação</span></div>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Mini label="Alcance" value={number.format(Number(media.reach || 0))} />
-          <Mini label="Impressões" value={number.format(Number(media.impressions || 0))} />
-          <Mini label="Interações" value={number.format(Number(media.interactions || 0))} />
-          <Mini label="Engajamento" value={`${engagement.toFixed(2).replace(".", ",")}%`} />
-          <Mini label="Curtidas" value={number.format(Number(media.likes || 0))} />
-          <Mini label="Comentários" value={number.format(Number(media.comments || 0))} />
-          <Mini label="Salvamentos" value={number.format(Number(media.saves || 0))} />
-          <Mini label="Compartilhamentos" value={number.format(Number(media.shares || 0))} />
-          <Mini label="Visualizações" value={media.video_views == null ? "Não disponível" : number.format(Number(media.video_views))} />
-        </div>
-      </section>
+      <div className="mt-5 grid grid-cols-4 divide-x divide-border overflow-hidden rounded-2xl border border-border bg-muted/15">
+        <Interaction icon={<Heart />} label="Curtidas" value={number.format(likes)} />
+        <Interaction icon={<MessageCircle />} label="Comentários" value={number.format(comments)} />
+        <Interaction icon={<Send />} label="Compart." value={number.format(shares)} />
+        <Interaction icon={<Bookmark />} label="Salvos" value={number.format(saves)} />
+      </div>
 
-      {media.video_views != null || media.average_watch_time != null || media.video_retention_rate != null ? <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
-        <h3 className="font-black">Leitura do vídeo</h3>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Mini label="Visualizações" value={number.format(Number(media.video_views || 0))} />
-          <Mini label="Retenção" value={media.video_retention_rate == null ? "Não disponível" : `${Number(media.video_retention_rate).toFixed(1).replace(".", ",")}%`} />
-          <Mini label="Tempo médio" value={media.average_watch_time == null ? "Não disponível" : `${Number(media.average_watch_time).toFixed(1).replace(".", ",")} s`} />
-        </div>
-      </section> : null}
+      <Tabs defaultValue="overview" className="mt-6">
+        <TabsList className="grid h-auto w-full grid-cols-3"><TabsTrigger value="overview">Visão geral</TabsTrigger><TabsTrigger value="engagement">Engajamento</TabsTrigger><TabsTrigger value="audience">Audiência</TabsTrigger></TabsList>
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <section>
+            <div className="flex items-baseline justify-between gap-3"><h3 className="font-black">Desempenho</h3><span className="text-xs text-muted-foreground">Por publicação</span></div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Mini label="Alcance" value={number.format(reach)} />
+              <Mini label="Impressões" value={number.format(impressions)} />
+              <Mini label="Interações" value={number.format(interactions)} />
+              <Mini label="Engajamento" value={`${engagement.toFixed(2).replace(".", ",")}%`} />
+              <Mini label="Visualizações" value={media.video_views == null ? "Não disponível" : number.format(Number(media.video_views))} />
+              <Mini label="Tipo" value={media.media_type} />
+            </div>
+          </section>
+          {media.video_views != null || media.average_watch_time != null || media.video_retention_rate != null ? <section className="rounded-2xl border border-border bg-muted/20 p-4">
+            <h3 className="font-black">Leitura do vídeo</h3>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Mini label="Visualizações" value={number.format(Number(media.video_views || 0))} />
+              <Mini label="Retenção" value={media.video_retention_rate == null ? "Não disponível" : `${Number(media.video_retention_rate).toFixed(1).replace(".", ",")}%`} />
+              <Mini label="Tempo médio" value={media.average_watch_time == null ? "Não disponível" : `${Number(media.average_watch_time).toFixed(1).replace(".", ",")} s`} />
+            </div>
+          </section> : null}
+        </TabsContent>
+        <TabsContent value="engagement" className="mt-4 space-y-4">
+          <section className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Mini label="Curtidas" value={number.format(likes)} />
+            <Mini label="Comentários" value={number.format(comments)} />
+            <Mini label="Compartilhamentos" value={number.format(shares)} />
+            <Mini label="Salvamentos" value={number.format(saves)} />
+            <Mini label="Sinais de intenção" value={number.format(savesAndShares)} />
+            <Mini label="Taxa de intenção" value={`${intentRate.toFixed(2).replace(".", ",")}%`} />
+          </section>
+          <p className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground">Sinais de intenção somam salvamentos e compartilhamentos. Eles ajudam a identificar conteúdos que a audiência quer rever ou enviar a outra pessoa.</p>
+        </TabsContent>
+        <TabsContent value="audience" className="mt-4">
+          <section className="rounded-2xl border border-dashed border-border bg-muted/15 p-5">
+            <Users className="h-5 w-5 text-primary" />
+            <h3 className="mt-3 font-black">Audiência deste conteúdo</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">A integração atual não recebe seguidores versus não seguidores, localização, idade ou gênero por publicação. Quando a Meta disponibilizar essas métricas para esta conta, elas aparecerão aqui sem estimativas.</p>
+          </section>
+        </TabsContent>
+      </Tabs>
 
       <section className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /><h3 className="font-black">Leitura Growdash</h3></div>
@@ -304,4 +339,8 @@ function SocialMediaDetailSheet({ media, onOpenChange, demoMode }: { media: Soci
       </section>
     </SheetContent>
   </Sheet>;
+}
+
+function Interaction({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <div className="min-w-0 p-3 text-center"><span className="mx-auto grid h-6 w-6 place-items-center text-muted-foreground [&>svg]:h-3.5 [&>svg]:w-3.5" aria-hidden="true">{icon}</span><b className="mt-1 block truncate text-sm tabular-nums">{value}</b><span className="block truncate text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span></div>;
 }
