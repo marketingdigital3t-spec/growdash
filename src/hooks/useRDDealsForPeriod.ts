@@ -45,19 +45,25 @@ interface Params {
   startDate: Date;
   endDate: Date;
   adAccountId?: string;
+  /**
+   * Used by multi-account views. Unlike an omitted account filter, this keeps
+   * unassigned RD deals out of an advertising-account total.
+   */
+  adAccountIds?: string[];
   enabled?: boolean;
 }
 
 const FIELDS =
   "id, rd_deal_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, utm_source, utm_medium, utm_campaign, utm_content, utm_term, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, updated_at";
 
-export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled = true }: Params) {
+export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, enabled = true }: Params) {
   return useQuery({
     queryKey: [
       "rd_deals_period",
       format(startDate, "yyyy-MM-dd"),
       format(endDate, "yyyy-MM-dd"),
       adAccountId ?? "all",
+      adAccountIds?.slice().sort().join(",") ?? "",
     ],
     enabled,
     queryFn: async () => {
@@ -77,6 +83,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
           .lte("lead_created_at", rangeEnd)
           .order("lead_created_at", { ascending: false });
         if (adAccountId) q = q.eq("ad_account_id", adAccountId);
+        else if (adAccountIds) q = q.in("ad_account_id", adAccountIds);
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await q.range(from, to);
@@ -101,9 +108,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, enabled =
  * fechado. Para integrações antigas que ainda não preenchem `closed_at`, a
  * última alteração de etapa é o fallback para não ocultar vendas reais.
  */
-export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, enabled = true }: Params) {
+export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, enabled = true }: Params) {
   return useQuery({
-    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), adAccountId ?? "all"],
+    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
     enabled,
     queryFn: async () => {
       const rangeStart = startOfDay(startDate).toISOString();
@@ -118,6 +125,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, enable
           .or(`and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
           .order("closed_at", { ascending: false, nullsFirst: false });
         if (adAccountId) query = query.eq("ad_account_id", adAccountId);
+        else if (adAccountIds) query = query.in("ad_account_id", adAccountIds);
         const { data, error } = await query.range(p * PAGE, (p + 1) * PAGE - 1);
         if (error) throw error;
         const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({

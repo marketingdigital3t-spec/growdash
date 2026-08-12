@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, Instagram, MessageCircle, RefreshCw, Search, Sparkles, Trash2, TriangleAlert } from "lucide-react";
+import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, FolderOpen, Instagram, Mail, MessageCircle, RefreshCw, Search, Sparkles, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,8 @@ import { AccountConnectionStatus } from "@/components/settings/AccountConnection
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGoogleWorkspaceOAuth } from "@/hooks/useGoogleWorkspaceOAuth";
+import { Textarea } from "@/components/ui/textarea";
 
 const tabs = [
   ["paid", "Tráfego pago"], ["social", "Mídia social"], ["crm", "CRM & Vendas"], ["ai", "IA"], ["messaging", "Mensageria"],
@@ -53,12 +55,14 @@ export default function IntegrationsPage() {
   const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
   const [search, setSearch] = useState("");
   const [metaDialogOpen, setMetaDialogOpen] = useState(false);
+  const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<{ id: string; name: string; account_id: string } | null>(null);
   const { data: adAccounts = [], isLoading: loadingMeta } = useAdAccounts();
   const { data: rdIntegration, isLoading: loadingRD } = useRDIntegration();
   const { data: rdFunnels = [] } = useRDFunnels(undefined, !!rdIntegration?.is_active);
   const connectMeta = useMetaOAuth();
   const connectInstagram = useInstagramOAuth();
+  const connectGoogle = useGoogleWorkspaceOAuth();
   const syncMeta = useSyncMeta();
 
   const reconnectStoredMetaToken = useMutation({
@@ -84,6 +88,14 @@ export default function IntegrationsPage() {
       return data ?? [];
     },
     retry: false,
+  });
+  const { data: googleIntegration } = useQuery({
+    queryKey: ["google_workspace_integration"], enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("integrations").select("id,provider,is_active,updated_at").eq("provider", "google_workspace").eq("is_active", true).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
   });
 
   const { data: latestRDDeal } = useQuery({
@@ -174,12 +186,16 @@ export default function IntegrationsPage() {
         </TabsContent>
         <TabsContent value="messaging"><ProviderGrid search={search} providers={[['WhatsApp Cloud API', 'Relatórios automáticos, alertas e mensagens transacionais.'], ['E-mail transacional', 'Recuperação, convites e alertas da operação.'], ['n8n', 'Automações via API e webhooks, respeitando licença comercial.']]} icon={<MessageCircle />} /></TabsContent>
         <TabsContent value="payments"><ProviderGrid search={search} providers={[['Stripe', 'Assinaturas, checkout, faturas e portal do cliente.'], ['Asaas', 'Pix, boleto, cartão e cobrança recorrente no Brasil.'], ['Mercado Pago', 'Checkout e pagamentos locais.']]} icon={<Cloud />} /></TabsContent>
-        <TabsContent value="files"><ProviderGrid search={search} providers={[['Google Drive', 'Relatórios, criativos e documentos do workspace.'], ['Google Sheets', 'Importação, exportação e fontes auxiliares.'], ['OneDrive', 'Arquivos corporativos e compartilhamento.']]} icon={<FileText />} /></TabsContent>
+        <TabsContent value="files" className="space-y-4">
+          {providerFilter("Google Drive") && <GoogleWorkspaceCard connected={!!googleIntegration} updatedAt={googleIntegration?.updated_at} pending={connectGoogle.isPending} onConnect={() => connectGoogle.mutate()} onOpen={() => setGoogleDialogOpen(true)} />}
+          <ProviderGrid search={search} providers={[['Google Sheets', 'Importação, exportação e fontes auxiliares.'], ['OneDrive', 'Arquivos corporativos e compartilhamento.']]} icon={<FileText />} />
+        </TabsContent>
         <TabsContent value="developers"><ProviderGrid search={search} providers={[['API Growdash', 'Chaves com escopo, rotação e auditoria.'], ['Webhooks', 'Eventos assinados, tentativas e fila de falhas.'], ['MCP', 'Ferramentas seguras para agentes e assistentes.']]} icon={<Code2 />} /></TabsContent>
         <TabsContent value="health" className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><HealthCard title="Meta Ads" value={metaConnected ? relativeDate(latestMetaSync as string | null) : "Não conectado"} ok={metaConnected} /><HealthCard title="RD Station" value={rdConnected ? relativeDate(latestRDDeal?.updated_at) : "Não conectado"} ok={rdConnected} /><HealthCard title="Filas e webhooks" value="Monitoramento por execução" ok /></div>{rdConnected && <><RDHealthCheckCard /><RDReconcileCard /><RDUTMDiagnosticsCard /><RDObservabilityCard /></>}</TabsContent>
       </Tabs>
 
       <Dialog open={metaDialogOpen} onOpenChange={setMetaDialogOpen}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>Conectar conta Meta Ads por ID e token</DialogTitle></DialogHeader><MetaManualConnectionCard onConnected={() => setMetaDialogOpen(false)} /></DialogContent></Dialog>
+      <Dialog open={googleDialogOpen} onOpenChange={setGoogleDialogOpen}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Google Drive e Gmail</DialogTitle></DialogHeader><GoogleWorkspaceManager /></DialogContent></Dialog>
       <DestructiveConfirmationDialog
         open={!!accountToDelete}
         onOpenChange={(open) => !open && setAccountToDelete(null)}
@@ -206,3 +222,20 @@ function EmptyState({ text }: { text: string }) { return <div className="grid mi
 function StatusDot({ tone, label }: { tone: "connected" | "available"; label: string }) { return <span className="inline-flex items-center gap-1.5"><i className={cn("h-2 w-2 rounded-full", tone === "connected" ? "bg-emerald-500" : "bg-muted-foreground")} />{label}</span>; }
 function HealthCard({ title, value, ok }: { title: string; value: string; ok: boolean }) { return <div className="gd-panel p-4"><div className="flex items-center gap-2">{ok ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <TriangleAlert className="h-4 w-4 text-amber-500" />}<b className="text-sm">{title}</b></div><p className="mt-2 text-xs text-muted-foreground">{value}</p></div>; }
 function Feature({ label, text }: { label: string; text: string }) { return <div className="rounded-xl border border-border bg-muted/20 p-4"><b className="text-xs">{label}</b><p className="mt-1 text-[11px] text-muted-foreground">{text}</p></div>; }
+
+function GoogleWorkspaceCard({ connected, updatedAt, pending, onConnect, onOpen }: { connected: boolean; updatedAt?: string; pending: boolean; onConnect: () => void; onOpen: () => void }) {
+  return <section className="gd-panel overflow-hidden"><SectionHeader icon={<FolderOpen />} title="Google Drive e Gmail" description="Acesse arquivos do seu Drive e envie e-mails pelo Gmail usando a autorização oficial do Google." status={connected ? "Conectado" : "Disponível"} connected={connected} /><div className="grid gap-3 p-5 md:grid-cols-3"><Feature label="Drive" text="Listar e enviar arquivos da conta Google conectada." /><Feature label="Gmail" text="Enviar e-mails pela conta autorizada, sem compartilhar senha." /><Feature label="Segurança" text="Tokens ficam no servidor e podem ser revogados no Google a qualquer momento." /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button onClick={onConnect} disabled={pending}>{connected ? <Mail className="mr-2 h-4 w-4" /> : <FolderOpen className="mr-2 h-4 w-4" />}{pending ? "Abrindo Google…" : connected ? "Reconectar Google" : "Conectar Google"}</Button>{connected && <Button variant="outline" onClick={onOpen}><FolderOpen className="mr-2 h-4 w-4" />Abrir Drive e Gmail</Button>}<span className="ml-auto self-center text-[10px] text-muted-foreground">{connected ? `Atualizado ${relativeDate(updatedAt)}` : "Requer OAuth configurado no Google Cloud"}</span></div></section>;
+}
+
+function GoogleWorkspaceManager() {
+  const { toast } = useToast();
+  const [files, setFiles] = useState<Array<{ id: string; name: string; mimeType?: string; size?: string; webViewLink?: string; modifiedTime?: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [mail, setMail] = useState({ to: "", subject: "", html: "" });
+  const loadFiles = async () => { setLoading(true); try { const { data, error } = await supabase.functions.invoke("google-drive-files", { body: { action: "list" } }); if (error || data?.error) throw error ?? new Error(data.error); setFiles(data.files ?? []); } catch (error) { toast({ title: "Não foi possível abrir o Drive", description: error instanceof Error ? error.message : "Erro inesperado", variant: "destructive" }); } finally { setLoading(false); } };
+  const upload = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { toast({ title: "Arquivo muito grande", description: "Envie arquivos de até 10 MB.", variant: "destructive" }); return; } setUploading(true); try { const contentBase64 = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error("Não foi possível ler o arquivo.")); reader.onload = () => resolve(String(reader.result).split(",")[1] || ""); reader.readAsDataURL(file); }); const { data, error } = await supabase.functions.invoke("google-drive-files", { body: { action: "upload", name: file.name, mimeType: file.type || "application/octet-stream", contentBase64 } }); if (error || data?.error) throw error ?? new Error(data.error); toast({ title: "Arquivo enviado", description: `${file.name} foi salvo no Google Drive.` }); await loadFiles(); } catch (error) { toast({ title: "Falha no envio", description: error instanceof Error ? error.message : "Erro inesperado", variant: "destructive" }); } finally { setUploading(false); event.target.value = ""; } };
+  const send = async () => { setSending(true); try { const { data, error } = await supabase.functions.invoke("google-gmail-send", { body: mail }); if (error || data?.error) throw error ?? new Error(data.error); toast({ title: "E-mail enviado", description: `Mensagem enviada por ${data.from || "sua conta Google"}.` }); setMail({ to: "", subject: "", html: "" }); } catch (error) { toast({ title: "Falha no envio", description: error instanceof Error ? error.message : "Erro inesperado", variant: "destructive" }); } finally { setSending(false); } };
+  return <Tabs defaultValue="drive" className="mt-2"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="drive">Google Drive</TabsTrigger><TabsTrigger value="gmail">Gmail</TabsTrigger></TabsList><TabsContent value="drive" className="space-y-4 pt-4"><div className="flex flex-wrap gap-2"><Button onClick={loadFiles} disabled={loading}><RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />{loading ? "Carregando…" : "Atualizar arquivos"}</Button><Button asChild variant="outline" disabled={uploading}><label className="cursor-pointer"><Upload className="mr-2 h-4 w-4" />{uploading ? "Enviando…" : "Enviar para o Drive"}<input className="sr-only" type="file" onChange={upload} /></label></Button></div><div className="max-h-[380px] space-y-2 overflow-y-auto">{files.map((file) => <a key={file.id} href={file.webViewLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 p-3 transition hover:border-primary/40"><FolderOpen className="h-4 w-4 text-primary" /><span className="min-w-0 grow truncate text-sm font-semibold">{file.name}</span><span className="text-[10px] text-muted-foreground">{file.mimeType || "arquivo"}</span></a>)}{!files.length && !loading && <EmptyState text="Atualize para listar os arquivos do Drive conectado." />}</div></TabsContent><TabsContent value="gmail" className="space-y-3 pt-4"><Input value={mail.to} onChange={(event) => setMail((current) => ({ ...current, to: event.target.value }))} placeholder="Destinatário" type="email" /><Input value={mail.subject} onChange={(event) => setMail((current) => ({ ...current, subject: event.target.value }))} placeholder="Assunto" /><Textarea value={mail.html} onChange={(event) => setMail((current) => ({ ...current, html: event.target.value }))} placeholder="Mensagem" className="min-h-40" /><Button onClick={send} disabled={sending || !mail.to || !mail.subject || !mail.html}><Mail className="mr-2 h-4 w-4" />{sending ? "Enviando…" : "Enviar pelo Gmail"}</Button><p className="text-[10px] text-muted-foreground">O e-mail é enviado pela conta Google que você autorizou nesta plataforma.</p></TabsContent></Tabs>;
+}

@@ -29,11 +29,20 @@ export default function ExpertDashboard() {
   }, [accountId, accounts, loadingAccounts]);
 
   const selectedId = accountId === "all" ? undefined : accountId;
+  // “Todas as contas” means the union of accounts authorized for this expert,
+  // not every RD deal without attribution. The latter is a reconciliation item
+  // and must never inflate the owner-facing dashboard total.
+  const selectedAccountIds = useMemo(() => accountId === "all" ? accounts.map((account) => account.id) : undefined, [accountId, accounts]);
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, startDate, endDate });
   const { data: sales = [] } = useSales({ adAccountId: selectedId, startDate, endDate });
-  const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, startDate, endDate });
-  const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, startDate, endDate });
+  const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
+  const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
   const permittedAccounts = useMemo(() => accounts.map((account) => ({ id: account.id, name: account.name })), [accounts]);
+  const permittedSales = useMemo(() => {
+    if (selectedId) return sales;
+    const accountIds = new Set(accounts.map((account) => account.id));
+    return sales.filter((sale) => !!sale.ad_account_id && accountIds.has(sale.ad_account_id));
+  }, [accounts, sales, selectedId]);
   const isLoading = loadingAccounts || loadingInsights;
 
   return (
@@ -64,7 +73,7 @@ export default function ExpertDashboard() {
         />
       </MotionItem>
 
-      <DashboardProvider value={{ startDate, endDate, adAccountId: selectedId, insights, sales, rdDeals, revenueDeals, alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading }}>
+      <DashboardProvider value={{ startDate, endDate, adAccountId: selectedId, insights, sales: permittedSales, rdDeals, revenueDeals, alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading }}>
         <MotionItem>
           <section aria-label="Indicadores de performance" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             <KPIWidget title="Faturamento líquido" config={{ metric: "revenue_net" }} />
