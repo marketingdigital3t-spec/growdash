@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PageHeading } from "./shared";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -162,7 +163,7 @@ export default function ProfilePage() {
           <div className="max-w-3xl space-y-5">
             <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-500" />Sua sessão usa autenticação segura do Supabase.</div>
             <Field label="E-mail de acesso"><div className="relative"><Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div></Field>
-            <Field label="Nova senha"><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 10 caracteres" autoComplete="new-password" /></Field>
+            <Field label="Nova senha"><PasswordInput value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 10 caracteres" autoComplete="new-password" /></Field>
             <Button onClick={() => updateAccess.mutate()} disabled={updateAccess.isPending || (!password && email === user?.email)}>{updateAccess.isPending ? "Atualizando…" : "Atualizar acesso"}</Button>
             <AuthenticatorMfaCard />
           </div>

@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 export function MetaManualConnectionCard({ onConnected }: { onConnected?: () => void }) {
@@ -70,9 +71,8 @@ export function MetaManualConnectionCard({ onConnected }: { onConnected?: () => 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="meta-access-token">Token de acesso</Label>
-          <Input
+          <PasswordInput
             id="meta-access-token"
-            type="password"
             autoComplete="new-password"
             placeholder="Cole o token da Meta"
             value={token}
