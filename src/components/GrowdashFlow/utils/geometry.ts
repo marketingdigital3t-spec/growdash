@@ -11,9 +11,19 @@ export function normalizeBounds(x: number, y: number, width: number, height: num
   };
 }
 
-const TEXT_HORIZONTAL_INSET = 16;
-const TEXT_VERTICAL_INSET = 20;
+// Keep these values aligned with ShapeRenderer. They include the editor's
+// internal padding as well as the foreignObject inset.
+const TEXT_HORIZONTAL_INSET = 28;
+const TEXT_VERTICAL_INSET = 28;
 const TEXT_LINE_HEIGHT = 1.24;
+const TEXT_MIN_WIDTH = 220;
+const STICKY_MIN_WIDTH = 200;
+const TEXT_MIN_HEIGHT = 104;
+const STICKY_MIN_HEIGHT = 180;
+
+export function minimumTextElementWidth(element: Pick<DrawElement, "type">) {
+  return element.type === "sticky" ? STICKY_MIN_WIDTH : TEXT_MIN_WIDTH;
+}
 
 /**
  * SVG foreignObject does not contribute to its parent's layout. Calculate a
@@ -23,17 +33,21 @@ const TEXT_LINE_HEIGHT = 1.24;
 export function minimumTextElementHeight(element: Pick<DrawElement, "type" | "text" | "width" | "fontSize">) {
   if (element.type !== "text" && element.type !== "sticky") return 20;
   const fontSize = Math.max(10, element.fontSize || (element.type === "sticky" ? 20 : 22));
-  const usableWidth = Math.max(40, Math.abs(element.width) - TEXT_HORIZONTAL_INSET);
-  // Nunito/Inter headings average roughly .56em; adding one column keeps
-  // accentuated words and bold text from wrapping a line too late.
-  const charactersPerLine = Math.max(1, Math.floor(usableWidth / (fontSize * .56)) - 1);
+  const usableWidth = Math.max(40, Math.max(Math.abs(element.width), minimumTextElementWidth(element)) - TEXT_HORIZONTAL_INSET);
+  // This deliberately overestimates a line a little. SVG foreignObject can
+  // otherwise clip accentuated Portuguese copy before React applies the next
+  // content-height update.
+  const charactersPerLine = Math.max(1, Math.floor(usableWidth / (fontSize * .6)) - 1);
   const rows = Math.max(1, (element.text || "").split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0));
-  return Math.ceil(rows * fontSize * TEXT_LINE_HEIGHT + TEXT_VERTICAL_INSET);
+  const contentHeight = Math.ceil(rows * fontSize * TEXT_LINE_HEIGHT + TEXT_VERTICAL_INSET + 4);
+  return Math.max(element.type === "sticky" ? STICKY_MIN_HEIGHT : TEXT_MIN_HEIGHT, contentHeight);
 }
 
 export function keepTextContentVisible<T extends DrawElement>(element: T): T {
   if (element.type !== "text" && element.type !== "sticky") return element;
-  return { ...element, height: Math.max(Math.abs(element.height), minimumTextElementHeight(element)) };
+  const width = Math.max(Math.abs(element.width), minimumTextElementWidth(element));
+  const withMinimumWidth = { ...element, width };
+  return { ...withMinimumWidth, height: Math.max(Math.abs(element.height), minimumTextElementHeight(withMinimumWidth)) };
 }
 
 export function getElementBounds(element: DrawElement): Bounds {

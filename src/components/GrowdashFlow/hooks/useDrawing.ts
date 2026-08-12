@@ -3,8 +3,11 @@ import type { DrawElement, Point, ToolType } from "../types";
 import { createId, minimumTextElementHeight, snapPoint } from "../utils/geometry";
 
 const DEFAULT_SIZE: Record<string, { width: number; height: number }> = {
-  text: { width: 220, height: 72 },
-  sticky: { width: 220, height: 180 },
+  // A text block is a working area, not a label. Starting with a generous
+  // footprint keeps the first lines readable and makes Flow feel like a
+  // canvas instead of a cramped form field.
+  text: { width: 340, height: 116 },
+  sticky: { width: 260, height: 180 },
   image: { width: 300, height: 200 },
 };
 

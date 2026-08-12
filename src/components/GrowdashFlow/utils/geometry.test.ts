@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DrawElement } from "../types";
-import { connectorPoints, getSelectionBounds, keepTextContentVisible, minimumTextElementHeight, snapPoint } from "./geometry";
+import { connectorPoints, getSelectionBounds, keepTextContentVisible, minimumTextElementHeight, minimumTextElementWidth, snapPoint } from "./geometry";
 
 function rectangle(id: string, x: number, y: number): DrawElement {
   return { id, type: "rectangle", x, y, width: 100, height: 80, rotation: 0, opacity: 1, fillColor: "#121212", strokeColor: "#F5A623", strokeWidth: 2, layerIndex: 0, locked: false };
@@ -26,5 +26,13 @@ describe("Growdash Flow geometry", () => {
     const text: DrawElement = { id: "headline", type: "text", x: 0, y: 0, width: 220, height: 20, rotation: 0, opacity: 1, fillColor: "transparent", strokeColor: "#fff", strokeWidth: 2, text: "ENGAJAMENTO\nObjeção", fontSize: 40, layerIndex: 0, locked: false };
     expect(minimumTextElementHeight(text)).toBeGreaterThan(100);
     expect(keepTextContentVisible(text).height).toBe(minimumTextElementHeight(text));
+  });
+
+  it("protects a comfortable text workspace and grows it for long copy", () => {
+    const cramped: DrawElement = { id: "note", type: "text", x: 0, y: 0, width: 100, height: 32, rotation: 0, opacity: 1, fillColor: "transparent", strokeColor: "#fff", strokeWidth: 2, text: "Uma orientação longa para validar que o conteúdo não fica cortado dentro do quadro de texto.", fontSize: 22, layerIndex: 0, locked: false };
+    const visible = keepTextContentVisible(cramped);
+    expect(visible.width).toBe(minimumTextElementWidth(cramped));
+    expect(visible.height).toBeGreaterThanOrEqual(104);
+    expect(visible.height).toBeGreaterThan(cramped.height);
   });
 });
