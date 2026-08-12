@@ -800,16 +800,16 @@ export default function Campaigns() {
         <div className="flex flex-col gap-2 px-3 py-2 lg:flex-row lg:items-center">
           <div className="flex shrink-0 items-center gap-2">
             <h1 className="text-lg font-black tracking-tight">Campanhas</h1>
-            <span className="grid h-7 w-7 place-items-center rounded-md border border-primary/25 bg-primary/10 text-[9px] font-black text-primary">GD</span>
+            <span className="campaign-brand-badge grid h-7 w-7 place-items-center rounded-md border text-[9px] font-black">GD</span>
           </div>
           {visibleAdAccounts.length > 0 && (
             <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-              <SelectTrigger className="h-8 w-full bg-background text-left text-xs sm:w-[260px] [&>span]:truncate [&>span]:text-left" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
+              <SelectTrigger className="campaign-account-select h-8 w-full text-left text-xs sm:w-[260px] [&>span]:truncate [&>span]:text-left" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
               <SelectContent><SelectItem value="all">Todas as contas de anúncio</SelectItem>{visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
             </Select>
           )}
           <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-primary text-[10px] font-black text-primary">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
+            <span className="campaign-opportunity-score grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-black">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
             <span className="truncate">Pontuação de oportunidade</span>
             <ChevronDown className="h-3.5 w-3.5" />
           </div>
