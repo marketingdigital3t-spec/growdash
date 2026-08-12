@@ -62,7 +62,9 @@ function reloadFreshBuild() {
   const retryKey = "growdash:loading-retry";
   let attempts = 0;
   try { attempts = Number(sessionStorage.getItem(retryKey) || "0"); } catch { /* storage is optional */ }
-  if (attempts >= 2) return false;
+  // One automatic refresh is enough to recover a stale Pages shell. Repeating
+  // it can hide a real network/CDN failure behind an endless spinner.
+  if (attempts >= 1) return false;
   try { sessionStorage.setItem(retryKey, String(attempts + 1)); } catch { /* a cache-busted reload is still safe */ }
   const url = new URL(window.location.href);
   url.searchParams.set("gd_reload", String(Date.now()));
@@ -72,6 +74,7 @@ function reloadFreshBuild() {
 
 function LoadingModule({ recover = false }: { recover?: boolean }) {
   const [slow, setSlow] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   useEffect(() => {
     const timeout = window.setTimeout(() => setSlow(true), 8000);
     return () => window.clearTimeout(timeout);
@@ -81,18 +84,31 @@ function LoadingModule({ recover = false }: { recover?: boolean }) {
     if (!recover) return;
     // A lazy chunk can remain pending forever after a Pages rollout if a
     // browser holds an old HTML shell. Recover once automatically instead of
-    // leaving the person on an endless spinner.
-    const timeout = window.setTimeout(() => { void reloadFreshBuild(); }, 10_000);
+    // leaving the person on an endless spinner. If it already recovered once,
+    // the visible recovery state stays available rather than retrying forever.
+    const timeout = window.setTimeout(() => {
+      if (reloadFreshBuild()) setRecovering(true);
+      else setSlow(true);
+    }, 10_000);
     return () => window.clearTimeout(timeout);
   }, [recover]);
 
   return <div className="grid min-h-[40vh] place-items-center px-4 text-center" role="status" aria-live="polite">
     {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
       <p className="font-bold">A Growdash está demorando para responder.</p>
-      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização pode ter sido interrompida. A versão mais recente será tentada automaticamente.</p>
-      <button type="button" onClick={() => { if (!reloadFreshBuild()) window.location.reload(); }} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar novamente</button>
-    </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
+      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. Esta tela não continuará tentando sozinha.</p>
+      <button type="button" onClick={() => { try { sessionStorage.removeItem("growdash:loading-retry"); } catch { /* storage is optional */ } window.location.reload(); }} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar novamente</button>
+    </div> : recovering ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl"><p className="font-bold">Atualizando a Growdash…</p><p className="mt-2 text-sm text-muted-foreground">Estamos buscando a versão mais recente para recuperar o carregamento.</p></div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
   </div>;
+}
+
+function ClearLoadingRecovery() {
+  useEffect(() => {
+    // This component only commits after the lazy route tree was actually
+    // rendered. Clearing the guard earlier reintroduced an infinite retry.
+    try { sessionStorage.removeItem("growdash:loading-retry"); } catch { /* storage is optional */ }
+  }, []);
+  return null;
 }
 
 type AppErrorBoundaryState = { failed: boolean };
@@ -121,7 +137,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
     }
     const activeRecovery = Date.now() - retry.startedAt < 30_000;
     const attempts = activeRecovery ? retry.attempts : 0;
-    if (isChunkError && attempts < 3) {
+    if (isChunkError && attempts < 1) {
       try {
         sessionStorage.setItem(retryKey, JSON.stringify({ attempts: attempts + 1, startedAt: activeRecovery ? retry.startedAt : Date.now() }));
       } catch {
@@ -170,11 +186,6 @@ function AuthenticatedLayout() {
 
 function AccentInitializer({ children }: { children: ReactNode }) {
   useAccentTheme();
-  useEffect(() => {
-    // A successful render clears the cache-recovery guard, so a future real
-    // deployment can use its own bounded recovery attempt.
-    try { sessionStorage.removeItem("growdash:loading-retry"); } catch { /* storage is optional */ }
-  }, []);
   return <>{children}</>;
 }
 
@@ -288,6 +299,7 @@ export default function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
                     </Routes>
+                    <ClearLoadingRecovery />
                   </Suspense>
                 </AppErrorBoundary>
               </AccentInitializer>
