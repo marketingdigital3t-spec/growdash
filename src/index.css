@@ -1627,6 +1627,40 @@ html:not(.dark) {
     box-shadow: 0 0 16px rgba(var(--brand-accent-rgb), .4);
   }
 
+  .goal-achievement-popup {
+    isolation: isolate;
+  }
+
+  .goal-confetti {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .goal-confetti i {
+    --confetti-color: #fbbf24;
+    position: absolute;
+    top: -16px;
+    left: calc((var(--confetti-index) * 5.75%) + 1%);
+    width: 7px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--confetti-color);
+    opacity: .88;
+    animation: goal-confetti-fall calc(2.6s + ((var(--confetti-index) % 4) * .35s)) linear infinite;
+    animation-delay: calc(var(--confetti-index) * -.28s);
+  }
+
+  .goal-confetti i:nth-child(3n) { --confetti-color: #34d399; width: 5px; height: 8px; }
+  .goal-confetti i:nth-child(4n) { --confetti-color: #fb7185; border-radius: 50%; }
+
+  @keyframes goal-confetti-fall {
+    from { transform: translate3d(0, -18px, 0) rotate(0deg); }
+    to { transform: translate3d(16px, 145px, 0) rotate(360deg); }
+  }
+
   .growdash-scrollbar {
     scrollbar-color: rgba(var(--brand-accent-rgb), .38) transparent;
     scrollbar-width: thin;
