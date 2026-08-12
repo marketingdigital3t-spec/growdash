@@ -3974,3 +3974,73 @@ html:not(.dark) .dashboard-video-glass {
   .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card):hover,
   .dashboard-widget-shell .rounded-lg.border.bg-card:hover { transform: none; }
 }
+
+/* Light mode recovery ------------------------------------------------------
+   Keep the dark workspace intentionally cinematic, but never let its last
+   "obsidian" overrides leak into the light theme. These selectors are placed
+   after the legacy visual passes so every module shares one clear hierarchy:
+   white glass, neutral gray canvas and dark readable type. */
+html:not(.dark) .brand-shell {
+  background:
+    radial-gradient(circle at 86% -8%, rgba(255,255,255,.98), transparent 25rem),
+    radial-gradient(circle at 10% 100%, rgba(0,0,0,.035), transparent 30rem),
+    linear-gradient(135deg, #e9e9e9 0%, #f8f8f8 47%, #e6e6e6 100%) !important;
+}
+
+html:not(.dark) .brand-shell::before {
+  opacity: .45;
+  background-image: linear-gradient(rgba(0,0,0,.028) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.022) 1px, transparent 1px);
+}
+
+html:not(.dark) .brand-shell .growdash-main,
+html:not(.dark) .expert-dashboard {
+  color: #151515;
+}
+
+html:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .expert-dashboard .gd-metric-card) {
+  color: #171717 !important;
+  border-color: rgba(0,0,0,.13) !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.76) 45%, rgba(235,235,235,.74) 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,1),
+    inset 0 -1px 0 rgba(0,0,0,.055),
+    0 18px 42px -36px rgba(0,0,0,.34) !important;
+}
+
+html:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .expert-dashboard .gd-metric-card) :is(h1, h2, h3, h4, p, span, b, strong, td, th, label) {
+  color: inherit;
+}
+
+html:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .expert-dashboard .gd-metric-card) :is(.text-muted-foreground, [class*="text-muted-foreground"]) {
+  color: #666 !important;
+}
+
+html:not(.dark) :is(.gd-metric-card, .dashboard-video-glass) [class*="bg-primary/"] {
+  background-color: rgba(0,0,0,.065) !important;
+}
+
+html:not(.dark) :is(.gd-metric-card, .dashboard-video-glass) [class*="text-primary"] {
+  color: #202020 !important;
+}
+
+html:not(.dark) .dashboard-glass-metrics > :is(article, button) {
+  color: #171717 !important;
+  border-color: rgba(0,0,0,.12) !important;
+  background: linear-gradient(135deg, #fff, #ededed) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.96), 0 10px 22px -21px rgba(0,0,0,.28) !important;
+}
+
+html:not(.dark) .gd-filter-strip .gd-filter-control:not(.gd-filter-account),
+html:not(.dark) .gd-filter-strip .gd-filter-refresh,
+html:not(.dark) .growdash-main :is(input, select, textarea) {
+  color: #161616 !important;
+  border-color: rgba(0,0,0,.16) !important;
+  background-color: rgba(255,255,255,.88) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 8px 18px -20px rgba(0,0,0,.28) !important;
+}
+
+html:not(.dark) .growdash-main :is(input, select, textarea)::placeholder { color: #777 !important; }
+html:not(.dark) .growdash-main .text-emerald-600 { color: #167a43 !important; }
+html:not(.dark) .growdash-main .text-red-500 { color: #b42323 !important; }
+html:not(.dark) .growdash-main .text-primary { color: #242424 !important; }
