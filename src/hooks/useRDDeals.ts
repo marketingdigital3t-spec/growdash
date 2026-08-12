@@ -52,6 +52,9 @@ export interface RDDeal {
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  utm_id: string | null;
   lead_state: string | null;
   lead_city: string | null;
   lead_created_at: string | null;
@@ -80,7 +83,7 @@ interface Params {
 }
 
 const DEAL_FIELDS =
-  "id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at";
+  "id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at";
 
 export function useRDDeals(params: Params) {
   const { funnelId, startDate, endDate, source, state, campaign, owner, product, enabled = true } = params;

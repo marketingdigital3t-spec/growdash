@@ -502,6 +502,9 @@ function DealDetails({ deal, funnelName, userId, onClose, onSaved }: { deal: RDD
           <DetailRow icon={<UsersRound />} label="Produto" value={deal.rd_product_name || "Não informado"} />
           <DetailRow icon={<Target />} label="Origem" value={deal.utm_source || "Não atribuída"} />
           <DetailRow icon={<Target />} label="Campanha" value={deal.rd_campaign_name || deal.utm_campaign || "Não atribuída"} />
+          <DetailRow icon={<Target />} label="Conjunto (UTM term)" value={deal.utm_term || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="Criativo (UTM content)" value={deal.utm_content || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="ID do anúncio (UTM id)" value={deal.utm_id || "Não atribuído"} />
           <DetailRow icon={<CalendarClock />} label="Criado em" value={fullDate(deal.lead_created_at)} />
           <DetailRow icon={<Clock3 />} label="Última movimentação" value={fullDate(deal.stage_updated_at || deal.updated_at)} />
           {deal.lost_reason && <DetailRow icon={<XCircle />} label="Motivo da perda" value={deal.lost_reason} danger />}
@@ -525,6 +528,9 @@ function DealEditor({ deal, userId, onSaved }: { deal: RDDealLite; userId?: stri
     product: deal.rd_product_name ?? "",
     source: deal.utm_source ?? "",
     campaign: deal.utm_campaign ?? "",
+    adset: deal.utm_term ?? "",
+    creative: deal.utm_content ?? "",
+    adId: deal.utm_id ?? "",
     lostReason: deal.lost_reason ?? "",
   }));
 
@@ -544,6 +550,9 @@ function DealEditor({ deal, userId, onSaved }: { deal: RDDealLite; userId?: stri
       rd_product_name: form.product.trim() || null,
       utm_source: form.source.trim() || null,
       utm_campaign: form.campaign.trim() || null,
+      utm_term: form.adset.trim() || null,
+      utm_content: form.creative.trim() || null,
+      utm_id: form.adId.trim() || null,
       lost_reason: form.lostReason.trim() || null,
     }).eq("id", deal.id);
     setSaving(false);
@@ -554,7 +563,7 @@ function DealEditor({ deal, userId, onSaved }: { deal: RDDealLite; userId?: stri
 
   if (!editing) return <section className="mt-5 rounded-2xl border border-primary/25 bg-primary/[.04] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-black">Editar negociação</h3><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Ajuste valor, contato, responsável, produto e atribuição diretamente na Growdash.</p></div><Button type="button" size="sm" onClick={() => setEditing(true)}>Editar</Button></div>{deal.manual_override_enabled && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-[10px] font-semibold text-amber-600">Valor manual ativo: {brl.format(getRDDealAmount(deal))}. Ele prevalece sobre o valor recebido do RD.</p>}</section>;
 
-  return <section className="mt-5 rounded-2xl border border-primary/35 bg-primary/[.05] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">O valor manual é preservado pela Growdash mesmo quando o RD sincronizar novamente.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><EditField label="Valor da venda realizada" value={form.amount} onChange={(value) => setForm({ ...form, amount: value })} inputMode="decimal" /><EditField label="Motivo do ajuste" value={form.reason} onChange={(value) => setForm({ ...form, reason: value })} /><EditField label="Nome do contato" value={form.contactName} onChange={(value) => setForm({ ...form, contactName: value })} /><EditField label="E-mail" value={form.contactEmail} onChange={(value) => setForm({ ...form, contactEmail: value })} type="email" /><EditField label="Responsável" value={form.owner} onChange={(value) => setForm({ ...form, owner: value })} /><EditField label="Produto" value={form.product} onChange={(value) => setForm({ ...form, product: value })} /><EditField label="Origem / UTM source" value={form.source} onChange={(value) => setForm({ ...form, source: value })} /><EditField label="Campanha / UTM campaign" value={form.campaign} onChange={(value) => setForm({ ...form, campaign: value })} /></div><label className="mt-3 grid gap-1.5 text-xs font-bold">Motivo de perda <Textarea value={form.lostReason} onChange={(event) => setForm({ ...form, lostReason: event.target.value })} rows={2} /></label><div className="mt-4 flex justify-end"><Button type="button" onClick={() => void save()} disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? "Salvando…" : "Salvar alterações"}</Button></div></section>;
+  return <section className="mt-5 rounded-2xl border border-primary/35 bg-primary/[.05] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">O valor manual é preservado pela Growdash mesmo quando o RD sincronizar novamente.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><EditField label="Valor da venda realizada" value={form.amount} onChange={(value) => setForm({ ...form, amount: value })} inputMode="decimal" /><EditField label="Motivo do ajuste" value={form.reason} onChange={(value) => setForm({ ...form, reason: value })} /><EditField label="Nome do contato" value={form.contactName} onChange={(value) => setForm({ ...form, contactName: value })} /><EditField label="E-mail" value={form.contactEmail} onChange={(value) => setForm({ ...form, contactEmail: value })} type="email" /><EditField label="Responsável" value={form.owner} onChange={(value) => setForm({ ...form, owner: value })} /><EditField label="Produto" value={form.product} onChange={(value) => setForm({ ...form, product: value })} /><EditField label="Origem / UTM source" value={form.source} onChange={(value) => setForm({ ...form, source: value })} /><EditField label="Campanha / UTM campaign" value={form.campaign} onChange={(value) => setForm({ ...form, campaign: value })} /><EditField label="Conjunto / UTM term" value={form.adset} onChange={(value) => setForm({ ...form, adset: value })} /><EditField label="Criativo / UTM content" value={form.creative} onChange={(value) => setForm({ ...form, creative: value })} /><EditField label="ID do anúncio / UTM id" value={form.adId} onChange={(value) => setForm({ ...form, adId: value })} /></div><label className="mt-3 grid gap-1.5 text-xs font-bold">Motivo de perda <Textarea value={form.lostReason} onChange={(event) => setForm({ ...form, lostReason: event.target.value })} rows={2} /></label><div className="mt-4 flex justify-end"><Button type="button" onClick={() => void save()} disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? "Salvando…" : "Salvar alterações"}</Button></div></section>;
 }
 
 function EditField({ label, value, onChange, type = "text", inputMode }: { label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }) {

@@ -57,6 +57,7 @@ export function LeadDetailSheet({ entry, onClose }: Props) {
                 <Row label="utm_campaign" value={deal.utm_campaign || deal.last_touch_utm_campaign || deal.first_touch_utm_campaign} mono />
                 <Row label="utm_term" value={deal.utm_term} mono />
                 <Row label="utm_content" value={deal.utm_content} mono />
+                <Row label="utm_id (anúncio Meta)" value={deal.utm_id} mono />
               </Section>
 
               <Section title="Atribuição">

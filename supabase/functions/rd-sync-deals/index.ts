@@ -784,6 +784,7 @@ Deno.serve(async (req) => {
       const utm_content =
         pickUtm("content", ["utmcontent", "utm_content", "content", "conteudo", "conteúdo"]) ||
         null;
+      const utm_id = pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "anuncioid", "anúncioid"]) || null;
 
       const leadEntryDate = d.created_at
         ? new Date(d.created_at).toISOString().split("T")[0]
@@ -820,6 +821,7 @@ Deno.serve(async (req) => {
             utm_campaign,
             utm_content,
             utm_term,
+            utm_id,
             contact_name: contactName,
             contact_email: contactEmail,
             lead_state: contactState,
@@ -851,7 +853,7 @@ Deno.serve(async (req) => {
       const { data: existing } = await admin
         .from("sales")
         .select(
-          "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
+          "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
         )
         .eq("rd_deal_id", rdDealId)
         .maybeSingle();
@@ -903,6 +905,7 @@ Deno.serve(async (req) => {
           utm_campaign: preserve(existing.utm_campaign, utm_campaign),
           utm_term: preserve(existing.utm_term, utm_term),
           utm_content: preserve(existing.utm_content, utm_content),
+          ad_id: preserve((existing as any).ad_id, utm_id),
         };
         if (rdPayment && (existing as any).payment_method_source !== "manual") {
           update.payment_method = rdPayment;
@@ -924,6 +927,7 @@ Deno.serve(async (req) => {
           utm_campaign,
           utm_term,
           utm_content,
+          ad_id: utm_id,
           payment_method: rdPayment ?? "pix",
           payment_method_source: rdPayment ? "rd" : "default",
           notes: null,
@@ -992,6 +996,7 @@ Deno.serve(async (req) => {
           utm_campaign: pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campanha"]),
           utm_term: pickUtm("term", ["utmterm", "utm_term", "term", "termo"]),
           utm_content: pickUtm("content", ["utmcontent", "utm_content", "content", "conteudo", "conteúdo"]),
+          utm_id: pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "anuncioid", "anúncioid"]),
         };
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;
