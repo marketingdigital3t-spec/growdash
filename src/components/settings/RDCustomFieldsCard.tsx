@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useRDFunnels } from "@/hooks/useRDFunnels";
 import {
   useRDFieldConfigs,
   useSaveRDFieldConfig,
@@ -24,10 +25,12 @@ export function RDCustomFieldsCard() {
   const [accountId, setAccountId] = useState<string>("");
   const effectiveAccount = accountId || accounts[0]?.id || "";
   const { data: configs = [], isLoading, refetch } = useRDFieldConfigs(effectiveAccount);
+  const { data: funnels = [] } = useRDFunnels();
   const save = useSaveRDFieldConfig();
   const del = useDeleteRDFieldConfig();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
   const [editingRanges, setEditingRanges] = useState<RDFieldConfig | null>(null);
   const [rangeDraft, setRangeDraft] = useState<RDFieldOption[]>([]);
 
@@ -49,6 +52,40 @@ export function RDCustomFieldsCard() {
       toast({ title: "Erro ao sincronizar", description: e.message, variant: "destructive" });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSyncAllFunnels = async () => {
+    const linkedFunnels = funnels.filter((f) => f.is_active && f.rd_funnel_id);
+    if (!linkedFunnels.length) {
+      toast({ title: "Nenhum funil do RD vinculado", description: "Vincule ao menos um funil antes de sincronizar." });
+      return;
+    }
+    setSyncingAll(true);
+    let fields = 0;
+    let failed = 0;
+    try {
+      // Sequencial para respeitar o limite da API do RD Station.
+      for (const funnel of linkedFunnels) {
+        const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
+          // Reads open, won, lost and paused deals so the initial catalogue is
+          // complete. Subsequent daily/webhook syncs keep it current.
+          body: { funnel_id: funnel.id, analytics_mode: true, max_deals: 10000, max_pages: 50 },
+        });
+        if (error || data?.error) {
+          failed++;
+          continue;
+        }
+        fields += Number(data?.fields_discovered) || 0;
+      }
+      toast({
+        title: failed ? "Sincronização concluída com pendências" : "Todos os funis foram sincronizados",
+        description: `${linkedFunnels.length - failed}/${linkedFunnels.length} funis processados · ${fields} campo(s) observado(s)${failed ? ` · ${failed} falha(s)` : ""}`,
+        variant: failed ? "destructive" : "default",
+      });
+      await refetch();
+    } finally {
+      setSyncingAll(false);
     }
   };
 
@@ -105,10 +142,16 @@ export function RDCustomFieldsCard() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleDiscover} disabled={!effectiveAccount || syncing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sincronizando..." : "Sincronizar campos do RD"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleDiscover} disabled={!effectiveAccount || syncing || syncingAll}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Sincronizando..." : "Somente esta conta"}
+            </Button>
+            <Button onClick={handleSyncAllFunnels} disabled={syncing || syncingAll}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncingAll ? "animate-spin" : ""}`} />
+              {syncingAll ? "Sincronizando funis..." : "Sincronizar todos os funis"}
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -171,8 +214,8 @@ export function RDCustomFieldsCard() {
         )}
 
         <p className="text-xs text-muted-foreground">
-          Após habilitar campos, rode a sincronização do RD em <strong>Saúde dos Dados</strong> para preencher
-          retroativamente os valores em deals e vendas.
+          Cada sincronização do RD agora descobre os campos recebidos automaticamente e mantém os valores em deals e vendas.
+          Para trazer o histórico de todos os funis agora, use <strong>Sincronizar todos os funis</strong>.
         </p>
       </CardContent>
 
