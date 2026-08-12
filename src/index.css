@@ -4095,3 +4095,34 @@ html:not(.dark) .expert-dashboard .gd-metric-card {
   background: linear-gradient(135deg, #fff, #eeeeee) !important;
 }
 html:not(.dark) .expert-dashboard .gd-metric-card .text-muted-foreground { color: #666 !important; }
+
+/* Brands -------------------------------------------------------------------
+   Brand cards have a dark media banner by design, while their data surface
+   follows the active theme. Explicit scoping prevents the black banner or
+   global dashboard rules from changing the readability of the card content. */
+.brands-module .gd-panel {
+  color: #f4f4f4;
+  border-color: rgba(255,255,255,.15) !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.025) 42%, transparent 72%),
+    rgba(22,22,22,.86) !important;
+}
+.brands-module .gd-panel :is(h1, h2, h3, h4, p, span, b, strong, label) { color: inherit; }
+.brands-module .gd-panel .text-muted-foreground { color: rgba(255,255,255,.58) !important; }
+.brands-module .gd-panel [class*="bg-background/"] { background-color: rgba(255,255,255,.055) !important; }
+.brands-module .gd-panel [class*="text-emerald"] { color: #6ee7a5 !important; }
+.brands-module .gd-panel > div:last-child > div.rounded-lg { border-color: rgba(255,255,255,.13) !important; }
+
+html:not(.dark) .brands-module .gd-panel {
+  color: #171717;
+  border-color: rgba(0,0,0,.13) !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.99), rgba(255,255,255,.78) 48%, rgba(232,232,232,.78)) !important;
+  box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0,0,0,.05), 0 17px 38px -33px rgba(0,0,0,.32) !important;
+}
+html:not(.dark) .brands-module .gd-panel .text-muted-foreground { color: #676767 !important; }
+html:not(.dark) .brands-module .gd-panel [class*="bg-background/"] { background-color: rgba(255,255,255,.74) !important; }
+html:not(.dark) .brands-module .gd-panel [class*="text-emerald"] { color: #157545 !important; }
+html:not(.dark) .brands-module :is(.bg-card, .bg-background) { color: #171717; }
+html:not(.dark) .brands-module :is(input, [role="combobox"]) { color: #171717 !important; border-color: rgba(0,0,0,.15) !important; background: rgba(255,255,255,.88) !important; }
+html:not(.dark) .brands-module .gd-panel > div:first-child .text-primary { color: #fff !important; }

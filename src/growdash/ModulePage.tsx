@@ -684,6 +684,7 @@ function BrandsModule() {
   };
 
   return (
+    <div className="brands-module">
     <Page title="Marcas" description="Cada conta de anúncio integrada gera automaticamente uma marca com diagnóstico e histórico próprios." action={<Link to="/integracoes" className="gold-action"><Plus className="h-4 w-4" /> Integrar conta</Link>}>
       <Toolbar
         left={<label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar marca" placeholder="Buscar marca ou ID da conta" className="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-muted-foreground" /></label>}
@@ -709,6 +710,7 @@ function BrandsModule() {
         </article>)}
       </div> : <EmptyState icon={<UsersRound className="h-6 w-6" />} title="Nenhuma conta integrada" description="Ao integrar uma conta Meta Ads, a marca correspondente será criada automaticamente e aparecerá aqui, mesmo antes de receber métricas." action={<Link to="/integracoes" className="gold-action"><Plus className="h-4 w-4" /> Integrar primeira conta</Link>} />}
     </Page>
+    </div>
   );
 }
 
