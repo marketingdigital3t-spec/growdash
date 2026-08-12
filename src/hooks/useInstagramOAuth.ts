@@ -39,6 +39,27 @@ export function useInstagramOAuth() {
         queryClient.invalidateQueries({ queryKey: ["social_accounts"] });
         queryClient.invalidateQueries({ queryKey: ["social_media"] });
         queryClient.invalidateQueries({ queryKey: ["social_insights_daily"] });
+        // OAuth imports the profile first. Start the initial media sync as soon
+        // as the callback identifies the account, so a newly connected profile
+        // does not look empty until the person discovers the manual refresh.
+        const socialAccountId = typeof event.data.socialAccountId === "string" ? event.data.socialAccountId : "";
+        if (socialAccountId) {
+          void supabase.functions.invoke("social-sync-instagram", { body: { social_account_id: socialAccountId } })
+            .then(({ data, error }) => {
+              if (error || data?.error) throw error ?? new Error(data.error);
+              toast({ title: "Publicações importadas", description: data?.message ?? "Os conteúdos do Instagram foram atualizados." });
+            })
+            .catch(() => {
+              // The connection itself remains valid. The Social page exposes a
+              // retry button and a precise error if the Meta API is unavailable.
+              toast({ title: "Perfil conectado", description: "Não foi possível importar as publicações agora. Use “Atualizar dados” para tentar novamente.", variant: "destructive" });
+            })
+            .finally(() => {
+              queryClient.invalidateQueries({ queryKey: ["social_accounts"] });
+              queryClient.invalidateQueries({ queryKey: ["social_media"] });
+              queryClient.invalidateQueries({ queryKey: ["social_insights_daily"] });
+            });
+        }
       } else {
         toast({ title: "Conexão não concluída", description: event.data.message, variant: "destructive" });
       }
