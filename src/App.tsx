@@ -111,6 +111,16 @@ function ClearLoadingRecovery() {
   return null;
 }
 
+function MarkApplicationBooted() {
+  useEffect(() => {
+    // The HTML fallback only stops its startup watchdog after React has
+    // actually committed. This preserves a usable recovery screen when an
+    // eager production module cannot be evaluated.
+    window.__GROWDASH_BOOTED__ = true;
+  }, []);
+  return null;
+}
+
 type AppErrorBoundaryState = { failed: boolean };
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBoundaryState> {
@@ -243,6 +253,7 @@ export default function App() {
           <Router>
             <AuthProvider>
               <AccentInitializer>
+                <MarkApplicationBooted />
                 <AppErrorBoundary>
                   <Suspense fallback={<LoadingModule recover />}>
                     <Routes>

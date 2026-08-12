@@ -13,6 +13,11 @@ declare global {
 }
 
 const rootElement = document.getElementById("root")!;
-rootElement.dataset.build = "2026-07-18-dashboard-restore";
-window.__GROWDASH_BOOTED__ = true;
+
+// Do not mark the application as started here. Importing this module is not a
+// successful React render: a runtime error in App (or one of its eager
+// dependencies) used to leave the static loading screen on forever because
+// index.html believed the app was already running. App now marks the boot only
+// after React has committed a visible shell.
+rootElement.dataset.build = "2026-08-12-loading-recovery";
 createRoot(rootElement).render(<App />);

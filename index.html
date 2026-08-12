@@ -36,7 +36,8 @@
     </div>
     <script>
       // Keep a broken/blocked entry module from leaving Safari on a permanent
-      // blank loading screen. main.tsx marks the boot as soon as React starts.
+      // loading screen. React marks the boot only after it commits a visible
+      // shell, not merely when the entry module begins evaluating.
       window.setTimeout(function () {
         if (window.__GROWDASH_BOOTED__) return;
         var root = document.getElementById("root");
