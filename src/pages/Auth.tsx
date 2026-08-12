@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -61,17 +61,21 @@ export default function Auth() {
   return <main className="auth-premium-shell">
     <div className="auth-ambient-grid" aria-hidden="true" /><div className="auth-ambient-glow auth-glow-a" aria-hidden="true" /><div className="auth-ambient-glow auth-glow-b" aria-hidden="true" />
     <section className="auth-hero-panel" aria-label="Growdash">
+      <div className="auth-hero-signal" aria-hidden="true"><i /><i /><i /><b /></div>
       <BrandLogo eager className="auth-hero-logo" />
-      <p className="auth-hero-tagline">Sua operação.<br /><span>No controle.</span></p>
+      <p className="auth-hero-kicker">INTELIGÊNCIA OPERACIONAL</p>
+      <p className="auth-hero-tagline">O seu crescimento,<br /><span>em uma só visão.</span></p>
+      <p className="auth-hero-description">Dados, decisões e a operação da sua agência reunidos em um painel feito para manter o ritmo.</p>
+      <div className="auth-hero-points" aria-label="Recursos da Growdash"><span><Check />Dados protegidos</span><span><Check />Visão em tempo real</span><span><Check />Decisões guiadas</span></div>
     </section>
     <motion.section initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .5, ease: "easeOut" }} className="auth-card-premium">
       <div className="auth-card-top"><div><span className="auth-card-kicker">GROWDASH</span><h1>{mode === "login" ? "Entrar" : "Criar conta"}</h1><p>{mode === "login" ? "Use seus dados para acessar a plataforma." : "Crie o acesso da sua operação."}</p></div></div>
       <div className="auth-mode-switch" role="tablist" aria-label="Tipo de acesso"><button type="button" role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")} className={cn(mode === "login" && "is-active")}>Entrar</button><button type="button" role="tab" aria-selected={mode === "register"} onClick={() => setMode("register")} className={cn(mode === "register" && "is-active")}>Cadastrar</button></div>
       <form onSubmit={handleSubmit} className="auth-form-premium">
-        {mode === "register" && <GoldInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />}
-        <GoldInput icon={<Mail />} type="text" value={identifier} onChange={setIdentifier} placeholder="Email" autoComplete="username" />
-        <GoldInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="Senha" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
-        {mode === "register" && <GoldInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
+        {mode === "register" && <PremiumInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />}
+        <PremiumInput icon={<Mail />} type="text" value={identifier} onChange={setIdentifier} placeholder="Email" autoComplete="username" />
+        <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="Senha" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
+        {mode === "register" && <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
         {mode === "login" && <div className="auth-forgot-row"><span /><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link">Esqueci minha senha</button></div>}
         {forgotOpen && <div className="auth-recovery-box"><p>Enviaremos um link seguro para criar uma nova senha.</p><div className="auth-recovery-row"><input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} placeholder="seu@email.com" /><button type="button" onClick={recover}>Enviar link</button></div></div>}
         <button type="submit" disabled={loading} className="auth-submit-button group">{loading ? "Sincronizando…" : mode === "login" ? "Entrar na Growdash" : "Criar minha conta"}<ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></button>
@@ -83,6 +87,6 @@ export default function Auth() {
   </main>;
 }
 
-function GoldInput({ icon, type, value, onChange, placeholder, autoComplete, trailing }: { icon: React.ReactNode; type: string; value: string; onChange: (value: string) => void; placeholder: string; autoComplete: string; trailing?: React.ReactNode }) {
-  return <label className="auth-input-premium flex h-16 items-center gap-4 rounded-2xl border border-[#6d521b]/60 bg-black/80 px-5 text-[#d3a426] focus-within:border-[#e0ae29] focus-within:shadow-[0_0_18px_rgba(214,161,37,.12)] [&_svg]:h-5 [&_svg]:w-5"><span className="shrink-0">{icon}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} required className="min-w-0 flex-1 bg-transparent text-lg text-white outline-none placeholder:text-white/55" /><span className="shrink-0">{trailing}</span></label>;
+function PremiumInput({ icon, type, value, onChange, placeholder, autoComplete, trailing }: { icon: React.ReactNode; type: string; value: string; onChange: (value: string) => void; placeholder: string; autoComplete: string; trailing?: React.ReactNode }) {
+  return <label className="auth-input-premium flex h-16 items-center gap-4 rounded-2xl border px-5 [&_svg]:h-5 [&_svg]:w-5"><span className="shrink-0">{icon}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} required className="min-w-0 flex-1 bg-transparent text-lg outline-none" /><span className="shrink-0">{trailing}</span></label>;
 }
