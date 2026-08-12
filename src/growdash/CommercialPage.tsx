@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BarChart3, Crown, Sparkles, Target, Users } from "lucide-react";
+import { AlertTriangle, BarChart3, Crown, Filter, Search, Sparkles, Target, Users, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useProducts } from "@/hooks/useProducts";
@@ -45,6 +46,11 @@ export default function CommercialPage() {
   const { data: goalData } = useSalesGoals(new Date());
   const [sellerFilter, setSellerFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
+  const [detailAccountFilter, setDetailAccountFilter] = useState("all");
+  const [detailSellerFilter, setDetailSellerFilter] = useState("all");
+  const [detailProductFilter, setDetailProductFilter] = useState("all");
+  const [detailStatusFilter, setDetailStatusFilter] = useState("all");
+  const [detailSearch, setDetailSearch] = useState("");
 
   const accessibleAccounts = useMemo(() => {
     const accounts = businessUnitId
@@ -79,6 +85,18 @@ export default function CommercialPage() {
     (sellerFilter === "all" || row.seller === sellerFilter)
     && (productFilter === "all" || productFilter === `local:${row.sale.product_id}` || (!row.sale.product_id && productFilter === `rd:${row.product}`))
   )), [enriched, productFilter, sellerFilter]);
+  const detailedFiltered = useMemo(() => {
+    const term = detailSearch.trim().toLocaleLowerCase("pt-BR");
+    return filtered.filter((row) => {
+      if (detailAccountFilter !== "all" && row.sale.ad_account_id !== detailAccountFilter) return false;
+      if (detailSellerFilter !== "all" && row.seller !== detailSellerFilter) return false;
+      if (detailProductFilter !== "all" && row.product !== detailProductFilter) return false;
+      if (detailStatusFilter !== "all" && row.sale.status !== detailStatusFilter) return false;
+      if (!term) return true;
+      return [row.sale.contact_name, row.sale.contact_email, row.seller, row.product, row.sale.rd_product_name]
+        .filter(Boolean).join(" ").toLocaleLowerCase("pt-BR").includes(term);
+    });
+  }, [detailAccountFilter, detailProductFilter, detailSearch, detailSellerFilter, detailStatusFilter, filtered]);
   const goals = useMemo(() => new Map((goalData?.rows ?? []).map((goal) => [goal.ad_account_id, Number(goal.target_revenue)])), [goalData?.rows]);
   const rankingDeals = useMemo(() => sellerFilter === "all" ? rdDeals : rdDeals.filter((deal) => deal.deal_owner_name === sellerFilter), [rdDeals, sellerFilter]);
   const accountRankings = useMemo(() => buildCommercialAccountRankings({ sales: filtered, deals: rankingDeals, accounts: rankingAccountOptions, goals }), [filtered, goals, rankingAccountOptions, rankingDeals]);
@@ -153,11 +171,15 @@ export default function CommercialPage() {
       </section>
 
       <section className="gd-panel mt-4 overflow-hidden">
-        <div className="border-b border-border p-5"><h2 className="font-black">Vendas detalhadas</h2><p className="text-xs text-muted-foreground">A comissão só aparece quando recebida em campo explícito; a plataforma não estima valores.</p></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr>{["Data", "Conta de anúncio", "Cliente", "Vendedor", "Produto", "Valor", "Comissão", "Status"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{filtered.map((row) => <tr key={row.sale.id}><td className="px-4 py-4">{format(new Date(`${row.sale.sale_date}T12:00:00`), "dd/MM/yyyy")}</td><td className="max-w-48 truncate px-4 py-4">{accountOptions.find((account) => account.id === row.sale.ad_account_id)?.name || "Sem conta de anúncio"}</td><td className="px-4 py-4 font-black">{row.sale.contact_name || row.sale.contact_email || "Não informado"}</td><td className="px-4 py-4">{row.seller}</td><td className="px-4 py-4">{row.product}</td><td className="px-4 py-4 font-black">{brl.format(Number(row.sale.net_revenue || 0))}</td><td className="px-4 py-4">{row.commission ? brl.format(row.commission) : "—"}</td><td className="px-4 py-4"><span className="rounded-full bg-muted px-2 py-1 text-[9px] font-bold">{row.sale.status}</span></td></tr>)}{!isLoading && !filtered.length && <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">Nenhuma venda encontrada com estes filtros.</td></tr>}</tbody></table></div>
+        <div className="border-b border-border p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-black">Vendas detalhadas</h2><p className="text-xs text-muted-foreground">A comissão só aparece quando recebida em campo explícito; a plataforma não estima valores.</p></div><span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">{detailedFiltered.length} venda(s)</span></div><div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(190px,1.4fr)_repeat(4,minmax(135px,1fr))_auto]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Buscar venda por cliente" className="h-10 pl-9" value={detailSearch} onChange={(event) => setDetailSearch(event.target.value)} placeholder="Buscar cliente, vendedor ou produto" /></label><DetailFilter label="Conta" value={detailAccountFilter} onChange={setDetailAccountFilter} options={accountOptions.map((item) => ({ value: item.id, label: item.name }))} /><DetailFilter label="Vendedor" value={detailSellerFilter} onChange={setDetailSellerFilter} options={sellers.map((item) => ({ value: item, label: item }))} /><DetailFilter label="Produto" value={detailProductFilter} onChange={setDetailProductFilter} options={Array.from(new Set(filtered.map((item) => item.product))).sort((a, b) => a.localeCompare(b, "pt-BR")).map((item) => ({ value: item, label: item }))} /><DetailFilter label="Status" value={detailStatusFilter} onChange={setDetailStatusFilter} options={Array.from(new Set(filtered.map((item) => item.sale.status))).sort().map((item) => ({ value: item, label: item }))} /><Button type="button" variant="outline" className="h-10" onClick={() => { setDetailAccountFilter("all"); setDetailSellerFilter("all"); setDetailProductFilter("all"); setDetailStatusFilter("all"); setDetailSearch(""); }}><X className="mr-1.5 h-4 w-4" />Limpar</Button></div></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr>{["Data", "Conta de anúncio", "Cliente", "Vendedor", "Produto", "Valor", "Comissão", "Status"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{detailedFiltered.map((row) => <tr key={row.sale.id}><td className="px-4 py-4">{format(new Date(`${row.sale.sale_date}T12:00:00`), "dd/MM/yyyy")}</td><td className="max-w-48 truncate px-4 py-4">{accountOptions.find((account) => account.id === row.sale.ad_account_id)?.name || "Sem conta de anúncio"}</td><td className="px-4 py-4 font-black">{row.sale.contact_name || row.sale.contact_email || "Não informado"}</td><td className="px-4 py-4">{row.seller}</td><td className="px-4 py-4">{row.product}</td><td className="px-4 py-4 font-black">{brl.format(Number(row.sale.net_revenue || 0))}</td><td className="px-4 py-4">{row.commission ? brl.format(row.commission) : "—"}</td><td className="px-4 py-4"><span className="rounded-full bg-muted px-2 py-1 text-[9px] font-bold">{row.sale.status}</span></td></tr>)}{!isLoading && !detailedFiltered.length && <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">Nenhuma venda encontrada com estes filtros.</td></tr>}</tbody></table></div>
       </section>
     </div>
   );
+}
+
+function DetailFilter({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
+  return <label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><select aria-label={`Filtrar vendas por ${label.toLocaleLowerCase("pt-BR")}`} className="h-10 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" value={value} onChange={(event) => onChange(event.target.value)}><option value="all">{label}: todos</option>{options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
 }
 
 function AccountPodium({ account }: { account: CommercialAccountRanking }) {
