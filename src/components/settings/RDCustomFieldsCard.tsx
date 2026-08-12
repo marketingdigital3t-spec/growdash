@@ -66,6 +66,17 @@ export function RDCustomFieldsCard() {
     let failed = 0;
     try {
       // Sequencial para respeitar o limite da API do RD Station.
+      const accountIds = Array.from(new Set(linkedFunnels.map((f) => f.ad_account_id)));
+      for (const adAccountId of accountIds) {
+        const { data, error } = await supabase.functions.invoke("rd-discover-fields", {
+          body: { ad_account_id: adAccountId },
+        });
+        if (error || data?.error) {
+          failed++;
+          continue;
+        }
+        fields += Number(data?.discovered) || 0;
+      }
       for (const funnel of linkedFunnels) {
         const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
           // Reads open, won, lost and paused deals so the initial catalogue is
@@ -80,7 +91,7 @@ export function RDCustomFieldsCard() {
       }
       toast({
         title: failed ? "Sincronização concluída com pendências" : "Todos os funis foram sincronizados",
-        description: `${linkedFunnels.length - failed}/${linkedFunnels.length} funis processados · ${fields} campo(s) observado(s)${failed ? ` · ${failed} falha(s)` : ""}`,
+        description: `${linkedFunnels.length - Math.min(linkedFunnels.length, failed)}/${linkedFunnels.length} funis processados · ${fields} campo(s) encontrado(s)${failed ? ` · ${failed} falha(s)` : ""}`,
         variant: failed ? "destructive" : "default",
       });
       await refetch();
