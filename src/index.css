@@ -2844,6 +2844,27 @@ html:not(.dark) {
   backdrop-filter: blur(18px) saturate(1.15);
 }
 
+/* The toolbar must reflow on narrow canvases.  A scrollable toolbar makes the
+   editor look broken and hides tools behind a horizontal scrollbar. */
+.growdash-flow-toolbar {
+  width: fit-content;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .growdash-flow-toolbar {
+    max-width: calc(100% - 1rem);
+    gap: .25rem;
+    padding: .375rem;
+  }
+
+  .growdash-flow-toolbar .growdash-flow-control {
+    width: 2rem;
+    height: 2rem;
+    border-radius: .625rem;
+  }
+}
+
 .growdash-flow-control,
 .growdash-flow-danger-control,
 .growdash-flow-secondary-action,

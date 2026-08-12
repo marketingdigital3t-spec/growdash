@@ -29,7 +29,7 @@ const TOOLS: Array<{ tool: ToolType; label: string; shortcut: string; icon: type
 ];
 
 export function Toolbar({ tool, onToolChange, onImage }: { tool: ToolType; onToolChange: (tool: ToolType) => void; onImage: () => void }) {
-  return <div aria-label="Ferramentas de desenho" className="growdash-flow-chrome absolute left-1/2 top-16 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-2xl p-1.5 2xl:top-3 2xl:max-w-[calc(100%-30rem)]">
+  return <div aria-label="Ferramentas de desenho" className="growdash-flow-toolbar growdash-flow-chrome absolute left-1/2 top-16 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-2xl p-1.5 2xl:top-3 2xl:max-w-[calc(100%-30rem)]">
     {TOOLS.map((item, index) => {
       const Icon = item.icon;
       const active = tool === item.tool;
