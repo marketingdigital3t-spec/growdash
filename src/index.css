@@ -4126,3 +4126,56 @@ html:not(.dark) .brands-module .gd-panel [class*="text-emerald"] { color: #15754
 html:not(.dark) .brands-module :is(.bg-card, .bg-background) { color: #171717; }
 html:not(.dark) .brands-module :is(input, [role="combobox"]) { color: #171717 !important; border-color: rgba(0,0,0,.15) !important; background: rgba(255,255,255,.88) !important; }
 html:not(.dark) .brands-module .gd-panel > div:first-child .text-primary { color: #fff !important; }
+
+/* Campaign hierarchy -------------------------------------------------------
+   Campaign / ad set / ad is navigation, not a table header. A segmented
+   control makes the current level unmistakable while keeping the three
+   counts readable in both themes. */
+.campaigns-workspace .campaign-tabs-header {
+  padding: .45rem .65rem;
+  border-bottom-color: rgba(255,255,255,.10) !important;
+  background: rgba(8,8,8,.76) !important;
+}
+.campaigns-workspace .campaign-tabs-list {
+  gap: .28rem;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.045) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.07);
+}
+.campaigns-workspace .campaign-hierarchy-tab {
+  position: relative;
+  color: rgba(255,255,255,.66) !important;
+  font-weight: 800;
+  transition: color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.campaigns-workspace .campaign-hierarchy-tab:hover {
+  color: #fff !important;
+  background: rgba(255,255,255,.075) !important;
+}
+.campaigns-workspace .campaign-hierarchy-tab[data-state="active"] {
+  color: #111 !important;
+  background: linear-gradient(135deg, #fff, #dedede) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.95), 0 5px 14px -10px rgba(255,255,255,.65) !important;
+  transform: translateY(-1px);
+}
+.campaigns-workspace .campaign-hierarchy-tab[data-state="active"] svg { color: #111 !important; }
+.campaigns-workspace .campaign-hierarchy-tab:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+html:not(.dark) .campaigns-workspace .campaign-tabs-header {
+  border-bottom-color: rgba(0,0,0,.10) !important;
+  background: rgba(255,255,255,.62) !important;
+}
+html:not(.dark) .campaigns-workspace .campaign-tabs-list {
+  border-color: rgba(0,0,0,.12);
+  background: rgba(0,0,0,.055) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.92);
+}
+html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab { color: #626262 !important; }
+html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab:hover { color: #171717 !important; background: rgba(255,255,255,.70) !important; }
+html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab[data-state="active"] {
+  color: #111 !important;
+  background: linear-gradient(135deg, #fff, #e7e7e7) !important;
+  box-shadow: inset 0 1px #fff, 0 4px 12px -9px rgba(0,0,0,.34) !important;
+}
+html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab[data-state="active"] svg { color: #111 !important; }
+html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab:focus-visible { outline-color: #111; }
