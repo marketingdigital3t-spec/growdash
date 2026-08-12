@@ -3798,6 +3798,64 @@ html:not(.dark) .brand-shell {
 .growdash-main .text-muted-foreground { color: rgba(255,255,255,.52); }
 .growdash-main h1 { color: #fff; letter-spacing: -.035em; }
 
+/* Contrast is defined at the token level. Components consume foreground,
+   card-foreground and muted-foreground, so styling only the parent left
+   black text inherited from the light scheme inside the new dark surfaces. */
+.brand-shell,
+.brand-shell .growdash-main {
+  --foreground: 0 0% 97%;
+  --card-foreground: 0 0% 97%;
+  --popover-foreground: 0 0% 97%;
+  --muted-foreground: 0 0% 68%;
+  --secondary-foreground: 0 0% 94%;
+  --accent-foreground: 0 0% 97%;
+  --border: 0 0% 23%;
+  --input: 0 0% 25%;
+}
+.brand-shell .growdash-main :is(h1, h2, h3, h4, p, span, b, strong, td, th, label) { color: inherit; }
+.brand-shell .growdash-main :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass) { color: #f7f7f6; }
+.brand-shell .growdash-main :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass) :is(h1, h2, h3, h4, p, span, b, strong, td, th, label) { color: inherit; }
+.brand-shell .growdash-main :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: rgba(255,255,255,.57) !important; }
+.brand-shell .growdash-main :is(.text-foreground, [class*="text-foreground"]) { color: #f7f7f6 !important; }
+
+/* Financial status colors remain semantic but bright enough over graphite. */
+.brand-shell .growdash-main .text-emerald-600 { color: #7ce7b0 !important; }
+.brand-shell .growdash-main .text-red-500 { color: #ff8f8f !important; }
+
+/* The light setting is the true inverse, not a dark canvas with dark text:
+   white glass, black typography and the same restrained metallic borders. */
+html:not(.dark) .brand-shell,
+html:not(.dark) .brand-shell .growdash-main {
+  --foreground: 0 0% 10%;
+  --card-foreground: 0 0% 10%;
+  --popover-foreground: 0 0% 10%;
+  --muted-foreground: 0 0% 38%;
+  --secondary-foreground: 0 0% 12%;
+  --accent-foreground: 0 0% 10%;
+  --border: 0 0% 81%;
+  --input: 0 0% 74%;
+  background: radial-gradient(ellipse at 82% -12%, rgba(255,255,255,.98), transparent 31rem), linear-gradient(125deg, #dedede 0%, #f5f5f5 49%, #d9d9d9 100%);
+}
+html:not(.dark) .growdash-main { color: #161616; }
+html:not(.dark) .growdash-main h1 { color: #080808; }
+html:not(.dark) .brand-shell .growdash-main :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass) { color: #151515; }
+html:not(.dark) .brand-shell .growdash-main :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: rgba(0,0,0,.52) !important; }
+html:not(.dark) .brand-shell .growdash-main :is(.text-foreground, [class*="text-foreground"]) { color: #151515 !important; }
+html:not(.dark) .gd-panel,
+html:not(.dark) .gd-metric-card,
+html:not(.dark) .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card,
+html:not(.dark) .dashboard-video-glass {
+  border-color: rgba(0,0,0,.13) !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,255,255,.62) 38%, rgba(226,226,226,.70)), rgba(255,255,255,.82) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(0,0,0,.06), 0 24px 48px -40px rgba(0,0,0,.34) !important;
+}
+html:not(.dark) .dashboard-glass-metrics > :is(article, button) { border-color: rgba(0,0,0,.12) !important; background: linear-gradient(135deg, #fff, #e5e5e5) !important; box-shadow: inset 0 1px rgba(255,255,255,.95), 0 10px 22px -21px rgba(0,0,0,.35) !important; }
+html:not(.dark) .gd-filter-strip .gd-filter-control:not(.gd-filter-account),
+html:not(.dark) .gd-filter-strip .gd-filter-refresh { border-color: rgba(0,0,0,.18) !important; background: linear-gradient(135deg, #fff, #dfdfdf) !important; color: #111 !important; }
+html:not(.dark) .brand-shell .growdash-main .text-emerald-600 { color: #167a43 !important; }
+html:not(.dark) .brand-shell .growdash-main .text-red-500 { color: #bc2626 !important; }
+
 .gd-panel,
 .dark .gd-panel,
 html:not(.dark) .gd-panel {
