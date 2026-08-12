@@ -3776,3 +3776,100 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card { border-colo
   .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
   .dashboard-widget-shell .rounded-lg.border.bg-card { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
+
+/* Dashboard obsidian system -------------------------------------------------
+   The interface previously fell back to a bright cream canvas whenever the
+   browser was in light mode. That made the black rail, warm logo and white
+   widgets look like independent products. The dashboard is intentionally
+   theme-stable: a neutral obsidian field and smoke-glass surfaces in every
+   browser theme, with white reserved for content and direct actions. */
+.brand-shell,
+html:not(.dark) .brand-shell {
+  background:
+    radial-gradient(ellipse at 78% -16%, rgba(255,255,255,.075), transparent 34rem),
+    radial-gradient(ellipse at 10% 72%, rgba(255,255,255,.035), transparent 31rem),
+    linear-gradient(125deg, #070707 0%, #111111 48%, #080808 100%);
+}
+.brand-shell::before { opacity: .72; background-image: linear-gradient(rgba(255,255,255,.026) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px); }
+.brand-sidebar .brand-logo-tint,
+.brand-sidebar .brand-mark-tint { background: linear-gradient(145deg, #fff 0%, #a7a7a7 48%, #fff 100%) !important; }
+
+.growdash-main { color: #f5f5f4; }
+.growdash-main .text-muted-foreground { color: rgba(255,255,255,.52); }
+.growdash-main h1 { color: #fff; letter-spacing: -.035em; }
+
+.gd-panel,
+.dark .gd-panel,
+html:not(.dark) .gd-panel {
+  border-color: rgba(255,255,255,.13) !important;
+  background:
+    linear-gradient(132deg, rgba(255,255,255,.115) 0%, rgba(255,255,255,.035) 25%, transparent 53%),
+    linear-gradient(315deg, rgba(255,255,255,.032), transparent 38%),
+    rgba(21,21,21,.78) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.5), 0 28px 58px -45px rgba(0,0,0,.98) !important;
+}
+
+.gd-metric-card,
+.dark .gd-metric-card,
+html:not(.dark) .gd-metric-card,
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+html:not(.dark) .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
+.dashboard-widget-shell .rounded-lg.border.bg-card,
+html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
+  border-color: rgba(255,255,255,.15) !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 27%, transparent 56%),
+    radial-gradient(circle at 88% 8%, rgba(255,255,255,.09), transparent 31%),
+    rgba(24,24,24,.80) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -1px 0 rgba(0,0,0,.48), 0 22px 48px -40px rgba(0,0,0,.92) !important;
+}
+.gd-metric-card .text-muted-foreground,
+.dashboard-widget-shell .text-muted-foreground { color: rgba(255,255,255,.48) !important; }
+.gd-metric-card:hover,
+.dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card):hover,
+.dashboard-widget-shell .rounded-lg.border.bg-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.48) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.55), 0 28px 58px -41px #000, 0 0 0 1px rgba(255,255,255,.06), 0 0 34px rgba(255,255,255,.075) !important;
+}
+.gd-metric-card [class*="bg-primary/"],
+.dashboard-video-glass [class*="bg-primary/"] { background-color: rgba(255,255,255,.085) !important; }
+.gd-metric-card [class*="text-primary"],
+.dashboard-video-glass [class*="text-primary"] { color: #fff !important; }
+
+.dashboard-video-glass,
+.dark .dashboard-video-glass,
+html:not(.dark) .dashboard-video-glass {
+  border-color: rgba(255,255,255,.18) !important;
+  background:
+    linear-gradient(105deg, rgba(255,255,255,.16), transparent 18%, rgba(255,255,255,.045) 58%, transparent 84%),
+    rgba(17,17,17,.88) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(0,0,0,.48), 0 20px 46px -34px rgba(0,0,0,.95) !important;
+}
+.dashboard-glass-metrics > :is(article, button) {
+  border-color: rgba(255,255,255,.12) !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.10), transparent 42%), rgba(4,4,4,.48) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.11), inset 0 -1px 0 rgba(0,0,0,.4) !important;
+}
+.dashboard-glass-metrics > :is(article, button):hover { border-color: rgba(255,255,255,.48) !important; background: linear-gradient(135deg, rgba(255,255,255,.16), transparent 43%), rgba(23,23,23,.84) !important; }
+
+.gd-filter-strip .gd-filter-control:not(.gd-filter-account),
+.gd-filter-strip .gd-filter-refresh {
+  border-color: rgba(255,255,255,.16) !important;
+  background: linear-gradient(135deg, rgba(255,255,255,.105), rgba(255,255,255,.025)), rgba(19,19,19,.84) !important;
+  color: #f4f4f4 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.13), 0 12px 24px -22px #000 !important;
+}
+.gd-filter-strip .gd-filter-control:not(.gd-filter-account):hover,
+.gd-filter-strip .gd-filter-control:not(.gd-filter-account)[data-state="open"],
+.gd-filter-strip .gd-filter-refresh:hover { border-color: rgba(255,255,255,.5) !important; }
+
+.dashboard-widget-shell [data-state="active"] { color: #fff !important; box-shadow: inset 0 -2px 0 #fff !important; }
+.dashboard-widget-shell [role="tablist"] { border-color: rgba(255,255,255,.1); background: rgba(0,0,0,.32); }
+.dashboard-widget-shell [role="tab"][data-state="active"] { background: rgba(255,255,255,.12); }
+
+@media (prefers-reduced-motion: reduce) {
+  .gd-metric-card:hover,
+  .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card):hover,
+  .dashboard-widget-shell .rounded-lg.border.bg-card:hover { transform: none; }
+}
