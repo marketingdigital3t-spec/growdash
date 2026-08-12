@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DrawElement } from "../types";
-import { connectorPoints, getSelectionBounds, snapPoint } from "./geometry";
+import { connectorPoints, getSelectionBounds, keepTextContentVisible, minimumTextElementHeight, snapPoint } from "./geometry";
 
 function rectangle(id: string, x: number, y: number): DrawElement {
   return { id, type: "rectangle", x, y, width: 100, height: 80, rotation: 0, opacity: 1, fillColor: "#121212", strokeColor: "#F5A623", strokeWidth: 2, layerIndex: 0, locked: false };
@@ -20,5 +20,11 @@ describe("Growdash Flow geometry", () => {
     expect(getSelectionBounds([rectangle("one", 20, 30), rectangle("two", 300, 200)], ["one", "two"])).toEqual({ x: 20, y: 30, width: 380, height: 250 });
     expect(snapPoint({ x: 29, y: 51 }, true, 20)).toEqual({ x: 20, y: 60 });
     expect(snapPoint({ x: 29, y: 51 }, false, 20)).toEqual({ x: 29, y: 51 });
+  });
+
+  it("keeps text boxes tall enough for the selected type size and wrapped copy", () => {
+    const text: DrawElement = { id: "headline", type: "text", x: 0, y: 0, width: 220, height: 20, rotation: 0, opacity: 1, fillColor: "transparent", strokeColor: "#fff", strokeWidth: 2, text: "ENGAJAMENTO\nObjeção", fontSize: 40, layerIndex: 0, locked: false };
+    expect(minimumTextElementHeight(text)).toBeGreaterThan(100);
+    expect(keepTextContentVisible(text).height).toBe(minimumTextElementHeight(text));
   });
 });

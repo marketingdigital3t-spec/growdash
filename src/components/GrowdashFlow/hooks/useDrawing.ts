@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { DrawElement, Point, ToolType } from "../types";
-import { createId, snapPoint } from "../utils/geometry";
+import { createId, minimumTextElementHeight, snapPoint } from "../utils/geometry";
 
 const DEFAULT_SIZE: Record<string, { width: number; height: number }> = {
   text: { width: 220, height: 72 },
@@ -19,7 +19,7 @@ export function createDrawElement(tool: ToolType, point: Point, layerIndex: numb
   const size = DEFAULT_SIZE[tool] || { width: 0, height: 0 };
   const sticky = tool === "sticky";
   const text = tool === "text";
-  return {
+  const element: DrawElement = {
     id: createId(tool),
     type: tool,
     x: origin.x,
@@ -40,6 +40,7 @@ export function createDrawElement(tool: ToolType, point: Point, layerIndex: numb
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  return (text || sticky) ? { ...element, height: Math.max(element.height, minimumTextElementHeight(element)) } : element;
 }
 
 export function useDrawing() {

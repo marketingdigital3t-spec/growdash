@@ -11,6 +11,31 @@ export function normalizeBounds(x: number, y: number, width: number, height: num
   };
 }
 
+const TEXT_HORIZONTAL_INSET = 16;
+const TEXT_VERTICAL_INSET = 20;
+const TEXT_LINE_HEIGHT = 1.24;
+
+/**
+ * SVG foreignObject does not contribute to its parent's layout. Calculate a
+ * conservative content height so an increased text size never gets clipped
+ * inside a manually resized Flow element.
+ */
+export function minimumTextElementHeight(element: Pick<DrawElement, "type" | "text" | "width" | "fontSize">) {
+  if (element.type !== "text" && element.type !== "sticky") return 20;
+  const fontSize = Math.max(10, element.fontSize || (element.type === "sticky" ? 20 : 22));
+  const usableWidth = Math.max(40, Math.abs(element.width) - TEXT_HORIZONTAL_INSET);
+  // Nunito/Inter headings average roughly .56em; adding one column keeps
+  // accentuated words and bold text from wrapping a line too late.
+  const charactersPerLine = Math.max(1, Math.floor(usableWidth / (fontSize * .56)) - 1);
+  const rows = Math.max(1, (element.text || "").split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0));
+  return Math.ceil(rows * fontSize * TEXT_LINE_HEIGHT + TEXT_VERTICAL_INSET);
+}
+
+export function keepTextContentVisible<T extends DrawElement>(element: T): T {
+  if (element.type !== "text" && element.type !== "sticky") return element;
+  return { ...element, height: Math.max(Math.abs(element.height), minimumTextElementHeight(element)) };
+}
+
 export function getElementBounds(element: DrawElement): Bounds {
   if (element.points?.length && element.type === "freehand") {
     const xs = element.points.map((point) => element.x + point.x);
