@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, Cloud, Download, ExternalLink, File, FileImage, HardDrive, Search, ShieldCheck, Trash2, Upload } from "lucide-react";
+import { Archive, Cloud, Database, Download, ExternalLink, File, FileImage, HardDrive, Image, Search, ShieldCheck, Trash2, Upload, UsersRound, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
@@ -28,6 +28,7 @@ interface WorkspaceFile {
   status: string;
   created_at: string;
 }
+type DataInventory = { key: string; label: string; description: string; count: number; storage: "files" | "database"; icon: "crm" | "lead" | "traffic" | "creative" | "sales" | "social" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEFAULT_LIMIT = 5 * 1024 ** 3;
@@ -80,6 +81,46 @@ export default function StoragePage() {
     },
   });
 
+  const { data: dataInventory = [], isLoading: loadingInventory, dataUpdatedAt: inventoryUpdatedAt, refetch: refetchInventory, isFetching: refreshingInventory } = useQuery({
+    queryKey: ["storage-data-inventory", workspace?.id, businessUnitId, user?.id],
+    enabled: !!workspace?.id && !!user?.id,
+    staleTime: 60_000,
+    queryFn: async (): Promise<DataInventory[]> => {
+      const workspaceScoped = UUID.test(workspace!.id);
+      const unitScoped = businessUnitId && UUID.test(businessUnitId);
+      const count = async (table: string, applyScope: (query: any) => any) => {
+        let request = (supabase as any).from(table).select("id", { count: "exact", head: true });
+        request = applyScope(request);
+        const { count: total, error } = await request;
+        if (error) {
+          if (error.code === "42P01" || error.code === "PGRST205" || /does not exist|schema cache/i.test(error.message)) return 0;
+          throw error;
+        }
+        return total ?? 0;
+      };
+      const byAccount = (query: any) => user?.id ? query.eq("user_id", user.id) : query;
+      const byWorkspace = (query: any) => workspaceScoped ? query.eq("workspace_id", workspace!.id) : byAccount(query);
+      const scopedUnit = (query: any) => unitScoped ? query.eq("business_unit_id", businessUnitId) : byWorkspace(query);
+      const [deals, leads, insights, campaigns, ads, sales, social] = [
+        await count("rd_deals", byAccount),
+        await count("meta_leads", byAccount),
+        await count("insights", byAccount),
+        await count("campaigns", byAccount),
+        await count("ads", byAccount),
+        await count("sales", scopedUnit),
+        await count("social_media", byAccount),
+      ];
+      return [
+        { key: "crm", label: "CRM e contatos", description: "Negociações sincronizadas do RD Station", count: deals, storage: "database", icon: "crm" },
+        { key: "leads", label: "Leads", description: "Leads recebidos pelas integrações Meta", count: leads, storage: "database", icon: "lead" },
+        { key: "traffic", label: "Tráfego pago", description: "Linhas de desempenho, campanhas e anúncios", count: insights + campaigns + ads, storage: "database", icon: "traffic" },
+        { key: "campaigns", label: "Criativos de anúncios", description: "Anúncios com referências de criativos", count: ads, storage: "database", icon: "creative" },
+        { key: "sales", label: "Vendas", description: "Vendas e receita canônica da unidade", count: sales, storage: "database", icon: "sales" },
+        { key: "social", label: "Mídia social", description: "Posts e métricas sociais sincronizadas", count: social, storage: "database", icon: "social" },
+      ];
+    },
+  });
+
   const currentPlan = plans.find((plan: any) => plan.code === subscription?.plan_code) ?? plans[0];
   const limit = Number((currentPlan as any)?.entitlements?.storage_bytes || DEFAULT_LIMIT);
   const managed = files.filter((item) => item.bucket_id && item.object_path && item.status === "active");
@@ -98,6 +139,8 @@ export default function StoragePage() {
     return Array.from(values.entries()).sort((a, b) => b[1].bytes - a[1].bytes || b[1].count - a[1].count);
   }, [files, legacyRefs]);
   const filtered = files.filter((item) => (source === "all" || item.source === source) && item.original_name.toLowerCase().includes(search.toLowerCase()));
+  const databaseRecords = dataInventory.reduce((sum, item) => sum + item.count, 0);
+  const mediaFiles = managed.filter((item) => item.mime_type?.startsWith("image/") || item.mime_type?.startsWith("video/") || item.mime_type?.startsWith("audio/") || item.source === "meta");
 
   const upload = useMutation({
     mutationFn: async (file: globalThis.File) => {
@@ -137,11 +180,13 @@ export default function StoragePage() {
   }
 
   return <div className="mx-auto max-w-[1500px] space-y-5">
-    <PageHeading eyebrow="Gestão de dados" title="Armazenamento" description="Arquivos da plataforma centralizados por workspace, unidade, origem e plano." actions={<><input ref={fileInput} type="file" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) upload.mutate(file); event.target.value = ""; }} /><Button onClick={() => fileInput.current?.click()} disabled={upload.isPending || quota >= 100}><Upload className="mr-2 h-4 w-4" />{upload.isPending ? "Enviando…" : "Enviar arquivo"}</Button></>} />
+    <PageHeading eyebrow="Gestão de dados" title="Armazenamento" description="Visibilidade do Storage e do volume lógico do banco por workspace e unidade." actions={<><input ref={fileInput} type="file" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) upload.mutate(file); event.target.value = ""; }} /><Button variant="outline" onClick={() => void refetchInventory()} disabled={refreshingInventory}>Atualizar leitura</Button><Button onClick={() => fileInput.current?.click()} disabled={upload.isPending || quota >= 100}><Upload className="mr-2 h-4 w-4" />{upload.isPending ? "Enviando…" : "Enviar arquivo"}</Button></>} />
 
     <div className="gd-auto-grid gap-3">
       <StorageKpi icon={<HardDrive />} label="Espaço usado" value={formatBytes(used)} note={`${quota.toFixed(1)}% de ${formatBytes(limit)}`} />
       <StorageKpi icon={<Archive />} label="Arquivos gerenciados" value={String(managed.length)} note="no bucket privado" />
+      <StorageKpi icon={<Database />} label="Registros do banco" value={numberFormat(databaseRecords)} note="CRM, leads, tráfego e vendas" />
+      <StorageKpi icon={<Image />} label="Mídia catalogada" value={formatBytes(mediaFiles.reduce((sum, item) => sum + Number(item.size_bytes || 0), 0))} note={`${mediaFiles.length} imagem(ns), vídeo(s) ou áudio(s)`} />
       <StorageKpi icon={<ExternalLink />} label="Referências externas" value={String(legacyRefs.length + files.filter((item) => item.external_url).length)} note="não ocupam a quota" />
       <StorageKpi icon={<ShieldCheck />} label="Plano" value={(currentPlan as any)?.name ?? "Starter"} note={subscription?.status === "configuring" ? "migration necessária" : subscription?.status ?? "ativo"} />
     </div>
@@ -149,8 +194,9 @@ export default function StoragePage() {
     <section className="gd-panel p-5"><div className="flex items-center justify-between gap-3"><div><b>Quota do workspace</b><p className="text-xs text-muted-foreground">Alertas progressivos em 70%, 85% e 100%.</p></div><b className={quota >= 85 ? "text-rose-500" : quota >= 70 ? "text-amber-500" : "text-primary"}>{formatBytes(used)} / {formatBytes(limit)}</b></div><Progress value={quota} className="mt-4 h-2" /></section>
 
     <Tabs defaultValue="overview" className="space-y-4">
-      <TabsList className="h-auto w-full justify-start overflow-x-auto"><TabsTrigger value="overview">Visão geral</TabsTrigger><TabsTrigger value="files">Arquivos</TabsTrigger><TabsTrigger value="sources">Fontes</TabsTrigger><TabsTrigger value="limits">Limites</TabsTrigger></TabsList>
-      <TabsContent value="overview" className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><section className="gd-panel p-5"><h2 className="font-black">Distribuição conhecida</h2><p className="text-xs text-muted-foreground">Somente bytes realmente armazenados entram na quota.</p><div className="mt-5 space-y-4">{allSources.map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><b>{sourceLabel(key)}</b><span>{value.count} item(ns) · {formatBytes(value.bytes)}</span></div><Progress value={used ? value.bytes / used * 100 : 0} className="h-1.5" /></div>)}{!allSources.length && <EmptyStorage schemaReady={UUID.test(workspace?.id ?? "")} />}</div></section><section className="gd-panel p-5"><Cloud className="h-8 w-8 text-primary" /><h2 className="mt-4 font-black">Catálogo unificado</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">Novos uploads são privados, catalogados e vinculados à unidade. Avatares e criativos existentes aparecem como referências até a migração assistida.</p><p className="mt-5 text-[10px] text-muted-foreground">Última leitura: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString("pt-BR") : "aguardando"}</p></section></TabsContent>
+      <TabsList className="h-auto w-full justify-start overflow-x-auto"><TabsTrigger value="overview">Visão geral</TabsTrigger><TabsTrigger value="platform">Dados da plataforma</TabsTrigger><TabsTrigger value="files">Arquivos</TabsTrigger><TabsTrigger value="sources">Fontes</TabsTrigger><TabsTrigger value="limits">Limites</TabsTrigger></TabsList>
+      <TabsContent value="overview" className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]"><section className="gd-panel p-5"><h2 className="font-black">Distribuição conhecida</h2><p className="text-xs text-muted-foreground">Somente bytes realmente armazenados entram na quota.</p><div className="mt-5 space-y-4">{allSources.map(([key, value]) => <div key={key}><div className="mb-1 flex justify-between text-xs"><b>{sourceLabel(key)}</b><span>{value.count} item(ns) · {formatBytes(value.bytes)}</span></div><Progress value={used ? value.bytes / used * 100 : 0} className="h-1.5" /></div>)}{!allSources.length && <EmptyStorage schemaReady={UUID.test(workspace?.id ?? "")} />}</div></section><section className="gd-panel p-5"><Cloud className="h-8 w-8 text-primary" /><h2 className="mt-4 font-black">Controle de capacidade</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">A quota acima mede arquivos do Supabase Storage. A aba Dados da plataforma mede quantos registros existem no banco por módulo. O tamanho físico de banco, backup e egress é administrativo do projeto Supabase e não é exposto ao navegador por segurança.</p><p className="mt-5 text-[10px] text-muted-foreground">Arquivos: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString("pt-BR") : "aguardando"} · Dados: {inventoryUpdatedAt ? new Date(inventoryUpdatedAt).toLocaleString("pt-BR") : "aguardando"}</p></section></TabsContent>
+      <TabsContent value="platform" className="space-y-4"><section className="gd-panel overflow-hidden"><div className="border-b border-border p-5"><h2 className="font-black">Inventário de dados da plataforma</h2><p className="mt-1 text-xs text-muted-foreground">Contagem atual de registros acessíveis pelo workspace. São dados reais de banco, não estimativa de bytes.</p></div><div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">{dataInventory.map((item) => <DataInventoryCard key={item.key} item={item} />)}{loadingInventory && <p className="col-span-full py-8 text-center text-xs text-muted-foreground">Atualizando inventário…</p>}</div></section><section className="rounded-2xl border border-amber-500/25 bg-amber-500/[.06] p-4 text-xs leading-5 text-muted-foreground"><b className="text-amber-600">Importante:</b> o navegador consegue medir arquivos e contar os registros que este workspace acessa. Para o consumo físico total do banco, backups, banda e capacidade do projeto, acompanhe também <b>Supabase Dashboard → Usage</b>; essas métricas são administrativas e não devem ficar expostas para usuários comuns.</section></TabsContent>
       <TabsContent value="files" className="space-y-3"><div className="flex flex-col gap-2 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar arquivo" className="pl-9" /></div><select value={source} onChange={(event) => setSource(event.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm"><option value="all">Todas as fontes</option>{allSources.map(([key]) => <option key={key} value={key}>{sourceLabel(key)}</option>)}</select></div><section className="gd-panel overflow-hidden"><div className="divide-y divide-border">{filtered.map((item) => <div key={item.id} className="flex items-center gap-3 p-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{item.mime_type?.startsWith("image/") ? <FileImage className="h-5 w-5" /> : <File className="h-5 w-5" />}</span><div className="min-w-0 flex-1"><b className="block truncate text-sm">{item.original_name}</b><p className="text-[10px] text-muted-foreground">{sourceLabel(item.source)} · {item.module} · {formatBytes(Number(item.size_bytes || 0))} · {new Date(item.created_at).toLocaleDateString("pt-BR")}</p></div><Button variant="ghost" size="icon" onClick={() => downloadFile(item)} title="Baixar"><Download className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => deleteFile(item)} title="Mover para lixeira"><Trash2 className="h-4 w-4 text-rose-500" /></Button></div>)}{!filtered.length && <div className="p-10 text-center text-xs text-muted-foreground">{isLoading ? "Carregando…" : "Nenhum arquivo encontrado."}</div>}</div></section></TabsContent>
       <TabsContent value="sources"><section className="gd-auto-grid gap-3">{["upload","avatar","meta","finance","automation","crm","report","import"].map((key) => { const value = allSources.find(([sourceKey]) => sourceKey === key)?.[1] ?? { count: 0, bytes: 0 }; return <div className="gd-panel p-5" key={key}><b>{sourceLabel(key)}</b><p className="mt-4 text-2xl font-black">{value.count}</p><p className="text-xs text-muted-foreground">{formatBytes(value.bytes)} administrados</p></div>; })}</section></TabsContent>
       <TabsContent value="limits"><section className="gd-panel overflow-hidden"><div className="border-b border-border p-5"><h2 className="font-black">Limites por plano</h2><p className="text-xs text-muted-foreground">A quota é do workspace e novos uploads param em 100%.</p></div><div className="gd-auto-grid gap-3 p-5">{plans.map((plan: any) => <div key={plan.code} className={`min-w-0 rounded-xl border p-4 ${plan.code === subscription?.plan_code ? "border-primary bg-primary/5" : "border-border"}`}><b>{plan.name}</b><p className="mt-3 truncate text-xl font-black" title={formatBytes(Number(plan.entitlements?.storage_bytes || DEFAULT_LIMIT))}>{formatBytes(Number(plan.entitlements?.storage_bytes || DEFAULT_LIMIT))}</p><p className="text-[10px] text-muted-foreground">por workspace</p></div>)}</div></section></TabsContent>
@@ -159,6 +205,8 @@ export default function StoragePage() {
 }
 
 function StorageKpi({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note: string }) { return <div className="gd-panel p-5"><div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</span><span className="text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</span></div><p className="mt-4 text-2xl font-black">{value}</p><p className="text-[10px] text-muted-foreground">{note}</p></div>; }
+function DataInventoryCard({ item }: { item: DataInventory }) { const icons = { crm: <UsersRound />, lead: <UsersRound />, traffic: <Database />, creative: <Image />, sales: <Database />, social: <Video /> }; return <article className="rounded-2xl border border-border bg-background/35 p-4"><span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary [&>svg]:h-4 [&>svg]:w-4">{icons[item.icon]}</span><p className="mt-4 text-[10px] font-black uppercase tracking-[.12em] text-muted-foreground">{item.label}</p><p className="mt-1 text-2xl font-black">{numberFormat(item.count)}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.description}</p></article>; }
 function EmptyStorage({ schemaReady }: { schemaReady: boolean }) { return <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">{schemaReady ? "Nenhum arquivo catalogado ainda." : "A migration de workspace/armazenamento precisa ser aplicada para ativar uploads."}</div>; }
 function formatBytes(value: number) { if (!value) return "0 B"; const units = ["B","KB","MB","GB","TB"]; const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1); return `${(value / 1024 ** index).toLocaleString("pt-BR", { maximumFractionDigits: index > 2 ? 1 : 2 })} ${units[index]}`; }
+function numberFormat(value: number) { return new Intl.NumberFormat("pt-BR").format(value); }
 function sourceLabel(value: string) { return ({ upload: "Uploads", avatar: "Avatares", meta: "Criativos Meta", finance: "Financeiro", automation: "Automações", crm: "CRM", report: "Relatórios", import: "Importações", external: "Externo" } as Record<string,string>)[value] ?? value; }
