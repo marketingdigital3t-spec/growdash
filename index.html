@@ -42,8 +42,8 @@
         if (window.__GROWDASH_BOOTED__) return;
         var root = document.getElementById("root");
         if (!root) return;
-        root.innerHTML = '<div style="display:grid;min-height:100vh;place-items:center;background:#050505;color:#f5f5f5;font:600 15px Nunito,system-ui,sans-serif;text-align:center;padding:24px"><div style="max-width:420px;border:1px solid #383838;border-radius:18px;background:#111;padding:28px;box-shadow:0 24px 70px #000"><p style="font-weight:800">A Growdash demorou mais do que o esperado.</p><p style="opacity:.72;margin-top:8px;line-height:1.5">Sua página não ficou presa: confirme o carregamento da versão mais recente.</p><button type="button" onclick="location.reload()" style="margin-top:18px;border:1px solid #fff;border-radius:10px;background:#f5f5f5;color:#080808;padding:10px 16px;font-weight:800;cursor:pointer">Tentar novamente</button></div></div>';
-      }, 8000);
+        root.innerHTML = '<div style="display:grid;min-height:100vh;place-items:center;background:#050505;color:#f5f5f5;font:600 15px Nunito,system-ui,sans-serif;text-align:center;padding:24px"><div style="max-width:420px;border:1px solid #383838;border-radius:18px;background:#111;padding:28px;box-shadow:0 24px 70px #000"><p style="font-weight:800">A Growdash demorou mais do que o esperado.</p><p style="opacity:.72;margin-top:8px;line-height:1.5">Sua página não ficou presa: confirme o carregamento da versão mais recente.</p><button type="button" onclick="var u=new URL(location.href);u.searchParams.set(\'gd_reload\',Date.now());location.replace(u.toString())" style="margin-top:18px;border:1px solid #fff;border-radius:10px;background:#f5f5f5;color:#080808;padding:10px 16px;font-weight:800;cursor:pointer">Tentar novamente</button></div></div>';
+      }, 15000);
     </script>
     <style>@keyframes growdash-spin{to{transform:rotate(360deg)}}</style>
     <script type="module" src="/src/main.tsx"></script>

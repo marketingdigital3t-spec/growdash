@@ -1,5 +1,5 @@
-import { Component, lazy, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
-import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Component, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,42 +10,45 @@ import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
+import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
+import { isRecoverableChunkError, lazyWithRetry, recordRuntimeDiagnostic } from "@/lib/resilience";
 
 // O shell autenticado reúne navegação, notificações e consultas de dados. Mantê-lo
 // fora do bundle inicial deixa a tela de acesso pronta sem baixar a plataforma toda.
-const GrowdashLayout = lazy(() => import("@/growdash/GrowdashLayout"));
-const MfaChallengeGate = lazy(() =>
+const GrowdashLayout = lazyWithRetry(() => import("@/growdash/GrowdashLayout"), "layout");
+const MfaChallengeGate = lazyWithRetry(() =>
   import("@/components/auth/MfaChallengeGate").then((module) => ({ default: module.MfaChallengeGate })),
+  "mfa",
 );
 
-const FullDashboard = lazy(() => import("@/pages/Index"));
-const TrafficPage = lazy(() => import("@/growdash/TrafficPage"));
-const FunnelAnalysis = lazy(() => import("@/pages/FunnelAnalysis"));
-const FullAlerts = lazy(() => import("@/pages/Alerts"));
-const EventClasses = lazy(() => import("@/pages/EventClasses"));
-const IncompleteLeads = lazy(() => import("@/pages/LeadsIncompletos"));
-const DataHealth = lazy(() => import("@/pages/DataHealth"));
-const FullSettings = lazy(() => import("@/pages/Settings"));
-const FullUsers = lazy(() => import("@/pages/Users"));
-const Products = lazy(() => import("@/pages/Products"));
-const Funnelytics = lazy(() => import("@/pages/Funnelytics"));
-const CrmPage = lazy(() => import("@/growdash/CrmPage"));
-const KanbanPage = lazy(() => import("@/growdash/KanbanPage"));
-const CommercialPage = lazy(() => import("@/growdash/CommercialPage"));
-const FinancePage = lazy(() => import("@/growdash/FinancePage"));
-const StoragePage = lazy(() => import("@/growdash/StoragePage"));
-const IntegrationsPage = lazy(() => import("@/growdash/IntegrationsPage"));
-const ProfilePage = lazy(() => import("@/growdash/ProfilePage"));
-const SocialMediaPage = lazy(() => import("@/growdash/SocialMediaPage"));
-const AnnouncementsPage = lazy(() => import("@/growdash/AnnouncementsPage"));
-const ModulePage = lazy(() => import("@/growdash/ModulePage"));
-const BrandDiagnosticPage = lazy(() => import("@/growdash/BrandDiagnosticPage"));
-const IntelligenceCenterPage = lazy(() => import("@/growdash/IntelligenceCenterPage"));
-const StrategyPage = lazy(() => import("@/growdash/StrategyPage"));
-const Auth = lazy(() => import("@/pages/Auth"));
-const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
-const SharedLeadReport = lazy(() => import("@/pages/SharedLeadReport"));
-const ExpertDashboard = lazy(() => import("@/pages/ExpertDashboard"));
+const FullDashboard = lazyWithRetry(() => import("@/pages/Index"), "dashboard");
+const TrafficPage = lazyWithRetry(() => import("@/growdash/TrafficPage"), "trafego-pago");
+const FunnelAnalysis = lazyWithRetry(() => import("@/pages/FunnelAnalysis"), "analise-de-funis");
+const FullAlerts = lazyWithRetry(() => import("@/pages/Alerts"), "alertas");
+const EventClasses = lazyWithRetry(() => import("@/pages/EventClasses"), "agenda-turmas");
+const IncompleteLeads = lazyWithRetry(() => import("@/pages/LeadsIncompletos"), "leads-incompletos");
+const DataHealth = lazyWithRetry(() => import("@/pages/DataHealth"), "saude-dos-dados");
+const FullSettings = lazyWithRetry(() => import("@/pages/Settings"), "configuracoes");
+const FullUsers = lazyWithRetry(() => import("@/pages/Users"), "usuarios");
+const Products = lazyWithRetry(() => import("@/pages/Products"), "produtos");
+const Funnelytics = lazyWithRetry(() => import("@/pages/Funnelytics"), "growdash-flow");
+const CrmPage = lazyWithRetry(() => import("@/growdash/CrmPage"), "crm");
+const KanbanPage = lazyWithRetry(() => import("@/growdash/KanbanPage"), "kanban");
+const CommercialPage = lazyWithRetry(() => import("@/growdash/CommercialPage"), "comercial");
+const FinancePage = lazyWithRetry(() => import("@/growdash/FinancePage"), "financeiro");
+const StoragePage = lazyWithRetry(() => import("@/growdash/StoragePage"), "armazenamento");
+const IntegrationsPage = lazyWithRetry(() => import("@/growdash/IntegrationsPage"), "integracoes");
+const ProfilePage = lazyWithRetry(() => import("@/growdash/ProfilePage"), "perfil");
+const SocialMediaPage = lazyWithRetry(() => import("@/growdash/SocialMediaPage"), "midia-social");
+const AnnouncementsPage = lazyWithRetry(() => import("@/growdash/AnnouncementsPage"), "anuncios");
+const ModulePage = lazyWithRetry(() => import("@/growdash/ModulePage"), "modulo");
+const BrandDiagnosticPage = lazyWithRetry(() => import("@/growdash/BrandDiagnosticPage"), "marca");
+const IntelligenceCenterPage = lazyWithRetry(() => import("@/growdash/IntelligenceCenterPage"), "inteligencia");
+const StrategyPage = lazyWithRetry(() => import("@/growdash/StrategyPage"), "estrategia");
+const Auth = lazyWithRetry(() => import("@/pages/Auth"), "autenticacao");
+const ResetPassword = lazyWithRetry(() => import("@/pages/ResetPassword"), "reset-senha");
+const SharedLeadReport = lazyWithRetry(() => import("@/pages/SharedLeadReport"), "relatorio-compartilhado");
+const ExpertDashboard = lazyWithRetry(() => import("@/pages/ExpertDashboard"), "painel-expert");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,7 +73,7 @@ function LoadingModule() {
     {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
       <p className="font-bold">A Growdash está demorando para responder.</p>
       <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. A página não será recarregada automaticamente.</p>
-      <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar novamente</button>
+      <button type="button" onClick={() => { const url = new URL(window.location.href); url.searchParams.set("gd_reload", String(Date.now())); window.location.replace(url.toString()); }} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar novamente</button>
     </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
   </div>;
 }
@@ -96,11 +99,12 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Keep diagnostic context in the browser without exposing it in the UI.
+    recordRuntimeDiagnostic("application", error);
     console.error("Growdash render error", error, info.componentStack);
     // A Pages release replaces hashed lazy chunks. Safari can retain the old
     // shell briefly and then fail a dynamic import. Retry exactly once against
     // a cache-busting URL before showing the manual recovery screen.
-    const isChunkError = /dynamically imported module|loading chunk|importing a module script|failed to fetch/i.test(error.message);
+    const isChunkError = isRecoverableChunkError(error);
     const retryKey = "growdash:chunk-retry";
     let retry = { attempts: 0, startedAt: 0 };
     try {
@@ -161,6 +165,11 @@ function AuthenticatedLayout() {
 function AccentInitializer({ children }: { children: ReactNode }) {
   useAccentTheme();
   return <>{children}</>;
+}
+
+function ResilientRoute({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  return <RouteErrorBoundary resetKey={`${location.pathname}${location.search}`} scope={location.pathname}>{children}</RouteErrorBoundary>;
 }
 
 function RequirePage({ page, children }: { page: PagePermission | "master"; children: ReactNode }) {
@@ -225,18 +234,18 @@ export default function App() {
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />
                   <Route element={<AuthenticatedLayout />}>
-                    <Route index element={<RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage>} />
-                    <Route path="painel-expert" element={<RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage>} />
+                    <Route index element={<ResilientRoute><RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage></ResilientRoute>} />
+                    <Route path="painel-expert" element={<ResilientRoute><RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
-                    <Route path="crm" element={<RequirePage page="crm"><CrmPage /></RequirePage>} />
-                    <Route path="comercial" element={<RequirePage page="commercial"><CommercialPage /></RequirePage>} />
-                    <Route path="campanhas" element={<RequirePage page="campaigns">{analytics(<TrafficPage />)}</RequirePage>} />
+                    <Route path="crm" element={<ResilientRoute><RequirePage page="crm"><CrmPage /></RequirePage></ResilientRoute>} />
+                    <Route path="comercial" element={<ResilientRoute><RequirePage page="commercial"><CommercialPage /></RequirePage></ResilientRoute>} />
+                    <Route path="campanhas" element={<ResilientRoute><RequirePage page="campaigns">{analytics(<TrafficPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="inteligencia" element={<RequirePage page="campaigns">{analytics(<IntelligenceCenterPage />)}</RequirePage>} />
                     <Route path="trafego-pago" element={<Navigate to="/campanhas" replace />} />
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />
-                    <Route path="analise-de-funis" element={<RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage>} />
+                    <Route path="analise-de-funis" element={<ResilientRoute><RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage></ResilientRoute>} />
                     <Route path="analise-funis" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="funnels" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="alertas" element={<RequirePage page="alerts">{analytics(<FullAlerts />)}</RequirePage>} />
@@ -244,8 +253,8 @@ export default function App() {
                     <Route path="classes" element={<Navigate to="/agenda-turmas" replace />} />
                     <Route path="leads-incompletos" element={<RequirePage page="leads">{analytics(<IncompleteLeads />)}</RequirePage>} />
                     <Route path="automacoes" element={<RequirePage page="automations"><ModulePage /></RequirePage>} />
-                    <Route path="growdash-flow" element={<RequirePage page="flow">{analytics(<Funnelytics />)}</RequirePage>} />
-                    <Route path="estrategia" element={<RequirePage page="brands">{analytics(<StrategyPage />)}</RequirePage>} />
+                    <Route path="growdash-flow" element={<ResilientRoute><RequirePage page="flow">{analytics(<Funnelytics />)}</RequirePage></ResilientRoute>} />
+                    <Route path="estrategia" element={<ResilientRoute><RequirePage page="brands">{analytics(<StrategyPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="saude-dos-dados" element={<RequirePage page="dataHealth">{analytics(<DataHealth />)}</RequirePage>} />
                     <Route path="data-health" element={<Navigate to="/saude-dos-dados" replace />} />
                     <Route path="produtos" element={<RequirePage page="products">{analytics(<Products />)}</RequirePage>} />
@@ -254,11 +263,11 @@ export default function App() {
                     <Route path="usuarios" element={<RequirePage page="users">{analytics(<FullUsers />)}</RequirePage>} />
                     <Route path="usuarios/avancado" element={<Navigate to="/usuarios" replace />} />
                     <Route path="users" element={<Navigate to="/usuarios" replace />} />
-                    <Route path="financeiro" element={<RequirePage page="finance"><FinancePage /></RequirePage>} />
+                    <Route path="financeiro" element={<ResilientRoute><RequirePage page="finance"><FinancePage /></RequirePage></ResilientRoute>} />
                     <Route path="armazenamento" element={<RequirePage page="storage"><StoragePage /></RequirePage>} />
                     <Route path="integracoes" element={<RequirePage page="integrations"><IntegrationsPage /></RequirePage>} />
                     <Route path="perfil" element={<ProfilePage />} />
-                    <Route path="midia-social" element={<RequirePage page="socialMedia">{analytics(<SocialMediaPage />)}</RequirePage>} />
+                    <Route path="midia-social" element={<ResilientRoute><RequirePage page="socialMedia">{analytics(<SocialMediaPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="kanban" element={<RequirePage page="kanban"><KanbanPage /></RequirePage>} />
                     <Route path="chamados" element={<RequirePage page="tickets"><ModulePage /></RequirePage>} />
                     <Route path="anuncios" element={<RequirePage page="announcements"><AnnouncementsPage /></RequirePage>} />
