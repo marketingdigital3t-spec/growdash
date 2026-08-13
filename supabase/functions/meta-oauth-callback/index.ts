@@ -21,7 +21,7 @@ const resultPage = (status: "success" | "error", message: string, accounts = 0) 
 <title>Growdash · Meta Ads</title><style>
 body{margin:0;background:#090909;color:#f5f5f5;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}
 main{max-width:520px;border:1px solid #5c4816;border-radius:18px;background:#15130e;padding:32px;text-align:center;box-shadow:0 20px 60px #0008}
-h1{color:${status === "success" ? "#f2c94c" : "#ff6b6b"};font-size:24px}p{color:#c8c4bb;line-height:1.55}button{border:0;border-radius:10px;background:#f2c94c;color:#17130a;padding:12px 18px;font-weight:700;cursor:pointer}
+h1{color:${status === "success" ? "#f5f5f5" : "#ff6b6b"};font-size:24px}p{color:#c8c8c8;line-height:1.55}button{border:1px solid #f5f5f5;border-radius:10px;background:#f5f5f5;color:#101010;padding:12px 18px;font-weight:700;cursor:pointer}
 </style></head><body><main><h1>${status === "success" ? "Meta Ads conectado" : "Não foi possível conectar"}</h1><p>${safeMessage}</p><button onclick="window.close()">Voltar para a Growdash</button></main>
 <script>try{if(window.opener)window.opener.postMessage(${payload},'*')}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1800)" : ""}</script>
 </body></html>`, {

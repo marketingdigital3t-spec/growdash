@@ -242,13 +242,13 @@
   }
 
   .brand-mark-tint {
-    -webkit-mask-image: url('/growdash-mark-gold.svg');
-    mask-image: url('/growdash-mark-gold.svg');
+    -webkit-mask-image: url('/growdash-mark-mono.svg');
+    mask-image: url('/growdash-mark-mono.svg');
   }
 
   .brand-logo-tint {
-    -webkit-mask-image: url('/growdash-brand-gold.png');
-    mask-image: url('/growdash-brand-gold.png');
+    -webkit-mask-image: url('/growdash-brand-mono.svg');
+    mask-image: url('/growdash-brand-mono.svg');
   }
 
   /* Analytics modules share the same Growdash palette as the rest of the SaaS.
@@ -418,6 +418,16 @@ html[data-accent="obsidian"] {
   --brand-ivory: #ffffff;
   --brand-accent-rgb: 226, 226, 226;
 }
+
+/* Old Tailwind warning colours were visually interpreted as brand yellow.
+   Preserve the semantic warning state, but render it in the same neutral
+   graphite/white system used by every Growdash control and icon. */
+.text-amber-400, .text-amber-500, .text-amber-600, .text-amber-700,
+.text-yellow-400, .text-yellow-500, .text-yellow-600, .text-yellow-700 { color: #d8d8d8 !important; }
+.bg-amber-400\/15, .bg-amber-500\/5, .bg-amber-500\/10, .bg-amber-500\/\[\.06\],
+.bg-yellow-400\/15, .bg-yellow-500\/5, .bg-yellow-500\/10 { background-color: rgba(255,255,255,.075) !important; }
+.border-amber-500\/20, .border-amber-500\/25, .border-amber-500\/30,
+.border-yellow-500\/20, .border-yellow-500\/25, .border-yellow-500\/30 { border-color: rgba(255,255,255,.18) !important; }
 
 html:not(.dark) {
   --background: 0 0% 94%;

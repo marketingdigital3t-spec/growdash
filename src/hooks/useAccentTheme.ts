@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 export type AccentTheme = "gold";
 const STORAGE_KEY = "growdash:accent-theme";
 
-const ACCENT_HEX: Record<AccentTheme, string> = { gold: "#b57a20" };
+const ACCENT_HEX: Record<AccentTheme, string> = { gold: "#f5f5f5" };
 
 function readAccent(): AccentTheme {
   return "gold";
@@ -22,7 +22,7 @@ export function applyAccent(_value: AccentTheme) {
   }
   themeColor.content = color;
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="${color}" d="M8 31 32 7l24 24-8 8-16-16-16 16z"/><path fill="${color}" d="m32 31 12 12-12 12-12-12z"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#9a9a9a"/></linearGradient></defs><path fill="url(#s)" d="M8 31 32 7l24 24-8 8-16-16-16 16z"/><path fill="url(#s)" d="m32 31 12 12-12 12-12-12z"/></svg>`;
   let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (!favicon) {
     favicon = document.createElement("link");
