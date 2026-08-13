@@ -147,6 +147,7 @@ export default function GrowdashLayout() {
       "/campanhas": permissions.canCampaigns,
       "/analise-de-funis": permissions.canFunnels,
       "/growdash-flow": permissions.canFlow,
+      "/estrategia": permissions.canBrands,
       "/midia-social": permissions.canSocialMedia,
       "/alertas": permissions.canAlerts,
       "/automacoes": permissions.canAutomations,

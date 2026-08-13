@@ -41,6 +41,7 @@ const AnnouncementsPage = lazy(() => import("@/growdash/AnnouncementsPage"));
 const ModulePage = lazy(() => import("@/growdash/ModulePage"));
 const BrandDiagnosticPage = lazy(() => import("@/growdash/BrandDiagnosticPage"));
 const IntelligenceCenterPage = lazy(() => import("@/growdash/IntelligenceCenterPage"));
+const StrategyPage = lazy(() => import("@/growdash/StrategyPage"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const SharedLeadReport = lazy(() => import("@/pages/SharedLeadReport"));
@@ -244,6 +245,7 @@ export default function App() {
                     <Route path="leads-incompletos" element={<RequirePage page="leads">{analytics(<IncompleteLeads />)}</RequirePage>} />
                     <Route path="automacoes" element={<RequirePage page="automations"><ModulePage /></RequirePage>} />
                     <Route path="growdash-flow" element={<RequirePage page="flow">{analytics(<Funnelytics />)}</RequirePage>} />
+                    <Route path="estrategia" element={<RequirePage page="brands">{analytics(<StrategyPage />)}</RequirePage>} />
                     <Route path="saude-dos-dados" element={<RequirePage page="dataHealth">{analytics(<DataHealth />)}</RequirePage>} />
                     <Route path="data-health" element={<Navigate to="/saude-dos-dados" replace />} />
                     <Route path="produtos" element={<RequirePage page="products">{analytics(<Products />)}</RequirePage>} />

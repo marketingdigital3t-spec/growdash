@@ -6,6 +6,7 @@ import {
   Building2,
   Cable,
   CalendarDays,
+  Compass,
   Columns3,
   GitBranch,
   HardDrive,
@@ -149,6 +150,14 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "Conclusão", value: "68%", change: "+5%" },
         ],
         highlights: ["Jornadas em execução", "Pontos de espera", "Próximas ações automáticas"],
+      },
+      {
+        label: "Estratégia",
+        path: "/estrategia",
+        icon: Compass,
+        description: "Planeje posicionamento, direção, conteúdo e prioridades de cada marca.",
+        metrics: [],
+        highlights: ["Posicionamento", "Pilares de conteúdo", "Banco de ideias"],
       },
       {
         label: "Análise de Mídia Social",
