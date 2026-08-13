@@ -21,7 +21,7 @@ import {
   UsersRound,
   XCircle,
 } from "lucide-react";
-import { endOfDay, format, formatDistanceToNow, startOfDay } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -64,7 +64,7 @@ export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { adAccountId, setAdAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
+  const { adAccountId, setAdAccountId, preset, setPreset, customRange, setCustomRange, businessUnitId, segment } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
   const { data: adAccounts = [] } = useAdAccounts();
   const availableAccounts = useMemo(() => businessUnitId
@@ -93,8 +93,25 @@ export default function CrmPage() {
     if (adAccountId !== "all" && availableAccounts.length && !availableAccountIds.has(adAccountId)) setAdAccountId("all");
   }, [adAccountId, availableAccountIds, availableAccounts.length, setAdAccountId]);
 
-  const scopedDeals = useMemo(() => allDeals.filter((deal) => !deal.ad_account_id || availableAccountIds.has(deal.ad_account_id)), [allDeals, availableAccountIds]);
-  const scopedSales = useMemo(() => canonicalSales.filter((sale) => !sale.ad_account_id || availableAccountIds.has(sale.ad_account_id)), [availableAccountIds, canonicalSales]);
+  // A consulta de rd_deals já é protegida por RLS. Não aplique um segundo
+  // filtro de contas quando a visão é "todas": durante a reconexão de uma
+  // conta ou enquanto a lista de anúncios atualiza, esse filtro local podia
+  // transformar um pipeline válido em uma tela vazia.
+  //
+  // A unidade de negócio continua sendo respeitada quando há contas daquela
+  // unidade carregadas; negócios sem conta vinculada permanecem visíveis para
+  // não desaparecerem durante a reconciliação de UTMs/RD.
+  const shouldScopeToBusinessUnit = Boolean(businessUnitId && availableAccountIds.size);
+  const scopedDeals = useMemo(() => (
+    shouldScopeToBusinessUnit
+      ? allDeals.filter((deal) => !deal.ad_account_id || availableAccountIds.has(deal.ad_account_id))
+      : allDeals
+  ), [allDeals, availableAccountIds, shouldScopeToBusinessUnit]);
+  const scopedSales = useMemo(() => (
+    shouldScopeToBusinessUnit
+      ? canonicalSales.filter((sale) => !sale.ad_account_id || availableAccountIds.has(sale.ad_account_id))
+      : canonicalSales
+  ), [availableAccountIds, canonicalSales, shouldScopeToBusinessUnit]);
 
   const selectedFunnelId = funnelId === "all" ? undefined : funnelId;
   const { data: storedStages = [] } = useFunnelStages(selectedFunnelId);
@@ -121,18 +138,15 @@ export default function CrmPage() {
 
   const funnelNames = useMemo(() => new Map(funnels.map((funnel) => [funnel.id, funnel.name])), [funnels]);
   const dealsInPipeline = useMemo(() => {
-    const rangeStart = startOfDay(startDate).getTime();
-    const rangeEnd = endOfDay(endDate).getTime();
     return scopedDeals.filter((deal) => {
       if (funnelId !== "all" && deal.rd_funnel_id !== funnelId) return false;
-      // O CRM usa a última movimentação quando ela existe; assim o período
-      // responde ao calendário para negócios antigos que avançaram agora.
-      const relevantDate = deal.stage_updated_at || deal.closed_at || deal.updated_at || deal.lead_created_at;
-      if (!relevantDate) return false;
-      const timestamp = new Date(relevantDate).getTime();
-      return !Number.isNaN(timestamp) && timestamp >= rangeStart && timestamp <= rangeEnd;
+      // CRM é um pipeline operacional, não um relatório por período: um lead
+      // antigo que ainda está em negociação precisa seguir visível. O filtro
+      // global de datas continua sendo usado nas telas analíticas, mas não
+      // pode ocultar cartões do funil.
+      return true;
     });
-  }, [endDate, funnelId, scopedDeals, startDate]);
+  }, [funnelId, scopedDeals]);
   const owners = useMemo(
     () => Array.from(new Set(dealsInPipeline.map((deal) => deal.deal_owner_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [dealsInPipeline],
