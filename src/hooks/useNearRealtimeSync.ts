@@ -5,6 +5,16 @@ import { supabase } from "@/integrations/supabase/client";
 const REFRESH_INTERVAL_MS = 15 * 60 * 1_000;
 const LOCAL_DEDUP_WINDOW_MS = 60_000;
 const STORAGE_PREFIX = "growdash:last-background-sync";
+// Realtime events are batched for one second. This makes every open sidebar
+// module reflect writes promptly without polling every endpoint or hammering
+// Meta/RD APIs (which would trigger rate limits and duplicate work).
+const REALTIME_UI_BATCH_MS = 1_000;
+
+const LIVE_TABLES = [
+  "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",
+  "rd_deals", "sales", "alerts", "social_media", "social_insights_daily",
+  "financial_entries", "kanban_boards", "kanban_cards", "workspace_files",
+] as const;
 
 type SyncState = "idle" | "refreshing" | "fresh" | "error";
 
@@ -31,19 +41,12 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
   const invalidateLiveQueries = useCallback(() => {
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
     invalidateTimer.current = window.setTimeout(() => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["insights"] }),
-        queryClient.invalidateQueries({ queryKey: ["insights_hourly"] }),
-        queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
-        queryClient.invalidateQueries({ queryKey: ["campaigns_full"] }),
-        queryClient.invalidateQueries({ queryKey: ["meta-adsets-independent"] }),
-        queryClient.invalidateQueries({ queryKey: ["meta-ads-independent"] }),
-        queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
-        queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }),
-        queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),
-        queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }),
-      ]);
-    }, 350);
+      // Invalidating only refetches queries mounted by the current page. Cached
+      // routes become stale and refresh when opened, so a write never leaves a
+      // lateral module showing an old snapshot.
+      void queryClient.invalidateQueries();
+      setLastUpdatedAt(new Date());
+    }, REALTIME_UI_BATCH_MS);
   }, [queryClient]);
 
   const refresh = useCallback(async (force = false) => {
@@ -113,11 +116,11 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
 
   useEffect(() => {
     if (!enabled) return;
-    const channel = supabase.channel(`live-data-${scope}-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "insights" }, invalidateLiveQueries)
-      .on("postgres_changes", { event: "*", schema: "public", table: "insights_hourly" }, invalidateLiveQueries)
-      .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, invalidateLiveQueries)
-      .subscribe();
+    let channel = supabase.channel(`live-data-${scope}-${Math.random().toString(36).slice(2)}`);
+    for (const table of LIVE_TABLES) {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, invalidateLiveQueries);
+    }
+    channel.subscribe();
     return () => {
       if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
       void supabase.removeChannel(channel);
