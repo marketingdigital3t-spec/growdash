@@ -185,6 +185,8 @@ export function useRDCRMDeals(adAccountId?: string, enabled = true) {
     staleTime: 15 * 60 * 1_000,
     gcTime: 24 * 60 * 60 * 1_000,
     refetchOnWindowFocus: true,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
 }
 

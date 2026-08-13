@@ -41,6 +41,7 @@ import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
+import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { MetricCard, PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 
@@ -73,8 +74,20 @@ export default function CrmPage() {
   const availableAccountIds = useMemo(() => new Set(availableAccounts.map((account) => account.id)), [availableAccounts]);
   const { data: rdIntegration, isLoading: loadingRDIntegration } = useRDIntegration();
   const rdEnabled = rdIntegration?.is_active === true;
-  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter, rdEnabled);
-  const { data: allDeals = [], isLoading: loadingDeals, isFetching } = useRDCRMDeals(accountFilter, rdEnabled);
+  // A conexão do RD pertence ao dono da conta/funil. Um gestor ou membro com
+  // permissão de leitura não deve perder o pipeline apenas por não possuir
+  // uma cópia pessoal do token. A consulta usa RLS e continua retornando
+  // somente os funis atribuídos ao usuário atual.
+  const canReadCrm = crmPipelineEnabled(!!user);
+  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter, canReadCrm);
+  const {
+    data: allDeals = [],
+    isLoading: loadingDeals,
+    isFetching,
+    isError: dealsError,
+    error: dealsQueryError,
+    refetch: refetchDeals,
+  } = useRDCRMDeals(accountFilter, canReadCrm);
   const { data: canonicalSales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter });
   const [funnelId, setFunnelId] = useState("all");
   const [view, setView] = useState<CRMView>(() => {
@@ -93,25 +106,12 @@ export default function CrmPage() {
     if (adAccountId !== "all" && availableAccounts.length && !availableAccountIds.has(adAccountId)) setAdAccountId("all");
   }, [adAccountId, availableAccountIds, availableAccounts.length, setAdAccountId]);
 
-  // A consulta de rd_deals já é protegida por RLS. Não aplique um segundo
-  // filtro de contas quando a visão é "todas": durante a reconexão de uma
-  // conta ou enquanto a lista de anúncios atualiza, esse filtro local podia
-  // transformar um pipeline válido em uma tela vazia.
-  //
-  // A unidade de negócio continua sendo respeitada quando há contas daquela
-  // unidade carregadas; negócios sem conta vinculada permanecem visíveis para
-  // não desaparecerem durante a reconciliação de UTMs/RD.
-  const shouldScopeToBusinessUnit = Boolean(businessUnitId && availableAccountIds.size);
-  const scopedDeals = useMemo(() => (
-    shouldScopeToBusinessUnit
-      ? allDeals.filter((deal) => !deal.ad_account_id || availableAccountIds.has(deal.ad_account_id))
-      : allDeals
-  ), [allDeals, availableAccountIds, shouldScopeToBusinessUnit]);
-  const scopedSales = useMemo(() => (
-    shouldScopeToBusinessUnit
-      ? canonicalSales.filter((sale) => !sale.ad_account_id || availableAccountIds.has(sale.ad_account_id))
-      : canonicalSales
-  ), [availableAccountIds, canonicalSales, shouldScopeToBusinessUnit]);
+  // A consulta já é limitada por RLS e o filtro de conta selecionada já é
+  // aplicado no banco. Não descarte localmente negociações cujo vínculo Meta
+  // histórico foi removido: elas continuam válidas no RD e devem permanecer
+  // no funil do proprietário ou de quem recebeu acesso ao funil.
+  const scopedDeals = allDeals;
+  const scopedSales = canonicalSales;
 
   const selectedFunnelId = funnelId === "all" ? undefined : funnelId;
   const { data: storedStages = [] } = useFunnelStages(selectedFunnelId);
@@ -241,15 +241,11 @@ export default function CrmPage() {
   }
 
   async function syncRD() {
-    if (!rdEnabled) {
-      toast.error("Conecte o RD Station antes de sincronizar as negociações.");
-      return;
-    }
     const selected = funnelId === "all"
       ? funnels.filter((funnel) => funnel.is_active)
       : funnels.filter((funnel) => funnel.id === funnelId && funnel.is_active);
     if (!selected.length) {
-      toast.error("Nenhum funil RD ativo para sincronizar.");
+      toast.error(rdEnabled ? "Nenhum funil RD ativo para sincronizar." : "Nenhum funil RD disponível para sua conta. Peça acesso ao funil ou conecte o RD Station.");
       return;
     }
     setSyncing(true);
@@ -294,7 +290,7 @@ export default function CrmPage() {
               <ViewButton active={view === "list"} onClick={() => changeView("list")} icon={<List />} label="Lista" />
               <ViewButton active={view === "ai"} onClick={() => changeView("ai")} icon={<Bot />} label="IA do Funil" />
             </div>
-            <button className="gd-button" onClick={() => void syncRD()} disabled={syncing || loadingRDIntegration || loadingFunnels || !rdEnabled}>
+            <button className="gd-button" onClick={() => void syncRD()} disabled={syncing || loadingRDIntegration || loadingFunnels || !funnels.length}>
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
               {syncing ? "Sincronizando" : "Atualizar RD"}
             </button>
@@ -336,7 +332,7 @@ export default function CrmPage() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
-          <span>{number.format(deals.length)} negociação(ões) encontrada(s)</span>
+          <span>{number.format(deals.length)} negociação(ões) encontrada(s){!rdEnabled && funnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
         </div>
       </section>
@@ -348,7 +344,11 @@ export default function CrmPage() {
         <MetricCard label="Conversão do pipeline" value={`${stats.conversion.toFixed(2)}%`} change={`${stats.lost} perdido(s)`} />
       </div>}
 
-      {loadingDeals || loadingSales ? <CRMLoading /> : view === "ai" ? (
+      {loadingDeals || loadingSales ? <CRMLoading /> : dealsError ? (
+        <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
+          <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar as negociações</h2><p className="mt-2 text-sm text-muted-foreground">{dealsQueryError instanceof Error ? dealsQueryError.message : "A consulta do CRM falhou. Verifique seu acesso ao funil e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchDeals()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
+        </section>
+      ) : view === "ai" ? (
         <CrmAIWorkspace deals={deals} sales={scopedSales} accountId={accountFilter} />
       ) : view === "board" ? (
         <KanbanBoard
@@ -370,9 +370,9 @@ export default function CrmPage() {
         />
       )}
 
-      {!loadingDeals && !deals.length && view !== "ai" && (
+      {!loadingDeals && !dealsError && !deals.length && view !== "ai" && (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
-          <div><UsersRound className="mx-auto h-9 w-9 text-primary" /><h2 className="mt-4 font-black">Nenhuma negociação encontrada</h2><p className="mt-2 text-sm text-muted-foreground">Revise os filtros ou sincronize o funil conectado ao RD Station.</p></div>
+          <div><UsersRound className="mx-auto h-9 w-9 text-primary" /><h2 className="mt-4 font-black">Nenhuma negociação encontrada</h2><p className="mt-2 text-sm text-muted-foreground">{crmEmptyState({ hasFunnels: !!funnels.length, hasOwnIntegration: rdEnabled })}</p></div>
         </section>
       )}
 
