@@ -259,7 +259,7 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) 
                         {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                  </div>}
+                  </div>
                   {sourceMode === "custom" && <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">Pacientes-modelo serão controlados manualmente nesta turma personalizada.</div>}
                 </div>
 
