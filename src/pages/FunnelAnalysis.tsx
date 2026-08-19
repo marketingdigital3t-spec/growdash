@@ -52,8 +52,6 @@ const blockHelp = {
 function normalizeName(value: string | null | undefined) {
   return String(value || "")
     .normalize("NFD")
-  const metaConversationsStarted = metaInsights?.reduce((s: number, r: any) => s + (r.messaging_conversations_started || 0), 0) ?? 0;
-  const metaLeadsTotal = metaLeads + metaConversationsStarted;
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("pt-BR")
     .replace(/[^a-z0-9]+/g, " ")
