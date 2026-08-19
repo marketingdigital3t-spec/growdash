@@ -5,16 +5,14 @@ export function aggregateMetrics(rows: InsightRow[]) {
   const totalLeads = rows.reduce((s, r) => s + r.leads, 0);
   const totalClicks = rows.reduce((s, r) => s + r.clicks, 0);
   const totalImpressions = rows.reduce((s, r) => s + r.impressions, 0);
-  const totalConversations = rows.reduce((s, r) => s + (r.messaging_conversations_started ?? 0), 0);
-  const totalResults = totalLeads + totalConversations;
 
-  const avgCPL = totalResults > 0 ? totalSpend / totalResults : 0;
+  const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
   const avgCTR = rows.length > 0 ? rows.reduce((s, r) => s + r.ctr, 0) / rows.length : 0;
   const avgCPM = rows.length > 0 ? rows.reduce((s, r) => s + r.cpm, 0) / rows.length : 0;
   const conversionRate = totalClicks > 0 ? (totalLeads / totalClicks) * 100 : 0;
   const efficiencyRate = totalImpressions > 0 ? (totalLeads / totalImpressions) * 100 : 0;
 
-  return { totalSpend, totalLeads, totalConversations, totalResults, avgCPL, avgCTR, avgCPM, conversionRate, efficiencyRate };
+  return { totalSpend, totalLeads, avgCPL, avgCTR, avgCPM, conversionRate, efficiencyRate };
 }
 
 export function calculateVariation(current: number, previous: number): number {

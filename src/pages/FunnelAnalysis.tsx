@@ -347,7 +347,7 @@ export default function FunnelAnalysis() {
             </MotionItem>
           )}
 
-          <MotionItem><FunnelKPIs a={analytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} metaLeadsTotal={(mediaMetrics.leads ?? 0) + (mediaMetrics.messagingConversationsStarted ?? 0)} /></MotionItem>
+          <MotionItem><FunnelKPIs a={analytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} /></MotionItem>
 
           <MotionItem>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
