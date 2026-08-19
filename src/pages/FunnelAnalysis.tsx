@@ -52,6 +52,8 @@ const blockHelp = {
 function normalizeName(value: string | null | undefined) {
   return String(value || "")
     .normalize("NFD")
+  const metaConversationsStarted = metaInsights?.reduce((s: number, r: any) => s + (r.messaging_conversations_started || 0), 0) ?? 0;
+  const metaLeadsTotal = metaLeads + metaConversationsStarted;
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("pt-BR")
     .replace(/[^a-z0-9]+/g, " ")
@@ -347,7 +349,7 @@ export default function FunnelAnalysis() {
             </MotionItem>
           )}
 
-          <MotionItem><FunnelKPIs a={analytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} /></MotionItem>
+          <MotionItem><FunnelKPIs a={analytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} metaLeadsTotal={(mediaMetrics.leads ?? 0) + (mediaMetrics.messagingConversationsStarted ?? 0)} /></MotionItem>
 
           <MotionItem>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -6,6 +6,7 @@ import { metricDescription } from "@/lib/metricPresentation";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 
 interface Props {
+  metaLeadsTotal?: number;
   a: FunnelAnalytics;
   cpl?: number | null;
   cac?: number | null;
@@ -14,9 +15,9 @@ interface Props {
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelKPIs({ a, cpl, cac }: Props) {
+export function FunnelKPIs({ a, cpl, cac, metaLeadsTotal }: Props) {
   const cards = [
-    { label: "Leads totais", value: a.totalLeads, icon: Users, color: "text-blue-400", format: "int" as const },
+    { label: "Leads totais", value: metaLeadsTotal ?? a.totalLeads, icon: Users, color: "text-blue-400", format: "int" as const },
     { label: "Leads qualificados", value: a.qualifiedLeads, icon: CheckCircle2, color: "text-cyan-400", format: "int" as const },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
     { label: "Taxa de conversão", value: a.conversionRate, icon: Percent, color: "text-violet-400", format: "pct" as const },
