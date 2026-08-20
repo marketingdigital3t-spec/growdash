@@ -22,7 +22,7 @@ export function FunnelKPIs({ a, metaLeads, conversations, cpl, cac, salesConvers
     { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-blue-400", format: "int" as const },
     { label: "Conversas iniciadas Meta", value: conversations, icon: CheckCircle2, color: "text-cyan-400", format: "int" as const },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
-    { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-violet-400", format: "pct" as const },
+    { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-violet-400", format: "pct" as const, decimals: 2 },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: "text-amber-400", format: "days" as const },
     { label: "Ticket médio", value: a.avgTicket, icon: Target, color: "text-cyan-400", format: "brl" as const },
     { label: "Receita gerada", value: a.revenue, icon: DollarSign, color: "text-emerald-400", format: "brl" as const },
@@ -50,7 +50,7 @@ export function FunnelKPIs({ a, metaLeads, conversations, cpl, cac, salesConvers
                 </div>
                 <div className="text-2xl font-semibold">
                   {c.format === "int" && <AnimatedNumber value={Math.round(c.value)} decimals={0} />}
-                  {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={1} />%</>}
+                  {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={c.decimals ?? 1} />%</>}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
                   {c.format === "brl" && fmtBRL(c.value)}
                   {c.format === "custom" && <span className="text-base">{c.custom}</span>}
