@@ -306,7 +306,7 @@ const Index = () => {
 
   return (
     <MotionPage className="dashboard-page mx-auto w-full min-w-0 max-w-[1680px] space-y-4 px-1 sm:space-y-6 sm:px-2">
-      <MotionItem>
+      <MotionItem className="mx-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -318,7 +318,7 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      <MotionItem>
+      <MotionItem className="mx-3">
         <div className="flex flex-col gap-3 border-b border-border/60 pb-3 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
             <DateFilterBar
@@ -367,7 +367,9 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
+      <div className="mx-3">
+        <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
+      </div>
 
       {(isEditing ? draftView : activeView) && (
         <DashboardProvider
