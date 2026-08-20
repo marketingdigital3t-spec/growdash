@@ -96,7 +96,7 @@ export function PlatformDistributionWidget() {
       : `Conv. média ${averageConversion.toFixed(2)}%`;
 
   return <>
-    <Card className="dashboard-glass-card h-full min-w-0 overflow-hidden">
+    <Card className="dashboard-glass-card h-full min-h-[320px] min-w-0 overflow-hidden">
       <CardHeader className="space-y-3 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base"><Globe2 className="h-4 w-4" />Distribuição por Plataforma</CardTitle>
@@ -112,7 +112,7 @@ export function PlatformDistributionWidget() {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center gap-4 md:flex-row">
-          {!isConversion && <div className="relative h-[170px] w-[170px] shrink-0">
+          {!isConversion && <div className="relative h-[188px] w-[188px] shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={2} stroke="none">
