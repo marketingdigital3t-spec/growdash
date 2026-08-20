@@ -473,7 +473,7 @@ export default function FunnelAnalysis() {
             <FunnelKPIs
               a={periodAnalytics}
               metaLeads={mediaMetrics.metaLeads}
-              conversations={mediaMetrics.conversations}
+              trafficSpend={mediaMetrics.spend}
               cpl={mediaMetrics.metaCpl}
               cac={mediaMetrics.cac}
               salesConversionRate={mediaMetrics.salesConversionRate}

@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { Users, CheckCircle2, Trophy, Percent, Clock, DollarSign, TrendingUp, Target } from "lucide-react";
+import { Users, Trophy, Percent, Clock, DollarSign, TrendingUp, Target } from "lucide-react";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 import { metricDescription } from "@/lib/metricPresentation";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
@@ -8,7 +8,7 @@ import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 interface Props {
   a: FunnelAnalytics;
   metaLeads: number;
-  conversations: number;
+  trafficSpend: number;
   cpl?: number | null;
   cac?: number | null;
   salesConversionRate?: number | null;
@@ -17,10 +17,10 @@ interface Props {
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelKPIs({ a, metaLeads, conversations, cpl, cac, salesConversionRate }: Props) {
+export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversionRate }: Props) {
   const cards = [
     { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-blue-400", format: "int" as const },
-    { label: "Conversas iniciadas Meta", value: conversations, icon: CheckCircle2, color: "text-cyan-400", format: "int" as const },
+    { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-cyan-400", format: "brl" as const },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
     { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-violet-400", format: "pct" as const, decimals: 2 },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: "text-amber-400", format: "days" as const },
