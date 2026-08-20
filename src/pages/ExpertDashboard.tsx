@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CircleDollarSign, LockKeyhole, MessageCircleMore, ShieldCheck, Target, UsersRound } from "lucide-react";
+import { BarChart3, LockKeyhole, MessageCircleMore, ShieldCheck, UsersRound } from "lucide-react";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -13,7 +13,7 @@ import { useSales } from "@/hooks/useSales";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
 import { MetricCard } from "@/components/dashboard/MetricCard";
-import { getExpertAttribution, getExpertDashboardMetrics } from "@/lib/expertDashboardMetrics";
+import { getExpertDashboardMetrics } from "@/lib/expertDashboardMetrics";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
@@ -82,7 +82,6 @@ export default function ExpertDashboard() {
     conversations: expertMetrics.conversations,
     total: expertMetrics.metaLeads,
   }), [expertMetrics]);
-  const attribution = useMemo(() => getExpertAttribution(permittedSales), [permittedSales]);
   const isLoading = loadingAccounts || loadingInsights;
 
   return (
@@ -140,35 +139,6 @@ export default function ExpertDashboard() {
           </section>
         </MotionItem>
 
-        <MotionItem>
-          <Card className="dashboard-glass-card min-w-0 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
-                <div>
-                  <div className="flex items-center gap-2 text-primary"><Target className="h-4 w-4" /><span className="text-sm font-bold">Vendas por campanha e criativo</span></div>
-                  <p className="mt-1 text-xs text-muted-foreground">Atribuição baseada nas UTMs registradas no RD Station: campanha (utm_campaign) e criativo (utm_content).</p>
-                </div>
-                <div className="rounded-full bg-muted/60 px-3 py-1 text-xs font-medium tabular-nums">{expertMetrics.salesCount.toLocaleString("pt-BR")} vendas confirmadas</div>
-              </div>
-              {attribution.length > 0 ? <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="bg-muted/35 text-xs uppercase tracking-wide text-muted-foreground">
-                    <tr><th className="px-5 py-3 font-semibold">Campanha</th><th className="px-4 py-3 font-semibold">Criativo</th><th className="px-4 py-3 text-right font-semibold">Vendas</th><th className="px-4 py-3 text-right font-semibold">Faturamento líquido</th><th className="px-5 py-3 font-semibold">Pagamento</th></tr>
-                  </thead>
-                  <tbody>
-                    {attribution.map((row) => <tr key={`${row.campaign}-${row.creative}`} className="border-t border-border/45 transition-colors hover:bg-muted/30">
-                      <td className="max-w-[260px] truncate px-5 py-3 font-medium" title={row.campaign}>{row.campaign}</td>
-                      <td className="max-w-[260px] truncate px-4 py-3 text-muted-foreground" title={row.creative}>{row.creative}</td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums">{row.sales.toLocaleString("pt-BR")}</td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums">R$ {row.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-5 py-3"><div className="flex flex-wrap gap-1">{row.payments.map((method) => <span key={method} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{paymentLabel(method)}</span>)}</div></td>
-                    </tr>)}
-                  </tbody>
-                </table>
-              </div> : <div className="flex min-h-32 items-center justify-center gap-2 px-5 py-8 text-center text-sm text-muted-foreground"><CircleDollarSign className="h-4 w-4" />Nenhuma venda confirmada com os filtros selecionados.</div>}
-            </CardContent>
-          </Card>
-        </MotionItem>
       </DashboardProvider>
 
       {!isLoading && accounts.length === 0 && (
@@ -176,8 +146,4 @@ export default function ExpertDashboard() {
       )}
     </MotionPage>
   );
-}
-
-function paymentLabel(method: string) {
-  return ({ pix: "Pix", cartao: "Cartão", boleto: "Boleto", outros: "Outros" } as Record<string, string>)[method] ?? "Outros";
 }
