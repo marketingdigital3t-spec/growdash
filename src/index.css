@@ -5101,3 +5101,21 @@ html[data-accent="monochrome"]:not(.dark) :is(.gd-panel, .gd-metric-card, .dashb
 html[data-accent="metallic-gold"]:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
   border-color: rgba(121,91,34,.22) !important;
 }
+
+/* Tráfego Pago: the metal theme owns broad input rules above.  Reassert the
+   reading surface last, so changing dark/light cannot leave its filters in
+   the previous dark material. */
+html[data-accent]:not(.dark) .campaigns-workspace :is(.campaign-account-select, .campaign-action-select, .campaign-search-input) {
+  color: #1b1e22 !important;
+  border-color: rgba(70,78,88,.28) !important;
+  background: #ffffff !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.96), 0 4px 12px -10px rgba(35,40,47,.28) !important;
+}
+
+html[data-accent]:not(.dark) .campaigns-workspace .campaign-search-input::placeholder {
+  color: #59616a !important;
+}
+
+html[data-accent]:not(.dark) .campaigns-workspace :is(.campaign-account-select, .campaign-action-select) > :is(span, svg) {
+  color: #1b1e22 !important;
+}
