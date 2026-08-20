@@ -19,8 +19,8 @@ const fmtBRL = (v: number) =>
 
 export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversionRate }: Props) {
   const cards = [
-    { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-blue-400", format: "int" as const },
     { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-cyan-400", format: "brl" as const },
+    { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-blue-400", format: "int" as const },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
     { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-violet-400", format: "pct" as const, decimals: 2 },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: "text-amber-400", format: "days" as const },
