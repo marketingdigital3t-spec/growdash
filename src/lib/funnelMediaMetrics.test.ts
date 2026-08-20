@@ -43,6 +43,7 @@ describe("computeFunnelMediaMetrics", () => {
     expect(result.roas).toBe(8);
     expect(result.leadGap).toBe(-10);
     expect(result.rdCoverage).toBeCloseTo(27 / 37 * 100);
+    expect(result.salesConversionRate).toBeCloseTo(3 / 37 * 100);
   });
 
   it("não produz divisão inválida quando não há mídia ou conversões", () => {
@@ -52,5 +53,11 @@ describe("computeFunnelMediaMetrics", () => {
     expect(result.cac).toBeNull();
     expect(result.roas).toBeNull();
     expect(result.rdCoverage).toBeNull();
+    expect(result.salesConversionRate).toBeNull();
+  });
+
+  it("calcula conversão de venda pela população Meta exibida", () => {
+    const result = computeFunnelMediaMetrics([row({ leads: 664 })], 0, 24, 9, 0);
+    expect(result.salesConversionRate).toBeCloseTo(1.3554216867, 8);
   });
 });

@@ -14,6 +14,15 @@ describe("contrato unificado de métricas", () => {
     expect(metrics.rdCoverage).toBe(10);
   });
 
+  it("usa leads Meta como base da conversão em venda", () => {
+    const metrics = aggregateUnifiedMetrics(
+      [row("2026-07-18", { leads: 664 })],
+      Array.from({ length: 24 }, () => ({ win: false, stage_bucket: "lead" } as any)),
+      [{ status: "confirmed", quantity: 9, net_revenue: 900 } as any],
+    );
+    expect(metrics.conversionRate).toBeCloseTo(9 / 664 * 100, 8);
+  });
+
   it("detecta deterioração de CPL e CTR", () => {
     const insights = [row("2026-07-14", {}), row("2026-07-15", {}), row("2026-07-16", { spend: 180, clicks: 100 }), row("2026-07-17", { spend: 190, clicks: 90 }), row("2026-07-18", { spend: 200, clicks: 80 })];
     const anomalies = detectAnomalies(insights);

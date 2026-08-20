@@ -11,17 +11,18 @@ interface Props {
   conversations: number;
   cpl?: number | null;
   cac?: number | null;
+  salesConversionRate?: number | null;
 }
 
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelKPIs({ a, metaLeads, conversations, cpl, cac }: Props) {
+export function FunnelKPIs({ a, metaLeads, conversations, cpl, cac, salesConversionRate }: Props) {
   const cards = [
     { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-blue-400", format: "int" as const },
     { label: "Conversas iniciadas Meta", value: conversations, icon: CheckCircle2, color: "text-cyan-400", format: "int" as const },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
-    { label: "Taxa de conversão", value: a.conversionRate, icon: Percent, color: "text-violet-400", format: "pct" as const },
+    { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-violet-400", format: "pct" as const },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: "text-amber-400", format: "days" as const },
     { label: "Ticket médio", value: a.avgTicket, icon: Target, color: "text-cyan-400", format: "brl" as const },
     { label: "Receita gerada", value: a.revenue, icon: DollarSign, color: "text-emerald-400", format: "brl" as const },

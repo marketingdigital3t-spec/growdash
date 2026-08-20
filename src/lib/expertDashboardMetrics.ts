@@ -37,7 +37,9 @@ export function getExpertDashboardMetrics(
   const rdLeads = rdDeals.length;
   const confirmedSales = sales.filter((sale) => sale.status === "confirmed");
   const salesCount = confirmedSales.reduce((total, sale) => total + Math.max(1, Number(sale.quantity ?? 1)), 0);
-  const conversionRate = rdLeads > 0 ? (salesCount / rdLeads) * 100 : 0;
+  // The displayed acquisition KPI is Meta leads, so its conversion rate must
+  // use the same population. RD volume remains a separate reconciliation KPI.
+  const conversionRate = metaLeads > 0 ? (salesCount / metaLeads) * 100 : 0;
   const spend = insights.reduce((total, insight) => total + Number(insight.spend ?? 0), 0);
   return {
     // DashboardProvider's generic "Leads" KPI must use Meta acquisitions.

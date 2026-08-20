@@ -21,6 +21,8 @@ export interface FunnelMediaMetrics {
   rdCpl: number | null;
   cac: number | null;
   roas: number | null;
+  /** Vendas confirmadas ÷ aquisições Meta no mesmo período e escopo. */
+  salesConversionRate: number | null;
   leadGap: number;
   rdCoverage: number | null;
 }
@@ -62,6 +64,7 @@ export function computeFunnelMediaMetrics(
     rdCpl: rdLeads > 0 ? totals.spend / rdLeads : null,
     cac: sales > 0 ? totals.spend / sales : null,
     roas: totals.spend > 0 ? revenue / totals.spend : null,
+    salesConversionRate: metaLeads > 0 ? (sales / metaLeads) * 100 : null,
     leadGap: rdLeads - metaLeads,
     rdCoverage: metaLeads > 0 ? (rdLeads / metaLeads) * 100 : null,
   };

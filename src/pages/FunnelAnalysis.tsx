@@ -476,6 +476,7 @@ export default function FunnelAnalysis() {
               conversations={mediaMetrics.conversations}
               cpl={mediaMetrics.metaCpl}
               cac={mediaMetrics.cac}
+              salesConversionRate={mediaMetrics.salesConversionRate}
             />
           </MotionItem>
 

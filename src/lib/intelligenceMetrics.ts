@@ -99,7 +99,10 @@ export function aggregateUnifiedMetrics(insights: InsightRow[], deals: RDDealLit
     cac: ratio(media.spend, sales),
     roas: ratio(revenue, media.spend),
     frequency: ratio(media.impressions, media.reach),
-    conversionRate: ratio(sales, deals.length || media.leads, 100),
+    // The reconciliation view reports acquisition-to-sale conversion. Using
+    // RD deals here made the visible Meta lead total disagree with its own
+    // denominator whenever the CRM received only part of the Meta leads.
+    conversionRate: ratio(sales, media.leads, 100),
     rdCoverage: ratio(deals.length, media.leads, 100),
   };
 }

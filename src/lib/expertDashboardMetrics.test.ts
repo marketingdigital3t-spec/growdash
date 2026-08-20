@@ -15,7 +15,7 @@ describe("expert dashboard metrics", () => {
     expect(result.conversations).toBe(8);
     expect(result.metaLeads).toBe(68);
     expect(result.rdLeads).toBe(4);
-    expect(result.conversionRate).toBe(50);
+    expect(result.conversionRate).toBeCloseTo(2 / 68 * 100);
     expect(result.cpl).toBeCloseTo(300 / 68);
   });
 
