@@ -66,7 +66,7 @@ export function FunnelAutoInsights({ a }: { a: FunnelAnalytics }) {
   }
 
   return (
-    <Card className="bg-card/60 border-border/40">
+    <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-amber-400" />

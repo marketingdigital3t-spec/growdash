@@ -9,7 +9,7 @@ const notifications: GrowdashNotification[] = [
 ];
 
 function permissions(overrides: Partial<NotificationPermissions> = {}): NotificationPermissions {
-  return { isMaster: false, canDashboard: false, canCampaigns: false, canFunnels: false, canClasses: false, allowedAdAccounts: [], ...overrides };
+  return { isMaster: false, canDashboard: false, canCampaigns: false, canFunnels: false, canClasses: false, canViewAllAccounts: false, allowedAdAccounts: [], ...overrides };
 }
 
 describe("filterNotifications", () => {
@@ -27,5 +27,9 @@ describe("filterNotifications", () => {
 
   it("não interpreta lista vazia como acesso global", () => {
     expect(filterNotifications(notifications, permissions({ canCampaigns: true }))).toEqual([]);
+  });
+
+  it("permite todas as contas retornadas por RLS para administradores do workspace", () => {
+    expect(filterNotifications(notifications, permissions({ canCampaigns: true, canViewAllAccounts: true })).map((item) => item.id)).toEqual(["campaign-a", "campaign-b"]);
   });
 });

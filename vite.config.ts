@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "path";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   server: {
@@ -13,11 +13,21 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   build: {
     sourcemap: false,
+    modulePreload: {
+      // The route graph contains heavy, lazy-only dependencies such as
+      // Recharts and the map renderer. Vite otherwise emits modulepreload
+      // links for those dependencies in index.html, making the login shell
+      // wait on hundreds of kilobytes that are not needed yet.
+      resolveDependencies(filename, deps) {
+        if (filename.includes("app-")) return [];
+        return deps;
+      },
+    },
     rollupOptions: {
       output: {
         // Keep production module URLs neutral. Browser privacy/ad-blocking

@@ -67,15 +67,27 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, supabaseServiceKey);
 
     const authHeader = req.headers.get("Authorization") || "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+    // A service-role bearer is reserved for trusted cron/orchestrator calls.
+    // Every other caller must present a valid user session.
+    const isService = Boolean(bearer && bearer === supabaseServiceKey);
     let userId: string | null = null;
-    if (authHeader) {
-      try {
-        const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-          global: { headers: { Authorization: authHeader } },
+    if (!isService) {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Não autenticado" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-        const { data: { user } } = await userClient.auth.getUser();
-        if (user) userId = user.id;
-      } catch (_) { /* ignore */ }
+      }
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Sessão inválida" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
     }
 
     // Permite forçar uma conta específica via body
@@ -87,12 +99,49 @@ Deno.serve(async (req) => {
       }
     } catch (_) {}
 
-    let q = admin.from("ad_accounts").select("id, account_id, name, access_token");
+    let delegatedIds = new Set<string>();
+    let activeWorkspaces = new Set<string>();
+    let isMaster = false;
+    if (!isService && userId) {
+      const { data: memberships } = await admin
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", userId)
+        .eq("status", "active");
+      const { data: delegated } = await admin
+        .from("user_ad_account_access")
+        .select("ad_account_id")
+        .eq("user_id", userId);
+      const { data: master } = await admin.rpc("is_master", { _user_id: userId });
+      activeWorkspaces = new Set((memberships ?? []).map((m: any) => String(m.workspace_id)));
+      delegatedIds = new Set((delegated ?? []).map((a: any) => String(a.ad_account_id)));
+      isMaster = master === true;
+    }
+
+    let q = admin.from("ad_accounts").select("id, account_id, name, access_token, user_id, workspace_id");
     if (onlyAccountId) q = q.eq("id", onlyAccountId);
-    else if (userId) q = q.eq("user_id", userId);
+    else if (!isService && userId && !isMaster) {
+      const safeDelegatedIds = Array.from(delegatedIds).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+      q = safeDelegatedIds.length
+        ? q.or(`user_id.eq.${userId},id.in.(${safeDelegatedIds.join(",")})`)
+        : q.eq("user_id", userId);
+    }
     const { data: accounts, error: accErr } = await q;
     if (accErr) throw accErr;
-    if (!accounts || accounts.length === 0) {
+    let authorizedAccounts = accounts ?? [];
+    if (!isService && userId) {
+      authorizedAccounts = authorizedAccounts.filter((account: any) => {
+        const workspaceAllowed = !account.workspace_id || activeWorkspaces.has(String(account.workspace_id));
+        const owns = account.user_id === userId;
+        return isMaster || (workspaceAllowed && (owns || delegatedIds.has(String(account.id))));
+      });
+      if (onlyAccountId && authorizedAccounts.length === 0) {
+        return new Response(JSON.stringify({ error: "Conta não autorizada" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+    if (authorizedAccounts.length === 0) {
       return new Response(JSON.stringify({ success: true, message: "No accounts", upserted: 0 }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -104,7 +153,7 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
     const perAccount: Record<string, number> = {};
 
-    for (const acc of accounts) {
+    for (const acc of authorizedAccounts) {
       try {
         const raw = acc.account_id;
         const metaId = raw.startsWith("act_") ? raw : `act_${raw}`;

@@ -1,5 +1,8 @@
 project_id = "cixnvosxqlacjbpymjha"
 
+[functions.ask-ai]
+verify_jwt = true
+
 [functions.meta-oauth-start]
 verify_jwt = true
 
@@ -7,6 +10,9 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.meta-connect-token]
+verify_jwt = true
+
+[functions.meta-reconnect-stored-token]
 verify_jwt = true
 
 [functions.rd-test-connection]
@@ -19,6 +25,12 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.instagram-oauth-callback]
+verify_jwt = false
+
+[functions.instagram-automation-run]
+verify_jwt = false
+
+[functions.instagram-automation-webhook]
 verify_jwt = false
 
 [functions.social-sync-instagram]
@@ -38,5 +50,23 @@ verify_jwt = false
 
 [functions.daily-incremental-sync]
 verify_jwt = false
+
+# These jobs perform global server-side work. The functions enforce service-role
+# or rotated cron-secret authentication internally; the gateway must let the
+# cron-secret path reach the function.
+[functions.sync-meta-transactions]
+verify_jwt = false
+
+[functions.rd-backfill-touches]
+verify_jwt = false
+
+[functions.daily-reconciliation]
+verify_jwt = false
+
+[functions.rd-resync-cron]
+verify_jwt = false
+
+[functions.rd-discover-fields]
+verify_jwt = true
 [functions.admin-create-user]
 verify_jwt = false

@@ -57,8 +57,8 @@ export function RDCustomFieldPieWidget() {
   const cfg = configs.find((c) => c.key === fieldKey) ?? configs[0];
   const [mode, setMode] = useState<"leads" | "sales">("leads");
   const { data: fieldData } = useRDFieldDataAll(adAccountId ?? null, cfg?.key ?? null);
-  const rdDeals = fieldData?.deals ?? [];
-  const sales = fieldData?.sales ?? [];
+  const rdDeals = useMemo(() => fieldData?.deals ?? [], [fieldData?.deals]);
+  const sales = useMemo(() => fieldData?.sales ?? [], [fieldData?.sales]);
 
 
   const { pieData, table } = useMemo(() => {

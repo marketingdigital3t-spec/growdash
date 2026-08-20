@@ -1,10 +1,11 @@
 import { useCallback } from "react";
 import type { DrawElement, Point, ToolType } from "../types";
-import { createId, snapPoint } from "../utils/geometry";
+import { createId, fitTextElementToContent, minimumTextElementHeight, snapPoint } from "../utils/geometry";
 
 const DEFAULT_SIZE: Record<string, { width: number; height: number }> = {
-  text: { width: 220, height: 72 },
-  sticky: { width: 220, height: 180 },
+  // Plain text is a compact label and expands only when its copy needs it.
+  text: { width: 88, height: 52 },
+  sticky: { width: 260, height: 180 },
   image: { width: 300, height: 200 },
 };
 
@@ -19,7 +20,7 @@ export function createDrawElement(tool: ToolType, point: Point, layerIndex: numb
   const size = DEFAULT_SIZE[tool] || { width: 0, height: 0 };
   const sticky = tool === "sticky";
   const text = tool === "text";
-  return {
+  const element: DrawElement = {
     id: createId(tool),
     type: tool,
     x: origin.x,
@@ -33,13 +34,15 @@ export function createDrawElement(tool: ToolType, point: Point, layerIndex: numb
     strokeWidth: 2,
     points: tool === "freehand" ? [{ x: 0, y: 0 }] : undefined,
     text: sticky ? "Digite sua nota…" : text ? "Texto" : undefined,
-    fontSize: sticky ? 20 : 22,
+    fontSize: sticky ? 20 : 16,
     fontFamily: "Nunito, Inter, system-ui, sans-serif",
     layerIndex,
     locked: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  if (text) return fitTextElementToContent({ ...element, autoSize: true });
+  return sticky ? { ...element, height: Math.max(element.height, minimumTextElementHeight(element)) } : element;
 }
 
 export function useDrawing() {

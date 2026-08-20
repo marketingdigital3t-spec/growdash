@@ -35,6 +35,8 @@ export interface DrawElement {
   text?: string;
   fontSize?: number;
   fontFamily?: string;
+  /** Plain text follows its content until the user resizes it horizontally. */
+  autoSize?: boolean;
   imageUrl?: string;
   layerIndex: number;
   locked: boolean;

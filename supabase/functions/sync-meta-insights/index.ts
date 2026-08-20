@@ -499,7 +499,7 @@ Deno.serve(async (req) => {
         // 5. Buscar breakdowns somente quando explicitamente solicitado. Eles
         // multiplicam o consumo da Graph API e não devem rodar em todo refresh.
         if (includeBreakdowns) try {
-          const breakdownTypes = ["age", "gender", "publisher_platform", "platform_position", "region"];
+          const breakdownTypes = ["age", "gender", "publisher_platform", "platform_position", "country", "region"];
           for (const bt of breakdownTypes) {
             const bRes = await fetchMetaPaginated(
               `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`

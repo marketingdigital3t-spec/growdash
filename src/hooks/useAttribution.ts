@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { endOfDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useDashboard } from "@/contexts/DashboardContext";
 
@@ -35,7 +36,7 @@ export function useAttribution(model: AttributionModel = "last") {
         .select("rd_deal_id, ad_account_id, amount_total, closed_at, win")
         .eq("win", true)
         .gte("closed_at", startDate.toISOString())
-        .lte("closed_at", endDate.toISOString());
+        .lte("closed_at", endOfDay(endDate).toISOString());
       if (adAccountId) dealsQ = dealsQ.eq("ad_account_id", adAccountId);
 
       const { data: deals, error: dealsErr } = await dealsQ.limit(5000);

@@ -1,6 +1,5 @@
-import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, LogOut, Moon, Sun, AlertCircle, GitBranch, CalendarDays, Users as UsersIcon, HeartPulse } from "lucide-react";
+import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, Moon, Sun, AlertCircle, GitBranch, CalendarDays, Users as UsersIcon, HeartPulse } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   Sidebar,
@@ -19,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AppSidebar() {
-  const { signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { state, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
@@ -95,15 +93,6 @@ export function AppSidebar() {
             <Moon className={`h-4 w-4 absolute inset-0 transition-all duration-500 ${theme === "dark" ? "rotate-90 opacity-0" : "rotate-0 opacity-100"}`} />
           </div>
           {!collapsed && <span className="ml-3">{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
-        </Button>
-        <Button
-          variant="ghost"
-          size={collapsed ? "icon" : "sm"}
-          className="w-full justify-start text-sidebar-foreground/70 hover:text-destructive hover:bg-sidebar-accent transition-all duration-300"
-          onClick={signOut}
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          {!collapsed && <span className="ml-3">Sair</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>

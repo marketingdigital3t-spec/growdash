@@ -2,8 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// These are intentionally public client settings (not a service-role secret).
+// Cloudflare's Git builds provide them as VITE_* variables, but a manual Pages
+// deploy does not inherit build variables. Keeping a safe fallback prevents a
+// malformed manual build from crashing before React can render.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://cixnvosxqlacjbpymjha.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_z8AGO0BnFocDtOVyaYMbNQ_JiEYpPIY";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

@@ -49,7 +49,7 @@ const readDealField = (deal: RDDealLite, field: UtmField): string | null => {
     case "utm_campaign": return deal.utm_campaign ?? deal.last_touch_utm_campaign ?? deal.first_touch_utm_campaign;
     case "utm_term": return deal.utm_term;
     case "utm_content": return deal.utm_content;
-    case "ad_id": return null;
+    case "ad_id": return deal.utm_id ?? null;
   }
 };
 
@@ -86,6 +86,7 @@ export function attributeLeadsToCampaigns(
     const campVal = readDealField(deal, mapping.campaign_utm);
     const adsetVal = readDealField(deal, mapping.adset_utm);
     const creativeVal = readDealField(deal, mapping.creative_utm);
+    const nativeAdId = deal.utm_id?.trim();
 
     const sameAccount = deal.ad_account_id
       ? insights.filter((r) => r.ad_account_id === deal.ad_account_id)
@@ -94,8 +95,14 @@ export function attributeLeadsToCampaigns(
 
     let entry: LeadDealAttribution | null = null;
 
+    // utm_id={{ad.id}} is immutable and therefore takes precedence over names.
+    if (nativeAdId) {
+      const hit = universeAds.find((row) => row.ad_id === nativeAdId);
+      if (hit) entry = { deal, bucket, campaign_id: hit.campaign_id ?? null, campaign_name: hit.campaign_name, adset_id: hit.adset_name, ad_id: hit.ad_id };
+    }
+
     // L2: trio camp+adset+criativo
-    if (campVal && adsetVal && creativeVal) {
+    if (!entry && campVal && adsetVal && creativeVal) {
       const hit = universeAds.find(
         (r) =>
           matches(r.campaign_name, campVal) &&

@@ -7,7 +7,7 @@ export function FunnelBottlenecks({ a }: { a: FunnelAnalytics }) {
   const worstStage = [...a.stages].filter((s) => !s.is_lost && !s.is_won).sort((x, y) => y.avgDaysInStage - x.avgDaysInStage)[0];
 
   return (
-    <Card className="bg-card/60 border-border/40">
+    <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base">4. Gargalos do funil</CardTitle>
       </CardHeader>

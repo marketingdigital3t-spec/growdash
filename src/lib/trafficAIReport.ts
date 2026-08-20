@@ -1,4 +1,4 @@
-export type TrafficAISectionKey = "summary" | "campaigns" | "adsets" | "ads" | "actions" | "projections";
+export type TrafficAISectionKey = "summary" | "monthly" | "weekly" | "campaigns" | "adsets" | "ads" | "actions" | "projections";
 
 function normalizeHeading(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
@@ -7,6 +7,8 @@ function normalizeHeading(value: string) {
 function headingKey(heading: string): TrafficAISectionKey | null {
   const value = normalizeHeading(heading);
   if (value.includes("RESUMO")) return "summary";
+  if (value.includes("ANALISE MENSAL") || value.includes("COMPARACAO MENSAL")) return "monthly";
+  if (value.includes("COMPARACAO SEMANAL") || value.includes("ANALISE SEMANAL")) return "weekly";
   if (value.includes("CAMPANHA")) return "campaigns";
   if (value.includes("CONJUNTO")) return "adsets";
   if (value.includes("ANUNCIO")) return "ads";

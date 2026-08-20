@@ -9,13 +9,15 @@ Deno.serve(async (req) => {
   const webhook = Deno.env.get("WHATSAPP_REPORT_WEBHOOK_URL");
   const cronSecret = Deno.env.get("INTELLIGENCE_CRON_SECRET");
   const auth = req.headers.get("Authorization") || "";
+  const bearer = auth.replace(/^Bearer\s+/i, "").trim();
+  const isService = Boolean(bearer && bearer === service);
   const isCron = Boolean(cronSecret && req.headers.get("x-cron-secret") === cronSecret);
   const admin = createClient(url, service);
   let allowedWorkspaceIds: string[] = [];
-  if (!isCron) {
+  if (!isCron && !isService) {
     const { data: { user } } = await admin.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    const { data: memberships } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id);
+    const { data: memberships } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id).eq("status", "active");
     allowedWorkspaceIds = (memberships || []).map((membership) => membership.workspace_id);
     if (!allowedWorkspaceIds.length) return new Response(JSON.stringify({ error: "Workspace not found" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
@@ -23,7 +25,7 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   let query = admin.from("whatsapp_report_schedules").select("*").eq("enabled", true);
-  if (!isCron) query = query.in("workspace_id", allowedWorkspaceIds);
+  if (!isCron && !isService) query = query.in("workspace_id", allowedWorkspaceIds);
   if (body?.schedule_id) query = query.eq("id", body.schedule_id);
   else query = query.or(`next_run_at.is.null,next_run_at.lte.${new Date().toISOString()}`);
   const { data: schedules, error } = await query.limit(100);

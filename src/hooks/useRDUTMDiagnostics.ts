@@ -155,6 +155,16 @@ export function useRDUTMDiagnostics(adAccountId?: string) {
         .select("id, title, rd_funnel_id, rd_model_patient_funnel_id, allowed_student_stage_ids, allowed_model_patient_stage_ids, ad_account_id, status");
       if (adAccountId) classQuery = classQuery.eq("ad_account_id", adAccountId);
       const { data: classes = [] } = await classQuery;
+      const classIds = (classes || []).map((eventClass: any) => eventClass.id);
+      const { data: configuredSources = [] } = classIds.length > 0
+        ? await (supabase as any).from("event_class_sources").select("event_class_id, rd_funnel_id, member_type, allowed_stage_ids").in("event_class_id", classIds)
+        : { data: [] as any[] };
+      const sourcesByClass = new Map<string, any[]>();
+      (configuredSources || []).forEach((source: any) => {
+        const current = sourcesByClass.get(source.event_class_id) || [];
+        current.push(source);
+        sourcesByClass.set(source.event_class_id, current);
+      });
 
       const { data: allStages = [] } = await supabase
         .from("rd_funnel_stages")
@@ -169,12 +179,14 @@ export function useRDUTMDiagnostics(adAccountId?: string) {
       let orphanCount = 0;
       (classes || []).forEach((c: any) => {
         if (c.status === "cancelled" || c.status === "finished") return;
-        const studentStages = stagesByFunnel.get(c.rd_funnel_id) || new Set();
-        const orphanStudent = (c.allowed_student_stage_ids || []).filter((s: string) => !studentStages.has(s));
-        const mpFunnel = c.rd_model_patient_funnel_id;
-        const mpStages = mpFunnel ? stagesByFunnel.get(mpFunnel) || new Set() : new Set();
-        const orphanMP = (c.allowed_model_patient_stage_ids || []).filter((s: string) => !mpStages.has(s));
-        const all = [...orphanStudent.map((s: string) => ({ type: "pessoas", id: s })), ...orphanMP.map((s: string) => ({ type: "paciente-modelo", id: s }))];
+        const sources = sourcesByClass.get(c.id) || [
+          c.rd_funnel_id && { rd_funnel_id: c.rd_funnel_id, member_type: "student", allowed_stage_ids: c.allowed_student_stage_ids || [] },
+          c.rd_model_patient_funnel_id && { rd_funnel_id: c.rd_model_patient_funnel_id, member_type: "model_patient", allowed_stage_ids: c.allowed_model_patient_stage_ids || [] },
+        ].filter(Boolean);
+        const all = sources.flatMap((source: any) => {
+          const knownStages = stagesByFunnel.get(source.rd_funnel_id) || new Set();
+          return (source.allowed_stage_ids || []).filter((stageId: string) => !knownStages.has(stageId)).map((stageId: string) => ({ type: source.member_type === "model_patient" ? "paciente-modelo" : "pessoas", id: stageId }));
+        });
         if (all.length > 0) {
           orphanCount += all.length;
           if (orphanSamples.length < 5) {

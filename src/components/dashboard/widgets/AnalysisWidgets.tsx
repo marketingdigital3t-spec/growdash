@@ -49,7 +49,7 @@ export function TopRankingWidget({ title, config }: { title: string; config: Wid
 }
 
 export function ComparePeriodWidget({ title, config }: { title: string; config: WidgetConfig }) {
-  const { insights, sales, startDate, endDate } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, startDate, endDate } = useDashboard();
   const metric = (config.metric ?? "cpl") as WidgetMetric;
   const result = useMemo(() => {
     const days = Math.max(1, differenceInDays(endDate, startDate) + 1);
@@ -64,11 +64,11 @@ export function ComparePeriodWidget({ title, config }: { title: string; config: 
     };
     const prevInsights = insights.filter((r) => inPrev(r.date));
     const prevSales = sales.filter((s) => inPrev(s.sale_date));
-    const cur = computeKpi(metric, insights, sales);
+    const cur = computeKpi(metric, insights, sales, revenueDeals);
     const prev = computeKpi(metric, prevInsights, prevSales);
     const delta = prev.value === 0 ? (cur.value > 0 ? 100 : 0) : ((cur.value - prev.value) / Math.abs(prev.value)) * 100;
     return { cur, prev, delta };
-  }, [insights, sales, startDate, endDate, metric]);
+  }, [insights, sales, revenueDeals, startDate, endDate, metric]);
 
   const isInverse = ["cpl", "cpm"].includes(metric);
   const positive = isInverse ? result.delta < 0 : result.delta > 0;

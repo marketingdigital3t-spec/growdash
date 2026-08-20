@@ -40,6 +40,7 @@ function periodOfHour(hour: number): "Manhã" | "Tarde" | "Noite" | "Madrugada" 
 
 export interface FunnelSaleFilters {
   funnelId?: string;
+  funnelIds?: string[];
   source?: string;
   campaign?: string;
   state?: string;
@@ -54,7 +55,8 @@ export interface FunnelSaleFilters {
  */
 export function filterCanonicalFunnelSales(sales: Sale[], filters: FunnelSaleFilters) {
   return realizedSales(sales).filter((sale) => {
-    if (filters.funnelId && sale.rd_funnel_id !== filters.funnelId) return false;
+    if (filters.funnelIds?.length && (!sale.rd_funnel_id || !filters.funnelIds.includes(sale.rd_funnel_id))) return false;
+    if (!filters.funnelIds?.length && filters.funnelId && sale.rd_funnel_id !== filters.funnelId) return false;
     if (filters.allowedDealIds && (!sale.rd_deal_id || !filters.allowedDealIds.has(sale.rd_deal_id))) return false;
     if (filters.source && filters.source !== "all" && normalized(sale.utm_source) !== normalized(filters.source)) return false;
     if (filters.campaign && filters.campaign !== "all") {

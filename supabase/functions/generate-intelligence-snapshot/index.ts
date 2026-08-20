@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const accountId = String(body?.account_id || "");
     if (!accountId) throw new Error("account_id required");
     const date = String(body?.date || new Date().toISOString().slice(0, 10));
-    const { data: memberships } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id);
+    const { data: memberships } = await admin.from("workspace_members").select("workspace_id").eq("user_id", user.id).eq("status", "active");
     const workspaceIds = (memberships || []).map((membership) => membership.workspace_id);
     if (!workspaceIds.length) throw new Error("Workspace not found");
     const { data: account } = await admin.from("ad_accounts")

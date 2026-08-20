@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, CalendarDays, Users, Stethoscope, AlertTriangle, CheckCircle2, Clock3, MapPin } from "lucide-react";
-import { useEventClasses, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
+import { useEventClasses, useRannielyClassSales, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { EventClassCard } from "@/components/event-classes/EventClassCard";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
@@ -41,24 +41,26 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: stri
 
 export default function EventClasses() {
   const { data: classes, isLoading } = useEventClasses();
-  const { data: funnels } = useRDFunnels();
+  const { data: rannielySales } = useRannielyClassSales();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [funnelFilter, setFunnelFilter] = useState<string>("all");
   const [formOpen, setFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<"classes" | "agenda">("classes");
+  const { data: funnels } = useRDFunnels(undefined, activeView === "classes");
 
   const filtered = useMemo(() => {
     const list = classes || [];
     return list
       .filter((c) => statusFilter === "all" || c.status === statusFilter)
-      .filter((c) => funnelFilter === "all" || c.rd_funnel_id === funnelFilter)
+      .filter((c) => funnelFilter === "all" || c.sources.some((source) => source.rd_funnel_id === funnelFilter))
       .filter((c) => {
         if (!query.trim()) return true;
         const ql = query.toLowerCase();
         return c.title.toLowerCase().includes(ql)
           || (c.location || "").toLowerCase().includes(ql)
-          || (c.rd_funnel_name || "").toLowerCase().includes(ql);
+          || (c.rd_funnel_name || "").toLowerCase().includes(ql)
+          || c.sources.some((source) => (source.funnel_name || "").toLowerCase().includes(ql));
       })
       .sort((a, b) => {
         // priorização operacional
@@ -107,9 +109,9 @@ export default function EventClasses() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
-      <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas">
-        <button onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" />Datas & Turmas</button>
-        <button onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" />Agenda</button>
+      <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
+        <button type="button" role="tab" aria-selected={activeView === "classes"} onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" aria-hidden="true" />Datas & Turmas</button>
+        <button type="button" role="tab" aria-selected={activeView === "agenda"} onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" aria-hidden="true" />Agenda</button>
       </nav>
 
       {activeView === "classes" ? <>
@@ -139,23 +141,43 @@ export default function EventClasses() {
         <StatCard icon={AlertTriangle} label="Críticas" value={summary.critical} accent="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
       </div>
 
+      <Card className="border-primary/20 bg-primary/[0.03]">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[.14em] text-primary">Preenchimento automático pelo CRM</p>
+              <h2 className="mt-1 text-base font-bold">Vendas confirmadas · Dra. Ranniely Silva</h2>
+              <p className="text-xs text-muted-foreground">Atualiza a cada 30 segundos e vincula automaticamente as vendas ganhas à turma da mesma região.</p>
+            </div>
+            <span className="text-xs font-semibold text-muted-foreground">Somente vendas realizadas</span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard icon={Users} label="Alunas · SP" value={rannielySales?.studentSP ?? 0} />
+            <StatCard icon={Users} label="Alunas · TO" value={rannielySales?.studentTO ?? 0} />
+            <StatCard icon={Stethoscope} label="Paciente modelo · SP" value={rannielySales?.modelPatientSP ?? 0} />
+            <StatCard icon={Stethoscope} label="Paciente modelo · TO" value={rannielySales?.modelPatientTO ?? 0} />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            aria-label="Buscar turma"
             value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar turma por nome, local ou funil..."
             className="pl-9"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+          <SelectTrigger aria-label="Filtrar turmas por status" className="w-full sm:w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={funnelFilter} onValueChange={setFunnelFilter}>
-          <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Funil RD" /></SelectTrigger>
+          <SelectTrigger aria-label="Filtrar turmas por funil RD" className="w-full sm:w-56"><SelectValue placeholder="Funil RD" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os funis</SelectItem>
             {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}

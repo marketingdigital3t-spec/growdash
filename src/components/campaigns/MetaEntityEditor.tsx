@@ -58,7 +58,7 @@ export function MetaEntityEditor({ entity, onOpenChange, onSaved }: Props) {
       status,
     };
 
-    if (entity.type === "campaign" || entity.type === "adset") {
+    if ((entity.type === "campaign" || entity.type === "adset") && dailyBudget.trim()) {
       const normalizedBudget = Number(dailyBudget.replace(",", "."));
       if (!Number.isFinite(normalizedBudget) || normalizedBudget <= 0) {
         toast.error("Informe um orçamento diário válido.");

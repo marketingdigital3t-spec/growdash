@@ -42,6 +42,17 @@ function derived(metric: Totals, revenue = 0) {
     revenue: round(revenue), roas: metric.spend > 0 ? round(revenue / metric.spend) : null,
   };
 }
+function monthStart(date: Date, offset = 0) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + offset, 1, 12, 0, 0));
+}
+function monday(date: Date) {
+  const day = date.getUTCDay();
+  const distance = day === 0 ? 6 : day - 1;
+  return new Date(date.getTime() - distance * DAY);
+}
+function weekKey(value: string) {
+  return dateString(monday(new Date(`${value}T12:00:00Z`)));
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -85,6 +96,11 @@ Deno.serve(async (req) => {
     const endStr = dateString(requestedEnd);
     const previousStartStr = dateString(previousStart);
     const previousEndStr = dateString(previousEnd);
+    const currentMonthStart = monthStart(requestedEnd);
+    const previousMonthStart = monthStart(requestedEnd, -1);
+    const previousMonthEnd = new Date(currentMonthStart.getTime() - DAY);
+    const twoMonthStartStr = dateString(previousMonthStart);
+    const previousMonthEndStr = dateString(previousMonthEnd);
 
     const admin = createClient(supabaseUrl, serviceKey);
     let accountQuery = admin.from("ad_accounts").select("id, account_id, name, daily_budget, remaining_balance, target_cpl, min_spend_threshold").eq("user_id", user.id);
@@ -107,7 +123,8 @@ Deno.serve(async (req) => {
     const adsetIds = (adsets || []).map((adset) => adset.id);
     const { data: ads } = await admin.from("ads").select("id, name, adset_id, status, thumbnail_url, creative_id").in("adset_id", adsetIds.length ? adsetIds : ["x"]);
     const adIds = (ads || []).map((ad) => ad.id);
-    const { data: insightRows, error: insightError } = await admin.from("insights").select("ad_id, date, spend, impressions, reach, clicks, leads, frequency").gte("date", previousStartStr).lte("date", endStr).in("ad_id", adIds.length ? adIds : ["x"]);
+    const dataStartStr = twoMonthStartStr < previousStartStr ? twoMonthStartStr : previousStartStr;
+    const { data: insightRows, error: insightError } = await admin.from("insights").select("ad_id, date, spend, impressions, reach, clicks, leads, frequency").gte("date", dataStartStr).lte("date", endStr).in("ad_id", adIds.length ? adIds : ["x"]);
     if (insightError) throw insightError;
     const allInsights = (insightRows || []) as Insight[];
     const currentInsights = allInsights.filter((row) => row.date >= startStr && row.date <= endStr);
@@ -116,7 +133,7 @@ Deno.serve(async (req) => {
     const { data: allSales, error: salesError } = await admin.from("sales")
       .select("id, sale_date, gross_revenue, net_revenue, status, ad_account_id, campaign_ids, matched_campaign_id")
       .eq("user_id", user.id).in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
-      .gte("sale_date", previousStartStr).lte("sale_date", endStr);
+      .gte("sale_date", dataStartStr).lte("sale_date", endStr);
     if (salesError) throw salesError;
     const usableSales = (allSales || []).filter((sale) => sale.status === "confirmed" || sale.status === "pending");
     const currentSales = usableSales.filter((sale) => sale.sale_date >= startStr && sale.sale_date <= endStr);
@@ -125,6 +142,36 @@ Deno.serve(async (req) => {
     const previousRevenue = previousSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
     const currentMetrics = derived(totals(currentInsights), currentRevenue);
     const previousMetrics = derived(totals(previousInsights), previousRevenue);
+
+    const twoMonthInsights = allInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= endStr);
+    const currentMonthInsights = twoMonthInsights.filter((row) => row.date >= dateString(currentMonthStart) && row.date <= endStr);
+    const previousMonthInsights = twoMonthInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= previousMonthEndStr);
+    const currentMonthSales = usableSales.filter((sale) => sale.sale_date >= dateString(currentMonthStart) && sale.sale_date <= endStr);
+    const previousMonthSales = usableSales.filter((sale) => sale.sale_date >= twoMonthStartStr && sale.sale_date <= previousMonthEndStr);
+    const currentMonthRevenue = currentMonthSales.filter((sale) => sale.status === "confirmed").reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
+    const previousMonthRevenue = previousMonthSales.filter((sale) => sale.status === "confirmed").reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
+    const monthlyComparison = [
+      { month: "previous", from: twoMonthStartStr, to: previousMonthEndStr, days: Math.floor((previousMonthEnd.getTime() - previousMonthStart.getTime()) / DAY) + 1, ...derived(totals(previousMonthInsights), previousMonthRevenue), sales: previousMonthSales.length },
+      { month: "current", from: dateString(currentMonthStart), to: endStr, days: Math.floor((requestedEnd.getTime() - currentMonthStart.getTime()) / DAY) + 1, ...derived(totals(currentMonthInsights), currentMonthRevenue), sales: currentMonthSales.length },
+    ];
+    const weeklyMap = new Map<string, { from: string; insights: Insight[]; sales: typeof usableSales }>();
+    for (const row of twoMonthInsights) {
+      const key = weekKey(row.date);
+      const value = weeklyMap.get(key) || { from: key, insights: [], sales: [] };
+      value.insights.push(row);
+      weeklyMap.set(key, value);
+    }
+    for (const sale of usableSales) {
+      const key = weekKey(sale.sale_date);
+      const value = weeklyMap.get(key) || { from: key, insights: [], sales: [] };
+      value.sales.push(sale);
+      weeklyMap.set(key, value);
+    }
+    const weeklyComparison = Array.from(weeklyMap.values()).sort((a, b) => a.from.localeCompare(b.from)).map((row) => {
+      const weekEnd = dateString(new Date(new Date(`${row.from}T12:00:00Z`).getTime() + 6 * DAY));
+      const revenue = row.sales.filter((sale) => sale.status === "confirmed").reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
+      return { week: row.from, from: row.from, to: weekEnd > endStr ? endStr : weekEnd, month: row.from >= dateString(currentMonthStart) ? "current" : "previous", ...derived(totals(row.insights), revenue), sales: row.sales.filter((sale) => sale.status === "confirmed").length };
+    });
 
     const comparison = Object.fromEntries(["spend", "impressions", "reach", "clicks", "leads", "cpl", "ctr", "cpm", "frequency", "revenue", "roas"].map((key) => {
       const current = Number((currentMetrics as Record<string, unknown>)[key] || 0);
@@ -170,6 +217,13 @@ Deno.serve(async (req) => {
       metrics: currentMetrics,
       previous_metrics: previousMetrics,
       comparison,
+      two_month_analysis: {
+        from: twoMonthStartStr,
+        to: endStr,
+        current_month: monthlyComparison[1],
+        previous_month: monthlyComparison[0],
+        weekly_comparison: weeklyComparison,
+      },
       daily_evolution: daily,
       campaigns: campaignSummary,
       adsets: adsetSummary,
@@ -202,6 +256,10 @@ REGRAS INEGOCIÁVEIS:
 FORMATO OBRIGATÓRIO — use exatamente estes títulos de nível 2:
 ## RESUMO EXECUTIVO
 Inclua tabela das métricas atuais, período anterior, variação e leitura. Depois: ✅ funcionando, ⚠️ atenção, 🚨 crítico e tendências.
+## ANÁLISE MENSAL
+Compare o mês atual com o mês anterior usando o bloco two_month_analysis. Deixe claro se o mês atual está incompleto, quantos dias foram analisados e o que mudou em investimento, leads, conversas, CPL, vendas, receita e ROAS.
+## COMPARAÇÃO SEMANAL
+Use weekly_comparison para mostrar a evolução semana a semana dos dois meses. Aponte a melhor e a pior semana somente quando houver dados; cite investimento, leads, conversas, CPL, vendas e ROAS.
 ## CAMPANHAS
 Analise campanhas ativas e ranking comparativo. Inclua objetivo, orçamento agregado dos conjuntos, gasto, impressões, cliques, CTR, CPM, leads, CPL, vendas, ROAS, nota e limites de dados.
 ## CONJUNTOS
@@ -210,6 +268,7 @@ Compare conjuntos por custo e conversão. Para segmentação e posicionamentos a
 Compare anúncios e criativos disponíveis. Destaque vencedor, pior desempenho, fadiga somente quando a frequência justificar e gasto sem leads.
 ## PLANO DE AÇÃO
 Divida em **Próximos 3 dias**, **Próxima semana** e **Próximo mês**. Cada ação deve ter prioridade, evidência, ação, resultado esperado e critério de parada.
+Dentro do resumo ou do plano, sinalize explicitamente **✅ O que deu bom**, **🚨 O que deu ruim** e **🎯 O que fazer agora**, sempre com números do JSON.
 ## PROJEÇÕES
 Projete 7, 15 e 30 dias mantendo o ritmo atual. Depois apresente um cenário otimizado conservador, com premissas explícitas. Mostre gasto, leads, CPL e ROAS quando disponível.
 

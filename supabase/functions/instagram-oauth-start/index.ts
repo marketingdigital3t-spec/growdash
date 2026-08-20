@@ -18,14 +18,17 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const appId = Deno.env.get("INSTAGRAM_APP_ID") ?? Deno.env.get("META_APP_ID");
-    const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET") ?? Deno.env.get("META_APP_SECRET");
+    // Instagram Login is a distinct Meta product. A Facebook Login app ID may
+    // work for Ads OAuth, but the Instagram authorization endpoint rejects it
+    // with "Invalid platform app". Never fall back to META_APP_* here.
+    const appId = Deno.env.get("INSTAGRAM_APP_ID");
+    const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET");
     if (!appId || !appSecret) {
       const missing = [!appId && "INSTAGRAM_APP_ID", !appSecret && "INSTAGRAM_APP_SECRET"].filter(Boolean).join(" e ");
       return json({
       error: "O Instagram Login ainda não foi configurado no servidor.",
       code: "INSTAGRAM_APP_NOT_CONFIGURED",
-        action: `Cadastre ${missing} nos segredos do Supabase. A URL de retorno já está configurada.`,
+        action: `Habilite “Instagram API with Instagram Login” no aplicativo Meta e cadastre ${missing} nos segredos do Supabase. Não use as credenciais de Facebook Login/META_APP_*.`,
       }, 503);
     }
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
@@ -42,7 +45,7 @@ Deno.serve(async (req) => {
     url.searchParams.set("client_id", appId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", Deno.env.get("INSTAGRAM_OAUTH_SCOPES") ?? "instagram_business_basic,instagram_business_manage_insights");
+    url.searchParams.set("scope", Deno.env.get("INSTAGRAM_OAUTH_SCOPES") ?? "instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_comments,instagram_business_manage_messages");
     url.searchParams.set("state", state);
     url.searchParams.set("enable_fb_login", "0");
     url.searchParams.set("force_authentication", "1");

@@ -5,8 +5,5 @@ export function BrandMark({ className }: { className?: string }) {
 }
 
 export function BrandLogo({ className, eager = false }: { className?: string; eager?: boolean }) {
-  void eager;
-  return (
-    <span role="img" aria-label="Growdash" className={cn("brand-logo-tint block shrink-0", className)} />
-  );
+  return <img src="/assets/growdash-logo-transparent.png" alt="Growdash" decoding="async" loading={eager ? "eager" : "lazy"} className={cn("brand-logo-image block shrink-0 object-contain", className)} />;
 }

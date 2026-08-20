@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toLocalDateString } from "@/lib/dateRange";
@@ -70,6 +70,9 @@ export function useSales(params?: UseSalesParams) {
   return useQuery({
     queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId],
     enabled: params?.enabled !== false,
+    // Evita um valor zero transitório nos KPIs ao trocar conta ou período.
+    // O resultado anterior permanece visível até a resposta da nova consulta.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
 
@@ -164,7 +167,7 @@ export function useUpdateSale() {
       }
       const { data, error } = await supabase
         .from("sales")
-        .update(payload)
+        .update(payload as any)
         .eq("id", id)
         .select()
         .single();
@@ -199,12 +202,10 @@ export function aggregateSales(sales: Sale[]) {
     .filter((s) => s.status === "pending" || (s.payment_method === "boleto" && s.status !== "confirmed"))
     .reduce((sum, s) => sum + s.net_revenue, 0);
 
-  const byPayment = {
-    pix: sales.filter((s) => s.payment_method === "pix" && s.status === "confirmed").reduce((sum, s) => sum + s.net_revenue, 0),
-    cartao: sales.filter((s) => s.payment_method === "cartao" && s.status === "confirmed").reduce((sum, s) => sum + s.net_revenue, 0),
-    boleto: sales.filter((s) => s.payment_method === "boleto" && s.status === "confirmed").reduce((sum, s) => sum + s.net_revenue, 0),
-    outros: sales.filter((s) => s.payment_method === "outros" && s.status === "confirmed").reduce((sum, s) => sum + s.net_revenue, 0),
-  };
+  const byPayment = { pix: 0, cartao: 0, boleto: 0, outros: 0 };
+  confirmed.forEach((sale) => {
+    byPayment[normalizePaymentMethod(sale.payment_method)] += sale.net_revenue;
+  });
 
   const receivables = sales
     .filter((s) => s.payment_method === "boleto" && s.status === "pending")
@@ -219,4 +220,13 @@ export function aggregateSales(sales: Sale[]) {
     totalQuantity, pendingRevenue, byPayment, receivables,
     refundRate, chargebackRate, arpu,
   };
+}
+
+/** Normalizes provider labels ("credit_card", "Card", etc.) for reporting. */
+export function normalizePaymentMethod(value: string | null | undefined): "pix" | "cartao" | "boleto" | "outros" {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized.includes("pix")) return "pix";
+  if (normalized.includes("boleto") || normalized.includes("bank_slip")) return "boleto";
+  if (normalized.includes("cart") || normalized.includes("card") || normalized.includes("credit") || normalized.includes("debit")) return "cartao";
+  return "outros";
 }

@@ -24,6 +24,76 @@ function keyNorm(s: string) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+function slugify(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function customFieldLabel(field: any): string {
+  return String(
+    field?.custom_field?.label || field?.label || field?.custom_field_id?.label || field?.name || "",
+  ).trim();
+}
+
+function customFieldValue(field: any): string | null {
+  const raw = field?.value ?? field?.values ?? null;
+  if (raw == null) return null;
+  const values = Array.isArray(raw) ? raw : [raw];
+  const normalized = values
+    .map((value) => typeof value === "object" ? (value?.label ?? value?.value ?? "") : value)
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  return normalized.length ? normalized.join(", ") : null;
+}
+
+/**
+ * Retains every RD custom field received with the deal. Keys are readable and
+ * stable. When a contact and a deal use the same label, the source is added so
+ * neither value silently replaces the other.
+ */
+function extractAllCustomFields(dealCfs: any[], contactCfs: any[]): Record<string, string> {
+  const entries: Array<{ source: "deal" | "contact"; label: string; value: string }> = [];
+  for (const [source, fields] of [["deal", dealCfs], ["contact", contactCfs]] as const) {
+    for (const field of Array.isArray(fields) ? fields : []) {
+      const label = customFieldLabel(field);
+      const value = customFieldValue(field);
+      if (label && value) entries.push({ source, label, value });
+    }
+  }
+  const labels = new Map<string, number>();
+  for (const entry of entries) labels.set(slugify(entry.label), (labels.get(slugify(entry.label)) || 0) + 1);
+  const out: Record<string, string> = {};
+  for (const entry of entries) {
+    const base = slugify(entry.label);
+    if (!base) continue;
+    const key = (labels.get(base) || 0) > 1 ? `${entry.source}_${base}` : base;
+    out[key] = entry.value;
+  }
+  return out;
+}
+
+type ObservedField = { label: string; source: "deal" | "contact"; values: Set<string> };
+
+function observeCustomFields(
+  target: Map<string, ObservedField>,
+  source: "deal" | "contact",
+  fields: any[],
+) {
+  for (const field of Array.isArray(fields) ? fields : []) {
+    const label = customFieldLabel(field);
+    const value = customFieldValue(field);
+    if (!label) continue;
+    const key = `${source}:${keyNorm(label)}`;
+    const entry = target.get(key) || { label, source, values: new Set<string>() };
+    if (value) entry.values.add(value);
+    target.set(key, entry);
+  }
+}
+
 const DDD_TO_UF: Record<string, string> = {
   "11": "SP",
   "12": "SP",
@@ -204,12 +274,16 @@ function asArray(value: unknown): any[] {
 
 function isWonDeal(d: any): boolean {
   if (d.win === true) return true;
-  const stage = (d.deal_stage?.name || "").toLowerCase();
+  const stage = (d.deal_stage?.name || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\s_-]+/g, " ")
+    .trim();
+  if (!stage || /\b(pre|pos) venda\b/.test(stage)) return false;
   return (
-    stage.includes("venda realizada") ||
-    stage.includes("ganho") ||
-    stage.includes("won") ||
-    stage.includes("fechado")
+    /^(venda|vendas|sale|sales)$/.test(stage) ||
+    /\b(venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(stage)
   );
 }
 
@@ -360,6 +434,8 @@ Deno.serve(async (req) => {
       service_user_id,
       cron_trigger,
       analytics_mode = false,
+      full_history = false,
+      refresh_amounts = false,
       start_date,
       end_date,
       max_deals = 1000,
@@ -497,6 +573,71 @@ Deno.serve(async (req) => {
       .select("key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
       .eq("ad_account_id", funnel.ad_account_id);
     const fieldConfigs: FieldConfig[] = (fieldConfigsRows as any[]) || [];
+    // The RD API has no reliable per-pipeline custom-field catalogue. Observe
+    // fields while reading every deal and upsert the account catalogue once at
+    // the end of this run. This makes discovery automatic for every linked
+    // funnel without exposing a privileged endpoint or adding an extra RD call.
+    const observedFields = new Map<string, ObservedField>();
+
+    async function syncObservedFieldCatalog() {
+      if (observedFields.size === 0) return { created: 0, updated: 0 };
+      const existingBySourceAndLabel = new Map<string, any>();
+      const usedKeys = new Set<string>();
+      for (const config of fieldConfigsRows || []) {
+        usedKeys.add(config.key);
+        existingBySourceAndLabel.set(
+          `${config.rd_source || "deal"}:${keyNorm(config.rd_field_label || config.label || "")}`,
+          config,
+        );
+      }
+      let created = 0;
+      let updated = 0;
+      for (const observed of observedFields.values()) {
+        const existing = existingBySourceAndLabel.get(`${observed.source}:${keyNorm(observed.label)}`);
+        const options = Array.from(observed.values).slice(0, 20).map((value) => ({ label: value, value }));
+        if (existing) {
+          const aliases = Array.from(new Set([
+            ...(existing.rd_field_aliases || []),
+            observed.label,
+          ].filter(Boolean)));
+          const keepRanges = existing.field_type === "number" && (existing.options || []).some(
+            (option: any) => option?.min != null || option?.max != null,
+          );
+          const { error } = await admin.from("rd_field_configs").update({
+            rd_field_aliases: aliases,
+            options: keepRanges || options.length === 0 ? existing.options : options,
+          }).eq("id", existing.id);
+          if (error) console.warn("[rd-fields] update failed", error.message);
+          else updated++;
+          continue;
+        }
+        const keyBase = slugify(observed.label) || "campo_rd";
+        // A key is unique per account. Prefix only when the same label exists
+        // in the other RD entity (contact vs. deal), preserving both values.
+        const key = usedKeys.has(keyBase) ? `${observed.source}_${keyBase}` : keyBase;
+        const { error } = await admin.from("rd_field_configs").upsert({
+          user_id: userId!,
+          ad_account_id: funnel!.ad_account_id,
+          key,
+          label: observed.label,
+          rd_source: observed.source,
+          rd_field_label: observed.label,
+          rd_field_aliases: [observed.label],
+          field_type: "enum",
+          options,
+          show_in_dashboard: false,
+        }, { onConflict: "ad_account_id,key" });
+        if (error) console.warn("[rd-fields] insert failed", error.message);
+        else {
+          usedKeys.add(key);
+          created++;
+        }
+      }
+      await admin.from("ad_accounts").update({
+        rd_fields_last_discovered_at: new Date().toISOString(),
+      }).eq("id", funnel!.ad_account_id);
+      return { created, updated };
+    }
 
     // Buscar e cachear etapas reais do funil no RD
     const stageOrderMap = new Map<string, number>();
@@ -518,11 +659,8 @@ Deno.serve(async (req) => {
           const isWon =
             Boolean(s?.win ?? s?.is_won ?? s?.won) ||
             lname.includes("ganho") ||
-            lname.includes("venda real") ||
-            lname.includes("venda concl") ||
-            lname.includes("fechado ganho") ||
-            lname.includes("won") ||
-            lname.includes("cliente");
+            /^(venda|vendas|sale|sales)$/.test(lname) ||
+            /\b(venda real|venda concl|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(lname);
           const isLost =
             Boolean(s?.loss ?? s?.is_lost ?? s?.lost) ||
             lname.includes("perdido") ||
@@ -564,6 +702,8 @@ Deno.serve(async (req) => {
       totalSkipped = 0,
       totalDeals = 0;
     let reconciledDeleted = 0;
+    let analyticsRangeComplete = false;
+    let fullHistoryRequested = false;
     const seenAnalyticsDealIds = new Set<string>();
     let debugLogged = false;
 
@@ -778,11 +918,12 @@ Deno.serve(async (req) => {
       const utm_medium =
         pickUtm("medium", ["utmmedium", "utm_medium", "medium", "midia", "mídia"]) || null;
       const utm_campaign =
-        pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campanha"]) || null;
+        pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campaign_name", "nome campanha", "nome da campanha", "campanha", "id campanha", "campaign_id"]) || null;
       const utm_term = pickUtm("term", ["utmterm", "utm_term", "term", "termo"]) || null;
       const utm_content =
-        pickUtm("content", ["utmcontent", "utm_content", "content", "conteudo", "conteúdo"]) ||
+        pickUtm("content", ["utmcontent", "utm_content", "content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]) ||
         null;
+      const utm_id = pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]) || null;
 
       const leadEntryDate = d.created_at
         ? new Date(d.created_at).toISOString().split("T")[0]
@@ -795,6 +936,10 @@ Deno.serve(async (req) => {
         dealCustomFields,
         contactCustomFields,
       );
+      const allCustomFields = extractAllCustomFields(dealCustomFields, contactCustomFields);
+      observeCustomFields(observedFields, "deal", dealCustomFields);
+      observeCustomFields(observedFields, "contact", contactCustomFields);
+      const customFields = { ...allCustomFields, ...customFieldsExtracted };
 
       // Upsert rd_deals (todos os deals, não apenas ganhos)
       try {
@@ -819,6 +964,7 @@ Deno.serve(async (req) => {
             utm_campaign,
             utm_content,
             utm_term,
+            utm_id,
             contact_name: contactName,
             contact_email: contactEmail,
             lead_state: contactState,
@@ -827,7 +973,7 @@ Deno.serve(async (req) => {
             stage_updated_at: d.updated_at || d.last_activity_at || null,
             closed_at: d.closed_at || null,
             raw: d,
-            custom_fields: customFieldsExtracted,
+            custom_fields: customFields,
           },
           { onConflict: "user_id,rd_deal_id" },
         );
@@ -850,7 +996,7 @@ Deno.serve(async (req) => {
       const { data: existing } = await admin
         .from("sales")
         .select(
-          "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
+          "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
         )
         .eq("rd_deal_id", rdDealId)
         .maybeSingle();
@@ -882,7 +1028,7 @@ Deno.serve(async (req) => {
         rd_product_name: rdProductName,
         rd_campaign_name: rdCampaignName,
         rd_funnel_id: funnel!.id,
-        custom_fields: customFieldsExtracted,
+        custom_fields: customFields,
         source_provider: "rd_station",
         source_record_id: rdDealId,
         source_closed_at: d.closed_at || null,
@@ -902,6 +1048,7 @@ Deno.serve(async (req) => {
           utm_campaign: preserve(existing.utm_campaign, utm_campaign),
           utm_term: preserve(existing.utm_term, utm_term),
           utm_content: preserve(existing.utm_content, utm_content),
+          ad_id: preserve((existing as any).ad_id, utm_id),
         };
         if (rdPayment && (existing as any).payment_method_source !== "manual") {
           update.payment_method = rdPayment;
@@ -923,6 +1070,7 @@ Deno.serve(async (req) => {
           utm_campaign,
           utm_term,
           utm_content,
+          ad_id: utm_id,
           payment_method: rdPayment ?? "pix",
           payment_method_source: rdPayment ? "rd" : "default",
           notes: null,
@@ -933,7 +1081,41 @@ Deno.serve(async (req) => {
 
     async function persistAnalyticsBatch(items: any[]) {
       if (!items.length) return;
-      const rows = items.map((d) => {
+      // The paginated endpoint can return an old or abbreviated amount after
+      // a negotiation is edited in RD. On an explicit user refresh, hydrate
+      // each item with the authoritative deal endpoint before updating the
+      // CRM record. The rd_deals trigger then propagates the same amount to
+      // canonical sales, which is what Comercial displays.
+      const hydratedItems: any[] = [];
+      if (refresh_amounts) {
+        const HYDRATION_BATCH_SIZE = 4;
+        for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
+          const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
+          const resolved = await Promise.all(batch.map(async (item) => {
+            const id = String(item?.id || item?._id || "");
+            if (!id) return item;
+            try {
+              const response = await fetchWithRetry(
+                `https://crm.rdstation.com/api/v1/deals/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`,
+              );
+              if (!response.ok) return item;
+              metrics.details++;
+              return { ...item, ...(await response.json()) };
+            } catch {
+              // Keep the list payload if one detail request fails; the sync
+              // remains usable and the next manual refresh retries it.
+              metrics.errors++;
+              return item;
+            }
+          }));
+          hydratedItems.push(...resolved);
+          if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
+        }
+      } else {
+        hydratedItems.push(...items);
+      }
+
+      const rows = hydratedItems.map((d) => {
         const rdDealId = String(d.id || d._id);
         seenAnalyticsDealIds.add(rdDealId);
         const stageName = d.deal_stage?.name || null;
@@ -947,6 +1129,12 @@ Deno.serve(async (req) => {
         const contact = { ...inline, ...baseContact };
         const contactFields = contact.contact_custom_fields || [];
         const dealFields = d.deal_custom_fields || d.custom_fields || [];
+        observeCustomFields(observedFields, "deal", dealFields);
+        observeCustomFields(observedFields, "contact", contactFields);
+        const customFields = {
+          ...extractAllCustomFields(dealFields, contactFields),
+          ...extractConfiguredFields(fieldConfigs, dealFields, contactFields),
+        };
         const allCfSources = [dealFields, contactFields];
         const contactState =
           contact.state ||
@@ -986,11 +1174,13 @@ Deno.serve(async (req) => {
           stage_updated_at: d.updated_at || d.stage_updated_at || null,
           closed_at: d.closed_at || null,
           raw: d,
+          custom_fields: customFields,
           utm_source: pickUtm("source", ["utmsource", "utm_source", "source", "fonte"]),
           utm_medium: pickUtm("medium", ["utmmedium", "utm_medium", "medium", "midia", "mídia"]),
-          utm_campaign: pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campanha"]),
+          utm_campaign: pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campaign_name", "nome campanha", "nome da campanha", "campanha", "id campanha", "campaign_id"]),
           utm_term: pickUtm("term", ["utmterm", "utm_term", "term", "termo"]),
-          utm_content: pickUtm("content", ["utmcontent", "utm_content", "content", "conteudo", "conteúdo"]),
+          utm_content: pickUtm("content", ["utmcontent", "utm_content", "content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]),
+          utm_id: pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]),
         };
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;
@@ -1023,18 +1213,30 @@ Deno.serve(async (req) => {
         await sleep(BATCH_PAUSE_MS);
       }
     } else {
-      let analyticsRangeComplete = false;
       const requestedPages = Number(max_pages);
+      // Full-history reconciliation is explicitly initiated by the user in
+      // CRM. Do not silently reduce it to the daily/interactive limits. The
+      // regular realtime and date-range paths intentionally stay bounded.
+      fullHistoryRequested = analytics_mode && full_history === true;
       const maxPages = realtime
         ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
         : analytics_mode
-          ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 50, 50))
+          ? Math.max(
+              1,
+              Math.min(
+                Number.isFinite(requestedPages) ? requestedPages : (fullHistoryRequested ? 250 : 50),
+                fullHistoryRequested ? 250 : 50,
+              ),
+            )
           : 50;
       const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
       const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
-      const maxAnalyticsDeals = Math.max(1, Math.min(Number(max_deals) || 10000, 10000));
+      const maxAnalyticsDeals = Math.max(
+        1,
+        Math.min(Number(max_deals) || (fullHistoryRequested ? 50_000 : 10_000), fullHistoryRequested ? 50_000 : 10_000),
+      );
       const periodParams =
-        analytics_mode && start_date && end_date
+        analytics_mode && !fullHistoryRequested && start_date && end_date
           ? `&created_at_period=true&start_date=${encodeURIComponent(`${start_date}T00:00:00-03:00`)}&end_date=${encodeURIComponent(`${end_date}T23:59:59-03:00`)}`
           : "";
       // A API v1 do RD não devolve "Todas as negociações" em uma única
@@ -1146,7 +1348,7 @@ Deno.serve(async (req) => {
       // intervalo com sucesso reconciliamos esses registros locais antigos.
       // Assim, a contagem por etapa representa o snapshot atual exibido pelo
       // RD para a mesma conta e o mesmo filtro de data.
-      if (analytics_mode && start_date && end_date && analyticsRangeComplete) {
+      if (analytics_mode && start_date && end_date && analyticsRangeComplete && !fullHistoryRequested) {
         const localIds: string[] = [];
         const pageSize = 1000;
         for (let localPage = 0; localPage < 50; localPage++) {
@@ -1178,7 +1380,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const status = metrics.errors > 0 ? "partial" : "success";
+    const fieldCatalog = await syncObservedFieldCatalog();
+    const status = metrics.errors > 0 || (analytics_mode && !analyticsRangeComplete) ? "partial" : "success";
     await finishRun({
       status,
       deals: totalDeals,
@@ -1200,6 +1403,11 @@ Deno.serve(async (req) => {
         contacts_fetched: metrics.contacts,
         retries: metrics.retries,
         errors: metrics.errors,
+        fields_discovered: observedFields.size,
+        fields_created: fieldCatalog.created,
+        fields_updated: fieldCatalog.updated,
+        complete: analytics_mode ? analyticsRangeComplete : undefined,
+        full_history: fullHistoryRequested,
       }),
       {
         status: 200,

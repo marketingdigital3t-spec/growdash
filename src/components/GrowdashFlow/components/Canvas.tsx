@@ -57,7 +57,7 @@ export const Canvas = memo(function Canvas({
 
   return <div
     data-growdash-flow-canvas
-    className="absolute inset-0 touch-none overflow-hidden bg-[#fbfbfd] dark:bg-[#121212]"
+    className="growdash-flow-canvas absolute inset-0 touch-none overflow-hidden"
     style={{ cursor }}
     onPointerDown={onPointerDown}
     onPointerMove={onPointerMove}
@@ -88,7 +88,7 @@ export const Canvas = memo(function Canvas({
           >
             <rect x={bounds.x - 8} y={bounds.y - 8} width={Math.max(16, bounds.width + 16)} height={Math.max(16, bounds.height + 16)} fill="transparent" stroke="transparent" />
             <ShapeRenderer element={element} elements={elements} editing={editingId === element.id} onTextChange={(value) => onTextChange(element.id, value)} onFinishEditing={onFinishEditing} />
-            {selected && selectedIds.length === 1 && <rect x={bounds.x - 4 / zoom} y={bounds.y - 4 / zoom} width={bounds.width + 8 / zoom} height={bounds.height + 8 / zoom} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${4 / zoom}`} pointerEvents="none" />}
+            {selected && selectedIds.length === 1 && <rect x={bounds.x - 2 / zoom} y={bounds.y - 2 / zoom} width={bounds.width + 4 / zoom} height={bounds.height + 4 / zoom} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${4 / zoom}`} pointerEvents="none" />}
           </g>;
         })}
 

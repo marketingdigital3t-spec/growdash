@@ -3,23 +3,53 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="./growdash-mark-gold.svg" />
+    <link rel="icon" type="image/svg+xml" href="/growdash-mark-mono.svg" />
+    <link rel="apple-touch-icon" href="/growdash-icon.png" />
+    <link rel="mask-icon" href="/growdash-mark-mono.svg" color="#f5f5f5" />
+    <link rel="canonical" href="https://growdash.com.br/" />
     <meta name="theme-color" content="#070503" />
-    <title>Growdash | Growth Intelligence</title>
+    <meta name="application-name" content="Growdash" />
+    <meta name="apple-mobile-web-app-title" content="Growdash" />
+    <meta property="og:site_name" content="Growdash" />
+    <title>Growdash</title>
     <meta name="description" content="Growdash: inteligência de growth, mídia, CRM e operação em um só lugar." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://growdash.com.br/" />
     <meta property="og:title" content="Growdash" />
     <meta property="og:description" content="Inteligência de growth, mídia, CRM e operação em um só lugar." />
+    <meta property="og:image" content="https://growdash.com.br/growdash-logo-full-light.png" />
+    <meta property="og:image:alt" content="Logo Growdash" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Growdash" />
     <meta name="twitter:description" content="Inteligência de growth, mídia, CRM e operação em um só lugar." />
+    <meta name="twitter:image" content="https://growdash.com.br/growdash-logo-full-light.png" />
+    <meta name="twitter:image:alt" content="Logo Growdash" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"Organization","name":"Growdash","url":"https://growdash.com.br/","logo":"https://growdash.com.br/growdash-logo-full-light.png"}
+    </script>
   </head>
   <body>
     <div id="root">
-      <div style="display:grid;min-height:100vh;place-items:center;background:#070503;color:#f6c94a;font:700 14px Nunito,system-ui,sans-serif;letter-spacing:.08em">
-        Carregando Growdash…
+      <div style="display:grid;min-height:100vh;place-items:center;background:#050505;color:#f5f5f5;font:700 14px Nunito,system-ui,sans-serif;letter-spacing:.08em">
+        <div style="display:grid;gap:13px;justify-items:center;text-align:center"><span style="width:28px;height:28px;border:2px solid #494949;border-top-color:#fff;border-radius:999px;animation:growdash-spin .7s linear infinite"></span><span>Carregando Growdash…</span></div>
       </div>
     </div>
+    <script>
+      // Keep a broken/blocked entry module from leaving Safari on a permanent
+      // loading screen. React marks the boot only after it commits a visible
+      // shell, not merely when the entry module begins evaluating.
+      window.setTimeout(function () {
+        var root = document.getElementById("root");
+        if (!root) return;
+        // `root` must be read before checking its dataset. In the failed-entry
+        // path there is no React boot flag; accessing an undeclared local here
+        // used to throw after 15 seconds and leave the initial spinner on the
+        // screen permanently.
+        if (window.__GROWDASH_BOOTED__ || root.dataset.growdashBooted === "true") return;
+        root.innerHTML = '<div style="display:grid;min-height:100vh;place-items:center;background:#050505;color:#f5f5f5;font:600 15px Nunito,system-ui,sans-serif;text-align:center;padding:24px"><div style="max-width:420px;border:1px solid #383838;border-radius:18px;background:#111;padding:28px;box-shadow:0 24px 70px #000"><p style="font-weight:800">A Growdash demorou mais do que o esperado.</p><p style="opacity:.72;margin-top:8px;line-height:1.5">A recarga automática foi bloqueada para evitar loops. Confirme manualmente o carregamento da versão mais recente.</p><button type="button" onclick="location.reload()" style="margin-top:18px;border:1px solid #fff;border-radius:10px;background:#f5f5f5;color:#080808;padding:10px 16px;font-weight:800;cursor:pointer">Tentar novamente</button></div></div>';
+      }, 15000);
+    </script>
+    <style>@keyframes growdash-spin{to{transform:rotate(360deg)}}</style>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

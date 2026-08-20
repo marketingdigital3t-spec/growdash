@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import type { WidgetType, WidgetConfig } from "@/lib/widgetCatalog";
 import { KPIWidget, KPIGridWidget } from "@/components/dashboard/widgets/KPIWidget";
+import { PaymentChartWidget, PlatformDistributionWidget } from "@/components/dashboard/widgets/FinancialOverviewWidgets";
 import { LineChartWidget, BarChartWidget, PieChartWidget } from "@/components/dashboard/widgets/ChartWidgets";
 import { TopRankingWidget, ComparePeriodWidget } from "@/components/dashboard/widgets/AnalysisWidgets";
 import { DefaultDashboardContent, CampaignsDetailWidget } from "@/components/dashboard/widgets/DefaultDashboardContent";
@@ -45,6 +46,10 @@ export function WidgetRenderer({ type, title, config, onEditSale }: Props) {
       return <KPIWidget title={title} config={config} />;
     case "kpi_grid":
       return <KPIGridWidget config={config} />;
+    case "payment_chart":
+      return <PaymentChartWidget />;
+    case "platform_distribution":
+      return <PlatformDistributionWidget />;
     case "line_chart":
       return <LineChartWidget title={title} config={config} />;
     case "bar_chart":
@@ -79,7 +84,13 @@ export function WidgetRenderer({ type, title, config, onEditSale }: Props) {
     case "campaigns_detail":
       return <CampaignsDetailWidget />;
     case "default_block":
-      return <DefaultDashboardContent onEditSale={onEditSale ?? (() => {})} hidePrimary={config.hidePrimary} />;
+      return <DefaultDashboardContent
+        onEditSale={onEditSale ?? (() => {})}
+        hidePrimary={config.hidePrimary}
+        hideFinancialOverview={config.hideFinancialOverview}
+        hideFinancialKpis={config.hideFinancialKpis}
+        hideCampaignKpis={config.hideCampaignKpis}
+      />;
     default:
       return <div className="p-4 text-sm text-muted-foreground">Widget desconhecido: {type}</div>;
   }

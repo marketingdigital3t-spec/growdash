@@ -28,7 +28,11 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
 
   const max = memberType === "student" ? (eventClass.max_people || eventClass.max_students) : eventClass.max_model_patients;
   const label = memberType === "student" ? "Pessoas" : "Pacientes-modelo";
-  const count = members?.length ?? 0;
+  const linkedCount = members?.length ?? 0;
+  const manualCount = memberType === "student"
+    ? Number(eventClass.manual_student_count || 0)
+    : Number(eventClass.manual_model_patient_count || 0);
+  const totalCount = linkedCount + manualCount;
 
   const handleRemove = async (id: string) => {
     if (!confirm("Remover este vínculo? O registro no RD não será afetado.")) return;
@@ -46,7 +50,7 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{label} — {eventClass.title}</DialogTitle>
-            <p className="text-sm text-muted-foreground">{count}/{max} vagas preenchidas</p>
+            <p className="text-sm text-muted-foreground">{totalCount}/{max} vagas preenchidas · RD: {linkedCount} · Manual: {manualCount}</p>
           </DialogHeader>
 
           <div className="flex gap-2">
@@ -60,9 +64,9 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
 
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
             {isLoading && <div className="text-sm text-muted-foreground text-center py-8">Carregando...</div>}
-            {!isLoading && count === 0 && (
+            {!isLoading && linkedCount === 0 && (
               <div className="text-center py-10 text-sm text-muted-foreground">
-                Nenhum{memberType === "student" ? "a pessoa" : " paciente-modelo"} vinculad{memberType === "student" ? "a" : "o"} ainda.
+                Nenhum{memberType === "student" ? "a pessoa" : " paciente-modelo"} vinculad{memberType === "student" ? "a" : "o"} via RD ainda.{manualCount > 0 && " As vagas manuais podem ser editadas na turma."}
               </div>
             )}
             {(members || []).map((m: any) => {

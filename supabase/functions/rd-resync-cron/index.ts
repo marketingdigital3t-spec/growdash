@@ -17,6 +17,21 @@ const MAX_PER_FUNNEL = 200;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const authHeader = req.headers.get("Authorization") || "";
+  const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const cronSecret = Deno.env.get("RD_RESYNC_CRON_SECRET") || Deno.env.get("CRON_SECRET");
+  const isService = Boolean(bearer && bearer === SERVICE_ROLE_KEY);
+  const isCron = Boolean(cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+  if (!isService && !isCron) {
+    console.warn("rd-resync-cron: unauthorized caller", {
+      hasBearer: Boolean(bearer),
+      hasCronSecret: Boolean(req.headers.get("x-cron-secret")),
+    });
+    return new Response(JSON.stringify({ error: "Unauthorized cron request" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const summary: Array<Record<string, unknown>> = [];
   try {
     // Active RD integrations

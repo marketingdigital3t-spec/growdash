@@ -20,7 +20,11 @@ function isPendingSchema(error: { code?: string; message?: string } | null) {
   return !!error && (error.code === "42P01" || error.code === "PGRST205" || /sales_goals|schema cache|does not exist/i.test(error.message ?? ""));
 }
 
-export function useSalesGoals(month: Date = new Date()) {
+interface UseSalesGoalsOptions {
+  enabled?: boolean;
+}
+
+export function useSalesGoals(month: Date = new Date(), options: UseSalesGoalsOptions = {}) {
   const { data: workspace } = useWorkspace();
   const { businessUnitId } = useGlobalFilters();
   const goalMonth = format(startOfMonth(month), "yyyy-MM-dd");
@@ -28,8 +32,8 @@ export function useSalesGoals(month: Date = new Date()) {
 
   return useQuery({
     queryKey: ["sales-goals", workspace?.id, businessUnitId, goalMonth],
-    enabled: !!workspace?.id && !!businessUnitId,
-    staleTime: 30_000,
+    enabled: options.enabled !== false && !!workspace?.id && !!businessUnitId,
+    staleTime: 5 * 60_000,
     queryFn: async (): Promise<{ rows: SalesGoal[]; schemaReady: boolean }> => {
       if (!ready) return { rows: [], schemaReady: false };
       const { data, error } = await (supabase as any)

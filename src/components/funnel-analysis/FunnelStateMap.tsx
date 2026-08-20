@@ -11,7 +11,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
   const topStates = a.stateBreakdown.filter((s) => s.state !== "—").slice(0, 10);
 
   return (
-    <Card className="bg-card/60 border-border/40">
+    <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base">7. Mapa por estado</CardTitle>
       </CardHeader>

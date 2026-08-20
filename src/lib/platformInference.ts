@@ -15,6 +15,8 @@ export interface PlatformInferenceInput {
   utm_content?: string | null;
   utm_term?: string | null;
   rd_campaign_name?: string | null;
+  /** RD deal source/origin (for example, "Tráfego Pago"). */
+  rd_source?: string | null;
   manual_platform?: string | null;
 }
 
@@ -27,6 +29,7 @@ function toInput(sale: Sale | PlatformInferenceInput): PlatformInferenceInput {
     utm_content: s.utm_content ?? null,
     utm_term: s.utm_term ?? null,
     rd_campaign_name: s.rd_campaign_name ?? null,
+    rd_source: s.rd_source ?? s.deal_source ?? s.source ?? null,
     manual_platform: s.manual_platform ?? null,
   };
 }
@@ -38,7 +41,7 @@ function getField(input: PlatformInferenceInput, field: string): string {
     case "utm_campaign": return (input.utm_campaign ?? "").toString();
     case "utm_content": return (input.utm_content ?? "").toString();
     case "utm_term": return (input.utm_term ?? "").toString();
-    case "rd_source": return (input.rd_campaign_name ?? "").toString();
+    case "rd_source": return (input.rd_source ?? input.rd_campaign_name ?? "").toString();
     case "rd_campaign": return (input.rd_campaign_name ?? "").toString();
     default: return "";
   }
@@ -92,9 +95,9 @@ function applyRules(input: PlatformInferenceInput, rules: PlatformRule[]): Platf
 
 // Heuristic on rd_campaign_name when UTMs are missing or unmatched.
 function heuristicByRdCampaign(input: PlatformInferenceInput): PlatformResult | null {
-  const name = (input.rd_campaign_name ?? "").toLowerCase();
+  const name = `${input.rd_source ?? ""} ${input.rd_campaign_name ?? ""} ${input.utm_source ?? ""} ${input.utm_medium ?? ""}`.toLowerCase();
   if (!name) return null;
-  if (/\b(meta|facebook|fb|instagram|ig|forms?\s*meta|meta\s*ads?|fbads)\b/i.test(name)) {
+  if (/\b(meta|facebook|fb|instagram|ig|forms?\s*meta|meta\s*ads?|fbads|trafego\s*pago|tr[aá]fego\s*pago|paid\s*traffic)\b/i.test(name)) {
     return { platform: "meta" };
   }
   if (/\b(google|gads|youtube|yt|search\s*ads?|gdn|pmax|performance\s*max)\b/i.test(name)) {

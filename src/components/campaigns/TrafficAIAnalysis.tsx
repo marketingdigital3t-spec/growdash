@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { splitTrafficAIReport, type TrafficAISectionKey } from "@/lib/trafficAIReport";
 
 const sectionTabs: { key: TrafficAISectionKey; label: string }[] = [
-  { key: "summary", label: "Resumo" }, { key: "campaigns", label: "Campanhas" }, { key: "adsets", label: "Conjuntos" },
+  { key: "summary", label: "Resumo" }, { key: "monthly", label: "Análise mensal" }, { key: "weekly", label: "Comparação semanal" }, { key: "campaigns", label: "Campanhas" }, { key: "adsets", label: "Conjuntos" },
   { key: "ads", label: "Anúncios" }, { key: "actions", label: "Plano de ação" }, { key: "projections", label: "Projeções" },
 ];
 const focusQuestions: Record<string, string> = {
@@ -81,7 +81,7 @@ export function TrafficAIAnalysis({ accountId, accountName, startDate, endDate, 
   return (
     <section className="border-b border-border bg-card">
       <div className="flex flex-col gap-3 px-3 py-3 sm:px-4 lg:flex-row lg:items-center">
-        <div className="flex min-w-0 items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary"><Bot className="h-5 w-5" /></span><div><h2 className="font-black">Analista de Tráfego IA</h2><p className="text-[11px] text-muted-foreground">Diagnóstico por conta e período, comparado ao intervalo anterior equivalente.</p></div></div>
+        <div className="flex min-w-0 items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary"><Bot className="h-5 w-5" /></span><div><h2 className="font-black">Analista de Tráfego IA</h2><p className="text-[11px] text-muted-foreground">Diagnóstico por conta, com leitura mensal e comparação semanal dos dois últimos meses.</p></div></div>
         <div className="flex flex-col gap-2 sm:flex-row lg:ml-auto">
           <Select value={focus} onValueChange={setFocus}><SelectTrigger className="h-9 w-full bg-background sm:w-[220px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="complete">Análise completa</SelectItem><SelectItem value="cost">Custos e eficiência</SelectItem><SelectItem value="creative">Criativos e fadiga</SelectItem><SelectItem value="scale">Oportunidades de escala</SelectItem></SelectContent></Select>
           <Button onClick={generate} disabled={!singleAccount || loading} className="h-9"><Sparkles className={cn("mr-2 h-4 w-4", loading && "animate-pulse")} />{loading ? "Analisando…" : report ? "Gerar novamente" : "Análise por IA"}</Button>
@@ -92,7 +92,7 @@ export function TrafficAIAnalysis({ accountId, accountName, startDate, endDate, 
       {open && <div className="border-t border-border bg-muted/20 p-3 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />Somente dados da conta selecionada</span><span className="inline-flex items-center gap-1"><CalendarRange className="h-3.5 w-3.5" />{accountName || "Conta Meta"} · {format(startDate, "dd/MM/yyyy")}–{format(endDate, "dd/MM/yyyy")}</span>{selectedCampaignIds.length > 0 && <span>{selectedCampaignIds.length} campanha(s) selecionada(s)</span>}{generatedAt && <span>Gerado às {format(generatedAt, "HH:mm")}</span>}</div>
         {error && <div className="mb-3 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"><TriangleAlert className="h-4 w-4" />{error}<Button size="sm" variant="outline" className="ml-auto" onClick={generate}><RefreshCw className="mr-1 h-3.5 w-3.5" />Tentar novamente</Button></div>}
-        {loading && !report && <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border bg-card"><div className="text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" /><p className="mt-3 text-xs font-bold">Cruzando Meta, vendas e período anterior…</p><p className="mt-1 text-[10px] text-muted-foreground">Nenhuma alteração será feita nas campanhas.</p></div></div>}
+        {loading && !report && <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border bg-card"><div className="text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" /><p className="mt-3 text-xs font-bold">Cruzando Meta, vendas, mês anterior e semanas…</p><p className="mt-1 text-[10px] text-muted-foreground">Nenhuma alteração será feita nas campanhas.</p></div></div>}
         {report && <Tabs defaultValue="summary"><TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto bg-muted/70 p-1">{sectionTabs.map((item) => <TabsTrigger key={item.key} value={item.key} disabled={!sections[item.key]?.trim()}>{item.label}</TabsTrigger>)}</TabsList>{sectionTabs.map((item) => <TabsContent key={item.key} value={item.key} className="mt-3 rounded-xl border border-border bg-card p-4 sm:p-6"><Markdown>{sections[item.key] || "_Seção não retornada pela IA._"}</Markdown></TabsContent>)}</Tabs>}
       </div>}
     </section>

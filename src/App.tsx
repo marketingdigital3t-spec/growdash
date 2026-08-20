@@ -1,58 +1,216 @@
-import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, HashRouter, Navigate, Route, Routes } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { dehydrate, hydrate, keepPreviousData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { GlobalFiltersProvider } from "@/contexts/GlobalFiltersContext";
-import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/usePermissions";
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
+import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
+import { clearRecoveryAttempts, consumeRecoveryAttempt, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
+import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
+import FullDashboard from "@/pages/Index";
+import TrafficPage from "@/growdash/TrafficPage";
+import FunnelAnalysis from "@/pages/FunnelAnalysis";
+import FullAlerts from "@/pages/Alerts";
+import EventClasses from "@/pages/EventClasses";
+import IncompleteLeads from "@/pages/LeadsIncompletos";
+import DataHealth from "@/pages/DataHealth";
+import FullSettings from "@/pages/Settings";
+import FullUsers from "@/pages/Users";
+import Products from "@/pages/Products";
+import Funnelytics from "@/pages/Funnelytics";
+import CrmPage from "@/growdash/CrmPage";
+import KanbanPage from "@/growdash/KanbanPage";
+import CommercialPage from "@/growdash/CommercialPage";
+import FinancePage from "@/growdash/FinancePage";
+import StoragePage from "@/growdash/StoragePage";
+import IntegrationsPage from "@/growdash/IntegrationsPage";
+import ProfilePage from "@/growdash/ProfilePage";
+import SocialMediaPage from "@/growdash/SocialMediaPage";
+import AnnouncementsPage from "@/growdash/AnnouncementsPage";
+import ModulePage from "@/growdash/ModulePage";
+import BrandDiagnosticPage from "@/growdash/BrandDiagnosticPage";
+import IntelligenceCenterPage from "@/growdash/IntelligenceCenterPage";
+import StrategyPage from "@/growdash/StrategyPage";
+import Auth from "@/pages/Auth";
+import ResetPassword from "@/pages/ResetPassword";
+import SharedLeadReport from "@/pages/SharedLeadReport";
+import PublicInvoiceForm from "@/pages/PublicInvoiceForm";
+import PublicBrandDiagnosticForm from "@/pages/PublicBrandDiagnosticForm";
+import ExpertDashboard from "@/pages/ExpertDashboard";
 
-const FullDashboard = lazy(() => import("@/pages/Index"));
-const TrafficPage = lazy(() => import("@/growdash/TrafficPage"));
-const FunnelAnalysis = lazy(() => import("@/pages/FunnelAnalysis"));
-const FullAlerts = lazy(() => import("@/pages/Alerts"));
-const EventClasses = lazy(() => import("@/pages/EventClasses"));
-const IncompleteLeads = lazy(() => import("@/pages/LeadsIncompletos"));
-const DataHealth = lazy(() => import("@/pages/DataHealth"));
-const FullSettings = lazy(() => import("@/pages/Settings"));
-const FullUsers = lazy(() => import("@/pages/Users"));
-const Products = lazy(() => import("@/pages/Products"));
-const Funnelytics = lazy(() => import("@/pages/Funnelytics"));
-const CrmPage = lazy(() => import("@/growdash/CrmPage"));
-const KanbanPage = lazy(() => import("@/growdash/KanbanPage"));
-const CommercialPage = lazy(() => import("@/growdash/CommercialPage"));
-const FinancePage = lazy(() => import("@/growdash/FinancePage"));
-const StoragePage = lazy(() => import("@/growdash/StoragePage"));
-const IntegrationsPage = lazy(() => import("@/growdash/IntegrationsPage"));
-const ProfilePage = lazy(() => import("@/growdash/ProfilePage"));
-const SocialMediaPage = lazy(() => import("@/growdash/SocialMediaPage"));
-const AnnouncementsPage = lazy(() => import("@/growdash/AnnouncementsPage"));
-const ModulePage = lazy(() => import("@/growdash/ModulePage"));
-const BrandDiagnosticPage = lazy(() => import("@/growdash/BrandDiagnosticPage"));
-const IntelligenceCenterPage = lazy(() => import("@/growdash/IntelligenceCenterPage"));
-const Auth = lazy(() => import("@/pages/Auth"));
-const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
-const SharedLeadReport = lazy(() => import("@/pages/SharedLeadReport"));
+const QUERY_SESSION_CACHE_KEY = "growdash:query-cache:v1";
+const QUERY_SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const QUERY_SESSION_MAX_BYTES = 4_200_000;
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 120_000,
+      gcTime: 30 * 60_000,
+      // Keep the last successful screen in place when filters or query keys
+      // change. Refreshes stay silent rather than replacing KPI cards with an
+      // empty state or a blocking loader.
+      placeholderData: keepPreviousData,
+      // A snapshot of the last successful session is immediately usable. Live
+      // changes arrive through the silent realtime layer; mounting a route
+      // must not re-read its entire history just because the user navigated.
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  },
 });
 
+function restoreQuerySession() {
+  if (typeof window === "undefined") return;
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(QUERY_SESSION_CACHE_KEY) || "null");
+    if (!saved?.state || !saved?.savedAt || Date.now() - Number(saved.savedAt) > QUERY_SESSION_MAX_AGE_MS) return;
+    hydrate(queryClient, saved.state);
+  } catch {
+    // A stale or partial browser cache must never prevent the application from opening.
+    window.sessionStorage.removeItem(QUERY_SESSION_CACHE_KEY);
+  }
+}
+
+restoreQuerySession();
+
+let querySessionSaveTimer: number | undefined;
+function persistQuerySession() {
+  if (typeof window === "undefined") return;
+  if (querySessionSaveTimer !== undefined) window.clearTimeout(querySessionSaveTimer);
+  querySessionSaveTimer = window.setTimeout(() => {
+    try {
+      const state = dehydrate(queryClient, {
+        shouldDehydrateQuery: (query) => query.state.status === "success" && query.state.data !== undefined,
+      });
+      // Keep the newest successful screen snapshots if the browser storage limit is near.
+      state.queries.sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
+      let serialized = JSON.stringify({ savedAt: Date.now(), state });
+      while (serialized.length > QUERY_SESSION_MAX_BYTES && state.queries.length > 1) {
+        state.queries.pop();
+        serialized = JSON.stringify({ savedAt: Date.now(), state });
+      }
+      window.sessionStorage.setItem(QUERY_SESSION_CACHE_KEY, serialized);
+    } catch {
+      // Storage is an enhancement only. Live data and navigation keep working without it.
+    }
+  }, 400);
+}
+
+if (typeof window !== "undefined") {
+  queryClient.getQueryCache().subscribe((event) => {
+    if (event?.type === "updated" && event.query.state.status === "success") persistQuerySession();
+  });
+}
+
 function LoadingModule() {
-  return <div className="grid min-h-[40vh] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSlow(true), 8000);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  return <div className="grid min-h-[40vh] place-items-center px-4 text-center" role="status" aria-live="polite">
+    {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
+      <p className="font-bold">A Growdash está demorando para responder.</p>
+      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. A página não será recarregada automaticamente.</p>
+      <button type="button" onClick={() => window.location.assign("/auth")} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Abrir acesso</button>
+    </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
+  </div>;
+}
+
+function MarkApplicationBooted() {
+  useEffect(() => {
+    // The HTML fallback only stops its startup watchdog after React has
+    // actually committed. This preserves a usable recovery screen when an
+    // eager production module cannot be evaluated.
+    window.__GROWDASH_BOOTED__ = true;
+    // URLs generated by an older recovery build must not perpetuate the
+    // impression that the application is reloading. The current build never
+    // adds this parameter automatically.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("gd_reload")) {
+      url.searchParams.delete("gd_reload");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    clearRecoveryAttempts("chunk-reload");
+  }, []);
+  return null;
+}
+
+type AppErrorBoundaryState = { failed: boolean; retryBlocked: boolean; attempts: number };
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBoundaryState> {
+  state: AppErrorBoundaryState = { failed: false, retryBlocked: false, attempts: 0 };
+
+  static getDerivedStateFromError(): AppErrorBoundaryState {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // Keep diagnostic context in the browser without exposing it in the UI.
+    recordRuntimeDiagnostic("application", error);
+    console.error("Growdash render error", error, info.componentStack);
+    recoverLatestBuildOnce("application", error);
+  }
+
+  retry = () => {
+    const recovery = consumeRecoveryAttempt("application");
+    if (recovery.blocked) {
+      this.setState({ retryBlocked: true, attempts: recovery.attempts });
+      return;
+    }
+    this.setState({ failed: false, retryBlocked: false, attempts: recovery.attempts });
+  };
+
+  goHome = () => {
+    clearRecoveryAttempts("application");
+    window.history.replaceState(null, "", "/");
+    window.location.assign("/");
+  };
+
+  render() {
+    if (this.state.failed) {
+      return <div className="grid min-h-screen place-items-center bg-background px-4 text-center text-foreground">
+        <div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl">
+          <p className="text-lg font-black">{this.state.retryBlocked ? "Esta tela continua indisponível" : "Não foi possível abrir esta tela."}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{this.state.retryBlocked ? "As tentativas nesta tela foram interrompidas para evitar um ciclo. Seus dados não foram alterados." : "O módulo falhou ao renderizar. Tente o módulo uma vez; a plataforma não será recarregada automaticamente."}</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {!this.state.retryBlocked && <button type="button" onClick={this.retry} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Tentar este módulo</button>}
+            <button type="button" onClick={this.goHome} className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-bold transition hover:bg-muted">Ir para o início</button>
+          </div>
+        </div>
+      </div>;
+    }
+    return this.props.children;
+  }
 }
 
 function AuthenticatedLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading, status, retrySession } = useAuth();
   if (loading) return <LoadingModule />;
+  if (status === "unavailable") return <section className="grid min-h-[52vh] place-items-center px-4 text-center"><div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl"><p className="text-lg font-black">Não foi possível validar seu acesso.</p><p className="mt-2 text-sm text-muted-foreground">Sua sessão não foi removida. Verifique a conexão e tente novamente.</p><button type="button" onClick={() => void retrySession()} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Tentar conexão</button></div></section>;
   if (!user) return <Navigate to="/auth" replace />;
-  return <MfaChallengeGate><DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider></MfaChallengeGate>;
+  return <MfaChallengeGate><GlobalFiltersProvider><DashboardEditorProvider><GrowdashLayout /></DashboardEditorProvider></GlobalFiltersProvider></MfaChallengeGate>;
+}
+
+function PublicOnlyRoute({ children }: { children: ReactNode }) {
+  const { status } = useAuth();
+  if (status === "hydrating") return <LoadingModule />;
+  // A failed session check is not proof of logout. Keep the public screen
+  // available so the user can recover access, but never bounce between it and
+  // an authenticated route.
+  if (status === "authenticated") return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 function AccentInitializer({ children }: { children: ReactNode }) {
@@ -60,9 +218,15 @@ function AccentInitializer({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function ResilientRoute({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  return <RouteErrorBoundary resetKey={`${location.pathname}${location.search}`} scope={location.pathname}>{children}</RouteErrorBoundary>;
+}
+
 function RequirePage({ page, children }: { page: PagePermission | "master"; children: ReactNode }) {
   const permissions = usePermissions();
   if (permissions.loading) return <LoadingModule />;
+  if (permissions.error) return <section className="grid min-h-[52vh] place-items-center px-4 text-center"><div className="max-w-md rounded-2xl border border-border bg-card p-7 shadow-xl"><p className="text-lg font-black">Não foi possível validar as permissões.</p><p className="mt-2 text-sm text-muted-foreground">Nenhum acesso foi ampliado. Tente novamente sem recarregar a página.</p><button type="button" onClick={() => void permissions.retry()} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">Tentar novamente</button></div></section>;
   const allowedByPage: Record<PagePermission, boolean> = {
     dashboard: permissions.canDashboard,
     crm: permissions.canCrm,
@@ -88,6 +252,7 @@ function RequirePage({ page, children }: { page: PagePermission | "master"; chil
     agents: permissions.canAgents,
     settings: permissions.canSettings,
     dataHealth: permissions.canDataHealth,
+    expertDashboard: permissions.canExpertDashboard,
   };
   const allowed = page === "master" ? permissions.isMaster : allowedByPage[page];
 
@@ -112,25 +277,28 @@ export default function App() {
           <Sonner />
           <Router>
             <AuthProvider>
-              <GlobalFiltersProvider>
-                <AccentInitializer>
-                <Suspense fallback={<LoadingModule />}>
+              <AccentInitializer>
+                <MarkApplicationBooted />
+                <AppErrorBoundary>
                   <Routes>
-                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />
+                  <Route path="/nota-fiscal/:token" element={<PublicInvoiceForm />} />
+                  <Route path="/diagnostico-marca/:token" element={<PublicBrandDiagnosticForm />} />
                   <Route element={<AuthenticatedLayout />}>
-                    <Route index element={<RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage>} />
+                    <Route index element={<ResilientRoute><RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage></ResilientRoute>} />
+                    <Route path="painel-expert" element={<ResilientRoute><RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
-                    <Route path="crm" element={<RequirePage page="crm"><CrmPage /></RequirePage>} />
-                    <Route path="comercial" element={<RequirePage page="commercial"><CommercialPage /></RequirePage>} />
-                    <Route path="campanhas" element={<RequirePage page="campaigns">{analytics(<TrafficPage />)}</RequirePage>} />
+                    <Route path="crm" element={<ResilientRoute><RequirePage page="crm"><CrmPage /></RequirePage></ResilientRoute>} />
+                    <Route path="comercial" element={<ResilientRoute><RequirePage page="commercial"><CommercialPage /></RequirePage></ResilientRoute>} />
+                    <Route path="campanhas" element={<ResilientRoute><RequirePage page="campaigns">{analytics(<TrafficPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="inteligencia" element={<RequirePage page="campaigns">{analytics(<IntelligenceCenterPage />)}</RequirePage>} />
                     <Route path="trafego-pago" element={<Navigate to="/campanhas" replace />} />
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />
-                    <Route path="analise-de-funis" element={<RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage>} />
+                    <Route path="analise-de-funis" element={<ResilientRoute><RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage></ResilientRoute>} />
                     <Route path="analise-funis" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="funnels" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="alertas" element={<RequirePage page="alerts">{analytics(<FullAlerts />)}</RequirePage>} />
@@ -138,7 +306,8 @@ export default function App() {
                     <Route path="classes" element={<Navigate to="/agenda-turmas" replace />} />
                     <Route path="leads-incompletos" element={<RequirePage page="leads">{analytics(<IncompleteLeads />)}</RequirePage>} />
                     <Route path="automacoes" element={<RequirePage page="automations"><ModulePage /></RequirePage>} />
-                    <Route path="growdash-flow" element={<RequirePage page="flow">{analytics(<Funnelytics />)}</RequirePage>} />
+                    <Route path="growdash-flow" element={<ResilientRoute><RequirePage page="flow">{analytics(<Funnelytics />)}</RequirePage></ResilientRoute>} />
+                    <Route path="estrategia" element={<ResilientRoute><RequirePage page="brands">{analytics(<StrategyPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="saude-dos-dados" element={<RequirePage page="dataHealth">{analytics(<DataHealth />)}</RequirePage>} />
                     <Route path="data-health" element={<Navigate to="/saude-dos-dados" replace />} />
                     <Route path="produtos" element={<RequirePage page="products">{analytics(<Products />)}</RequirePage>} />
@@ -147,27 +316,29 @@ export default function App() {
                     <Route path="usuarios" element={<RequirePage page="users">{analytics(<FullUsers />)}</RequirePage>} />
                     <Route path="usuarios/avancado" element={<Navigate to="/usuarios" replace />} />
                     <Route path="users" element={<Navigate to="/usuarios" replace />} />
-                    <Route path="financeiro" element={<RequirePage page="finance"><FinancePage /></RequirePage>} />
+                    <Route path="financeiro" element={<ResilientRoute><RequirePage page="finance"><FinancePage /></RequirePage></ResilientRoute>} />
                     <Route path="armazenamento" element={<RequirePage page="storage"><StoragePage /></RequirePage>} />
-                    <Route path="integracoes" element={<RequirePage page="integrations"><IntegrationsPage /></RequirePage>} />
+                    <Route path="integracoes" element={<ResilientRoute><RequirePage page="integrations"><IntegrationsPage /></RequirePage></ResilientRoute>} />
                     <Route path="perfil" element={<ProfilePage />} />
-                    <Route path="midia-social" element={<RequirePage page="socialMedia">{analytics(<SocialMediaPage />)}</RequirePage>} />
+                    <Route path="midia-social" element={<ResilientRoute><RequirePage page="socialMedia">{analytics(<SocialMediaPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="kanban" element={<RequirePage page="kanban"><KanbanPage /></RequirePage>} />
                     <Route path="chamados" element={<RequirePage page="tickets"><ModulePage /></RequirePage>} />
                     <Route path="anuncios" element={<RequirePage page="announcements"><AnnouncementsPage /></RequirePage>} />
                     <Route path="marcas" element={<RequirePage page="brands"><ModulePage /></RequirePage>} />
                     <Route path="marcas/:brandId" element={<RequirePage page="brands">{analytics(<BrandDiagnosticPage />)}</RequirePage>} />
                     <Route path="marca" element={<Navigate to="/marcas" replace />} />
-                    <Route path="meta-connect" element={<RequirePage page="metaConnect"><ModulePage /></RequirePage>} />
+                    {/* Legacy URL: Meta Connect is now the paid tab in the unified integrations center. */}
+                    <Route path="meta-connect" element={<RequirePage page="integrations"><Navigate to="/integracoes?tab=paid" replace /></RequirePage>} />
                     <Route path="agentes" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
+                    <Route path="neural-core" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
+                    <Route path="life-sim" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
                     <Route path="ia-do-funil" element={<Navigate to="/crm?tab=ai" replace />} />
                     <Route path=":module" element={<ModulePage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
-                  </Routes>
-                </Suspense>
-                </AccentInitializer>
-              </GlobalFiltersProvider>
+                    </Routes>
+                </AppErrorBoundary>
+              </AccentInitializer>
             </AuthProvider>
           </Router>
         </TooltipProvider>

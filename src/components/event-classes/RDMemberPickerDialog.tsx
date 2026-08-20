@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, UserPlus, Loader2, AlertCircle } from "lucide-react";
 import {
   useRDDealSearch,
   useAddEventClassMember,
   useEventClassMembers,
   type EventClass,
+  type EventClassSource,
   type MemberType,
 } from "@/hooks/useEventClasses";
 import { toast } from "@/hooks/use-toast";
@@ -23,13 +25,20 @@ interface Props {
 
 export function RDMemberPickerDialog({ open, onOpenChange, eventClass, memberType }: Props) {
   const [query, setQuery] = useState("");
+  const [sourceKey, setSourceKey] = useState("");
   const isModel = memberType === "model_patient";
-  const allowed = isModel
-    ? eventClass.allowed_model_patient_stage_ids
-    : eventClass.allowed_student_stage_ids;
-  const pickerFunnelId = isModel
-    ? (eventClass.rd_model_patient_funnel_id || eventClass.rd_funnel_id)
-    : eventClass.rd_funnel_id;
+  const availableSources = useMemo(() => {
+    const saved = ((eventClass as any).sources || []) as EventClassSource[];
+    if (saved.length > 0) return saved.filter((source) => source.member_type === memberType);
+    const legacy = isModel
+      ? eventClass.rd_model_patient_funnel_id && [{ rd_funnel_id: eventClass.rd_model_patient_funnel_id, allowed_stage_ids: eventClass.allowed_model_patient_stage_ids, member_type: "model_patient" as const }]
+      : eventClass.rd_funnel_id && [{ rd_funnel_id: eventClass.rd_funnel_id, allowed_stage_ids: eventClass.allowed_student_stage_ids, member_type: "student" as const }];
+    return (legacy || []) as EventClassSource[];
+  }, [eventClass, isModel, memberType]);
+  useEffect(() => { setSourceKey(availableSources[0]?.id || availableSources[0]?.rd_funnel_id || ""); }, [availableSources]);
+  const selectedSource = availableSources.find((source) => (source.id || source.rd_funnel_id) === sourceKey) || availableSources[0];
+  const allowed = selectedSource?.allowed_stage_ids || [];
+  const pickerFunnelId = selectedSource?.rd_funnel_id || null;
 
   const { data: studentMembers } = useEventClassMembers(eventClass.id, "student");
   const { data: modelMembers } = useEventClassMembers(eventClass.id, "model_patient");
@@ -70,9 +79,16 @@ export function RDMemberPickerDialog({ open, onOpenChange, eventClass, memberTyp
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Funil RD vinculado · {allowed.length} etapa{allowed.length !== 1 ? "s" : ""} permitida{allowed.length !== 1 ? "s" : ""}
+            Fonte RD vinculada · {allowed.length} etapa{allowed.length !== 1 ? "s" : ""} permitida{allowed.length !== 1 ? "s" : ""}
           </p>
         </DialogHeader>
+
+        {availableSources.length > 1 && <div>
+          <Select value={sourceKey} onValueChange={setSourceKey}>
+            <SelectTrigger aria-label="Selecionar fonte RD"><SelectValue placeholder="Selecionar conta e funil" /></SelectTrigger>
+            <SelectContent>{availableSources.map((source, index) => <SelectItem key={source.id || `${source.rd_funnel_id}-${index}`} value={source.id || source.rd_funnel_id}>{source.funnel_name || `Funil ${index + 1}`}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>}
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

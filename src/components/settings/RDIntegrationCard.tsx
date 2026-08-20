@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link2, CheckCircle2, AlertCircle, Trash2, Unplug } from "lucide-react";
@@ -118,8 +118,7 @@ export function RDIntegrationCard() {
 
         <div className="space-y-1">
           <Label>Token da API do RD CRM</Label>
-          <Input
-            type="password"
+          <PasswordInput
             autoComplete="off"
             placeholder={isConnected ? "Cole um novo token para substituir o atual" : "Cole o token aqui"}
             value={token}

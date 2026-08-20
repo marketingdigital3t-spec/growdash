@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_VIEW } from "@/lib/widgetCatalog";
 import { ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
 
@@ -34,8 +35,12 @@ const fallbackGlobalView: DashboardView = {
 };
 
 export function useGlobalView() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["dashboard_view_global"],
+    // Keep dashboard layouts isolated when the browser switches accounts;
+    // otherwise React Query can briefly show the previous user's cached view.
+    queryKey: ["dashboard_view_global", user?.id ?? "anonymous"],
+    enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("dashboard_views")
@@ -57,11 +62,16 @@ export function useSaveView() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, layout, widgets }: { id: string; layout: any[]; widgets: any[] }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("dashboard_views")
         .update({ layout, widgets, updated_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      // Supabase can return a successful empty update when RLS removes access.
+      // Do not close the editor or discard the draft unless the view was really saved.
+      if (!data) throw new Error("O dashboard não foi salvo. Verifique sua permissão e tente novamente.");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["dashboard_view_global"] }),
   });

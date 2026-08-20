@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
@@ -37,16 +37,57 @@ import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
-import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { supabase } from "@/integrations/supabase/client";
+import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
 
+// Preload only after an intentional hover/focus. This removes the cold-chunk
+// pause from menu navigation without making the initial login/app shell heavy.
+const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
+  "/": () => import("@/pages/Index"),
+  "/painel-expert": () => import("@/pages/ExpertDashboard"),
+  "/crm": () => import("@/growdash/CrmPage"),
+  "/comercial": () => import("@/growdash/CommercialPage"),
+  "/campanhas": () => import("@/growdash/TrafficPage"),
+  "/analise-de-funis": () => import("@/pages/FunnelAnalysis"),
+  "/growdash-flow": () => import("@/pages/Funnelytics"),
+  "/estrategia": () => import("@/growdash/StrategyPage"),
+  "/midia-social": () => import("@/growdash/SocialMediaPage"),
+  "/financeiro": () => import("@/growdash/FinancePage"),
+  "/armazenamento": () => import("@/growdash/StoragePage"),
+  "/integracoes": () => import("@/growdash/IntegrationsPage"),
+  "/kanban": () => import("@/growdash/KanbanPage"),
+  "/anuncios": () => import("@/growdash/AnnouncementsPage"),
+  "/configuracoes": () => import("@/pages/Settings"),
+  "/usuarios": () => import("@/pages/Users"),
+  "/agenda-turmas": () => import("@/pages/EventClasses"),
+  "/agentes": () => import("@/growdash/ModulePage"),
+  "/chamados": () => import("@/growdash/ModulePage"),
+  "/automacoes": () => import("@/growdash/ModulePage"),
+  "/marcas": () => import("@/growdash/ModulePage"),
+};
+
+function ContentLoadingFallback() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSlow(true), 8_000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return <div className="grid min-h-[42vh] place-items-center rounded-2xl border border-border/70 bg-card/35 p-6 motion-safe:animate-in motion-safe:fade-in" role="status" aria-live="polite">
+    {slow ? <div className="max-w-sm text-center"><p className="font-bold text-foreground">Este módulo demorou mais do que o esperado.</p><p className="mt-2 text-sm text-muted-foreground">A navegação continua disponível. Escolha outra tela ou atualize esta versão manualmente.</p><button type="button" onClick={() => window.location.reload()} className="gd-button mt-4">Atualizar versão</button></div> : <div className="flex items-center gap-3 text-sm font-semibold text-muted-foreground"><span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />Abrindo módulo…</div>}
+  </div>;
+}
+
 function getInitialSidebarState() {
   if (typeof window === "undefined") return false;
-  const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
-  if (saved !== null) return saved === "true";
+  try {
+    const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (saved !== null) return saved === "true";
+  } catch {
+    // O menu usa o padrão responsivo quando o navegador bloqueia storage.
+  }
   return window.innerWidth >= 768 && window.innerWidth < 1024;
 }
 
@@ -66,6 +107,7 @@ export default function GrowdashLayout() {
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const [loadBackgroundData, setLoadBackgroundData] = useState(false);
   const { editor } = useDashboardEditor();
   const { pathname, search } = useLocation();
   const { theme, setTheme } = useTheme();
@@ -81,7 +123,7 @@ export default function GrowdashLayout() {
   });
   const { data: isMaster = false } = useIsMaster();
   const permissions = usePermissions();
-  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const {
     adAccountId,
     setAdAccountId,
@@ -96,12 +138,20 @@ export default function GrowdashLayout() {
     [adAccounts, businessUnitId, segment],
   );
   const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
+  // Mantém a mesma referência de mês durante toda a sessão do layout. Assim,
+  // atualizações de UI não criam novas chaves de consulta para a meta mensal.
+  const currentMonth = useMemo(() => new Date(), []);
+  const monthlyRange = useMemo(() => ({
+    startDate: startOfMonth(currentMonth),
+    endDate: endOfMonth(currentMonth),
+  }), [currentMonth]);
   const { data: monthlySales = [] } = useSales({
-    startDate: startOfMonth(new Date()),
-    endDate: endOfMonth(new Date()),
+    startDate: monthlyRange.startDate,
+    endDate: monthlyRange.endDate,
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
+    enabled: loadBackgroundData,
   });
-  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(new Date());
+  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(currentMonth, { enabled: loadBackgroundData });
   const goalRevenue = useMemo(() => aggregateSales(monthlySales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id) && (adAccountId === "all" || sale.ad_account_id === adAccountId))).totalNet, [adAccountId, monthlySales, visibleAccountIds]);
   const goalTarget = useMemo(() => (goalData?.rows ?? []).filter((goal) => visibleAccountIds.has(goal.ad_account_id) && (adAccountId === "all" || goal.ad_account_id === adAccountId)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0), [adAccountId, goalData?.rows, visibleAccountIds]);
   const goalAccountLabel = adAccountId === "all"
@@ -110,7 +160,7 @@ export default function GrowdashLayout() {
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
-  useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId });
+  useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId, enabled: loadBackgroundData });
 
   const displayName = sidebarProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const avatarUrl = sidebarProfile?.avatar_url || user?.user_metadata?.avatar_url || "";
@@ -125,15 +175,23 @@ export default function GrowdashLayout() {
   const isCampaignsWorkspace = pathname.startsWith("/campanhas")
     && campaignWorkspaceTab === "campaigns"
     && !campaignAnalysisMode;
+  const preloadRoute = useCallback((path: string) => {
+    const pathnameOnly = path.split("?")[0];
+    void ROUTE_PRELOADERS[pathnameOnly]?.().catch(() => {
+      // Navigation keeps its normal resilient retry path if a preload fails.
+    });
+  }, []);
   const permittedPath = (path: string) => {
     const pathnameOnly = path.split("?")[0];
     const guarded: Record<string, boolean> = {
       "/": permissions.canDashboard,
+      "/painel-expert": permissions.canExpertDashboard,
       "/crm": permissions.canCrm,
       "/comercial": permissions.canCommercial,
       "/campanhas": permissions.canCampaigns,
       "/analise-de-funis": permissions.canFunnels,
       "/growdash-flow": permissions.canFlow,
+      "/estrategia": permissions.canBrands,
       "/midia-social": permissions.canSocialMedia,
       "/alertas": permissions.canAlerts,
       "/automacoes": permissions.canAutomations,
@@ -146,7 +204,6 @@ export default function GrowdashLayout() {
       "/marcas": permissions.canBrands,
       "/produtos": permissions.canProducts,
       "/integracoes": permissions.canIntegrations,
-      "/meta-connect": permissions.canMetaConnect,
       "/anuncios": permissions.canAnnouncements,
       "/usuarios": permissions.canUsers,
       "/agentes": permissions.canAgents,
@@ -161,10 +218,24 @@ export default function GrowdashLayout() {
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+    const idleWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const enableBackgroundData = () => setLoadBackgroundData(true);
+    const idleHandle = idleWindow.requestIdleCallback?.(enableBackgroundData, { timeout: 2_500 });
+    const timeoutHandle = idleHandle === undefined ? window.setTimeout(enableBackgroundData, 1_500) : undefined;
+
+    return () => {
+      if (idleHandle !== undefined) idleWindow.cancelIdleCallback?.(idleHandle);
+      if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
+    };
+  }, []);
+  useEffect(() => {
+    try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed)); } catch { /* preferência apenas nesta sessão */ }
   }, [collapsed]);
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_SECTIONS_STORAGE_KEY, JSON.stringify(openSections));
+    try { window.localStorage.setItem(SIDEBAR_SECTIONS_STORAGE_KEY, JSON.stringify(openSections)); } catch { /* preferência apenas nesta sessão */ }
   }, [openSections]);
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -177,10 +248,14 @@ export default function GrowdashLayout() {
     };
   }, []);
   useEffect(() => {
+    // Durante o carregamento/refetch a lista pode ficar vazia por um instante.
+    // Não trate esse estado transitório como remoção de acesso, pois isso faz o
+    // seletor global e a meta mensal saltarem para "todas as contas".
+    if (loadingAdAccounts || visibleAccounts.length === 0) return;
     if (adAccountId !== "all" && businessUnitId && !visibleAccounts.some((account) => account.id === adAccountId)) {
       setAdAccountId("all");
     }
-  }, [adAccountId, businessUnitId, setAdAccountId, visibleAccounts]);
+  }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);
 
   return (
     <div className="brand-shell min-h-screen max-w-full overflow-x-clip text-foreground transition-colors">
@@ -196,7 +271,7 @@ export default function GrowdashLayout() {
             {showSidebarLabels ? (
               <BrandLogo eager className="h-[66px] w-[178px] shrink-0" />
             ) : (
-              <BrandMark className="h-10 w-10 shrink-0 drop-shadow-[0_0_12px_rgba(255,193,45,.3)]" />
+              <BrandMark className="brand-mark-premium h-10 w-10 shrink-0" />
             )}
           </NavLink>
           <button
@@ -212,7 +287,7 @@ export default function GrowdashLayout() {
         {editor ? (
           <div className="flex min-h-0 grow flex-col">
             <div className="border-b border-white/10 px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[.18em] text-[#e8bd4f]">Editor do dashboard</p>
+              <p className="text-[10px] font-black uppercase tracking-[.18em] text-primary">Editor do dashboard</p>
               <h2 className="mt-1 truncate text-sm font-black">{editor.title}</h2>
               <p className="mt-1 text-[10px] leading-relaxed text-white/48">Mostre ou oculte métricas. No conteúdo, arraste e redimensione pelos cantos.</p>
             </div>
@@ -267,6 +342,8 @@ export default function GrowdashLayout() {
                       to={item.path}
                       end={itemPathname === "/"}
                       aria-label={item.label}
+                      onPointerEnter={() => preloadRoute(item.path)}
+                      onFocus={() => preloadRoute(item.path)}
                       className={cn(
                         "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
                         showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
@@ -359,7 +436,7 @@ export default function GrowdashLayout() {
             <Menu className="h-5 w-5" />
           </button>
           <NavLink to="/" aria-label="Growdash - início" className="mr-1 flex lg:hidden">
-            <BrandMark className="h-7 w-7 drop-shadow-[0_0_10px_rgba(255,193,45,.25)]" />
+            <BrandMark className="brand-mark-premium h-7 w-7" />
           </NavLink>
           <button
             type="button"
@@ -372,19 +449,18 @@ export default function GrowdashLayout() {
           <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
             <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} />
           </div>
-          <NotificationCenter />
           <div className="order-2 ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px] lg:order-none">
             <button
               type="button"
               onClick={() => setSegment("infoproduto")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(242,197,72,.2)]" : "text-white/55")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "premium-glow bg-primary text-primary-foreground" : "text-white/55")}
             >
               Infoproduto
             </button>
             <button
               type="button"
               onClick={() => setSegment("saas")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(242,197,72,.2)]" : "text-white/55")}
+              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "premium-glow bg-primary text-primary-foreground" : "text-white/55")}
             >
               SaaS
             </button>
@@ -405,12 +481,15 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
-            <Outlet />
+            {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
+            <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
+              <Suspense fallback={<ContentLoadingFallback />}><Outlet /></Suspense>
+            </RouteErrorBoundary>
           </div>
         </main>
       </div>
       {!isOnline && (
-        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#080808]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
+        <div role="status" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-3 z-[100] max-w-[calc(100vw-1.5rem)] rounded-xl border border-amber-400/35 bg-[#080808]/95 px-4 py-3 text-xs font-semibold text-amber-100 shadow-2xl backdrop-blur-xl">
           Você está offline. Os dados exibidos podem estar desatualizados e nenhuma alteração será enviada até a conexão voltar.
         </div>
       )}

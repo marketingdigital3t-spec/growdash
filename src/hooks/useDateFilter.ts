@@ -74,7 +74,11 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
       return { startDate: startOfMonth(lastMonth), endDate: endOfMonth(lastMonth) };
     }
     case "max":
-      return { startDate: subDays(today, 365), endDate: new Date() };
+      // “Máximo” is the complete operational history, not a rolling year.
+      // The actual lower bound is additionally constrained by the oldest
+      // record available in each provider, but the UI must never discard
+      // older RD/Meta data on its own.
+      return { startDate: new Date(2000, 0, 1), endDate: new Date() };
     case "custom":
       return { startDate: customRange.from, endDate: customRange.to };
     default:

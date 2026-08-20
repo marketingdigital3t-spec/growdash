@@ -8,21 +8,29 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useAlerts } from "@/hooks/useAlerts";
-import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
+import { useSales, type Sale } from "@/hooks/useSales";
+import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { useProducts } from "@/hooks/useProducts";
-import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
 import { differenceInCalendarDays, format } from "date-fns";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardGrid, buildWidgetFromDef } from "@/components/dashboard/grid/DashboardGrid";
 import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView, type DashboardView } from "@/hooks/useDashboardViews";
-import { useIsMaster } from "@/hooks/useIsMaster";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Pencil } from "lucide-react";
 import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip";
 import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useToast } from "@/hooks/use-toast";
+
+const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
+const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
 
 const Index = () => {
   const {
@@ -49,24 +57,22 @@ const Index = () => {
   const [draftView, setDraftView] = useState<DashboardView | null>(null);
   const originalViewRef = useRef<DashboardView | null>(null);
   const { setEditor } = useDashboardEditor();
+  const { toast } = useToast();
 
-  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
   const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
+  const visibleAccountIdList = useMemo(() => visibleAccounts.map((account) => account.id), [visibleAccounts]);
+  const isRDAccountScopeReady = selectedAccount !== "all" || (!loadingAdAccounts && visibleAccountIdList.length > 0);
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
-  const { data: insights = [], isLoading, refetch } = useInsights({
-    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-    campaignIds: selectedCampaignIds.length > 0 ? selectedCampaignIds : undefined,
-    startDate,
-    endDate,
-    enabled: true,
-  });
   // Universo estável de campanhas com veiculação no período/conta — não muda quando
   // o usuário marca/desmarca campanhas, para que o popover continue listando todas.
-  const { data: campaignPickerInsights = [] } = useInsights({
+  // O filtro por campanha é aplicado em memória porque este universo completo já é
+  // obrigatório para o seletor; assim evitamos uma segunda consulta idêntica ao banco.
+  const { data: allInsights = [], isLoading } = useInsights({
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
     startDate,
     endDate,
@@ -77,19 +83,33 @@ const Index = () => {
     endDate,
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
   });
+  // O Dashboard separa duas leituras do RD: pipeline pelo período de criação
+  // e vendas pelo momento do fechamento. A leitura de vendas é explícita para
+  // não depender do carregamento completo do Kanban e não misturar registros
+  // financeiros extras ao total de negócios ganhos.
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
     adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+    adAccountIds: selectedAccount === "all" ? visibleAccountIdList : undefined,
+    enabled: isRDAccountScopeReady,
   });
+  const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
+    startDate,
+    endDate,
+    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+    adAccountIds: selectedAccount === "all" ? visibleAccountIdList : undefined,
+    enabled: isRDAccountScopeReady,
+  });
+  const { data: rdFunnels = [] } = useRDFunnels();
   const { data: alerts = [] } = useAlerts();
   const syncMeta = useSyncMeta();
 
   const { data: activeView } = useGlobalView();
-  const { data: isMaster = false } = useIsMaster();
+  const { canEdit: canEditWorkspace } = usePermissions();
   const saveView = useSaveView();
   const canEditDashboard = Boolean(
-    isMaster && activeView && activeView.id !== FALLBACK_DASHBOARD_VIEW_ID,
+    canEditWorkspace && activeView && activeView.id !== FALLBACK_DASHBOARD_VIEW_ID,
   );
 
   useEffect(() => {
@@ -97,44 +117,82 @@ const Index = () => {
   }, [selectedCampaignIds]);
 
   useEffect(() => {
+    // A lista fica vazia antes da primeira resposta. Não transforme essa fase
+    // transitória em "Todas as contas", pois isso troca a base de cálculo do
+    // dashboard e da previsão sem uma ação do usuário.
+    if (loadingAdAccounts || visibleAccounts.length === 0) return;
     if (selectedAccount !== "all" && !visibleAccounts.some((a) => a.id === selectedAccount)) {
       setSelectedAccount("all");
     }
-  }, [visibleAccounts, selectedAccount, setSelectedAccount]);
+  }, [loadingAdAccounts, visibleAccounts, selectedAccount, setSelectedAccount]);
 
-  const dashboardInsights = useMemo(() => insights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [insights, visibleAccountIds]);
-  const visiblePickerInsights = useMemo(() => campaignPickerInsights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [campaignPickerInsights, visibleAccountIds]);
+  const visiblePickerInsights = useMemo(() => allInsights.filter((row) => visibleAccountIds.has(row.ad_account_id)), [allInsights, visibleAccountIds]);
+  const dashboardInsights = useMemo(() => selectedCampaignIds.length
+    ? visiblePickerInsights.filter((row) => selectedCampaignIds.includes(row.campaign_id))
+    : visiblePickerInsights, [selectedCampaignIds, visiblePickerInsights]);
   const visibleCampaigns = useMemo(() => campaigns.filter((campaign: any) => visibleAccountIds.has(campaign.ad_account_id)), [campaigns, visibleAccountIds]);
-  const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id)), [sales, visibleAccountIds]);
+  const operationalRDDeals = useMemo(() => filterOperationalRDDeals(rdDeals, rdFunnels), [rdDeals, rdFunnels]);
+  const operationalRDWonDeals = useMemo(() => filterOperationalRDDeals(rdWonDeals, rdFunnels), [rdFunnels, rdWonDeals]);
+  const operationalWonDealIds = useMemo(() => new Set(
+    operationalRDWonDeals.map((deal) => deal.rd_deal_id).filter(Boolean),
+  ), [operationalRDWonDeals]);
+  // useSales preserva a última resposta durante uma troca de conta para evitar
+  // um flash de zero. Reaplique o escopo aqui: enquanto a nova resposta não
+  // chega, nenhuma venda da conta anterior pode entrar nos KPIs ou previsão.
+  const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id
+    && visibleAccountIds.has(sale.ad_account_id)
+    && (selectedAccount === "all" || sale.ad_account_id === selectedAccount)), [sales, selectedAccount, visibleAccountIds]);
+  // No Dashboard de contas integradas, "venda" é a negociação efetivamente
+  // ganha no RD. Registros financeiros sem um negócio ganho correspondente
+  // ficam no Financeiro, mas não podem alterar KPIs de CRM, conversão ou ROAS.
+  const operationalUnitSales = useMemo(() => unitSales.filter((sale) =>
+    sale.status !== "confirmed" || (!!sale.rd_deal_id && operationalWonDealIds.has(sale.rd_deal_id)),
+  ), [operationalWonDealIds, unitSales]);
   const selectedCampaigns = useMemo(
     () => visibleCampaigns.filter((campaign: any) => selectedCampaignIds.includes(campaign.id)),
     [selectedCampaignIds, visibleCampaigns],
   );
   const dashboardSales = useMemo(() => selectedCampaignIds.length
-    ? unitSales.filter((sale) => selectedCampaigns.some((campaign: any) => saleMatchesCampaign(sale, {
+    ? operationalUnitSales.filter((sale) => selectedCampaigns.some((campaign: any) => saleMatchesCampaign(sale, {
       id: campaign.id,
       name: campaign.name,
-      adAccountId: campaign.ad_account_id,
+      ad_account_id: campaign.ad_account_id,
     })))
-    : unitSales, [selectedCampaignIds.length, selectedCampaigns, unitSales]);
-  const dashboardDeals = useMemo(() => rdDeals.filter((deal) => !!deal.ad_account_id && visibleAccountIds.has(deal.ad_account_id)), [rdDeals, visibleAccountIds]);
-  const glassSales = aggregateSales(dashboardSales);
+    : operationalUnitSales, [operationalUnitSales, selectedCampaignIds.length, selectedCampaigns]);
+  const dashboardDeals = useMemo(() => operationalRDDeals.filter((deal) => !!deal.ad_account_id
+    && visibleAccountIds.has(deal.ad_account_id)
+    && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [operationalRDDeals, selectedAccount, visibleAccountIds]);
+  const dashboardRevenueDeals = useMemo(() => operationalRDWonDeals.filter((deal) => !!deal.ad_account_id
+    && visibleAccountIds.has(deal.ad_account_id)
+    && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [operationalRDWonDeals, selectedAccount, visibleAccountIds]);
+  // Total de vendas e faturamento do Dashboard são sempre os negócios ganhos
+  // do RD dentro do período. Os lançamentos financeiros seguem disponíveis em
+  // Financeiro e no detalhamento de pagamento, mas não podem elevar o KPI de
+  // vendas acima da quantidade real de negociações ganhas.
+  const glassSales = aggregateRevenueSources([], dashboardRevenueDeals);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-  const glassLeads = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+  const glassLeadsFromInsights = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+  const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
+  const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
+  const { data: dashboardActionData } = useActionTotalsByAds(dashboardActionAdIds, startDate, endDate, dashboardActionAccountMap);
+  const glassConversations = dashboardActionData?.totals?.[MESSAGING_CONVERSATION_EVENT] || 0;
+  const glassForms = Math.min(glassLeadsFromInsights, dashboardActionData?.totals?.[NATIVE_FORM_LEAD_EVENT] || 0);
+  const leadBreakdown = useMemo(() => ({ forms: glassForms, site: Math.max(0, glassLeadsFromInsights - glassForms), conversations: glassConversations, total: glassLeadsFromInsights + glassConversations }), [glassConversations, glassForms, glassLeadsFromInsights]);
+  const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
 
-  const handleSync = async () => {
-    refetch();
-    syncMeta
-      .mutateAsync({
-        adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-        startDate: format(startDate, "yyyy-MM-dd"),
-        endDate: format(endDate, "yyyy-MM-dd"),
-      })
-      .then(() => refetch());
+  const handleSync = () => {
+    // A mutation já invalida as consultas de insights ao terminar. Refazer a
+    // consulta antes e depois da sincronização só competia por rede e fazia o
+    // dashboard trocar desnecessariamente para estado de carregamento.
+    syncMeta.mutate({
+      adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+      startDate: format(startDate, "yyyy-MM-dd"),
+      endDate: format(endDate, "yyyy-MM-dd"),
+    });
   };
 
   const cloneView = useCallback((view: DashboardView): DashboardView => ({
@@ -194,8 +252,15 @@ const Index = () => {
         setIsEditing(false);
         setEditor(null);
       },
+      onError: (error) => {
+        toast({
+          title: "Não foi possível salvar o dashboard",
+          description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
+          variant: "destructive",
+        });
+      },
     });
-  }, [canEditDashboard, draftView, saveView, setEditor]);
+  }, [canEditDashboard, draftView, saveView, setEditor, toast]);
 
   const editorItems = useMemo(() => {
     const removable = (draftView?.widgets ?? [])
@@ -302,7 +367,7 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
+      <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
 
       {(isEditing ? draftView : activeView) && (
         <DashboardProvider
@@ -313,11 +378,13 @@ const Index = () => {
             insights: dashboardInsights,
             sales: dashboardSales,
             rdDeals: dashboardDeals,
+            revenueDeals: dashboardRevenueDeals,
             alerts,
             campaigns: visibleCampaigns,
             adAccounts: visibleAccounts,
             products,
             isLoading,
+            leadBreakdown,
           }}
         >
           <DashboardGrid
@@ -332,11 +399,11 @@ const Index = () => {
         </DashboardProvider>
       )}
 
-      <SalesDialog
-        open={salesDialogOpen}
-        onOpenChange={(o) => { setSalesDialogOpen(o); if (!o) setEditingSale(null); }}
-        editingSale={editingSale}
-      />
+      {salesDialogOpen && <SalesDialog
+          open
+          onOpenChange={(o) => { setSalesDialogOpen(o); if (!o) setEditingSale(null); }}
+          editingSale={editingSale}
+        />}
     </MotionPage>
   );
 };

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
+import { addDays, format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,14 +58,16 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CampaignDetailSheet } from "@/components/campaigns/CampaignDetailSheet";
 import { EditableMetaEntity, MetaEntityEditor } from "@/components/campaigns/MetaEntityEditor";
 import { MetaCampaignCreator } from "@/components/campaigns/MetaCampaignCreator";
+import { MetaCampaignDuplicator } from "@/components/campaigns/MetaCampaignDuplicator";
 import { ResizableHead, StatusDot, normalizeStatus, useColWidths } from "@/components/dashboard/ResizableTableHelpers";
 import { cn } from "@/lib/utils";
 import { getStatusBadge } from "@/lib/status";
 import { MetaTableControls } from "@/components/campaigns/MetaTableControls";
-import { getBreakdownLabel, getMetaColumnPreset, type CampaignColumnKey, type MetaColumnPresetKey } from "@/lib/metaTableConfig";
+import { getBreakdownLabel, getBreakdownStorageType, getMetaColumnPreset, type CampaignColumnKey, type MetaColumnPresetKey } from "@/lib/metaTableConfig";
 import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 import { MetaEntityDetailSheet, type MetaDetailEntity } from "@/components/campaigns/MetaEntityDetailSheet";
 import { useToast } from "@/hooks/use-toast";
@@ -74,6 +77,8 @@ import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierar
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
+import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
+import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -108,7 +113,16 @@ const CAMPAIGN_COLUMN_FILTERS: Array<{ key: string; label: string; column?: Camp
 
 function campaignColumnValue(campaign: any, key: string) {
   if (key === "status" || key === "deliveryStatus") return `${getStatusBadge(campaign.status).label} ${campaign.status || ""}`;
+  if (key === "leads") return String(campaign.primaryResult ?? campaign.results?.total ?? campaign.leads ?? 0);
+  if (key === "cpl") return String(campaign.costPerResult ?? campaign.cpl ?? 0);
   return String(campaign[key] ?? "");
+}
+
+function campaignPrimaryResult(campaign: any) {
+  return resolveCampaignPrimaryResult(campaign.objective, {
+    leadCount: Math.max(0, Number((campaign.results?.leadCount ?? campaign.leads) || 0)),
+    conversations: Math.max(0, Number(campaign.results?.conversations || 0)),
+  });
 }
 
 function formatApiDate(date: Date) {
@@ -163,6 +177,18 @@ const CAMP_DEFAULTS: Record<CampColKey, number> = {
   metaPurchases: 100, metaCostPerPurchase: 140, metaPurchaseRoas: 100,
   videoViews: 130, actions: 90,
 };
+// Evita que uma largura salva muito pequena faça os títulos se sobreporem.
+// Cada coluna ainda pode ser ampliada livremente pelo usuário.
+const CAMP_MIN_WIDTHS: Record<CampColKey, number> = {
+  check: 40, delivery: 92, name: 250, deliveryStatus: 110, actions: 82,
+  objective: 105, budget: 105, spend: 105, impressions: 90, reach: 90,
+  frequency: 82, cpm: 76, clicks: 78, linkClicks: 108, linkCpc: 132,
+  uniqueLinkCtr: 140, cpc: 86, ctr: 80, leads: 122, cpl: 112,
+  conversion: 105, sales: 84, cpa: 98, revenue: 112, roas: 80,
+  profit: 108, roi: 78, landingPageViews: 160, costPerLandingPageView: 178,
+  checkouts: 160, costPerCheckout: 178, metaPurchases: 94,
+  metaCostPerPurchase: 128, metaPurchaseRoas: 94, videoViews: 120,
+};
 const ADSET_DEFAULTS: Record<AdsetColKey, number> = {
   name: 260, campaign: 220, budget: 130, spend: 120, leads: 90, cpl: 110, clicks: 100, ctr: 90,
   cpc: 100, impressions: 120, reach: 110, frequency: 100, cpm: 110,
@@ -210,6 +236,7 @@ export default function Campaigns() {
   const [detailEntity, setDetailEntity] = useState<MetaDetailEntity | null>(null);
   const [editingEntity, setEditingEntity] = useState<EditableMetaEntity | null>(null);
   const [createCampaignOpen, setCreateCampaignOpen] = useState(false);
+  const [duplicatingCampaign, setDuplicatingCampaign] = useState<{ id: string; name: string; status?: string | null } | null>(null);
   const [sortKey, setSortKey] = useState<CampSortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
   const [adsetSortKey, setAdsetSortKey] = useState<AdsetColKey>("spend");
@@ -285,7 +312,8 @@ export default function Campaigns() {
 
   const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount });
 
-  const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v3");
+  // v4 descarta preferências antigas que permitiam salvar larguras ilegíveis.
+  const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v4", CAMP_MIN_WIDTHS);
   const adset = useColWidths<AdsetColKey>(ADSET_DEFAULTS, "campaigns-adset-cols-v1");
   const ad = useColWidths<AdColKey>(AD_DEFAULTS, "campaigns-ad-cols-v1");
 
@@ -356,8 +384,8 @@ export default function Campaigns() {
           adsetBudget += adset.daily_budget ?? 0;
           for (const ad of adset.ads || []) {
             for (const i of ad.insights || []) {
-              if (startDate && i.date < startDate.toISOString().split("T")[0]) continue;
-              if (endDate && i.date > endDate.toISOString().split("T")[0]) continue;
+              if (startDate && i.date < format(startDate, "yyyy-MM-dd")) continue;
+              if (endDate && i.date > format(endDate, "yyyy-MM-dd")) continue;
               spend += i.spend ?? 0;
               leads += i.leads ?? 0;
               clicks += i.clicks ?? 0;
@@ -401,6 +429,7 @@ export default function Campaigns() {
   const { data: actionData } = useActionTotalsByAds(campaignAdIds, startDate, endDate);
   const campaigns = useMemo(() => campaignBaseRows.map((campaign: any) => {
     const actionMetrics = { linkClicks: 0, landingPageViews: 0, checkouts: 0, purchases: 0, purchaseValue: 0 };
+    const actionEventTotals: Record<string, number> = {};
     for (const currentAdset of campaign.adsets || []) {
       for (const currentAd of currentAdset.ads || []) {
         const resolved = resolveMetaActionMetrics(actionData?.totalsByAd[currentAd.id], actionData?.valueTotalsByAd[currentAd.id]);
@@ -409,12 +438,23 @@ export default function Campaigns() {
         actionMetrics.checkouts += resolved.checkouts;
         actionMetrics.purchases += resolved.purchases;
         actionMetrics.purchaseValue += resolved.purchaseValue;
+        for (const [actionType, value] of Object.entries(actionData?.totalsByAd[currentAd.id] || {})) {
+          actionEventTotals[actionType] = (actionEventTotals[actionType] || 0) + Number(value || 0);
+        }
       }
     }
 
     const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
+    const results = resolveCampaignResults(campaign.leads, actionEventTotals);
+    const primaryResult = resolveCampaignPrimaryResult(campaign.objective, results).value;
     return {
       ...campaign,
+      // Todas as métricas de aquisição usam a mesma definição operacional de
+      // lead: formulário/site + conversa iniciada. O resultado exibido na
+      // linha segue o objetivo da campanha e é calculado em `primaryResult`.
+      leads: results.total,
+      cpl: results.total > 0 ? campaign.spend / results.total : 0,
+      conversionRate: campaign.clicks > 0 ? results.total / campaign.clicks * 100 : 0,
       linkClicks,
       linkCpc: linkClicks > 0 ? campaign.spend / linkClicks : 0,
       landingPageViews: actionMetrics.landingPageViews,
@@ -424,6 +464,12 @@ export default function Campaigns() {
       metaPurchases: actionMetrics.purchases,
       metaCostPerPurchase: actionMetrics.purchases > 0 ? campaign.spend / actionMetrics.purchases : 0,
       metaPurchaseRoas: campaign.spend > 0 ? actionMetrics.purchaseValue / campaign.spend : 0,
+      actionEvents: Object.entries(actionEventTotals).map(([actionType, value]) => ({ actionType, value })).sort((a, b) => b.value - a.value),
+      results,
+      // Para campanhas de mensagem, conversa iniciada é o resultado mostrado
+      // e a base do custo. Leads e os demais eventos ficam no detalhamento.
+      primaryResult,
+      costPerResult: primaryResult > 0 ? campaign.spend / primaryResult : 0,
     };
   }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignBaseRows]);
 
@@ -451,7 +497,7 @@ export default function Campaigns() {
     queryFn: async () => {
       let query = supabase
         .from("ads")
-        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,ad_account_id))")
+        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,objective,ad_account_id))")
         .order("name", { ascending: true });
       if (selectedAccount !== "all") query = query.eq("adsets.campaigns.ad_account_id", selectedAccount);
       else {
@@ -533,7 +579,7 @@ export default function Campaigns() {
     let result = campaigns;
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter((c: any) => [c.name, c.id, c.objective, c.status, c.spend, c.leads, c.cpl, c.ctr, c.roas]
+      result = result.filter((c: any) => [c.name, c.id, c.objective, c.status, c.spend, c.primaryResult ?? c.results?.total ?? c.leads, c.costPerResult ?? c.cpl, c.ctr, c.roas]
         .some((value) => String(value ?? "").toLowerCase().includes(q)));
     }
     if (statusFilter !== "all") {
@@ -557,7 +603,8 @@ export default function Campaigns() {
         return sortAsc ? difference : -difference;
       }
 
-      const av = a[sortKey], bv = b[sortKey];
+      const av = sortKey === "leads" ? (a.primaryResult ?? a.results?.total ?? a.leads) : sortKey === "cpl" ? (a.costPerResult ?? a.cpl) : a[sortKey];
+      const bv = sortKey === "leads" ? (b.primaryResult ?? b.results?.total ?? b.leads) : sortKey === "cpl" ? (b.costPerResult ?? b.cpl) : b[sortKey];
       if (typeof av === "string" && typeof bv === "string") {
         return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       }
@@ -570,6 +617,32 @@ export default function Campaigns() {
     () => analysisMode ? filtered : filtered.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize),
     [analysisMode, campaignPage, filtered],
   );
+  const storageBreakdownType = getBreakdownStorageType(breakdown);
+  const breakdownCampaignIds = useMemo(() => filtered.map((campaign: any) => String(campaign.id)).filter(Boolean), [filtered]);
+  const breakdownQuery = useQuery({
+    queryKey: ["campaign-breakdown-workspace", storageBreakdownType, breakdownCampaignIds.join(","), formatApiDate(startDate), formatApiDate(endDate)],
+    enabled: !!storageBreakdownType && breakdownCampaignIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("insights_breakdowns").select("segment_key,spend,impressions,clicks,leads,date").eq("breakdown_type", storageBreakdownType).in("campaign_id", breakdownCampaignIds).gte("date", formatApiDate(startDate)).lte("date", formatApiDate(endDate));
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const breakdownSegments = useMemo(() => {
+    const grouped = new Map<string, { key: string; spend: number; impressions: number; clicks: number; leads: number }>();
+    for (const row of breakdownQuery.data ?? []) {
+      const key = String(row.segment_key || "Não informado");
+      const current = grouped.get(key) ?? { key, spend: 0, impressions: 0, clicks: 0, leads: 0 };
+      current.spend += Number(row.spend || 0); current.impressions += Number(row.impressions || 0); current.clicks += Number(row.clicks || 0); current.leads += Number(row.leads || 0);
+      grouped.set(key, current);
+    }
+    return [...grouped.values()].map((row) => ({ ...row, ctr: row.impressions ? row.clicks / row.impressions * 100 : 0, cpl: row.leads ? row.spend / row.leads : 0 })).sort((a, b) => b.spend - a.spend);
+  }, [breakdownQuery.data]);
+  const requestBreakdownSync = () => syncMeta.mutate({
+    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+    adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : undefined,
+    startDate: formatApiDate(startDate), endDate: formatApiDate(endDate), includeBreakdowns: true,
+  });
   useEffect(() => { setCampaignPage(0); }, [search, statusFilter, healthFilter, columnFilters, selectedAccount, startDate, endDate, sortKey, sortAsc]);
   useEffect(() => { if (campaignPage >= pageCount) setCampaignPage(pageCount - 1); }, [campaignPage, pageCount]);
 
@@ -588,7 +661,14 @@ export default function Campaigns() {
 
   const totals = useMemo(() => filtered.reduce(
     (acc: any, c: any) => ({
-      budget: acc.budget + c.budget, spend: acc.spend + c.spend, leads: acc.leads + c.leads,
+      budget: acc.budget + c.budget,
+      spend: acc.spend + c.spend,
+      // Lead de aquisição inclui formulário/site e conversas iniciadas. A tabela
+      // continua mostrando o resultado principal de cada campanha individual.
+      leads: acc.leads + (c.results?.total ?? c.leads),
+      formLeads: acc.formLeads + (c.results?.leadCount ?? c.leads),
+      conversations: acc.conversations + (c.results?.conversations ?? 0),
+      results: acc.results + (c.results?.total ?? c.primaryResult ?? c.leads),
       salesCount: acc.salesCount + c.salesCount, revenue: acc.revenue + c.revenue,
       profit: acc.profit + c.profit, impressions: acc.impressions + c.impressions, clicks: acc.clicks + c.clicks,
       reach: acc.reach + c.reach, linkClicks: acc.linkClicks + c.linkClicks,
@@ -597,12 +677,12 @@ export default function Campaigns() {
       checkouts: acc.checkouts + c.checkouts, metaPurchases: acc.metaPurchases + c.metaPurchases,
       metaPurchaseValue: acc.metaPurchaseValue + (c.metaPurchaseRoas * c.spend),
     }),
-    { budget: 0, spend: 0, leads: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0, linkClicks: 0, uniqueLinkClicks: 0, landingPageViews: 0, checkouts: 0, metaPurchases: 0, metaPurchaseValue: 0 }
+    { budget: 0, spend: 0, leads: 0, formLeads: 0, conversations: 0, results: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0, linkClicks: 0, uniqueLinkClicks: 0, landingPageViews: 0, checkouts: 0, metaPurchases: 0, metaPurchaseValue: 0 }
   ), [filtered]);
   const totalCtr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
   const totalCpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : 0;
-  const totalCpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
+  const totalCpl = totals.results > 0 ? totals.spend / totals.results : 0;
   const totalRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
   const totalLinkCpc = totals.linkClicks > 0 ? totals.spend / totals.linkClicks : 0;
   const totalUniqueLinkCtr = totals.reach > 0 ? totals.uniqueLinkClicks / totals.reach * 100 : 0;
@@ -610,21 +690,39 @@ export default function Campaigns() {
   const totalCostPerCheckout = totals.checkouts > 0 ? totals.spend / totals.checkouts : 0;
   const totalMetaCostPerPurchase = totals.metaPurchases > 0 ? totals.spend / totals.metaPurchases : 0;
   const totalMetaPurchaseRoas = totals.spend > 0 ? totals.metaPurchaseValue / totals.spend : 0;
-  const totalResultRate = totals.clicks > 0 ? totals.leads / totals.clicks * 100 : 0;
+  const totalResultRate = totals.clicks > 0 ? totals.results / totals.clicks * 100 : 0;
   const intelligenceSeries = useMemo(() => {
-    const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number }>();
+    const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number; hasData: boolean }>();
+    const lastDate = formatApiDate(endDate);
+    for (let cursor = startDate; formatApiDate(cursor) <= lastDate; cursor = addDays(cursor, 1)) {
+      const date = formatApiDate(cursor);
+      byDate.set(date, { date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false });
+    }
     for (const campaign of filtered) {
       for (const currentAdset of campaign.adsets || []) {
         for (const currentAd of currentAdset.ads || []) {
+          const insightsByDate = new Map<string, any>();
           for (const insight of currentAd.insights || []) {
             if (!insight.date) continue;
             if (insight.date < formatApiDate(startDate) || insight.date > formatApiDate(endDate)) continue;
-            const current = byDate.get(insight.date) ?? { date: insight.date, spend: 0, impressions: 0, clicks: 0, leads: 0 };
+            insightsByDate.set(insight.date, insight);
+            const current = byDate.get(insight.date) ?? { date: insight.date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
             current.spend += Number(insight.spend || 0);
             current.impressions += Number(insight.impressions || 0);
             current.clicks += Number(insight.clicks || 0);
-            current.leads += Number(insight.leads || 0);
+            current.hasData = true;
             byDate.set(insight.date, current);
+          }
+
+          const actionDays = actionData?.dailyByAd?.[currentAd.id] || {};
+          const dates = new Set([...insightsByDate.keys(), ...Object.keys(actionDays)]);
+          for (const date of dates) {
+            const insight = insightsByDate.get(date);
+            const current = byDate.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
+            const dailyResults = resolveCampaignResults(Number(insight?.leads || 0), actionDays[date] || {});
+            current.leads += dailyResults.total;
+            current.hasData = true;
+            byDate.set(date, current);
           }
         }
       }
@@ -638,7 +736,7 @@ export default function Campaigns() {
       cpl: item.leads > 0 ? item.spend / item.leads : 0,
       resultRate: item.clicks > 0 ? item.leads / item.clicks * 100 : 0,
     }));
-  }, [endDate, filtered, startDate]);
+  }, [actionData?.dailyByAd, endDate, filtered, startDate]);
 
   const selectedCampaign = useMemo(() => {
     if (selectedIds.size !== 1) return null;
@@ -706,9 +804,22 @@ export default function Campaigns() {
         const currentAdset = firstRelation(currentAd.adsets);
         const campaign = firstRelation(currentAdset?.campaigns);
         const metrics = aggregateInsights([embeddedAdsById.get(currentAd.id)].filter(Boolean), startDate, endDate);
+        // A tabela de insights guarda leads, mas as campanhas de mensagem da
+        // Meta registram o resultado em insight_actions. Sem esta composição,
+        // os criativos exibiam cliques e investimento corretos, porém zero
+        // resultados apesar de a campanha ter conversas iniciadas.
+        const results = resolveCampaignResults(metrics.leads, actionData?.totalsByAd[currentAd.id] || {});
+        const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results);
         return {
           ...currentAd,
           ...metrics,
+          leads: primaryResult.value,
+          results,
+          resultLabel: primaryResult.label,
+          costPerResult: primaryResult.value > 0 ? metrics.spend / primaryResult.value : 0,
+          actionEvents: Object.entries(actionData?.totalsByAd[currentAd.id] || {})
+            .map(([actionType, value]) => ({ actionType, value: Number(value || 0) }))
+            .sort((a, b) => b.value - a.value),
           campaignId: currentAdset?.campaign_id,
           adsetName: currentAdset?.name || "Conjunto sem nome",
           campaignName: campaign?.name || "Campanha sem nome",
@@ -718,7 +829,7 @@ export default function Campaigns() {
       .filter((currentAd: any) => statusFilter === "all" || normalizeStatus(currentAd.status) === statusFilter)
       .filter((currentAd: any) => !query || currentAd.name.toLowerCase().includes(query) || currentAd.adsetName.toLowerCase().includes(query) || currentAd.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adSortKey, adSortAsc);
-  }, [accountAds, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
+  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
@@ -742,16 +853,16 @@ export default function Campaigns() {
         <div className="flex flex-col gap-2 px-3 py-2 lg:flex-row lg:items-center">
           <div className="flex shrink-0 items-center gap-2">
             <h1 className="text-lg font-black tracking-tight">Campanhas</h1>
-            <span className="grid h-7 w-7 place-items-center rounded-md border border-primary/25 bg-primary/10 text-[9px] font-black text-primary">GD</span>
+            <span className="campaign-brand-badge grid h-7 w-7 place-items-center rounded-md border text-[9px] font-black">GD</span>
           </div>
           {visibleAdAccounts.length > 0 && (
             <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-              <SelectTrigger className="h-8 w-full bg-background text-left text-xs sm:w-[260px] [&>span]:truncate [&>span]:text-left" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
+              <SelectTrigger className="campaign-account-select h-8 w-full text-left text-xs sm:w-[260px] [&>span]:truncate [&>span]:text-left" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
               <SelectContent><SelectItem value="all">Todas as contas de anúncio</SelectItem>{visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
             </Select>
           )}
           <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-primary text-[10px] font-black text-primary">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
+            <span className="campaign-opportunity-score grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-black">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
             <span className="truncate">Pontuação de oportunidade</span>
             <ChevronDown className="h-3.5 w-3.5" />
           </div>
@@ -765,13 +876,13 @@ export default function Campaigns() {
           </div>
         </div>
 
-        <div className="growdash-scrollbar-hidden flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
-          <Button variant="outline" size="sm" className="meta-toolbar-button meta-toolbar-button-active shrink-0"><FolderOpen className="h-3.5 w-3.5" />Todos os anúncios</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Megaphone className="h-3.5 w-3.5" />Anúncios ativos</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0"><ShieldCheck className="h-3.5 w-3.5" />Ações</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Eye className="h-3.5 w-3.5" />Tiveram veiculação</Button>
-          <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-2 text-[11px]"><Plus className="h-3.5 w-3.5" />Ver mais</Button>
-          <Button variant="outline" size="sm" className="meta-toolbar-primary ml-auto shrink-0"><SlidersHorizontal className="h-3.5 w-3.5" />Criar visualização</Button>
+        <div className="campaign-scope-toolbar growdash-scrollbar-hidden flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button meta-toolbar-button-active shrink-0"><FolderOpen className="h-3.5 w-3.5" />Todos os anúncios</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Megaphone className="h-3.5 w-3.5" />Anúncios ativos</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0"><ShieldCheck className="h-3.5 w-3.5" />Ações</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Eye className="h-3.5 w-3.5" />Tiveram veiculação</Button>
+          <Button variant="ghost" size="sm" className="campaign-scope-action h-8 shrink-0 gap-2 text-[11px]"><Plus className="h-3.5 w-3.5" />Ver mais</Button>
+          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-primary ml-auto shrink-0"><SlidersHorizontal className="h-3.5 w-3.5" />Criar visualização</Button>
         </div>
 
         <div className="border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
@@ -786,32 +897,32 @@ export default function Campaigns() {
 
       <MotionItem className={cn(!analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn(!analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
-          <div className="growdash-scrollbar-hidden flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
-            <TabsList className="h-auto w-max min-w-0 shrink-0 justify-start rounded-none bg-transparent p-0">
-              <TabsTrigger value="campaigns" className="h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
+          <div className="campaign-tabs-header growdash-scrollbar-hidden flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
+            <TabsList className="campaign-tabs-list h-auto w-max min-w-0 shrink-0 justify-start rounded-xl bg-transparent p-1">
+              <TabsTrigger value="campaigns" className="campaign-hierarchy-tab h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-lg px-3 text-xs">
                 <FolderKanban className="h-3.5 w-3.5" /> Campanhas ({filtered.length})
               </TabsTrigger>
-              <TabsTrigger value="adsets" className="h-10 min-w-[210px] shrink-0 justify-start gap-2 rounded-none border-r border-border px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
+              <TabsTrigger value="adsets" className="campaign-hierarchy-tab h-10 min-w-[210px] shrink-0 justify-start gap-2 rounded-lg px-3 text-xs">
                 <Layers3 className="h-3.5 w-3.5" /> Conjuntos de anúncios ({selectedAdsets.length})
               </TabsTrigger>
-              <TabsTrigger value="ads" className="h-10 min-w-[160px] shrink-0 justify-start gap-2 rounded-none px-3 text-xs data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
+              <TabsTrigger value="ads" className="campaign-hierarchy-tab h-10 min-w-[160px] shrink-0 justify-start gap-2 rounded-lg px-3 text-xs">
                 <RectangleHorizontal className="h-3.5 w-3.5" /> Anúncios ({selectedAds.length})
               </TabsTrigger>
             </TabsList>
-            <div className="ml-auto flex shrink-0 items-center px-2 py-1.5">
+            <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5">
               <div className="w-[205px] [&_.gd-filter-date]:!w-full [&_.gd-filter-date]:!min-w-0 [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[10px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
             </div>
           </div>
 
-          <div className="growdash-scrollbar-hidden flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
-            <div className="flex shrink-0 items-center gap-2">
-              <Button size="sm" className="h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
-              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={selectedIds.size === 0}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
-              <Button variant="outline" size="sm" className="meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
-              <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
-              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
+          <div className="campaign-actions-toolbar growdash-scrollbar-hidden flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
+            <div className="campaign-primary-actions flex shrink-0 items-center gap-2">
+              <Button size="sm" className="campaign-action-button h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
+              <Button variant="outline" size="sm" className="campaign-action-button meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDuplicatingCampaign({ id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
+              <Button variant="outline" size="sm" className="campaign-action-button meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
+              <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="campaign-action-select h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
+              <Button variant="outline" size="sm" onClick={() => { camp.reset(); adset.reset(); ad.reset(); }} className="campaign-action-button meta-toolbar-button"><RotateCcw className="h-3.5 w-3.5" />Resetar</Button>
             </div>
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="campaign-secondary-actions ml-auto flex shrink-0 items-center gap-2">
               {activeTab === "campaigns" && <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className={cn("meta-toolbar-button", analysisPanel && "meta-toolbar-button-active")}><BarChart3 className="h-3.5 w-3.5" />Análises<ChevronDown className="h-3 w-3" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -819,8 +930,8 @@ export default function Campaigns() {
                   <DropdownMenuItem onSelect={() => { setHealthFilter("all"); updateAnalysisPanel(analysisPanel === "intelligence" ? null : "intelligence"); }}><BrainCircuit className="mr-2 h-4 w-4 text-primary" />Intelligence</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>}
-              {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
-              {activeTab === "campaigns" && <Button variant="outline" size="sm" className={cn("meta-toolbar-button", columnFiltersOpen && "meta-toolbar-button-active")} onClick={() => setColumnFiltersOpen((open) => !open)}><SlidersHorizontal className="h-3.5 w-3.5" />Filtros por coluna{activeColumnFilterCount > 0 && <Badge className="ml-1 h-4 min-w-4 px-1 text-[8px]">{activeColumnFilterCount}</Badge>}</Button>}
+              {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} onRequestBreakdown={requestBreakdownSync} isRequestingBreakdown={syncMeta.isPending} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
+              {activeTab === "campaigns" && <Button variant="outline" size="sm" className={cn("campaign-action-button meta-toolbar-button", columnFiltersOpen && "meta-toolbar-button-active")} onClick={() => setColumnFiltersOpen((open) => !open)}><SlidersHorizontal className="h-3.5 w-3.5" />Filtros por coluna{activeColumnFilterCount > 0 && <Badge className="ml-1 h-4 min-w-4 px-1 text-[8px]">{activeColumnFilterCount}</Badge>}</Button>}
             </div>
           </div>
 
@@ -855,7 +966,7 @@ export default function Campaigns() {
             </div>
           )}
 
-          {activeTab === "campaigns" && breakdown !== "none" && <div className="flex items-start gap-2 border-b border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span><b>{getBreakdownLabel(breakdown)} selecionado.</b> A interface está pronta, mas este corte exige que a sincronização da Meta grave breakdowns por linha. Até isso ocorrer, os totais abaixo continuam consolidados e não são duplicados artificialmente.</span></div>}
+          {activeTab === "campaigns" && breakdown !== "none" && <BreakdownWorkspace label={getBreakdownLabel(breakdown)} supported={!!storageBreakdownType} loading={breakdownQuery.isLoading || syncMeta.isPending} rows={breakdownSegments} onSync={requestBreakdownSync} />}
           {activeTab === "campaigns" && analysisPanel === "alerts" && (
             <section className="campaign-analysis-shell border-b border-primary/20" data-analysis-content="alerts">
               <header className="campaign-analysis-header flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center">
@@ -1040,8 +1151,8 @@ export default function Campaigns() {
                             {showColumn("uniqueLinkCtr") && <TableCell style={cellW("uniqueLinkCtr")} className={cn("text-right tabular-nums text-sm", sortBg("uniqueLinkCtr"))}><AnimatedNumber value={c.uniqueLinkCtr} suffix="%" decimals={2} /></TableCell>}
                             {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))}><AnimatedNumber value={c.leads} decimals={0} /><span className="block text-[8px] text-muted-foreground">Leads na Meta</span></TableCell>}
-                            {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.cpl} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))} onClick={(event) => event.stopPropagation()}><CampaignResultCell campaign={c} onOpen={() => setDetailCampaignId(c.id)} /></TableCell>}
+                            {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.costPerResult ?? c.cpl} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("landingPageViews") && <TableCell style={cellW("landingPageViews")} className={cn("text-right tabular-nums text-sm", sortBg("landingPageViews"))}><AnimatedNumber value={c.landingPageViews} decimals={0} /></TableCell>}
                             {showColumn("costPerLandingPageView") && <TableCell style={cellW("costPerLandingPageView")} className={cn("text-right tabular-nums text-sm", sortBg("costPerLandingPageView"))}><AnimatedNumber value={c.costPerLandingPageView} prefix="R$ " decimals={2} /></TableCell>}
@@ -1089,7 +1200,7 @@ export default function Campaigns() {
                         {showColumn("uniqueLinkCtr") && <CampaignTotalCell width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
                         {showColumn("cpm") && <CampaignTotalCell width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por 1.000 impressões" />}
                         {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Orçamento somado" />}
-                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.leads.toLocaleString("pt-BR")} label="Resultados" />}
+                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.results.toLocaleString("pt-BR")} label="Resultado principal por campanha" />}
                         {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado" />}
                         {showColumn("spend") && <CampaignTotalCell width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total usado" />}
                         {showColumn("landingPageViews") && <CampaignTotalCell width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}
@@ -1270,6 +1381,8 @@ export default function Campaigns() {
         open={!!detailCampaignId}
         onOpenChange={(v) => !v && setDetailCampaignId(null)}
         campaign={detailCampaignId ? (campaigns.find((c: any) => c.id === detailCampaignId) || null) : null}
+        startDate={startDate}
+        endDate={endDate}
         onEdit={(campaign) => { setDetailCampaignId(null); setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: (campaign as any).daily_budget ?? (campaign as any).budget }); }}
         onViewAds={(campaign) => { setSelectedIds(new Set([campaign.id])); setActiveTab("ads"); setDetailCampaignId(null); }}
       />
@@ -1298,6 +1411,15 @@ export default function Campaigns() {
         defaultAccountId={selectedAccount !== "all" ? selectedAccount : undefined}
         onOpenChange={setCreateCampaignOpen}
         onCreated={async () => { await refetch(); }}
+      />
+      <MetaCampaignDuplicator
+        campaign={duplicatingCampaign}
+        onOpenChange={(open) => { if (!open) setDuplicatingCampaign(null); }}
+        onDuplicated={async (duplicate) => {
+          await refetch();
+          setSelectedIds(new Set([duplicate.id]));
+          setEditingEntity({ type: "campaign", id: duplicate.id, name: duplicate.name, status: duplicate.status });
+        }}
       />
     </MotionPage>
   );
@@ -1350,6 +1472,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
     { id: "actions", label: "IA e ações" },
   ] as const;
   const showMetrics = view === "overview" || view === "metrics";
+  const daysWithData = useMemo(() => series.filter((item) => item.hasData).length, [series]);
   return (
     <section className="campaign-analysis-shell border-b border-primary/20" data-analysis-content="intelligence">
       <header className="campaign-analysis-header flex flex-col gap-1 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1359,7 +1482,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
         </div>
         <div className="flex items-center gap-2">
           <a href="/inteligencia" className="gd-button h-8 px-3 text-[10px]"><Sparkles className="h-3.5 w-3.5" />10 automações IA</a>
-          <Badge variant="outline" className="w-fit">{series.length} dia(s) com dados</Badge>
+          <Badge variant="outline" className="w-fit">{daysWithData} de {series.length} dia(s) com dados</Badge>
         </div>
       </header>
 
@@ -1384,7 +1507,11 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
         <AnalysisMetric label="Impressões" value={Number(totals.impressions || 0).toLocaleString("pt-BR")} />
         <AnalysisMetric label="CTR" value={`${Number(totalCtr || 0).toFixed(2).replace(".", ",")}%`} />
         <AnalysisMetric label="Investimento" value={currency(Number(totals.spend || 0))} />
-        <AnalysisMetric label="Leads" value={Number(totals.leads || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} />
+        <AnalysisMetric
+          label="Leads de aquisição"
+          value={Number(totals.leads || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+          description={`${Number(totals.formLeads || 0).toLocaleString("pt-BR")} leads em formulário/site + ${Number(totals.conversations || 0).toLocaleString("pt-BR")} conversas iniciadas.`}
+        />
         <AnalysisMetric label="CPL" value={currency(Number(totalCpl || 0))} />
         <AnalysisMetric label="ROAS" value={`${Number(totalRoas || 0).toFixed(2).replace(".", ",")}x`} />
         <AnalysisMetric label="CPM" value={currency(Number(totalCpm || 0))} />
@@ -1394,8 +1521,8 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
       </div>
 
         <div className="relative grid gap-3 border-t border-border p-3 xl:grid-cols-2">
-          {series.length === 0 && <span className="absolute right-5 top-5 z-10 rounded-full border border-border bg-background/90 px-2 py-1 text-[9px] font-bold text-muted-foreground">Sem dados no período · exibindo estrutura zerada</span>}
-          <ChartPanel title="Investimento × leads" description="Evolução diária com duas escalas para não distorcer volume e custo.">
+          {daysWithData === 0 && <span className="absolute right-5 top-5 z-10 rounded-full border border-border bg-background/90 px-2 py-1 text-[9px] font-bold text-muted-foreground">Sem dados no período · exibindo todos os dias zerados</span>}
+          <ChartPanel title="Investimento × leads de aquisição" description="Formulários, site e conversas iniciadas por dia, com duas escalas para não distorcer volume e custo.">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={safeSeries} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.6} />
@@ -1405,7 +1532,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
                 <ChartTooltip contentStyle={tooltipStyle} formatter={(value: number, name: string) => [name === "Investimento" ? currency(value) : Number(value).toLocaleString("pt-BR"), name]} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
                 <Bar yAxisId="money" dataKey="spend" name="Investimento" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="volume" type="monotone" dataKey="leads" name="Leads" stroke="hsl(var(--success))" strokeWidth={2.5} dot={false} />
+                <Line yAxisId="volume" type="monotone" dataKey="leads" name="Leads de aquisição" stroke="hsl(var(--success))" strokeWidth={2.5} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </ChartPanel>
@@ -1442,29 +1569,53 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
   );
 }
 
+type CreativeSort = "leads" | "cpl" | "ctr" | "clicks" | "conversion" | "spend";
+
 function CreativeIntelligenceGallery({ ads }: { ads: any[] }) {
+  const [sortBy, setSortBy] = useState<CreativeSort>("leads");
   const creatives = useMemo(() => ads.map((ad) => ({
     ...ad,
     mediaUrl: ad.thumbnail_url || ad.media_url || ad.video_url || null,
-  })).sort((a, b) => Number(b.spend || 0) - Number(a.spend || 0)), [ads]);
+    spend: Number(ad.spend || 0),
+    leads: Number(ad.leads || 0),
+    resultLabel: ad.resultLabel || "Resultados",
+    clicks: Number(ad.clicks || ad.linkClicks || 0),
+    ctr: Number(ad.ctr || 0),
+    cpl: Number(ad.leads || 0) > 0 ? Number(ad.spend || 0) / Number(ad.leads || 0) : 0,
+    conversion: Number(ad.clicks || ad.linkClicks || 0) > 0 ? Number(ad.leads || 0) / Number(ad.clicks || ad.linkClicks || 0) * 100 : 0,
+  })).sort((a, b) => {
+    if (sortBy === "cpl") {
+      if (a.leads === 0 && b.leads === 0) return b.spend - a.spend;
+      if (a.leads === 0) return 1;
+      if (b.leads === 0) return -1;
+      return a.cpl - b.cpl;
+    }
+    return Number(b[sortBy] || 0) - Number(a[sortBy] || 0);
+  }), [ads, sortBy]);
 
   return <section className="border-t border-border p-3">
-    <div className="mb-3"><h3 className="text-xs font-black">Galeria de criativos</h3><p className="mt-1 text-[9px] text-muted-foreground">Imagem ou vídeo original disponível na Meta, sem desfoque e com identificação do anúncio.</p></div>
+    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div><h3 className="text-xs font-black">Galeria de criativos</h3><p className="mt-1 text-[9px] text-muted-foreground">Compare as peças pelo resultado real dentro do período e dos filtros selecionados.</p></div>
+      <label className="grid gap-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground"><span>Ordenar criativos</span><Select value={sortBy} onValueChange={(value) => setSortBy(value as CreativeSort)}><SelectTrigger className="h-9 min-w-52 bg-background text-xs normal-case tracking-normal text-foreground"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="leads">Mais resultados</SelectItem><SelectItem value="cpl">Menor custo por resultado</SelectItem><SelectItem value="ctr">Maior CTR</SelectItem><SelectItem value="clicks">Mais cliques</SelectItem><SelectItem value="conversion">Maior conversão</SelectItem><SelectItem value="spend">Maior investimento</SelectItem></SelectContent></Select></label>
+    </div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {creatives.length > 0 ? creatives.map((ad) => {
-        const isVideo = typeof ad.mediaUrl === "string" && /\.(mp4|webm|mov|m4v)(?:\?|$)/i.test(ad.mediaUrl);
         return <article key={ad.id} className="overflow-hidden rounded-xl border border-border bg-background">
-          <div className="grid aspect-video place-items-center overflow-hidden bg-black">
-            {ad.mediaUrl ? isVideo
-              ? <video src={ad.mediaUrl} controls preload="metadata" className="h-full w-full object-contain" aria-label={`Vídeo do criativo ${ad.name || "sem nome"}`} />
-              : <img src={ad.mediaUrl} alt={`Criativo ${ad.name || "sem nome"}`} loading="lazy" className="h-full w-full object-contain" />
-              : <div className="px-4 text-center text-[10px] text-white/55"><RectangleHorizontal className="mx-auto mb-2 h-7 w-7" />Prévia ainda não sincronizada</div>}
-          </div>
-          <div className="p-3"><h4 className="truncate text-[11px] font-black" title={ad.name || "Sem nome"}>{ad.name || "Sem nome"}</h4><p className="mt-1 truncate text-[9px] text-muted-foreground">{ad.campaignName || "Campanha não identificada"}</p><div className="mt-3 grid grid-cols-3 gap-2"><IssueMetric label="Investido" value={Number(ad.spend || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Leads" value={Number(ad.leads || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} /><IssueMetric label="CTR" value={`${Number(ad.ctr || 0).toFixed(2).replace(".", ",")}%`} /></div></div>
+          <CreativeMediaPreview mediaUrl={ad.mediaUrl} name={ad.name} />
+          <div className="p-3"><div className="flex items-center justify-between gap-2"><h4 className="truncate text-[11px] font-black" title={ad.name || "Sem nome"}>{ad.name || "Sem nome"}</h4><Badge variant="outline" className="shrink-0 text-[8px]">{ad.leads > 0 ? `${ad.leads.toLocaleString("pt-BR")} ${ad.resultLabel.toLocaleLowerCase()}` : "Sem resultado"}</Badge></div><p className="mt-1 truncate text-[9px] text-muted-foreground">{ad.campaignName || "Campanha não identificada"}</p><div className="mt-3 grid grid-cols-3 gap-2"><IssueMetric label={ad.resultLabel} value={ad.leads.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} /><IssueMetric label="Custo/result." value={ad.leads > 0 ? ad.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"} /><IssueMetric label="Conversão" value={`${ad.conversion.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Cliques" value={ad.clicks.toLocaleString("pt-BR")} /><IssueMetric label="CTR" value={`${ad.ctr.toFixed(2).replace(".", ",")}%`} /><IssueMetric label="Investido" value={ad.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>
         </article>;
       }) : <div className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">Nenhum criativo sincronizado para os filtros atuais.</div>}
     </div>
   </section>;
+}
+
+function CreativeMediaPreview({ mediaUrl, name }: { mediaUrl: string | null; name?: string }) {
+  const [failed, setFailed] = useState(false);
+  const isVideo = typeof mediaUrl === "string" && /\.(mp4|webm|mov|m4v)(?:\?|$)/i.test(mediaUrl);
+  if (!mediaUrl || failed) return <div className="grid aspect-video place-items-center bg-black px-4 text-center text-[10px] text-white/55"><span><RectangleHorizontal className="mx-auto mb-2 h-7 w-7" />{failed ? "Prévia expirada — sincronize a Meta novamente" : "Prévia ainda não sincronizada"}</span></div>;
+  return <div className="grid aspect-video place-items-center overflow-hidden bg-black">{isVideo
+    ? <video src={mediaUrl} controls preload="metadata" className="h-full w-full object-contain" aria-label={`Vídeo do criativo ${name || "sem nome"}`} onError={() => setFailed(true)} />
+    : <img src={mediaUrl} alt={`Criativo ${name || "sem nome"}`} loading="lazy" className="h-full w-full object-contain" onError={() => setFailed(true)} />}</div>;
 }
 
 function EntityIntelligenceTable({ title, nameLabel, entities }: { title: string; nameLabel: string; entities: any[] }) {
@@ -1509,6 +1660,27 @@ function ChartPanel({ title, description, children }: { title: string; descripti
   return <article className="campaign-analysis-card min-w-0 p-4"><h3 className="text-xs font-black">{title}</h3><p className="mt-1 text-[9px] text-muted-foreground">{description}</p><div className="mt-4 h-[260px] min-w-0">{children}</div></article>;
 }
 
+function CampaignResultCell({ campaign, onOpen }: { campaign: any; onOpen: () => void }) {
+  const primary = campaignPrimaryResult(campaign);
+  const breakdown = campaign.results?.breakdown ?? (Number(campaign.leads || 0) > 0 ? [{ label: "Leads Meta", value: Number(campaign.leads) }] : []);
+  const events = (campaign.actionEvents ?? []).slice(0, 8);
+  return <Tooltip>
+    <TooltipTrigger asChild>
+      <button type="button" className="ml-auto block rounded-md px-1 py-0.5 text-right transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={onOpen} aria-label={`Abrir resultado e eventos de ${campaign.name}`}>
+        <AnimatedNumber value={primary.value} decimals={0} />
+        <span className="block text-[11px] font-medium leading-tight text-muted-foreground">{primary.value > 0 ? primary.label : "Sem resultado no período"}</span>
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="left" align="end" className="max-w-80 border-primary/25 bg-popover p-3 text-popover-foreground shadow-xl">
+      <p className="text-[10px] font-black uppercase tracking-wider text-primary">Resultados da campanha</p>
+      <p className="mt-1 text-xs font-bold">{primary.value.toLocaleString("pt-BR")} {primary.label.toLocaleLowerCase()} no período</p>
+      {breakdown.length > 0 ? <div className="mt-2 space-y-1 border-t border-border pt-2 text-[11px]">{breakdown.map((item: any) => <div key={item.label} className="flex justify-between gap-4"><span className="text-muted-foreground">{item.label}</span><b>{Number(item.value).toLocaleString("pt-BR")}</b></div>)}</div> : <p className="mt-2 text-[11px] text-muted-foreground">A Meta não registrou leads nem conversas iniciadas neste período.</p>}
+      {events.length > 0 ? <div className="mt-3 border-t border-border pt-2"><p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Eventos sincronizados</p><div className="mt-1 space-y-1 text-[11px]">{events.map((event: any) => <div key={event.actionType} className="flex justify-between gap-4"><span className="truncate" title={friendlyActionLabel(event.actionType)}>{friendlyActionLabel(event.actionType)}</span><b>{Number(event.value).toLocaleString("pt-BR")}</b></div>)}</div></div> : null}
+      <p className="mt-3 text-[10px] text-muted-foreground">Clique para abrir o detalhamento completo.</p>
+    </TooltipContent>
+  </Tooltip>;
+}
+
 function CampaignTotalCell({ width, value, label, align = "right", stickyLeft, strongDivider = false }: { width: number; value?: string; label?: string; align?: "left" | "right"; stickyLeft?: number; strongDivider?: boolean }) {
   return <TableCell
     style={{ width, minWidth: width, maxWidth: width, ...(stickyLeft !== undefined ? { left: stickyLeft } : {}) }}
@@ -1528,12 +1700,13 @@ function TotalMetric({ label, value }: { label: string; value: string }) {
   return <div className="min-w-[118px] shrink-0 rounded-lg border border-border/70 bg-muted/35 px-3 py-2"><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-0.5 block whitespace-nowrap text-xs tabular-nums">{value}</strong></div>;
 }
 
-function AnalysisMetric({ label, value }: { label: string; value: string }) {
-  return <div className="campaign-analysis-card px-3 py-2"><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-1 block text-sm tabular-nums">{value}</strong></div>;
+function AnalysisMetric({ label, value, description }: { label: string; value: string; description?: string }) {
+  return <div className="campaign-analysis-card px-3 py-2" title={description}><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-1 block text-sm tabular-nums">{value}</strong></div>;
 }
 
 function AnalysisCampaignAlert({ campaign, health, targetCpl, accountName, onOpen }: { campaign: any; health: CampaignHealth; targetCpl: number; accountName: string; onOpen: () => void }) {
   const option = HEALTH_OPTIONS.find((item) => item.id === health)!;
+  const primary = campaignPrimaryResult(campaign);
   const days = getCampaignActiveDays(campaign.created_at);
   return (
     <button type="button" onClick={onOpen} className="campaign-analysis-card p-3 text-left hover:bg-primary/[0.025] hover:shadow-md">
@@ -1547,8 +1720,8 @@ function AnalysisCampaignAlert({ campaign, health, targetCpl, accountName, onOpe
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         <IssueMetric label="Investido" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-        <IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} />
-        <IssueMetric label="Custo/resultado" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+        <IssueMetric label={primary.label} value={primary.value.toLocaleString("pt-BR")} />
+        <IssueMetric label="Custo/resultado" value={(campaign.costPerResult ?? campaign.cpl).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
         <IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} />
       </div>
     </button>
@@ -1561,7 +1734,8 @@ function IssueMetric({ label, value }: { label: string; value: string }) {
 
 function CampaignMobileCard({ campaign, selected, health, onSelect, onOpen, onEdit }: { campaign: any; selected: boolean; health: CampaignHealth; onSelect: () => void; onOpen: () => void; onEdit: () => void }) {
   const healthOption = HEALTH_OPTIONS.find((item) => item.id === health)!;
-  return <article className={cn("rounded-xl border bg-card p-3", selected ? "border-primary bg-primary/5" : "border-border")}><div className="flex items-start gap-3"><Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`Selecionar ${campaign.name}`} /><button type="button" onClick={onOpen} className="min-w-0 grow text-left"><span className="block truncate text-sm font-black">{campaign.name}</span><span className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase text-muted-foreground"><span className={cn("h-2 w-2 rounded-full", healthOption.dot)} />{healthOption.label} · {getStatusBadge(campaign.status).label}</span></button><Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onEdit}><Pencil className="h-4 w-4" /></Button></div><button type="button" onClick={onOpen} className="mt-3 grid w-full grid-cols-2 gap-2 text-left"><IssueMetric label="Investimento" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="Resultados" value={campaign.leads.toLocaleString("pt-BR")} /><IssueMetric label="CPL" value={campaign.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></button></article>;
+  const primary = campaignPrimaryResult(campaign);
+  return <article className={cn("rounded-xl border bg-card p-3", selected ? "border-primary bg-primary/5" : "border-border")}><div className="flex items-start gap-3"><Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`Selecionar ${campaign.name}`} /><button type="button" onClick={onOpen} className="min-w-0 grow text-left"><span className="block truncate text-sm font-black">{campaign.name}</span><span className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase text-muted-foreground"><span className={cn("h-2 w-2 rounded-full", healthOption.dot)} />{healthOption.label} · {getStatusBadge(campaign.status).label}</span></button><Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onEdit}><Pencil className="h-4 w-4" /></Button></div><button type="button" onClick={onOpen} className="mt-3 grid w-full grid-cols-2 gap-2 text-left"><IssueMetric label="Investimento" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label={primary.label} value={primary.value.toLocaleString("pt-BR")} /><IssueMetric label="Custo / resultado" value={(campaign.costPerResult ?? campaign.cpl).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></button></article>;
 }
 
 function LevelMobileCard({ entity, onOpen }: { entity: MetaDetailEntity; onOpen: () => void }) {
@@ -1585,4 +1759,9 @@ function LevelTotals({ label, count, totals }: { label: string; count: number; t
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
   return <div className="campaign-total-bar z-20 shrink-0 px-3 py-3"><div className="growdash-scrollbar flex gap-2 overflow-x-auto"><TotalMetric label="Total" value={`${count} ${label}`} /><TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><TotalMetric label="Alcance*" value={totals.reach.toLocaleString("pt-BR")} /><TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} /><TotalMetric label="CTR" value={`${ctr.toFixed(2).replace(".", ",")}%`} /><TotalMetric label="Resultados" value={totals.leads.toLocaleString("pt-BR")} /><TotalMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>;
+}
+
+function BreakdownWorkspace({ label, supported, loading, rows, onSync }: { label: string; supported: boolean; loading: boolean; rows: Array<{ key: string; spend: number; impressions: number; clicks: number; leads: number; ctr: number; cpl: number }>; onSync: () => void }) {
+  if (!supported) return <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-3 py-2 text-[11px]"><Layers3 className="h-4 w-4 text-primary" /><span><b>{label}</b> está disponível como opção de análise, mas a Meta não disponibiliza este recorte de forma confiável para todas as contas via API. Nenhum dado é estimado.</span>{label === "Criativo" && <span className="ml-auto text-primary">Use a aba Anúncios para analisar por criativo.</span>}</div>;
+  return <section className="border-b border-border bg-primary/[.035] px-3 py-3" aria-label={`Detalhamento por ${label}`}><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-xs font-black"><Layers3 className="h-4 w-4 text-primary" />Detalhamento por {label}</h2><p className="mt-1 text-[10px] text-muted-foreground">Recorte consolidado das campanhas e período atuais. Atualize somente quando precisar de dados novos.</p></div><Button variant="outline" size="sm" className="h-8 text-[10px]" disabled={loading} onClick={onSync}><RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />{loading ? "Atualizando…" : "Atualizar recorte"}</Button></div>{rows.length ? <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full min-w-[650px] text-xs"><thead className="bg-muted/45 text-[9px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-2.5 text-left">{label}</th><th className="p-2.5 text-right">Investimento</th><th className="p-2.5 text-right">Impressões</th><th className="p-2.5 text-right">Cliques</th><th className="p-2.5 text-right">CTR</th><th className="p-2.5 text-right">Resultados</th><th className="p-2.5 text-right">Custo / resultado</th></tr></thead><tbody className="divide-y divide-border">{rows.slice(0, 20).map((row) => <tr key={row.key}><td className="p-2.5 font-bold">{row.key}</td><td className="p-2.5 text-right tabular-nums">{row.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="p-2.5 text-right tabular-nums">{row.impressions.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.clicks.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.ctr.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</td><td className="p-2.5 text-right tabular-nums">{row.leads.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td></tr>)}</tbody></table></div> : <div className="rounded-lg border border-dashed border-border bg-background/40 p-4 text-xs text-muted-foreground">Ainda não há dados de {label.toLocaleLowerCase("pt-BR")} para este período. Clique em “Atualizar recorte” para solicitar a leitura à Meta.</div>}</section>;
 }

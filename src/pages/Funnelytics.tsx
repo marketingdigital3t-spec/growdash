@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { GrowdashFlowCanvas } from "@/components/GrowdashFlow/GrowdashFlowCanvas";
 import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
+import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate } from "@/components/GrowdashFlow/utils/templates";
 
 /* ─── Types ─── */
 interface FunnelNode {
@@ -297,6 +298,24 @@ function CreateFunnelDialog({ open, onOpenChange, onCreated }: {
     }
   };
 
+  const handleCreatePaidTrafficTemplate = async (template: "sql" | "sql-detailed") => {
+    const elements = template === "sql" ? createSqlTrafficFunnelTemplate() : createSqlTrafficDetailedTemplate();
+    try {
+      const result = await createFunnel.mutateAsync({
+        name: funnelName === "Novo Funil" ? (template === "sql" ? "Funil SQL · Advantage+" : "Funil SQL · Operação de tráfego") : funnelName,
+        nodes: elements,
+        connections: [{ kind: "growdash-flow-view", version: 1, zoom: 0.72, panOffset: { x: 35, y: 35 }, showGrid: true, snapToGrid: false, updatedAt: new Date().toISOString() }],
+        funnel_type: "blank",
+      });
+      toast({ title: "Funil de tráfego criado", description: "O modelo está pronto para adaptar à conta e às campanhas." });
+      reset();
+      onOpenChange(false);
+      onCreated(result);
+    } catch {
+      toast({ title: "Erro ao criar o modelo", variant: "destructive" });
+    }
+  };
+
   const handleCreateLinked = async () => {
     if (!selectedAccountId || selectedCampaignIds.length === 0) return;
     try {
@@ -392,6 +411,22 @@ function CreateFunnelDialog({ open, onOpenChange, onCreated }: {
                   <Users className="h-6 w-6 text-amber-500" />
                 </div>
                 <div><p className="text-sm font-semibold">Acompanhar leads</p><p className="mt-0.5 text-xs text-muted-foreground">Captação até fechamento</p></div>
+              </button>
+              <button
+                onClick={() => handleCreatePaidTrafficTemplate("sql")}
+                disabled={createFunnel.isPending}
+                className="group flex flex-col items-center gap-3 rounded-lg border-2 border-border p-5 text-center transition-all hover:border-primary/50 hover:bg-accent/50"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10"><Megaphone className="h-6 w-6 text-primary" /></div>
+                <div><p className="text-sm font-semibold">Tráfego pago · SQL</p><p className="mt-0.5 text-xs text-muted-foreground">4 estágios e distribuição de verba</p></div>
+              </button>
+              <button
+                onClick={() => handleCreatePaidTrafficTemplate("sql-detailed")}
+                disabled={createFunnel.isPending}
+                className="group flex flex-col items-center gap-3 rounded-lg border-2 border-border p-5 text-center transition-all hover:border-primary/50 hover:bg-accent/50"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10"><Waypoints className="h-6 w-6 text-emerald-500" /></div>
+                <div><p className="text-sm font-semibold">SQL · Operação completa</p><p className="mt-0.5 text-xs text-muted-foreground">Públicos, exclusões e regras de avanço</p></div>
               </button>
             </div>
           </div>

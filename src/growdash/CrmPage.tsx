@@ -13,6 +13,7 @@ import {
   Mail,
   MapPin,
   RefreshCw,
+  Save,
   Search,
   Target,
   Trophy,
@@ -20,21 +21,34 @@ import {
   UsersRound,
   XCircle,
 } from "lucide-react";
-import { endOfDay, format, formatDistanceToNow, startOfDay } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useInsights } from "@/hooks/useInsights";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useProducts } from "@/hooks/useProducts";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
-import { useFunnelStages } from "@/hooks/useRDDeals";
-import { classifyLead, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
-import { aggregateSales, useSales } from "@/hooks/useSales";
+import { useRDIntegration } from "@/hooks/useRDIntegration";
+import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
+import { classifyLead, dedupeRDDeals, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
+import { useSales } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { getRDDealAmount } from "@/lib/rdDealAmount";
+import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
+import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
+import { consolidateCRMPipeline, consolidatedCRMStage, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
+import { isRDDealInCrmPeriod } from "@/lib/crmDateScope";
+import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { MetricCard, PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 
@@ -42,6 +56,7 @@ const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" 
 const number = new Intl.NumberFormat("pt-BR");
 const PAGE_SIZE = 50;
 const BOARD_STEP = 50;
+const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
 type CRMView = "board" | "list" | "ai";
 type StatusFilter = "all" | "open" | "won" | "lost";
@@ -57,12 +72,51 @@ type PipelineStage = {
 export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { adAccountId, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
+  const { user } = useAuth();
+  const {
+    adAccountId,
+    setAdAccountId,
+    preset,
+    setPreset,
+    customRange,
+    setCustomRange,
+    startDate,
+    endDate,
+    businessUnitId,
+    segment,
+  } = useGlobalFilters();
   const accountFilter = adAccountId === "all" ? undefined : adAccountId;
-  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(accountFilter);
-  const { data: allDeals = [], isLoading: loadingDeals, isFetching } = useRDCRMDeals(accountFilter);
-  const { data: canonicalSales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter });
-  const [funnelId, setFunnelId] = useState("all");
+  const isConsolidatedView = adAccountId === "all";
+  const { data: adAccounts = [] } = useAdAccounts();
+  const availableAccounts = useMemo(() => businessUnitId
+    ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccounts, businessUnitId, segment]);
+  const availableAccountIds = useMemo(() => new Set(availableAccounts.map((account) => account.id)), [availableAccounts]);
+  const availableAccountIdList = useMemo(() => availableAccounts.map((account) => account.id), [availableAccounts]);
+  const { data: rdIntegration, isLoading: loadingRDIntegration } = useRDIntegration();
+  const rdEnabled = rdIntegration?.is_active === true;
+  // A conexão do RD pertence ao dono da conta/funil. Um gestor ou membro com
+  // permissão de leitura não deve perder o pipeline apenas por não possuir
+  // uma cópia pessoal do token. A consulta usa RLS e continua retornando
+  // somente os funis atribuídos ao usuário atual.
+  const canReadCrm = crmPipelineEnabled(!!user);
+  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(accountFilter, canReadCrm);
+  const {
+    data: dealData = [],
+    isLoading: loadingDeals,
+    isFetching,
+    isPlaceholderData: isPreviousDealScope,
+    isError: dealsError,
+    error: dealsQueryError,
+    refetch: refetchDeals,
+  } = useRDCRMDeals(
+    accountFilter,
+    canReadCrm && (!isConsolidatedView || availableAccountIdList.length > 0),
+    isConsolidatedView ? availableAccountIdList : undefined,
+  );
+  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter });
+  const { data: insightData = [], isLoading: loadingMetaInsights, isPlaceholderData: isPreviousInsightScope } = useInsights({ adAccountId: accountFilter, startDate, endDate });
+  const { data: products = [], isLoading: loadingProducts } = useProducts();
   const [view, setView] = useState<CRMView>(() => {
     if (searchParams.get("tab") === "ai") return "ai";
     return window.localStorage.getItem("growdash:crm-view") === "list" ? "list" : "board";
@@ -75,16 +129,87 @@ export default function CrmPage() {
   const [page, setPage] = useState(1);
   const [stageLimits, setStageLimits] = useState<Record<string, number>>({});
 
-  const selectedFunnelId = funnelId === "all" ? undefined : funnelId;
-  const { data: storedStages = [] } = useFunnelStages(selectedFunnelId);
+  // Query cache keeps the previous screen visible globally, which is useful
+  // for a silent refresh of the same scope. A different account is a hard
+  // boundary: displaying that previous account while the new query runs is
+  // materially misleading in CRM. Fail closed until every account-scoped
+  // source belongs to the selection.
+  const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope || isPreviousInsightScope;
+  const isLoadingSelectedScope = isChangingAccountScope || loadingDeals || loadingSales || loadingMetaInsights;
+  const funnels = useMemo(() => isChangingAccountScope ? [] : funnelData, [funnelData, isChangingAccountScope]);
+  const allDeals = useMemo(() => isChangingAccountScope ? [] : dealData, [dealData, isChangingAccountScope]);
+  const canonicalSales = useMemo(() => isChangingAccountScope ? [] : salesData, [isChangingAccountScope, salesData]);
+  const metaInsights = useMemo(() => isChangingAccountScope ? [] : insightData, [insightData, isChangingAccountScope]);
 
   useEffect(() => {
-    if (funnelId !== "all" && !funnels.some((funnel) => funnel.id === funnelId)) setFunnelId("all");
-  }, [funnels, funnelId]);
+    if (adAccountId !== "all" && availableAccounts.length && !availableAccountIds.has(adAccountId)) setAdAccountId("all");
+  }, [adAccountId, availableAccountIds, availableAccounts.length, setAdAccountId]);
 
-  useEffect(() => {
-    if (view === "board" && funnelId === "all" && funnels.length) setFunnelId(funnels[0].id);
-  }, [funnels, funnelId, view]);
+  // Historical RD rows can remain in the database after a funnel is detached.
+  // They are retained for audit, but must not create phantom columns or appear
+  // in the operational CRM. The board has exactly the active RD funnels that
+  // are still linked in Integrations.
+  const connectedFunnels = useMemo(
+    () => funnels.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id && availableAccountIds.has(funnel.ad_account_id)),
+    [availableAccountIds, funnels],
+  );
+  // CRM is driven by the Meta account selector. Each active RD funnel linked
+  // to that account becomes its pipeline scope automatically; users should
+  // never need to reconcile a second, independent funnel filter.
+  const funnelScopeIds = useMemo(
+    () => connectedFunnels.map((funnel) => funnel.id),
+    [connectedFunnels],
+  );
+  const connectedFunnelIdSet = useMemo(() => connectedRDFunnelIds(connectedFunnels), [connectedFunnels]);
+  const connectedFunnelNameById = useMemo(
+    () => new Map(connectedFunnels.map((funnel) => [funnel.id, funnel.name])),
+    [connectedFunnels],
+  );
+  const scopedDeals = useMemo(
+    () => dedupeRDDeals(allDeals.filter((deal) =>
+      !!deal.ad_account_id
+      && availableAccountIds.has(deal.ad_account_id)
+      && !!deal.rd_funnel_id
+      && connectedFunnelIdSet.has(deal.rd_funnel_id)
+      && !isExcludedLegacyRannielyStage(connectedFunnelNameById.get(deal.rd_funnel_id), deal.rd_stage_name),
+    )),
+    [allDeals, availableAccountIds, connectedFunnelIdSet, connectedFunnelNameById],
+  );
+  const scopedSales = useMemo(() => canonicalSales.filter((sale) =>
+    !!sale.ad_account_id && availableAccountIds.has(sale.ad_account_id),
+  ), [availableAccountIds, canonicalSales]);
+  const scopedMetaInsights = useMemo(
+    () => metaInsights.filter((insight) => !!insight.ad_account_id && availableAccountIds.has(insight.ad_account_id)),
+    [availableAccountIds, metaInsights],
+  );
+  const metaLeads = useMemo(() => scopedMetaInsights
+    .reduce((sum, insight) => sum + Number(insight.leads ?? 0), 0), [scopedMetaInsights]);
+  const metaActionAdIds = useMemo(
+    () => Array.from(new Set(scopedMetaInsights.map((insight) => insight.ad_id).filter(Boolean))),
+    [scopedMetaInsights],
+  );
+  const metaActionAccountMap = useMemo(
+    () => Object.fromEntries(scopedMetaInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
+    [scopedMetaInsights],
+  );
+  const { data: metaActionData, isLoading: loadingMetaActions } = useActionTotalsByAds(
+    metaActionAdIds,
+    startDate,
+    endDate,
+    metaActionAccountMap,
+  );
+  const metaConversations = Number(metaActionData?.totals?.[MESSAGING_CONVERSATION_EVENT] ?? 0);
+  const totalMetaLeads = metaLeads + metaConversations;
+  const productPriceByName = useMemo(() => new Map(
+    products
+      .filter((product) => Number(product.price) > 0)
+      .map((product) => [normalizeProductName(product.name), Number(product.price)]),
+  ), [products]);
+
+  const { data: storedStages = [] } = useFunnelStagesForIds(funnelScopeIds);
+  const visibleStoredStages = useMemo(() => storedStages.filter((stage) =>
+    !isExcludedLegacyRannielyStage(connectedFunnelNameById.get(stage.rd_funnel_id), stage.name),
+  ), [connectedFunnelNameById, storedStages]);
 
   useEffect(() => {
     window.localStorage.setItem("growdash:crm-view", view);
@@ -96,22 +221,13 @@ export default function CrmPage() {
   useEffect(() => {
     setPage(1);
     setStageLimits({});
-  }, [funnelId, owner, query, status]);
+  }, [adAccountId, endDate, owner, preset, query, startDate, status]);
 
-  const funnelNames = useMemo(() => new Map(funnels.map((funnel) => [funnel.id, funnel.name])), [funnels]);
-  const dealsInPipeline = useMemo(() => {
-    const rangeStart = startOfDay(startDate).getTime();
-    const rangeEnd = endOfDay(endDate).getTime();
-    return allDeals.filter((deal) => {
-      if (funnelId !== "all" && deal.rd_funnel_id !== funnelId) return false;
-      // O CRM usa a última movimentação quando ela existe; assim o período
-      // responde ao calendário para negócios antigos que avançaram agora.
-      const relevantDate = deal.closed_at || deal.stage_updated_at || deal.updated_at || deal.lead_created_at;
-      if (!relevantDate) return false;
-      const timestamp = new Date(relevantDate).getTime();
-      return !Number.isNaN(timestamp) && timestamp >= rangeStart && timestamp <= rangeEnd;
-    });
-  }, [allDeals, endDate, funnelId, startDate]);
+  const funnelNames = useMemo(() => new Map(connectedFunnels.map((funnel) => [funnel.id, funnel.name])), [connectedFunnels]);
+  const dealsInPipeline = useMemo(
+    () => scopedDeals.filter((deal) => isRDDealInCrmPeriod(deal, startDate, endDate, preset === "max")),
+    [endDate, preset, scopedDeals, startDate],
+  );
   const owners = useMemo(
     () => Array.from(new Set(dealsInPipeline.map((deal) => deal.deal_owner_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [dealsInPipeline],
@@ -139,24 +255,34 @@ export default function CrmPage() {
   }), [dealsInPipeline, normalizedQuery, owner, status]);
 
   const stats = useMemo(() => {
-    const won = deals.filter((deal) => deal.win);
-    const lost = deals.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
-    const active = deals.filter((deal) => !deal.win && !lost.includes(deal));
-    const visibleDealIds = new Set(deals.map((deal) => deal.rd_deal_id));
-    const realized = aggregateSales(canonicalSales.filter((sale) => sale.rd_deal_id && visibleDealIds.has(sale.rd_deal_id)));
+    // KPIs describe the selected account/date scope, never a transient board
+    // search or status filter. In "Todas as contas" this is the union of all
+    // connected Meta accounts and RD funnels.
+    const won = dealsInPipeline.filter((deal) => classifyLead(deal) === "won");
+    const lost = dealsInPipeline.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
+    const active = dealsInPipeline.filter((deal) => !deal.win && !lost.includes(deal));
+    const wonIds = new Set(won.map((deal) => deal.rd_deal_id));
+    const realized = aggregateRevenueSources(scopedSales.filter((sale) => sale.rd_deal_id && wonIds.has(sale.rd_deal_id)), won);
     return {
+      total: dealsInPipeline.length,
       active: active.length,
-      openRevenue: active.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0),
+      openRevenue: active.reduce((sum, deal) => sum + getRDDealAmount(deal, productPriceByName.get(normalizeProductName(deal.rd_product_name))), 0),
       won: won.length,
       wonRevenue: realized.totalNet,
       lost: lost.length,
-      conversion: deals.length ? (won.length / deals.length) * 100 : 0,
+      conversion: dealsInPipeline.length ? (won.length / dealsInPipeline.length) * 100 : 0,
     };
-  }, [canonicalSales, deals]);
+  }, [dealsInPipeline, productPriceByName, scopedSales]);
 
   const stages = useMemo<PipelineStage[]>(() => {
+    if (isConsolidatedView) {
+      return consolidateCRMPipeline([
+        ...visibleStoredStages.map((stage) => ({ id: stage.rd_stage_id, name: stage.name, order: stage.order, won: stage.is_won, lost: stage.is_lost })),
+        ...dealsInPipeline.map((deal) => ({ id: deal.rd_stage_id, name: deal.rd_stage_name, order: deal.rd_stage_order, won: classifyLead(deal) === "won", lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified" })),
+      ]);
+    }
     const map = new Map<string, PipelineStage>();
-    for (const stage of storedStages) {
+    for (const stage of visibleStoredStages) {
       map.set(stage.rd_stage_id, {
         id: stage.rd_stage_id,
         name: stage.name,
@@ -172,58 +298,71 @@ export default function CrmPage() {
           id,
           name: deal.rd_stage_name || "Sem etapa",
           order: deal.rd_stage_order ?? 9_999,
-          won: deal.win,
+          won: classifyLead(deal) === "won",
           lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified",
         });
       }
     }
     return Array.from(map.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR"));
-  }, [dealsInPipeline, storedStages]);
+  }, [dealsInPipeline, isConsolidatedView, visibleStoredStages]);
 
   const stageDeals = useMemo(() => {
     const map = new Map<string, RDDealLite[]>();
     for (const stage of stages) map.set(stage.id, []);
     for (const deal of deals) {
-      const stageId = deal.rd_stage_id || "no-stage";
+      const stageId = isConsolidatedView
+        ? consolidatedCRMStage({ name: deal.rd_stage_name, order: deal.rd_stage_order, won: classifyLead(deal) === "won", lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified" }).id
+        : deal.rd_stage_id || "no-stage";
       const current = map.get(stageId) || [];
       current.push(deal);
       map.set(stageId, current);
     }
     return map;
-  }, [deals, stages]);
+  }, [deals, isConsolidatedView, stages]);
 
   const lastUpdatedAt = useMemo(() => {
-    const timestamps = allDeals.map((deal) => deal.updated_at || deal.stage_updated_at).filter(Boolean) as string[];
+    const timestamps = scopedDeals.map((deal) => deal.updated_at || deal.stage_updated_at).filter(Boolean) as string[];
     return timestamps.sort().at(-1) || null;
-  }, [allDeals]);
+  }, [scopedDeals]);
 
   const pageCount = Math.max(1, Math.ceil(deals.length / PAGE_SIZE));
   const visibleList = deals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function changeView(next: CRMView) {
-    if (next === "board" && funnelId === "all" && funnels.length) setFunnelId(funnels[0].id);
     setView(next);
   }
 
   async function syncRD() {
-    const selected = funnelId === "all"
-      ? funnels.filter((funnel) => funnel.is_active)
-      : funnels.filter((funnel) => funnel.id === funnelId && funnel.is_active);
-    if (!selected.length) {
-      toast.error("Nenhum funil RD ativo para sincronizar.");
+    if (!connectedFunnels.length) {
+      toast.error(rdEnabled ? "Nenhum funil RD ativo para sincronizar." : "Nenhum funil RD disponível para sua conta. Peça acesso ao funil ou conecte o RD Station.");
       return;
     }
     setSyncing(true);
     try {
-      for (const funnel of selected) {
+      for (const funnel of connectedFunnels) {
         const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
           body: {
             funnel_id: funnel.id,
-            realtime: true,
+            // This is an explicit user action, so synchronize every RD status
+            // in the period selected on the screen. The background realtime
+            // job remains deliberately small; it must not redefine history.
+            realtime: false,
             analytics_mode: true,
-            max_pages: 1,
-            max_deals: 200,
-            trigger_source: "crm_refresh",
+            // A list response from RD can be stale or omit the edited amount.
+            // A manual CRM refresh asks the server to hydrate each deal with
+            // its authoritative detail before updating CRM and Comercial.
+            refresh_amounts: true,
+            // "Máximo" is a full RD pipeline reconciliation, not a synthetic
+            // date interval beginning in 2000. The RD API's date filter can
+            // omit legacy/open negotiations in some accounts.
+            full_history: preset === "max",
+            ...(preset === "max" ? {} : {
+              start_date: format(startDate, "yyyy-MM-dd"),
+              end_date: format(endDate, "yyyy-MM-dd"),
+            }),
+            max_pages: preset === "max" ? 250 : 50,
+            max_deals: preset === "max" ? 50_000 : 10_000,
+            trigger_source: "crm_history_refresh",
           },
         });
         if (error || data?.error || data?.success === false) throw error || new Error(data?.error || "Falha na sincronização.");
@@ -233,6 +372,7 @@ export default function CrmPage() {
         queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] }),
+        queryClient.invalidateQueries({ queryKey: ["sales"] }),
       ]);
       toast.success("Negociações atualizadas com o RD Station.");
     } catch (error: unknown) {
@@ -250,12 +390,12 @@ export default function CrmPage() {
         description="Pipeline operacional sincronizado com os leads e negociações reais do RD Station."
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1">
+            <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Visualização das negociações">
               <ViewButton active={view === "board"} onClick={() => changeView("board")} icon={<LayoutGrid />} label="Kanban" />
               <ViewButton active={view === "list"} onClick={() => changeView("list")} icon={<List />} label="Lista" />
               <ViewButton active={view === "ai"} onClick={() => changeView("ai")} icon={<Bot />} label="IA do Funil" />
             </div>
-            <button className="gd-button" onClick={() => void syncRD()} disabled={syncing || loadingFunnels}>
+            <button className="gd-button" onClick={() => void syncRD()} disabled={syncing || loadingRDIntegration || loadingFunnels || !connectedFunnels.length}>
               <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
               {syncing ? "Sincronizando" : "Atualizar RD"}
             </button>
@@ -264,16 +404,16 @@ export default function CrmPage() {
       />
 
       <section className="gd-panel mb-4 p-3 sm:p-4">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.3fr)_minmax(180px,.8fr)_minmax(170px,.7fr)_minmax(235px,.95fr)_auto]">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
+            <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
-          <select value={funnelId} onChange={(event) => setFunnelId(event.target.value)} className="gd-button h-11 min-w-0">
-            {view === "list" && <option value="all">Todos os funis conectados</option>}
-            {funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}
+          <select aria-label="Filtrar por conta de anúncio" value={adAccountId} onChange={(event) => setAdAccountId(event.target.value)} className="gd-button h-11 min-w-0">
+            <option value="all">Todas as contas</option>
+            {availableAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
-          <select value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
+          <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
@@ -288,25 +428,40 @@ export default function CrmPage() {
           />
           <div className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
             {([ ["all", "Todos"], ["open", "Abertos"], ["won", "Ganhos"], ["lost", "Perdidos"] ] as [StatusFilter, string][]).map(([id, label]) => (
-              <button key={id} type="button" onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
+              <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
             ))}
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
-          <span>{number.format(deals.length)} negociação(ões) encontrada(s)</span>
+          <span>{number.format(deals.length)} negociação(ões) encontrada(s) · {isConsolidatedView ? "pipeline único consolidado de todas as contas" : funnelScopeIds.length === 1 ? `funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? `${funnelScopeIds.length} funis vinculados à conta selecionada` : "nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
         </div>
       </section>
 
       {view !== "ai" && <div className="gd-auto-grid gap-3">
-        <MetricCard label="Negociações ativas" value={number.format(stats.active)} change="pipeline" emphasis />
-        <MetricCard label="Receita em aberto" value={brl.format(stats.openRevenue)} change="potencial" />
-        <MetricCard label="Negócios ganhos" value={number.format(stats.won)} change={brl.format(stats.wonRevenue)} />
-        <MetricCard label="Conversão do pipeline" value={`${stats.conversion.toFixed(2)}%`} change={`${stats.lost} perdido(s)`} />
+        <MetricCard
+          label="Leads Meta"
+          value={number.format(totalMetaLeads)}
+          change={`${number.format(metaLeads)} leads · ${number.format(metaConversations)} conversas iniciadas`}
+          emphasis
+        />
+        <MetricCard
+          label="Negociações RD"
+          value={number.format(stats.total)}
+          change={`${number.format(stats.active)} ativas · ${number.format(stats.won)} ganhas`}
+          emphasis
+        />
+        <MetricCard label="Receita em aberto" value={brl.format(stats.openRevenue)} change="valores das negociações ativas no RD" />
+        <MetricCard label="Faturamento ganho" value={brl.format(stats.wonRevenue)} change={`${number.format(stats.won)} negociação(ões) ganha(s)`} />
+        <MetricCard label="Taxa de conversão" value={`${stats.conversion.toFixed(2)}%`} change={`${stats.lost} perdido(s)`} />
       </div>}
 
-      {loadingDeals || loadingSales ? <CRMLoading /> : view === "ai" ? (
-        <CrmAIWorkspace deals={deals} sales={canonicalSales} accountId={accountFilter} />
+      {isLoadingSelectedScope || loadingMetaActions || loadingProducts ? <CRMLoading /> : dealsError ? (
+        <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
+          <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar as negociações</h2><p className="mt-2 text-sm text-muted-foreground">{dealsQueryError instanceof Error ? dealsQueryError.message : "A consulta do CRM falhou. Verifique seu acesso ao funil e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchDeals()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
+        </section>
+      ) : view === "ai" ? (
+        <CrmAIWorkspace deals={deals} sales={scopedSales} accountId={accountFilter} />
       ) : view === "board" ? (
         <KanbanBoard
           stages={stages}
@@ -327,13 +482,13 @@ export default function CrmPage() {
         />
       )}
 
-      {!loadingDeals && !deals.length && view !== "ai" && (
+      {!isLoadingSelectedScope && !dealsError && !deals.length && view !== "ai" && (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
-          <div><UsersRound className="mx-auto h-9 w-9 text-primary" /><h2 className="mt-4 font-black">Nenhuma negociação encontrada</h2><p className="mt-2 text-sm text-muted-foreground">Revise os filtros ou sincronize o funil conectado ao RD Station.</p></div>
+          <div><UsersRound className="mx-auto h-9 w-9 text-primary" /><h2 className="mt-4 font-black">Nenhuma negociação encontrada</h2><p className="mt-2 text-sm text-muted-foreground">{crmEmptyState({ hasFunnels: !!connectedFunnels.length, hasOwnIntegration: rdEnabled })}</p></div>
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} onClose={() => setSelectedDeal(null)} />
+      <DealDetails deal={selectedDeal} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} userId={user?.id} onClose={() => setSelectedDeal(null)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }); queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }); toast.success("Negociação atualizada na Growdash"); }} />
     </div>
   );
 }
@@ -355,7 +510,7 @@ function KanbanBoard({ stages, stageDeals, stageLimits, onLoadMore, onOpen }: {
         <div className="flex min-h-[520px] min-w-max items-start gap-3">
           {stages.map((stage) => {
             const deals = stageDeals.get(stage.id) || [];
-            const total = deals.reduce((sum, deal) => sum + Number(deal.amount_total || 0), 0);
+            const total = deals.reduce((sum, deal) => sum + getRDDealAmount(deal), 0);
             const limit = stageLimits[stage.id] || BOARD_STEP;
             return (
               <div key={stage.id} className="w-[286px] shrink-0 overflow-hidden rounded-2xl border border-border bg-muted/25">
@@ -389,7 +544,7 @@ function DealCard({ deal, onOpen }: { deal: RDDealLite; onOpen: (deal: RDDealLit
         <DealStatus deal={deal} compact />
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-2.5">
-        <span className="text-xs font-black text-foreground">{brl.format(Number(deal.amount_total || 0))}</span>
+        <span className="text-xs font-black text-foreground">{brl.format(getRDDealAmount(deal))}</span>
         <span className="max-w-[125px] truncate text-[9px] text-muted-foreground" title={deal.deal_owner_name || "Sem responsável"}>{deal.deal_owner_name || "Sem responsável"}</span>
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-muted-foreground">
@@ -420,7 +575,7 @@ function DealsList({ deals, funnels, page, pageCount, total, onPage, onOpen }: {
         {deals.map((deal) => (
           <button key={deal.id} type="button" className="grid w-full gap-2 p-4 text-left" onClick={() => onOpen(deal)}>
             <div className="flex items-start justify-between gap-2"><div className="min-w-0"><b className="block truncate text-sm">{deal.contact_name || deal.contact_email || "Contato não informado"}</b><span className="text-[10px] text-muted-foreground">{deal.rd_stage_name || "Sem etapa"}</span></div><DealStatus deal={deal} /></div>
-            <div className="flex items-center justify-between gap-2 text-xs"><span className="truncate text-muted-foreground">{deal.deal_owner_name || "Sem responsável"}</span><b>{brl.format(Number(deal.amount_total || 0))}</b></div>
+            <div className="flex items-center justify-between gap-2 text-xs"><span className="truncate text-muted-foreground">{deal.deal_owner_name || "Sem responsável"}</span><b>{brl.format(getRDDealAmount(deal))}</b></div>
           </button>
         ))}
       </div>
@@ -430,14 +585,14 @@ function DealsList({ deals, funnels, page, pageCount, total, onPage, onOpen }: {
           <thead className="bg-muted/60 text-[10px] font-black uppercase tracking-wide text-muted-foreground"><tr>{["Negociação", "Etapa", "Funil", "Responsável", "Origem/campanha", "Atualização", "Valor", "Status"].map((label) => <th key={label} className="whitespace-nowrap px-4 py-3">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-border">
             {deals.map((deal) => (
-              <tr key={deal.id} onClick={() => onOpen(deal)} className="cursor-pointer transition hover:bg-muted/45">
-                <td className="max-w-64 px-4 py-3"><b className="block truncate">{deal.contact_name || "Contato não informado"}</b><span className="block truncate text-[10px] text-muted-foreground">{deal.contact_email || deal.rd_deal_id}</span></td>
+              <tr key={deal.id} className="transition hover:bg-muted/45">
+                <td className="max-w-64 p-0"><button type="button" onClick={() => onOpen(deal)} className="block w-full px-4 py-3 text-left outline-none focus-visible:bg-primary/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><b className="block truncate">{deal.contact_name || "Contato não informado"}</b><span className="block truncate text-[10px] text-muted-foreground">{deal.contact_email || deal.rd_deal_id}</span><span className="sr-only">Abrir negociação</span></button></td>
                 <td className="px-4 py-3"><span className="inline-flex max-w-48 truncate rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[9px] font-bold text-primary">{deal.rd_stage_name || "Sem etapa"}</span></td>
                 <td className="max-w-48 truncate px-4 py-3" title={deal.rd_funnel_id ? funnels.get(deal.rd_funnel_id) : undefined}>{deal.rd_funnel_id ? funnels.get(deal.rd_funnel_id) || "Funil RD" : "—"}</td>
                 <td className="max-w-44 truncate px-4 py-3">{deal.deal_owner_name || "Não informado"}</td>
                 <td className="max-w-56 px-4 py-3"><span className="block truncate">{deal.rd_campaign_name || deal.utm_campaign || deal.utm_source || "Não atribuída"}</span><span className="text-[9px] text-muted-foreground">{deal.rd_product_name || "Sem produto"}</span></td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{relativeDate(deal.stage_updated_at || deal.updated_at || deal.lead_created_at)}</td>
-                <td className="whitespace-nowrap px-4 py-3 font-black">{brl.format(Number(deal.amount_total || 0))}</td>
+                <td className="whitespace-nowrap px-4 py-3 font-black">{brl.format(getRDDealAmount(deal))}</td>
                 <td className="px-4 py-3"><DealStatus deal={deal} /></td>
               </tr>
             ))}
@@ -449,7 +604,7 @@ function DealsList({ deals, funnels, page, pageCount, total, onPage, onOpen }: {
   );
 }
 
-function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; funnelName?: string; onClose: () => void }) {
+function DealDetails({ deal, funnelName, userId, onClose, onSaved }: { deal: RDDealLite | null; funnelName?: string; userId?: string; onClose: () => void; onSaved: () => void }) {
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
   return (
@@ -460,11 +615,12 @@ function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; f
           <SheetDescription>Negociação sincronizada do RD Station CRM</SheetDescription>
         </SheetHeader>
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <DetailMetric icon={<CircleDollarSign />} label="Valor" value={brl.format(Number(deal.amount_total || 0))} />
+          <DetailMetric icon={<CircleDollarSign />} label="Valor" value={brl.format(getRDDealAmount(deal))} />
           <DetailMetric icon={<Target />} label="Etapa" value={deal.rd_stage_name || "Sem etapa"} />
           <DetailMetric icon={<UserRound />} label="Responsável" value={deal.deal_owner_name || "Não informado"} />
           <DetailMetric icon={deal.win ? <Trophy /> : <XCircle />} label="Situação" value={statusLabel(deal)} />
         </div>
+        <DealEditor deal={deal} userId={userId} onSaved={onSaved} />
         <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
           <DetailRow icon={<Columns3 />} label="Funil" value={funnelName || "Funil RD"} />
           <DetailRow icon={<Mail />} label="E-mail" value={deal.contact_email || "Não informado"} />
@@ -472,6 +628,9 @@ function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; f
           <DetailRow icon={<UsersRound />} label="Produto" value={deal.rd_product_name || "Não informado"} />
           <DetailRow icon={<Target />} label="Origem" value={deal.utm_source || "Não atribuída"} />
           <DetailRow icon={<Target />} label="Campanha" value={deal.rd_campaign_name || deal.utm_campaign || "Não atribuída"} />
+          <DetailRow icon={<Target />} label="Conjunto (UTM term)" value={deal.utm_term || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="Criativo (UTM content)" value={deal.utm_content || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="ID do anúncio (UTM id)" value={deal.utm_id || "Não atribuído"} />
           <DetailRow icon={<CalendarClock />} label="Criado em" value={fullDate(deal.lead_created_at)} />
           <DetailRow icon={<Clock3 />} label="Última movimentação" value={fullDate(deal.stage_updated_at || deal.updated_at)} />
           {deal.lost_reason && <DetailRow icon={<XCircle />} label="Motivo da perda" value={deal.lost_reason} danger />}
@@ -483,8 +642,62 @@ function DealDetails({ deal, funnelName, onClose }: { deal: RDDealLite | null; f
   );
 }
 
+function DealEditor({ deal, userId, onSaved }: { deal: RDDealLite; userId?: string; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(() => ({
+    amount: String(deal.amount_total_manual ?? getRDDealAmount(deal) ?? ""),
+    reason: deal.manual_override_reason ?? "Correção manual no CRM Growdash",
+    contactName: deal.contact_name ?? "",
+    contactEmail: deal.contact_email ?? "",
+    owner: deal.deal_owner_name ?? "",
+    product: deal.rd_product_name ?? "",
+    source: deal.utm_source ?? "",
+    campaign: deal.utm_campaign ?? "",
+    adset: deal.utm_term ?? "",
+    creative: deal.utm_content ?? "",
+    adId: deal.utm_id ?? "",
+    lostReason: deal.lost_reason ?? "",
+  }));
+
+  async function save() {
+    const amount = Number(form.amount.replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(amount) || amount < 0) return toast.error("Informe um valor de venda válido.");
+    setSaving(true);
+    const { error } = await supabase.from("rd_deals").update({
+      amount_total_manual: amount || null,
+      manual_override_enabled: amount > 0,
+      manual_override_reason: amount > 0 ? form.reason.trim() || "Correção manual no CRM Growdash" : null,
+      manual_override_at: amount > 0 ? new Date().toISOString() : null,
+      manual_override_by: amount > 0 ? userId ?? null : null,
+      contact_name: form.contactName.trim() || null,
+      contact_email: form.contactEmail.trim() || null,
+      deal_owner_name: form.owner.trim() || null,
+      rd_product_name: form.product.trim() || null,
+      utm_source: form.source.trim() || null,
+      utm_campaign: form.campaign.trim() || null,
+      utm_term: form.adset.trim() || null,
+      utm_content: form.creative.trim() || null,
+      utm_id: form.adId.trim() || null,
+      lost_reason: form.lostReason.trim() || null,
+    }).eq("id", deal.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    setEditing(false);
+    onSaved();
+  }
+
+  if (!editing) return <section className="mt-5 rounded-2xl border border-primary/25 bg-primary/[.04] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-black">Editar negociação</h3><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Ajuste valor, contato, responsável, produto e atribuição diretamente na Growdash.</p></div><Button type="button" size="sm" onClick={() => setEditing(true)}>Editar</Button></div>{deal.manual_override_enabled && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-[10px] font-semibold text-amber-600">Valor manual ativo: {brl.format(getRDDealAmount(deal))}. Ele prevalece sobre o valor recebido do RD.</p>}</section>;
+
+  return <section className="mt-5 rounded-2xl border border-primary/35 bg-primary/[.05] p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-black">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">O valor manual é preservado pela Growdash mesmo quando o RD sincronizar novamente.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving}>Cancelar</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><EditField label="Valor da venda realizada" value={form.amount} onChange={(value) => setForm({ ...form, amount: value })} inputMode="decimal" /><EditField label="Motivo do ajuste" value={form.reason} onChange={(value) => setForm({ ...form, reason: value })} /><EditField label="Nome do contato" value={form.contactName} onChange={(value) => setForm({ ...form, contactName: value })} /><EditField label="E-mail" value={form.contactEmail} onChange={(value) => setForm({ ...form, contactEmail: value })} type="email" /><EditField label="Responsável" value={form.owner} onChange={(value) => setForm({ ...form, owner: value })} /><EditField label="Produto" value={form.product} onChange={(value) => setForm({ ...form, product: value })} /><EditField label="Origem / UTM source" value={form.source} onChange={(value) => setForm({ ...form, source: value })} /><EditField label="Campanha / UTM campaign" value={form.campaign} onChange={(value) => setForm({ ...form, campaign: value })} /><EditField label="Conjunto / UTM term" value={form.adset} onChange={(value) => setForm({ ...form, adset: value })} /><EditField label="Criativo / UTM content" value={form.creative} onChange={(value) => setForm({ ...form, creative: value })} /><EditField label="ID do anúncio / UTM id" value={form.adId} onChange={(value) => setForm({ ...form, adId: value })} /></div><label className="mt-3 grid gap-1.5 text-xs font-bold">Motivo de perda <Textarea value={form.lostReason} onChange={(event) => setForm({ ...form, lostReason: event.target.value })} rows={2} /></label><div className="mt-4 flex justify-end"><Button type="button" onClick={() => void save()} disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? "Salvando…" : "Salvar alterações"}</Button></div></section>;
+}
+
+function EditField({ label, value, onChange, type = "text", inputMode }: { label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }) {
+  return <label className="grid gap-1.5 text-xs font-bold">{label}<Input type={type} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
 function ViewButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
-  return <button type="button" onClick={onClick} className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{<span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>}{label}</button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{<span className="[&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">{icon}</span>}{label}</button>;
 }
 
 function StageDot({ won, lost }: { won: boolean; lost: boolean }) {
@@ -498,7 +711,7 @@ function DealStatus({ deal, compact = false }: { deal: RDDealLite; compact?: boo
 }
 
 function Pagination({ page, pageCount, onPage }: { page: number; pageCount: number; onPage: (page: number) => void }) {
-  return <div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="h-4 w-4" /></Button><span className="min-w-16 text-center text-[10px] font-bold">{page} de {pageCount}</span><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page >= pageCount} onClick={() => onPage(page + 1)}><ChevronRight className="h-4 w-4" /></Button></div>;
+  return <div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button><span className="min-w-16 text-center text-[10px] font-bold" aria-live="polite">{page} de {pageCount}</span><Button type="button" variant="outline" size="icon" className="h-8 w-8" disabled={page >= pageCount} onClick={() => onPage(page + 1)} aria-label="Próxima página"><ChevronRight className="h-4 w-4" /></Button></div>;
 }
 
 function DetailMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
@@ -515,6 +728,10 @@ function CRMLoading() {
 
 function normalize(value: string) {
   return value.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function normalizeProductName(value: string | null | undefined) {
+  return normalize(value || "").replace(/[^a-z0-9]+/g, "");
 }
 
 function initials(value: string) {

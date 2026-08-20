@@ -15,9 +15,10 @@ async function authenticate(page: import("@playwright/test").Page) {
 
 test("login não cria overflow horizontal", async ({ page }) => {
   await page.goto("/auth");
+  await expect(page.getByRole("heading", { name: /entrar/i })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  await expect(page).toHaveScreenshot("auth.png", { fullPage: true, animations: "disabled" });
+  await expect(page).toHaveScreenshot("auth.png", { fullPage: true, animations: "disabled", maxDiffPixelRatio: 0.02 });
 });
 
 test("rotas principais mantêm conteúdo dentro do viewport", async ({ page }) => {

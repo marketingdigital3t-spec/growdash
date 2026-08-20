@@ -60,10 +60,11 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant={status.variant}>{status.label}</Badge>
-                {ec.rd_funnel_name && <Badge variant="outline" className="text-xs">{ec.rd_funnel_name}</Badge>}
-                {ec.has_model_patients && ec.rd_model_patient_funnel_name && ec.rd_model_patient_funnel_name !== ec.rd_funnel_name && (
-                  <Badge variant="outline" className="text-xs">PM: {ec.rd_model_patient_funnel_name}</Badge>
-                )}
+                {ec.sources.map((source, index) => (
+                  <Badge key={source.id || `${source.rd_funnel_id}-${index}`} variant="outline" className="text-xs">
+                    {source.member_type === "student" ? "Alunas" : "PM"}: {source.funnel_name || "Funil RD"}
+                  </Badge>
+                ))}
               </div>
               <h3 className="font-semibold text-base leading-tight">{ec.title}</h3>
               <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
@@ -96,6 +97,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                 <span className="font-medium">{ec.studentCount}/{peopleCap}</span>
               </div>
               <Progress value={Math.min(studentPct, 100)} className="h-1.5" />
+              {ec.manual_student_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedStudentCount} · Manual: {ec.manual_student_count}</p>}
             </div>
             {ec.has_model_patients && (
               <div className="space-y-1">
@@ -104,6 +106,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                   <span className="font-medium">{ec.modelPatientCount}/{ec.max_model_patients}</span>
                 </div>
                 <Progress value={Math.min(patientPct, 100)} className="h-1.5" />
+                {ec.manual_model_patient_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedModelPatientCount} · Manual: {ec.manual_model_patient_count}</p>}
               </div>
             )}
           </div>

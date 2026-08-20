@@ -7,7 +7,7 @@ const fmtBRL = (v: number) =>
 export function FunnelSourceTable({ a }: { a: FunnelAnalytics }) {
   const rows = a.sourceBreakdown.slice(0, 10);
   return (
-    <Card className="bg-card/60 border-border/40">
+    <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base">5. Origem dos leads que mais vendem</CardTitle>
       </CardHeader>

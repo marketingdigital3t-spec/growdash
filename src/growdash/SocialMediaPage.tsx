@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { BarChart3, CheckCircle2, ExternalLink, Eye, Heart, ImageOff, Instagram, RefreshCw, Sparkles, TrendingUp, Users } from "lucide-react";
+import { BarChart3, Bookmark, CheckCircle2, Clapperboard, ExternalLink, Eye, Grid3X3, Heart, ImageOff, Instagram, MessageCircle, RefreshCw, Send, Sparkles, TrendingUp, Users } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import { PageHeading } from "./shared";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +14,7 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { useToast } from "@/hooks/use-toast";
 import { metricDescription } from "@/lib/metricPresentation";
+import { useAuth } from "@/contexts/AuthContext";
 
 type SocialAccount = {
   id: string;
@@ -48,7 +50,60 @@ type SocialMedia = {
 };
 type DailyInsight = { insight_date: string; followers: number; follower_delta: number; reach: number; impressions: number; interactions: number };
 
-const number = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
+// Métricas de conteúdo precisam preservar a leitura exata: 1.542, nunca “1,5 mil”.
+const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+const SOCIAL_QUERY_TIMEOUT_MS = 15_000;
+
+async function socialQuery<T>(run: (signal: AbortSignal) => PromiseLike<{ data: T | null; error: { message: string } | null }>) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), SOCIAL_QUERY_TIMEOUT_MS);
+  try {
+    const { data, error } = await run(controller.signal);
+    if (error) throw error;
+    return data ?? [] as T;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("A consulta demorou mais que o esperado. Verifique a conexão e tente novamente.", { cause: error });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+// Preview-only data. It never reaches Supabase, never triggers a sync and is
+// deliberately marked in the UI so it cannot be mistaken for a real account.
+const DEMO_ACCOUNT: SocialAccount = {
+  id: "growdash-demo-instagram",
+  provider: "instagram",
+  username: "studio.growdash_demo",
+  display_name: "Studio Growdash · demonstração",
+  profile_picture_url: null,
+  followers_count: 12840,
+  media_count: 86,
+  connection_status: "demo",
+  last_sync_at: null,
+  last_error: null,
+};
+
+const DEMO_MEDIA: SocialMedia[] = [
+  { id: "demo-reel-1", media_type: "REELS", caption: "3 ajustes que aumentaram a qualidade dos leads nesta semana.", permalink: null, media_url: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=800&q=80", thumbnail_url: null, published_at: "2026-08-08T15:00:00.000Z", reach: 18420, impressions: 22110, likes: 1286, comments: 74, saves: 318, shares: 142, interactions: 1820, engagement_rate: 9.88, video_views: 16200, average_watch_time: 13.8, video_retention_rate: 47.2 },
+  { id: "demo-post-1", media_type: "CAROUSEL_ALBUM", caption: "Checklist para uma campanha começar bem antes da decolagem.", permalink: null, media_url: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=800&q=80", thumbnail_url: null, published_at: "2026-08-05T14:00:00.000Z", reach: 9230, impressions: 10780, likes: 692, comments: 38, saves: 226, shares: 87, interactions: 1043, engagement_rate: 11.30, video_views: 0, average_watch_time: null, video_retention_rate: null },
+  { id: "demo-reel-2", media_type: "VIDEO", caption: "Bastidores de uma reunião de performance com foco em decisões.", permalink: null, media_url: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=800&q=80", thumbnail_url: null, published_at: "2026-08-02T13:00:00.000Z", reach: 6750, impressions: 8010, likes: 413, comments: 21, saves: 96, shares: 44, interactions: 574, engagement_rate: 8.50, video_views: 5840, average_watch_time: 10.4, video_retention_rate: 39.6 },
+];
+
+const DEMO_DAILY: DailyInsight[] = Array.from({ length: 14 }, (_, index) => {
+  const day = new Date(Date.UTC(2026, 7, index + 1));
+  const followerDelta = [18, 26, -4, 31, 24, 39, 12, -7, 42, 28, 36, 19, 47, 33][index];
+  return {
+    insight_date: format(day, "yyyy-MM-dd"),
+    followers: 12496 + [18, 44, 40, 71, 95, 134, 146, 139, 181, 209, 245, 264, 311, 344][index],
+    follower_delta: followerDelta,
+    reach: 2400 + index * 260 + (index % 3) * 520,
+    impressions: 3000 + index * 330 + (index % 3) * 610,
+    interactions: 180 + index * 22 + (index % 4) * 36,
+  };
+});
 
 function MediaPreview({ media }: { media: SocialMedia }) {
   const [failed, setFailed] = useState(false);
@@ -59,39 +114,39 @@ function MediaPreview({ media }: { media: SocialMedia }) {
 
 export default function SocialMediaPage() {
   const { startDate, endDate } = useGlobalFilters();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const connectInstagram = useInstagramOAuth();
   const [accountId, setAccountId] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<SocialMedia | null>(null);
+  const [contentSort, setContentSort] = useState<"interactions" | "reach" | "engagement_rate" | "saves" | "shares" | "comments" | "video_views">("interactions");
 
   const accountsQuery = useQuery({
-    queryKey: ["social_accounts"],
+    queryKey: ["social_accounts", user?.id],
+    enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_accounts").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as SocialAccount[];
+      return socialQuery((signal) => supabase.from("social_accounts").select("*").order("created_at", { ascending: false }).abortSignal(signal)) as Promise<SocialAccount[]>;
     },
   });
-  const accounts = accountsQuery.data ?? [];
-  const selectedId = accountId || accounts[0]?.id || "";
+  const liveAccounts = accountsQuery.data ?? [];
+  const accounts = demoMode ? [DEMO_ACCOUNT] : liveAccounts;
+  const selectedId = demoMode ? DEMO_ACCOUNT.id : accountId || accounts[0]?.id || "";
   const selected = accounts.find((account) => account.id === selectedId);
 
   const mediaQuery = useQuery({
-    queryKey: ["social_media", selectedId, startDate.toISOString(), endDate.toISOString()],
-    enabled: !!selectedId,
+    queryKey: ["social_media", selectedId],
+    enabled: !!selectedId && !demoMode,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_media").select("*").eq("social_account_id", selectedId).gte("published_at", startDate.toISOString()).lte("published_at", endDate.toISOString()).order("published_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as SocialMedia[];
+      return socialQuery((signal) => supabase.from("social_media").select("*").eq("social_account_id", selectedId).order("published_at", { ascending: false }).limit(100).abortSignal(signal)) as Promise<SocialMedia[]>;
     },
   });
   const dailyQuery = useQuery({
     queryKey: ["social_insights_daily", selectedId, startDate.toISOString(), endDate.toISOString()],
-    enabled: !!selectedId,
+    enabled: !!selectedId && !demoMode,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date");
-      if (error) throw error;
-      return (data ?? []) as DailyInsight[];
+      return socialQuery((signal) => supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date").abortSignal(signal)) as Promise<DailyInsight[]>;
     },
   });
 
@@ -112,8 +167,15 @@ export default function SocialMediaPage() {
     onError: (error: Error) => toast({ title: "Falha na sincronização", description: error.message, variant: "destructive" }),
   });
 
-  const media = useMemo(() => mediaQuery.data ?? [], [mediaQuery.data]);
-  const daily = dailyQuery.data ?? [];
+  const allMedia = useMemo(() => demoMode ? DEMO_MEDIA : mediaQuery.data ?? [], [demoMode, mediaQuery.data]);
+  const periodMedia = useMemo(() => allMedia.filter((item) => !item.published_at || (new Date(item.published_at) >= startDate && new Date(item.published_at) <= endOfDay(endDate))), [allMedia, endDate, startDate]);
+  // Do not make a connected profile look empty only because the global
+  // dashboard interval excludes its latest publication. Period metrics still
+  // use periodMedia; the content gallery falls back to the latest real posts.
+  const media = periodMedia.length ? periodMedia : allMedia;
+  const showingOutsidePeriod = !demoMode && periodMedia.length === 0 && allMedia.length > 0;
+  const sortedMedia = useMemo(() => [...media].sort((a, b) => Number(b[contentSort] || 0) - Number(a[contentSort] || 0)), [contentSort, media]);
+  const daily = demoMode ? DEMO_DAILY : dailyQuery.data ?? [];
   const totals = useMemo(() => media.reduce((sum, item) => ({ reach: sum.reach + Number(item.reach), interactions: sum.interactions + Number(item.interactions), likes: sum.likes + Number(item.likes), comments: sum.comments + Number(item.comments), saves: sum.saves + Number(item.saves), shares: sum.shares + Number(item.shares) }), { reach: 0, interactions: 0, likes: 0, comments: 0, saves: 0, shares: 0 }), [media]);
   const engagement = totals.reach > 0 ? (totals.interactions / totals.reach) * 100 : 0;
   const followersGained = daily.reduce((sum, row) => sum + Math.max(Number(row.follower_delta || 0), 0), 0);
@@ -127,46 +189,62 @@ export default function SocialMediaPage() {
   const best = [...media].sort((a, b) => b.interactions - a.interactions)[0];
   const chart = daily.map((row) => ({ ...row, label: format(new Date(`${row.insight_date}T12:00:00`), "dd/MM") }));
 
-  const schemaMissing = accountsQuery.error && /social_accounts|schema cache|relation/i.test((accountsQuery.error as Error).message);
+  const schemaMissing = !demoMode && accountsQuery.error && /social_accounts|schema cache|relation/i.test((accountsQuery.error as Error).message);
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5">
-      <PageHeading eyebrow="Inteligência de conteúdo" title="Análise de Mídia Social" description="Métricas orgânicas oficiais por perfil e por conteúdo, sem misturar resultados pagos do Meta Ads." actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button><Button onClick={() => sync.mutate()} disabled={!selectedId || sync.isPending}><RefreshCw className={`mr-2 h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} />Atualizar dados</Button></div>} />
+      <PageHeading eyebrow="Inteligência de conteúdo" title="Análise de Mídia Social" description="Métricas orgânicas oficiais por perfil e por conteúdo, sem misturar resultados pagos do Meta Ads." actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setDemoMode((current) => !current)}>{demoMode ? "Sair da demonstração" : "Ver demonstração"}</Button><Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button><Button onClick={() => sync.mutate()} disabled={demoMode || !selectedId || sync.isPending}><RefreshCw className={`mr-2 h-4 w-4 ${sync.isPending ? "animate-spin" : ""}`} />Atualizar dados</Button></div>} />
 
       {schemaMissing && <section className="gd-panel border-amber-500/30 p-5"><b className="text-sm text-amber-500">Atualização de banco pendente</b><p className="mt-1 text-xs text-muted-foreground">Aplique a migration 20260715120000 para liberar contas, conteúdos e insights sociais.</p></section>}
 
-      {!accountsQuery.isLoading && !accounts.length && !schemaMissing ? (
+      {accountsQuery.isLoading ? <section className="gd-panel grid min-h-[420px] place-items-center p-8 text-center" role="status" aria-live="polite"><p className="text-sm text-muted-foreground">Verificando perfis conectados…</p></section> : accountsQuery.isError ? <section className="gd-panel grid min-h-[420px] place-items-center p-8 text-center"><div className="max-w-md"><h2 className="text-lg font-black">Não foi possível carregar o Instagram</h2><p className="mt-2 text-sm text-muted-foreground">{(accountsQuery.error as Error).message}</p><Button className="mt-5" variant="outline" onClick={() => void accountsQuery.refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></section> : !accounts.length && !schemaMissing ? (
         <section className="gd-panel grid min-h-[420px] place-items-center overflow-hidden p-8 text-center">
-          <div className="max-w-lg"><span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#f3c74a] to-[#9b6810] text-[#211706] shadow-[0_18px_60px_-25px_rgba(226,176,44,.9)]"><Instagram className="h-8 w-8" /></span><h2 className="mt-6 text-2xl font-black">Conecte um perfil profissional</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Use o login oficial do Instagram para importar perfil, publicações, Reels e métricas de alcance, salvamentos, compartilhamentos e engajamento. Senhas nunca passam pela Growdash.</p><Button className="mt-6" onClick={() => connectInstagram.mutate()}><Instagram className="mr-2 h-4 w-4" />Continuar com Instagram</Button></div>
+          <div className="max-w-lg"><span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#f3c74a] to-[#9b6810] text-[#211706] shadow-[0_18px_60px_-25px_rgba(226,176,44,.9)]"><Instagram className="h-8 w-8" /></span><h2 className="mt-6 text-2xl font-black">Conecte um perfil profissional</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">Use o login oficial do Instagram para importar perfil, publicações, Reels e métricas de alcance, salvamentos, compartilhamentos e engajamento. Senhas nunca passam pela Growdash.</p><div className="mt-6 flex flex-wrap justify-center gap-2"><Button onClick={() => connectInstagram.mutate()}><Instagram className="mr-2 h-4 w-4" />Continuar com Instagram</Button><Button variant="outline" onClick={() => setDemoMode(true)}>Ver dados demonstrativos</Button></div></div>
         </section>
       ) : accounts.length > 0 ? (
         <>
           <section className="gd-panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
             <div className="flex min-w-0 items-center gap-3">{selected?.profile_picture_url ? <img src={selected.profile_picture_url} className="h-11 w-11 rounded-xl object-cover" alt="" /> : <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span>}<div className="min-w-0"><b className="block truncate text-sm">{selected?.display_name}</b><span className="text-xs text-muted-foreground">@{selected?.username || "perfil"} · {selected?.connection_status === "connected" ? "conectado" : selected?.connection_status}</span></div></div>
-            <Select value={selectedId} onValueChange={setAccountId}><SelectTrigger className="sm:ml-auto sm:w-72"><SelectValue /></SelectTrigger><SelectContent>{accounts.map((account) => <SelectItem key={account.id} value={account.id}>@{account.username || account.display_name}</SelectItem>)}</SelectContent></Select>
-            <span className="text-[10px] text-muted-foreground">Último sync: {selected?.last_sync_at ? format(new Date(selected.last_sync_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "nunca"}</span>
+            <Select value={selectedId} onValueChange={setAccountId}><SelectTrigger aria-label="Selecionar perfil do Instagram" className="sm:ml-auto sm:w-72"><SelectValue /></SelectTrigger><SelectContent>{accounts.map((account) => <SelectItem key={account.id} value={account.id}>@{account.username || account.display_name}</SelectItem>)}</SelectContent></Select>
+            <span className={demoMode ? "rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-500" : "text-[10px] text-muted-foreground"}>{demoMode ? "Demonstração — dados não oficiais" : `Último sync: ${selected?.last_sync_at ? format(new Date(selected.last_sync_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "nunca"}`}</span>
           </section>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
-            <Kpi icon={<Users />} label="Seguidores" value={number.format(selected?.followers_count ?? 0)} />
-            <Kpi icon={<TrendingUp />} label="Ganhos" value={`+${number.format(followersGained)}`} />
-            <Kpi icon={<TrendingUp />} label="Perdidos" value={`-${number.format(followersLost)}`} />
-            <Kpi icon={<Eye />} label="Alcance no período" value={number.format(totals.reach)} />
-            <Kpi icon={<Heart />} label="Interações" value={number.format(totals.interactions)} />
-            <Kpi icon={<TrendingUp />} label="Engajamento" value={`${engagement.toFixed(2).replace(".", ",")}%`} />
-            <Kpi icon={<BarChart3 />} label="Retenção de vídeo" value={videoRetention ? `${videoRetention.toFixed(1).replace(".", ",")}%` : averageWatchTime ? `${averageWatchTime.toFixed(1).replace(".", ",")} s médios` : videoViews ? "Sem métrica" : "—"} />
-          </div>
-
-          <Tabs defaultValue="overview" className="space-y-4">
+          <Tabs defaultValue="content" className="space-y-4">
             <TabsList className="h-auto w-full justify-start overflow-x-auto p-1"><TabsTrigger value="overview">Visão geral</TabsTrigger><TabsTrigger value="content">Conteúdos</TabsTrigger><TabsTrigger value="audience">Audiência</TabsTrigger><TabsTrigger value="recommendations">Recomendações</TabsTrigger></TabsList>
             <TabsContent value="overview" className="grid gap-4 xl:grid-cols-[1.45fr_.55fr]">
               <section className="gd-panel p-5"><h3 className="font-black">Evolução do perfil</h3><p className="text-xs text-muted-foreground">Seguidores, alcance e interações dentro do período global.</p><div className="mt-5 h-72">{chart.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={chart}><CartesianGrid strokeDasharray="3 3" opacity={0.15} /><XAxis dataKey="label" fontSize={11} /><YAxis fontSize={11} /><ChartTooltip contentStyle={{ background: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 12 }} /><Line type="monotone" dataKey="followers" stroke="#e0ad2d" strokeWidth={2.5} dot={false} /><Line type="monotone" dataKey="reach" stroke="#3da46d" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer> : <Empty text="Sincronize a conta para formar a série histórica diária." />}</div></section>
               <section className="gd-panel p-5"><Sparkles className="h-5 w-5 text-primary" /><h3 className="mt-3 font-black">Melhor conteúdo</h3>{best ? <><p className="mt-2 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{best.caption || "Conteúdo sem legenda"}</p><div className="mt-5 grid grid-cols-2 gap-2"><Mini label="Interações" value={number.format(best.interactions)} /><Mini label="Alcance" value={number.format(best.reach)} /><Mini label="Salvos" value={number.format(best.saves)} /><Mini label="Compart." value={number.format(best.shares)} /></div>{best.permalink && <Button asChild variant="outline" className="mt-4 w-full"><a href={best.permalink} target="_blank" rel="noreferrer">Abrir publicação <ExternalLink className="ml-2 h-3 w-3" /></a></Button>}</> : <Empty text="Nenhum conteúdo no período." />}</section>
             </TabsContent>
-            <TabsContent value="content"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{media.map((item) => <article key={item.id} className="gd-panel group overflow-hidden"><MediaPreview media={item} /><div className="p-4"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-primary"><span>{item.media_type}</span><span>{item.published_at ? format(new Date(item.published_at), "dd/MM/yyyy") : "—"}</span></div><p className="mt-2 line-clamp-2 min-h-10 text-xs leading-relaxed text-muted-foreground">{item.caption || "Sem legenda"}</p><div className="mt-4 grid grid-cols-3 gap-2"><Mini label="Alcance" value={number.format(item.reach)} /><Mini label="Interações" value={number.format(item.interactions)} /><Mini label="Engaj." value={`${Number(item.engagement_rate).toFixed(1)}%`} /></div></div></article>)}{!media.length && <Empty text="Nenhum conteúdo publicado no período selecionado." />}</div></TabsContent>
+            <TabsContent value="content" className="space-y-5">
+              <section className="mx-auto max-w-[1120px] border-b border-border/80 pb-8 pt-2 sm:pt-6">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-10">
+                  <div className="mx-auto grid h-32 w-32 shrink-0 place-items-center overflow-hidden rounded-full border-[3px] border-foreground/35 bg-muted p-1 shadow-[0_0_0_5px_hsl(var(--background)),0_15px_42px_-24px_hsl(var(--foreground)/.6)] sm:mx-0 sm:h-40 sm:w-40">
+                    <span className="grid h-full w-full place-items-center overflow-hidden rounded-full bg-primary/10 text-primary">{selected?.profile_picture_url ? <img src={selected.profile_picture_url} alt={`Foto do perfil ${selected.display_name}`} className="h-full w-full object-cover" /> : <Instagram className="h-12 w-12" />}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><h2 className="truncate text-2xl font-black tracking-tight">{selected?.username ? `@${selected.username}` : selected?.display_name || "Perfil Instagram"}</h2><span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[.12em] ${demoMode ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300" : "border-emerald-500/35 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"}`}>{demoMode ? "Demonstração" : "Conectado"}</span></div>
+                    <div className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-sm"><span><b className="font-black">{number.format(selected?.media_count ?? media.length)}</b> publicações</span><span><b className="font-black">{number.format(selected?.followers_count ?? 0)}</b> seguidores</span><span><b className="font-black">{number.format(totals.interactions)}</b> interações</span></div>
+                    <p className="mt-4 text-sm font-bold">{selected?.display_name || "Perfil profissional"}</p><p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">Central de análise orgânica Growdash. Selecione uma publicação para abrir as métricas completas no painel lateral.</p>
+                    <div className="mt-5 flex flex-wrap gap-2"><Button size="sm" variant="secondary" onClick={() => sync.mutate()} disabled={demoMode || sync.isPending}>{sync.isPending ? "Atualizando…" : "Atualizar publicações"}</Button>{selected?.last_sync_at && <span className="self-center text-[11px] text-muted-foreground">Sincronizado em {format(new Date(selected.last_sync_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>}</div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="mx-auto max-w-[1120px]">
+                <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-5"><span className="flex items-center gap-2 border-b-2 border-foreground px-1 pb-3 -mb-[13px] text-sm font-black"><Grid3X3 className="h-4 w-4" />Publicações</span><span className="flex items-center gap-2 text-sm text-muted-foreground"><Clapperboard className="h-4 w-4" />Análise por conteúdo</span></div><Select value={contentSort} onValueChange={(value) => setContentSort(value as typeof contentSort)}><SelectTrigger className="sm:w-60" aria-label="Ordenar conteúdos do Instagram"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="interactions">Mais interações</SelectItem><SelectItem value="reach">Maior alcance</SelectItem><SelectItem value="engagement_rate">Maior engajamento</SelectItem><SelectItem value="saves">Mais salvamentos</SelectItem><SelectItem value="shares">Mais compartilhamentos</SelectItem><SelectItem value="comments">Mais comentários</SelectItem><SelectItem value="video_views">Mais visualizações</SelectItem></SelectContent></Select></div>
+
+              {showingOutsidePeriod && <p className="rounded-xl border border-border bg-muted/25 px-3 py-2 text-[11px] text-muted-foreground">Não há publicações no período global selecionado. Abaixo estão os conteúdos reais mais recentes do perfil.</p>}
+
+                <div className="mt-4 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
+                {sortedMedia.map((item) => <button key={item.id} type="button" onClick={() => setSelectedMedia(item)} className="group relative aspect-square overflow-hidden bg-muted text-left outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" aria-label={`Abrir análise da publicação ${item.caption?.slice(0, 60) || item.media_type}`}><MediaPreview media={item} /><span className="absolute inset-0 grid place-items-center bg-black/50 p-3 opacity-0 transition duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"><span className="flex items-center gap-4 text-sm font-black text-white"><span className="inline-flex items-center gap-1.5"><Heart className="h-4 w-4 fill-current" />{number.format(item.likes)}</span><span className="inline-flex items-center gap-1.5"><MessageCircle className="h-4 w-4 fill-current" />{number.format(item.comments)}</span></span></span></button>)}
+                {mediaQuery.isLoading && !demoMode ? <div className="col-span-full"><Empty text="Carregando publicações…" /></div> : mediaQuery.isError && !demoMode ? <div className="col-span-full"><Empty text={(mediaQuery.error as Error).message} action={<Button size="sm" variant="outline" onClick={() => void mediaQuery.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar novamente</Button>} /></div> : !media.length && <div className="col-span-full"><Empty text="Nenhuma publicação foi sincronizada ainda." action={!demoMode && !!selectedId ? <Button size="sm" variant="outline" onClick={() => sync.mutate()} disabled={sync.isPending}><RefreshCw className={`mr-2 h-3.5 w-3.5 ${sync.isPending ? "animate-spin" : ""}`} />{sync.isPending ? "Atualizando…" : "Atualizar publicações"}</Button> : undefined} /></div>}
+                </div>
+              </div>
+            </TabsContent>
             <TabsContent value="audience"><section className="gd-panel p-6"><h3 className="font-black">Crescimento da audiência</h3><p className="mt-1 text-xs text-muted-foreground">Ganhos e perdas são somados a partir da série diária oficial. Demografia e retenção só aparecem quando a Meta entrega a métrica para a conta.</p><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Mini label="Seguidores atuais" value={number.format(selected?.followers_count ?? 0)} /><Mini label="Ganhos no período" value={`+${number.format(followersGained)}`} /><Mini label="Perdas no período" value={`-${number.format(followersLost)}`} /><Mini label="Variação líquida" value={number.format(followersGained - followersLost)} /><Mini label="Publicações" value={number.format(selected?.media_count ?? 0)} /></div></section></TabsContent>
             <TabsContent value="recommendations"><section className="grid gap-3 md:grid-cols-2"><Recommendation title="Repita o que gera intenção" text={best ? `O conteúdo líder concentra ${number.format(best.saves + best.shares)} salvamentos e compartilhamentos. Use o mesmo tema em novos formatos.` : "Sincronize conteúdos para identificar temas com maior intenção."} /><Recommendation title="Proteção contra mídia expirada" text="URLs temporárias são atualizadas em cada sincronização e a interface exibe fallback quando a CDN da Meta expira uma prévia." /><Recommendation title="Orgânico ≠ pago" text="Alcance e interação deste módulo nunca são somados às métricas de campanha do Meta Ads." /><Recommendation title="Decisão com contexto" text="Compare pelo menos sete dias e volume suficiente antes de concluir que um formato ou horário venceu." /></section></TabsContent>
           </Tabs>
+          <SocialMediaDetailSheet media={selectedMedia} onOpenChange={(open) => { if (!open) setSelectedMedia(null); }} demoMode={demoMode} />
         </>
       ) : null}
     </div>
@@ -175,5 +253,105 @@ export default function SocialMediaPage() {
 
 function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) { return <article className="gd-panel gd-metric-card group cursor-default p-4 transition hover:-translate-y-0.5 hover:border-primary/30" title={metricDescription(label)}><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.13em] text-muted-foreground">{label}</p><strong className="mt-3 block text-2xl font-black tabular-nums">{value}</strong></div><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></article>; }
 function Mini({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-border bg-muted/20 p-3"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">{label}</span><b className="mt-1 block text-sm tabular-nums">{value}</b></div>; }
-function Empty({ text }: { text: string }) { return <div className="grid min-h-32 place-items-center rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{text}</div>; }
+function Empty({ text, action }: { text: string; action?: React.ReactNode }) { return <div className="grid min-h-32 place-items-center rounded-xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground"><div className="grid justify-items-center gap-3"><span>{text}</span>{action}</div></div>; }
 function Recommendation({ title, text }: { title: string; text: string }) { return <article className="gd-panel p-5"><div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /><b className="text-sm">{title}</b></div><p className="mt-2 text-xs leading-relaxed text-muted-foreground">{text}</p></article>; }
+
+function SocialMediaDetailSheet({ media, onOpenChange, demoMode }: { media: SocialMedia | null; onOpenChange: (open: boolean) => void; demoMode: boolean }) {
+  if (!media) return null;
+
+  const engagement = Number(media.engagement_rate || 0);
+  const reach = Number(media.reach || 0);
+  const impressions = Number(media.impressions || 0);
+  const interactions = Number(media.interactions || 0);
+  const likes = Number(media.likes || 0);
+  const comments = Number(media.comments || 0);
+  const saves = Number(media.saves || 0);
+  const shares = Number(media.shares || 0);
+  const savesAndShares = Number(media.saves || 0) + Number(media.shares || 0);
+  const intentRate = reach > 0 ? (savesAndShares / reach) * 100 : 0;
+  const diagnosis = engagement >= 8
+    ? "Este conteúdo gerou engajamento acima de 8%. Avalie repetir o tema, formato e gancho em uma nova publicação."
+    : savesAndShares > Number(media.comments || 0) * 3
+      ? "Salvamentos e compartilhamentos são o principal sinal deste conteúdo. O tema parece útil para a audiência e pode render uma sequência."
+      : "Use esta leitura junto ao período e ao volume de alcance antes de decidir por mudanças no conteúdo.";
+
+  return <Sheet open={!!media} onOpenChange={onOpenChange}>
+    <SheetContent className="w-full overflow-y-auto border-l border-primary/15 bg-background p-5 sm:max-w-xl">
+      <SheetHeader className="pr-8">
+        <SheetTitle className="text-xl font-black">Insights do conteúdo</SheetTitle>
+        <SheetDescription>{demoMode ? "Demonstração — dados não oficiais" : "Dados oficiais disponíveis para esta publicação"}</SheetDescription>
+      </SheetHeader>
+
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-muted/20">
+        <div className="aspect-video bg-muted"><MediaPreview media={media} /></div>
+        <div className="p-4">
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wider text-primary">
+            <span className="rounded-full bg-primary/10 px-2 py-1">{media.media_type}</span>
+            <span className="text-muted-foreground">{media.published_at ? format(new Date(media.published_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : "Data indisponível"}</span>
+          </div>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{media.caption || "Esta publicação não possui legenda."}</p>
+          {media.permalink && <Button asChild variant="outline" size="sm" className="mt-4"><a href={media.permalink} target="_blank" rel="noreferrer">Abrir publicação <ExternalLink className="ml-2 h-3.5 w-3.5" /></a></Button>}
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-4 divide-x divide-border overflow-hidden rounded-2xl border border-border bg-muted/15">
+        <Interaction icon={<Heart />} label="Curtidas" value={number.format(likes)} />
+        <Interaction icon={<MessageCircle />} label="Comentários" value={number.format(comments)} />
+        <Interaction icon={<Send />} label="Compart." value={number.format(shares)} />
+        <Interaction icon={<Bookmark />} label="Salvos" value={number.format(saves)} />
+      </div>
+
+      <Tabs defaultValue="overview" className="mt-6">
+        <TabsList className="grid h-auto w-full grid-cols-3"><TabsTrigger value="overview">Visão geral</TabsTrigger><TabsTrigger value="engagement">Engajamento</TabsTrigger><TabsTrigger value="audience">Audiência</TabsTrigger></TabsList>
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <section>
+            <div className="flex items-baseline justify-between gap-3"><h3 className="font-black">Desempenho</h3><span className="text-xs text-muted-foreground">Por publicação</span></div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Mini label="Alcance" value={number.format(reach)} />
+              <Mini label="Impressões" value={number.format(impressions)} />
+              <Mini label="Interações" value={number.format(interactions)} />
+              <Mini label="Engajamento" value={`${engagement.toFixed(2).replace(".", ",")}%`} />
+              <Mini label="Visualizações" value={media.video_views == null ? "Não disponível" : number.format(Number(media.video_views))} />
+              <Mini label="Tipo" value={media.media_type} />
+            </div>
+          </section>
+          {media.video_views != null || media.average_watch_time != null || media.video_retention_rate != null ? <section className="rounded-2xl border border-border bg-muted/20 p-4">
+            <h3 className="font-black">Leitura do vídeo</h3>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Mini label="Visualizações" value={number.format(Number(media.video_views || 0))} />
+              <Mini label="Retenção" value={media.video_retention_rate == null ? "Não disponível" : `${Number(media.video_retention_rate).toFixed(1).replace(".", ",")}%`} />
+              <Mini label="Tempo médio" value={media.average_watch_time == null ? "Não disponível" : `${Number(media.average_watch_time).toFixed(1).replace(".", ",")} s`} />
+            </div>
+          </section> : null}
+        </TabsContent>
+        <TabsContent value="engagement" className="mt-4 space-y-4">
+          <section className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Mini label="Curtidas" value={number.format(likes)} />
+            <Mini label="Comentários" value={number.format(comments)} />
+            <Mini label="Compartilhamentos" value={number.format(shares)} />
+            <Mini label="Salvamentos" value={number.format(saves)} />
+            <Mini label="Sinais de intenção" value={number.format(savesAndShares)} />
+            <Mini label="Taxa de intenção" value={`${intentRate.toFixed(2).replace(".", ",")}%`} />
+          </section>
+          <p className="rounded-xl border border-border bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground">Sinais de intenção somam salvamentos e compartilhamentos. Eles ajudam a identificar conteúdos que a audiência quer rever ou enviar a outra pessoa.</p>
+        </TabsContent>
+        <TabsContent value="audience" className="mt-4">
+          <section className="rounded-2xl border border-dashed border-border bg-muted/15 p-5">
+            <Users className="h-5 w-5 text-primary" />
+            <h3 className="mt-3 font-black">Audiência deste conteúdo</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">A integração atual não recebe seguidores versus não seguidores, localização, idade ou gênero por publicação. Quando a Meta disponibilizar essas métricas para esta conta, elas aparecerão aqui sem estimativas.</p>
+          </section>
+        </TabsContent>
+      </Tabs>
+
+      <section className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+        <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /><h3 className="font-black">Leitura Growdash</h3></div>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{diagnosis}</p>
+      </section>
+    </SheetContent>
+  </Sheet>;
+}
+
+function Interaction({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <div className="min-w-0 p-3 text-center"><span className="mx-auto grid h-6 w-6 place-items-center text-muted-foreground [&>svg]:h-3.5 [&>svg]:w-3.5" aria-hidden="true">{icon}</span><b className="mt-1 block truncate text-sm tabular-nums">{value}</b><span className="block truncate text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span></div>;
+}

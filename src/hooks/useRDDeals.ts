@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { endOfDay } from "date-fns";
+import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -51,14 +53,19 @@ export interface RDDeal {
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  utm_id: string | null;
   lead_state: string | null;
   lead_city: string | null;
   lead_created_at: string | null;
   stage_updated_at: string | null;
   closed_at: string | null;
+  updated_at?: string | null;
 }
 
 export interface FunnelStage {
+  rd_funnel_id: string;
   rd_stage_id: string;
   name: string;
   order: number;
@@ -66,8 +73,48 @@ export interface FunnelStage {
   is_lost: boolean;
 }
 
+type CanonicalFunnelStage = Omit<FunnelStage, "rd_stage_id"> & { rd_stage_id: string };
+
+/**
+ * Multiple connected RD funnels can expose the same operational stage with
+ * different IDs. A consolidated view must have one pipeline (not one copy of
+ * "Lead novo", "Oportunidade" etc. per account), while the original IDs keep
+ * mapping each deal to that canonical stage.
+ */
+export function consolidateFunnelStages(stages: FunnelStage[]) {
+  const sourceToCanonicalId = new Map<string, string>();
+  const canonicalById = new Map<string, CanonicalFunnelStage>();
+
+  for (const stage of stages) {
+    const canonical = consolidatedCRMStage({
+      id: stage.rd_stage_id,
+      name: stage.name,
+      order: stage.order,
+      won: stage.is_won,
+      lost: stage.is_lost,
+    });
+    sourceToCanonicalId.set(stage.rd_stage_id, canonical.id);
+    const current = canonicalById.get(canonical.id);
+    if (!current || canonical.order < current.order) {
+      canonicalById.set(canonical.id, {
+        rd_stage_id: canonical.id,
+        name: canonical.name,
+        order: canonical.order,
+        is_won: canonical.won,
+        is_lost: canonical.lost,
+      });
+    }
+  }
+
+  return {
+    stages: Array.from(canonicalById.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR")),
+    sourceToCanonicalId,
+  };
+}
+
 interface Params {
   funnelId?: string;
+  funnelIds?: string[];
   startDate?: Date;
   endDate?: Date;
   source?: string;
@@ -75,18 +122,44 @@ interface Params {
   campaign?: string;
   owner?: string;
   product?: string;
+  /**
+   * O RD mantém o pipeline atual independentemente da data em que o lead foi
+   * criado. Em análises de funil, ocultar um lead antigo que ainda está em
+   * negociação produz um funil vazio e uma conversão incorreta.
+   */
+  includeHistory?: boolean;
   enabled?: boolean;
 }
 
+export function shouldApplyRDDateRange(includeHistory = false) {
+  return !includeHistory;
+}
+
 const DEAL_FIELDS =
-  "id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at";
+  "id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, updated_at";
+
+/** Keeps the newest snapshot of a single RD deal when an integration retry
+ * left more than one local row. The RD deal ID is global and is the canonical
+ * identity across a combined-account analysis. */
+export function dedupeRDDeals(rows: RDDeal[]) {
+  const unique = new Map<string, RDDeal>();
+  for (const row of rows) {
+    const key = row.rd_deal_id || row.id;
+    const current = unique.get(key);
+    const rowTime = new Date(row.updated_at || row.stage_updated_at || row.closed_at || row.lead_created_at || 0).getTime();
+    const currentTime = current ? new Date(current.updated_at || current.stage_updated_at || current.closed_at || current.lead_created_at || 0).getTime() : -Infinity;
+    if (!current || rowTime >= currentTime) unique.set(key, row);
+  }
+  return Array.from(unique.values());
+}
 
 export function useRDDeals(params: Params) {
-  const { funnelId, startDate, endDate, source, state, campaign, owner, product, enabled = true } = params;
+  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, owner, product, includeHistory = false, enabled = true } = params;
+  const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
   return useQuery({
     queryKey: [
       "rd_deals",
-      funnelId,
+      scopeIds.join(","),
       startDate?.toISOString(),
       endDate?.toISOString(),
       source ?? "all",
@@ -94,17 +167,18 @@ export function useRDDeals(params: Params) {
       campaign ?? "all",
       owner ?? "all",
       product ?? "all",
+      includeHistory ? "history" : "period",
     ],
-    enabled: enabled && !!funnelId,
+    enabled: enabled && scopeIds.length > 0,
     queryFn: async () => {
       let query = supabase
         .from("rd_deals")
         .select(DEAL_FIELDS)
-        .eq("rd_funnel_id", funnelId!)
         .order("lead_created_at", { ascending: false });
+      query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
 
-      if (startDate) query = query.gte("lead_created_at", startDate.toISOString());
-      if (endDate) query = query.lte("lead_created_at", endOfDay(endDate).toISOString());
+      if (shouldApplyRDDateRange(includeHistory) && startDate) query = query.gte("lead_created_at", startDate.toISOString());
+      if (shouldApplyRDDateRange(includeHistory) && endDate) query = query.lte("lead_created_at", endOfDay(endDate).toISOString());
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
       if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
@@ -123,7 +197,7 @@ export function useRDDeals(params: Params) {
         all = all.concat(batch);
         if (batch.length < PAGE) break;
       }
-      return all;
+      return dedupeRDDeals(all);
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
@@ -138,11 +212,12 @@ export function useRDDeals(params: Params) {
  * datas foi a principal causa de divergência com os relatórios do RD.
  */
 export function useRDClosedDeals(params: Params) {
-  const { funnelId, startDate, endDate, source, state, campaign, owner, product, enabled = true } = params;
+  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, owner, product, includeHistory = false, enabled = true } = params;
+  const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
   return useQuery({
     queryKey: [
       "rd_closed_deals",
-      funnelId,
+      scopeIds.join(","),
       startDate?.toISOString(),
       endDate?.toISOString(),
       source ?? "all",
@@ -150,19 +225,19 @@ export function useRDClosedDeals(params: Params) {
       campaign ?? "all",
       owner ?? "all",
       product ?? "all",
+      includeHistory ? "history" : "period",
     ],
-    enabled: enabled && !!funnelId,
+    enabled: enabled && scopeIds.length > 0,
     queryFn: async () => {
       let query = supabase
         .from("rd_deals")
         .select(DEAL_FIELDS)
-        .eq("rd_funnel_id", funnelId!)
-        .eq("win", true)
         .not("closed_at", "is", null)
         .order("closed_at", { ascending: false });
+      query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
 
-      if (startDate) query = query.gte("closed_at", startDate.toISOString());
-      if (endDate) query = query.lte("closed_at", endOfDay(endDate).toISOString());
+      if (shouldApplyRDDateRange(includeHistory) && startDate) query = query.gte("closed_at", startDate.toISOString());
+      if (shouldApplyRDDateRange(includeHistory) && endDate) query = query.lte("closed_at", endOfDay(endDate).toISOString());
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
       if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
@@ -179,7 +254,10 @@ export function useRDClosedDeals(params: Params) {
         all = all.concat(batch);
         if (batch.length < PAGE) break;
       }
-      return all;
+      // Alguns pipelines do RD mantêm a etapa final como “Vendas realizadas”
+      // antes de preencher o booleano técnico `win`. Não descartamos essas
+      // vendas reais por causa da ordem de sincronização.
+      return dedupeRDDeals(all).filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
@@ -188,15 +266,21 @@ export function useRDClosedDeals(params: Params) {
 }
 
 export function useFunnelStages(funnelId?: string) {
+  return useFunnelStagesForIds(funnelId ? [funnelId] : []);
+}
+
+export function useFunnelStagesForIds(funnelIds: string[]) {
+  const scopeIds = Array.from(new Set(funnelIds)).sort();
   return useQuery({
-    queryKey: ["rd_funnel_stages", funnelId],
-    enabled: !!funnelId,
+    queryKey: ["rd_funnel_stages", scopeIds.join(",")],
+    enabled: scopeIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("rd_funnel_stages")
-        .select("rd_stage_id, name, order, is_won, is_lost")
-        .eq("rd_funnel_id", funnelId!)
+        .select("rd_funnel_id, rd_stage_id, name, order, is_won, is_lost")
         .order("order", { ascending: true });
+      query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as unknown as FunnelStage[];
     },
@@ -249,6 +333,7 @@ export interface FunnelAnalytics {
     revenue: number;
   }[];
   lostReasons: { reason: string; count: number; pct: number }[];
+  standbyReasons: { reason: string; count: number; pct: number }[];
   stateBreakdown: {
     state: string;
     leads: number;
@@ -285,11 +370,24 @@ function periodOfHour(h: number): "Manhã" | "Tarde" | "Noite" | "Madrugada" {
 export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], closedDeals: RDDeal[] = deals.filter((deal) => deal.win)): FunnelAnalytics {
   const totalLeads = deals.length;
 
-  // Ordena estágios pelo "order" real do RD
-  const sortedStages = [...stages].sort((a, b) => a.order - b.order);
+  const { stages: sortedStages, sourceToCanonicalId } = consolidateFunnelStages(stages);
+  const canonicalDealStageId = (deal: RDDeal) => {
+    if (deal.rd_stage_id && sourceToCanonicalId.has(deal.rd_stage_id)) return sourceToCanonicalId.get(deal.rd_stage_id)!;
+    return consolidatedCRMStage({
+      name: deal.rd_stage_name,
+      order: deal.rd_stage_order ?? undefined,
+      won: deal.win || isWonRDStageName(deal.rd_stage_name),
+      lost: deal.stage_bucket === "lost",
+    }).id;
+  };
 
   // Sequência (sem perdido) para taxas de avanço
   const sequence = sortedStages.filter((s) => !s.is_lost);
+  const wonStageIds = new Set(sortedStages.filter((stage) => stage.is_won).map((stage) => stage.rd_stage_id));
+  const confirmedClosedDeals = Array.from(new Map(
+    [...closedDeals, ...deals.filter((deal) => deal.win || wonStageIds.has(canonicalDealStageId(deal)) || isWonRDStageName(deal.rd_stage_name))]
+      .map((deal) => [deal.rd_deal_id, deal]),
+  ).values());
 
   // Mapa: stage_id -> índice na sequência
   const indexInSeq = new Map<string, number>();
@@ -302,14 +400,14 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   const daysCountByStage = new Map<string, number>();
 
   let qualifiedLeads = 0;
-  const conversions = closedDeals.length;
+  const conversions = confirmedClosedDeals.length;
   let lostDeals = 0;
-  const revenue = closedDeals.reduce((sum, deal) => sum + (deal.amount_total || 0), 0);
-  const wonAmounts: number[] = closedDeals.map((deal) => deal.amount_total || 0);
+  const revenue = confirmedClosedDeals.reduce((sum, deal) => sum + (deal.amount_total || 0), 0);
+  const wonAmounts: number[] = confirmedClosedDeals.map((deal) => deal.amount_total || 0);
 
   const now = Date.now();
   for (const d of deals) {
-    const sid = d.rd_stage_id || "";
+    const sid = canonicalDealStageId(d);
     currentCount.set(sid, (currentCount.get(sid) || 0) + 1);
     valueByStage.set(sid, (valueByStage.get(sid) || 0) + (d.amount_total || 0));
 
@@ -330,7 +428,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   // Considera perdidos (lost) como atribuídos à última etapa em que estavam? Sem rastro, contamos como ao menos lead.
   const cumulativeBySeqIdx = sequence.map(() => 0);
   for (const d of deals) {
-    const idx = d.rd_stage_id ? indexInSeq.get(d.rd_stage_id) ?? -1 : -1;
+    const idx = indexInSeq.get(canonicalDealStageId(d)) ?? -1;
     if (idx >= 0) {
       for (let i = 0; i <= idx; i++) cumulativeBySeqIdx[i] += 1;
     } else if (d.stage_bucket !== "lost") {
@@ -398,7 +496,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   const avgTicket = wonAmounts.length > 0 ? wonAmounts.reduce((a, b) => a + b, 0) / wonAmounts.length : 0;
 
   // Tempo médio até conversão
-  const wonWithDates = closedDeals.filter((d) => d.lead_created_at && d.closed_at);
+  const wonWithDates = confirmedClosedDeals.filter((d) => d.lead_created_at && d.closed_at);
   const avgDaysToConvert =
     wonWithDates.length > 0
       ? wonWithDates.reduce((s, d) => {
@@ -416,12 +514,12 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
       const day = d.lead_created_at.slice(0, 10);
       const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
       cur.leads += 1;
-      const idx = d.rd_stage_id ? indexInSeq.get(d.rd_stage_id) ?? -1 : -1;
+      const idx = indexInSeq.get(canonicalDealStageId(d)) ?? -1;
       if (idx >= oppIdxThreshold) cur.opportunities += 1;
       evoMap.set(day, cur);
     }
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     if (!d.closed_at) continue;
     const day = d.closed_at.slice(0, 10);
     const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
@@ -435,7 +533,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   // Aging — leads não fechados parados há X dias (baseado em stage_updated_at)
   const agingBuckets = { gt3: 0, gt7: 0, gt15: 0 };
   for (const d of deals) {
-    if (d.win || d.stage_bucket === "lost") continue;
+    if (d.win || wonStageIds.has(canonicalDealStageId(d)) || isWonRDStageName(d.rd_stage_name) || d.stage_bucket === "lost") continue;
     const ref = d.stage_updated_at || d.lead_created_at;
     if (!ref) continue;
     const days = (now - new Date(ref).getTime()) / 86400000;
@@ -456,7 +554,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     cur.leads += 1;
     srcMap.set(k, cur);
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     const k = d.utm_source || "Não informado";
     const cur = srcMap.get(k) || { leads: 0, sales: 0, revenue: 0 };
     cur.sales += 1;
@@ -486,6 +584,21 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     .map(([reason, count]) => ({ reason, count, pct: totalLost > 0 ? (count / totalLost) * 100 : 0 }))
     .sort((a, b) => b.count - a.count);
 
+  // "Stand By" é uma espera operacional, não uma perda. Quando o RD traz um
+  // motivo nessa etapa, ele precisa ser visível separadamente para a equipe
+  // agir sem contaminar os motivos de perda.
+  const standbyMap = new Map<string, number>();
+  for (const d of deals) {
+    const stageName = String(d.rd_stage_name || "").toLocaleLowerCase("pt-BR");
+    if (!/(stand\s*by|standby|aguardando)/.test(stageName)) continue;
+    const reason = d.lost_reason || "Sem motivo informado";
+    standbyMap.set(reason, (standbyMap.get(reason) || 0) + 1);
+  }
+  const totalStandby = Array.from(standbyMap.values()).reduce((sum, count) => sum + count, 0);
+  const standbyReasons = Array.from(standbyMap.entries())
+    .map(([reason, count]) => ({ reason, count, pct: totalStandby > 0 ? (count / totalStandby) * 100 : 0 }))
+    .sort((a, b) => b.count - a.count);
+
   // Estado — normaliza nome completo → UF (mesma lógica da dashboard principal)
   const stateMap = new Map<string, { leads: number; conversions: number }>();
   for (const d of deals) {
@@ -494,7 +607,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     cur.leads += 1;
     stateMap.set(k, cur);
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     const k = normalizeUF(d.lead_state);
     const cur = stateMap.get(k) || { leads: 0, conversions: 0 };
     cur.conversions += 1;
@@ -519,7 +632,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
       cur.leads += 1;
     }
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     if (!d.closed_at) continue;
     const wd = new Date(d.closed_at).getDay();
     const cur = wdMap.get(wd)!;
@@ -552,7 +665,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
       hourMap.get(h)!.leads += 1;
     }
   }
-  for (const d of closedDeals) {
+  for (const d of confirmedClosedDeals) {
     if (!d.closed_at) continue;
     const h = new Date(d.closed_at).getHours();
     const p = periodOfHour(h);
@@ -583,7 +696,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     const k = d.deal_owner_name || "Não atribuído";
     const cur = ownerMap.get(k) || { deals: 0, wins: 0 };
     cur.deals += 1;
-    if (d.win) cur.wins += 1;
+    if (d.win || wonStageIds.has(canonicalDealStageId(d)) || isWonRDStageName(d.rd_stage_name)) cur.wins += 1;
     ownerMap.set(k, cur);
   }
   const ownerBreakdown = Array.from(ownerMap.entries())
@@ -607,6 +720,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     bottleneck,
     sourceBreakdown,
     lostReasons,
+    standbyReasons,
     stateBreakdown,
     weekdayBreakdown,
     hourBreakdown,

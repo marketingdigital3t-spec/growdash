@@ -8,6 +8,7 @@ const corsHeaders = {
 const PLATFORM_OWNER_EMAIL = "marketingdigital3t@gmail.com";
 type AccessRole = "admin" | "editor" | "viewer";
 const PERMISSION_KEYS = [
+  "can_expert_dashboard",
   "can_dashboard",
   "can_campaigns",
   "can_funnels",
@@ -275,9 +276,9 @@ async function listUsers(admin: any, workspaceId: string, callerId: string) {
   if (!ids.length) return json({ users: [] });
 
   const [{ data: permissions, error: permissionError }, { data: accounts }, { data: funnels }, authUsers] = await Promise.all([
-    admin.from("user_permissions").select("*").in("user_id", ids),
-    admin.from("user_ad_account_access").select("user_id, ad_account_id").in("user_id", ids),
-    admin.from("user_rd_funnel_access").select("user_id, rd_funnel_id").in("user_id", ids),
+    admin.from("workspace_user_permissions").select("*").eq("workspace_id", workspaceId).in("user_id", ids),
+    admin.from("user_ad_account_access").select("user_id, ad_account_id").eq("workspace_id", workspaceId).in("user_id", ids),
+    admin.from("user_rd_funnel_access").select("user_id, rd_funnel_id").eq("workspace_id", workspaceId).in("user_id", ids),
     Promise.all(ids.map(async (id: string) => {
       const { data } = await admin.auth.admin.getUserById(id);
       return data?.user ?? null;

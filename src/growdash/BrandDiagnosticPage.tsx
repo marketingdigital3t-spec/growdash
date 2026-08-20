@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
+import { BrandStrategyDiagnostic } from "@/components/brands/BrandStrategyDiagnostic";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
@@ -208,13 +209,18 @@ export default function BrandDiagnosticPage() {
         {loadingData && <span className="ml-auto inline-flex items-center gap-2 text-xs text-muted-foreground"><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Atualizando dados…</span>}
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-5">
+      <Tabs defaultValue="strategy" className="space-y-5">
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1">
+          <TabsTrigger value="strategy">Estratégia</TabsTrigger>
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
           <TabsTrigger value="media">Mídia paga</TabsTrigger>
           <TabsTrigger value="funnel">Funil RD</TabsTrigger>
           <TabsTrigger value="health">Saúde e sincronização</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="strategy">
+          <BrandStrategyDiagnostic brand={brand} />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

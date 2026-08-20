@@ -2,6 +2,7 @@ import { createContext, useContext, ReactNode } from "react";
 import type { InsightRow } from "@/hooks/useInsights";
 import type { Sale } from "@/hooks/useSales";
 import type { RDDealLite } from "@/hooks/useRDDealsForPeriod";
+import type { WidgetMetric } from "@/lib/widgetCatalog";
 
 export interface DashboardContextValue {
   startDate: Date;
@@ -10,11 +11,23 @@ export interface DashboardContextValue {
   insights: InsightRow[];
   sales: Sale[];
   rdDeals: RDDealLite[];
+  revenueDeals?: RDDealLite[];
   alerts: any[];
   campaigns: any[];
   adAccounts: any[];
   products: any[];
   isLoading: boolean;
+  leadBreakdown?: {
+    forms: number;
+    site: number;
+    conversations: number;
+    total: number;
+  };
+  /**
+   * Read-only dashboards can provide a metric whose business definition is
+   * different from the acquisition dashboard (for example, sold / RD leads).
+   */
+  metricOverrides?: Partial<Record<WidgetMetric, number>>;
 }
 
 const Ctx = createContext<DashboardContextValue | null>(null);

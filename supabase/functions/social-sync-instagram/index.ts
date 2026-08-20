@@ -21,6 +21,24 @@ async function graphJson(url: URL) {
   return payload;
 }
 
+async function profileJson(base: string, accountId: string, token: string) {
+  let lastError: unknown = null;
+  for (const fields of [
+    "id,username,name,profile_picture_url,followers_count,media_count",
+    "user_id,username,name,profile_picture_url,followers_count,media_count",
+  ]) {
+    const url = new URL(`${base}/${accountId}`);
+    url.searchParams.set("fields", fields);
+    url.searchParams.set("access_token", token);
+    try {
+      return await graphJson(url);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Não foi possível ler o perfil do Instagram.");
+}
+
 async function mediaInsights(base: string, mediaId: string, token: string) {
   const metrics = ["reach", "saved", "shares", "total_interactions", "views", "ig_reels_avg_watch_time", "ig_reels_video_view_total_time", "video_retention_rate"];
   const result: Record<string, number> = {};
@@ -32,20 +50,11 @@ async function mediaInsights(base: string, mediaId: string, token: string) {
     for (const item of payload.data ?? []) result[item.name] = Number(item.values?.[0]?.value ?? item.value ?? 0);
     return result;
   } catch {
-    // Media types support different metric sets. A failed metric must not make
-    // the entire content sync fail, so retry individually and keep what exists.
-    for (const metric of metrics) {
-      const url = new URL(`${base}/${mediaId}/insights`);
-      url.searchParams.set("metric", metric);
-      url.searchParams.set("access_token", token);
-      try {
-        const payload = await graphJson(url);
-        const item = payload.data?.[0];
-        if (item) result[metric] = Number(item.values?.[0]?.value ?? item.value ?? 0);
-      } catch {
-        result[metric] = 0;
-      }
-    }
+    // Instagram exposes different insight sets for posts, reels and older
+    // media. Retrying every unsupported metric individually could turn one
+    // profile sync into hundreds of Graph calls and time out before posts were
+    // saved. Preserve the publication and leave unavailable metrics at zero;
+    // the next sync can enrich it when Meta makes them available.
     return result;
   }
 }
@@ -75,10 +84,7 @@ Deno.serve(async (req) => {
     const token = String(integration.api_token);
     const version = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
     const base = `https://graph.instagram.com/${version}`;
-    const profileUrl = new URL(`${base}/${account.provider_account_id}`);
-    profileUrl.searchParams.set("fields", "id,username,name,profile_picture_url,followers_count,media_count");
-    profileUrl.searchParams.set("access_token", token);
-    const profile = await graphJson(profileUrl);
+    const profile = await profileJson(base, account.provider_account_id, token);
     const mediaUrl = new URL(`${base}/${account.provider_account_id}/media`);
     mediaUrl.searchParams.set("fields", "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count");
     mediaUrl.searchParams.set("limit", "25");
@@ -97,10 +103,15 @@ Deno.serve(async (req) => {
       const interactions = Number(insights.total_interactions ?? likes + comments + saves + shares);
       totalReach += reach;
       totalInteractions += interactions;
+      const rawMediaType = String(item.media_type ?? "").toUpperCase();
+      const rawProductType = String(item.media_product_type ?? "").toUpperCase();
+      const mediaType = rawMediaType === "VIDEO" || rawProductType === "REELS"
+        ? "reels"
+        : rawMediaType.toLowerCase() || rawProductType.toLowerCase() || "post";
       const { error } = await admin.from("social_media").upsert({
         social_account_id: account.id,
         provider_media_id: String(item.id),
-        media_type: String(item.media_product_type ?? item.media_type ?? "post").toLowerCase(),
+        media_type: mediaType,
         caption: item.caption ?? null,
         permalink: item.permalink ?? null,
         media_url: item.media_url ?? null,

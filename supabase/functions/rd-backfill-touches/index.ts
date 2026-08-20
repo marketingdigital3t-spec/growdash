@@ -79,16 +79,78 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const authHeader = req.headers.get("Authorization") || "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const isService = Boolean(bearer && bearer === serviceKey);
+    let userId: string | null = null;
+    let allowedAccountIds: string[] | null = null;
+    if (!isService) {
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Não autenticado" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Sessão inválida" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
+      const { data: memberships } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", userId)
+        .eq("status", "active");
+      const activeWorkspaces = new Set((memberships ?? []).map((m: any) => String(m.workspace_id)));
+      const { data: delegated } = await supabase
+        .from("user_ad_account_access")
+        .select("ad_account_id")
+        .eq("user_id", userId);
+      const delegatedIds = new Set((delegated ?? []).map((a: any) => String(a.ad_account_id)));
+      const { data: isMaster } = await supabase.rpc("is_master", { _user_id: userId });
+      let accountQuery = supabase.from("ad_accounts").select("id, user_id, workspace_id");
+      if (isMaster !== true) {
+        const safeDelegatedIds = Array.from(delegatedIds).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+        accountQuery = safeDelegatedIds.length
+          ? accountQuery.or(`user_id.eq.${userId},id.in.(${safeDelegatedIds.join(",")})`)
+          : accountQuery.eq("user_id", userId);
+      }
+      const { data: ownedAccounts } = await accountQuery;
+      allowedAccountIds = (ownedAccounts ?? [])
+        .filter((account: any) => {
+          const workspaceAllowed = !account.workspace_id || activeWorkspaces.has(String(account.workspace_id));
+          return isMaster === true || (workspaceAllowed && (account.user_id === userId || delegatedIds.has(String(account.id))));
+        })
+        .map((account: any) => String(account.id));
+    }
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const adAccountId: string | undefined = body.ad_account_id;
 
     let query = supabase.from("rd_deals").select("id, rd_deal_id, ad_account_id, user_id, raw, lead_created_at, closed_at");
-    if (adAccountId) query = query.eq("ad_account_id", adAccountId);
+    if (adAccountId) {
+      if (!isService && !(allowedAccountIds ?? []).includes(adAccountId)) {
+        return new Response(JSON.stringify({ error: "Conta não autorizada" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      query = query.eq("ad_account_id", adAccountId);
+    } else if (!isService) {
+      if (!allowedAccountIds?.length) {
+        return new Response(JSON.stringify({ ok: true, deals_processed: 0, touches_inserted: 0 }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      query = query.in("ad_account_id", allowedAccountIds);
+    }
 
     const { data: deals, error } = await query.limit(5000);
     if (error) throw error;

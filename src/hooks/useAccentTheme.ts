@@ -1,37 +1,40 @@
 import { useEffect, useState } from "react";
 
-export type AccentTheme = "gold" | "purple" | "blue" | "pink" | "sapphire" | "obsidian" | "emerald";
+export type AccentTheme = "monochrome" | "metallic-gold";
 const STORAGE_KEY = "growdash:accent-theme";
 
-const ACCENT_HEX: Record<AccentTheme, string> = {
-  gold: "#b88722",
-  blue: "#2f6bf4",
-  purple: "#8b5cf6",
-  pink: "#ec4899",
-  sapphire: "#0ea5e9",
-  obsidian: "#a8b0bd",
-  emerald: "#10b981",
+const ACCENT: Record<AccentTheme, { html: string; color: string }> = {
+  monochrome: { html: "monochrome", color: "#e4e4e4" },
+  "metallic-gold": { html: "metallic-gold", color: "#c98a24" },
 };
 
 function readAccent(): AccentTheme {
-  if (typeof window === "undefined") return "gold";
-  const value = window.localStorage.getItem(STORAGE_KEY);
-  return value && value in ACCENT_HEX ? value as AccentTheme : "gold";
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    // Versions prior to the selector stored "gold" while still rendering the
+    // monochrome palette. Preserve that visual preference on upgrade.
+    return saved === "metallic-gold" ? "metallic-gold" : "monochrome";
+  } catch {
+    return "monochrome";
+  }
 }
 
 export function applyAccent(value: AccentTheme) {
-  document.documentElement.dataset.accent = value;
+  const palette = ACCENT[value];
+  document.documentElement.dataset.accent = palette.html;
 
-  const color = ACCENT_HEX[value];
   let themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (!themeColor) {
     themeColor = document.createElement("meta");
     themeColor.name = "theme-color";
     document.head.appendChild(themeColor);
   }
-  themeColor.content = color;
+  themeColor.content = palette.color;
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path fill="${color}" d="M8 31 32 7l24 24-8 8-16-16-16 16z"/><path fill="${color}" d="m32 31 12 12-12 12-12-12z"/></svg>`;
+  const gradient = value === "metallic-gold"
+    ? `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7a4407"/><stop offset=".42" stop-color="#f7d36a"/><stop offset=".7" stop-color="#b87616"/><stop offset="1" stop-color="#fff0a0"/></linearGradient>`
+    : `<linearGradient id="s" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#9a9a9a"/></linearGradient>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs>${gradient}</defs><path fill="url(#s)" d="M8 31 32 7l24 24-8 8-16-16-16 16z"/><path fill="url(#s)" d="m32 31 12 12-12 12-12-12z"/></svg>`;
   let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (!favicon) {
     favicon = document.createElement("link");
@@ -48,7 +51,11 @@ export function useAccentTheme() {
   useEffect(() => applyAccent(accent), [accent]);
 
   const setAccent = (value: AccentTheme) => {
-    window.localStorage.setItem(STORAGE_KEY, value);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, value);
+    } catch {
+      // The preference remains active for this session if browser storage is blocked.
+    }
     applyAccent(value);
     setAccentState(value);
   };

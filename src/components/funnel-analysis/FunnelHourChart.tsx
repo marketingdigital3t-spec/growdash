@@ -29,7 +29,7 @@ export function FunnelHourChart({ a }: { a: FunnelAnalytics }) {
     : [];
 
   return (
-    <Card className="bg-card/60 border-border/40">
+    <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base">10. Melhor período do dia para conversão</CardTitle>
       </CardHeader>

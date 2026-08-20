@@ -15,7 +15,15 @@ export type WidgetMetric =
   | "roas"
   | "roi"
   | "profit"
-  | "sales_count";
+  | "sales_count"
+  | "profit_margin"
+  | "receivables"
+  | "average_ticket"
+  | "campaign_leads"
+  | "campaign_cpl"
+  | "campaign_cost_per_link"
+  | "campaign_ctr"
+  | "campaign_conversion_rate";
 
 export type WidgetGroupBy = "date" | "campaign" | "ad" | "state" | "formation" | "product" | "payment";
 
@@ -31,6 +39,9 @@ export interface WidgetConfig {
   comparePeriod?: boolean;
   text?: string;
   hidePrimary?: boolean;
+  hideFinancialOverview?: boolean;
+  hideFinancialKpis?: boolean;
+  hideCampaignKpis?: boolean;
   individualized?: boolean;
   canonicalLayoutVersion?: number;
 }
@@ -38,6 +49,8 @@ export interface WidgetConfig {
 export type WidgetType =
   | "kpi"
   | "kpi_grid"
+  | "payment_chart"
+  | "platform_distribution"
   | "line_chart"
   | "bar_chart"
   | "pie_chart"
@@ -87,6 +100,14 @@ export const METRIC_LABELS: Record<WidgetMetric, string> = {
   roi: "ROI",
   profit: "Lucro",
   sales_count: "Nº Vendas",
+  profit_margin: "Margem",
+  receivables: "Recebíveis",
+  average_ticket: "Ticket Médio",
+  campaign_leads: "Leads (Forms + site + conversas)",
+  campaign_cpl: "Custo por Lead",
+  campaign_cost_per_link: "Custo por Clique no Link",
+  campaign_ctr: "CTR",
+  campaign_conversion_rate: "Taxa de Conversão",
 };
 
 export const WIDGET_CATALOG: WidgetDef[] = [
@@ -105,6 +126,22 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     description: "Vários KPIs lado a lado",
     defaultLayout: { w: 12, h: 2, minW: 4, minH: 2 },
     defaultConfig: { metrics: ["spend", "leads", "cpl", "ctr"] },
+  },
+  {
+    type: "payment_chart",
+    title: "Vendas por Pagamento",
+    category: "Gráfico",
+    description: "Distribuição da receita por forma de pagamento",
+    defaultLayout: { w: 4, h: 5, minW: 3, minH: 5 },
+    defaultConfig: {},
+  },
+  {
+    type: "platform_distribution",
+    title: "Distribuição por Plataforma",
+    category: "Análise",
+    description: "Leads, receita e conversão por plataforma de origem",
+    defaultLayout: { w: 5, h: 5, minW: 4, minH: 5 },
+    defaultConfig: {},
   },
   {
     type: "line_chart",
@@ -280,7 +317,9 @@ export function getWidgetDef(type: WidgetType) {
 
 // Default "Padrão" view: the canonical full-width dashboard recovered from the
 // original Growdash project. System widgets are appended by the renderer.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 4;
+// v10 remove KPIs financeiros redundantes da faixa principal e mantém os dois
+// gráficos alinhados à coluna de CTR e taxa de conversão.
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 11;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
@@ -289,18 +328,32 @@ export const DEFAULT_VIEW = {
     { i: "primary_spend", x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "primary_roas", x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "primary_profit", x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "default", x: 0, y: 2, w: 12, h: 30, minW: 12, minH: 10 },
+    { i: "payment_chart", x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 5 },
+    { i: "platform_distribution", x: 4, y: 2, w: 5, h: 5, minW: 4, minH: 5 },
+    { i: "campaign_ctr", x: 9, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_conversion_rate", x: 9, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "default", x: 0, y: 7, w: 12, h: 30, minW: 6, minH: 10 },
   ],
   widgets: [
     { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Líquido", config: { metric: "revenue_net" } },
     { id: "primary_spend", type: "kpi" as WidgetType, title: "Gastos com Anúncios", config: { metric: "spend" } },
     { id: "primary_roas", type: "kpi" as WidgetType, title: "ROAS", config: { metric: "roas" } },
     { id: "primary_profit", type: "kpi" as WidgetType, title: "Lucro Líquido", config: { metric: "profit" } },
+    { id: "payment_chart", type: "payment_chart" as WidgetType, title: "Vendas por Pagamento", config: {} },
+    { id: "platform_distribution", type: "platform_distribution" as WidgetType, title: "Distribuição por Plataforma", config: {} },
+    { id: "campaign_ctr", type: "kpi" as WidgetType, title: "CTR", config: { metric: "campaign_ctr" } },
+    { id: "campaign_conversion_rate", type: "kpi" as WidgetType, title: "Taxa de Conversão", config: { metric: "campaign_conversion_rate" } },
     {
       id: "default",
       type: "default_block" as WidgetType,
-      title: "Padrão",
-      config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION, hidePrimary: true },
+      title: "Gráficos, funil e tabelas",
+      config: {
+        canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+        hidePrimary: true,
+        hideFinancialOverview: true,
+        hideFinancialKpis: true,
+        hideCampaignKpis: true,
+      },
     },
   ],
 };

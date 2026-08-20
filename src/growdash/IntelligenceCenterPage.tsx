@@ -99,9 +99,9 @@ export default function IntelligenceCenterPage() {
         ad_account_id: intelligence.context.id,
         created_by: user.id,
         phone_e164: phoneE164,
-        report_time: reportTime,
+        local_time: reportTime,
         timezone: intelligence.context.timezone,
-        metrics: ["spend", "leads", "cpl", "ctr", "cpm", "roas", "frequency"],
+        include_metrics: ["spend", "leads", "cpl", "ctr", "cpm", "roas", "frequency"],
         next_run_at: new Date(Date.now() + 86_400_000).toISOString(),
       });
       if (error) throw error;

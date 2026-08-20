@@ -9,6 +9,8 @@ export interface ActionTotalsResult {
   totalsByAccount: Record<string, Record<string, number>>;
   /** Per-account, per-day, per-action totals: { [accountId]: { [date]: { [action_type]: value } } }. */
   dailyByAccount: Record<string, Record<string, Record<string, number>>>;
+  /** Per-ad, per-day, per-action totals. Keeps daily charts scoped to the selected campaigns. */
+  dailyByAd: Record<string, Record<string, Record<string, number>>>;
   /** Per-ad totals: { [ad_id]: { [action_type]: value } }. Used to classify campaigns by mechanism. */
   totalsByAd: Record<string, Record<string, number>>;
   /** Per-ad monetary values keyed by action_type (for purchase value and ROAS). */
@@ -40,19 +42,23 @@ export function useActionTotalsByAds(
   adAccountByAdId?: Record<string, string | null | undefined>,
 ) {
   const sortedIds = [...adIds].sort();
+  const accountMapSignature = adAccountByAdId
+    ? JSON.stringify(Object.entries(adAccountByAdId).sort(([a], [b]) => a.localeCompare(b)))
+    : "";
   return useQuery({
     queryKey: [
       "action-totals-by-ads",
       sortedIds.join(","),
       startDate?.toISOString(),
       endDate?.toISOString(),
-      adAccountByAdId ? Object.keys(adAccountByAdId).length : 0,
+      accountMapSignature,
     ],
     enabled: sortedIds.length > 0,
     queryFn: async (): Promise<ActionTotalsResult> => {
       const totals: Record<string, number> = {};
       const totalsByAccount: Record<string, Record<string, number>> = {};
       const dailyByAccount: Record<string, Record<string, Record<string, number>>> = {};
+      const dailyByAd: Record<string, Record<string, Record<string, number>>> = {};
       const totalsByAd: Record<string, Record<string, number>> = {};
       const valueTotalsByAd: Record<string, Record<string, number>> = {};
       const start = startDate ? format(startDate, "yyyy-MM-dd") : null;
@@ -124,6 +130,9 @@ export function useActionTotalsByAds(
             totals[r.action_type] = (totals[r.action_type] || 0) + v;
             if (!totalsByAd[r.ad_id]) totalsByAd[r.ad_id] = {};
             totalsByAd[r.ad_id][r.action_type] = (totalsByAd[r.ad_id][r.action_type] || 0) + v;
+            if (!dailyByAd[r.ad_id]) dailyByAd[r.ad_id] = {};
+            if (!dailyByAd[r.ad_id][r.date]) dailyByAd[r.ad_id][r.date] = {};
+            dailyByAd[r.ad_id][r.date][r.action_type] = (dailyByAd[r.ad_id][r.date][r.action_type] || 0) + v;
             if (!valueTotalsByAd[r.ad_id]) valueTotalsByAd[r.ad_id] = {};
             valueTotalsByAd[r.ad_id][r.action_type] = (valueTotalsByAd[r.ad_id][r.action_type] || 0) + Number(r.value_amount || 0);
             const acc = adAccountByAdId ? adAccountByAdId[r.ad_id] : undefined;
@@ -139,7 +148,10 @@ export function useActionTotalsByAds(
           if (rows.length < PAGE) break;
         }
       }
-      return { totals, totalsByAccount, dailyByAccount, totalsByAd, valueTotalsByAd, excludedAdCount };
+      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount };
     },
+    staleTime: 120_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
   });
 }

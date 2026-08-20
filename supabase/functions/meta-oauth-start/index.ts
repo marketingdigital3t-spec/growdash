@@ -66,16 +66,23 @@ Deno.serve(async (req) => {
     if (stateError) throw stateError;
 
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
+    const loginConfigId = Deno.env.get("META_LOGIN_CONFIG_ID")?.trim();
     const redirectUri = Deno.env.get("META_OAUTH_REDIRECT_URI")
       ?? `${supabaseUrl}/functions/v1/meta-oauth-callback`;
     const scopes = Deno.env.get("META_OAUTH_SCOPES")
+      // `leads_retrieval` requires a separate Meta permission approval and makes
+      // the complete login fail when it is not enabled for the app. Request the
+      // core Ads permissions first; lead access is added only after Meta grants it.
       ?? "ads_read,ads_management,business_management";
 
     const oauthUrl = new URL(`https://www.facebook.com/${graphVersion}/dialog/oauth`);
     oauthUrl.searchParams.set("client_id", appId);
     oauthUrl.searchParams.set("redirect_uri", redirectUri);
     oauthUrl.searchParams.set("state", state);
-    oauthUrl.searchParams.set("scope", scopes);
+    // Meta Login for Business uses the permissions configured in config_id.
+    // Keep the scope fallback for legacy Facebook Login applications.
+    if (loginConfigId) oauthUrl.searchParams.set("config_id", loginConfigId);
+    else oauthUrl.searchParams.set("scope", scopes);
     oauthUrl.searchParams.set("response_type", "code");
     oauthUrl.searchParams.set("auth_type", "rerequest");
 

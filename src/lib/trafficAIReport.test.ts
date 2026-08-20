@@ -4,12 +4,15 @@ import { splitTrafficAIReport } from "./trafficAIReport";
 describe("splitTrafficAIReport", () => {
   it("separa todas as seções obrigatórias mesmo com acentos", () => {
     const report = [
-      "## RESUMO EXECUTIVO", "Resumo", "## CAMPANHAS", "Campanhas",
+      "## RESUMO EXECUTIVO", "Resumo", "## ANÁLISE MENSAL", "Meses",
+      "## COMPARAÇÃO SEMANAL", "Semanas", "## CAMPANHAS", "Campanhas",
       "## CONJUNTOS", "Conjuntos", "## ANÚNCIOS", "Anúncios",
       "## PLANO DE AÇÃO", "Ações", "## PROJEÇÕES", "Projeções",
     ].join("\n");
     const sections = splitTrafficAIReport(report);
     expect(sections.summary).toContain("Resumo");
+    expect(sections.monthly).toContain("Meses");
+    expect(sections.weekly).toContain("Semanas");
     expect(sections.campaigns).toContain("Campanhas");
     expect(sections.adsets).toContain("Conjuntos");
     expect(sections.ads).toContain("Anúncios");

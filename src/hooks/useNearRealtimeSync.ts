@@ -2,9 +2,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const REFRESH_INTERVAL_MS = 15 * 60 * 1_000;
-const LOCAL_DEDUP_WINDOW_MS = 60_000;
+// External APIs have rate limits; one minute is the fastest sustained cadence
+// that keeps the current-day sync useful without turning every open tab into
+// a duplicate Meta/RD poller. Database writes themselves remain realtime and
+// are applied to the screen in one-second batches below.
+const REFRESH_INTERVAL_MS = 60_000;
+const LOCAL_DEDUP_WINDOW_MS = 55_000;
 const STORAGE_PREFIX = "growdash:last-background-sync";
+// Realtime events are batched for one second. This makes every open sidebar
+// module reflect writes promptly without polling every endpoint or hammering
+// Meta/RD APIs (which would trigger rate limits and duplicate work).
+const REALTIME_UI_BATCH_MS = 1_000;
+
+const LIVE_TABLES = [
+  "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",
+  "rd_deals", "sales", "alerts", "social_media", "social_insights_daily",
+  "financial_entries", "kanban_boards", "kanban_cards", "workspace_files",
+] as const;
+
+// A realtime write must refresh live data, but invalidating every cached query
+// makes expensive route modules re-render together and can freeze navigation.
+// Keep the list explicit and restricted to data fed by the realtime tables.
+const LIVE_QUERY_PREFIXES = new Set([
+  "ad_accounts", "campaigns", "campaigns_full", "meta-adsets-independent", "meta-ads-independent",
+  "insights", "insights_hourly", "daily_spend_by_account", "daily_budget_active_by_account",
+  "rd_deals", "rd_crm_deals", "rd_deals_period", "rd_won_deals_period", "rd_funnel_stages",
+  "sales", "alerts", "social_accounts", "social_media", "social_insights_daily",
+  "financial-entries", "financial-history", "kanban_boards", "kanban_board_details", "workspace-files",
+]);
 
 type SyncState = "idle" | "refreshing" | "fresh" | "error";
 
@@ -16,9 +41,11 @@ interface Params {
 /**
  * Stale-while-revalidate para Meta Ads + RD Station.
  *
- * As telas leem primeiro o banco local (histórico já sincronizado) e esta rotina
- * atualiza apenas o dia corrente em segundo plano. A Edge Function possui uma
- * segunda trava persistida, então várias abas/dispositivos continuam seguros.
+ * As telas leem primeiro o último snapshot local (histórico já sincronizado).
+ * A rotina externa só consulta o delta do dia corrente em segundo plano; cada
+ * gravação no banco é recebida em realtime e agrupada por no máximo um segundo.
+ * Assim, os KPIs permanecem visíveis e mudam sem um loader central nem novo
+ * backfill do histórico a cada navegação.
  */
 export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
@@ -31,19 +58,13 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
   const invalidateLiveQueries = useCallback(() => {
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
     invalidateTimer.current = window.setTimeout(() => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["insights"] }),
-        queryClient.invalidateQueries({ queryKey: ["insights_hourly"] }),
-        queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
-        queryClient.invalidateQueries({ queryKey: ["campaigns_full"] }),
-        queryClient.invalidateQueries({ queryKey: ["meta-adsets-independent"] }),
-        queryClient.invalidateQueries({ queryKey: ["meta-ads-independent"] }),
-        queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
-        queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }),
-        queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),
-        queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }),
-      ]);
-    }, 350);
+      // Only queries derived from realtime tables become stale. This preserves
+      // cached permission/layout/module data while a person changes pages.
+      void queryClient.invalidateQueries({
+        predicate: (query) => LIVE_QUERY_PREFIXES.has(String(query.queryKey[0])),
+      });
+      setLastUpdatedAt(new Date());
+    }, REALTIME_UI_BATCH_MS);
   }, [queryClient]);
 
   const refresh = useCallback(async (force = false) => {
@@ -88,7 +109,9 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
 
   useEffect(() => {
     if (!enabled) return;
-    const initial = window.setTimeout(() => void refresh(false), 650);
+    // A primeira pintura deve mostrar o cache local. A sincronização com Meta/RD
+    // só entra depois que a tela já ficou utilizável.
+    const initial = window.setTimeout(() => void refresh(false), 4_000);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => {
       invalidateLiveQueries();
@@ -111,11 +134,11 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
 
   useEffect(() => {
     if (!enabled) return;
-    const channel = supabase.channel(`live-data-${scope}-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "insights" }, invalidateLiveQueries)
-      .on("postgres_changes", { event: "*", schema: "public", table: "insights_hourly" }, invalidateLiveQueries)
-      .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, invalidateLiveQueries)
-      .subscribe();
+    let channel = supabase.channel(`live-data-${scope}-${Math.random().toString(36).slice(2)}`);
+    for (const table of LIVE_TABLES) {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table }, invalidateLiveQueries);
+    }
+    channel.subscribe();
     return () => {
       if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
       void supabase.removeChannel(channel);

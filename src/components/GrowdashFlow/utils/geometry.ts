@@ -11,6 +11,95 @@ export function normalizeBounds(x: number, y: number, width: number, height: num
   };
 }
 
+// Keep these values aligned with ShapeRenderer. They include the editor's
+// internal padding as well as the foreignObject inset.
+const TEXT_HORIZONTAL_INSET = 32;
+const TEXT_VERTICAL_INSET = 32;
+const TEXT_LINE_HEIGHT = 1.24;
+const TEXT_MIN_WIDTH = 64;
+const STICKY_MIN_WIDTH = 200;
+const TEXT_MIN_HEIGHT = 52;
+const STICKY_MIN_HEIGHT = 180;
+const TEXT_MAX_AUTO_WIDTH = 360;
+
+export function minimumTextElementWidth(element: Pick<DrawElement, "type">) {
+  return element.type === "sticky" ? STICKY_MIN_WIDTH : TEXT_MIN_WIDTH;
+}
+
+function wrapTextLine(line: string, usableWidth: number, fontSize: number) {
+  const glyphWidth = fontSize * .58;
+  const maxCharacters = Math.max(1, Math.floor(usableWidth / glyphWidth));
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (word.length > maxCharacters) {
+      if (current) lines.push(current);
+      for (let index = 0; index < word.length; index += maxCharacters) lines.push(word.slice(index, index + maxCharacters));
+      current = "";
+      continue;
+    }
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxCharacters) current = candidate;
+    else { lines.push(current); current = word; }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function estimateTextLayout(element: Pick<DrawElement, "text" | "width" | "fontSize">, width = Math.abs(element.width)) {
+  const fontSize = Math.max(10, element.fontSize || 18);
+  const usableWidth = Math.max(40, width - TEXT_HORIZONTAL_INSET);
+  const lines = (element.text || "").split("\n").flatMap((line) => wrapTextLine(line, usableWidth, fontSize));
+  const glyphWidth = fontSize * .58;
+  return { rows: Math.max(1, lines.length), maxLineWidth: Math.max(0, ...lines.map((line) => line.length * glyphWidth)) };
+}
+
+/**
+ * SVG foreignObject does not contribute to its parent's layout. Calculate a
+ * conservative content height so an increased text size never gets clipped
+ * inside a manually resized Flow element.
+ */
+export function minimumTextElementHeight(element: Pick<DrawElement, "type" | "text" | "width" | "fontSize">) {
+  if (element.type !== "text" && element.type !== "sticky") return 20;
+  const fontSize = Math.max(10, element.fontSize || (element.type === "sticky" ? 20 : 22));
+  const { rows } = estimateTextLayout(element, Math.max(Math.abs(element.width), minimumTextElementWidth(element)));
+  const contentHeight = Math.ceil(rows * fontSize * TEXT_LINE_HEIGHT + TEXT_VERTICAL_INSET + 4);
+  return Math.max(element.type === "sticky" ? STICKY_MIN_HEIGHT : TEXT_MIN_HEIGHT, contentHeight);
+}
+
+/** Fits plain labels to their copy while preserving larger sticky-note cards. */
+export function fitTextElementToContent<T extends DrawElement>(element: T): T {
+  if (element.type !== "text") return keepTextContentVisible(element);
+  // Preserve intentional wrapping while removing unused blank space. This is
+  // the same useful editing rule as a whiteboard: text measures its visible
+  // lines, rather than expanding a two-line label into a wide one-line card.
+  const { maxLineWidth } = estimateTextLayout(element);
+  const width = Math.min(TEXT_MAX_AUTO_WIDTH, Math.max(TEXT_MIN_WIDTH, Math.ceil(maxLineWidth + TEXT_HORIZONTAL_INSET)));
+  const withFittedWidth = { ...element, width };
+  return { ...withFittedWidth, height: minimumTextElementHeight(withFittedWidth), autoSize: true };
+}
+
+/**
+ * Old saved flows predate automatic text sizing. Treat their text as
+ * content-sized unless it was deliberately resized by the author. This keeps
+ * a selection frame close to the actual label instead of preserving a large
+ * card-sized box from an earlier template.
+ */
+export function normalizeAutoTextElements(elements: DrawElement[]) {
+  return elements.map((element) => element.type === "text" && element.autoSize !== false
+    ? fitTextElementToContent({ ...element, autoSize: true })
+    : element);
+}
+
+export function keepTextContentVisible<T extends DrawElement>(element: T): T {
+  if (element.type !== "text" && element.type !== "sticky") return element;
+  const width = Math.max(Math.abs(element.width), minimumTextElementWidth(element));
+  const withMinimumWidth = { ...element, width };
+  return { ...withMinimumWidth, height: Math.max(Math.abs(element.height), minimumTextElementHeight(withMinimumWidth)) };
+}
+
 export function getElementBounds(element: DrawElement): Bounds {
   if (element.points?.length && element.type === "freehand") {
     const xs = element.points.map((point) => element.x + point.x);

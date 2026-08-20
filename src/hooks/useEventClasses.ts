@@ -5,6 +5,18 @@ import { useAuth } from "@/contexts/AuthContext";
 export type EventClassStatus = "open" | "sold_out" | "upcoming" | "cancelled" | "finished";
 export type MemberType = "student" | "model_patient";
 
+export interface EventClassSource {
+  id?: string;
+  event_class_id?: string;
+  ad_account_id: string | null;
+  rd_funnel_id: string;
+  member_type: MemberType;
+  allowed_stage_ids: string[];
+  label?: string | null;
+  funnel_name?: string;
+  ad_account_name?: string;
+}
+
 export interface EventClass {
   id: string;
   user_id: string;
@@ -17,6 +29,9 @@ export interface EventClass {
   max_students: number;
   max_people: number;
   max_model_patients: number;
+  /** Occupancy registered outside RD Station (walk-ins, spreadsheets, etc.). */
+  manual_student_count: number;
+  manual_model_patient_count: number;
   has_model_patients: boolean;
   rd_model_patient_funnel_id: string | null;
   status: EventClassStatus;
@@ -38,16 +53,82 @@ export interface EventClassMember {
 }
 
 export interface EventClassWithCounts extends EventClass {
+  /** People linked to RD deals only. */
+  linkedStudentCount: number;
+  /** Model patients linked to RD deals only. */
+  linkedModelPatientCount: number;
+  /** Total occupied slots: RD links plus the manual occupancy. */
   studentCount: number;
   modelPatientCount: number;
   rd_funnel_name?: string;
   rd_model_patient_funnel_name?: string;
+  sources: EventClassSource[];
+}
+
+export interface RannielyClassSales {
+  studentSP: number;
+  studentTO: number;
+  modelPatientSP: number;
+  modelPatientTO: number;
+}
+
+const emptyRannielyClassSales: RannielyClassSales = {
+  studentSP: 0, studentTO: 0, modelPatientSP: 0, modelPatientTO: 0,
+};
+
+function normalizeClassRegion(value: string | null) {
+  const normalized = (value || "").trim().toLocaleLowerCase("pt-BR");
+  if (["sp", "são paulo", "sao paulo"].includes(normalized)) return "SP";
+  if (["to", "tocantins"].includes(normalized)) return "TO";
+  return null;
+}
+
+/** Confirmed Ranniely sales, split exactly as the class operation needs them. */
+export function useRannielyClassSales() {
+  return useQuery({
+    queryKey: ["ranniely-class-sales"],
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<RannielyClassSales> => {
+      const { data: funnels, error: funnelError } = await supabase
+        .from("rd_funnels")
+        .select("id, name")
+        .ilike("name", "%Ranniely%");
+      if (funnelError) throw funnelError;
+
+      const studentFunnels = (funnels || []).filter((f: any) => /aluna/i.test(f.name)).map((f: any) => f.id);
+      const modelFunnels = (funnels || []).filter((f: any) => /paciente\s*modelo/i.test(f.name)).map((f: any) => f.id);
+      const funnelIds = [...studentFunnels, ...modelFunnels];
+      if (funnelIds.length === 0) return emptyRannielyClassSales;
+
+      const { data: deals, error: dealError } = await supabase
+        .from("rd_deals")
+        .select("rd_funnel_id, lead_state")
+        .eq("win", true)
+        .in("rd_funnel_id", funnelIds);
+      if (dealError) throw dealError;
+
+      return (deals || []).reduce<RannielyClassSales>((total, deal: any) => {
+        const region = normalizeClassRegion(deal.lead_state);
+        if (!region) return total;
+        const isStudent = studentFunnels.includes(deal.rd_funnel_id);
+        if (isStudent && region === "SP") total.studentSP += 1;
+        if (isStudent && region === "TO") total.studentTO += 1;
+        if (!isStudent && modelFunnels.includes(deal.rd_funnel_id) && region === "SP") total.modelPatientSP += 1;
+        if (!isStudent && modelFunnels.includes(deal.rd_funnel_id) && region === "TO") total.modelPatientTO += 1;
+        return total;
+      }, { ...emptyRannielyClassSales });
+    },
+  });
 }
 
 export function useEventClasses() {
   return useQuery({
     queryKey: ["event_classes"],
+    refetchInterval: 30_000,
     queryFn: async () => {
+      // Adds only confirmed, region-compatible RD deals and never changes a
+      // manually linked member. This keeps occupancy current after every sync.
+      await (supabase as any).rpc("sync_event_class_members_from_rd");
       const { data: classes, error } = await (supabase as any)
         .from("event_classes")
         .select("*")
@@ -63,8 +144,29 @@ export function useEventClasses() {
         .select("event_class_id, member_type")
         .in("event_class_id", ids);
 
+      const { data: sourceRows, error: sourceError } = await (supabase as any)
+        .from("event_class_sources")
+        .select("id, event_class_id, ad_account_id, rd_funnel_id, member_type, allowed_stage_ids, label")
+        .in("event_class_id", ids);
+      if (sourceError) throw sourceError;
+
+      const sourcesByClass = new Map<string, EventClassSource[]>();
+      (sourceRows || []).forEach((source: EventClassSource) => {
+        const current = sourcesByClass.get(source.event_class_id!) || [];
+        current.push(source);
+        sourcesByClass.set(source.event_class_id!, current);
+      });
+      // Fallback for an existing deployment that has not yet received the migration.
+      list.forEach((eventClass) => {
+        if (sourcesByClass.has(eventClass.id)) return;
+        const legacy = [
+          eventClass.rd_funnel_id && { ad_account_id: eventClass.ad_account_id, rd_funnel_id: eventClass.rd_funnel_id, member_type: "student" as const, allowed_stage_ids: eventClass.allowed_student_stage_ids },
+          eventClass.has_model_patients && eventClass.rd_model_patient_funnel_id && { ad_account_id: eventClass.ad_account_id, rd_funnel_id: eventClass.rd_model_patient_funnel_id, member_type: "model_patient" as const, allowed_stage_ids: eventClass.allowed_model_patient_stage_ids },
+        ].filter(Boolean) as EventClassSource[];
+        sourcesByClass.set(eventClass.id, legacy);
+      });
       const funnelIds = Array.from(new Set(
-        list.flatMap((c) => [c.rd_funnel_id, c.rd_model_patient_funnel_id]).filter(Boolean) as string[],
+        [...sourcesByClass.values()].flat().map((source) => source.rd_funnel_id).filter(Boolean),
       ));
       const { data: funnels } = funnelIds.length > 0
         ? await supabase.from("rd_funnels").select("id, name").in("id", funnelIds)
@@ -79,15 +181,21 @@ export function useEventClasses() {
         countMap.set(m.event_class_id, cur);
       });
 
-      return list.map((c) => ({
+      return list.map((c) => {
+        const sources = (sourcesByClass.get(c.id) || []).map((source) => ({ ...source, funnel_name: funnelMap.get(source.rd_funnel_id) }));
+        return ({
         ...c,
-        studentCount: countMap.get(c.id)?.s ?? 0,
-        modelPatientCount: countMap.get(c.id)?.p ?? 0,
+        linkedStudentCount: countMap.get(c.id)?.s ?? 0,
+        linkedModelPatientCount: countMap.get(c.id)?.p ?? 0,
+        studentCount: (countMap.get(c.id)?.s ?? 0) + Number(c.manual_student_count || 0),
+        modelPatientCount: (countMap.get(c.id)?.p ?? 0) + Number(c.manual_model_patient_count || 0),
         rd_funnel_name: funnelMap.get(c.rd_funnel_id) as string | undefined,
         rd_model_patient_funnel_name: c.rd_model_patient_funnel_id
           ? (funnelMap.get(c.rd_model_patient_funnel_id) as string | undefined)
           : undefined,
-      })) as EventClassWithCounts[];
+        sources,
+      });
+      }) as EventClassWithCounts[];
     },
   });
 }
@@ -134,13 +242,20 @@ export function useCreateEventClass() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async (input: Omit<EventClass, "id" | "user_id" | "created_at" | "updated_at">) => {
+    mutationFn: async (input: Omit<EventClass, "id" | "user_id" | "created_at" | "updated_at"> & { sources?: EventClassSource[] }) => {
+      const { sources = [], ...eventClassInput } = input;
       const { data, error } = await (supabase as any)
         .from("event_classes")
-        .insert({ ...input, user_id: user!.id })
+        .insert({ ...eventClassInput, user_id: user!.id })
         .select()
         .single();
       if (error) throw error;
+      if (sources.length > 0) {
+        const { error: sourcesError } = await (supabase as any).from("event_class_sources").insert(
+          sources.map((source) => ({ ...source, id: undefined, event_class_id: data.id })),
+        );
+        if (sourcesError) throw sourcesError;
+      }
       await (supabase as any).from("event_class_history").insert({
         event_class_id: data.id, actor_id: user!.id, action: "created",
         description: `Turma "${input.title}" criada`,
@@ -155,10 +270,20 @@ export function useUpdateEventClass() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ id, ...input }: Partial<EventClass> & { id: string }) => {
+    mutationFn: async ({ id, sources, ...input }: Partial<EventClass> & { id: string; sources?: EventClassSource[] }) => {
       const { data, error } = await (supabase as any)
         .from("event_classes").update(input).eq("id", id).select().single();
       if (error) throw error;
+      if (sources) {
+        const { error: deleteError } = await (supabase as any).from("event_class_sources").delete().eq("event_class_id", id);
+        if (deleteError) throw deleteError;
+        if (sources.length > 0) {
+          const { error: sourcesError } = await (supabase as any).from("event_class_sources").insert(
+            sources.map((source) => ({ ...source, id: undefined, event_class_id: id })),
+          );
+          if (sourcesError) throw sourcesError;
+        }
+      }
       await (supabase as any).from("event_class_history").insert({
         event_class_id: id, actor_id: user?.id, action: "updated",
         description: "Turma atualizada",

@@ -11,8 +11,9 @@ import { createDrawElement, useDrawing } from "./hooks/useDrawing";
 import { useUndoRedo } from "./hooks/useUndoRedo";
 import type { DrawElement, FlowData, Point, ResizeHandle, ToolType } from "./types";
 import { EMPTY_FLOW } from "./types";
-import { boundsFromPoints, boundsIntersect, createId, getElementBounds, nearestAnchor, normalizeBounds, pointInElement, snapPoint } from "./utils/geometry";
+import { boundsFromPoints, boundsIntersect, createId, fitTextElementToContent, getElementBounds, keepTextContentVisible, nearestAnchor, normalizeAutoTextElements, normalizeBounds, pointInElement, snapPoint } from "./utils/geometry";
 import { exportFlowJson, exportFlowPng, exportFlowSvg } from "./utils/export";
+import { createAcquisitionFunnelTemplate } from "./utils/templates";
 
 export type GrowdashFlowCanvasHandle = {
   save: () => Promise<void>;
@@ -55,13 +56,32 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
   const canvas = useCanvas(flow.zoom || 1, flow.panOffset || { x: 0, y: 0 });
   const { moveElements } = useDrawing();
   const { toast } = useToast();
+  const loadedFlowSignature = useMemo(() => JSON.stringify({
+    version: flow.version,
+    elements: flow.elements || [],
+    zoom: flow.zoom || 1,
+    panOffset: flow.panOffset || { x: 0, y: 0 },
+    showGrid: flow.showGrid ?? true,
+    snapToGrid: flow.snapToGrid ?? false,
+  }), [flow.elements, flow.panOffset, flow.showGrid, flow.snapToGrid, flow.version, flow.zoom]);
+  const lastLoadedFlowSignature = useRef<string | null>(null);
 
   useEffect(() => {
+    // The editor can stay mounted while the user opens another saved funnel.
+    // Reset the local history/view only when the persisted input really changed;
+    // this avoids showing the previous canvas and preserves unsaved edits during
+    // ordinary parent re-renders.
+    if (lastLoadedFlowSignature.current === loadedFlowSignature) return;
+    lastLoadedFlowSignature.current = loadedFlowSignature;
+    history.reset(normalizeAutoTextElements(structuredClone(flow.elements || [])));
+    setSelectedIds([]);
+    setEditingId(null);
+    setSelectionBox(null);
+    canvas.setZoom(flow.zoom || 1);
+    canvas.setPanOffset(flow.panOffset || { x: 0, y: 0 });
     canvas.setShowGrid(flow.showGrid ?? true);
     canvas.setSnapToGrid(flow.snapToGrid ?? false);
-  // Apenas na carga/troca explícita do quadro.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFlow]);
+  }, [canvas, flow.elements, flow.panOffset, flow.showGrid, flow.snapToGrid, flow.zoom, history, loadedFlowSignature]);
 
   const getFlowData = useCallback((): FlowData => ({
     version: 1,
@@ -206,7 +226,11 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       if (interaction.handle === "n" || interaction.handle === "s") { left = startBounds.x; right = startBounds.x + startBounds.width; }
       if (interaction.handle === "e" || interaction.handle === "w") { top = startBounds.y; bottom = startBounds.y + startBounds.height; }
       const bounds = normalizeBounds(left, top, right - left, bottom - top);
-      history.replace(interaction.snapshot.map((element) => element.id === interaction.element.id ? { ...element, x: bounds.x, y: bounds.y, width: Math.max(20, bounds.width), height: Math.max(20, bounds.height), updatedAt: new Date().toISOString() } : element));
+      history.replace(interaction.snapshot.map((element) => {
+        if (element.id !== interaction.element.id) return element;
+        const resized = { ...element, x: bounds.x, y: bounds.y, width: Math.max(20, bounds.width), height: Math.max(20, bounds.height), autoSize: element.type === "text" && /[ew]/.test(interaction.handle) ? false : element.autoSize, updatedAt: new Date().toISOString() };
+        return keepTextContentVisible(resized);
+      }));
       return;
     }
     history.replace((elements) => elements.map((element) => {
@@ -272,7 +296,12 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
   const duplicateSelected = useCallback(() => { copySelected(); const source = selectedElements; if (!source.length) return; const next = source.map((element, index) => ({ ...structuredClone(element), id: createId(element.type), x: element.x + 24, y: element.y + 24, layerIndex: topLayer + index, startBinding: undefined, endBinding: undefined })); history.commit((elements) => [...elements, ...next]); setSelectedIds(next.map((element) => element.id)); }, [copySelected, history, selectedElements, topLayer]);
 
   const changeSelected = useCallback((patch: Partial<DrawElement>) => {
-    history.commit((elements) => elements.map((element) => selectedIds.includes(element.id) ? { ...element, ...patch, updatedAt: new Date().toISOString() } : element));
+    history.commit((elements) => elements.map((element) => {
+      if (!selectedIds.includes(element.id)) return element;
+      const next = { ...element, ...patch, updatedAt: new Date().toISOString() };
+      if (next.type === "text" && (next.autoSize !== false || patch.autoSize === true)) return fitTextElementToContent(next);
+      return keepTextContentVisible(next);
+    }));
   }, [history, selectedIds]);
 
   const moveLayer = useCallback((direction: "front" | "back") => {
@@ -325,7 +354,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
     setEditingId(null);
   }, [history]);
 
-  return <section ref={rootRef} className={`relative min-h-[620px] h-[calc(100dvh-7.5rem)] w-full overflow-hidden rounded-2xl border border-black/10 bg-[#fbfbfd] shadow-[0_24px_80px_rgba(0,0,0,.16)] dark:border-primary/20 dark:bg-[#121212] dark:shadow-[0_24px_80px_rgba(0,0,0,.38)] ${className}`}>
+  return <section ref={rootRef} className={`growdash-flow-shell relative min-h-[620px] h-[calc(100dvh-7.5rem)] w-full overflow-hidden rounded-2xl ${className}`}>
     <Canvas
       elements={history.value}
       selectedIds={selectedIds}
@@ -342,15 +371,19 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       onElementPointerDown={handleElementPointerDown}
       onElementDoubleClick={(element) => { if (element.type === "text" || element.type === "sticky") { textSnapshotRef.current = structuredClone(history.valueRef.current); setEditingId(element.id); setSelectedIds([element.id]); } }}
       onResizePointerDown={handleResizePointerDown}
-      onTextChange={(elementId, value) => history.replace((elements) => elements.map((element) => element.id === elementId ? { ...element, text: value, updatedAt: new Date().toISOString() } : element))}
+      onTextChange={(elementId, value) => history.replace((elements) => elements.map((element) => {
+        if (element.id !== elementId) return element;
+        const next = { ...element, text: value, updatedAt: new Date().toISOString() };
+        return element.type === "text" && element.autoSize !== false ? fitTextElementToContent(next) : keepTextContentVisible(next);
+      }))}
       onFinishEditing={finishTextEditing}
       onDropFiles={(files, client) => Array.from(files).forEach((file) => addImage(file, client))}
       onContextMenu={(event) => { event.preventDefault(); setContextMenu({ client: { x: event.clientX - rootRect().left, y: event.clientY - rootRect().top }, world: clientToWorld(event.clientX, event.clientY) }); }}
     />
 
-    <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[25%] items-center gap-2"><div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-xl border border-black/10 bg-white/95 p-1.5 pr-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-[#090909]/92">{onBack && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-slate-500 hover:bg-primary/10 hover:text-primary dark:text-white/60 dark:hover:bg-primary/10 dark:hover:text-primary" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>}<div className="hidden min-w-0 xl:block"><span className="block truncate text-[10px] font-black uppercase tracking-[.16em] text-primary">Growdash Flow</span><strong className="block truncate text-xs text-slate-800 dark:text-white/85">{title}</strong></div></div></div>
+    <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[25%] items-center gap-2"><div className="growdash-flow-chrome pointer-events-auto flex min-w-0 items-center gap-2 rounded-xl p-1.5 pr-3">{onBack && <Button variant="ghost" size="icon" className="growdash-flow-control h-8 w-8 shrink-0" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>}<div className="hidden min-w-0 xl:block"><span className="block truncate text-[10px] font-black uppercase tracking-[.16em] text-primary">Growdash Flow</span><strong className="block truncate text-xs text-foreground">{title}</strong></div></div></div>
     <Toolbar tool={tool} onToolChange={setTool} onImage={() => fileInputRef.current?.click()} />
-    <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
+    <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onApplyAcquisitionTemplate={() => { const template = createAcquisitionFunnelTemplate(); history.commit(template); setSelectedIds([]); canvas.setZoom(0.72); canvas.setPanOffset({ x: 48, y: 30 }); toast({ title: "Estratégia inserida", description: "O funil de aquisição está pronto para você editar." }); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
     {primarySelected && <PropertiesPanel element={primarySelected} selectionCount={selectedIds.length} onChange={changeSelected} onDuplicate={duplicateSelected} onDelete={deleteSelected} onFront={() => moveLayer("front")} onBack={() => moveLayer("back")} onClose={() => setSelectedIds([])} />}
 
     {contextMenu && <div className="absolute z-50 min-w-44 rounded-xl border border-white/10 bg-[#17130e]/96 p-1.5 text-xs text-white shadow-2xl backdrop-blur-xl" style={{ left: Math.min(contextMenu.client.x, rootRect().width - 190), top: Math.min(contextMenu.client.y, rootRect().height - 190) }}>
@@ -360,7 +393,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       <ContextAction icon={Trash2} label="Excluir" shortcut="Delete" danger disabled={!selectedIds.length} onClick={() => { deleteSelected(); setContextMenu(null); }} />
     </div>}
 
-    <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-3 rounded-full border border-black/10 bg-white/88 px-3 py-1.5 text-[9px] font-bold text-slate-500 backdrop-blur-xl md:flex dark:border-white/10 dark:bg-[#090909]/82 dark:text-white/45"><span>{history.value.length} elementos</span><span className="h-1 w-1 rounded-full bg-primary" /><span>{selectedIds.length} selecionado(s)</span><span>Espaço + arrastar para mover</span></div>
+    <div className="growdash-flow-chrome pointer-events-none absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-3 rounded-full px-3 py-1.5 text-[9px] font-bold md:flex"><span>{history.value.length} elementos</span><span className="h-1 w-1 rounded-full bg-primary" /><span>{selectedIds.length} selecionado(s)</span><span>Espaço + arrastar para mover</span></div>
     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" multiple onChange={(event) => { Array.from(event.target.files || []).forEach((file) => addImage(file)); event.target.value = ""; }} />
   </section>;
 });

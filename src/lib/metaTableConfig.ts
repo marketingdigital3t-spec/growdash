@@ -31,12 +31,22 @@ export const metaColumnPresets: { id: MetaColumnPresetKey; label: string; descri
 // colunas estruturais: nunca podem ser ocultadas por um preset do usuário.
 export const editableCampaignColumns = (Object.keys(campaignColumnLabels) as CampaignColumnKey[]).filter((key) => !["check", "delivery", "name"].includes(key));
 
-export const metaBreakdownGroups = [
+export type MetaBreakdownItem = { id: string; label: string; supported?: boolean };
+
+export const metaBreakdownGroups: ReadonlyArray<{ label: string; items: ReadonlyArray<MetaBreakdownItem> }> = [
   { label: "Geral", items: [{ id: "none", label: "Sem detalhamento", supported: true }] },
-  { label: "Por tempo", items: [{ id: "day", label: "Dia" }, { id: "week", label: "Semana" }, { id: "two_weeks", label: "2 semanas" }, { id: "month", label: "Mês" }] },
-  { label: "Por veiculação", items: [{ id: "age", label: "Idade" }, { id: "gender", label: "Gênero" }, { id: "age_gender", label: "Idade e gênero" }, { id: "country", label: "País" }, { id: "region", label: "Região" }, { id: "dma", label: "Área de mercado designada" }, { id: "platform", label: "Plataforma" }, { id: "placement", label: "Posicionamento" }, { id: "device", label: "Dispositivo de impressão" }, { id: "product_id", label: "ID do produto" }, { id: "hour_account", label: "Hora do dia — conta" }, { id: "hour_viewer", label: "Hora do dia — visualizador" }] },
-  { label: "Por ação", items: [{ id: "conversion_device", label: "Dispositivo de conversão" }, { id: "destination", label: "Destino" }, { id: "video_view_type", label: "Tipo de visualização do vídeo" }, { id: "carousel_card", label: "Card do carrossel" }, { id: "dynamic_creative", label: "Elemento do criativo dinâmico" }] },
-] as const;
+  { label: "Populares", items: [{ id: "day", label: "Dia" }, { id: "age", label: "Idade", supported: true }, { id: "placement", label: "Posicionamento", supported: true }, { id: "country", label: "País", supported: true }, { id: "platform", label: "Plataforma", supported: true }, { id: "hour_account", label: "Hora" }] },
+  { label: "Dados demográficos", items: [{ id: "age", label: "Idade", supported: true }, { id: "gender", label: "Gênero", supported: true }, { id: "age_gender", label: "Idade e gênero" }, { id: "country", label: "País", supported: true }, { id: "region", label: "Região", supported: true }, { id: "dma", label: "Área de mercado designada" }] },
+  { label: "Veiculação", items: [{ id: "placement", label: "Posicionamento", supported: true }, { id: "platform", label: "Plataforma", supported: true }, { id: "device", label: "Dispositivo de impressão" }, { id: "hour_account", label: "Hora do dia — conta" }, { id: "hour_viewer", label: "Hora do dia — visualizador" }] },
+  { label: "Ação", items: [{ id: "conversion_device", label: "Dispositivo de conversão" }, { id: "destination", label: "Destino" }, { id: "video_view_type", label: "Tipo de visualização do vídeo" }, { id: "carousel_card", label: "Card do carrossel" }, { id: "dynamic_creative", label: "Elemento do criativo dinâmico" }] },
+  { label: "Criativo e atribuição", items: [{ id: "creative", label: "Criativo" }, { id: "audience", label: "Segmentos de público" }, { id: "attribution", label: "Atribuição" }] },
+];
+
+/** Maps a UI choice to persisted Meta breakdown rows. Unsupported choices stay
+ * selectable so the interface mirrors Ads Manager, but are never fabricated. */
+export function getBreakdownStorageType(id: string) {
+  return ({ age: "age", gender: "gender", platform: "publisher_platform", placement: "platform_position", region: "region", country: "country" } as Record<string, string>)[id] ?? null;
+}
 
 export function getMetaColumnPreset(id: MetaColumnPresetKey) {
   return metaColumnPresets.find((preset) => preset.id === id) ?? metaColumnPresets[0];

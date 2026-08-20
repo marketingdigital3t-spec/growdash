@@ -1,39 +1,57 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   Bot,
   BriefcaseBusiness,
   Coffee,
+  ChevronRight,
   MessageCircle,
   Minimize2,
   Network,
+  Radar,
+  Rotate3D,
+  RotateCcw,
   Send,
   Sparkles,
   UserCog,
   UsersRound,
   WandSparkles,
   X,
+  Zap,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { buildAgentAnswer, type AgentMetrics } from "@/lib/agentOffice";
+import { buildCoreAccountSummaries, type CoreAccountInput, type CoreAgentConfig, type CoreAreaId, type CoreSchedule } from "@/lib/agentCore";
+import { AGENT_NEED_META, advanceAgentLifeState, createInitialAgentLifeStates, formatAgentClock, getAgentPhaseLabel, type AgentLifeState, type AgentNeedKey } from "@/lib/agentLife";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { NeuralCommandCore3D } from "@/growdash/NeuralCommandCore3D";
 
 type AgentStatus = "working" | "walking" | "free";
 type ChatMessage = { id: string; role: "agent" | "user"; text: string };
 
+const LifeSimPage = lazy(() => import("@/growdash/LifeSimPage"));
+
 const AGENTS = [
-  { id: "atlas", name: "Atlas", role: "Gestor de tráfego", color: "#e9b72d", desk: "desk-a", position: "npc-a" },
-  { id: "nina", name: "Nina", role: "Analista de funil", color: "#38bdf8", desk: "desk-b", position: "npc-b" },
-  { id: "milo", name: "Milo", role: "Especialista em criativos", color: "#a78bfa", desk: "desk-c", position: "npc-c" },
-  { id: "luna", name: "Luna", role: "Revenue & CRM", color: "#34d399", desk: "desk-d", position: "npc-d" },
+  { id: "atlas", name: "Ágata", role: "Gestora de tráfego", specialty: "Mídia & escala", task: "Otimizando campanhas", color: "#e9b72d", desk: "station-traffic", position: "npc-atlas", look: "look-a", skin: "#c88b68", hair: "#291c19", outfit: "#b87924", pants: "#25252b" },
+  { id: "fina", name: "Bianca", role: "Gestora financeira", specialty: "Caixa & margem", task: "Conciliando receita", color: "#34d399", desk: "station-finance", position: "npc-fina", look: "look-b", skin: "#e0a07d", hair: "#4b2b24", outfit: "#266e59", pants: "#343038" },
+  { id: "dora", name: "Camila", role: "Gestora comercial", specialty: "Vendas & CRM", task: "Revisando pipeline", color: "#fb7185", desk: "station-sales", position: "npc-dora", look: "look-c", skin: "#b87556", hair: "#161518", outfit: "#a63e5d", pants: "#272128" },
+  { id: "otto", name: "Júlia", role: "Especialista SEO", specialty: "Busca & conteúdo", task: "Mapeando oportunidades", color: "#38bdf8", desk: "station-seo", position: "npc-otto", look: "look-d", skin: "#efb08d", hair: "#7e3f29", outfit: "#27648d", pants: "#34383d" },
+  { id: "nina", name: "Natália", role: "Analista de funil", specialty: "Jornadas & conversão", task: "Investigando gargalos", color: "#a78bfa", desk: "station-funnel", position: "npc-nina", look: "look-e", skin: "#d29272", hair: "#211a23", outfit: "#6c4fa5", pants: "#24232b" },
+  { id: "milo", name: "Marina", role: "Diretora de criativos", specialty: "Criativos & testes", task: "Avaliando criativos", color: "#f97316", desk: "station-creative", position: "npc-milo", look: "look-f", skin: "#f0b18d", hair: "#c36c37", outfit: "#a84e24", pants: "#39333a" },
 ] as const;
+
+const INITIAL_LIFE_STATES = createInitialAgentLifeStates(AGENTS);
 
 function readStored<T>(key: string, fallback: T): T {
   try { return JSON.parse(localStorage.getItem(key) || "") as T; } catch { return fallback; }
@@ -47,11 +65,25 @@ export default function AgentsOfficePage() {
     : accounts, [accounts, businessUnitId, segment]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   const [view, setView] = useState<"map" | "office">("map");
+  const showLegacyOfficePreview = window.location.hash === "#legacy-office";
+  const [officeAngle, setOfficeAngle] = useState(0);
+  const officeDragStart = useRef<number | null>(null);
+  const officeAngleStart = useRef(0);
   const [minimized, setMinimized] = useState(false);
   const [input, setInput] = useState("");
+  const [gameMinutes, setGameMinutes] = useState(8 * 60 + 20);
+  const [timeSpeed, setTimeSpeed] = useState<0 | 1 | 2 | 3>(1);
+  const [lifeMode, setLifeMode] = useState<"life" | "build">("life");
+  const [autonomyEnabled, setAutonomyEnabled] = useState(true);
+  const [lifeStates, setLifeStates] = useState<Record<string, AgentLifeState>>(() => INITIAL_LIFE_STATES);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>(() => readStored("growdash:agent-statuses", Object.fromEntries(AGENTS.map((agent) => [agent.id, "working"]))));
   const [assignments, setAssignments] = useState<Record<string, string>>(() => readStored("growdash:agent-accounts", {}));
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(() => Object.fromEntries(AGENTS.map((agent) => [agent.id, [{ id: `${agent.id}-welcome`, role: "agent", text: `Olá, eu sou ${agent.name}. Vincule uma conta e pergunte sobre tráfego, leads, funil ou escala.` }]])));
+  const gameMinutesRef = useRef(gameMinutes);
+  const statusesRef = useRef(statuses);
+  const timeSpeedRef = useRef(timeSpeed);
+  const autonomyRef = useRef(autonomyEnabled);
+  const lifeStatesRef = useRef(lifeStates);
   const activeAgent = AGENTS.find((agent) => agent.id === activeAgentId) || null;
   const activeAccountId = activeAgent ? assignments[activeAgent.id] : undefined;
   const account = visibleAccounts.find((item) => item.id === activeAccountId);
@@ -61,6 +93,33 @@ export default function AgentsOfficePage() {
 
   useEffect(() => { localStorage.setItem("growdash:agent-statuses", JSON.stringify(statuses)); }, [statuses]);
   useEffect(() => { localStorage.setItem("growdash:agent-accounts", JSON.stringify(assignments)); }, [assignments]);
+  useEffect(() => { gameMinutesRef.current = gameMinutes; }, [gameMinutes]);
+  useEffect(() => { statusesRef.current = statuses; }, [statuses]);
+  useEffect(() => { timeSpeedRef.current = timeSpeed; }, [timeSpeed]);
+  useEffect(() => { autonomyRef.current = autonomyEnabled; }, [autonomyEnabled]);
+  useEffect(() => { lifeStatesRef.current = lifeStates; }, [lifeStates]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const speed = timeSpeedRef.current;
+      if (speed === 0) return;
+      const nextMinutes = (gameMinutesRef.current + speed) % (24 * 60);
+      gameMinutesRef.current = nextMinutes;
+      setGameMinutes(nextMinutes);
+      setLifeStates((current) => Object.fromEntries(AGENTS.map((agent) => [
+        agent.id,
+        advanceAgentLifeState(current[agent.id] || INITIAL_LIFE_STATES[agent.id], statusesRef.current[agent.id] || "working", nextMinutes),
+      ])));
+      if (autonomyRef.current && nextMinutes % 45 === 0) {
+        setStatuses((current) => Object.fromEntries(AGENTS.map((agent) => {
+          const state = lifeStatesRef.current[agent.id];
+          const nextStatus = state?.needs.energia !== undefined && state.needs.energia < 24 ? "free" : current[agent.id] === "free" ? "working" : current[agent.id];
+          return [agent.id, nextStatus];
+        })) as Record<string, AgentStatus>);
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const metrics = useMemo<AgentMetrics>(() => {
     const media = insights.reduce((total, row) => ({
@@ -78,6 +137,11 @@ export default function AgentsOfficePage() {
       revenue: confirmed.totalNet,
     };
   }, [deals, insights, sales]);
+
+  const activeLifeState = activeAgent ? lifeStates[activeAgent.id] : null;
+  const gameClock = formatAgentClock(gameMinutes);
+  const fundsLabel = "R$ 284.290";
+  const phaseLabel = activeLifeState ? getAgentPhaseLabel(activeLifeState.phase) : "Selecione uma agente";
 
   const updateStatus = (agentId: string, status: AgentStatus) => setStatuses((current) => ({ ...current, [agentId]: status }));
   const openAgent = (agentId: string) => { setActiveAgentId(agentId); setMinimized(false); };
@@ -99,31 +163,99 @@ export default function AgentsOfficePage() {
     <div className="agents-office-page mx-auto w-full max-w-[1920px]">
       <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div><span className="text-[10px] font-black uppercase tracking-[.2em] text-primary">Growdash Intelligence Core</span><h1 className="mt-1 text-2xl font-black">Conhecimento & Agentes</h1><p className="mt-1 text-xs text-muted-foreground">Navegue pela inteligência da operação ou entre no escritório 3D dos agentes.</p></div>
-        <div className="flex flex-wrap items-center gap-2 text-[10px]"><button type="button" onClick={() => setView("map")} className={cn("rounded-lg border px-3 py-2 font-black", view === "map" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><Network className="mr-1 inline h-3.5 w-3.5" />Mapa</button><button type="button" onClick={() => setView("office")} className={cn("rounded-lg border px-3 py-2 font-black", view === "office" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><BriefcaseBusiness className="mr-1 inline h-3.5 w-3.5" />Escritório 3D</button>{view === "office" && <><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></>}</div>
+        <div className="flex flex-wrap items-center gap-2 text-[10px]"><button type="button" onClick={() => setView("map")} className={cn("rounded-lg border px-3 py-2 font-black", view === "map" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><Network className="mr-1 inline h-3.5 w-3.5" />Núcleo neural</button><button type="button" onClick={() => setView("office")} className={cn("rounded-lg border px-3 py-2 font-black", view === "office" ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}><BriefcaseBusiness className="mr-1 inline h-3.5 w-3.5" />Escritório 3D</button>{view === "office" && <><StatusLegend color="bg-emerald-500" label="Trabalhando" /><StatusLegend color="bg-sky-400" label="Caminhando" /><StatusLegend color="bg-amber-400" label="Tempo livre" /></>}</div>
       </header>
 
-      {view === "map" ? <KnowledgeMap onOpenOffice={() => setView("office")} /> : <div className="agent-office-shell relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
-        <div className="office-window"><span /><span /><span /></div>
-        <div className="office-wall-sign"><WandSparkles className="h-4 w-4" /> GROWDASH INTELLIGENCE</div>
-        <div className="office-floor-grid" />
-        <div className="office-rug"><Bot className="h-8 w-8" /><span>AI<br />HUB</span></div>
-        <div className="office-plant plant-a"><i /><b /></div><div className="office-plant plant-b"><i /><b /></div>
-        {AGENTS.map((agent) => <div key={agent.id} className={cn("office-desk", agent.desk)}><span className="office-monitor"><Activity /></span><span className="office-keyboard" /></div>)}
+      {view === "map" ? <KnowledgeMap
+        onOpenOffice={() => setView("office")}
+        accounts={visibleAccounts.map((account) => ({ id: account.id, name: account.name, target_cpl: account.target_cpl }))}
+        startDate={startDate}
+        endDate={endDate}
+      /> : <>
+        <Suspense fallback={<div className="grid min-h-[620px] place-items-center rounded-2xl border border-primary/25 bg-[#161108] text-sm text-primary">Carregando escritório 3D…</div>}>
+          <LifeSimPage />
+        </Suspense>
+        {showLegacyOfficePreview && <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
+        <div className="office-sim-topbar">
+          <div className="office-sim-brand"><span className="office-sim-brand-mark"><Bot className="h-3.5 w-3.5" /></span><span><b>GROWDASH LIFE</b><small>AGENT OPERATIONS</small></span></div>
+          <div className="office-sim-presence" aria-label="Agentes presentes no escritório">
+            {AGENTS.map((agent) => <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-presence-agent", `is-${statuses[agent.id] || "working"}`)} style={{ "--agent-color": agent.color } as React.CSSProperties}><span className="office-presence-avatar"><Bot className="h-3 w-3" /></span><span><b>{agent.name}</b><small>{statuses[agent.id] === "working" ? "online" : statuses[agent.id] === "walking" ? "andando" : "livre"}</small></span><i /></button>)}
+          </div>
+          <div className="office-sim-live"><span className="office-live-dot" /><span><b>Operação ao vivo</b><small>6 agentes conectados</small></span><button type="button" onClick={() => updateStatus("atlas", "walking")} aria-label="Abrir standup da equipe">STANDUP BOARD</button></div>
+        </div>
+        <aside className="office-sim-rail" aria-label="Navegação do escritório">
+          <span className="office-rail-logo"><Sparkles className="h-4 w-4" /></span>
+          <button type="button" className="is-active" aria-label="Escritório"><BriefcaseBusiness className="h-4 w-4" /></button>
+          <button type="button" onClick={() => setView("map")} aria-label="Mapa de inteligência"><Network className="h-4 w-4" /></button>
+          <button type="button" onClick={() => openAgent(activeAgentId || AGENTS[0].id)} aria-label="Chat dos agentes"><MessageCircle className="h-4 w-4" /></button>
+          <button type="button" onClick={() => updateStatus("atlas", "working")} aria-label="Ativar operação"><Activity className="h-4 w-4" /></button>
+          <span className="office-rail-spacer" />
+          <button type="button" onClick={() => setOfficeAngle(0)} aria-label="Recentrar escritório"><RotateCcw className="h-4 w-4" /></button>
+        </aside>
+        <div className="office-viewport-toolbar" role="toolbar" aria-label="Controles da câmera do escritório">
+          <span className="office-viewport-title"><Rotate3D className="h-3.5 w-3.5" />ESCRITÓRIO 360°</span>
+          <span className="office-viewport-hint">Arraste a visão ou use as setas para orbitar</span>
+          <div className="office-camera-buttons"><button type="button" onClick={() => setOfficeAngle((value) => value - 18)} aria-label="Orbitar para a esquerda"><ArrowLeft className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle(0)} aria-label="Centralizar câmera"><RotateCcw className="h-3.5 w-3.5" /></button><button type="button" onClick={() => setOfficeAngle((value) => value + 18)} aria-label="Orbitar para a direita"><ArrowRight className="h-3.5 w-3.5" /></button></div>
+        </div>
+        <div className="office-3d-world" style={{ "--office-angle": `${officeAngle}deg` } as React.CSSProperties} onPointerDown={(event) => { if ((event.target as HTMLElement).closest("button")) return; officeDragStart.current = event.clientX; officeAngleStart.current = officeAngle; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={(event) => { if (officeDragStart.current === null) return; setOfficeAngle(Math.max(-180, Math.min(180, officeAngleStart.current + (event.clientX - officeDragStart.current) / 4.5))); }} onPointerUp={() => { officeDragStart.current = null; }} onPointerCancel={() => { officeDragStart.current = null; }}>
+          <div className="office-life-hud" aria-label="Controles do Growdash Life">
+            <div className="office-life-clock"><span className="office-life-clock-icon">◷</span><span><b>{gameClock}</b><small>{timeSpeed === 0 ? "Pausado" : `Velocidade ${timeSpeed}x`}</small></span></div>
+            <div className="office-life-mode" role="group" aria-label="Modo do escritório"><button type="button" className={cn(lifeMode === "life" && "is-active")} onClick={() => setLifeMode("life")}>◈ Vida</button><button type="button" className={cn(lifeMode === "build" && "is-active")} onClick={() => setLifeMode("build")}>▦ Construir</button></div>
+            <div className="office-life-speed" role="group" aria-label="Velocidade do tempo"><button type="button" className={cn(timeSpeed === 0 && "is-active")} onClick={() => setTimeSpeed(0)} aria-label="Pausar tempo">Ⅱ</button>{([1, 2, 3] as const).map((speed) => <button key={speed} type="button" className={cn(timeSpeed === speed && "is-active")} onClick={() => setTimeSpeed(speed)} aria-label={`Velocidade ${speed}x`}>{speed}×</button>)}</div>
+            <div className="office-life-funds"><span>§</span><b>{fundsLabel}</b></div>
+            <button type="button" className={cn("office-life-autonomy", autonomyEnabled && "is-active")} onClick={() => setAutonomyEnabled((value) => !value)} aria-pressed={autonomyEnabled}><span className="office-live-dot" /> Autonomia</button>
+          </div>
+          <div className="office-architecture" aria-hidden="true">
+            <span className="office-ceiling-plane"><i /><i /><i /><b>GROWDASH HQ · LIVE INTELLIGENCE FLOOR</b></span>
+            <span className="office-architecture-wall office-architecture-wall-back"><i /><i /><i /><b>CONTROL ROOM 01</b></span>
+            <span className="office-architecture-wall office-architecture-wall-left"><i /><i /></span>
+            <span className="office-architecture-wall office-architecture-wall-right"><i /><i /></span>
+            <span className="office-light-beam office-light-beam-a" /><span className="office-light-beam office-light-beam-b" /><span className="office-light-beam office-light-beam-c" />
+            <span className="office-ceiling-spot spot-a" /><span className="office-ceiling-spot spot-b" /><span className="office-ceiling-spot spot-c" />
+          </div>
+          <div className="office-room-shell" aria-hidden="true"><span className="room-wall room-wall-back" /><span className="room-wall room-wall-left" /><span className="room-wall room-wall-right" /><span className="room-door room-door-main" /><span className="room-window-strip" /></div>
+          <div className="office-glass-divider divider-a" aria-hidden="true"><i /><i /><i /></div><div className="office-glass-divider divider-b" aria-hidden="true"><i /><i /><i /></div>
+          <div className="office-zone zone-war"><b>WAR ROOM</b><small>Planejamento</small></div><div className="office-zone zone-lounge"><b>LOUNGE</b><small>Tempo livre</small></div><div className="office-zone zone-focus"><b>FOCUS PODS</b><small>Execução</small></div>
+          <div className="office-window"><span /><span /><span /></div>
+          <div className="office-wall-sign"><WandSparkles className="h-4 w-4" /> GROWDASH INTELLIGENCE</div>
+          <div className="office-floor-grid" />
+          <div className="office-rug"><Bot className="h-8 w-8" /><span>AI<br />HUB</span></div>
+          <div className="office-plant plant-a"><i /><b /></div><div className="office-plant plant-b"><i /><b /></div>
+          <div className="office-room-label room-label-lounge"><Coffee className="h-3 w-3" /> Lounge</div><div className="office-room-label room-label-war"><Sparkles className="h-3 w-3" /> War room</div>
+          {AGENTS.map((agent) => {
+            const phase = lifeStates[agent.id]?.phase || "TRABALHAR";
+            const monitorOn = phase === "TRABALHAR" || phase === "INTERAGIR";
+            return <div key={agent.id} className={cn("office-desk", agent.desk, monitorOn && "is-monitor-on")}>
+              <span className="office-desk-top" /><span className="office-desk-leg desk-leg-left" /><span className="office-desk-leg desk-leg-right" />
+              <span className="office-monitor-shell"><span className={cn("office-monitor", monitorOn ? "is-on" : "is-off")} aria-label={monitorOn ? "Computador ligado" : "Computador desligado"}><Activity /></span><i className="office-monitor-reflection" /></span>
+              <span className="office-keyboard" /><span className="office-desk-lamp"><i /><b /></span><span className="office-chair"><i /><b /></span><small>{agent.specialty}</small>
+            </div>;
+          })}
+          <div className="office-lounge"><Coffee className="h-5 w-5" /><span>PAUSA</span></div>
+          <div className="office-whiteboard"><b>OPERATIONAL BOARD</b><span>Prioridades · alertas · próximos passos</span><i /><i /><i /></div>
 
-        {AGENTS.map((agent) => {
-          const status = statuses[agent.id] || "working";
-          const assigned = visibleAccounts.find((item) => item.id === assignments[agent.id]);
-          return (
-            <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-npc", agent.position, `is-${status}`)} style={{ "--agent-color": agent.color } as React.CSSProperties} aria-label={`Conversar com ${agent.name}`}>
-              <span className="npc-shadow" /><span className="npc-body"><i className="npc-head" /><i className="npc-shirt" /><i className="npc-legs" /></span>
-              <span className="npc-plumbob" />
-              <span className="npc-label"><b>{agent.name}</b><small>{assigned?.name || agent.role}</small></span>
-            </button>
-          );
-        })}
+          {AGENTS.map((agent, index) => {
+            const status = statuses[agent.id] || "working";
+            const lifeState = lifeStates[agent.id] || INITIAL_LIFE_STATES[agent.id];
+            const assigned = visibleAccounts.find((item) => item.id === assignments[agent.id]);
+            return (
+              <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-npc office-3d-npc", agent.position, agent.look, `is-${status}`, `phase-${lifeState.phase.toLowerCase()}`, lifeState.phase === "IDLE" && "is-resting")} style={{ "--agent-color": agent.color, "--npc-delay": `${index * -0.7}s`, "--npc-skin": agent.skin, "--npc-hair": agent.hair, "--npc-outfit": agent.outfit, "--npc-pants": agent.pants } as React.CSSProperties} aria-label={`Abrir estação de ${agent.name}, ${agent.role}`}>
+                <span className="npc-shadow" /><span className="npc-ground-light" /><span className="npc-chair-back" /><span className="npc-body"><i className="npc-head" /><i className="npc-hair" /><i className="npc-neck" /><i className="npc-shirt" /><i className="npc-arm npc-arm-left" /><i className="npc-arm npc-arm-right" /><i className="npc-legs" /><i className="npc-shoe npc-shoe-left" /><i className="npc-shoe npc-shoe-right" /></span>
+                <span className="npc-plumbob" /><span className="npc-task-light" />
+                <span className="npc-label"><b>{agent.name}</b><small>{assigned?.name || agent.role}</small><em>{lifeState.phase === "IDLE" && status === "working" ? "Pausa automática" : getAgentPhaseLabel(lifeState.phase)}</em></span>
+              </button>
+            );
+          })}
+        </div>
 
-        <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/65 p-2 backdrop-blur-xl">
-          {AGENTS.map((agent) => <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className="flex min-w-[150px] flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-white transition hover:bg-white/10"><span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: `${agent.color}22`, color: agent.color }}><Bot className="h-4 w-4" /></span><span className="min-w-0"><b className="block truncate text-xs">{agent.name}</b><small className="block truncate text-[9px] text-white/45">{statuses[agent.id] === "working" ? "Trabalhando" : statuses[agent.id] === "walking" ? "Caminhando" : "Tempo livre"}</small></span></button>)}
+        {activeAgent && activeLifeState && <aside className="office-life-inspector" aria-live="polite">
+          <div className="office-life-inspector-head"><span className="office-agent-avatar" style={{ "--agent-color": activeAgent.color } as React.CSSProperties}><Bot className="h-3.5 w-3.5" /></span><span><b>{activeAgent.name}</b><small>{phaseLabel}</small></span><i className={cn(activeLifeState.phase === "IDLE" ? "is-warn" : "is-ok")} /></div>
+          <div className="office-needs-grid">{(Object.keys(AGENT_NEED_META) as AgentNeedKey[]).map((key) => { const meta = AGENT_NEED_META[key]; const value = activeLifeState.needs[key]; return <div key={key} className="office-need-row"><span><b>{meta.icon}</b>{meta.label}</span><span className="office-need-track"><i style={{ width: `${value}%`, background: meta.color }} /></span><small>{Math.round(value)}</small></div>; })}</div>
+        </aside>}
+
+        <div className="office-command-bar" aria-label="Comandos dos agentes">
+          <div className="office-command-copy"><b>Comando do escritório</b><small>Escolha o que cada NPC deve fazer agora.</small></div>
+          {AGENTS.map((agent) => <div key={agent.id} className="office-agent-command"><button type="button" onClick={() => openAgent(agent.id)} className="office-agent-identity" style={{ "--agent-color": agent.color } as React.CSSProperties}><span className="office-agent-avatar"><Bot className="h-3.5 w-3.5" /></span><span><b>{agent.name}</b><small>{agent.role}</small></span></button><div className="office-agent-modes"><AgentModeButton active={statuses[agent.id] === "working"} onClick={() => updateStatus(agent.id, "working")} icon={<BriefcaseBusiness />} label="Trabalhar" /><AgentModeButton active={statuses[agent.id] === "walking"} onClick={() => updateStatus(agent.id, "walking")} icon={<UsersRound />} label="Andar" /><AgentModeButton active={statuses[agent.id] === "free"} onClick={() => updateStatus(agent.id, "free")} icon={<Coffee />} label="Livre" /></div></div>)}
         </div>
 
         {activeAgent && (
@@ -146,33 +278,280 @@ export default function AgentsOfficePage() {
               </div>
               <div className="border-t border-white/10 p-3">
                 <div className="mb-2 flex gap-1 overflow-x-auto growdash-scrollbar-hidden">{["Leads e CPL", "CTR e criativos", "Vendas e ROAS"].map((suggestion) => <button key={suggestion} type="button" onClick={() => setInput(suggestion)} className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[9px] text-white/55 hover:border-primary/50 hover:text-primary">{suggestion}</button>)}</div>
-                <div className="flex gap-2"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") sendMessage(); }} placeholder="Pergunte sobre esta conta…" className="h-10 min-w-0 grow rounded-xl border border-white/15 bg-black/50 px-3 text-xs text-white outline-none placeholder:text-white/25 focus:border-primary/55" /><button type="button" onClick={sendMessage} className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground" aria-label="Enviar pergunta"><Send className="h-4 w-4" /></button></div>
+                <div className="flex gap-2"><input aria-label={`Perguntar ao agente ${activeAgent.name}`} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") sendMessage(); }} placeholder="Pergunte sobre esta conta…" className="h-10 min-w-0 grow rounded-xl border border-white/15 bg-black/50 px-3 text-xs text-white outline-none placeholder:text-white/25 focus:border-primary/55" /><button type="button" onClick={sendMessage} className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground" aria-label="Enviar pergunta"><Send className="h-4 w-4" /></button></div>
               </div>
             </>}
           </aside>
         )}
-      </div>}
+        </div>}</>}
     </div>
   );
 }
 
-const KNOWLEDGE_NODES = [
-  { label: "Tráfego", note: "Campanhas, criativos, orçamento e Meta Ads", href: "/campanhas", angle: -90 },
-  { label: "CRM", note: "Negociações, funil, RD Station e IA do Funil", href: "/crm", angle: -30 },
-  { label: "Comercial", note: "Metas, ranking, receita e conversão", href: "/comercial", angle: 30 },
-  { label: "Financeiro", note: "DRE, caixa, mídia e previsões", href: "/financeiro", angle: 90 },
-  { label: "Experts", note: "Marcas, contas, posicionamento e conteúdo", href: "/marcas", angle: 150 },
-  { label: "Automações", note: "Playbooks, alertas, WhatsApp e webhooks", href: "/automacoes", angle: 210 },
+const KNOWLEDGE_NODES: KnowledgeNode[] = [
+  { id: "traffic", label: "Tráfego", note: "Mídia, criativos, orçamento e escala", document: "Centraliza investimento, campanhas, criativos e os sinais que mostram onde escalar ou proteger margem.", decision: "Priorize orçamento nos conjuntos que combinam volume de leads e custo sustentável; investigue os criativos antes de ampliar investimento.", strategies: [["Estratégias de mídia", "media"], ["Criativos & testes", "creative"], ["Alertas de performance", "performance"]] },
+  { id: "crm", label: "CRM", note: "Pipeline, qualificação e follow-up", document: "Conecta negociações, etapas, origem e histórico de contato para revelar onde cada oportunidade perde ritmo.", decision: "Use as etapas com maior acúmulo para organizar cadência, responsáveis e a próxima ação de cada lead.", strategies: [["Pipeline & etapas", "pipeline"], ["Scripts de vendas", "scripts"], ["Follow-ups", "followups"]] },
+  { id: "commercial", label: "Comercial", note: "Metas, conversão e receita", document: "Transforma o pipeline em leitura de vendas, metas, receita e previsibilidade por operação.", decision: "Compare receita confirmada com pipeline em aberto para orientar o time para as oportunidades que mudam a meta do período.", strategies: [["Metas e ranking", "ranking"], ["Playbook de vendas", "playbook"], ["Forecast", "forecast"]] },
+  { id: "finance", label: "Financeiro", note: "Caixa, margem e previsibilidade", document: "Reúne receita, investimento de mídia e custos para acompanhar resultado e capacidade de decisão da empresa.", decision: "Leia receita e mídia juntas: crescimento saudável preserva margem e não depende de um custo de aquisição fora do planejado.", strategies: [["DRE & caixa", "dre"], ["Margem e custos", "margin"], ["Planejamento", "planning"]] },
+  { id: "brand", label: "Marca", note: "Posicionamento, conteúdo e confiança", document: "Organiza posicionamento, conteúdo e sinais de audiência que sustentam a demanda antes e depois da conversão.", decision: "Use alcance, CTR e campanha líder para decidir quais mensagens merecem virar novos criativos, páginas e conteúdos.", strategies: [["Posicionamento", "positioning"], ["Conteúdo estratégico", "content"], ["Reputação", "reputation"]] },
+  { id: "automations", label: "Automações", note: "Playbooks, WhatsApp e operações", document: "Acompanha rotinas automatizadas, playbooks e integrações que mantêm atendimento e análise consistentes.", decision: "Mantenha rotinas críticas monitoradas e conecte cada automação a uma etapa ou objetivo mensurável da operação.", strategies: [["Playbooks", "playbooks"], ["WhatsApp", "whatsapp"], ["Webhooks & rotinas", "webhooks"]] },
+];
+
+const NEURAL_POINTS = Array.from({ length: 18 }, (_, index) => ({
+  id: index,
+  x: 4 + ((index * 37) % 92),
+  y: 5 + ((index * 53) % 88),
+  size: 2 + (index % 4),
+  delay: -((index * 0.31) % 4.8),
+  duration: 3.2 + ((index * 7) % 18) / 10,
+  depth: (index % 5) + 1,
+}));
+
+const NEURAL_LINKS = Array.from({ length: 20 }, (_, index) => {
+  const from = index % NEURAL_POINTS.length;
+  const to = (index * 7 + 11) % NEURAL_POINTS.length;
+  return [from, to] as const;
+});
+
+type CorePhase = "brain" | "entering" | "core";
+
+type KnowledgeStrategy = readonly [string, string];
+type KnowledgeNode = { id: CoreAreaId; label: string; note: string; document: string; decision: string; strategies: readonly KnowledgeStrategy[] };
+type SpatialGraphNode = { id: string; area: CoreAreaId | null; label: string; kind: "root" | "area" | "topic"; x: number; y: number; strategyId?: string };
+
+const AREA_POSITIONS: Record<CoreAreaId, readonly [number, number]> = {
+  traffic: [24, 22], crm: [77, 20], commercial: [80, 49], finance: [71, 78], brand: [24, 77], automations: [17, 50],
+};
+
+const TOPIC_POSITIONS: Record<CoreAreaId, readonly (readonly [number, number])[]> = {
+  traffic: [[8, 10], [35, 8], [42, 26]], crm: [[61, 8], [91, 11], [91, 30]], commercial: [[94, 42], [94, 59], [82, 68]],
+  finance: [[58, 91], [76, 94], [91, 87]], brand: [[8, 89], [29, 94], [42, 73]], automations: [[5, 39], [5, 59], [23, 62]],
+};
+
+const SPATIAL_GRAPH_NODES: SpatialGraphNode[] = [
+  { id: "growdash", area: null, label: "Growdash", kind: "root", x: 50, y: 50 },
+  ...KNOWLEDGE_NODES.flatMap((node) => {
+    const [x, y] = AREA_POSITIONS[node.id];
+    return [{ id: node.id, area: node.id, label: node.label, kind: "area" as const, x, y }, ...node.strategies.map(([label, strategyId], index) => {
+      const [topicX, topicY] = TOPIC_POSITIONS[node.id][index];
+      return { id: `${node.id}-${strategyId}`, area: node.id, label, kind: "topic" as const, x: topicX, y: topicY, strategyId };
+    })];
+  }),
+];
+
+const SPATIAL_GRAPH_EDGES = [
+  ...KNOWLEDGE_NODES.map((node) => ["growdash", node.id] as const),
+  ...KNOWLEDGE_NODES.flatMap((node) => node.strategies.map(([, strategyId]) => [node.id, `${node.id}-${strategyId}`] as const)),
+  ["traffic-creative", "brand-content"], ["traffic-performance", "commercial-forecast"], ["crm-pipeline", "commercial-playbook"],
+  ["commercial-ranking", "finance-planning"], ["finance-margin", "traffic-media"], ["automations-whatsapp", "crm-followups"],
+  ["automations-webhooks", "finance-dre"], ["brand-positioning", "commercial-scripts"],
 ] as const;
 
-function KnowledgeMap({ onOpenOffice }: { onOpenOffice: () => void }) {
-  return <section className="knowledge-map relative min-h-[680px] overflow-hidden rounded-2xl border border-primary/20 bg-[#050505]">
+function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOffice: () => void; accounts: CoreAccountInput[]; startDate: Date; endDate: Date }) {
+  const [phase, setPhase] = useState<CorePhase>("brain");
+  const [selectedArea, setSelectedArea] = useState<CoreAreaId | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
+  const [animationsActive, setAnimationsActive] = useState(true);
+  const transitionTimer = useRef<number | null>(null);
+  const stageRef = useRef<HTMLElement | null>(null);
+  const parallaxFrameRef = useRef<number | null>(null);
+  const parallaxValuesRef = useRef({ x: 0, y: 0 });
+  const isCoreOpen = phase === "core";
+  const selectedNode = KNOWLEDGE_NODES.find((node) => node.id === selectedArea) || null;
+  // Load the shared operational signals once the user enters the core. The
+  // graph and its health state then use the same real data without a request
+  // per node or fabricated placeholders.
+  const needsMedia = isCoreOpen;
+  const needsDeals = isCoreOpen;
+  const needsSales = isCoreOpen;
+  const { data: workspace } = useWorkspace();
+  const mediaQuery = useInsights({ startDate, endDate, enabled: isCoreOpen && needsMedia });
+  const dealsQuery = useRDDealsForPeriod({ startDate, endDate, enabled: isCoreOpen && needsDeals });
+  const salesQuery = useSales({ startDate, endDate, enabled: isCoreOpen && needsSales });
+  const schedulesQuery = useQuery<CoreSchedule[]>({
+    queryKey: ["agent-core-schedules", workspace?.id],
+    enabled: isCoreOpen && selectedArea === "automations" && !!workspace?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_report_schedules")
+        .select("id, ad_account_id, name, enabled, next_run_at, last_status")
+        .eq("workspace_id", workspace!.id)
+        .order("next_run_at", { ascending: true, nullsFirst: false });
+      if (error) {
+        console.warn("Growdash core schedules unavailable:", error.message);
+        return [];
+      }
+      return (data || []) as CoreSchedule[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const configsQuery = useQuery<CoreAgentConfig[]>({
+    queryKey: ["agent-core-configs", workspace?.id],
+    enabled: isCoreOpen && !!selectedArea && !!workspace?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("intelligence_agent_configs")
+        .select("id, ad_account_id, specialty, objective, status, last_run_at")
+        .eq("workspace_id", workspace!.id)
+        .order("updated_at", { ascending: false });
+      if (error) {
+        console.warn("Growdash core agent configs unavailable:", error.message);
+        return [];
+      }
+      return (data || []) as CoreAgentConfig[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const summaries = useMemo(() => buildCoreAccountSummaries(selectedArea || "traffic", {
+    accounts,
+    insights: mediaQuery.data,
+    deals: dealsQuery.data,
+    sales: salesQuery.data,
+    schedules: schedulesQuery.data,
+    agentConfigs: configsQuery.data,
+  }), [accounts, configsQuery.data, dealsQuery.data, mediaQuery.data, schedulesQuery.data, selectedArea, salesQuery.data]);
+  const neuralHealth = useMemo(() => {
+    const measured = summaries.filter((summary) => summary.health !== "no-data");
+    if (!measured.length) return { status: "no-data" as const, score: null };
+    const values = { healthy: 100, attention: 60, critical: 25 } as const;
+    const score = Math.round(measured.reduce((total, summary) => total + values[summary.health], 0) / measured.length);
+    return {
+      status: score < 45 ? "critical" as const : score < 80 ? "attention" as const : "healthy" as const,
+      score,
+    };
+  }, [summaries]);
+  const selectedStrategyLabel = selectedNode?.strategies.find(([, id]) => id === selectedStrategy)?.[0] || selectedNode?.strategies[0]?.[0] || "Visão geral";
+  const panelLoading = (needsMedia && mediaQuery.isFetching) || (needsDeals && dealsQuery.isFetching) || (needsSales && salesQuery.isFetching) || (selectedArea === "automations" && (schedulesQuery.isFetching || configsQuery.isFetching));
+
+  useEffect(() => () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
+    if (parallaxFrameRef.current !== null) window.cancelAnimationFrame(parallaxFrameRef.current);
+  }, []);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const updateVisibility = () => setAnimationsActive(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", updateVisibility);
+    if (typeof IntersectionObserver === "undefined") return () => document.removeEventListener("visibilitychange", updateVisibility);
+    const observer = new IntersectionObserver(([entry]) => setAnimationsActive(entry.isIntersecting && document.visibilityState === "visible"), { threshold: 0.08 });
+    observer.observe(stage);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", updateVisibility);
+    };
+  }, []);
+
+  const enterCore = () => {
+    if (phase !== "brain") return;
+    setPhase("entering");
+    transitionTimer.current = window.setTimeout(() => setPhase("core"), 1140);
+  };
+
+  const resetCore = () => {
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
+    transitionTimer.current = null;
+    setPhase("brain");
+    setSelectedArea(null);
+    setSelectedStrategy(null);
+  };
+
+  const updateParallax = (event: React.PointerEvent<HTMLElement>) => {
+    if (window.matchMedia?.("(pointer: coarse)").matches || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - .5) * 2));
+    const y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - .5) * 2));
+    parallaxValuesRef.current = { x, y };
+    if (parallaxFrameRef.current !== null) return;
+    parallaxFrameRef.current = window.requestAnimationFrame(() => {
+      parallaxFrameRef.current = null;
+      const values = parallaxValuesRef.current;
+      const target = stageRef.current;
+      if (!target) return;
+      target.style.setProperty("--jarvis-bg-x", `${(values.x * 20).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-bg-y", `${(values.y * 14).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-grid-x", `${(values.x * -7).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-grid-y", `${(values.y * -5).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-field-x", `${(values.x * 8).toFixed(1)}px`);
+      target.style.setProperty("--jarvis-field-y", `${(values.y * 6).toFixed(1)}px`);
+    });
+  };
+
+  const resetParallax = () => {
+    if (parallaxFrameRef.current !== null) window.cancelAnimationFrame(parallaxFrameRef.current);
+    parallaxFrameRef.current = null;
+    ["--jarvis-bg-x", "--jarvis-bg-y", "--jarvis-grid-x", "--jarvis-grid-y", "--jarvis-field-x", "--jarvis-field-y"].forEach((property) => stageRef.current?.style.setProperty(property, "0px"));
+  };
+
+  const openArea = (area: CoreAreaId, strategyId?: string) => {
+    setSelectedArea(area);
+    setSelectedStrategy(strategyId || KNOWLEDGE_NODES.find((node) => node.id === area)?.strategies[0]?.[1] || null);
+  };
+
+  return <section ref={stageRef} className={cn("jarvis-command-center growdash-core-v2", `is-${phase}`, !animationsActive && "is-paused")} aria-label="Núcleo de inteligência Growdash" onPointerMove={updateParallax} onPointerLeave={resetParallax}>
     <div className="knowledge-map-grid" />
-    <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 680" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="knowledge-line" x1="0" x2="1"><stop offset="0" stopColor="currentColor" stopOpacity=".08" /><stop offset=".5" stopColor="currentColor" stopOpacity=".7" /><stop offset="1" stopColor="currentColor" stopOpacity=".08" /></linearGradient></defs>{KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; const x = 500 + Math.cos(radians) * 330; const y = 340 + Math.sin(radians) * 245; return <line key={node.label} x1="500" y1="340" x2={x} y2={y} stroke="url(#knowledge-line)" strokeWidth="1.5" strokeDasharray="5 7" />; })}</svg>
-    <button type="button" onClick={onOpenOffice} className="knowledge-core brain-core" aria-label="Abrir escritório 3D da Growdash"><span className="knowledge-core-ring" /><span className="brain-hemisphere brain-left" /><span className="brain-hemisphere brain-right" /><span className="brain-synapse synapse-a" /><span className="brain-synapse synapse-b" /><span className="brain-synapse synapse-c" /><span className="brain-synapse synapse-d" /><span className="brain-label"><Bot className="h-6 w-6" /><b>Growdash</b><small>Intelligence Core</small><em>Clique para entrar no escritório 3D</em></span></button>
-    {KNOWLEDGE_NODES.map((node) => { const radians = node.angle * Math.PI / 180; return <NavLink key={node.label} to={node.href} className="knowledge-node" style={{ left: `${50 + Math.cos(radians) * 35}%`, top: `${50 + Math.sin(radians) * 34}%` }}><Sparkles className="h-4 w-4" /><b>{node.label}</b><small>{node.note}</small></NavLink>; })}
-    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-2 text-center text-[9px] text-white/45 backdrop-blur-xl">O núcleo conecta as fontes da operação; cada agente consulta apenas contas e módulos permitidos.</div>
+    <div className="jarvis-scanline" aria-hidden="true" />
+    <div className="jarvis-neural-field" aria-hidden="true">
+      <svg viewBox="0 0 1000 760" preserveAspectRatio="none">
+        {NEURAL_LINKS.map(([from, to], index) => <line key={`${from}-${to}-${index}`} x1={NEURAL_POINTS[from].x * 10} y1={NEURAL_POINTS[from].y * 7.6} x2={NEURAL_POINTS[to].x * 10} y2={NEURAL_POINTS[to].y * 7.6} style={{ "--link-delay": `${-(index % 9) * .24}s` } as React.CSSProperties} />)}
+      </svg>
+      {NEURAL_POINTS.map((point) => <i key={point.id} className="jarvis-neural-point" style={{ left: `${point.x}%`, top: `${point.y}%`, width: `${point.size}px`, height: `${point.size}px`, "--point-delay": `${point.delay}s`, "--point-duration": `${point.duration}s`, "--point-depth": point.depth } as React.CSSProperties} />)}
+    </div>
+    <div className="jarvis-cinematic-tunnel" aria-hidden="true"><i /><i /><i /><i /><span /></div>
+    <div className="jarvis-phase-status sr-only" aria-live="polite">{phase === "brain" ? "Cérebro operacional pronto" : phase === "entering" ? "Entrando no núcleo de inteligência" : "Grafo operacional Growdash aberto"}</div>
+
+    <NeuralCommandCore3D expanded={isCoreOpen} entering={phase === "entering"} onEnter={enterCore} health={neuralHealth.status} healthScore={neuralHealth.score} />
+
+    {isCoreOpen && <>
+      <div className="jarvis-core-label" aria-live="polite"><Radar /><span>Mapa da operação · {KNOWLEDGE_NODES.length} áreas · {KNOWLEDGE_NODES.reduce((total, node) => total + node.strategies.length, 0)} documentos</span></div>
+      <div className="growdash-spatial-graph" aria-label="Mapa mental da operação Growdash">
+        <svg className="growdash-spatial-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="growdash-map-link" x1="0" x2="1"><stop stopColor="#fff" stopOpacity=".12" /><stop offset=".5" stopColor="#fff" stopOpacity=".72" /><stop offset="1" stopColor="#fff" stopOpacity=".12" /></linearGradient></defs>
+          {SPATIAL_GRAPH_EDGES.map(([fromId, toId], index) => {
+            const from = SPATIAL_GRAPH_NODES.find((node) => node.id === fromId)!;
+            const to = SPATIAL_GRAPH_NODES.find((node) => node.id === toId)!;
+            return <line key={`${fromId}-${toId}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} style={{ "--map-delay": `${-(index % 10) * .25}s` } as React.CSSProperties} />;
+          })}
+        </svg>
+        {SPATIAL_GRAPH_NODES.map((graphNode, index) => {
+          const active = graphNode.area !== null && selectedArea === graphNode.area && (!graphNode.strategyId || selectedStrategy === graphNode.strategyId);
+          return <button key={graphNode.id} type="button" className={cn("growdash-map-node", `is-${graphNode.kind}`, active && "is-selected")} style={{ left: `${graphNode.x}%`, top: `${graphNode.y}%`, "--node-index": index } as React.CSSProperties} onClick={() => graphNode.area && openArea(graphNode.area, graphNode.strategyId)} aria-pressed={active} aria-label={graphNode.kind === "root" ? "Growdash, centro do mapa" : `Abrir documento: ${graphNode.label}`}>
+            <i aria-hidden="true" /><span>{graphNode.label}</span>{graphNode.kind === "area" && <small>{KNOWLEDGE_NODES.find((node) => node.id === graphNode.area)?.note}</small>}
+          </button>;
+        })}
+        <div className="growdash-map-legend"><span><i /> Área</span><span><i /> Documento</span><span>Selecione um nó para abrir sua leitura operacional</span></div>
+      </div>
+      <div className="jarvis-actions"><button type="button" onClick={resetCore}><RotateCcw className="h-3.5 w-3.5" />Visão do cérebro</button><button type="button" onClick={onOpenOffice}><BriefcaseBusiness className="h-3.5 w-3.5" />Entrar no escritório 3D</button></div>
+      {selectedNode && <OperationalAreaPanel node={selectedNode} summaries={summaries} selectedStrategy={selectedStrategyLabel} loading={panelLoading} onClose={() => setSelectedArea(null)} onSelectStrategy={(id) => setSelectedStrategy(id)} />}
+    </>}
+
+    {!isCoreOpen && <div className="jarvis-intro"><b>Central de comando autônoma</b><span>Entre no cérebro operacional para navegar pelas áreas, conexões e estratégias da Growdash.</span><small><Sparkles />Experiência neural interativa</small></div>}
   </section>;
+}
+
+function OperationalAreaPanel({ node, summaries, selectedStrategy, loading, onClose, onSelectStrategy }: { node: KnowledgeNode; summaries: ReturnType<typeof buildCoreAccountSummaries>; selectedStrategy: string; loading: boolean; onClose: () => void; onSelectStrategy: (id: string) => void }) {
+  return <aside className="growdash-core-panel" aria-label={`Inteligência de ${node.label}`}>
+    <header className="growdash-core-panel-header"><div><span className="growdash-core-kicker">DOCUMENTO OPERACIONAL · {node.label.toUpperCase()}</span><h2>{node.label}</h2><p>{node.note}</p></div><button type="button" onClick={onClose} aria-label="Fechar análise da área"><X className="h-4 w-4" /></button></header>
+    <div className="growdash-core-strategies" role="tablist" aria-label={`Estratégias de ${node.label}`}>
+      {node.strategies.map(([label, id]) => <button type="button" key={id} role="tab" aria-selected={selectedStrategy === label} onClick={() => onSelectStrategy(id)} className={cn(selectedStrategy === label && "is-active")}><span>{label}</span><ChevronRight className="h-3 w-3" /></button>)}
+    </div>
+    <div className="growdash-core-panel-body">
+      <div className="growdash-core-document"><span>Contexto</span><p>{node.document}</p><span>Decisão para escala</span><p>{node.decision}</p></div>
+      <div className="growdash-core-panel-intro"><Radar className="h-4 w-4" /><span>{loading ? "Sincronizando sinais reais das contas…" : `Leitura atual · ${selectedStrategy}`}</span></div>
+      {loading ? <div className="growdash-core-loading" aria-live="polite"><i /><i /><i /></div> : summaries.length ? <div className="growdash-core-account-list">{summaries.map((summary) => <article key={summary.id} className="growdash-core-account-card"><div className="growdash-core-account-heading"><div><b>{summary.name}</b><small>{summary.strategy}</small></div><span className={`is-${summary.health}`}>{summary.health === "healthy" ? "Em rota" : summary.health === "attention" ? "Atenção" : summary.health === "critical" ? "Risco" : "Sem dados"}</span></div><div className="growdash-core-metrics">{getAreaMetrics(node.id, summary).map((metric) => <div key={metric.label}><small>{metric.label}</small><b>{metric.value}</b></div>)}</div><p>{summary.strategyDetail}</p></article>)}</div> : <div className="growdash-core-empty"><Network className="h-5 w-5" /><p>Nenhuma conta acessível para esta área.</p></div>}
+    </div>
+  </aside>;
+}
+
+function getAreaMetrics(area: CoreAreaId, summary: ReturnType<typeof buildCoreAccountSummaries>[number]) {
+  const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+  const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
+  if (area === "traffic") return [{ label: "Investimento", value: money(summary.spend) }, { label: "Leads", value: integer.format(summary.leads) }, { label: "CPL", value: summary.cpl ? money(summary.cpl) : "—" }, { label: "Campanhas ativas", value: integer.format(summary.activeCampaigns) }];
+  if (area === "crm") return [{ label: "Negócios", value: integer.format(summary.deals) }, { label: "Ganhos", value: integer.format(summary.wonDeals) }, { label: "Pipeline", value: money(summary.pipeline) }, { label: "Rotinas", value: integer.format(summary.schedules) }];
+  if (area === "commercial") return [{ label: "Receita", value: money(summary.revenue) }, { label: "Vendas", value: integer.format(summary.sales) }, { label: "Ticket médio", value: summary.ticket ? money(summary.ticket) : "—" }, { label: "Melhor vendedor", value: summary.topSeller || "Sem atribuição" }];
+  if (area === "finance") return [{ label: "Receita", value: money(summary.revenue) }, { label: "Mídia", value: money(summary.spend) }, { label: "Resultado", value: money(summary.revenue - summary.spend) }, { label: "ROAS", value: summary.roas ? `${summary.roas.toFixed(2).replace(".", ",")}x` : "—" }];
+  if (area === "brand") return [{ label: "Impressões", value: integer.format(summary.impressions) }, { label: "Alcance", value: integer.format(summary.reach) }, { label: "CTR", value: summary.ctr ? `${summary.ctr.toFixed(2).replace(".", ",")}%` : "—" }, { label: "Campanha líder", value: summary.topCampaign || "Sem dados" }];
+  return [{ label: "Rotinas", value: integer.format(summary.schedules) }, { label: "Ativas", value: integer.format(summary.activeSchedules) }, { label: "Última estratégia", value: summary.strategy }, { label: "Execução", value: summary.activeSchedules > 0 ? "Monitorada" : "Pendente" }];
 }
 
 function StatusLegend({ color, label }: { color: string; label: string }) { return <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1"><i className={cn("h-2 w-2 rounded-full", color)} />{label}</span>; }

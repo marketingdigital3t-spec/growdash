@@ -129,12 +129,34 @@ Deno.serve(async (req) => {
     // Find account owner to fetch integration token
     const { data: account } = await admin
       .from("ad_accounts")
-      .select("id, user_id")
+      .select("id, user_id, workspace_id")
       .eq("id", adAccountId)
       .maybeSingle();
     if (!account) {
       return new Response(JSON.stringify({ error: "Conta não encontrada" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: memberships } = await admin
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", userId)
+      .eq("status", "active");
+    const activeWorkspaces = new Set((memberships ?? []).map((membership: any) => String(membership.workspace_id)));
+    const { data: delegatedAccess } = await admin
+      .from("user_ad_account_access")
+      .select("ad_account_id")
+      .eq("user_id", userId)
+      .eq("ad_account_id", adAccountId)
+      .maybeSingle();
+    const { data: master } = await admin.rpc("is_master", { _user_id: userId });
+    const workspaceAllowed = !account.workspace_id || activeWorkspaces.has(String(account.workspace_id));
+    const authorized = master === true || (workspaceAllowed && (account.user_id === userId || Boolean(delegatedAccess)));
+    if (!authorized) {
+      console.warn("rd-discover-fields: forbidden account access", { userId, adAccountId });
+      return new Response(JSON.stringify({ error: "Conta não autorizada" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

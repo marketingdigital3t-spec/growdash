@@ -39,6 +39,22 @@ export interface InsightRow {
   ad_account_id?: string | null;
 }
 
+/**
+ * Insights are daily facts. A single ad/date must contribute once to a
+ * multi-account total even when an old sync retry left a repeated response in
+ * a cached client payload. The database has this same unique key; applying it
+ * at the boundary keeps the UI mathematically stable while reconciliation is
+ * running in the background.
+ */
+export function dedupeDailyInsights(rows: InsightRow[]) {
+  const unique = new Map<string, InsightRow>();
+  for (const row of rows) {
+    const key = `${row.ad_id}::${row.date}`;
+    if (!unique.has(key)) unique.set(key, row);
+  }
+  return Array.from(unique.values());
+}
+
 export function useInsights({ adAccountId, campaignId, campaignIds, objectives, startDate, endDate, enabled = true }: UseInsightsParams) {
   return useQuery({
     queryKey: ["insights", adAccountId, campaignId, campaignIds?.join(","), objectives?.join(","), startDate.toISOString(), endDate.toISOString()],
@@ -90,9 +106,10 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
 
       // Paginar para evitar o limite default de 1000 linhas do Supabase.
       const PAGE = 1000;
-      const MAX_PAGES = 20;
       let allRows: any[] = [];
-      for (let page = 0; page < MAX_PAGES; page++) {
+      // Do not truncate long-running accounts after an arbitrary number of
+      // pages. The selected interval is already enforced by the database.
+      for (let page = 0; ; page++) {
         const from = page * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await query.range(from, to);
@@ -100,12 +117,9 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
         const batch = data || [];
         allRows = allRows.concat(batch);
         if (batch.length < PAGE) break;
-        if (page === MAX_PAGES - 1) {
-          console.warn(`[useInsights] hit MAX_PAGES (${MAX_PAGES}) — possible truncation`);
-        }
       }
 
-      return allRows.map((row: any) => ({
+      return dedupeDailyInsights(allRows.map((row: any) => ({
         ad_id: row.ad_id,
         date: row.date,
         spend: row.spend ?? 0,
@@ -130,7 +144,7 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
         campaign_status: row.ads?.adsets?.campaigns?.status ?? null,
         campaign_id: row.ads?.adsets?.campaigns?.id ?? null,
         ad_account_id: row.ads?.adsets?.campaigns?.ad_account_id ?? null,
-      })) as InsightRow[];
+      })) as InsightRow[]);
     },
     enabled,
     staleTime: 15 * 60 * 1000,

@@ -35,6 +35,49 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     const operation = String(body?.operation ?? "update");
 
+    if (operation === "duplicate_campaign") {
+      const campaignId = String(body?.campaignId ?? "").trim();
+      const name = String(body?.name ?? "").trim();
+      if (!/^[0-9]{5,30}$/.test(campaignId)) return json({ error: "Campanha inválida" }, 400);
+      if (name.length < 1 || name.length > 255) return json({ error: "Nome inválido" }, 400);
+
+      const { data: campaign } = await admin.from("campaigns").select("id,ad_account_id,name,objective").eq("id", campaignId).maybeSingle();
+      if (!campaign) return json({ error: "Campanha não encontrada" }, 404);
+      const { data: account } = await admin.from("ad_accounts").select("id,account_id,user_id,access_token").eq("id", campaign.ad_account_id).maybeSingle();
+      if (!account?.access_token) return json({ error: "Conta Meta sem token válido" }, 409);
+      const { data: master } = await admin.rpc("is_master", { _user_id: user.id });
+      if (account.user_id !== user.id && master !== true) return json({ error: "Sem permissão para duplicar nesta conta" }, 403);
+
+      const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") ?? "v25.0";
+      const copyPayload = new URLSearchParams({
+        access_token: account.access_token,
+        deep_copy: "true",
+        rename_options: JSON.stringify({ rename_strategy: "DEEP_RENAME", rename_prefix: `${name} — ` }),
+      });
+      const metaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${campaignId}/copies`, {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: copyPayload,
+      });
+      const metaResult = await metaResponse.json().catch(() => ({}));
+      const duplicateId = String(metaResult?.copied_campaign_id ?? metaResult?.id ?? "");
+      if (!metaResponse.ok || metaResult?.error || !/^[0-9]{5,30}$/.test(duplicateId)) {
+        const message = metaResult?.error?.message ?? "A Meta recusou a duplicação";
+        return json({ error: `${message} (código ${metaResult?.error?.code ?? metaResponse.status})` }, 422);
+      }
+
+      // A cópia da Meta pode receber um nome automático. Renomeie e mantenha
+      // pausada antes de devolvê-la à interface para edição.
+      const updatePayload = new URLSearchParams({ access_token: account.access_token, name, status: "PAUSED" });
+      const updateResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${duplicateId}`, {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: updatePayload,
+      });
+      const updateResult = await updateResponse.json().catch(() => ({}));
+      if (!updateResponse.ok || updateResult?.error) return json({ error: updateResult?.error?.message ?? "A cópia foi criada, mas não pôde ser pausada para revisão." }, 422);
+
+      await admin.from("campaigns").upsert({ id: duplicateId, ad_account_id: account.id, name, objective: campaign.objective, status: "PAUSED", updated_at: new Date().toISOString() });
+      await admin.from("campaign_changes").insert({ campaign_id: duplicateId, entity_type: "campaign", entity_id: duplicateId, change_type: "manual_duplicate", field: "campaign", old_value: campaign.name, new_value: name, created_by: user.id, note: `Cópia criada a partir de ${campaignId}` });
+      return json({ success: true, operation, campaignId: duplicateId, name, status: "PAUSED" });
+    }
+
     if (operation === "create_campaign") {
       const accountId = String(body?.accountId ?? "").trim();
       const name = String(body?.campaign?.name ?? "").trim();
@@ -165,11 +208,9 @@ Deno.serve(async (req) => {
       status,
     });
     let normalizedBudget: number | null = null;
-    if (entityType === "campaign" || entityType === "adset") {
+    if ((entityType === "campaign" || entityType === "adset") && changes.dailyBudget != null) {
       const budget = Number(changes.dailyBudget);
-      if (!Number.isFinite(budget) || budget <= 0 || budget > 100_000_000) {
-        return json({ error: "Orçamento diário inválido" }, 400);
-      }
+      if (!Number.isFinite(budget) || budget <= 0 || budget > 100_000_000) return json({ error: "Orçamento diário inválido" }, 400);
       normalizedBudget = Math.round(budget * 100) / 100;
       metaPayload.set("daily_budget", String(Math.round(normalizedBudget * 100)));
     }

@@ -14,7 +14,7 @@ export function FunnelWeekdayChart({ a }: { a: FunnelAnalytics }) {
   }));
 
   return (
-    <Card className="bg-card/60 border-border/40">
+    <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base">9. Dias que mais convertem</CardTitle>
       </CardHeader>

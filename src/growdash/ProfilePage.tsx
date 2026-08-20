@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PageHeading } from "./shared";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -162,7 +163,7 @@ export default function ProfilePage() {
           <div className="max-w-3xl space-y-5">
             <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 text-sm"><ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-500" />Sua sessão usa autenticação segura do Supabase.</div>
             <Field label="E-mail de acesso"><div className="relative"><Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></div></Field>
-            <Field label="Nova senha"><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 10 caracteres" autoComplete="new-password" /></Field>
+            <Field label="Nova senha"><PasswordInput value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 10 caracteres" autoComplete="new-password" /></Field>
             <Button onClick={() => updateAccess.mutate()} disabled={updateAccess.isPending || (!password && email === user?.email)}>{updateAccess.isPending ? "Atualizando…" : "Atualizar acesso"}</Button>
             <AuthenticatorMfaCard />
           </div>
@@ -174,13 +175,17 @@ export default function ProfilePage() {
             <AppearanceCard active={theme === "light"} title="Modo claro" description="Mais contraste em ambientes bem iluminados." onClick={() => setTheme("light")} />
           </div>
           <div className="mt-7 border-t border-border pt-6">
-            <h2 className="font-black">Cor de destaque da plataforma</h2>
-            <p className="mt-1 text-xs text-muted-foreground">A cor é aplicada aos botões, seleções, glass do Dashboard e realces, mantendo contraste acessível.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {([['gold', 'Dourado', '#e6ad28'], ['purple', 'Ametista', '#9258ff'], ['blue', 'Azul imperial', '#2f80ff'], ['pink', 'Quartzo rosa', '#f04f9a'], ['sapphire', 'Safira', '#0ea5e9'], ['obsidian', 'Obsidiana', '#a8b0bd'], ['emerald', 'Esmeralda', '#10b981']] as [AccentTheme, string, string][]).map(([value, label, color]) => (
-                <button key={value} type="button" onClick={() => setAccent(value)} className={`flex min-h-16 items-center gap-3 rounded-xl border p-3 text-left transition ${accent === value ? "border-primary bg-primary/10 ring-1 ring-primary/35" : "border-border hover:bg-muted/45"}`}>
-                  <span className="h-9 w-9 rounded-xl border border-white/20 shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, #ffffff55)` }} />
-                  <span><b className="block text-sm">{label}</b><small className="text-[10px] text-muted-foreground">Tema operacional</small></span>
+            <h2 className="font-black">Paleta da plataforma</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Escolha o acabamento visual desta sessão. A paleta dourada preserva contraste e usa metal escovado, não amarelo puro.</p>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {([
+                ["monochrome", "Preto e branco", "Vidro, carvão e reflexos brancos", "profile-palette-mono"],
+                ["metallic-gold", "Ônix dourado", "Preto profundo, ouro metálico e bordas luminosas", "profile-palette-gold"],
+              ] as [AccentTheme, string, string, string][]).map(([value, label, description, previewClass]) => (
+                <button key={value} type="button" onClick={() => setAccent(value)} aria-pressed={accent === value} className={`profile-palette-choice ${previewClass} ${accent === value ? "is-active" : ""}`}>
+                  <span className="profile-palette-swatch" aria-hidden="true"><i /><i /><i /></span>
+                  <span className="min-w-0"><b className="block text-sm">{label}</b><small className="mt-1 block text-[10px] text-muted-foreground">{description}</small></span>
+                  {accent === value && <Check className="ml-auto h-4 w-4 shrink-0" />}
                 </button>
               ))}
             </div>
