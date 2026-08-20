@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, LockKeyhole, MessageCircleMore, ShieldCheck, UsersRound } from "lucide-react";
+import { BarChart3, LockKeyhole, ShieldCheck, UsersRound } from "lucide-react";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -124,7 +124,6 @@ export default function ExpertDashboard() {
               ["Faturamento líquido", "revenue_net"], ["Investimento", "spend"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
             <DashboardWidgetHelp type="kpi" title="Leads Meta" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
-            <DashboardWidgetHelp type="kpi" title="Conversas iniciadas" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Conversas iniciadas" value={expertMetrics.conversations} icon={<MessageCircleMore className="h-4 w-4" />} decimals={0} tooltip="Conversas de mensagem iniciadas nos anúncios Meta das contas e do período selecionados." /></DashboardWidgetHelp>
             {[
               ["CPL", "cpl"], ["ROAS", "roas"],
               ["Lucro", "profit"], ["Margem", "profit_margin"], ["Recebíveis", "receivables"], ["CTR", "ctr"], ["Taxa de conversão", "conversion_rate"],
