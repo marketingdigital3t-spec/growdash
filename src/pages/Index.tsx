@@ -305,7 +305,7 @@ const Index = () => {
   }, [cancelDashboardEdit, draftView, editorItems, isEditing, resetDashboardEdit, saveDashboardEdit, saveView.isPending, setEditor, toggleDashboardWidget]);
 
   return (
-    <MotionPage className="min-w-0 space-y-4 sm:space-y-6">
+    <MotionPage className="dashboard-page mx-auto w-full min-w-0 max-w-[1680px] space-y-4 px-1 sm:space-y-6 sm:px-2">
       <MotionItem>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
