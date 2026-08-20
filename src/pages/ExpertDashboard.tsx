@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BarChart3, CircleDollarSign, Database, LockKeyhole, MessageCircleMore, ShieldCheck, Target, TrendingUp, UsersRound } from "lucide-react";
+import { BarChart3, CircleDollarSign, LockKeyhole, MessageCircleMore, ShieldCheck, Target, UsersRound } from "lucide-react";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -125,29 +125,12 @@ export default function ExpertDashboard() {
               ["Faturamento líquido", "revenue_net"], ["Investimento", "spend"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
             <DashboardWidgetHelp type="kpi" title="Leads Meta" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
-            <DashboardWidgetHelp type="kpi" title="Leads RD" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads RD" value={expertMetrics.rdLeads} icon={<Database className="h-4 w-4" />} decimals={0} tooltip="Negociações/leads recebidos no RD Station para as contas e o período selecionados." /></DashboardWidgetHelp>
             <DashboardWidgetHelp type="kpi" title="Conversas iniciadas" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Conversas iniciadas" value={expertMetrics.conversations} icon={<MessageCircleMore className="h-4 w-4" />} decimals={0} tooltip="Conversas de mensagem iniciadas nos anúncios Meta das contas e do período selecionados." /></DashboardWidgetHelp>
             {[
               ["CPL", "cpl"], ["ROAS", "roas"],
               ["Lucro", "profit"], ["Margem", "profit_margin"], ["Recebíveis", "receivables"], ["CTR", "ctr"], ["Taxa de conversão", "conversion_rate"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
           </section>
-        </MotionItem>
-
-        <MotionItem>
-          <Card className="dashboard-glass-card overflow-hidden">
-            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-bold"><TrendingUp className="h-4 w-4 text-primary" />Comparativo de leads</div>
-                <p className="mt-1 text-xs text-muted-foreground">Mesmas contas e período: captação Meta (formulários, site e conversas) versus negociações recebidas no RD Station.</p>
-              </div>
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:min-w-[410px]">
-                <LeadSourceStat label="Meta Ads" value={expertMetrics.metaLeads} icon={<UsersRound className="h-3.5 w-3.5" />} detail={`${expertMetrics.forms.toLocaleString("pt-BR")} formulários · ${expertMetrics.siteLeads.toLocaleString("pt-BR")} site · ${expertMetrics.conversations.toLocaleString("pt-BR")} conversas`} />
-                <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                <LeadSourceStat label="RD Station" value={expertMetrics.rdLeads} icon={<Database className="h-3.5 w-3.5" />} detail={expertMetrics.metaLeads > 0 ? `${((expertMetrics.rdLeads / expertMetrics.metaLeads) * 100).toFixed(1)}% recebido no RD` : "Sem leads Meta no período"} />
-              </div>
-            </CardContent>
-          </Card>
         </MotionItem>
 
         <MotionItem>
@@ -197,12 +180,4 @@ export default function ExpertDashboard() {
 
 function paymentLabel(method: string) {
   return ({ pix: "Pix", cartao: "Cartão", boleto: "Boleto", outros: "Outros" } as Record<string, string>)[method] ?? "Outros";
-}
-
-function LeadSourceStat({ label, value, icon, detail }: { label: string; value: number; icon: ReactNode; detail?: string }) {
-  return <div className="rounded-xl border border-border/70 bg-background/35 px-3 py-2.5">
-    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-    <div className="mt-1 text-xl font-black tabular-nums">{value.toLocaleString("pt-BR")}</div>
-    {detail && <div className="mt-0.5 truncate text-[10px] text-muted-foreground" title={detail}>{detail}</div>}
-  </div>;
 }
