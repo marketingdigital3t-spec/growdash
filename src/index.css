@@ -4526,15 +4526,15 @@ html[data-accent="metallic-gold"] :is(input, textarea, select, [role="combobox"]
 }
 html[data-accent="metallic-gold"] ::placeholder { color: rgba(255, 231, 166, .46) !important; }
 
-html[data-accent="metallic-gold"] :is(button.bg-primary, [class*="bg-primary"], .campaign-hierarchy-tab[data-state="active"], [role="tab"][data-state="active"]) {
+html[data-accent="metallic-gold"] :is(button.bg-primary, [class~="bg-primary"], .campaign-hierarchy-tab[data-state="active"], [role="tab"][data-state="active"]) {
   color: #251302 !important;
   background: linear-gradient(110deg, #7b4307 0%, #d79427 30%, #ffed9b 51%, #b56d12 73%, #f6d067 100%) !important;
   background-size: 190% 100% !important;
   border-color: rgba(255, 224, 125, .86) !important;
   box-shadow: inset 0 1px rgba(255,250,208,.85), inset 0 -1px rgba(101,53,4,.44), 0 6px 22px -9px rgba(219,153,31,.66) !important;
 }
-html[data-accent="metallic-gold"] :is(button.bg-primary, [class*="bg-primary"], .campaign-hierarchy-tab[data-state="active"], [role="tab"][data-state="active"]):hover { background-position: 100% 50% !important; }
-html[data-accent="metallic-gold"] :is(button.bg-primary, [class*="bg-primary"], .campaign-hierarchy-tab[data-state="active"], [role="tab"][data-state="active"]) :is(svg, span) { color: inherit !important; }
+html[data-accent="metallic-gold"] :is(button.bg-primary, [class~="bg-primary"], .campaign-hierarchy-tab[data-state="active"], [role="tab"][data-state="active"]):hover { background-position: 100% 50% !important; }
+html[data-accent="metallic-gold"] :is(button.bg-primary, [class~="bg-primary"], .campaign-hierarchy-tab[data-state="active"], [role="tab"][data-state="active"]) :is(svg, span) { color: inherit !important; }
 
 html[data-accent="metallic-gold"] .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card, .rounded-lg.border.bg-card),
 html[data-accent="metallic-gold"] .expert-dashboard .gd-metric-card,
@@ -4771,7 +4771,7 @@ html[data-accent="metallic-gold"] :is(.gd-filter-strip .gd-filter-control, .gd-f
 html[data-accent="metallic-gold"] :is(.gd-filter-strip .gd-filter-control, .gd-filter-strip .gd-filter-refresh)::placeholder,
 html[data-accent="metallic-gold"] .growdash-main ::placeholder { color: rgba(255,230,160,.55) !important; }
 
-html[data-accent="metallic-gold"] :is(button.bg-primary, [class*="bg-primary"], .gold-action, [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
+html[data-accent="metallic-gold"] :is(button.bg-primary, [class~="bg-primary"], .gold-action, [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
   color: #2c1702 !important;
   border-color: #ffe5a0 !important;
   background: linear-gradient(105deg, #85500b 0%, #d89627 27%, #fff1ae 49%, #b66911 71%, #f2c855 100%) !important;
@@ -4910,7 +4910,7 @@ html[data-accent="metallic-gold"] :is(.gd-filter-strip .gd-filter-control, .gd-f
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05) !important;
 }
 
-html[data-accent="metallic-gold"] :is(button.bg-primary, [class*="bg-primary"], .gold-action, [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab, .premium-button, .meta-toolbar-primary) {
+html[data-accent="metallic-gold"] :is(button.bg-primary, [class~="bg-primary"], .gold-action, [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab, .premium-button, .meta-toolbar-primary) {
   color: #211805 !important;
   border-color: #dfbd70 !important;
   background: #d1a64f !important;
@@ -4971,7 +4971,7 @@ html[data-accent="monochrome"] :is(.gd-filter-strip .gd-filter-control, .gd-filt
   background: #101214 !important;
 }
 
-html[data-accent="monochrome"] :is(button.bg-primary, [class*="bg-primary"], [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
+html[data-accent="monochrome"] :is(button.bg-primary, [class~="bg-primary"], [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
   color: #141619 !important;
   border-color: #eef1f4 !important;
   background: #cfd5da !important;
@@ -4999,7 +4999,7 @@ html[data-accent="metallic-gold"]:not(.dark) :is(.gd-filter-strip .gd-filter-con
   background: #fffdf8 !important;
 }
 
-html[data-accent="metallic-gold"]:not(.dark) :is(button.bg-primary, [class*="bg-primary"], [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
+html[data-accent="metallic-gold"]:not(.dark) :is(button.bg-primary, [class~="bg-primary"], [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
   color: #2d210b !important;
   border-color: #ba8b31 !important;
   background: #d6ad5a !important;
