@@ -3,6 +3,7 @@ import { Copy, Link2, RefreshCw, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 const platforms = [
   ["hotmart", "Hotmart"], ["kiwify", "Kiwify"], ["cakto", "Cakto"], ["herospark", "HeroSpark"], ["themembers", "TheMembers"], ["generic", "Outra plataforma"],
@@ -39,7 +40,8 @@ export function SalesWebhookGatewayCard() {
     setPending(true);
     try {
       const { data, error } = await supabase.functions.invoke("sales-webhook-config", { body: { action: "create", provider } });
-      if (error || data?.error) throw new Error(data?.error || error?.message || "Não foi possível criar o webhook.");
+      if (error) throw new Error(await getEdgeFunctionErrorMessage(error, "Não foi possível criar o webhook. Tente novamente."));
+      if (data?.error) throw new Error(data.error);
       setConnection(data.connection);
       toast({ title: "Webhook criado", description: "Copie a URL e o segredo para a plataforma de vendas." });
     } catch (error) { toast({ title: "Falha ao criar webhook", description: error instanceof Error ? error.message : "Tente novamente.", variant: "destructive" }); }

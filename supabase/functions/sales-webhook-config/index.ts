@@ -18,10 +18,12 @@ Deno.serve(async (req) => {
     if (!providers.has(provider)) return json({ error: "Plataforma inválida" }, 400);
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const key = `sales_webhook_${provider}`;
-    const { data: current } = await admin.from("integrations").select("id,provider,provider_account_id,is_active,updated_at").eq("user_id", auth.user.id).eq("provider", key).order("updated_at", { ascending: false }).maybeSingle();
+    const { data: current, error: currentError } = await admin.from("integrations").select("id,provider,provider_account_id,is_active,updated_at").eq("user_id", auth.user.id).eq("provider", key).order("updated_at", { ascending: false }).maybeSingle();
+    if (currentError) throw new Error(`Não foi possível consultar a conexão existente: ${currentError.message}`);
     if (body.action === "list") return json({ connection: current ? publicConnection(current) : null });
     if (body.action === "disable" && current) {
-      await admin.from("integrations").update({ is_active: false }).eq("id", current.id);
+      const { error } = await admin.from("integrations").update({ is_active: false }).eq("id", current.id);
+      if (error) throw new Error(`Não foi possível desativar o webhook: ${error.message}`);
       return json({ ok: true });
     }
     const publicId = current?.provider_account_id || crypto.randomUUID();
