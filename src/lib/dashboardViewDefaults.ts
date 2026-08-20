@@ -33,6 +33,29 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // A versão 14 equaliza a altura da faixa analítica. A atualização reposiciona
+  // somente os widgets padrão e mantém qualquer conteúdo adicionado pelo usuário
+  // abaixo deles, sem deixar uma faixa vazia sob o gráfico de pagamento.
+  if (currentVersion === 13 && existingDefault) {
+    const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
+    const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
+    const customWidgets = widgets.filter((widget) => !canonicalIds.has(widget.id));
+    const customLayout = layout.filter((item) => !canonicalIds.has(item.i));
+    const canonicalWidgets = DEFAULT_VIEW.widgets.map((widget) => {
+      const existing = widget.type === "default_block"
+        ? existingDefault
+        : widgets.find((candidate) => candidate.id === widget.id);
+      return existing
+        ? (widget.type === "default_block"
+          ? { ...existing, id: defaultId, config: { ...existing.config, ...defaultWidget.config } }
+          : existing)
+        : { ...widget, config: { ...widget.config } };
+    });
+    const firstFreeRow = canonicalLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
+    const safeCustomLayout = customLayout.map((item) => ({ ...item, y: Math.max(Number(item.y || 0), firstFreeRow) }));
+    return { ...view, widgets: [...canonicalWidgets, ...customWidgets], layout: [...canonicalLayout, ...safeCustomLayout] };
+  }
+
   // A versão 12 corrige o desalinhamento da faixa analítica: os gráficos
   // passam a terminar junto da coluna CTR/conversão, sem uma lacuna visual.
   // Apenas os widgets canônicos são reposicionados; widgets adicionados pelo

@@ -317,9 +317,9 @@ export function getWidgetDef(type: WidgetType) {
 
 // Default "Padrão" view: the canonical full-width dashboard recovered from the
 // original Growdash project. System widgets are appended by the renderer.
-// v13 amplia a Distribuição por Plataforma para acomodar integralmente o
-// gráfico e a lista de origens, sem cortar os dados do card.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 13;
+// v14 equaliza toda a faixa analítica: os dois gráficos e a coluna de KPIs
+// terminam na mesma linha, eliminando áreas vazias e cortes visuais.
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 14;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
@@ -328,13 +328,12 @@ export const DEFAULT_VIEW = {
     { i: "primary_spend", x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "primary_roas", x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "primary_profit", x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
-    // A faixa analítica termina na mesma linha dos dois KPIs da direita.
-    // Isso impede o espaço vazio que surgia no desktop e preserva uma grade
-    // previsível quando o layout é reempacotado para tablet e mobile.
-    { i: "payment_chart", x: 0, y: 2, w: 4, h: 4, minW: 3, minH: 4 },
+    // Todos os blocos desta faixa ocupam cinco linhas: os gráficos têm a
+    // mesma altura e a coluna de KPIs preenche exatamente o mesmo espaço.
+    { i: "payment_chart", x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 5 },
     { i: "platform_distribution", x: 4, y: 2, w: 5, h: 5, minW: 4, minH: 5 },
     { i: "campaign_ctr", x: 9, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "campaign_conversion_rate", x: 9, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
+    { i: "campaign_conversion_rate", x: 9, y: 4, w: 3, h: 3, minW: 2, minH: 2 },
     { i: "default", x: 0, y: 7, w: 12, h: 30, minW: 6, minH: 10 },
   ],
   widgets: [
