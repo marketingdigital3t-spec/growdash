@@ -12,9 +12,11 @@ import {
   List,
   Mail,
   MapPin,
+  MessageSquareText,
   RefreshCw,
   Save,
   Search,
+  Send,
   Target,
   Trophy,
   UserRound,
@@ -36,6 +38,7 @@ import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
 import { classifyLead, dedupeRDDeals, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
+import { useCreateRDDealNote, useRDDealNotes } from "@/hooks/useRDDealNotes";
 import { useSales } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -502,7 +505,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} userId={user?.id} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }); queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }); toast.success("Negociação atualizada na Growdash"); }} />
+      <DealDetails deal={selectedDeal} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} userId={user?.id} userName={String(user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário Growdash")} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }); queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }); toast.success("Negociação atualizada na Growdash"); }} />
     </div>
   );
 }
@@ -620,7 +623,7 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, funnelName, userId, getOpportunityAmount, onClose, onSaved }: { deal: RDDealLite | null; funnelName?: string; userId?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onSaved: () => void }) {
+function DealDetails({ deal, funnelName, userId, userName, getOpportunityAmount, onClose, onSaved }: { deal: RDDealLite | null; funnelName?: string; userId?: string; userName: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onSaved: () => void }) {
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
   return (
@@ -637,6 +640,7 @@ function DealDetails({ deal, funnelName, userId, getOpportunityAmount, onClose, 
           <DetailMetric icon={deal.win ? <Trophy /> : <XCircle />} label="Situação" value={statusLabel(deal)} />
         </div>
         <DealEditor deal={deal} userId={userId} onSaved={onSaved} />
+        <DealNotes dealId={deal.id} userId={userId} userName={userName} />
         <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
           <DetailRow icon={<Columns3 />} label="Funil" value={funnelName || "Funil RD"} />
           <DetailRow icon={<Mail />} label="E-mail" value={deal.contact_email || "Não informado"} />
@@ -656,6 +660,43 @@ function DealDetails({ deal, funnelName, userId, getOpportunityAmount, onClose, 
       </SheetContent>
     </Sheet>
   );
+}
+
+function DealNotes({ dealId, userId, userName }: { dealId: string; userId?: string; userName: string }) {
+  const [body, setBody] = useState("");
+  const { data: notes = [], isLoading, isError } = useRDDealNotes(dealId);
+  const createNote = useCreateRDDealNote();
+  const trimmed = body.trim();
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmed) return;
+    if (!userId) return toast.error("Sua sessão não está pronta para registrar uma anotação.");
+    try {
+      await createNote.mutateAsync({ dealId, authorId: userId, authorName: userName, body: trimmed });
+      setBody("");
+      toast.success("Anotação registrada na negociação.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível registrar a anotação.");
+    }
+  }
+
+  return <section className="mt-5 rounded-2xl border border-primary/25 bg-primary/[.035] p-4">
+    <div className="flex items-start gap-3">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><MessageSquareText className="h-4 w-4" /></span>
+      <div><h3 className="text-sm font-black">Histórico de anotações</h3><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">Registre contatos, combinados e próximos passos. As notas não são alteradas pela sincronização do RD Station.</p></div>
+    </div>
+    <form className="mt-4" onSubmit={(event) => void submit(event)}>
+      <Textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength={4000} rows={3} placeholder="Escreva uma anotação sobre esta negociação…" aria-label="Nova anotação" />
+      <div className="mt-2 flex items-center justify-between gap-3"><span className="text-[10px] text-muted-foreground">{body.length}/4000</span><Button type="submit" size="sm" disabled={!trimmed || createNote.isPending}><Send className="mr-2 h-3.5 w-3.5" />{createNote.isPending ? "Salvando…" : "Adicionar anotação"}</Button></div>
+    </form>
+    <div className="mt-4 border-t border-border/70 pt-4">
+      {isLoading && <p className="text-xs text-muted-foreground">Carregando histórico…</p>}
+      {isError && <p className="rounded-lg bg-destructive/10 p-3 text-xs text-destructive">Não foi possível carregar as anotações desta negociação.</p>}
+      {!isLoading && !isError && !notes.length && <p className="rounded-xl border border-dashed border-border bg-background/40 p-4 text-center text-xs text-muted-foreground">Nenhuma anotação ainda. Registre o primeiro contato ou próximo passo.</p>}
+      <ol className="space-y-3">{notes.map((note) => <li key={note.id} className="relative border-l-2 border-primary/30 pl-4"><span className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-primary" /><div className="flex items-baseline justify-between gap-3"><b className="truncate text-xs">{note.author_name || "Usuário Growdash"}</b><time className="shrink-0 text-[9px] text-muted-foreground" dateTime={note.created_at}>{fullDate(note.created_at)}</time></div><p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/90">{note.body}</p></li>)}</ol>
+    </div>
+  </section>;
 }
 
 function DealEditor({ deal, userId, onSaved }: { deal: RDDealLite; userId?: string; onSaved: () => void }) {
