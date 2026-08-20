@@ -33,6 +33,30 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // A versão 12 corrige o desalinhamento da faixa analítica: os gráficos
+  // passam a terminar junto da coluna CTR/conversão, sem uma lacuna visual.
+  // Apenas os widgets canônicos são reposicionados; widgets adicionados pelo
+  // usuário continuam disponíveis logo após a composição padrão.
+  if (currentVersion === 11 && existingDefault) {
+    const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
+    const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
+    const customWidgets = widgets.filter((widget) => !canonicalIds.has(widget.id));
+    const customLayout = layout.filter((item) => !canonicalIds.has(item.i));
+    const canonicalWidgets = DEFAULT_VIEW.widgets.map((widget) => {
+      const existing = widget.type === "default_block"
+        ? existingDefault
+        : widgets.find((candidate) => candidate.id === widget.id);
+      return existing
+        ? (widget.type === "default_block"
+          ? { ...existing, id: defaultId, config: { ...existing.config, ...defaultWidget.config } }
+          : existing)
+        : { ...widget, config: { ...widget.config } };
+    });
+    const firstFreeRow = canonicalLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
+    const safeCustomLayout = customLayout.map((item) => ({ ...item, y: Math.max(Number(item.y || 0), firstFreeRow) }));
+    return { ...view, widgets: [...canonicalWidgets, ...customWidgets], layout: [...canonicalLayout, ...safeCustomLayout] };
+  }
+
   // A versão 10 retira Margem e Recebíveis da faixa inicial e reduz os dois
   // gráficos para a altura exata dos dois KPIs restantes. Só são removidos os
   // IDs padrão; cards financeiros adicionados manualmente pelo usuário ficam

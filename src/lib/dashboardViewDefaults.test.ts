@@ -127,7 +127,7 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
       canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
     });
-    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 5 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 4 });
     expect(migrated.layout.find((item) => item.i === "financial_margin")).toBeUndefined();
     expect(migrated.layout.find((item) => item.i === "campaign_ctr")).toMatchObject({ x: 9, y: 2, w: 3 });
     expect(migrated.widgets.some((widget) => widget.id === "financial_ticket")).toBe(false);
@@ -152,12 +152,12 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
       canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
     });
-    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ x: 0, y: 2, w: 4, h: 5 });
-    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 5 });
+    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ x: 0, y: 2, w: 4, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ x: 4, y: 2, w: 5, h: 4 });
     expect(migrated.layout.find((item) => item.i === "campaign_conversion_rate")).toMatchObject({ x: 9, y: 4, w: 3, h: 2 });
     expect(migrated.layout.find((item) => item.i === "financial_margin")).toBeUndefined();
     expect(migrated.layout.find((item) => item.i === "financial_receivables")).toBeUndefined();
-    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 7, w: 12 });
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 6, w: 12 });
   });
 
   it("remove Margem e Recebíveis de uma visualização v9 e alinha a faixa", () => {
@@ -181,8 +181,30 @@ describe("ensureDefaultDashboardContent", () => {
 
     expect(migrated.widgets.some((widget) => widget.id === "financial_margin")).toBe(false);
     expect(migrated.widgets.some((widget) => widget.id === "financial_receivables")).toBe(false);
-    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ y: 2, h: 5 });
-    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ y: 2, h: 5 });
-    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ y: 7 });
+    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ y: 2, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ y: 2, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ y: 6 });
+  });
+
+  it("realinha automaticamente a composição canônica v11", () => {
+    const legacy = {
+      id: "view-v11-alignment",
+      widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 11 } }
+        : widget),
+      layout: DEFAULT_VIEW.layout.map((item) => ({
+        ...item,
+        h: item.i === "payment_chart" || item.i === "platform_distribution" ? 5 : item.h,
+        y: item.i === "default" ? 7 : item.y,
+      })),
+    };
+
+    const migrated = ensureDefaultDashboardContent(legacy);
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+    });
+    expect(migrated.layout.find((item) => item.i === "payment_chart")).toMatchObject({ y: 2, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "platform_distribution")).toMatchObject({ y: 2, h: 4 });
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ y: 6 });
   });
 });
