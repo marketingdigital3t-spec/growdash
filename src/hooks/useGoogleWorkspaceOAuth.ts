@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
@@ -29,7 +29,7 @@ export function useGoogleWorkspaceOAuth() {
   });
 
   useEffect(() => {
-    const origin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
+    const origin = new URL(SUPABASE_URL).origin;
     const receive = (event: MessageEvent) => {
       if (event.origin !== origin || event.source !== popupRef.current || event.data?.type !== "growdash-google-workspace-oauth") return;
       popupRef.current = null;

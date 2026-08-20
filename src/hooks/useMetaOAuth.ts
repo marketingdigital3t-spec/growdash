@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
@@ -42,7 +42,7 @@ export function useMetaOAuth() {
   });
 
   useEffect(() => {
-    const expectedOrigin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
+    const expectedOrigin = new URL(SUPABASE_URL).origin;
     const receiveOAuthResult = (event: MessageEvent) => {
       if (event.origin !== expectedOrigin || event.source !== oauthPopup.current) return;
       if (event.data?.type !== "growdash-meta-oauth") return;
