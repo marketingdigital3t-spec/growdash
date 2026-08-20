@@ -853,7 +853,9 @@ html:not(.dark) {
   }
 
   .growdash-content-frame {
-    padding-inline: 0;
+    /* One shared content gutter for every sidebar route. Dashboard keeps its
+       grid margin inside this frame, so its headers and cards stay aligned. */
+    padding-inline: .75rem;
     transition: max-width 220ms ease, padding 220ms ease;
   }
 
