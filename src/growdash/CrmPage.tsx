@@ -53,7 +53,7 @@ import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
 import { consolidateCRMPipeline, consolidatedCRMStage, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
 import { isRDDealInCrmPeriod } from "@/lib/crmDateScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
-import { MetricCard, PageHeading } from "./shared";
+import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -72,6 +72,40 @@ type PipelineStage = {
   won: boolean;
   lost: boolean;
 };
+
+type CrmMetricCardProps = {
+  source: string;
+  label: string;
+  value: string;
+  description: string;
+  icon: ReactNode;
+  tone: "meta" | "rd" | "revenue" | "success";
+};
+
+function CrmMetricCard({ source, label, value, description, icon, tone }: CrmMetricCardProps) {
+  const tones = {
+    meta: "border-sky-500/30 bg-sky-500/[0.07] dark:bg-sky-400/[0.10] text-sky-700 dark:text-sky-300",
+    rd: "border-violet-500/30 bg-violet-500/[0.07] dark:bg-violet-400/[0.10] text-violet-700 dark:text-violet-300",
+    revenue: "border-amber-500/30 bg-amber-500/[0.08] dark:bg-amber-400/[0.10] text-amber-800 dark:text-amber-200",
+    success: "border-emerald-500/30 bg-emerald-500/[0.07] dark:bg-emerald-400/[0.10] text-emerald-800 dark:text-emerald-200",
+  } as const;
+
+  return (
+    <article className={cn("min-w-0 rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md", tones[tone])}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="inline-flex rounded-full border border-current/20 bg-background/65 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em]">
+            {source}
+          </span>
+          <h3 className="mt-3 text-sm font-black text-foreground">{label}</h3>
+        </div>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-background/70 shadow-sm">{icon}</span>
+      </div>
+      <p className="mt-4 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight text-foreground" title={value}>{value}</p>
+      <p className="mt-2 min-h-8 text-xs font-medium leading-4 text-muted-foreground">{description}</p>
+    </article>
+  );
+}
 
 export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -419,7 +453,11 @@ export default function CrmPage() {
       />
 
       <section className="gd-panel mb-4 p-3 sm:p-4">
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
+        <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
+          <Search className="h-4 w-4 text-primary" />
+          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">Defina a conta, o período e as negociações exibidas abaixo.</p></div>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
@@ -453,23 +491,59 @@ export default function CrmPage() {
         </div>
       </section>
 
-      {view !== "ai" && <div className="gd-auto-grid gap-3">
-        <MetricCard
-          label="Leads Meta"
-          value={number.format(totalMetaLeads)}
-          change={`${number.format(metaLeads)} leads · ${number.format(metaConversations)} conversas iniciadas`}
-          emphasis
-        />
-        <MetricCard
-          label="Negociações RD"
-          value={number.format(stats.total)}
-          change={`${number.format(stats.active)} ativas · ${number.format(stats.won)} ganhas`}
-          emphasis
-        />
-        <MetricCard label="Receita em aberto" value={brl.format(stats.openRevenue)} change="valores das negociações ativas no RD" />
-        <MetricCard label="Faturamento ganho" value={brl.format(stats.wonRevenue)} change={`${number.format(stats.won)} negociação(ões) ganha(s)`} />
-        <MetricCard label="Taxa de conversão" value={`${stats.conversion.toFixed(2)}%`} change={`${stats.lost} perdido(s)`} />
-      </div>}
+      {view !== "ai" && (
+        <section className="mb-4 rounded-2xl border border-border bg-card/80 p-3 shadow-sm sm:p-4" aria-labelledby="crm-metrics-title">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Resumo do período selecionado</p>
+              <h2 id="crm-metrics-title" className="mt-1 text-lg font-black tracking-tight text-foreground">Indicadores do CRM</h2>
+            </div>
+            <p className="text-xs text-muted-foreground">Cada card informa a fonte e o critério do dado.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <CrmMetricCard
+              source="Meta Ads"
+              label="Leads Meta"
+              value={number.format(totalMetaLeads)}
+              description={`${number.format(metaLeads)} leads + ${number.format(metaConversations)} conversas iniciadas`}
+              icon={<UsersRound className="h-4 w-4" />}
+              tone="meta"
+            />
+            <CrmMetricCard
+              source="RD Station CRM"
+              label="Negociações no funil"
+              value={number.format(stats.total)}
+              description={`${number.format(stats.active)} ativas · ${number.format(stats.won)} ganhas`}
+              icon={<Columns3 className="h-4 w-4" />}
+              tone="rd"
+            />
+            <CrmMetricCard
+              source="Comercial · RD"
+              label="Receita em aberto"
+              value={brl.format(stats.openRevenue)}
+              description="Soma das negociações ativas no RD Station"
+              icon={<CircleDollarSign className="h-4 w-4" />}
+              tone="revenue"
+            />
+            <CrmMetricCard
+              source="Comercial · RD"
+              label="Faturamento ganho"
+              value={brl.format(stats.wonRevenue)}
+              description={`${number.format(stats.won)} negociação(ões) marcada(s) como ganha(s)`}
+              icon={<Trophy className="h-4 w-4" />}
+              tone="success"
+            />
+            <CrmMetricCard
+              source="Conversão · RD"
+              label="Taxa de conversão"
+              value={`${stats.conversion.toFixed(2)}%`}
+              description={`${number.format(stats.won)} ganhas de ${number.format(stats.total)} negociações · ${number.format(stats.lost)} perdidas`}
+              icon={<Target className="h-4 w-4" />}
+              tone="success"
+            />
+          </div>
+        </section>
+      )}
 
       {isLoadingSelectedScope || loadingMetaActions || loadingProducts ? <CRMLoading /> : dealsError ? (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
