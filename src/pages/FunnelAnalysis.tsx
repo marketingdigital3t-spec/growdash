@@ -29,7 +29,6 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { computeFunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
-import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
@@ -37,6 +36,7 @@ import { useSales } from "@/hooks/useSales";
 import { filterCanonicalFunnelSales, reconcileFunnelRevenue } from "@/lib/funnelRevenue";
 import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { getMetaSyncRange } from "@/lib/metaSyncRange";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
@@ -293,11 +293,10 @@ export default function FunnelAnalysis() {
     if (!funnelId && visibleAccounts.length === 0) return;
     setSyncing(true);
     try {
-      // O botão é uma reconciliação manual e deve recompor a base completa,
-      // inclusive campanhas anteriores ao filtro visual. A tela continua
-      // mostrando Meta no período escolhido para não misturar janelas.
-      const metaHistoryStart = "2018-01-01";
-      const end = format(endDate, "yyyy-MM-dd");
+      // A Meta aceita no máximo 37 meses. A reconciliação é independente do
+      // filtro visual, mas fica nos 36 meses completos mais recentes para não
+      // ser recusada pela API nem inverter o intervalo em filtros antigos.
+      const metaSyncRange = getMetaSyncRange();
       const funnelsToSync = effectiveAdAccountId
         ? activeFunnels.filter((funnel) => funnel.ad_account_id === effectiveAdAccountId)
         : activeFunnels;
@@ -308,8 +307,8 @@ export default function FunnelAnalysis() {
           status: "fulfilled",
           value: await syncMeta.mutateAsync({
           adAccountId: effectiveAdAccountId,
-          startDate: metaHistoryStart,
-          endDate: end,
+          startDate: metaSyncRange.startDate,
+          endDate: metaSyncRange.endDate,
           }),
         };
       } catch (reason) {
