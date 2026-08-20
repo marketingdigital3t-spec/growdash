@@ -10,7 +10,18 @@ export type RuntimeDiagnostic = {
 const DIAGNOSTICS_KEY = "growdash:runtime-diagnostics";
 const RECOVERY_KEY = "growdash:runtime-recovery";
 const CHUNK_ERROR =
-  /dynamically imported module|loading chunk|importing a module script|failed to fetch|module script|\bload failed\b/i;
+  /dynamically imported module|loading chunk|importing a module script|failed to fetch|module script|\bload failed\b|unable to preload (?:css|module)|error loading dynamically imported/i;
+
+/**
+ * Gives the document request a new cache key after a deployment replaced a
+ * hashed chunk. Keeping the current route, query parameters and fragment is
+ * important: a recovery must never drop the user's current context.
+ */
+export function latestBuildRecoveryUrl(href: string, nonce = Date.now()) {
+  const url = new URL(href);
+  url.searchParams.set("__gd_build", String(nonce));
+  return url.toString();
+}
 
 export function consumeRecoveryAttempt(scope: string, windowMs = 30_000, limit = 2) {
   try {
@@ -83,7 +94,10 @@ export function recoverLatestBuildOnce(scope: string, error: unknown) {
     const previous = Number(sessionStorage.getItem(key) || 0);
     if (previous && Date.now() - previous < 60_000) return false;
     sessionStorage.setItem(key, String(Date.now()));
-    window.location.reload();
+    // reload() can reuse a cached HTML document which still points to the
+    // deleted chunk. A harmless cache-busting parameter forces Pages/CDN and
+    // the browser to request the current application shell instead.
+    window.location.replace(latestBuildRecoveryUrl(window.location.href));
     return true;
   } catch {
     // If session storage is unavailable, preserve the visible recovery UI

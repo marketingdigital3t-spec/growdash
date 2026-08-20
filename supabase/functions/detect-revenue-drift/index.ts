@@ -44,6 +44,10 @@ Deno.serve(async (req) => {
       const { data: deals } = await supabase
         .from("rd_deals")
         .select("rd_deal_id, amount_total")
+        // rd_deal_id is only unique together with user_id. This endpoint uses
+        // the service role, so the tenant condition must be explicit rather
+        // than relying on RLS to prevent matching another customer's deal.
+        .eq("user_id", user.id)
         .in("rd_deal_id", slice);
       for (const d of (deals || []) as any[]) dealMap.set(d.rd_deal_id, Number(d.amount_total || 0));
     }

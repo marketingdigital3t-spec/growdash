@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
 import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { dehydrate, hydrate, keepPreviousData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
@@ -11,39 +11,43 @@ import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/u
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
-import { clearRecoveryAttempts, consumeRecoveryAttempt, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
+import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
 import GrowdashLayout from "@/growdash/GrowdashLayout";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
-import FullDashboard from "@/pages/Index";
-import TrafficPage from "@/growdash/TrafficPage";
-import FunnelAnalysis from "@/pages/FunnelAnalysis";
-import FullAlerts from "@/pages/Alerts";
-import EventClasses from "@/pages/EventClasses";
-import IncompleteLeads from "@/pages/LeadsIncompletos";
-import DataHealth from "@/pages/DataHealth";
-import FullSettings from "@/pages/Settings";
-import FullUsers from "@/pages/Users";
-import Products from "@/pages/Products";
-import Funnelytics from "@/pages/Funnelytics";
-import CrmPage from "@/growdash/CrmPage";
-import KanbanPage from "@/growdash/KanbanPage";
-import CommercialPage from "@/growdash/CommercialPage";
-import FinancePage from "@/growdash/FinancePage";
-import StoragePage from "@/growdash/StoragePage";
-import IntegrationsPage from "@/growdash/IntegrationsPage";
-import ProfilePage from "@/growdash/ProfilePage";
-import SocialMediaPage from "@/growdash/SocialMediaPage";
-import AnnouncementsPage from "@/growdash/AnnouncementsPage";
-import ModulePage from "@/growdash/ModulePage";
-import BrandDiagnosticPage from "@/growdash/BrandDiagnosticPage";
-import IntelligenceCenterPage from "@/growdash/IntelligenceCenterPage";
-import StrategyPage from "@/growdash/StrategyPage";
-import Auth from "@/pages/Auth";
-import ResetPassword from "@/pages/ResetPassword";
-import SharedLeadReport from "@/pages/SharedLeadReport";
-import PublicInvoiceForm from "@/pages/PublicInvoiceForm";
-import PublicBrandDiagnosticForm from "@/pages/PublicBrandDiagnosticForm";
-import ExpertDashboard from "@/pages/ExpertDashboard";
+
+// Route modules must remain lazy here as well as in the layout preloader.
+// Statically importing them defeated code splitting and made one stale asset
+// capable of delaying the whole authenticated application.
+const FullDashboard = lazyWithRetry(() => import("@/pages/Index"), "dashboard");
+const TrafficPage = lazyWithRetry(() => import("@/growdash/TrafficPage"), "campaigns");
+const FunnelAnalysis = lazyWithRetry(() => import("@/pages/FunnelAnalysis"), "funnel-analysis");
+const FullAlerts = lazyWithRetry(() => import("@/pages/Alerts"), "alerts");
+const EventClasses = lazyWithRetry(() => import("@/pages/EventClasses"), "event-classes");
+const IncompleteLeads = lazyWithRetry(() => import("@/pages/LeadsIncompletos"), "incomplete-leads");
+const DataHealth = lazyWithRetry(() => import("@/pages/DataHealth"), "data-health");
+const FullSettings = lazyWithRetry(() => import("@/pages/Settings"), "settings");
+const FullUsers = lazyWithRetry(() => import("@/pages/Users"), "users");
+const Products = lazyWithRetry(() => import("@/pages/Products"), "products");
+const Funnelytics = lazyWithRetry(() => import("@/pages/Funnelytics"), "funnelytics");
+const CrmPage = lazyWithRetry(() => import("@/growdash/CrmPage"), "crm");
+const KanbanPage = lazyWithRetry(() => import("@/growdash/KanbanPage"), "kanban");
+const CommercialPage = lazyWithRetry(() => import("@/growdash/CommercialPage"), "commercial");
+const FinancePage = lazyWithRetry(() => import("@/growdash/FinancePage"), "finance");
+const StoragePage = lazyWithRetry(() => import("@/growdash/StoragePage"), "storage");
+const IntegrationsPage = lazyWithRetry(() => import("@/growdash/IntegrationsPage"), "integrations");
+const ProfilePage = lazyWithRetry(() => import("@/growdash/ProfilePage"), "profile");
+const SocialMediaPage = lazyWithRetry(() => import("@/growdash/SocialMediaPage"), "social-media");
+const AnnouncementsPage = lazyWithRetry(() => import("@/growdash/AnnouncementsPage"), "announcements");
+const ModulePage = lazyWithRetry(() => import("@/growdash/ModulePage"), "module");
+const BrandDiagnosticPage = lazyWithRetry(() => import("@/growdash/BrandDiagnosticPage"), "brand-diagnostic");
+const IntelligenceCenterPage = lazyWithRetry(() => import("@/growdash/IntelligenceCenterPage"), "intelligence-center");
+const StrategyPage = lazyWithRetry(() => import("@/growdash/StrategyPage"), "strategy");
+const Auth = lazyWithRetry(() => import("@/pages/Auth"), "auth");
+const ResetPassword = lazyWithRetry(() => import("@/pages/ResetPassword"), "reset-password");
+const SharedLeadReport = lazyWithRetry(() => import("@/pages/SharedLeadReport"), "shared-lead-report");
+const PublicInvoiceForm = lazyWithRetry(() => import("@/pages/PublicInvoiceForm"), "public-invoice");
+const PublicBrandDiagnosticForm = lazyWithRetry(() => import("@/pages/PublicBrandDiagnosticForm"), "public-brand-diagnostic");
+const ExpertDashboard = lazyWithRetry(() => import("@/pages/ExpertDashboard"), "expert-dashboard");
 
 const QUERY_SESSION_CACHE_KEY = "growdash:query-cache:v1";
 const QUERY_SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
@@ -134,12 +138,12 @@ function MarkApplicationBooted() {
     // actually committed. This preserves a usable recovery screen when an
     // eager production module cannot be evaluated.
     window.__GROWDASH_BOOTED__ = true;
-    // URLs generated by an older recovery build must not perpetuate the
-    // impression that the application is reloading. The current build never
-    // adds this parameter automatically.
+    // The one-time cache-busting parameter is only for obtaining the newest
+    // document shell; remove it after React commits so it is never shared or
+    // bookmarked as application state.
     const url = new URL(window.location.href);
-    if (url.searchParams.has("gd_reload")) {
-      url.searchParams.delete("gd_reload");
+    if (url.searchParams.has("__gd_build")) {
+      url.searchParams.delete("__gd_build");
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     }
     clearRecoveryAttempts("chunk-reload");
@@ -280,7 +284,8 @@ export default function App() {
               <AccentInitializer>
                 <MarkApplicationBooted />
                 <AppErrorBoundary>
-                  <Routes>
+                  <Suspense fallback={<LoadingModule />}>
+                    <Routes>
                   <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />
@@ -337,6 +342,7 @@ export default function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
                     </Routes>
+                  </Suspense>
                 </AppErrorBoundary>
               </AccentInitializer>
             </AuthProvider>
