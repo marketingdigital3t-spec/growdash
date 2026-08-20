@@ -252,7 +252,7 @@ function IntegrationsContent() {
           <ProviderGrid search={search} providers={[['OpenAI', 'Provedor adicional para análises e agentes com franquia de tokens.'], ['Claude', 'Provedor adicional para síntese extensa e raciocínio operacional.'], ['Gemini', 'Gateway atual usado pelo analista; conexão direta poderá ser adicionada por workspace.']]} icon={<Bot />} />
         </TabsContent>
         <TabsContent value="messaging"><ProviderGrid search={search} providers={[['WhatsApp Cloud API', 'Relatórios automáticos, alertas e mensagens transacionais.'], ['E-mail transacional', 'Recuperação, convites e alertas da operação.'], ['n8n', 'Automações via API e webhooks, respeitando licença comercial.']]} icon={<MessageCircle />} /></TabsContent>
-        <TabsContent value="payments"><ProviderGrid search={search} providers={[['Stripe', 'Assinaturas, checkout, faturas e portal do cliente.'], ['Asaas', 'Pix, boleto, cartão e cobrança recorrente no Brasil.'], ['Mercado Pago', 'Checkout e pagamentos locais.']]} icon={<Cloud />} /></TabsContent>
+        <TabsContent value="payments" className="space-y-4"><SalesWebhookGatewayCard /><ProviderGrid search={search} providers={[['Stripe', 'Assinaturas, checkout, faturas e portal do cliente.'], ['Asaas', 'Pix, boleto, cartão e cobrança recorrente no Brasil.'], ['Mercado Pago', 'Checkout e pagamentos locais.']]} icon={<Cloud />} /></TabsContent>
         <TabsContent value="files" className="space-y-4">
           {providerFilter("Google Drive") && <GoogleWorkspaceCard connected={!!googleIntegration} updatedAt={googleIntegration?.updated_at} pending={connectGoogle.isPending} onConnect={() => connectGoogle.mutate()} onOpen={() => setGoogleDialogOpen(true)} />}
           <ProviderGrid search={search} providers={[['Google Sheets', 'Importação, exportação e fontes auxiliares.'], ['OneDrive', 'Arquivos corporativos e compartilhamento.']]} icon={<FileText />} />
@@ -275,6 +275,8 @@ function IntegrationsContent() {
     </div>
   );
 }
+
+import { SalesWebhookGatewayCard } from "@/components/settings/SalesWebhookGatewayCard";
 
 function SectionHeader({ icon, title, description, status, connected }: { icon: React.ReactNode; title: string; description: string; status: string; connected: boolean }) { return <div className="flex flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</span><div className="grow"><h2 className="font-black">{title}</h2><p className="text-xs text-muted-foreground">{description}</p></div><span className={cn("w-fit rounded-full px-2 py-1 text-[9px] font-black uppercase", connected ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground")}>{status}</span></div>; }
 const AVAILABLE_PROVIDER_ROUTES: Record<string, { href: string; action: string }> = {
