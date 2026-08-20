@@ -422,7 +422,7 @@ export default function FunnelAnalysis() {
         </MotionItem>
       ) : (
         <>
-          {(activeFunnels.length === 0 || noStages || operationalDeals.length === 0) && (
+          {(activeFunnels.length === 0 || noStages || operationalPeriodDeals.length === 0) && (
             <MotionItem>
               <div className="flex flex-col gap-3 rounded-xl border border-dashed border-primary/25 bg-primary/[0.035] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -447,43 +447,43 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {adAccountId === "all" ? `em ${funnelScopeIds.length} funil(is) conectado(s)` : "neste funil"}. A comparação Meta Ads × RD acima respeita apenas o período selecionado.
+              <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {adAccountId === "all" ? `em ${funnelScopeIds.length} funil(is) conectado(s)` : "neste funil"}. Os KPIs e gráficos abaixo usam somente o período selecionado.
             </div>
-            <FunnelKPIs a={analytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} />
+            <FunnelKPIs a={periodAnalytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} />
           </MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={analytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={periodAnalytics} /></HelpBlock>
             </div>
           </MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2">
-                <HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={analytics} /></HelpBlock>
+                <HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={periodAnalytics} /></HelpBlock>
               </div>
-              <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
             </div>
           </MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <HelpBlock help={blockHelp.sources}><FunnelSourceTable a={analytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.losses}><FunnelLostReasons a={analytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.insights}><FunnelAutoInsights a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.sources}><FunnelSourceTable a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.losses}><FunnelLostReasons a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.insights}><FunnelAutoInsights a={periodAnalytics} /></HelpBlock>
             </div>
           </MotionItem>
 
           <MotionItem>
-            <HelpBlock help={blockHelp.states}><FunnelStateMap a={analytics} /></HelpBlock>
+            <HelpBlock help={blockHelp.states}><FunnelStateMap a={periodAnalytics} /></HelpBlock>
           </MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <HelpBlock help={blockHelp.weekdays}><FunnelWeekdayChart a={analytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.hours}><FunnelHourChart a={analytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.weekdays}><FunnelWeekdayChart a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.hours}><FunnelHourChart a={periodAnalytics} /></HelpBlock>
             </div>
           </MotionItem>
 

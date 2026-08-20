@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getExpertAttribution, getExpertDashboardMetrics } from "./expertDashboardMetrics";
 
 describe("expert dashboard metrics", () => {
-  it("keeps Meta and RD totals separate and adds conversations to acquisition leads", () => {
+  it("keeps Meta, RD and conversations as separate metrics", () => {
     const result = getExpertDashboardMetrics(
       [{ leads: 40, spend: 240 } as any, { leads: 20, spend: 60 } as any],
       [{ id: "1" }, { id: "2" }, { id: "3" }, { id: "4" }] as any,
@@ -13,10 +13,10 @@ describe("expert dashboard metrics", () => {
     expect(result.forms).toBe(10);
     expect(result.siteLeads).toBe(50);
     expect(result.conversations).toBe(8);
-    expect(result.metaLeads).toBe(68);
+    expect(result.metaLeads).toBe(60);
     expect(result.rdLeads).toBe(4);
     expect(result.conversionRate).toBe(50);
-    expect(result.cpl).toBeCloseTo(300 / 68);
+    expect(result.cpl).toBeCloseTo(300 / 60);
   });
 
   it("groups confirmed sales by campaign, creative and normalized payment", () => {

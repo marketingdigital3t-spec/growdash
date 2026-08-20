@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
 
-const EMAIL_SUFFIX = "@users.local";
 type Mode = "login" | "register";
 
 export default function Auth() {
@@ -26,14 +25,17 @@ export default function Auth() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const raw = identifier.trim();
-    const email = raw.includes("@") ? raw : `${raw.toLowerCase()}${EMAIL_SUFFIX}`;
+    const email = identifier.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ title: "Informe um e-mail válido", description: "Use o e-mail completo cadastrado na Growdash.", variant: "destructive" });
+      return;
+    }
     if (mode === "register" && password !== confirmPassword) { toast({ title: "As senhas não coincidem", variant: "destructive" }); return; }
     setLoading(true);
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
-      if (error) { toast({ title: "Não foi possível entrar", description: "Verifique o email e a senha ou use a recuperação de acesso.", variant: "destructive" }); return; }
+      if (error) { toast({ title: "Não foi possível entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos. Se necessário, use a recuperação de acesso." : error.message, variant: "destructive" }); return; }
       navigate("/", { replace: true });
       return;
     }
@@ -79,7 +81,7 @@ export default function Auth() {
       {mode === "register" && <div className="auth-mode-switch" role="tablist" aria-label="Tipo de acesso"><button type="button" role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")}>Entrar</button><button type="button" role="tab" aria-selected className="is-active">Cadastrar</button></div>}
       <form onSubmit={handleSubmit} className="auth-form-premium">
         {mode === "register" && <PremiumInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />}
-        <PremiumInput label="E-mail" icon={<Mail />} type="text" value={identifier} onChange={setIdentifier} placeholder="seu@email.com" autoComplete="username" />
+        <PremiumInput label="E-mail" icon={<Mail />} type="email" value={identifier} onChange={setIdentifier} placeholder="seu@email.com" autoComplete="email" />
         <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
         {mode === "register" && <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
         {mode === "login" && <div className="auth-forgot-row"><label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Lembrar de mim</label><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link">Esqueceu a senha?</button></div>}

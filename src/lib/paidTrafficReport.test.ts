@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildTwoMonthAnalysis } from "./paidTrafficReport";
 
 describe("buildTwoMonthAnalysis", () => {
-  it("compara o mês atual com o anterior e soma conversas aos leads", () => {
+  it("compara o mês atual com o anterior sem somar conversas aos leads", () => {
     const report = buildTwoMonthAnalysis({
       analysisFrom: new Date("2026-07-01T12:00:00"),
       analysisTo: new Date("2026-08-15T12:00:00"),
@@ -20,13 +20,13 @@ describe("buildTwoMonthAnalysis", () => {
       ],
     });
 
-    expect(report.previousMonth.metrics.leads).toBe(22);
-    expect(report.currentMonth.metrics.leads).toBe(36);
+    expect(report.previousMonth.metrics.leads).toBe(20);
+    expect(report.currentMonth.metrics.leads).toBe(30);
     expect(report.currentMonth.metrics.conversations).toBe(6);
     expect(report.currentMonth.metrics.sales).toBe(2);
     expect(report.currentMonth.metrics.roas).toBe(4);
     expect(report.currentMonth.isPartial).toBe(true);
-    expect(report.metricComparisons.find((item) => item.id === "leads")?.variationPercent).toBe(63.6);
+    expect(report.metricComparisons.find((item) => item.id === "leads")?.variationPercent).toBe(50);
     expect(report.weeklyComparison.length).toBeGreaterThanOrEqual(4);
     expect(report.wins.length).toBeGreaterThan(0);
   });

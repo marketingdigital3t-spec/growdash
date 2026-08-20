@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { resolveCampaignPrimaryResult, resolveCampaignResults } from "./campaignResultEvents";
 
 describe("resolveCampaignResults", () => {
-  it("combina leads Meta e conversas iniciadas sem contar cliques", () => {
+  it("mantém leads Meta e conversas iniciadas separados", () => {
     expect(resolveCampaignResults(12, {
       link_click: 900,
       "onsite_conversion.messaging_conversation_started_7d": 4,
     })).toEqual({
-      total: 16,
+      total: 12,
       leadCount: 12,
       conversations: 4,
       breakdown: [
@@ -30,7 +30,7 @@ describe("resolveCampaignResults", () => {
       "onsite_conversion.messaging_conversation_started_7d": 8,
       "onsite_conversion.messaging_conversation_started_28d": 8,
       "onsite_conversion.messaging_first_reply": 8,
-    })).toMatchObject({ total: 8, leadCount: 0, conversations: 8 });
+    })).toMatchObject({ total: 0, leadCount: 0, conversations: 8 });
   });
 
   it("mostra apenas leads para campanha de geração de leads", () => {

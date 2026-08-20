@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   startOfDay,
+  endOfDay,
   subDays,
   startOfMonth,
   endOfMonth,
@@ -43,23 +44,24 @@ export const PRESET_LABELS: Record<DatePreset, string> = {
 
 export function resolvePreset(preset: DatePreset, customRange: { from: Date; to: Date }) {
   const today = startOfDay(new Date());
+  const endToday = endOfDay(today);
   switch (preset) {
     case "today_yesterday":
-      return { startDate: subDays(today, 1), endDate: new Date() };
+      return { startDate: subDays(today, 1), endDate: endToday };
     case "today":
-      return { startDate: today, endDate: new Date() };
+      return { startDate: today, endDate: endToday };
     case "yesterday":
       return { startDate: subDays(today, 1), endDate: subDays(today, 1) };
     case "7days":
-      return { startDate: subDays(today, 6), endDate: new Date() };
+      return { startDate: subDays(today, 6), endDate: endToday };
     case "last_14_days":
-      return { startDate: subDays(today, 13), endDate: new Date() };
+      return { startDate: subDays(today, 13), endDate: endToday };
     case "last_28_days":
-      return { startDate: subDays(today, 27), endDate: new Date() };
+      return { startDate: subDays(today, 27), endDate: endToday };
     case "30days":
-      return { startDate: subDays(today, 29), endDate: new Date() };
+      return { startDate: subDays(today, 29), endDate: endToday };
     case "this_week":
-      return { startDate: startOfWeek(today, { weekStartsOn: 1 }), endDate: new Date() };
+      return { startDate: startOfWeek(today, { weekStartsOn: 1 }), endDate: endToday };
     case "last_week": {
       const lw = subWeeks(today, 1);
       return {
@@ -68,7 +70,7 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
       };
     }
     case "this_month":
-      return { startDate: startOfMonth(today), endDate: new Date() };
+      return { startDate: startOfMonth(today), endDate: endToday };
     case "last_month": {
       const lastMonth = subMonths(today, 1);
       return { startDate: startOfMonth(lastMonth), endDate: endOfMonth(lastMonth) };
@@ -78,9 +80,9 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
       // The actual lower bound is additionally constrained by the oldest
       // record available in each provider, but the UI must never discard
       // older RD/Meta data on its own.
-      return { startDate: new Date(2000, 0, 1), endDate: new Date() };
+      return { startDate: new Date(2000, 0, 1), endDate: endToday };
     case "custom":
-      return { startDate: customRange.from, endDate: customRange.to };
+      return { startDate: startOfDay(customRange.from), endDate: endOfDay(customRange.to) };
     default:
       return { startDate: subDays(today, 29), endDate: new Date() };
   }

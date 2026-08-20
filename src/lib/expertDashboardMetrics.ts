@@ -31,7 +31,7 @@ export function getExpertDashboardMetrics(
   const forms = Math.min(leadsReportedByMeta, Math.max(0, Number(actions.nativeFormLeads ?? 0)));
   const siteLeads = Math.max(0, leadsReportedByMeta - forms);
   const conversations = Math.max(0, Number(actions.conversations ?? 0));
-  const metaLeads = forms + siteLeads + conversations;
+  const metaLeads = forms + siteLeads;
   const rdLeads = rdDeals.length;
   const confirmedSales = sales.filter((sale) => sale.status === "confirmed");
   const salesCount = confirmedSales.reduce((total, sale) => total + Math.max(1, Number(sale.quantity ?? 1)), 0);

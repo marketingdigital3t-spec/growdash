@@ -25,7 +25,7 @@ function preferredActionTotal(actionTotals: Record<string, number>, aliases: rea
 /**
  * Meta can expose a campaign outcome in `insights.leads` or only through an
  * action event. Conversations are a separate, valid lead origin and must be
- * included once, without counting clicks, page views, checkout or purchases.
+ * exposed separately, without counting clicks, page views, checkout or purchases.
  */
 export function resolveCampaignResults(insightLeads: number, actionTotals: Record<string, number>) {
   const leadsFromInsights = Math.max(0, Number(insightLeads || 0));
@@ -37,7 +37,7 @@ export function resolveCampaignResults(insightLeads: number, actionTotals: Recor
   if (leadCount > 0) breakdown.push({ label: leadsFromInsights > 0 ? "Leads Meta" : "Leads por evento", value: leadCount });
   if (conversations > 0) breakdown.push({ label: "Conversas iniciadas", value: conversations });
 
-  return { total: leadCount + conversations, leadCount, conversations, breakdown };
+  return { total: leadCount, leadCount, conversations, breakdown };
 }
 
 /**

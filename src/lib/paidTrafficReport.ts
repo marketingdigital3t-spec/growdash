@@ -159,7 +159,7 @@ function calculateMetrics(
   const spend = scopedInsights.reduce((sum, row) => sum + number(row.spend), 0);
   const formLeads = scopedInsights.reduce((sum, row) => sum + number(row.leads), 0);
   const conversations = Object.entries(conversationsByDate).reduce((sum, [date, value]) => sum + (inRange(date, from, to) ? number(value) : 0), 0);
-  const leads = formLeads + conversations;
+  const leads = formLeads;
   const impressions = scopedInsights.reduce((sum, row) => sum + number(row.impressions), 0);
   const reach = scopedInsights.reduce((sum, row) => sum + number(row.reach), 0);
   const clicks = scopedInsights.reduce((sum, row) => sum + number(row.clicks), 0);
