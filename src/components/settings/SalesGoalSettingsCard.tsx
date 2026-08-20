@@ -1,7 +1,8 @@
 /* Generated Supabase types are refreshed only after the additive migration is applied. */
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { CalendarRange, Save, Target } from "lucide-react";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
@@ -12,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -25,6 +28,7 @@ function parseCurrency(value: string) {
 
 export function SalesGoalSettingsCard() {
   const [monthValue, setMonthValue] = useState(format(new Date(), "yyyy-MM"));
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const monthDate = parseISO(`${monthValue}-01`);
   const { data: goalData, isLoading } = useSalesGoals(monthDate);
@@ -71,7 +75,7 @@ export function SalesGoalSettingsCard() {
   }, 0);
 
   return <section id="sales-goals" className="rounded-2xl border border-border bg-card p-4 sm:p-5">
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-center"><div className="flex min-w-0 items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-5 w-5" /></span><div className="min-w-0"><h2 className="font-black">Metas mensais por marca</h2><p className="text-xs text-muted-foreground">A barra do Dashboard usa vendas atribuídas a cada conta, sem misturar {segment === "saas" ? "SaaS" : "Infoproduto"}.</p></div></div><label className="relative lg:ml-auto"><CalendarRange className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-primary" /><Input type="month" value={monthValue} onChange={(event) => setMonthValue(event.target.value)} className="min-h-11 w-full pl-9 sm:w-48" /></label><Button className="min-h-11" disabled={saveGoals.isPending || isLoading || !visibleAccounts.length || !goalData?.schemaReady} onClick={() => saveGoals.mutate()}><Save className="mr-2 h-4 w-4" />{saveGoals.isPending ? "Salvando…" : "Salvar metas"}</Button></div>
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-center"><div className="flex min-w-0 items-center gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Target className="h-5 w-5" /></span><div className="min-w-0"><h2 className="font-black">Metas mensais por marca</h2><p className="text-xs text-muted-foreground">A barra do Dashboard usa vendas atribuídas a cada conta, sem misturar {segment === "saas" ? "SaaS" : "Infoproduto"}.</p></div></div><Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}><PopoverTrigger asChild><Button type="button" variant="outline" className="min-h-11 w-full justify-start gap-2 lg:ml-auto sm:w-52" aria-label="Selecionar mês das metas"><CalendarRange className="h-4 w-4 text-primary" />{format(monthDate, "MMMM 'de' yyyy", { locale: ptBR })}</Button></PopoverTrigger><PopoverContent align="end" className="w-auto p-0"><Calendar mode="single" selected={monthDate} defaultMonth={monthDate} onSelect={(date) => { if (!date) return; setMonthValue(format(startOfMonth(date), "yyyy-MM")); setMonthPickerOpen(false); }} locale={ptBR} initialFocus /></PopoverContent></Popover><Button className="min-h-11" disabled={saveGoals.isPending || isLoading || !visibleAccounts.length || !goalData?.schemaReady} onClick={() => saveGoals.mutate()}><Save className="mr-2 h-4 w-4" />{saveGoals.isPending ? "Salvando…" : "Salvar metas"}</Button></div>
     <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleAccounts.map((account) => <label key={account.id} className="min-w-0 rounded-xl border border-border bg-background/60 p-4"><span className="block truncate text-xs font-black" title={account.name}>{account.name}</span><span className="mt-1 block text-[10px] text-muted-foreground">Meta de faturamento líquido</span><div className="mt-3 flex min-w-0 items-center gap-2"><span className="shrink-0 text-sm font-black text-primary">R$</span><Input inputMode="decimal" value={drafts[account.id] ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [account.id]: event.target.value }))} placeholder="0,00" className="min-w-0" /></div></label>)}</div>
     {!visibleAccounts.length && <div className="mt-5 rounded-xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">Conecte e vincule contas de anúncio a esta unidade para definir metas por marca.</div>}
     <div className="mt-4 flex flex-col gap-1 border-t border-border pt-4 text-xs sm:flex-row sm:items-center sm:justify-between"><span className="text-muted-foreground">Total planejado para {monthValue.split("-").reverse().join("/")}</span><b className="text-base text-primary">{brl.format(total)}</b></div>
