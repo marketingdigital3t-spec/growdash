@@ -616,7 +616,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
                 <div className="flex flex-col md:flex-row items-center gap-4">
                   {/* Left: donut (leads/revenue) or compact summary (conv) */}
                   {!isConv ? (
-                    <div className="relative w-[170px] h-[170px] shrink-0">
+                    <div className="relative h-[194px] w-[194px] shrink-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
