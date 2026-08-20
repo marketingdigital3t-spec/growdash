@@ -8,7 +8,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useAlerts } from "@/hooks/useAlerts";
-import { useSales, type Sale } from "@/hooks/useSales";
+import { dedupeCanonicalSales, useSales, type Sale } from "@/hooks/useSales";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
@@ -133,43 +133,43 @@ const Index = () => {
   const visibleCampaigns = useMemo(() => campaigns.filter((campaign: any) => visibleAccountIds.has(campaign.ad_account_id)), [campaigns, visibleAccountIds]);
   const operationalRDDeals = useMemo(() => filterOperationalRDDeals(rdDeals, rdFunnels), [rdDeals, rdFunnels]);
   const operationalRDWonDeals = useMemo(() => filterOperationalRDDeals(rdWonDeals, rdFunnels), [rdFunnels, rdWonDeals]);
-  const operationalWonDealIds = useMemo(() => new Set(
-    operationalRDWonDeals.map((deal) => deal.rd_deal_id).filter(Boolean),
-  ), [operationalRDWonDeals]);
-  // useSales preserva a última resposta durante uma troca de conta para evitar
-  // um flash de zero. Reaplique o escopo aqui: enquanto a nova resposta não
-  // chega, nenhuma venda da conta anterior pode entrar nos KPIs ou previsão.
-  const unitSales = useMemo(() => sales.filter((sale) => !!sale.ad_account_id
-    && visibleAccountIds.has(sale.ad_account_id)
-    && (selectedAccount === "all" || sale.ad_account_id === selectedAccount)), [sales, selectedAccount, visibleAccountIds]);
-  // No Dashboard de contas integradas, "venda" é a negociação efetivamente
-  // ganha no RD. Registros financeiros sem um negócio ganho correspondente
-  // ficam no Financeiro, mas não podem alterar KPIs de CRM, conversão ou ROAS.
-  const operationalUnitSales = useMemo(() => unitSales.filter((sale) =>
-    sale.status !== "confirmed" || (!!sale.rd_deal_id && operationalWonDealIds.has(sale.rd_deal_id)),
-  ), [operationalWonDealIds, unitSales]);
+  const activeScopedFunnelIds = useMemo(() => new Set(
+    rdFunnels
+      .filter((funnel) => funnel.is_active && visibleAccountIds.has(funnel.ad_account_id)
+        && (selectedAccount === "all" || funnel.ad_account_id === selectedAccount))
+      .map((funnel) => funnel.id),
+  ), [rdFunnels, selectedAccount, visibleAccountIds]);
+  // `sales` é a fonte canônica de vendas, receita, reembolso e chargeback.
+  // Uma venda RD histórica pode não ter `ad_account_id`, mas ainda pertence à
+  // conta pelo funil. Incluí-la por esse vínculo evita que Dashboard e Análise
+  // de Funis exibam totais diferentes no mesmo período.
+  const canonicalUnitSales = useMemo(() => dedupeCanonicalSales(sales.filter((sale) => {
+    if (sale.ad_account_id) return visibleAccountIds.has(sale.ad_account_id)
+      && (selectedAccount === "all" || sale.ad_account_id === selectedAccount);
+    return !!sale.rd_funnel_id && activeScopedFunnelIds.has(sale.rd_funnel_id);
+  })), [activeScopedFunnelIds, sales, selectedAccount, visibleAccountIds]);
   const selectedCampaigns = useMemo(
     () => visibleCampaigns.filter((campaign: any) => selectedCampaignIds.includes(campaign.id)),
     [selectedCampaignIds, visibleCampaigns],
   );
   const dashboardSales = useMemo(() => selectedCampaignIds.length
-    ? operationalUnitSales.filter((sale) => selectedCampaigns.some((campaign: any) => saleMatchesCampaign(sale, {
+    ? canonicalUnitSales.filter((sale) => selectedCampaigns.some((campaign: any) => saleMatchesCampaign(sale, {
       id: campaign.id,
       name: campaign.name,
       ad_account_id: campaign.ad_account_id,
     })))
-    : operationalUnitSales, [operationalUnitSales, selectedCampaignIds.length, selectedCampaigns]);
+    : canonicalUnitSales, [canonicalUnitSales, selectedCampaignIds.length, selectedCampaigns]);
   const dashboardDeals = useMemo(() => operationalRDDeals.filter((deal) => !!deal.ad_account_id
     && visibleAccountIds.has(deal.ad_account_id)
     && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [operationalRDDeals, selectedAccount, visibleAccountIds]);
   const dashboardRevenueDeals = useMemo(() => operationalRDWonDeals.filter((deal) => !!deal.ad_account_id
     && visibleAccountIds.has(deal.ad_account_id)
     && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [operationalRDWonDeals, selectedAccount, visibleAccountIds]);
-  // Total de vendas e faturamento do Dashboard são sempre os negócios ganhos
-  // do RD dentro do período. Os lançamentos financeiros seguem disponíveis em
-  // Financeiro e no detalhamento de pagamento, mas não podem elevar o KPI de
-  // vendas acima da quantidade real de negociações ganhas.
-  const glassSales = aggregateRevenueSources([], dashboardRevenueDeals);
+  // O Dashboard e a Análise de Funis usam a mesma fonte canônica. Os ganhos
+  // do RD abaixo ficam apenas como reconciliação para registros que ainda não
+  // chegaram a `sales`; uma venda de checkout nunca é descartada por o RD
+  // ainda não ter atualizado a etapa.
+  const glassSales = aggregateRevenueSources(dashboardSales, dashboardRevenueDeals);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const glassLeadsFromInsights = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
   const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
