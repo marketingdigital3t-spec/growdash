@@ -5024,3 +5024,52 @@ html[data-accent="monochrome"]:not(.dark) .growdash-main :is(.text-primary, [cla
 @media (prefers-reduced-motion: reduce) {
   .growdash-content-frame { transition: none; }
 }
+
+/* Calm operational surfaces -------------------------------------------------
+   Metal is a detail, never a translucent layer over the interface. Keeping
+   backgrounds flat makes the light/dark switch feel deliberate and prevents
+   the washed-out veil caused by overlapping radial gradients. */
+html[data-accent="monochrome"] .brand-shell,
+html[data-accent="monochrome"] .brand-shell .growdash-main {
+  background: #101112 !important;
+}
+
+html[data-accent="metallic-gold"] .brand-shell,
+html[data-accent="metallic-gold"] .brand-shell .growdash-main {
+  background: #12110e !important;
+}
+
+html[data-accent] .brand-shell::before {
+  display: none !important;
+}
+
+html[data-accent] :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  background-image: none !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 10px 24px -22px rgba(0,0,0,.72) !important;
+}
+
+html[data-accent="monochrome"]:not(.dark) .brand-shell,
+html[data-accent="monochrome"]:not(.dark) .brand-shell .growdash-main {
+  color: #202226;
+  background: #f4f5f6 !important;
+}
+
+html[data-accent="metallic-gold"]:not(.dark) .brand-shell,
+html[data-accent="metallic-gold"]:not(.dark) .brand-shell .growdash-main {
+  color: #29251d;
+  background: #f6f3ec !important;
+}
+
+html[data-accent]:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  background: #ffffff !important;
+  background-image: none !important;
+  box-shadow: 0 8px 22px -20px rgba(35,40,47,.24) !important;
+}
+
+html[data-accent="monochrome"]:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  border-color: rgba(70,78,88,.18) !important;
+}
+
+html[data-accent="metallic-gold"]:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  border-color: rgba(121,91,34,.22) !important;
+}
