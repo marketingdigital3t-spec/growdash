@@ -108,7 +108,7 @@ export default function EventClasses() {
   }, [filtered]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
+    <div className="mx-auto w-full max-w-[1600px] space-y-6">
       <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
         <button type="button" role="tab" aria-selected={activeView === "classes"} onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" aria-hidden="true" />Datas & Turmas</button>
         <button type="button" role="tab" aria-selected={activeView === "agenda"} onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" aria-hidden="true" />Agenda</button>
@@ -131,7 +131,7 @@ export default function EventClasses() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
         <StatCard icon={CalendarDays} label="Turmas" value={summary.total} />
         <StatCard icon={CheckCircle2} label="Abertas" value={summary.open} accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
         <StatCard icon={CheckCircle2} label="Esgotadas" value={summary.soldOut} accent="bg-muted text-muted-foreground" />

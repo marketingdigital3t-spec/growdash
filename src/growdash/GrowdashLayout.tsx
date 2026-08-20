@@ -39,6 +39,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
+import { PageTransition } from "@/components/PageTransition";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -483,7 +484,9 @@ export default function GrowdashLayout() {
             <GlobalAnnouncementBanner />
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
-              <Suspense fallback={<ContentLoadingFallback />}><Outlet /></Suspense>
+              <PageTransition>
+                <Suspense fallback={<ContentLoadingFallback />}><Outlet /></Suspense>
+              </PageTransition>
             </RouteErrorBoundary>
           </div>
         </main>

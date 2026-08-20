@@ -176,10 +176,10 @@ export default function ProfilePage() {
           </div>
           <div className="mt-7 border-t border-border pt-6">
             <h2 className="font-black">Paleta da plataforma</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Escolha o acabamento visual desta sessão. A paleta dourada preserva contraste e usa metal escovado, não amarelo puro.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Escolha entre prata e dourado. As duas paletas usam metal escovado, superfícies de leitura neutras e contraste garantido nos modos claro e escuro.</p>
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               {([
-                ["monochrome", "Preto e branco", "Vidro, carvão e reflexos brancos", "profile-palette-mono"],
+                ["monochrome", "Prata metálica", "Grafite, cromo escovado e reflexos prateados", "profile-palette-mono"],
                 ["metallic-gold", "Ônix dourado", "Preto profundo, ouro metálico e bordas luminosas", "profile-palette-gold"],
               ] as [AccentTheme, string, string, string][]).map(([value, label, description, previewClass]) => (
                 <button key={value} type="button" onClick={() => setAccent(value)} aria-pressed={accent === value} className={`profile-palette-choice ${previewClass} ${accent === value ? "is-active" : ""}`}>

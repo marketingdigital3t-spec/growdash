@@ -4315,6 +4315,28 @@ html:not(.dark) .growdash-main .text-emerald-600 { color: #167a43 !important; }
 html:not(.dark) .growdash-main .text-red-500 { color: #b42323 !important; }
 html:not(.dark) .growdash-main .text-primary { color: #242424 !important; }
 
+/* Recharts inherits several low-opacity tokens intended for the dark surface.
+   On the light theme those series become nearly invisible, so chart anatomy
+   receives explicit contrast without affecting dark mode. */
+html:not(.dark) .growdash-main .recharts-cartesian-axis-tick-value {
+  fill: #4b4b4b !important;
+}
+
+html:not(.dark) .growdash-main .recharts-cartesian-grid line {
+  stroke: #d8cdbd !important;
+  stroke-opacity: .9;
+}
+
+html:not(.dark) .growdash-main .recharts-line-curve {
+  stroke: #684600 !important;
+  stroke-opacity: .95 !important;
+}
+
+html:not(.dark) .growdash-main .recharts-bar-rectangle path {
+  fill: #795000 !important;
+  fill-opacity: .9 !important;
+}
+
 /* Dashboard theme contract -------------------------------------------------
    Widgets were still inheriting several historical all-theme dark rules.
    Scope the material explicitly at the dashboard boundary, including tabs,
@@ -4912,4 +4934,93 @@ html[data-accent="metallic-gold"] :is(.premium-button, .gd-button, .meta-toolbar
   html[data-accent="metallic-gold"] :is(.premium-button, .gd-button, .meta-toolbar-button, .meta-toolbar-primary, .gold-action) {
     transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
   }
+}
+
+/* Premium dual-metal finish -------------------------------------------------
+   The application has two deliberate finishes: silver (monochrome) and gold.
+   Both keep data on neutral reading surfaces, preventing decorative metal from
+   lowering legibility in either colour mode. This final layer also provides a
+   stable visual contract for every route rendered inside the shared sidebar
+   content frame. */
+html[data-accent="monochrome"] {
+  --primary: 0 0% 76%;
+  --primary-foreground: 0 0% 9%;
+  --primary-soft: 0 0% 20%;
+  --ring: 0 0% 88%;
+  --brand-accent-rgb: 202, 207, 214;
+}
+
+html[data-accent="monochrome"] .brand-shell,
+html[data-accent="monochrome"] .brand-shell .growdash-main {
+  color: #f2f4f6;
+  background: radial-gradient(ellipse at 86% -18%, rgba(204, 211, 221, .10), transparent 27rem), linear-gradient(135deg, #090a0b 0%, #121416 50%, #08090a 100%) !important;
+}
+
+html[data-accent="monochrome"] :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  color: #f2f4f6 !important;
+  border-color: rgba(218, 225, 234, .23) !important;
+  background: #17191b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 20px 44px -38px rgba(0,0,0,.92) !important;
+}
+
+html[data-accent="monochrome"] .growdash-main :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: #b9c0c8 !important; }
+html[data-accent="monochrome"] .growdash-main :is(.text-primary, [class*="text-primary"]) { color: #e6eaee !important; }
+html[data-accent="monochrome"] :is(.gd-filter-strip .gd-filter-control, .gd-filter-strip .gd-filter-refresh, .growdash-main input, .growdash-main select, .growdash-main textarea, [role="combobox"]) {
+  color: #f2f4f6 !important;
+  border-color: rgba(218, 225, 234, .30) !important;
+  background: #101214 !important;
+}
+
+html[data-accent="monochrome"] :is(button.bg-primary, [class*="bg-primary"], [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
+  color: #141619 !important;
+  border-color: #eef1f4 !important;
+  background: #cfd5da !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.62), 0 8px 20px -14px rgba(205, 214, 222, .45) !important;
+}
+
+html[data-accent="metallic-gold"]:not(.dark) .brand-shell,
+html[data-accent="metallic-gold"]:not(.dark) .brand-shell .growdash-main {
+  color: #211e18;
+  background: radial-gradient(ellipse at 88% -18%, rgba(196,154,74,.14), transparent 28rem), linear-gradient(135deg, #f4f0e7 0%, #ece7dc 50%, #f8f5ee 100%) !important;
+}
+
+html[data-accent="metallic-gold"]:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  color: #282319 !important;
+  border-color: rgba(139, 102, 33, .28) !important;
+  background: #fffdf8 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 18px 40px -34px rgba(70,50,14,.28) !important;
+}
+
+html[data-accent="metallic-gold"]:not(.dark) .growdash-main :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: #655d50 !important; }
+html[data-accent="metallic-gold"]:not(.dark) .growdash-main :is(.text-primary, [class*="text-primary"]) { color: #785312 !important; }
+html[data-accent="metallic-gold"]:not(.dark) :is(.gd-filter-strip .gd-filter-control, .gd-filter-strip .gd-filter-refresh, .growdash-main input, .growdash-main select, .growdash-main textarea, [role="combobox"]) {
+  color: #282319 !important;
+  border-color: rgba(139, 102, 33, .32) !important;
+  background: #fffdf8 !important;
+}
+
+html[data-accent="metallic-gold"]:not(.dark) :is(button.bg-primary, [class*="bg-primary"], [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab) {
+  color: #2d210b !important;
+  border-color: #ba8b31 !important;
+  background: #d6ad5a !important;
+}
+
+html[data-accent="monochrome"]:not(.dark) .brand-shell,
+html[data-accent="monochrome"]:not(.dark) .brand-shell .growdash-main {
+  color: #1b1e22;
+  background: radial-gradient(ellipse at 86% -18%, rgba(102, 111, 122, .12), transparent 27rem), linear-gradient(135deg, #f3f5f7 0%, #e9edf1 50%, #f8fafb 100%) !important;
+}
+
+html[data-accent="monochrome"]:not(.dark) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  color: #1b1e22 !important;
+  border-color: rgba(76, 87, 99, .22) !important;
+  background: #ffffff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 18px 40px -34px rgba(43,52,62,.24) !important;
+}
+
+html[data-accent="monochrome"]:not(.dark) .growdash-main :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: #59616a !important; }
+html[data-accent="monochrome"]:not(.dark) .growdash-main :is(.text-primary, [class*="text-primary"]) { color: #30363d !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .growdash-content-frame { transition: none; }
 }
