@@ -30,8 +30,8 @@ Deno.serve(async (req) => {
     const operation = current ? admin.from("integrations").update(values).eq("id", current.id) : admin.from("integrations").insert({ user_id: auth.user.id, provider: key, ...values });
     const { error } = await operation;
     if (error) throw error;
-    return json({ connection: { provider, endpoint: `${Deno.env.get("SUPABASE_URL")}/functions/v1/sales-webhook/${publicId}`, secret, header: "x-growdash-webhook-secret" } });
+    return json({ connection: { provider, endpoint: `${Deno.env.get("SUPABASE_URL")}/functions/v1/sales-webhook/${publicId}?token=${secret}`, secret, header: "x-growdash-webhook-secret (opcional)" } });
   } catch (error) { console.error("sales-webhook-config", error); return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500); }
 });
 
-function publicConnection(row: any) { return { provider: String(row.provider).replace("sales_webhook_", ""), endpoint: `${Deno.env.get("SUPABASE_URL")}/functions/v1/sales-webhook/${row.provider_account_id}`, active: !!row.is_active, updated_at: row.updated_at, header: "x-growdash-webhook-secret" }; }
+function publicConnection(row: any) { return { provider: String(row.provider).replace("sales_webhook_", ""), endpoint: `${Deno.env.get("SUPABASE_URL")}/functions/v1/sales-webhook/${row.provider_account_id}`, active: !!row.is_active, updated_at: row.updated_at, header: "x-growdash-webhook-secret (opcional)" }; }

@@ -8,11 +8,12 @@ const stringValue = (value: unknown) => typeof value === "string" || typeof valu
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
   try {
-    const publicId = new URL(req.url).pathname.split("/").filter(Boolean).at(-1);
+    const requestUrl = new URL(req.url);
+    const publicId = requestUrl.pathname.split("/").filter(Boolean).at(-1);
     if (!publicId) return json({ error: "Conexão não informada" }, 404);
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: integration } = await admin.from("integrations").select("id,user_id,provider,webhook_secret,is_active").like("provider", "sales_webhook_%").eq("provider_account_id", publicId).eq("is_active", true).maybeSingle();
-    const secret = req.headers.get("x-growdash-webhook-secret")?.trim();
+    const secret = req.headers.get("x-growdash-webhook-secret")?.trim() || requestUrl.searchParams.get("token")?.trim();
     if (!integration || !secret || secret !== integration.webhook_secret) return json({ error: "Não autorizado" }, 401);
     const raw = await req.text();
     const payload = JSON.parse(raw || "{}");
