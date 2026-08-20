@@ -24,26 +24,29 @@ const row = (partial: Partial<InsightRow>): InsightRow => ({
 });
 
 describe("computeFunnelMediaMetrics", () => {
-  it("reconcilia métricas Meta com leads e vendas do RD", () => {
+  it("soma leads e conversas da Meta para o total de aquisição", () => {
     const result = computeFunnelMediaMetrics([
       row({ spend: 100, impressions: 10_000, reach: 8_000, clicks: 200, leads: 20 }),
       row({ ad_id: "ad-2", spend: 50, impressions: 5_000, reach: 4_000, clicks: 100, leads: 10 }),
-    ], 27, 3, 1_200);
+    ], 7, 27, 3, 1_200);
 
     expect(result.spend).toBe(150);
     expect(result.ctr).toBe(2);
     expect(result.cpm).toBe(10);
     expect(result.cpc).toBe(0.5);
-    expect(result.metaCpl).toBe(5);
+    expect(result.metaCpl).toBeCloseTo(150 / 37);
+    expect(result.formLeads).toBe(30);
+    expect(result.conversations).toBe(7);
+    expect(result.metaLeads).toBe(37);
     expect(result.rdCpl).toBeCloseTo(5.5555, 3);
     expect(result.cac).toBe(50);
     expect(result.roas).toBe(8);
-    expect(result.leadGap).toBe(-3);
-    expect(result.rdCoverage).toBe(90);
+    expect(result.leadGap).toBe(-10);
+    expect(result.rdCoverage).toBeCloseTo(27 / 37 * 100);
   });
 
   it("não produz divisão inválida quando não há mídia ou conversões", () => {
-    const result = computeFunnelMediaMetrics([], 0, 0, 0);
+    const result = computeFunnelMediaMetrics([], 0, 0, 0, 0);
     expect(result.metaCpl).toBeNull();
     expect(result.rdCpl).toBeNull();
     expect(result.cac).toBeNull();

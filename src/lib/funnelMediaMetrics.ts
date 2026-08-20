@@ -5,6 +5,11 @@ export interface FunnelMediaMetrics {
   impressions: number;
   reach: number;
   clicks: number;
+  /** Leads de formulário/site reportados nos insights da Meta. */
+  formLeads: number;
+  /** Conversas iniciadas por anúncios Meta no período selecionado. */
+  conversations: number;
+  /** Aquisições Meta: leads de formulário/site + conversas iniciadas. */
   metaLeads: number;
   rdLeads: number;
   sales: number;
@@ -22,6 +27,7 @@ export interface FunnelMediaMetrics {
 
 export function computeFunnelMediaMetrics(
   insights: InsightRow[],
+  conversations: number,
   rdLeads: number,
   sales: number,
   revenue: number,
@@ -37,20 +43,26 @@ export function computeFunnelMediaMetrics(
     },
     { spend: 0, impressions: 0, reach: 0, clicks: 0, metaLeads: 0 },
   );
+  const safeConversations = Math.max(0, Number(conversations) || 0);
+  const formLeads = totals.metaLeads;
+  const metaLeads = formLeads + safeConversations;
 
   return {
     ...totals,
+    formLeads,
+    conversations: safeConversations,
+    metaLeads,
     rdLeads,
     sales,
     revenue,
     ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
     cpm: totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0,
     cpc: totals.clicks > 0 ? totals.spend / totals.clicks : 0,
-    metaCpl: totals.metaLeads > 0 ? totals.spend / totals.metaLeads : null,
+    metaCpl: metaLeads > 0 ? totals.spend / metaLeads : null,
     rdCpl: rdLeads > 0 ? totals.spend / rdLeads : null,
     cac: sales > 0 ? totals.spend / sales : null,
     roas: totals.spend > 0 ? revenue / totals.spend : null,
-    leadGap: rdLeads - totals.metaLeads,
-    rdCoverage: totals.metaLeads > 0 ? (rdLeads / totals.metaLeads) * 100 : null,
+    leadGap: rdLeads - metaLeads,
+    rdCoverage: metaLeads > 0 ? (rdLeads / metaLeads) * 100 : null,
   };
 }

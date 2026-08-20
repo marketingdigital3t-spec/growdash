@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { FunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
-import { Activity, BadgeDollarSign, Eye, Gauge, MousePointerClick, Users } from "lucide-react";
+import { Activity, BadgeDollarSign, Eye, Gauge, MessageCircleMore, MousePointerClick, Users } from "lucide-react";
 import { metricDescription } from "@/lib/metricPresentation";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 
@@ -15,7 +15,8 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
     { label: "Investimento Meta", value: fmtBRL(metrics.spend), detail: "Meta Ads", icon: BadgeDollarSign },
     { label: "Impressões", value: fmtInt(metrics.impressions), detail: `Alcance ${fmtInt(metrics.reach)}`, icon: Eye },
     { label: "Cliques no link", value: fmtInt(metrics.clicks), detail: `CTR ${fmtPct(metrics.ctr)}`, icon: MousePointerClick },
-    { label: "Leads Meta", value: fmtInt(metrics.metaLeads), detail: `CPL ${fmtBRL(metrics.metaCpl)}`, icon: Users },
+    { label: "Leads totais Meta", value: fmtInt(metrics.metaLeads), detail: `${fmtInt(metrics.formLeads)} forms/site + ${fmtInt(metrics.conversations)} conversas · CPL ${fmtBRL(metrics.metaCpl)}`, icon: Users },
+    { label: "Conversas iniciadas", value: fmtInt(metrics.conversations), detail: "Também incluídas nos leads totais Meta", icon: MessageCircleMore },
     { label: "Leads no RD (período)", value: fmtInt(metrics.rdLeads), detail: `CPL real ${fmtBRL(metrics.rdCpl)}`, icon: Activity },
     { label: "CAC / ROAS", value: `${fmtBRL(metrics.cac)} / ${metrics.roas == null ? "—" : `${metrics.roas.toFixed(2)}x`}`, detail: `${metrics.sales} venda(s)`, icon: Gauge },
   ];
@@ -40,7 +41,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-7">
           {cards.map(({ label, value, detail, icon: Icon }) => (
             <MetricHelpTooltip key={label} title={label} description={metricDescription(label)} detail={`Fonte e contexto: ${detail}.`} className="h-full" showHint>
               <div className="gd-metric-card gd-funnel-media-kpi h-full min-w-0 cursor-default rounded-xl border border-border/50 bg-background/70 p-3">

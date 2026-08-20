@@ -36,6 +36,9 @@ import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 import { useSales } from "@/hooks/useSales";
 import { filterCanonicalFunnelSales, reconcileFunnelRevenue } from "@/lib/funnelRevenue";
 import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+
+const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -262,9 +265,28 @@ export default function FunnelAnalysis() {
     return { scopedInsights: matches, campaignWithoutMediaMatch: matches.length === 0 };
   }, [adAccountId, integratedAccountIds, insightRows, selectedCampaign]);
 
+  // O total de aquisição da Análise de Funis é uma métrica da Meta: cada
+  // conversa iniciada por anúncio é um lead a ser trabalhado. Buscamos os
+  // eventos apenas dos anúncios já delimitados pela conta, campanha e período.
+  const actionAdIds = useMemo(
+    () => Array.from(new Set(scopedInsights.map((insight) => insight.ad_id).filter(Boolean))),
+    [scopedInsights],
+  );
+  const actionAccountMap = useMemo(
+    () => Object.fromEntries(scopedInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
+    [scopedInsights],
+  );
+  const { data: actionData, isLoading: loadingMetaActions } = useActionTotalsByAds(actionAdIds, startDate, endDate, actionAccountMap);
+
   const mediaMetrics = useMemo(
-    () => computeFunnelMediaMetrics(scopedInsights, periodAnalytics.totalLeads, periodAnalytics.conversions, periodAnalytics.revenue),
-    [periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
+    () => computeFunnelMediaMetrics(
+      scopedInsights,
+      actionData?.totals?.[MESSAGING_CONVERSATION_EVENT] ?? 0,
+      periodAnalytics.totalLeads,
+      periodAnalytics.conversions,
+      periodAnalytics.revenue,
+    ),
+    [actionData?.totals, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
   );
 
   async function handleSync() {
@@ -416,7 +438,7 @@ export default function FunnelAnalysis() {
         </div>
       </MotionItem>
 
-      {loadingFunnels || isLoading || loadingPeriodDeals || loadingClosedDeals || loadingPeriodClosedDeals || loadingStages || loadingHistoricalSales || loadingPeriodSales ? (
+      {loadingFunnels || isLoading || loadingMetaActions || loadingPeriodDeals || loadingClosedDeals || loadingPeriodClosedDeals || loadingStages || loadingHistoricalSales || loadingPeriodSales ? (
         <MotionItem>
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>
@@ -449,7 +471,13 @@ export default function FunnelAnalysis() {
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {adAccountId === "all" ? `em ${funnelScopeIds.length} funil(is) conectado(s)` : "neste funil"}. Os KPIs e gráficos abaixo usam somente o período selecionado.
             </div>
-            <FunnelKPIs a={periodAnalytics} cpl={mediaMetrics.rdCpl} cac={mediaMetrics.cac} />
+            <FunnelKPIs
+              a={periodAnalytics}
+              metaLeads={mediaMetrics.metaLeads}
+              conversations={mediaMetrics.conversations}
+              cpl={mediaMetrics.metaCpl}
+              cac={mediaMetrics.cac}
+            />
           </MotionItem>
 
           <MotionItem>
