@@ -18,8 +18,8 @@ export type ExpertLeadActions = {
 
 /**
  * Keeps acquisition sources explicit. A native Meta lead and a messaging
- * conversation are distinct events, so neither may replace the other (or the
- * RD total) when the expert is viewing more than one authorised account.
+ * conversation are distinct events. Both are Meta acquisitions and therefore
+ * compose the Expert's total lead KPI, while RD remains a separate metric.
  */
 export function getExpertDashboardMetrics(
   insights: InsightRow[],
@@ -31,15 +31,18 @@ export function getExpertDashboardMetrics(
   const forms = Math.min(leadsReportedByMeta, Math.max(0, Number(actions.nativeFormLeads ?? 0)));
   const siteLeads = Math.max(0, leadsReportedByMeta - forms);
   const conversations = Math.max(0, Number(actions.conversations ?? 0));
-  const metaLeads = forms + siteLeads;
+  // Same business rule used by the operational Dashboard: each started Meta
+  // conversation is an acquisition and must be included in total Meta leads.
+  const metaLeads = forms + siteLeads + conversations;
   const rdLeads = rdDeals.length;
   const confirmedSales = sales.filter((sale) => sale.status === "confirmed");
   const salesCount = confirmedSales.reduce((total, sale) => total + Math.max(1, Number(sale.quantity ?? 1)), 0);
   const conversionRate = rdLeads > 0 ? (salesCount / rdLeads) * 100 : 0;
   const spend = insights.reduce((total, insight) => total + Number(insight.spend ?? 0), 0);
   return {
-    // `leads` is retained for the existing "Leads RD" KPI.
-    leads: rdLeads,
+    // DashboardProvider's generic "Leads" KPI must use Meta acquisitions.
+    // RD deals are intentionally exposed by the dedicated `rdLeads` metric.
+    leads: metaLeads,
     forms,
     siteLeads,
     conversations,
