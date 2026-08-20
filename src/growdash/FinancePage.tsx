@@ -64,13 +64,17 @@ export default function FinancePage() {
   const [entry, setEntry] = useState({ entry_type: "expense" as EntryType, description: "", amount: "", competence_date: format(new Date(), "yyyy-MM-dd"), due_date: "", status: "pending", recurrence: "none", notes: "" });
   const twelveMonthsAgo = startOfMonth(subMonths(new Date(), 11));
   const futureMonth = endOfMonth(new Date());
+  // O histórico financeiro continua completo no modo Máximo. Para mídia,
+  // porém, consultamos somente a janela operacional disponível na origem;
+  // isso evita uma varredura desde 2000 que deixa os KPIs aparentemente vazios.
+  const metaInsightsStartDate = preset === "max" ? startOfMonth(subMonths(endDate, 36)) : startDate;
 
   const { data: allAccounts = [], isLoading: loadingAccounts } = useAdAccounts();
   const unitAccounts = businessUnitId
     ? allAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : allAccounts;
   const accounts = accountFilter ? unitAccounts.filter((account) => account.id === accountFilter) : unitAccounts;
-  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, startDate, endDate });
+  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, startDate: metaInsightsStartDate, endDate });
   const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, startDate, endDate });
   const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, startDate: twelveMonthsAgo, endDate: futureMonth });
   const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, startDate: twelveMonthsAgo, endDate: futureMonth });
