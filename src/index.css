@@ -4804,7 +4804,7 @@ html[data-accent="metallic-gold"] .brand-topbar :is(.text-muted-foreground, [cla
    behind the logo. */
 .brand-logo-image { background: transparent !important; }
 html[data-accent="metallic-gold"] .brand-logo-image {
-  filter: sepia(1) saturate(1.45) hue-rotate(352deg) brightness(1.12) contrast(1.05) drop-shadow(0 0 10px rgba(225,166,44,.32));
+  filter: none;
 }
 
 /* High-density presentation ------------------------------------------------
@@ -4832,4 +4832,82 @@ html {
 @media (min-width: 3000px) {
   :root { --gd-page-gutter: 2.25rem; }
   .growdash-main { font-size: 1.08rem; }
+}
+
+/* Visual quality contract --------------------------------------------------
+   Gold is a concise signal for the current selection and primary action. It
+   must never become a reading surface: dark graphite carries content, ivory
+   carries type, and semantic colours retain their meaning. This final layer
+   intentionally overrides historical warm gradients that could create poor
+   contrast or make unrelated cards look like separate products. */
+html[data-accent="metallic-gold"] {
+  --primary: 40 55% 52%;
+  --primary-foreground: 38 45% 9%;
+  --primary-soft: 41 54% 20%;
+  --ring: 42 72% 68%;
+  --brand-gold: #c49a4a;
+  --brand-gold-light: #f0d79c;
+  --brand-bronze: #6d5121;
+  --brand-accent-rgb: 196, 154, 74;
+}
+
+html[data-accent="metallic-gold"] .brand-shell,
+html[data-accent="metallic-gold"] .brand-shell .growdash-main {
+  color: #f6f3ec;
+  background:
+    radial-gradient(ellipse at 88% -24%, rgba(196,154,74,.10), transparent 28rem),
+    linear-gradient(135deg, #0a0a09 0%, #12110f 50%, #090908 100%) !important;
+}
+
+html[data-accent="metallic-gold"] :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .dashboard-glass-metrics > article, .dashboard-glass-metrics > button) {
+  color: #f6f3ec !important;
+  border-color: rgba(224, 196, 132, .25) !important;
+  background: #171614 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 20px 44px -38px rgba(0,0,0,.92) !important;
+}
+
+html[data-accent="metallic-gold"] :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass)::before,
+html[data-accent="metallic-gold"] :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass)::after {
+  display: none;
+}
+
+html[data-accent="metallic-gold"] .growdash-main :is(.text-muted-foreground, [class*="text-muted-foreground"]) {
+  color: #bcb7ab !important;
+}
+
+html[data-accent="metallic-gold"] .growdash-main :is(.text-primary, [class*="text-primary"]) {
+  color: #e4bd67 !important;
+}
+
+html[data-accent="metallic-gold"] :is(.gd-filter-strip .gd-filter-control, .gd-filter-strip .gd-filter-refresh, .growdash-main input, .growdash-main select, .growdash-main textarea, [role="combobox"]) {
+  color: #f6f3ec !important;
+  border-color: rgba(224, 196, 132, .32) !important;
+  background: #11110f !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05) !important;
+}
+
+html[data-accent="metallic-gold"] :is(button.bg-primary, [class*="bg-primary"], .gold-action, [role="tab"][data-state="active"], [data-state="active"].campaign-hierarchy-tab, .premium-button, .meta-toolbar-primary) {
+  color: #211805 !important;
+  border-color: #dfbd70 !important;
+  background: #d1a64f !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.42), 0 8px 20px -14px rgba(209,166,79,.48) !important;
+}
+
+html[data-accent="metallic-gold"] :is(.gd-button, .meta-toolbar-button) {
+  color: #f6f3ec !important;
+  border-color: rgba(224, 196, 132, .30) !important;
+  background: #211f1b !important;
+  box-shadow: none !important;
+}
+
+html[data-accent="metallic-gold"] :is(.premium-button, .gd-button, .meta-toolbar-button, .meta-toolbar-primary, .gold-action)::before,
+html[data-accent="metallic-gold"] :is(.premium-button, .gd-button, .meta-toolbar-button, .meta-toolbar-primary, .gold-action)::after {
+  animation: none !important;
+  opacity: 0 !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-accent="metallic-gold"] :is(.premium-button, .gd-button, .meta-toolbar-button, .meta-toolbar-primary, .gold-action) {
+    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  }
 }
