@@ -317,9 +317,9 @@ export function getWidgetDef(type: WidgetType) {
 
 // Default "Padrão" view: the canonical full-width dashboard recovered from the
 // original Growdash project. System widgets are appended by the renderer.
-// v10 remove KPIs financeiros redundantes da faixa principal e mantém os dois
-// gráficos alinhados à coluna de CTR e taxa de conversão.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 12;
+// v13 amplia a Distribuição por Plataforma para acomodar integralmente o
+// gráfico e a lista de origens, sem cortar os dados do card.
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 13;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
@@ -332,10 +332,10 @@ export const DEFAULT_VIEW = {
     // Isso impede o espaço vazio que surgia no desktop e preserva uma grade
     // previsível quando o layout é reempacotado para tablet e mobile.
     { i: "payment_chart", x: 0, y: 2, w: 4, h: 4, minW: 3, minH: 4 },
-    { i: "platform_distribution", x: 4, y: 2, w: 5, h: 4, minW: 4, minH: 4 },
+    { i: "platform_distribution", x: 4, y: 2, w: 5, h: 5, minW: 4, minH: 5 },
     { i: "campaign_ctr", x: 9, y: 2, w: 3, h: 2, minW: 2, minH: 2 },
     { i: "campaign_conversion_rate", x: 9, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
-    { i: "default", x: 0, y: 6, w: 12, h: 30, minW: 6, minH: 10 },
+    { i: "default", x: 0, y: 7, w: 12, h: 30, minW: 6, minH: 10 },
   ],
   widgets: [
     { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Líquido", config: { metric: "revenue_net" } },
