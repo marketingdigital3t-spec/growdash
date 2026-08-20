@@ -13,7 +13,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
-        <CardTitle className="text-base">7. Mapa por estado</CardTitle>
+        <CardTitle className="text-base">8. Mapa por estado</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

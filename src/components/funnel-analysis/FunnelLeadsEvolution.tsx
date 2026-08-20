@@ -16,7 +16,7 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
-        <CardTitle className="text-base">3. Evolução de leads, oportunidades e vendas</CardTitle>
+        <CardTitle className="text-base">4. Evolução de leads, oportunidades e vendas</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-72">

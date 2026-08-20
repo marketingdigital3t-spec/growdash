@@ -9,7 +9,7 @@ export function FunnelBottlenecks({ a }: { a: FunnelAnalytics }) {
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
-        <CardTitle className="text-base">4. Gargalos do funil</CardTitle>
+        <CardTitle className="text-base">1. Gargalos do funil</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {b ? (

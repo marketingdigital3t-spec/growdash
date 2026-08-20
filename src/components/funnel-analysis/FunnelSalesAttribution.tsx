@@ -19,7 +19,7 @@ export function FunnelSalesAttribution({ sales }: { sales: Sale[] }) {
     <Card className="gd-analysis-card min-w-0 bg-card/60 border-border/40">
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
         <div>
-          <CardTitle className="flex items-center gap-2 text-base"><Target className="h-4 w-4 text-primary" />11. Vendas por campanha e criativo</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base"><Target className="h-4 w-4 text-primary" />10. Vendas por campanha e criativo</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">Fechamento do ciclo usando campanha (UTM campaign) e criativo (UTM content) gravados no RD.</p>
         </div>
         <Badge variant="outline" className="shrink-0 tabular-nums">Rastreamento {trackingScore.toFixed(0)}% · {attributedSales.toLocaleString("pt-BR")}/{totalSales.toLocaleString("pt-BR")}</Badge>

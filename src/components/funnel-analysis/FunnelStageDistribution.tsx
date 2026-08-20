@@ -34,7 +34,7 @@ export function FunnelStageDistribution({ a }: Props) {
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
-        <CardTitle className="text-base">1. Distribuição por etapa do funil (RD)</CardTitle>
+        <CardTitle className="text-base">2. Distribuição por etapa do funil (RD)</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -70,7 +70,7 @@ export function FunnelAutoInsights({ a }: { a: FunnelAnalytics }) {
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-amber-400" />
-          8. Insights automáticos
+          7. Insights automáticos
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
