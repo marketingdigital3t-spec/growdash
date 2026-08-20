@@ -26,6 +26,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 import { BrandStrategyDiagnostic } from "@/components/brands/BrandStrategyDiagnostic";
+import { ExpertQuestionnairePanel } from "@/components/brands/ExpertQuestionnairePanel";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
@@ -212,6 +213,7 @@ export default function BrandDiagnosticPage() {
       <Tabs defaultValue="strategy" className="space-y-5">
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1">
           <TabsTrigger value="strategy">Estratégia</TabsTrigger>
+          <TabsTrigger value="questionnaire">Questionário expert</TabsTrigger>
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
           <TabsTrigger value="media">Mídia paga</TabsTrigger>
           <TabsTrigger value="funnel">Funil RD</TabsTrigger>
@@ -220,6 +222,10 @@ export default function BrandDiagnosticPage() {
 
         <TabsContent value="strategy">
           <BrandStrategyDiagnostic brand={brand} />
+        </TabsContent>
+
+        <TabsContent value="questionnaire">
+          <ExpertQuestionnairePanel brand={brand} />
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-5">

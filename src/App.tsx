@@ -47,6 +47,7 @@ const ResetPassword = lazyWithRetry(() => import("@/pages/ResetPassword"), "rese
 const SharedLeadReport = lazyWithRetry(() => import("@/pages/SharedLeadReport"), "shared-lead-report");
 const PublicInvoiceForm = lazyWithRetry(() => import("@/pages/PublicInvoiceForm"), "public-invoice");
 const PublicBrandDiagnosticForm = lazyWithRetry(() => import("@/pages/PublicBrandDiagnosticForm"), "public-brand-diagnostic");
+const PublicExpertQuestionnaire = lazyWithRetry(() => import("@/pages/PublicExpertQuestionnaire"), "public-expert-questionnaire");
 const ExpertDashboard = lazyWithRetry(() => import("@/pages/ExpertDashboard"), "expert-dashboard");
 
 const QUERY_SESSION_CACHE_KEY = "growdash:query-cache:v1";
@@ -291,6 +292,7 @@ export default function App() {
                   <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />
                   <Route path="/nota-fiscal/:token" element={<PublicInvoiceForm />} />
                   <Route path="/diagnostico-marca/:token" element={<PublicBrandDiagnosticForm />} />
+                  <Route path="/questionario-expert/:token" element={<PublicExpertQuestionnaire />} />
                   <Route element={<AuthenticatedLayout />}>
                     <Route index element={<ResilientRoute><RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="painel-expert" element={<ResilientRoute><RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage></ResilientRoute>} />
