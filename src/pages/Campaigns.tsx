@@ -888,7 +888,7 @@ export default function Campaigns() {
         <div className="border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Pesquise para filtrar por: nome, identificação ou métrica" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 border-border bg-background pl-9 text-xs" />
+            <Input placeholder="Pesquise para filtrar por: nome, identificação ou métrica" value={search} onChange={(e) => setSearch(e.target.value)} className="campaign-search-input h-8 border-border bg-background pl-9 text-xs" />
           </div>
         </div>
       </MotionItem>
@@ -1225,14 +1225,10 @@ export default function Campaigns() {
                       </TableRow>
                     </TableFooter>;
 
-                      if (!campaignTotalsDock) return null;
-
-                      return createPortal(
-                        <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}>
-                          {footer}
-                        </table>,
-                        campaignTotalsDock,
-                      );
+                      // The persistent summary is rendered directly below the
+                      // table. Keeping a portal inside the scroll dock made it
+                      // disappear after layout/theme transitions.
+                      return null;
                     })()}
                   </table>
                 </div>
@@ -1245,11 +1241,20 @@ export default function Campaigns() {
                       campaignTableScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
                     }
                   }}
-                  className={cn(
-                    "growdash-scrollbar hidden h-[72px] shrink-0 overflow-x-auto overflow-y-hidden border-t border-border/80 bg-muted/95 md:block dark:border-[#373226] dark:bg-[#11110f]/95",
-                  )}
+                  className="campaign-totals-dock growdash-scrollbar hidden h-[72px] shrink-0 overflow-x-auto overflow-y-hidden border-t border-border/80 bg-muted/95 md:block dark:border-[#373226] dark:bg-[#11110f]/95"
                   aria-label="Totais das campanhas"
-                />
+                >
+                  <div className="campaign-total-bar flex h-full min-w-max items-center gap-2 px-3 py-2">
+                    <TotalMetric label="Campanhas" value={filtered.length.toLocaleString("pt-BR")} />
+                    <TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+                    <TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} />
+                    <TotalMetric label="Alcance" value={totals.reach.toLocaleString("pt-BR")} />
+                    <TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} />
+                    <TotalMetric label="Resultados" value={totals.results.toLocaleString("pt-BR")} />
+                    <TotalMetric label="Custo / resultado" value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+                    <TotalMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />
+                  </div>
+                </div>
               </Card>
             )}
           </TabsContent>

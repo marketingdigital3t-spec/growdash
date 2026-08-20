@@ -4472,6 +4472,34 @@ html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab[data-state="active"
 html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab[data-state="active"] svg { color: #111 !important; }
 html:not(.dark) .campaigns-workspace .campaign-hierarchy-tab:focus-visible { outline-color: #111; }
 
+/* Campaign manager theme contract -----------------------------------------
+   These controls were inheriting the old obsidian filter material after a
+   light/dark transition. Keep their surface and text tied to the active
+   theme instead of to the previous one. */
+.campaigns-workspace :is(.campaign-account-select, .campaign-action-select, .campaign-search-input) {
+  border-color: hsl(var(--border)) !important;
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.campaigns-workspace :is(.campaign-account-select, .campaign-action-select) > span,
+.campaigns-workspace :is(.campaign-account-select, .campaign-action-select) > svg {
+  color: currentColor !important;
+}
+.campaigns-workspace .campaign-search-input::placeholder { color: hsl(var(--muted-foreground)) !important; }
+.dark .campaigns-workspace :is(.campaign-account-select, .campaign-action-select, .campaign-search-input) {
+  border-color: rgba(255,255,255,.16) !important;
+  background: #11110f !important;
+  color: #f4f4f4 !important;
+}
+html:not(.dark) .campaigns-workspace :is(.campaign-account-select, .campaign-action-select, .campaign-search-input) {
+  border-color: rgba(0,0,0,.20) !important;
+  background: linear-gradient(135deg, #fff, #eeeeec) !important;
+  color: #171717 !important;
+  box-shadow: inset 0 1px #fff, 0 4px 12px -10px rgba(0,0,0,.30) !important;
+}
+html:not(.dark) .campaigns-workspace .campaign-search-input::placeholder { color: #686868 !important; }
+.campaigns-workspace .campaign-totals-dock { position: sticky; bottom: 0; z-index: 35; }
+
 /* Full Ônix Dourado material system ---------------------------------------
    This mode intentionally replaces pale surfaces, not only the accent token.
    Text remains white/ivory; every operational surface receives the same deep
