@@ -6,10 +6,14 @@ const fmtBRL = (v: number) =>
 
 export function FunnelSourceTable({ a }: { a: FunnelAnalytics }) {
   const rows = a.sourceBreakdown.slice(0, 10);
+  const totalLeads = a.sourceBreakdown.reduce((sum, row) => sum + row.leads, 0);
+  const filledLeads = a.sourceBreakdown.filter((row) => row.source !== "Não informado").reduce((sum, row) => sum + row.leads, 0);
+  const quality = totalLeads ? (filledLeads / totalLeads) * 100 : 0;
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
-        <CardTitle className="text-base">5. Origem dos leads que mais vendem</CardTitle>
+        <CardTitle className="text-base">Origem dos leads que mais vendem</CardTitle>
+        <p className="mt-1 text-xs font-normal text-muted-foreground">Qualidade de origem: <b className={quality >= 80 ? "text-emerald-500" : quality >= 50 ? "text-amber-500" : "text-red-500"}>{quality.toFixed(0)}% preenchida</b> · CPL/CAC por origem só aparece quando o custo Meta estiver ligado à mesma UTM, evitando rateio artificial.</p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

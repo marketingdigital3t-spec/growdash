@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { differenceInCalendarDays, subDays } from "date-fns";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, computeFunnelAnalytics } from "@/hooks/useRDDeals";
@@ -16,8 +17,8 @@ import { FunnelSourceTable } from "@/components/funnel-analysis/FunnelSourceTabl
 import { FunnelLostReasons } from "@/components/funnel-analysis/FunnelLostReasons";
 import { FunnelStateMap } from "@/components/funnel-analysis/FunnelStateMap";
 import { FunnelAutoInsights } from "@/components/funnel-analysis/FunnelAutoInsights";
-import { FunnelWeekdayChart } from "@/components/funnel-analysis/FunnelWeekdayChart";
-import { FunnelHourChart } from "@/components/funnel-analysis/FunnelHourChart";
+import { FunnelConversionHeatmap } from "@/components/funnel-analysis/FunnelConversionHeatmap";
+import { FunnelSuggestedActions } from "@/components/funnel-analysis/FunnelSuggestedActions";
 import { FunnelMediaOverview } from "@/components/funnel-analysis/FunnelMediaOverview";
 import { FunnelSalesAttribution } from "@/components/funnel-analysis/FunnelSalesAttribution";
 import { RefreshCw, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
@@ -239,6 +240,17 @@ export default function FunnelAnalysis() {
     () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales),
     [periodBaseAnalytics, periodFunnelSales],
   );
+  const previousAvgDaysToConvert = useMemo(() => {
+    const span = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
+    const previousStart = subDays(startDate, span);
+    const previousEnd = subDays(startDate, 1);
+    const values = operationalClosedDeals.filter((deal) => {
+      if (!deal.closed_at || !deal.lead_created_at) return false;
+      const closed = new Date(deal.closed_at);
+      return closed >= previousStart && closed <= new Date(previousEnd.getFullYear(), previousEnd.getMonth(), previousEnd.getDate(), 23, 59, 59, 999);
+    }).map((deal) => Math.max(0, (new Date(deal.closed_at!).getTime() - new Date(deal.lead_created_at!).getTime()) / 86400000));
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  }, [endDate, operationalClosedDeals, startDate]);
 
   const { data: insightRows = [], isLoading: loadingInsights } = useInsights({
     // In "Todas as contas", undefined intentionally aggregates all accounts
@@ -477,8 +489,13 @@ export default function FunnelAnalysis() {
               cpl={mediaMetrics.metaCpl}
               cac={mediaMetrics.cac}
               salesConversionRate={mediaMetrics.salesConversionRate}
+              previousAvgDaysToConvert={previousAvgDaysToConvert}
             />
           </MotionItem>
+
+          <MotionItem><HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock></MotionItem>
+
+          <MotionItem><FunnelSuggestedActions a={periodAnalytics} /></MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -487,14 +504,7 @@ export default function FunnelAnalysis() {
             </div>
           </MotionItem>
 
-          <MotionItem>
-            <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2">
-                <HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={periodAnalytics} /></HelpBlock>
-              </div>
-              <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
-            </div>
-          </MotionItem>
+          <MotionItem><HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={periodAnalytics} /></HelpBlock></MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -508,12 +518,7 @@ export default function FunnelAnalysis() {
             <HelpBlock help={blockHelp.states}><FunnelStateMap a={periodAnalytics} /></HelpBlock>
           </MotionItem>
 
-          <MotionItem>
-            <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <HelpBlock help={blockHelp.weekdays}><FunnelWeekdayChart a={periodAnalytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.hours}><FunnelHourChart a={periodAnalytics} /></HelpBlock>
-            </div>
-          </MotionItem>
+          <MotionItem><HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]}><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock></MotionItem>
 
           <MotionItem>
             <HelpBlock help={blockHelp.attribution}><FunnelSalesAttribution sales={periodFunnelSales} /></HelpBlock>
