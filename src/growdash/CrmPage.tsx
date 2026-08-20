@@ -50,7 +50,7 @@ import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
-import { consolidateCRMPipeline, consolidatedCRMStage, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
+import { isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
 import { isRDDealInCrmPeriod } from "@/lib/crmDateScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { PageHeading } from "./shared";
@@ -72,6 +72,13 @@ type PipelineStage = {
   won: boolean;
   lost: boolean;
 };
+
+// RD stage IDs are only unique within a pipeline. Keeping the funnel ID in
+// the board key prevents stages from separate funnels being merged or moved
+// by a local name-based heuristic when the user views more than one account.
+function rdPipelineStageKey(rdFunnelId: string | null | undefined, rdStageId: string | null | undefined) {
+  return `${rdFunnelId || "unassigned-funnel"}:${rdStageId || "no-stage"}`;
+}
 
 type CrmMetricCardProps = {
   source: string;
@@ -324,16 +331,11 @@ export default function CrmPage() {
   }, [dealsInPipeline, getOpportunityAmount, scopedSales]);
 
   const stages = useMemo<PipelineStage[]>(() => {
-    if (isConsolidatedView) {
-      return consolidateCRMPipeline([
-        ...visibleStoredStages.map((stage) => ({ id: stage.rd_stage_id, name: stage.name, order: stage.order, won: stage.is_won, lost: stage.is_lost })),
-        ...dealsInPipeline.map((deal) => ({ id: deal.rd_stage_id, name: deal.rd_stage_name, order: deal.rd_stage_order, won: classifyLead(deal) === "won", lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified" })),
-      ]);
-    }
     const map = new Map<string, PipelineStage>();
     for (const stage of visibleStoredStages) {
-      map.set(stage.rd_stage_id, {
-        id: stage.rd_stage_id,
+      const id = rdPipelineStageKey(stage.rd_funnel_id, stage.rd_stage_id);
+      map.set(id, {
+        id,
         name: stage.name,
         order: stage.order,
         won: stage.is_won,
@@ -341,7 +343,7 @@ export default function CrmPage() {
       });
     }
     for (const deal of dealsInPipeline) {
-      const id = deal.rd_stage_id || "no-stage";
+      const id = rdPipelineStageKey(deal.rd_funnel_id, deal.rd_stage_id);
       if (!map.has(id)) {
         map.set(id, {
           id,
@@ -359,15 +361,13 @@ export default function CrmPage() {
     const map = new Map<string, RDDealLite[]>();
     for (const stage of stages) map.set(stage.id, []);
     for (const deal of deals) {
-      const stageId = isConsolidatedView
-        ? consolidatedCRMStage({ name: deal.rd_stage_name, order: deal.rd_stage_order, won: classifyLead(deal) === "won", lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified" }).id
-        : deal.rd_stage_id || "no-stage";
+      const stageId = rdPipelineStageKey(deal.rd_funnel_id, deal.rd_stage_id);
       const current = map.get(stageId) || [];
       current.push(deal);
       map.set(stageId, current);
     }
     return map;
-  }, [deals, isConsolidatedView, stages]);
+  }, [deals, stages]);
 
   const lastUpdatedAt = useMemo(() => {
     const timestamps = scopedDeals.map((deal) => deal.updated_at || deal.stage_updated_at).filter(Boolean) as string[];

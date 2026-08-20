@@ -688,6 +688,34 @@ Deno.serve(async (req) => {
           await admin
             .from("rd_funnel_stages")
             .upsert(rows, { onConflict: "rd_funnel_id,rd_stage_id" });
+          // A pipeline can be edited directly in RD Station. Retaining a
+          // deleted or renamed stage locally makes the CRM render columns that
+          // no longer exist in RD, so remove only stages absent from a
+          // successful, non-empty authoritative response.
+          const activeStageIds = new Set(rows.map((row) => row.rd_stage_id));
+          const { data: storedStages, error: storedStagesError } = await admin
+            .from("rd_funnel_stages")
+            .select("rd_stage_id")
+            .eq("rd_funnel_id", funnel!.id);
+          if (storedStagesError) {
+            console.warn(`[stages] não foi possível conferir etapas antigas do funil ${funnel.name}: ${storedStagesError.message}`);
+          } else {
+            const staleStageIds = (storedStages || [])
+              .map((stage) => String(stage.rd_stage_id || ""))
+              .filter((stageId) => stageId && !activeStageIds.has(stageId));
+            if (staleStageIds.length > 0) {
+              const { error: deleteStagesError } = await admin
+                .from("rd_funnel_stages")
+                .delete()
+                .eq("rd_funnel_id", funnel!.id)
+                .in("rd_stage_id", staleStageIds);
+              if (deleteStagesError) {
+                console.warn(`[stages] não foi possível remover etapas obsoletas do funil ${funnel.name}: ${deleteStagesError.message}`);
+              } else {
+                console.log(`[stages] removidas ${staleStageIds.length} etapa(s) obsoleta(s) do funil ${funnel.name}`);
+              }
+            }
+          }
           console.log(`[stages] sincronizadas ${rows.length} etapas reais do funil ${funnel.name}`);
         }
       } else {
