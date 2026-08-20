@@ -48,6 +48,12 @@ verify_jwt = true
 [functions.sync-rd-crm]
 verify_jwt = false
 
+[functions.sales-webhook]
+verify_jwt = false
+
+[functions.sales-webhook-config]
+verify_jwt = true
+
 [functions.daily-incremental-sync]
 verify_jwt = false
 
