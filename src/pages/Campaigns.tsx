@@ -1056,7 +1056,7 @@ export default function Campaigns() {
                   data-sticky-totals="true"
                   className={cn(
                     "growdash-scrollbar-hidden relative hidden md:block",
-                    "min-h-0 flex-1 overflow-auto",
+                    "min-h-0 flex-1 overflow-auto md:absolute md:inset-x-0 md:top-0 md:bottom-16",
                   )}
                   onScroll={(event) => {
                     const totalsDock = campaignTotalsScrollRef.current;
@@ -1234,7 +1234,7 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <div ref={campaignTotalsScrollRef} className="campaign-totals-dock campaign-total-bar relative z-40 hidden h-16 shrink-0 overflow-x-auto border-t border-border md:block" style={{ position: "static" }} aria-label="Totais das campanhas filtradas" onScroll={(event) => { const table = campaignTableScrollRef.current; if (table && table.scrollLeft !== event.currentTarget.scrollLeft) table.scrollLeft = event.currentTarget.scrollLeft; }}>
+                <div ref={campaignTotalsScrollRef} className="campaign-totals-dock campaign-total-bar relative z-40 hidden h-16 shrink-0 overflow-x-auto border-t border-border md:absolute md:inset-x-0 md:bottom-0 md:block" aria-label="Totais das campanhas filtradas" onScroll={(event) => { const table = campaignTableScrollRef.current; if (table && table.scrollLeft !== event.currentTarget.scrollLeft) table.scrollLeft = event.currentTarget.scrollLeft; }}>
                   <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><CampaignTotalsRow widths={camp.colWidths} visibleColumns={visibleColumns} count={filtered.length} totals={totals} totalCpm={totalCpm} totalCpl={totalCpl} totalCpc={totalCpc} totalCtr={totalCtr} totalRoas={totalRoas} totalLinkCpc={totalLinkCpc} totalUniqueLinkCtr={totalUniqueLinkCtr} totalCostPerLandingPageView={totalCostPerLandingPageView} totalCostPerCheckout={totalCostPerCheckout} totalMetaCostPerPurchase={totalMetaCostPerPurchase} totalMetaPurchaseRoas={totalMetaPurchaseRoas} totalResultRate={totalResultRate} /></tbody></table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
