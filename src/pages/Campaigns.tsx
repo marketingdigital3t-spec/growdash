@@ -1050,6 +1050,7 @@ export default function Campaigns() {
                 <div
                   ref={campaignTableScrollRef}
                   data-campaign-table-scroll
+                  data-sticky-totals="true"
                   className={cn(
                     "growdash-scrollbar-hidden relative hidden md:block",
                     "min-h-0 flex-1 overflow-auto",
