@@ -251,7 +251,6 @@ export default function Campaigns() {
   });
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
-  const [campaignTotalsDock, setCampaignTotalsDock] = useState<HTMLDivElement | null>(null);
   const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
@@ -1051,11 +1050,6 @@ export default function Campaigns() {
                 <div
                   ref={campaignTableScrollRef}
                   data-campaign-table-scroll
-                  onScroll={(event) => {
-                    if (campaignTotalsDock && campaignTotalsDock.scrollLeft !== event.currentTarget.scrollLeft) {
-                      campaignTotalsDock.scrollLeft = event.currentTarget.scrollLeft;
-                    }
-                  }}
                   className={cn(
                     "growdash-scrollbar-hidden relative hidden md:block",
                     "min-h-0 flex-1 overflow-auto",
@@ -1178,7 +1172,7 @@ export default function Campaigns() {
                       </AnimatePresence>
                     </TableBody>
                     {(() => {
-                      const footer = <TableFooter className="campaign-total-bar shadow-[0_-8px_20px_-14px_rgba(0,0,0,.75)]">
+                      const footer = <TableFooter className="campaign-total-bar sticky bottom-0 z-30 shadow-[0_-8px_20px_-14px_rgba(0,0,0,.75)]">
                       <TableRow data-campaign-totals className="h-14 border-y border-border/80 bg-muted/95 backdrop-blur-xl hover:bg-muted/95 dark:border-[#373226] dark:bg-[#11110f]/95 dark:hover:bg-[#11110f]/95 [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
                         <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
@@ -1225,36 +1219,14 @@ export default function Campaigns() {
                       </TableRow>
                     </TableFooter>;
 
-                      // The persistent summary is rendered directly below the
-                      // table. Keeping a portal inside the scroll dock made it
-                      // disappear after layout/theme transitions.
-                      return null;
+                      // The summary belongs to the same scroll container as
+                      // the data rows. This keeps it visible while scrolling
+                      // vertically and precisely aligned with every column.
+                      return footer;
                     })()}
                   </table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
-                <div
-                  ref={setCampaignTotalsDock}
-                  data-campaign-totals-fixed
-                  onScroll={(event) => {
-                    if (campaignTableScrollRef.current && campaignTableScrollRef.current.scrollLeft !== event.currentTarget.scrollLeft) {
-                      campaignTableScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
-                    }
-                  }}
-                  className="campaign-totals-dock growdash-scrollbar sticky bottom-0 z-30 block min-h-[72px] shrink-0 overflow-x-auto overflow-y-hidden border-t border-border/80 bg-muted/95 shadow-[0_-10px_24px_-16px_rgba(0,0,0,.75)] md:h-[72px] dark:border-[#373226] dark:bg-[#11110f]/95"
-                  aria-label="Totais das campanhas"
-                >
-                  <div className="campaign-total-bar flex h-full min-w-max items-center gap-2 px-3 py-2">
-                    <TotalMetric label="Campanhas" value={filtered.length.toLocaleString("pt-BR")} />
-                    <TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-                    <TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} />
-                    <TotalMetric label="Alcance" value={totals.reach.toLocaleString("pt-BR")} />
-                    <TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} />
-                    <TotalMetric label="Resultados" value={totals.results.toLocaleString("pt-BR")} />
-                    <TotalMetric label="Custo / resultado" value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
-                    <TotalMetric label="CTR" value={`${totalCtr.toFixed(2).replace(".", ",")}%`} />
-                  </div>
-                </div>
               </Card>
             )}
           </TabsContent>
