@@ -1241,7 +1241,7 @@ export default function Campaigns() {
                       campaignTableScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
                     }
                   }}
-                  className="campaign-totals-dock growdash-scrollbar hidden h-[72px] shrink-0 overflow-x-auto overflow-y-hidden border-t border-border/80 bg-muted/95 md:block dark:border-[#373226] dark:bg-[#11110f]/95"
+                  className="campaign-totals-dock growdash-scrollbar sticky bottom-0 z-30 block min-h-[72px] shrink-0 overflow-x-auto overflow-y-hidden border-t border-border/80 bg-muted/95 shadow-[0_-10px_24px_-16px_rgba(0,0,0,.75)] md:h-[72px] dark:border-[#373226] dark:bg-[#11110f]/95"
                   aria-label="Totais das campanhas"
                 >
                   <div className="campaign-total-bar flex h-full min-w-max items-center gap-2 px-3 py-2">
