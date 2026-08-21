@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { BarChart3, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -90,7 +90,6 @@ export default function Auth() {
       </form>
       <div className="auth-divider"><span />ou continue com<span /></div>
       <div className="auth-social-grid"><button type="button" onClick={() => social("google")}><span className="auth-google-mark">G</span>Continuar com Google</button><button type="button" onClick={() => social("apple")}><span className="auth-apple-mark" aria-hidden="true"></span>Continuar com iCloud</button></div>
-      <div className="auth-card-footer"><ShieldCheck className="h-3.5 w-3.5" /> Não tem uma conta? <button type="button" onClick={() => setMode("register")}>Criar conta</button></div>
     </motion.section>
   </main>;
 }
