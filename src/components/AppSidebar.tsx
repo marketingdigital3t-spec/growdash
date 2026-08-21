@@ -1,4 +1,4 @@
-import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, Moon, Sun, AlertCircle, GitBranch, CalendarDays, Users as UsersIcon, HeartPulse } from "lucide-react";
+import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, Moon, Sun, AlertCircle, GitBranch, CalendarDays, Users as UsersIcon, HeartPulse, Sparkles } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -26,6 +26,7 @@ export function AppSidebar() {
 
   const navItems = [
     { title: "Dashboard", url: "/", icon: LayoutDashboard, show: perms.canDashboard },
+    { title: "Painel do Expert", url: "/painel-expert", icon: Sparkles, show: perms.canExpertDashboard },
     { title: "Campanhas", url: "/campanhas", icon: Megaphone, show: perms.canCampaigns },
     { title: "Análise de Funis", url: "/analise-de-funis", icon: GitBranch, show: perms.canFunnels },
     { title: "Datas & Turmas", url: "/agenda-turmas", icon: CalendarDays, show: perms.canClasses },
