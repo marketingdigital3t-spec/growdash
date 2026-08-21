@@ -18,7 +18,7 @@ export function RDIntegrationCard() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const { user } = useAuth();
 
-  const { data: integration } = useRDIntegration();
+  const { data: integration, isError: integrationLoadFailed, error: integrationLoadError, refetch: refetchIntegration } = useRDIntegration();
   const isConnected = !!integration?.is_active;
 
   const save = useMutation({
@@ -107,6 +107,13 @@ export function RDIntegrationCard() {
           {isConnected ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
           {isConnected ? "RD Station CRM conectado" : "Não conectado"}
         </div>
+
+        {integrationLoadFailed && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive" role="alert">
+            <span>Não foi possível verificar a conexão: {integrationLoadError instanceof Error ? integrationLoadError.message : "erro de consulta"}.</span>
+            <Button type="button" size="sm" variant="outline" onClick={() => void refetchIntegration()}>Tentar novamente</Button>
+          </div>
+        )}
 
         <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
           <p className="font-medium text-foreground">Como gerar o token:</p>

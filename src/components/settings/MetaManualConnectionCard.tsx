@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 export function MetaManualConnectionCard({ onConnected }: { onConnected?: () => void }) {
   const { toast } = useToast();
@@ -33,9 +34,9 @@ export function MetaManualConnectionCard({ onConnected }: { onConnected?: () => 
       });
       onConnected?.();
     },
-    onError: (error: Error) => toast({
+    onError: async (error: Error) => toast({
       title: "Não foi possível conectar",
-      description: error.message,
+      description: await getEdgeFunctionErrorMessage(error, "A conexão com a Meta falhou. Verifique o ID, as permissões do token e tente novamente."),
       variant: "destructive",
     }),
   });

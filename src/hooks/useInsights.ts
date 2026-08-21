@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { withRequestTimeout } from "@/lib/resilience";
 
 interface UseInsightsParams {
   adAccountId?: string;
@@ -112,7 +113,9 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
       for (let page = 0; ; page++) {
         const from = page * PAGE;
         const to = from + PAGE - 1;
-        const { data, error } = await query.range(from, to);
+        // A provider delay must surface as a recoverable query failure rather
+        // than leaving every Meta KPI in a permanent loading state.
+        const { data, error } = await withRequestTimeout(query.range(from, to), 15_000);
         if (error) throw error;
         const batch = data || [];
         allRows = allRows.concat(batch);

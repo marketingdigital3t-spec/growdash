@@ -6,7 +6,7 @@ import {
   BarChart3, Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, CreditCard,
   ExternalLink, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
   Network, RefreshCw, Settings2, Smartphone, Sparkles, Target, UsersRound, Video,
-  WalletCards, Wrench, Zap,
+  WalletCards, Wrench, Zap, Presentation,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -29,14 +29,16 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { LeadReportStudio } from "@/growdash/LeadReportStudio";
+import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
 
 const CampaignsManager = lazy(() => import("@/pages/Campaigns"));
-const validTabs = new Set(["campaigns", "budget", "ai", "funnels", "tools"]);
+const validTabs = new Set(["campaigns", "budget", "ai", "funnels", "presentation", "tools"]);
 const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
   { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
   { id: "ai", label: "IA & Relatórios de Leads", icon: Bot },
   { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
+  { id: "presentation", label: "Apresentação", icon: Presentation },
   { id: "tools", label: "Ferramentas Meta", icon: Wrench },
 ] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -63,11 +65,11 @@ export default function TrafficPage() {
           : "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
         : "space-y-3",
     )}>
-      <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-3 lg:max-w-[1500px] lg:grid-cols-5" aria-label="Áreas de Tráfego Pago">
+      <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-3 lg:max-w-[1500px] lg:grid-cols-6" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("traffic-area-tab flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
 
-      {activeTab !== "campaigns" && activeTab !== "ai" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
+      {activeTab !== "campaigns" && activeTab !== "ai" && activeTab !== "presentation" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
         <span className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conta de anúncio</span>
         <Select value={adAccountId} onValueChange={setAdAccountId}><SelectTrigger className="h-9 w-full bg-background sm:max-w-md"><SelectValue placeholder="Selecione uma conta" /></SelectTrigger><SelectContent><SelectItem value="all">Todas as contas da unidade</SelectItem>{visibleAccounts.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>
         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[10px] font-bold text-emerald-600"><Check className="h-3 w-3" />Dados sincronizados</span>
@@ -78,6 +80,7 @@ export default function TrafficPage() {
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountId} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
       {activeTab === "ai" && <AIAndLeadReports accountId={adAccountId} accountName={account?.name} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} onAccountChange={setAdAccountId} />}
       {activeTab === "funnels" && <TrafficFunnels />}
+      {activeTab === "presentation" && <PaidTrafficPresentation />}
       {activeTab === "tools" && <MetaToolsWorkspace
         providerAccountId={account?.account_id}
         accountName={account?.name}

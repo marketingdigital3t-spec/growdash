@@ -1,6 +1,6 @@
 import { Component, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
 import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { dehydrate, hydrate, keepPreviousData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
@@ -50,72 +50,23 @@ const PublicBrandDiagnosticForm = lazyWithRetry(() => import("@/pages/PublicBran
 const PublicExpertQuestionnaire = lazyWithRetry(() => import("@/pages/PublicExpertQuestionnaire"), "public-expert-questionnaire");
 const ExpertDashboard = lazyWithRetry(() => import("@/pages/ExpertDashboard"), "expert-dashboard");
 
-const QUERY_SESSION_CACHE_KEY = "growdash:query-cache:v1";
-const QUERY_SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const QUERY_SESSION_MAX_BYTES = 4_200_000;
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       staleTime: 120_000,
       gcTime: 30 * 60_000,
-      // Keep the last successful screen in place when filters or query keys
-      // change. Refreshes stay silent rather than replacing KPI cards with an
-      // empty state or a blocking loader.
-      placeholderData: keepPreviousData,
-      // A snapshot of the last successful session is immediately usable. Live
-      // changes arrive through the silent realtime layer; mounting a route
-      // must not re-read its entire history just because the user navigated.
-      refetchOnMount: false,
+      // A changed key means a different period, account or workspace. Do not
+      // display its previous result as if it belonged to the new selection.
+      placeholderData: undefined,
+      // Revalidate stale facts when a module is opened, including after a
+      // background Meta or RD synchronization has completed.
+      refetchOnMount: true,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
   },
 });
-
-function restoreQuerySession() {
-  if (typeof window === "undefined") return;
-  try {
-    const saved = JSON.parse(window.sessionStorage.getItem(QUERY_SESSION_CACHE_KEY) || "null");
-    if (!saved?.state || !saved?.savedAt || Date.now() - Number(saved.savedAt) > QUERY_SESSION_MAX_AGE_MS) return;
-    hydrate(queryClient, saved.state);
-  } catch {
-    // A stale or partial browser cache must never prevent the application from opening.
-    window.sessionStorage.removeItem(QUERY_SESSION_CACHE_KEY);
-  }
-}
-
-restoreQuerySession();
-
-let querySessionSaveTimer: number | undefined;
-function persistQuerySession() {
-  if (typeof window === "undefined") return;
-  if (querySessionSaveTimer !== undefined) window.clearTimeout(querySessionSaveTimer);
-  querySessionSaveTimer = window.setTimeout(() => {
-    try {
-      const state = dehydrate(queryClient, {
-        shouldDehydrateQuery: (query) => query.state.status === "success" && query.state.data !== undefined,
-      });
-      // Keep the newest successful screen snapshots if the browser storage limit is near.
-      state.queries.sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
-      let serialized = JSON.stringify({ savedAt: Date.now(), state });
-      while (serialized.length > QUERY_SESSION_MAX_BYTES && state.queries.length > 1) {
-        state.queries.pop();
-        serialized = JSON.stringify({ savedAt: Date.now(), state });
-      }
-      window.sessionStorage.setItem(QUERY_SESSION_CACHE_KEY, serialized);
-    } catch {
-      // Storage is an enhancement only. Live data and navigation keep working without it.
-    }
-  }, 400);
-}
-
-if (typeof window !== "undefined") {
-  queryClient.getQueryCache().subscribe((event) => {
-    if (event?.type === "updated" && event.query.state.status === "success") persistQuerySession();
-  });
-}
 
 function LoadingModule() {
   const [slow, setSlow] = useState(false);

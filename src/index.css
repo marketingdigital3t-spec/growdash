@@ -876,7 +876,7 @@ html:not(.dark) {
     outline-offset: -1px;
   }
 
-  .growdash-main :where(section, article, div, header, footer, nav, form, fieldset) {
+.growdash-main :where(section, article, div, header, footer, nav, form, fieldset) {
     min-width: 0;
     max-width: 100%;
   }
@@ -891,6 +891,19 @@ html:not(.dark) {
   [class~="xl:grid-cols-6"]
   ):not(nav):not([role="tablist"]) {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+
+/* react-grid-layout receives the exact usable width from DashboardGrid. The
+   container is deliberately constrained so a saved desktop layout can never
+   create horizontal clipping when the sidebar changes width. */
+.dashboard-grid-container {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-grid-container .react-grid-layout {
+  max-width: 100%;
 }
 
   /* Tratamento visual único para ações da plataforma. O reflexo e o glow

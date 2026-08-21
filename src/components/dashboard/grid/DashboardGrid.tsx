@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 // @ts-ignore - default export missing types alias
-import RGL, { Responsive, WidthProvider } from "react-grid-layout";
+import RGL, { Responsive } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { WidgetRenderer } from "./WidgetRenderer";
@@ -18,7 +18,7 @@ import {
 import { DashboardWidgetConfigDialog } from "./DashboardWidgetConfigDialog";
 import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
 
-const ResponsiveGrid = WidthProvider(Responsive);
+const ResponsiveGrid = Responsive;
 const GRID_ROW_HEIGHT = 60;
 const GRID_MARGIN_Y = 12;
 
@@ -89,6 +89,21 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
   const [widgets, setWidgets] = useState<any[]>(view.widgets || []);
   const [autoHeightRows, setAutoHeightRows] = useState<Record<string, number>>({});
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+  const [gridWidth, setGridWidth] = useState(0);
+
+  // The sidebar changes the usable content width without firing window.resize.
+  // Measuring this element (rather than the browser viewport) prevents RGL
+  // from positioning cards behind the right edge after the menu is toggled.
+  useLayoutEffect(() => {
+    const element = gridContainerRef.current;
+    if (!element) return;
+    const update = () => setGridWidth(Math.max(0, Math.floor(element.getBoundingClientRect().width)));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     setLayout(view.layout || []);
@@ -174,8 +189,9 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
   }
 
   return (
-    <div className="relative min-w-0 max-w-full overflow-x-clip">
-      <ResponsiveGrid
+    <div ref={gridContainerRef} className="dashboard-grid-container relative min-w-0 max-w-full overflow-x-clip">
+      {gridWidth > 0 && <ResponsiveGrid
+        width={gridWidth}
         className={isEditing ? "layout dashboard-layout-editing" : "layout"}
         layouts={responsiveLayouts}
         breakpoints={{ lg: 1280, md: 900, sm: 0 }}
@@ -214,7 +230,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
             </div>
           );
         })}
-      </ResponsiveGrid>
+      </ResponsiveGrid>}
       <DashboardWidgetConfigDialog widget={configuringWidget} open={!!configuringWidget} onOpenChange={(open) => !open && setConfiguringWidgetId(null)} onSave={(patch) => { if (configuringWidget) updateWidget(configuringWidget.id, patch); }} />
     </div>
   );

@@ -14,6 +14,11 @@ export function useRDIntegration() {
         .select("id, provider, is_active, created_at, updated_at")
         .eq("user_id", user!.id)
         .eq("provider", "rd_station_crm")
+        // Older installations may contain more than one historical RD row.
+        // The backend always uses the newest credential, so the UI must use
+        // the same deterministic rule rather than failing on maybeSingle().
+        .order("updated_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
       if (error) throw error;
       return data;

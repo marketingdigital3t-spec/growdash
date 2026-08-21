@@ -41,7 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const applySession = (nextSession: Session | null) => {
       if (!active) return;
       const nextUserId = nextSession?.user.id ?? null;
-      if (userIdRef.current !== null && userIdRef.current !== nextUserId) queryClient.clear();
+      // Clear even on the first resolved user: a startup cache can precede
+      // authentication and must never appear in the authenticated workspace.
+      if (userIdRef.current !== nextUserId) queryClient.clear();
       userIdRef.current = nextUserId;
       setSession(nextSession);
       setStatus(nextSession ? "authenticated" : "unauthenticated");
@@ -77,6 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // boot. Without this timeout a flaky Supabase connection could return
       // the entire platform to an infinite loading state.
       const { data } = await withRequestTimeout(supabase.auth.getSession(), 10_000);
+      const nextUserId = data.session?.user.id ?? null;
+      if (userIdRef.current !== nextUserId) queryClient.clear();
+      userIdRef.current = nextUserId;
       setSession(data.session);
       setStatus(data.session ? "authenticated" : "unauthenticated");
     } catch {

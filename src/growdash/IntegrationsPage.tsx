@@ -36,6 +36,7 @@ import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGoogleWorkspaceOAuth } from "@/hooks/useGoogleWorkspaceOAuth";
 import { Textarea } from "@/components/ui/textarea";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 const tabs = [
   ["paid", "Tráfego pago"], ["social", "Mídia social"], ["crm", "CRM & Vendas"], ["ai", "IA"], ["messaging", "Mensageria"],
@@ -110,8 +111,8 @@ function IntegrationsContent() {
   const [metaDialogOpen, setMetaDialogOpen] = useState(false);
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<{ id: string; name: string; account_id: string } | null>(null);
-  const { data: adAccountsData, isLoading: loadingMeta } = useAdAccounts();
-  const { data: rdIntegration, isLoading: loadingRD } = useRDIntegration();
+  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts();
+  const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
   const { data: rdFunnelsData } = useRDFunnels(undefined, !!rdIntegration?.is_active);
   const connectMeta = useMetaOAuth();
   const connectInstagram = useInstagramOAuth();
@@ -176,10 +177,51 @@ function IntegrationsContent() {
   const syncAll = useMutation({
     mutationFn: async () => {
       if (!metaConnected && !rdConnected) throw new Error("Conecte ao menos uma fonte antes de sincronizar.");
-      if (metaConnected) await syncMeta.mutateAsync({ startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd") });
-      if (rdConnected) for (const funnel of activeRDFunnels) { const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: { funnel_id: funnel.id } }); if (error) throw error; if (data?.error) throw new Error(data.error); }
+      const completed: string[] = [];
+      const failures: string[] = [];
+
+      if (metaConnected) {
+        try {
+          await syncMeta.mutateAsync({ startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd") });
+          completed.push("Meta Ads");
+        } catch (error) {
+          failures.push(`Meta Ads: ${error instanceof Error ? error.message : "falha na sincronização"}`);
+        }
+      }
+
+      if (rdConnected) {
+        if (!activeRDFunnels.length) {
+          failures.push("RD Station: conecte e ative ao menos um funil para sincronizar negócios.");
+        } else {
+          let syncedFunnels = 0;
+          for (const funnel of activeRDFunnels) {
+            try {
+              const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: { funnel_id: funnel.id } });
+              if (error) throw new Error(await getEdgeFunctionErrorMessage(error, `Não foi possível sincronizar o funil ${funnel.name}.`));
+              if (data?.error) throw new Error(data.error);
+              syncedFunnels += 1;
+            } catch (error) {
+              failures.push(`RD Station (${funnel.name}): ${error instanceof Error ? error.message : "falha na sincronização"}`);
+            }
+          }
+          if (syncedFunnels) completed.push(`RD Station (${syncedFunnels} funil${syncedFunnels > 1 ? "is" : ""})`);
+        }
+      }
+
+      if (!completed.length) throw new Error(failures.join(" "));
+      return { completed, failures };
     },
-    onSuccess: () => { queryClient.invalidateQueries(); toast({ title: "Sincronização concluída", description: "As fontes conectadas foram atualizadas." }); },
+    onSuccess: ({ completed, failures }) => {
+      void queryClient.invalidateQueries({ queryKey: ["rd_latest_sync"] });
+      void queryClient.invalidateQueries({ queryKey: ["rd_funnels"] });
+      void queryClient.invalidateQueries({ queryKey: ["rd_health_check"] });
+      void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      toast({
+        title: failures.length ? "Sincronização concluída com alertas" : "Sincronização concluída",
+        description: failures.length ? `${completed.join(" e ")} foi atualizado. ${failures.join(" ")}` : `${completed.join(" e ")} foi atualizado.`,
+        variant: failures.length ? "destructive" : "default",
+      });
+    },
     onError: (error: Error) => toast({ title: "Falha na sincronização", description: error.message, variant: "destructive" }),
   });
 
@@ -212,6 +254,11 @@ function IntegrationsContent() {
   return (
     <div className="mx-auto max-w-[1500px]">
       <PageHeading eyebrow="Administração" title="Central de integrações" description="Conecte mídia, CRM, IA, mensageria e dados com credenciais protegidas e saúde monitorada." actions={<Button onClick={() => syncAll.mutate()} disabled={syncAll.isPending || (!metaConnected && !rdConnected)}><RefreshCw className={cn("mr-2 h-4 w-4", syncAll.isPending && "animate-spin")} />{syncAll.isPending ? "Sincronizando…" : "Sincronizar tudo"}</Button>} />
+
+      {(metaLoadFailed || rdLoadFailed) && <section className="mb-4 flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert">
+        <div className="min-w-0"><b className="text-destructive">Não foi possível verificar todas as integrações.</b><p className="mt-1 break-words text-xs text-muted-foreground">{metaLoadFailed ? `Meta Ads: ${metaLoadError instanceof Error ? metaLoadError.message : "erro de consulta"}. ` : ""}{rdLoadFailed ? `RD Station: ${rdLoadError instanceof Error ? rdLoadError.message : "erro de consulta"}.` : ""}</p></div>
+        <div className="flex shrink-0 gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { if (metaLoadFailed) void refetchMeta(); if (rdLoadFailed) void refetchRD(); }}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar novamente</Button></div>
+      </section>}
 
       <div className="gd-panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
         <div className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar provedor ou recurso" value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Buscar provedor ou recurso…" /></div>

@@ -1041,7 +1041,7 @@ export default function Campaigns() {
               </Card>
             ) : (
               <Card className={cn(
-                "relative min-h-0 overflow-hidden rounded-none border-0 shadow-none",
+                "relative flex min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none",
                 analysisMode
                   ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
                   : "md:h-[clamp(300px,calc(100dvh-22rem),640px)] md:min-h-0",
@@ -1053,7 +1053,7 @@ export default function Campaigns() {
                   ref={campaignTableScrollRef}
                   data-campaign-table-scroll
                   className={cn(
-                    "growdash-scrollbar-hidden absolute inset-x-0 top-0 bottom-16 hidden overflow-auto md:block",
+                    "growdash-scrollbar-hidden hidden min-h-0 flex-1 overflow-auto md:block",
                   )}
                 >
                   <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}>
@@ -1227,7 +1227,7 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <div className="campaign-total-bar absolute inset-x-0 bottom-0 z-[60] hidden h-16 overflow-x-auto overflow-y-hidden border-t border-border md:block" style={{ overflowY: "hidden" }} aria-label="Totais das campanhas filtradas">
+                <div className="campaign-total-bar relative z-[60] hidden h-16 shrink-0 overflow-x-auto overflow-y-hidden border-t border-border md:block" style={{ overflowY: "hidden" }} aria-label="Totais das campanhas filtradas">
                   <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><CampaignTotalsRow widths={camp.colWidths} visibleColumns={visibleColumns} count={filtered.length} totals={totals} totalCpm={totalCpm} totalCpl={totalCpl} totalCpc={totalCpc} totalCtr={totalCtr} totalRoas={totalRoas} totalLinkCpc={totalLinkCpc} totalUniqueLinkCtr={totalUniqueLinkCtr} totalCostPerLandingPageView={totalCostPerLandingPageView} totalCostPerCheckout={totalCostPerCheckout} totalMetaCostPerPurchase={totalMetaCostPerPurchase} totalMetaPurchaseRoas={totalMetaPurchaseRoas} totalResultRate={totalResultRate} /></tbody></table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}

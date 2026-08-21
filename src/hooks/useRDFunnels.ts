@@ -16,9 +16,11 @@ export interface RDFunnel {
 }
 
 export function useRDFunnels(adAccountId?: string, enabled = true) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["rd_funnels", adAccountId ?? "all"],
-    enabled,
+    // Do not retain a previous user's funnels while the session changes.
+    queryKey: ["rd_funnels", user?.id ?? "anonymous", adAccountId ?? "all"],
+    enabled: enabled && !!user,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
