@@ -1235,7 +1235,7 @@ export default function Campaigns() {
                       // The summary belongs to the same scroll container as
                       // the data rows. This keeps it visible while scrolling
                       // vertically and precisely aligned with every column.
-                      return false ? footer : null;
+                      return footer;
                     })()}
                   </table>
                 </div>
