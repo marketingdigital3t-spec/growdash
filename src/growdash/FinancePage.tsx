@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
 import { InvoicePdfStudio } from "@/components/finance/InvoicePdfStudio";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
+import { calculateTrafficFundsAdded } from "@/lib/trafficFunding";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
@@ -39,6 +40,7 @@ interface FinancialAccount { id: string; name: string; account_type: string; ins
 interface Company { id: string; name: string; legal_name?: string | null; expert_name?: string | null; status: string; }
 interface FinancialTransaction { id: string; amount: number; description: string; occurred_at: string; transaction_type: string; matched_entry_id?: string | null; }
 interface AccountBalanceEvent { ad_account_id: string; delta: number; event_at: string; }
+interface AccountFundingTransaction { ad_account_id: string; amount: number; time: string; payment_method?: string | null; status?: string | null; }
 
 function csvCell(value: unknown) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 
@@ -92,6 +94,23 @@ export default function FinancePage() {
         .lte("event_at", `${format(endDate, "yyyy-MM-dd")}T23:59:59`);
       if (error) {
         if (error.code === "42P01" || /account_balance_events|schema cache/i.test(error.message)) return [];
+        throw error;
+      }
+      return data ?? [];
+    },
+  });
+
+  const { data: fundingTransactions = [], isLoading: loadingFundingTransactions } = useQuery({
+    queryKey: ["finance-pix-funding", accountIds, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    enabled: accountIds.length > 0,
+    queryFn: async (): Promise<AccountFundingTransaction[]> => {
+      const { data, error } = await (supabase as any).from("account_transactions")
+        .select("ad_account_id,amount,time,payment_method,status")
+        .in("ad_account_id", accountIds)
+        .gte("time", `${format(startDate, "yyyy-MM-dd")}T00:00:00`)
+        .lte("time", `${format(endDate, "yyyy-MM-dd")}T23:59:59`);
+      if (error) {
+        if (error.code === "42P01" || /account_transactions|schema cache/i.test(error.message)) return [];
         throw error;
       }
       return data ?? [];
@@ -165,13 +184,13 @@ export default function FinancePage() {
   const totalRevenue = aggregateSales(visibleSales).totalNet + otherRevenue;
   const metaTaxRate = 0.1215;
   const adjustedSpend = spend * (includeMetaTax ? 1 + metaTaxRate : 1);
-  const balanceAdded = balanceEvents.reduce((sum, event) => sum + Math.max(0, Number(event.delta || 0)), 0);
+  const balanceAdded = calculateTrafficFundsAdded(balanceEvents, fundingTransactions);
   const balanceAddedTax = includeMetaTax ? balanceAdded * metaTaxRate : 0;
   const result = totalRevenue - adjustedSpend - expenses;
   const margin = totalRevenue > 0 ? result / totalRevenue : 0;
   const balance = accounts.reduce((sum, account) => sum + Number(account.remaining_balance || 0), 0);
   const roas = adjustedSpend > 0 ? aggregateSales(visibleSales).totalNet / adjustedSpend : 0;
-  const isLoading = loadingAccounts || loadingInsights || loadingSales || loadingEntries || loadingTransactions || loadingBalanceEvents;
+  const isLoading = loadingAccounts || loadingInsights || loadingSales || loadingEntries || loadingTransactions || loadingBalanceEvents || loadingFundingTransactions;
 
   const rows = useMemo(() => accounts.map((account) => { const ai = insights.filter((item) => item.ad_account_id === account.id); const as = sales.filter((item) => item.ad_account_id === account.id); const accountSpend = ai.reduce((sum, item) => sum + Number(item.spend || 0), 0); const saleTotals = aggregateSales(as); const revenue = saleTotals.totalNet; return { account, spend: accountSpend, balance: Number(account.remaining_balance || 0), leads: ai.reduce((sum, item) => sum + Number(item.leads || 0), 0), sales: saleTotals.totalQuantity, revenue, roas: accountSpend > 0 ? revenue / accountSpend : 0 }; }), [accounts, insights, sales]);
 
@@ -296,7 +315,7 @@ export default function FinancePage() {
           <section className="gd-panel overflow-hidden">
             <PanelTitle icon={<ReceiptText />} title={`DRE — Demonstrativo ${segment === "saas" ? "SaaS" : "Infoproduto"}`} subtitle="Regime de competência e unidade isolada pelos filtros globais." />
             <DreRow label="(+) Receita bruta" value={grossRevenue} />
-            <DreRow label="(−) Tráfego pago — gasto efetivo" value={-spend} />
+            <DreRow label="(−) Investimento em tráfego pago" value={-spend} />
             <DreRow label="(−) Imposto sobre saldo adicionado (12,15%)" value={-balanceAddedTax} />
             <DreRow label="(−) Outros impostos" value={-otherTaxes} />
             <DreRow label="(−) Folha / Equipe" value={-payroll} />
@@ -308,11 +327,11 @@ export default function FinancePage() {
             <div className="border-t border-primary/20 bg-primary/[.035] p-5">
               <p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conciliação do investimento em mídia</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <ReconciliationMetric label="Saldo adicionado nas contas" value={balanceAdded} accent />
+                <ReconciliationMetric label="Fundos adicionados nas contas" value={balanceAdded} accent />
                 <ReconciliationMetric label="Valor investido no período" value={spend} />
                 <ReconciliationMetric label="Imposto sobre saldo adicionado" value={balanceAddedTax} strong />
               </div>
-              <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Aportes são aumentos positivos de saldo registrados no período. O valor investido vem do gasto sincronizado da Meta; o imposto incide somente sobre os aportes. Saldo atual disponível: {brl.format(balance)}.</p>
+              <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Fundos incluem aumentos positivos de saldo e aportes pagos por PIX no período, sem duplicar a confirmação da Meta. O valor investido vem do gasto sincronizado da Meta; o imposto incide somente sobre os fundos adicionados. Saldo atual disponível: {brl.format(balance)}.</p>
             </div>
           </section>
           <section className="gd-panel overflow-hidden">
