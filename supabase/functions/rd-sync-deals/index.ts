@@ -273,18 +273,27 @@ function asArray(value: unknown): any[] {
 }
 
 function isWonDeal(d: any): boolean {
-  if (d.win === true) return true;
   const stage = (d.deal_stage?.name || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[\s_-]+/g, " ")
     .trim();
-  if (!stage || /\b(pre|pos) venda\b/.test(stage)) return false;
-  return (
-    /^(venda|vendas|sale|sales)$/.test(stage) ||
-    /\b(venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(stage)
-  );
+  // A etapa atual é a fonte de verdade quando o RD a informa. Alguns
+  // negócios históricos mantêm `win: true` no payload mesmo após terem sido
+  // reposicionados para uma etapa operacional; confiar no flag nesse caso
+  // infla as vendas do CRM fora da coluna de venda.
+  if (stage) {
+    if (/\b(pre|pos) venda\b/.test(stage)) return false;
+    return (
+      /^(venda|vendas|sale|sales)$/.test(stage) ||
+      /\b(venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(stage)
+    );
+  }
+  // Sem etapa no payload, o flag terminal do RD continua sendo o melhor
+  // fallback disponível e evita ocultar uma venda realmente fechada.
+  if (d.win === true) return true;
+  return false;
 }
 
 function bucketFromStage(
