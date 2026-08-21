@@ -1180,8 +1180,8 @@ export default function Campaigns() {
                       </AnimatePresence>
                     </TableBody>
                     {(() => {
-                      const footer = <TableFooter className="hidden">
-                      <TableRow data-campaign-totals className="h-14 border-y border-border/80 bg-muted/95 backdrop-blur-xl hover:bg-muted/95 dark:border-[#373226] dark:bg-[#11110f]/95 dark:hover:bg-[#11110f]/95 [&>td]:px-3 [&>td]:py-1">
+                      const footer = <TableFooter className="sticky bottom-0 z-40 bg-card shadow-[0_-6px_14px_-12px_rgba(0,0,0,.4)] dark:bg-[#070706]">
+                      <TableRow data-campaign-totals className="h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
                         <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
                         <CampaignTotalCell
@@ -1202,7 +1202,7 @@ export default function Campaigns() {
                         {showColumn("uniqueLinkCtr") && <CampaignTotalCell width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
                         {showColumn("cpm") && <CampaignTotalCell width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por 1.000 impressões" />}
                         {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Orçamento somado" />}
-                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.results.toLocaleString("pt-BR")} label="Resultado principal por campanha" />}
+                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.results.toLocaleString("pt-BR")} label={`${totals.conversations.toLocaleString("pt-BR")} conversas · ${totals.formLeads.toLocaleString("pt-BR")} forms/site`} />}
                         {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado" />}
                         {showColumn("spend") && <CampaignTotalCell width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total usado" />}
                         {showColumn("landingPageViews") && <CampaignTotalCell width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}
@@ -1233,9 +1233,6 @@ export default function Campaigns() {
                       return footer;
                     })()}
                   </table>
-                </div>
-                <div ref={campaignTotalsScrollRef} className="campaign-totals-dock relative z-30 hidden h-16 shrink-0 overflow-x-auto border-t border-border md:block" style={{ position: "static", background: "hsl(var(--card))", boxShadow: "none" }} aria-label="Totais das campanhas filtradas" onScroll={(event) => { const table = campaignTableScrollRef.current; if (table && table.scrollLeft !== event.currentTarget.scrollLeft) table.scrollLeft = event.currentTarget.scrollLeft; }}>
-                  <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><CampaignTotalsRow widths={camp.colWidths} visibleColumns={visibleColumns} count={filtered.length} totals={totals} totalCpm={totalCpm} totalCpl={totalCpl} totalCpc={totalCpc} totalCtr={totalCtr} totalRoas={totalRoas} totalLinkCpc={totalLinkCpc} totalUniqueLinkCtr={totalUniqueLinkCtr} totalCostPerLandingPageView={totalCostPerLandingPageView} totalCostPerCheckout={totalCostPerCheckout} totalMetaCostPerPurchase={totalMetaCostPerPurchase} totalMetaPurchaseRoas={totalMetaPurchaseRoas} totalResultRate={totalResultRate} /></tbody></table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
