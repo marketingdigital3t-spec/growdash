@@ -103,6 +103,7 @@ export default function UsersPage() {
     ad_account_ids: [] as string[],
     rd_funnel_ids: [] as string[],
   });
+  const hasAllowedPage = form.role === "admin" || PAGES.some(({ key }) => form[key]);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["managed_users", workspace?.id],
@@ -356,6 +357,7 @@ export default function UsersPage() {
                   </label>
                 ))}
               </div>
+              {!hasAllowedPage && <p className="mt-2 text-xs font-medium text-destructive">Selecione ao menos uma aba para que o usuário tenha uma rota de acesso.</p>}
             </div>
 
             <div>
@@ -416,7 +418,7 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => save.mutate()}
-              disabled={save.isPending || !form.email || (!editing && !form.password)}
+              disabled={save.isPending || !form.email || (!editing && !form.password) || !hasAllowedPage}
             >
               {save.isPending ? "Salvando..." : "Salvar"}
             </Button>

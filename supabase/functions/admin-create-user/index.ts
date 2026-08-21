@@ -127,6 +127,10 @@ function uuidList(value: unknown) {
   return [...new Set(value.map(String).filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)))];
 }
 
+function sameIds(expected: string[], actual: string[]) {
+  return expected.length === actual.length && expected.every((id) => actual.includes(id));
+}
+
 async function saveWorkspaceAccess(
   admin: any,
   workspaceId: string,
@@ -145,6 +149,42 @@ async function saveWorkspaceAccess(
     _rd_funnel_ids: uuidList(body.rd_funnel_ids),
   });
   if (error) throw error;
+
+  // Never report success before the server confirms every page, account and
+  // funnel selected by the administrator. This protects the access screen
+  // from silent partial writes caused by stale workspace/resource records.
+  const expectedPermissions = permissionRecord(body, role);
+  const { data: savedPermissions, error: permissionError } = await admin
+    .from("workspace_user_permissions")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (permissionError || !savedPermissions) throw permissionError ?? new Error("As permissões da página não foram gravadas.");
+  const permissionsMatch = Object.entries(expectedPermissions).every(([key, value]) => savedPermissions[key] === value);
+  if (!permissionsMatch) throw new Error("As permissões das abas não foram confirmadas. Nenhuma confirmação de acesso foi exibida.");
+
+  const expectedAccounts = uuidList(body.ad_account_ids);
+  const { data: savedAccounts, error: accountsError } = await admin
+    .from("user_ad_account_access")
+    .select("ad_account_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId);
+  if (accountsError) throw accountsError;
+  if (!sameIds(expectedAccounts, (savedAccounts ?? []).map((row: any) => row.ad_account_id))) {
+    throw new Error("Uma ou mais contas selecionadas não pertencem a este workspace e não tiveram o acesso confirmado.");
+  }
+
+  const expectedFunnels = uuidList(body.rd_funnel_ids);
+  const { data: savedFunnels, error: funnelsError } = await admin
+    .from("user_rd_funnel_access")
+    .select("rd_funnel_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId);
+  if (funnelsError) throw funnelsError;
+  if (!sameIds(expectedFunnels, (savedFunnels ?? []).map((row: any) => row.rd_funnel_id))) {
+    throw new Error("Um ou mais funis selecionados não pertencem a este workspace e não tiveram o acesso confirmado.");
+  }
 }
 
 async function findUserByEmail(admin: any, email: string) {
