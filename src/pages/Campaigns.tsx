@@ -1183,6 +1183,7 @@ export default function Campaigns() {
                         );})}
                       </AnimatePresence>
                     </TableBody>
+                    <BarraTotais rows={filtered} columns={campaignTotalColumns} />
                     {(() => {
                       const footer = <TableFooter className="hidden">
                       <TableRow data-campaign-totals className="h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
@@ -1234,11 +1235,10 @@ export default function Campaigns() {
                       // The summary belongs to the same scroll container as
                       // the data rows. This keeps it visible while scrolling
                       // vertically and precisely aligned with every column.
-                      return footer;
+                      return false ? footer : null;
                     })()}
                   </table>
                 </div>
-                <BarraTotais rows={filtered} columns={campaignTotalColumns} scrollContainerRef={campaignTableScrollRef} />
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}
