@@ -38,6 +38,7 @@ interface FinancialEntry {
 interface FinancialAccount { id: string; name: string; account_type: string; institution_name?: string | null; last_four?: string | null; balance?: number | null; status: string; last_synced_at?: string | null; }
 interface Company { id: string; name: string; legal_name?: string | null; expert_name?: string | null; status: string; }
 interface FinancialTransaction { id: string; amount: number; description: string; occurred_at: string; transaction_type: string; matched_entry_id?: string | null; }
+interface AccountBalanceEvent { ad_account_id: string; delta: number; event_at: string; }
 
 function csvCell(value: unknown) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 
@@ -74,10 +75,28 @@ export default function FinancePage() {
     ? allAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : allAccounts;
   const accounts = accountFilter ? unitAccounts.filter((account) => account.id === accountFilter) : unitAccounts;
+  const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, startDate: metaInsightsStartDate, endDate });
   const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, startDate, endDate });
   const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, startDate: twelveMonthsAgo, endDate: futureMonth });
   const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, startDate: twelveMonthsAgo, endDate: futureMonth });
+
+  const { data: balanceEvents = [], isLoading: loadingBalanceEvents } = useQuery({
+    queryKey: ["finance-balance-events", accountIds, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    enabled: accountIds.length > 0,
+    queryFn: async (): Promise<AccountBalanceEvent[]> => {
+      const { data, error } = await (supabase as any).from("account_balance_events")
+        .select("ad_account_id,delta,event_at")
+        .in("ad_account_id", accountIds)
+        .gte("event_at", `${format(startDate, "yyyy-MM-dd")}T00:00:00`)
+        .lte("event_at", `${format(endDate, "yyyy-MM-dd")}T23:59:59`);
+      if (error) {
+        if (error.code === "42P01" || /account_balance_events|schema cache/i.test(error.message)) return [];
+        throw error;
+      }
+      return data ?? [];
+    },
+  });
 
   const { data: entries = [], isLoading: loadingEntries } = useQuery({
     queryKey: ["financial-entries", workspace?.id, businessUnitId, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
@@ -146,12 +165,13 @@ export default function FinancePage() {
   const totalRevenue = aggregateSales(visibleSales).totalNet + otherRevenue;
   const metaTaxRate = 0.1215;
   const adjustedSpend = spend * (includeMetaTax ? 1 + metaTaxRate : 1);
-  const metaTax = adjustedSpend - spend;
+  const balanceAdded = balanceEvents.reduce((sum, event) => sum + Math.max(0, Number(event.delta || 0)), 0);
+  const balanceAddedTax = includeMetaTax ? balanceAdded * metaTaxRate : 0;
   const result = totalRevenue - adjustedSpend - expenses;
   const margin = totalRevenue > 0 ? result / totalRevenue : 0;
   const balance = accounts.reduce((sum, account) => sum + Number(account.remaining_balance || 0), 0);
   const roas = adjustedSpend > 0 ? aggregateSales(visibleSales).totalNet / adjustedSpend : 0;
-  const isLoading = loadingAccounts || loadingInsights || loadingSales || loadingEntries || loadingTransactions;
+  const isLoading = loadingAccounts || loadingInsights || loadingSales || loadingEntries || loadingTransactions || loadingBalanceEvents;
 
   const rows = useMemo(() => accounts.map((account) => { const ai = insights.filter((item) => item.ad_account_id === account.id); const as = sales.filter((item) => item.ad_account_id === account.id); const accountSpend = ai.reduce((sum, item) => sum + Number(item.spend || 0), 0); const saleTotals = aggregateSales(as); const revenue = saleTotals.totalNet; return { account, spend: accountSpend, balance: Number(account.remaining_balance || 0), leads: ai.reduce((sum, item) => sum + Number(item.leads || 0), 0), sales: saleTotals.totalQuantity, revenue, roas: accountSpend > 0 ? revenue / accountSpend : 0 }; }), [accounts, insights, sales]);
 
@@ -235,7 +255,7 @@ export default function FinancePage() {
   const materials = classifyExpense(["material", "insumo", "equipamento"]);
   const categorized = Math.min(expenses, otherTaxes - aggregateSales(visibleSales).totalTax + payroll + software + materials);
   const otherExpenses = Math.max(0, expenses - categorized);
-  const dreResult = grossRevenue - spend - (includeMetaTax ? metaTax : 0) - otherTaxes - payroll - software - materials - otherExpenses;
+  const dreResult = grossRevenue - spend - balanceAddedTax - otherTaxes - payroll - software - materials - otherExpenses;
   const dreMargin = grossRevenue > 0 ? dreResult / grossRevenue : 0;
   const weeklyInvestment = useMemo(() => {
     const groups = new Map<string, number>();
@@ -277,7 +297,7 @@ export default function FinancePage() {
             <PanelTitle icon={<ReceiptText />} title={`DRE — Demonstrativo ${segment === "saas" ? "SaaS" : "Infoproduto"}`} subtitle="Regime de competência e unidade isolada pelos filtros globais." />
             <DreRow label="(+) Receita bruta" value={grossRevenue} />
             <DreRow label="(−) Tráfego pago — gasto efetivo" value={-spend} />
-            <DreRow label="(−) Imposto Meta (12,15%)" value={includeMetaTax ? -metaTax : 0} />
+            <DreRow label="(−) Imposto sobre saldo adicionado (12,15%)" value={-balanceAddedTax} />
             <DreRow label="(−) Outros impostos" value={-otherTaxes} />
             <DreRow label="(−) Folha / Equipe" value={-payroll} />
             <DreRow label="(−) Software / SaaS" value={-software} />
@@ -288,11 +308,11 @@ export default function FinancePage() {
             <div className="border-t border-primary/20 bg-primary/[.035] p-5">
               <p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conciliação do investimento em mídia</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <ReconciliationMetric label="Gasto efetivo no período" value={spend} />
-                <ReconciliationMetric label="Saldo atual nas contas" value={balance} accent />
-                <ReconciliationMetric label="Posição total de mídia" value={spend + balance} strong />
+                <ReconciliationMetric label="Saldo adicionado nas contas" value={balanceAdded} accent />
+                <ReconciliationMetric label="Valor investido no período" value={spend} />
+                <ReconciliationMetric label="Imposto sobre saldo adicionado" value={balanceAddedTax} strong />
               </div>
-              <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">O saldo é crédito pré-pago ainda disponível nas contas Meta. Ele fecha a conciliação da mídia, mas não reduz o resultado do DRE até ser efetivamente gasto.</p>
+              <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Aportes são aumentos positivos de saldo registrados no período. O valor investido vem do gasto sincronizado da Meta; o imposto incide somente sobre os aportes. Saldo atual disponível: {brl.format(balance)}.</p>
             </div>
           </section>
           <section className="gd-panel overflow-hidden">
