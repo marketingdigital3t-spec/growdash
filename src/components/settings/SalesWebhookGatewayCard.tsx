@@ -10,12 +10,12 @@ const platforms = [
 ] as const;
 
 const providerInstructions: Record<(typeof platforms)[number][0], string> = {
-  hotmart: "Na Hotmart, crie um webhook de transação e cole a URL completa abaixo.",
-  kiwify: "Na Kiwify, abra as configurações de webhook e cole a URL completa abaixo.",
-  cakto: "Na Cakto, crie um webhook de vendas e cole a URL completa abaixo.",
-  herospark: "Na HeroSpark, adicione a URL no webhook do produto ou checkout.",
-  themembers: "Na TheMembers, cadastre a URL no webhook do produto ou da oferta.",
-  generic: "Na sua plataforma, configure um webhook POST e cole a URL completa abaixo.",
+  hotmart: "Na Hotmart, crie um webhook de transação, cole a URL e configure o cabeçalho x-growdash-webhook-secret.",
+  kiwify: "Na Kiwify, abra as configurações de webhook, cole a URL e configure o cabeçalho x-growdash-webhook-secret.",
+  cakto: "Na Cakto, crie um webhook de vendas, cole a URL e configure o cabeçalho x-growdash-webhook-secret.",
+  herospark: "Na HeroSpark, adicione a URL no webhook do produto ou checkout e configure o cabeçalho x-growdash-webhook-secret.",
+  themembers: "Na TheMembers, cadastre a URL e informe o segredo no campo “Token de segurança”. Não é necessário criar cabeçalho.",
+  generic: "Na sua plataforma, configure um webhook POST, cole a URL e envie o segredo no cabeçalho x-growdash-webhook-secret.",
 };
 
 type Connection = { endpoint: string; secret?: string; header: string; active?: boolean; updated_at?: string };
@@ -51,8 +51,8 @@ export function SalesWebhookGatewayCard() {
   return <details className="gd-panel overflow-hidden" open>
     <summary className="flex cursor-pointer list-none flex-col gap-3 border-b border-border p-5 sm:flex-row sm:items-center"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Webhook className="h-5 w-5" /></span><div className="grow"><h2 className="font-black">Webhooks de vendas</h2><p className="text-xs text-muted-foreground">Receba vendas, reembolsos e chargebacks em tempo real sem duplicar faturamento.</p></div><span className="text-xs font-semibold text-primary">Mostrar / recolher</span></summary>
     <div className="space-y-4 p-5"><div className="flex flex-col gap-2 sm:flex-row sm:items-center"><label className="text-sm font-semibold" htmlFor="sales-webhook-provider">Plataforma</label><select id="sales-webhook-provider" value={provider} onChange={(event) => setProvider(event.target.value as typeof provider)} className="h-10 rounded-md border border-input bg-background px-3 text-sm sm:min-w-56">{platforms.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><Button className="sm:ml-auto" onClick={create} disabled={pending}>{pending ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}{connection ? "Gerar nova URL segura" : "Gerar webhook"}</Button></div>
-      <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground"><b className="text-foreground">Como conectar:</b> {providerInstructions[provider]} Selecione os eventos de compra aprovada, reembolso e chargeback e informe o cabeçalho secreto abaixo. O segredo não é enviado na URL, evitando vazamento em logs.</div>
-      {connection && <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/[.04] p-4 text-xs"><p className="font-semibold">1. Copie a URL. 2. Cadastre o cabeçalho secreto. 3. Salve e envie um evento de teste pela própria plataforma.</p><CopyValue label="URL do webhook" value={connection.endpoint} onCopy={copy} /><CopyValue label={`Cabeçalho ${connection.header}`} value={connection.secret || "Segredo mantido; gere uma nova conexão para visualizá-lo."} onCopy={copy} /><p className="text-muted-foreground">O segredo é exibido apenas quando criado ou rotacionado. Guarde-o em local seguro.</p></div>}
+      <div className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground"><b className="text-foreground">Como conectar:</b> {providerInstructions[provider]} Selecione os eventos de compra aprovada, reembolso e chargeback. O segredo não é enviado na URL, evitando vazamento em logs.</div>
+      {connection && <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/[.04] p-4 text-xs"><p className="font-semibold">{provider === "themembers" ? "1. Copie a URL. 2. Cole o segredo em “Token de segurança”. 3. Salve e envie um evento de teste." : "1. Copie a URL. 2. Cadastre o cabeçalho secreto. 3. Salve e envie um evento de teste pela própria plataforma."}</p><CopyValue label="URL do webhook" value={connection.endpoint} onCopy={copy} /><CopyValue label={provider === "themembers" ? "Token de segurança" : `Cabeçalho ${connection.header}`} value={connection.secret || "Segredo mantido; gere uma nova conexão para visualizá-lo."} onCopy={copy} /><p className="text-muted-foreground">O segredo é exibido apenas quando criado ou rotacionado. Guarde-o em local seguro.</p></div>}
     </div>
   </details>;
 }
