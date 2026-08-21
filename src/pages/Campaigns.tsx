@@ -1043,8 +1043,10 @@ export default function Campaigns() {
             ) : (
               <Card className={cn(
                 "overflow-hidden rounded-none border-0 shadow-none md:flex md:min-h-0 md:flex-col",
-                analysisMode ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]" : "md:h-full",
-              )}>
+                analysisMode
+                  ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
+                  : "md:h-[clamp(300px,calc(100dvh-22rem),640px)] md:min-h-0",
+              )} style={analysisMode ? undefined : { height: "clamp(300px, calc(100dvh - 22rem), 640px)" }}>
                 <div className="space-y-2 p-2 md:hidden">
                   {visibleCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
                 </div>
