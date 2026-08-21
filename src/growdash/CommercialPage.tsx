@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BarChart3, Crown, Filter, Search, Sparkles, Target, Users, X } from "lucide-react";
+import { Crown, Expand, Filter, Minimize, Search, TrendingUp, Trophy, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
+import { eachDayOfInterval, format, isValid, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
-import { aggregateSales, useSales, type Sale } from "@/hooks/useSales";
+import { useSales, type Sale } from "@/hooks/useSales";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
-import { MetricCard, PageHeading } from "./shared";
+import { PageHeading } from "./shared";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { buildCommercialAccountRankings, type CommercialAccountRanking, type CommercialSaleRow } from "@/lib/commercialRanking";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+type RankingMetric = "revenue" | "sales" | "goalPercentage";
 
 function customValue(sale: Sale, keys: string[]) {
   const fields = sale.custom_fields || {};
@@ -52,6 +55,9 @@ export default function CommercialPage() {
   const [detailProductFilter, setDetailProductFilter] = useState("all");
   const [detailStatusFilter, setDetailStatusFilter] = useState("all");
   const [detailSearch, setDetailSearch] = useState("");
+  const [rankingMetric, setRankingMetric] = useState<RankingMetric>("revenue");
+  const [leaderboardAccountId, setLeaderboardAccountId] = useState("");
+  const [rankingPage, setRankingPage] = useState(0);
 
   const accessibleAccounts = useMemo(() => {
     const accounts = businessUnitId
@@ -101,22 +107,33 @@ export default function CommercialPage() {
   const goals = useMemo(() => new Map((goalData?.rows ?? []).map((goal) => [goal.ad_account_id, Number(goal.target_revenue)])), [goalData?.rows]);
   const rankingDeals = useMemo(() => sellerFilter === "all" ? rdDeals : rdDeals.filter((deal) => deal.deal_owner_name === sellerFilter), [rdDeals, sellerFilter]);
   const accountRankings = useMemo(() => buildCommercialAccountRankings({ sales: filtered, deals: rankingDeals, accounts: rankingAccountOptions, goals }), [filtered, goals, rankingAccountOptions, rankingDeals]);
-  const totals = useMemo(() => aggregateSales(filtered.map((row) => row.sale)), [filtered]);
-  const overallRanking = useMemo(() => {
-    const map = new Map<string, { seller: string; revenue: number; count: number; commission: number }>();
+  useEffect(() => {
+    const preferred = adAccountId !== "all" ? adAccountId : accountRankings[0]?.accountId;
+    if (preferred && !accountRankings.some((account) => account.accountId === leaderboardAccountId)) setLeaderboardAccountId(preferred);
+  }, [accountRankings, adAccountId, leaderboardAccountId]);
+  const leaderboardAccount = useMemo(() => accountRankings.find((account) => account.accountId === leaderboardAccountId) || accountRankings[0], [accountRankings, leaderboardAccountId]);
+  const rankedSellers = useMemo(() => {
+    const sellersForAccount = leaderboardAccount?.sellers || [];
+    const metricValue = (seller: typeof sellersForAccount[number]) => rankingMetric === "sales" ? seller.count : rankingMetric === "goalPercentage" ? seller.performance : seller.revenue;
+    return [...sellersForAccount].sort((a, b) => metricValue(b) - metricValue(a) || b.revenue - a.revenue || b.count - a.count || a.seller.localeCompare(b.seller, "pt-BR"));
+  }, [leaderboardAccount, rankingMetric]);
+  const performanceSeries = useMemo(() => {
+    if (!leaderboardAccount) return [];
+    const dates = eachDayOfInterval({ start: startDate, end: endDate });
+    const data = new Map(dates.map((date) => [format(date, "yyyy-MM-dd"), { date: format(date, "dd/MM"), revenue: 0, sales: 0 }]));
     for (const row of filtered) {
-      if (row.sale.status !== "confirmed") continue;
-      const current = map.get(row.seller) || { seller: row.seller, revenue: 0, count: 0, commission: 0 };
-      current.revenue += Number(row.sale.net_revenue || 0);
-      current.count += Number(row.sale.quantity || 1);
-      current.commission += row.commission;
-      map.set(row.seller, current);
+      if (row.sale.ad_account_id !== leaderboardAccount.accountId || row.sale.status !== "confirmed") continue;
+      const parsed = parseISO(row.sale.sale_date);
+      if (!isValid(parsed)) continue;
+      const key = format(parsed, "yyyy-MM-dd");
+      const current = data.get(key);
+      if (current) { current.revenue += Number(row.sale.net_revenue || 0); current.sales += Number(row.sale.quantity || 1); }
     }
-    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue || b.count - a.count);
-  }, [filtered]);
-  const bestAccount = accountRankings.find((account) => account.leader?.revenue > 0) || accountRankings[0];
-  const recovery = accountRankings.flatMap((account) => account.recovery.map((seller) => ({ ...seller, accountName: account.accountName, accountId: account.accountId })));
-
+    return Array.from(data.values());
+  }, [endDate, filtered, leaderboardAccount, startDate]);
+  const selectedTarget = leaderboardAccount?.target || 0;
+  const selectedRevenue = leaderboardAccount?.totalRevenue || 0;
+  const selectedSales = leaderboardAccount?.totalCount || 0;
   return (
     <div className="mx-auto max-w-[1600px] space-y-5">
       <PageHeading
@@ -136,40 +153,21 @@ export default function CommercialPage() {
         )}
       />
 
-      <div className="gd-auto-grid gap-3">
-        <MetricCard label="Receita líquida" value={isLoading ? "Carregando…" : brl.format(totals.totalNet)} change="vendas confirmadas" emphasis />
-        <MetricCard label="Vendas" value={isLoading ? "Carregando…" : String(totals.totalQuantity)} change={`${accountRankings.length} conta(s)`} />
-        <MetricCard label="Ticket médio" value={isLoading ? "Carregando…" : brl.format(totals.arpu)} change="por item" />
-        <MetricCard label="Líderes identificados" value={isLoading ? "Carregando…" : String(accountRankings.filter((account) => !!account.leader).length)} change="por conta de anúncio" />
-      </div>
-
-      <section className="gd-panel overflow-hidden border-[#b57a20]/45 bg-gradient-to-br from-[#241607] via-[#110b04] to-[#060402] text-white shadow-[0_20px_80px_-35px_rgba(104,62,9,.72)] dark:border-[#b57a20]/45">
-        <div className="flex flex-col gap-3 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#e1b832]">Líderes de vendas</p><h2 className="mt-1 text-xl font-black tracking-tight">Melhor vendedor por conta de anúncio</h2><p className="mt-1 text-xs text-white/55">A classificação usa somente a receita líquida confirmada no intervalo selecionado.</p></div>
-          <div className="flex items-center gap-2 rounded-full border border-[#e1b832]/30 bg-[#e1b832]/10 px-3 py-2 text-xs font-bold text-[#f1cc55]"><Crown className="h-4 w-4" />{accountRankings.length} conta(s) analisada(s)</div>
-        </div>
-        <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
-          <div className="space-y-5">
-            {accountRankings.map((account) => <AccountPodium key={account.accountId} account={account} />)}
-            {!accountRankings.length && <EmptyRanking text="Nenhuma conta de anúncio encontrada para os filtros atuais." />}
-          </div>
-          <div className="space-y-5">
-            <section className="rounded-2xl border border-[#b57a20]/45 bg-[#171006]/75 p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-[#d9b86c]">Classificação geral</p><h3 className="mt-1 text-lg font-black">Todos os vendedores</h3></div><BarChart3 className="h-5 w-5 text-[#d8a63a]" /></div>
-              <div className="mt-4 space-y-2">{overallRanking.map((item, index) => <div key={item.seller} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-white/8 bg-white/[.035] p-3"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#9e6815]/25 text-sm font-black text-[#e7c776]">{index + 1}</span><span className="min-w-0"><b className="block truncate text-sm">{item.seller}</b><small className="text-[10px] text-white/45">{item.count} venda(s) confirmada(s)</small></span><b className="text-sm tabular-nums text-[#f4dfaa]">{brl.format(item.revenue)}</b></div>)}{!overallRanking.length && <p className="py-6 text-center text-xs text-white/45">Nenhuma venda confirmada no período.</p>}</div>
-            </section>
-            <section className="rounded-2xl border border-rose-400/35 bg-rose-950/20 p-4">
-              <div className="flex items-center gap-2 text-rose-300"><AlertTriangle className="h-4 w-4" /><p className="text-[10px] font-black uppercase tracking-[.2em]">Zona de recuperação</p></div>
-              <p className="mt-1 text-xs text-white/50">Vendedores abaixo de 50% da meta ou da participação de receita da conta.</p>
-              <div className="mt-4 space-y-2">{recovery.slice(0, 12).map((item) => <div key={`${item.accountId}:${item.seller}`} className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-rose-300/15 bg-rose-900/10 p-3"><span className="grid h-7 w-7 place-items-center rounded-full bg-rose-400/15 text-xs font-black text-rose-300">!</span><span className="min-w-0"><b className="block truncate text-sm text-rose-100">{item.seller}</b><small className="block truncate text-[10px] text-rose-200/50">{item.accountName} · {item.count} venda(s)</small></span><b className="text-sm tabular-nums text-rose-300">{item.performance.toFixed(1).replace(".", ",")}%</b></div>)}{!recovery.length && <p className="py-6 text-center text-xs text-white/45">Nenhum vendedor na zona de recuperação.</p>}</div>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <section className="gd-panel overflow-hidden border-[#d3aa35]/35 bg-gradient-to-br from-[#fffdf5] to-[#f7f0dc] dark:from-[#211a0a] dark:to-[#0e0d0a]">
-        <div className="flex items-start gap-3 border-b border-[#d3aa35]/20 p-5"><Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-[#d4a92e]" /><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-[#a27c1b] dark:text-[#e0b53b]">Motivação</p><p className="mt-2 text-xl font-black italic text-[#302710] dark:text-[#f7edcf]">{bestAccount?.leader ? `“${bestAccount.leader.seller}, ${bestAccount.accountName} está puxando o time para cima.”` : "“Cada conversa é uma oportunidade de evolução.”"}</p></div></div>
-      </section>
+      <CommercialLeaderboard
+        account={leaderboardAccount}
+        accounts={accountRankings}
+        isLoading={isLoading}
+        metric={rankingMetric}
+        onMetricChange={setRankingMetric}
+        accountId={leaderboardAccount?.accountId || ""}
+        onAccountChange={(value) => { setLeaderboardAccountId(value); setRankingPage(0); }}
+        ranking={rankedSellers}
+        rankingPage={rankingPage}
+        onRankingPageChange={setRankingPage}
+        periodLabel={format(startDate, "MMMM yyyy", { locale: ptBR }).toLocaleUpperCase("pt-BR")}
+        totals={{ revenue: selectedRevenue, sales: selectedSales, target: selectedTarget, ticket: selectedSales ? selectedRevenue / selectedSales : 0 }}
+        series={performanceSeries}
+      />
 
       <section className="gd-panel mt-4 overflow-hidden">
         <div className="border-b border-border p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-black">Vendas detalhadas</h2><p className="text-xs text-muted-foreground">A comissão só aparece quando recebida em campo explícito; a plataforma não estima valores.</p></div><span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">{detailedFiltered.length} venda(s)</span></div><div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(190px,1.4fr)_repeat(4,minmax(135px,1fr))_auto]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Buscar venda por cliente" className="h-10 pl-9" value={detailSearch} onChange={(event) => setDetailSearch(event.target.value)} placeholder="Buscar cliente, vendedor ou produto" /></label><DetailFilter label="Conta" value={detailAccountFilter} onChange={setDetailAccountFilter} options={accountOptions.map((item) => ({ value: item.id, label: item.name }))} /><DetailFilter label="Vendedor" value={detailSellerFilter} onChange={setDetailSellerFilter} options={sellers.map((item) => ({ value: item, label: item }))} /><DetailFilter label="Produto" value={detailProductFilter} onChange={setDetailProductFilter} options={Array.from(new Set(filtered.map((item) => item.product))).sort((a, b) => a.localeCompare(b, "pt-BR")).map((item) => ({ value: item, label: item }))} /><DetailFilter label="Status" value={detailStatusFilter} onChange={setDetailStatusFilter} options={Array.from(new Set(filtered.map((item) => item.sale.status))).sort().map((item) => ({ value: item, label: item }))} /><Button type="button" variant="outline" className="h-10" onClick={() => { setDetailAccountFilter("all"); setDetailSellerFilter("all"); setDetailProductFilter("all"); setDetailStatusFilter("all"); setDetailSearch(""); }}><X className="mr-1.5 h-4 w-4" />Limpar</Button></div></div>
@@ -183,18 +181,51 @@ function DetailFilter({ label, value, onChange, options }: { label: string; valu
   return <label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><select aria-label={`Filtrar vendas por ${label.toLocaleLowerCase("pt-BR")}`} className="h-10 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" value={value} onChange={(event) => onChange(event.target.value)}><option value="all">{label}: todos</option>{options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
 }
 
-function AccountPodium({ account }: { account: CommercialAccountRanking }) {
-  const podium = account.sellers.slice(0, 3);
-  const hasGoal = account.target > 0;
-  return <section className="rounded-2xl border border-[#c49b2e]/35 bg-[#0c1429]/70 p-4">
-    <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.18em] text-[#d9b63c]">Conta de anúncio</p><h3 className="mt-1 truncate text-lg font-black text-white" title={account.accountName}>{account.accountName}</h3></div><div className="text-right"><p className="text-[10px] text-white/45">Receita confirmada</p><b className="text-sm text-[#f4d064]">{brl.format(account.totalRevenue)}</b></div></div>
-    {hasGoal && <div className="mt-3 flex items-center gap-2 text-[10px] text-white/50"><Target className="h-3.5 w-3.5 text-[#e1b832]" />Meta: {brl.format(account.target)} · {account.totalRevenue > 0 ? ((account.totalRevenue / account.target) * 100).toFixed(1).replace(".", ",") : "0,0"}% alcançada</div>}
-    <div className="mt-4 grid items-end gap-3 sm:grid-cols-3">{podium.map((seller, index) => <div key={seller.seller} className={`rounded-xl border p-3 text-center ${index === 0 ? "border-[#e4bb38]/80 bg-[#30250d] shadow-[0_0_28px_-12px_rgba(239,193,55,.9)]" : index === 1 ? "border-slate-300/35 bg-white/[.05]" : "border-amber-600/35 bg-amber-900/10"}`}>
-      <div className="mx-auto grid h-11 w-11 place-items-center rounded-full border-2 border-[#e4bb38] bg-[#1d2d4e] text-sm font-black text-white">{initials(seller.seller)}</div>
-      <p className="mt-2 truncate text-xs font-black text-white" title={seller.seller}>{seller.seller}</p><p className="mt-1 text-[10px] text-white/50">{index + 1}º lugar</p><p className="mt-3 text-lg font-black text-[#f6d86b]">{seller.performance.toFixed(1).replace(".", ",")}%</p><p className="mt-1 truncate text-[10px] text-white/50" title={hasGoal ? "da meta da conta" : "da receita da conta"}>{hasGoal ? "da meta" : "da receita"}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#e4bb38]" style={{ width: `${Math.min(100, seller.performance)}%` }} /></div><div className="mt-3 grid grid-cols-2 gap-1 text-[10px]"><span className="rounded-lg bg-white/[.05] p-2"><small className="block text-white/40">Vendas</small><b className="text-white">{seller.count}</b></span><span className="rounded-lg bg-white/[.05] p-2"><small className="block text-white/40">Receita</small><b className="block truncate text-white" title={brl.format(seller.revenue)}>{brl.format(seller.revenue)}</b></span></div>
-    </div>)}{!podium.length && <EmptyRanking text="Nenhum vendedor identificado nesta conta." />}</div>
+function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricChange, accountId, onAccountChange, ranking, rankingPage, onRankingPageChange, periodLabel, totals, series }: {
+  account: CommercialAccountRanking | undefined; accounts: CommercialAccountRanking[]; isLoading: boolean; metric: RankingMetric; onMetricChange: (metric: RankingMetric) => void; accountId: string; onAccountChange: (id: string) => void; ranking: CommercialAccountRanking["sellers"]; rankingPage: number; onRankingPageChange: (page: number) => void; periodLabel: string; totals: { revenue: number; sales: number; target: number; ticket: number }; series: Array<{ date: string; revenue: number; sales: number }>;
+}) {
+  const podiumOrder = ranking.length === 1 ? [ranking[0]] : ranking.length === 2 ? [ranking[0], ranking[1]] : [ranking[1], ranking[0], ranking[2]].filter(Boolean);
+  const rowsPerPage = 10;
+  const remaining = ranking.slice(3);
+  const totalPages = Math.max(1, Math.ceil(remaining.length / rowsPerPage));
+  const safePage = Math.min(rankingPage, totalPages - 1);
+  const pageRows = remaining.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
+  const metricLabel = metric === "sales" ? "Vendas" : metric === "goalPercentage" ? "% da meta" : "Caixa gerado";
+  const goalProgress = totals.target > 0 ? (totals.revenue / totals.target) * 100 : 0;
+  const requestFullscreen = async () => { try { await document.documentElement.requestFullscreen(); } catch { /* browser may block fullscreen */ } };
+  const exitFullscreen = async () => { if (document.fullscreenElement) await document.exitFullscreen(); };
+  return <section className="relative isolate overflow-hidden rounded-[28px] border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)]">
+    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(217,169,40,.16),transparent_42%),radial-gradient(ellipse_at_5%_35%,rgba(33,94,176,.14),transparent_38%),linear-gradient(135deg,#081226_0%,#050b18_58%,#0d1830_100%)]" />
+    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f6c94c]/75 to-transparent" />
+    <div className="relative p-4 sm:p-6 xl:p-8">
+      <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0"><div className="flex items-center gap-2 text-[#f6c94c]"><Trophy className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-[.28em]">Ranking Comercial</span></div><h2 className="mt-2 text-2xl font-black tracking-[-.045em] text-white sm:text-3xl">Painel de performance</h2><p className="mt-1 text-xs text-slate-400">Classificação calculada somente com vendas confirmadas no período.</p></div>
+        <div className="flex flex-wrap items-end gap-2"><div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div><button type="button" aria-label="Alternar tela cheia do ranking" onClick={() => document.fullscreenElement ? exitFullscreen() : requestFullscreen()} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{document.fullscreenElement ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
+      </header>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><select aria-label="Conta exibida no ranking" value={accountId} onChange={(event) => onAccountChange(event.target.value)} className="h-10 max-w-full rounded-xl border border-white/10 bg-[#0b172c] px-3 text-xs font-bold text-slate-100 outline-none focus:border-[#f6c94c]">{accounts.map((item) => <option key={item.accountId} value={item.accountId}>{item.accountName}</option>)}</select><div className="flex rounded-xl border border-white/10 bg-black/20 p-1">{(["revenue", "sales", "goalPercentage"] as RankingMetric[]).map((item) => <button type="button" key={item} onClick={() => { onMetricChange(item); onRankingPageChange(0); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[.08em] transition ${metric === item ? "bg-[#d9a928] text-[#111728] shadow-lg" : "text-slate-400 hover:text-white"}`}>{item === "revenue" ? "Caixa" : item === "sales" ? "Vendas" : "Meta"}</button>)}</div></div>
+      {!account && <div className="mt-6"><EmptyRanking text="Nenhuma conta ou vendedor encontrado para os filtros atuais." /></div>}
+      {account && <><div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.38fr)_minmax(320px,.62fr)]">
+        <div className="rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#f6c94c]">Elite do período</p><p className="mt-1 text-xs text-slate-400">Critério: <b className="text-slate-200">{metricLabel}</b></p></div><span className="rounded-full border border-[#f6c94c]/20 bg-[#f6c94c]/10 px-3 py-1.5 text-[10px] font-black text-[#f6c94c]">{ranking.length} vendedor(es)</span></div>
+          <div className={`mt-5 grid items-end gap-3 ${podiumOrder.length === 1 ? "mx-auto max-w-sm" : podiumOrder.length === 2 ? "mx-auto max-w-2xl grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>{podiumOrder.map((seller) => <PodiumCard key={seller.seller} seller={seller} place={ranking.findIndex((item) => item.seller === seller.seller) + 1} hasGoal={account.target > 0} />)}</div>
+        </div>
+        <aside className="rounded-2xl border border-white/10 bg-[#08152b]/80 p-4 sm:p-5"><p className="text-[10px] font-black uppercase tracking-[.22em] text-slate-500">Resumo geral</p><div className="mt-4 grid grid-cols-2 gap-3"><SummaryMetric label="Vendas" value={isLoading ? "—" : String(totals.sales)} /><SummaryMetric label="Caixa gerado" value={isLoading ? "—" : brl.format(totals.revenue)} /><SummaryMetric label="Meta atingida" value={totals.target ? `${goalProgress.toFixed(1).replace(".", ",")}%` : "Não definida"} /><SummaryMetric label="Ticket médio" value={isLoading ? "—" : brl.format(totals.ticket)} /></div><div className="mt-5 border-t border-white/10 pt-4"><p className="text-[10px] font-black uppercase tracking-[.18em] text-slate-500">Meta da conta</p><div className="mt-2 flex items-end justify-between gap-2"><b className="text-lg text-white">{totals.target ? brl.format(totals.target) : "Não configurada"}</b>{totals.target > 0 && <span className="text-xs font-black text-[#f6c94c]">{Math.min(999, goalProgress).toFixed(1).replace(".", ",")}%</span>}</div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#d9a928] to-[#ffe692]" style={{ width: `${Math.min(100, goalProgress)}%` }} /></div></div></aside>
+      </div>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,.92fr)]"><section className="min-h-[260px] rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[#f6c94c]" /><div><p className="text-[10px] font-black uppercase tracking-[.18em] text-[#f6c94c]">Evolução da performance</p><p className="mt-1 text-xs text-slate-400">Caixa gerado por dia</p></div></div><div className="mt-4 h-[185px]">{series.some((item) => item.revenue > 0) ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={series}><defs><linearGradient id="commercialGoldFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f6c94c" stopOpacity={.4}/><stop offset="100%" stopColor="#f6c94c" stopOpacity={0}/></linearGradient></defs><CartesianGrid vertical={false} stroke="rgba(255,255,255,.08)" /><XAxis dataKey="date" tick={{ fontSize: 10, fill: "#7c8aa5" }} axisLine={false} tickLine={false} minTickGap={24} /><YAxis tick={{ fontSize: 10, fill: "#7c8aa5" }} axisLine={false} tickLine={false} width={48} tickFormatter={(value) => value >= 1000 ? `R$${Math.round(value / 1000)}k` : `R$${value}`} /><Tooltip formatter={(value: number) => brl.format(value)} contentStyle={{ background: "#0d1830", border: "1px solid rgba(246,201,76,.25)", borderRadius: 12, color: "#fff" }} /><Area type="monotone" dataKey="revenue" name="Caixa gerado" stroke="#f6c94c" strokeWidth={2.5} fill="url(#commercialGoldFill)" /></AreaChart></ResponsiveContainer> : <div className="grid h-full place-items-center text-center text-xs text-slate-500">Sem vendas confirmadas para formar a evolução deste período.</div>}</div></section>
+        <section className="rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><p className="text-[10px] font-black uppercase tracking-[.18em] text-[#f6c94c]">Mensagem do time</p><p className="mt-3 text-xl font-black leading-snug tracking-tight text-white">{ranking[0] ? `“${ranking[0].seller} lidera o período. Cada venda fortalece o próximo nível.”` : "“Todo resultado começa com uma boa conversa.”"}</p><p className="mt-4 text-xs leading-relaxed text-slate-400">Acompanhe o ranking, celebre as evoluções e use os dados para transformar foco em resultado.</p></section></div>
+      {remaining.length > 0 && <section className="mt-4 rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#f6c94c]">Ranking geral</p><p className="mt-1 text-xs text-slate-400">Da 4ª posição em diante · sem limite de vendedores</p></div><p className="text-xs font-bold text-slate-400">{remaining.length} posição(ões)</p></div><div className="mt-4 space-y-2">{pageRows.map((seller, index) => <RankingRow key={seller.seller} seller={seller} position={safePage * rowsPerPage + index + 4} hasGoal={account.target > 0} />)}</div>{totalPages > 1 && <div className="mt-4 flex items-center justify-end gap-2"><button type="button" disabled={safePage === 0} onClick={() => onRankingPageChange(safePage - 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Anterior</button><span className="text-xs text-slate-500">{safePage + 1} / {totalPages}</span><button type="button" disabled={safePage >= totalPages - 1} onClick={() => onRankingPageChange(safePage + 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Próxima</button></div>}</section>}</>}
+    </div>
   </section>;
 }
+
+function PodiumCard({ seller, place, hasGoal }: { seller: CommercialAccountRanking["sellers"][number]; place: number; hasGoal: boolean }) {
+  const styles = place === 1 ? "border-[#f6c94c]/75 bg-[radial-gradient(circle_at_50%_0%,rgba(246,201,76,.22),transparent_48%),#151b20] shadow-[0_0_42px_-16px_rgba(246,201,76,.8)] sm:-translate-y-3" : place === 2 ? "border-[#d5dae3]/35 bg-[#0e1a2c]" : "border-[#d77a2b]/40 bg-[#1b1520]";
+  const accent = place === 1 ? "#f6c94c" : place === 2 ? "#d5dae3" : "#ed8a36";
+  return <article className={`relative min-w-0 rounded-2xl border p-4 text-center transition ${styles}`}><p className="text-[10px] font-black uppercase tracking-[.16em]" style={{ color: accent }}>{place === 1 ? "1º lugar" : `${place}º lugar`}</p>{place === 1 && <Crown className="mx-auto mt-2 h-5 w-5 text-[#f6c94c]" />}<div className="mx-auto mt-3 grid h-16 w-16 place-items-center rounded-full border-2 text-lg font-black" style={{ borderColor: accent, background: `${accent}18`, color: accent }}>{initials(seller.seller)}</div><h3 className="mt-3 truncate text-base font-black text-white" title={seller.seller}>{seller.seller}</h3><p className="mt-1 text-xs font-bold text-slate-400">{seller.count} venda(s)</p><p className="mt-4 truncate text-xl font-black tracking-tight text-white" title={brl.format(seller.revenue)}>{brl.format(seller.revenue)}</p><p className="mt-1 text-[10px] uppercase tracking-[.12em] text-slate-500">caixa gerado</p><div className="mt-4 grid grid-cols-2 gap-2 text-left"><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Ticket</p><b className="mt-1 block truncate text-[11px] text-slate-200" title={brl.format(seller.count ? seller.revenue / seller.count : 0)}>{brl.format(seller.count ? seller.revenue / seller.count : 0)}</b></div><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">{hasGoal ? "Meta" : "Participação"}</p><b className="mt-1 block text-[11px]" style={{ color: accent }}>{seller.performance.toFixed(1).replace(".", ",")}%</b></div></div></article>;
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-white/8 bg-white/[.035] p-3"><p className="text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{label}</p><b className="mt-1 block truncate text-sm font-black text-slate-100" title={value}>{value}</b></div>; }
+
+function RankingRow({ seller, position, hasGoal }: { seller: CommercialAccountRanking["sellers"][number]; position: number; hasGoal: boolean }) { return <article className="grid grid-cols-[32px_36px_minmax(120px,1fr)_auto] items-center gap-3 rounded-xl border border-white/[.07] bg-white/[.025] p-3 transition hover:border-[#f6c94c]/25 hover:bg-white/[.045] sm:grid-cols-[38px_40px_minmax(150px,1.2fr)_minmax(70px,.55fr)_minmax(100px,.75fr)_minmax(90px,.65fr)]"><b className="text-sm text-slate-500">{position}º</b><span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-[#12213b] text-[10px] font-black text-[#d5dae3]">{initials(seller.seller)}</span><div className="min-w-0"><b className="block truncate text-sm text-white">{seller.seller}</b><span className="text-[10px] text-slate-500">{seller.count} venda(s)</span></div><b className="hidden text-right text-xs text-slate-300 sm:block">{seller.count}</b><b className="hidden text-right text-xs text-slate-200 sm:block">{brl.format(seller.revenue)}</b><div className="text-right"><b className="text-xs text-[#f6c94c]">{seller.performance.toFixed(1).replace(".", ",")}%</b><span className="mt-1 block text-[9px] text-slate-500">{hasGoal ? "da meta" : "participação"}</span></div></article>; }
 
 function EmptyRanking({ text }: { text: string }) {
   return <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-xs text-white/45"><Users className="mx-auto mb-2 h-5 w-5" />{text}</div>;
