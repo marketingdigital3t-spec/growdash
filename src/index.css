@@ -4498,7 +4498,6 @@ html:not(.dark) .campaigns-workspace :is(.campaign-account-select, .campaign-act
   box-shadow: inset 0 1px #fff, 0 4px 12px -10px rgba(0,0,0,.30) !important;
 }
 html:not(.dark) .campaigns-workspace .campaign-search-input::placeholder { color: #686868 !important; }
-.campaigns-workspace .campaign-totals-dock { position: sticky; bottom: 0; z-index: 35; }
 
 /* Full Ônix Dourado material system ---------------------------------------
    This mode intentionally replaces pale surfaces, not only the accent token.
