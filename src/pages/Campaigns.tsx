@@ -1043,7 +1043,9 @@ export default function Campaigns() {
             ) : (
               <Card className={cn(
                 "relative overflow-hidden rounded-none border-0 shadow-none md:flex md:flex-col",
-                analysisMode ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]" : "md:h-full md:min-h-0",
+                analysisMode
+                  ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
+                  : "md:h-[clamp(300px,calc(100dvh-22rem),640px)] md:min-h-0",
               )}>
                 <div className="space-y-2 p-2 md:hidden">
                   {visibleCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
@@ -1232,7 +1234,7 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <div ref={campaignTotalsScrollRef} className="campaign-totals-dock campaign-total-bar hidden shrink-0 overflow-x-auto border-t border-border/80 md:block" aria-label="Totais das campanhas filtradas" onScroll={(event) => { const table = campaignTableScrollRef.current; if (table && table.scrollLeft !== event.currentTarget.scrollLeft) table.scrollLeft = event.currentTarget.scrollLeft; }}>
+                <div ref={campaignTotalsScrollRef} className="campaign-totals-dock campaign-total-bar relative z-30 hidden h-14 shrink-0 overflow-x-auto border-t border-border/80 md:block" style={{ position: "static" }} aria-label="Totais das campanhas filtradas" onScroll={(event) => { const table = campaignTableScrollRef.current; if (table && table.scrollLeft !== event.currentTarget.scrollLeft) table.scrollLeft = event.currentTarget.scrollLeft; }}>
                   <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><CampaignTotalsRow widths={camp.colWidths} visibleColumns={visibleColumns} count={filtered.length} totals={totals} totalCpm={totalCpm} totalCpl={totalCpl} totalCpc={totalCpc} totalCtr={totalCtr} totalRoas={totalRoas} totalLinkCpc={totalLinkCpc} totalUniqueLinkCtr={totalUniqueLinkCtr} totalCostPerLandingPageView={totalCostPerLandingPageView} totalCostPerCheckout={totalCostPerCheckout} totalMetaCostPerPurchase={totalMetaCostPerPurchase} totalMetaPurchaseRoas={totalMetaPurchaseRoas} totalResultRate={totalResultRate} /></tbody></table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
