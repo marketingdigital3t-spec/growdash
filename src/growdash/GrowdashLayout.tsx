@@ -484,7 +484,7 @@ export default function GrowdashLayout() {
             <GlobalAnnouncementBanner />
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
-              <PageTransition>
+              <PageTransition className={cn(isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>
                 <Suspense fallback={<ContentLoadingFallback />}><Outlet /></Suspense>
               </PageTransition>
             </RouteErrorBoundary>

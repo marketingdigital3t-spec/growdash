@@ -1,11 +1,13 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 interface PageTransitionProps {
   children: React.ReactNode;
+  className?: string;
 }
 
-export function PageTransition({ children }: PageTransitionProps) {
+export function PageTransition({ children, className }: PageTransitionProps) {
   const location = useLocation();
 
   return (
@@ -16,6 +18,7 @@ export function PageTransition({ children }: PageTransitionProps) {
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         exit={{ opacity: 0, y: -4, filter: "blur(1px)" }}
         transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+        className={className}
       >
         {children}
       </motion.div>
