@@ -252,6 +252,7 @@ export default function Campaigns() {
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
   const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
+  const campaignTotalsScrollRef = useRef<HTMLDivElement | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
     const requested = searchParams.get("analise");
@@ -1055,6 +1056,10 @@ export default function Campaigns() {
                     "growdash-scrollbar-hidden relative hidden md:block",
                     "min-h-0 flex-1 overflow-auto",
                   )}
+                  onScroll={(event) => {
+                    const totalsDock = campaignTotalsScrollRef.current;
+                    if (totalsDock && totalsDock.scrollLeft !== event.currentTarget.scrollLeft) totalsDock.scrollLeft = event.currentTarget.scrollLeft;
+                  }}
                 >
                   <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-50 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
@@ -1173,7 +1178,7 @@ export default function Campaigns() {
                       </AnimatePresence>
                     </TableBody>
                     {(() => {
-                      const footer = <TableFooter className="campaign-total-bar sticky bottom-0 z-30 shadow-[0_-8px_20px_-14px_rgba(0,0,0,.75)]">
+                      const footer = <TableFooter className="hidden">
                       <TableRow data-campaign-totals className="h-14 border-y border-border/80 bg-muted/95 backdrop-blur-xl hover:bg-muted/95 dark:border-[#373226] dark:bg-[#11110f]/95 dark:hover:bg-[#11110f]/95 [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
                         <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
@@ -1226,6 +1231,9 @@ export default function Campaigns() {
                       return footer;
                     })()}
                   </table>
+                </div>
+                <div ref={campaignTotalsScrollRef} className="campaign-totals-dock campaign-total-bar hidden shrink-0 overflow-x-auto border-t border-border/80 md:block" aria-label="Totais das campanhas filtradas" onScroll={(event) => { const table = campaignTableScrollRef.current; if (table && table.scrollLeft !== event.currentTarget.scrollLeft) table.scrollLeft = event.currentTarget.scrollLeft; }}>
+                  <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><CampaignTotalsRow widths={camp.colWidths} visibleColumns={visibleColumns} count={filtered.length} totals={totals} totalCpm={totalCpm} totalCpl={totalCpl} totalCpc={totalCpc} totalCtr={totalCtr} totalRoas={totalRoas} totalLinkCpc={totalLinkCpc} totalUniqueLinkCtr={totalUniqueLinkCtr} totalCostPerLandingPageView={totalCostPerLandingPageView} totalCostPerCheckout={totalCostPerCheckout} totalMetaCostPerPurchase={totalMetaCostPerPurchase} totalMetaPurchaseRoas={totalMetaPurchaseRoas} totalResultRate={totalResultRate} /></tbody></table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
@@ -1672,6 +1680,18 @@ function CampaignTotalCell({ width, value, label, align = "right", stickyLeft, s
     {value && <strong className="block truncate text-[11px] font-bold text-foreground">{value}</strong>}
     {label && <span className="mt-0.5 block truncate text-[9px] font-semibold leading-tight text-muted-foreground">{label}</span>}
   </TableCell>;
+}
+
+function CampaignTotalsRow({ widths, visibleColumns, count, totals, totalCpm, totalCpl, totalCpc, totalCtr, totalRoas, totalLinkCpc, totalUniqueLinkCtr, totalCostPerLandingPageView, totalCostPerCheckout, totalMetaCostPerPurchase, totalMetaPurchaseRoas, totalResultRate }: any) {
+  const show = (key: CampaignColumnKey) => visibleColumns.has(key);
+  const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const decimal = (value: number, suffix = "") => `${value.toFixed(2).replace(".", ",")}${suffix}`;
+  return <TableRow data-campaign-totals className="h-14 border-y border-border/80 bg-muted/95 hover:bg-muted/95 dark:border-[#373226] dark:bg-[#11110f]/95 dark:hover:bg-[#11110f]/95 [&>td]:px-3 [&>td]:py-1">
+    <CampaignTotalCell width={widths.check} stickyLeft={0} /><CampaignTotalCell width={widths.delivery} stickyLeft={widths.check} /><CampaignTotalCell width={widths.name} value={`Resultados de ${count} campanhas`} label="Totais do período e filtros selecionados" align="left" stickyLeft={widths.check + widths.delivery} strongDivider />
+    {show("deliveryStatus") && <CampaignTotalCell width={widths.deliveryStatus} value="—" />}{show("actions") && <CampaignTotalCell width={widths.actions} value="—" />}{show("reach") && <CampaignTotalCell width={widths.reach} value={totals.reach.toLocaleString("pt-BR")} label="Total" />}{show("impressions") && <CampaignTotalCell width={widths.impressions} value={totals.impressions.toLocaleString("pt-BR")} label="Total" />}{show("frequency") && <CampaignTotalCell width={widths.frequency} value={totals.reach ? decimal(totals.impressions / totals.reach) : "0,00"} label="Média" />}{show("linkClicks") && <CampaignTotalCell width={widths.linkClicks} value={totals.linkClicks.toLocaleString("pt-BR")} label="Total" />}{show("linkCpc") && <CampaignTotalCell width={widths.linkCpc} value={money(totalLinkCpc)} label="Por clique no link" />}{show("uniqueLinkCtr") && <CampaignTotalCell width={widths.uniqueLinkCtr} value={decimal(totalUniqueLinkCtr, "%")} label="Taxa total" />}{show("cpm") && <CampaignTotalCell width={widths.cpm} value={money(totalCpm)} label="Por 1.000 impressões" />}{show("budget") && <CampaignTotalCell width={widths.budget} value={money(totals.budget)} label="Orçamento somado" />}
+    {show("leads") && <CampaignTotalCell width={widths.leads} value={totals.results.toLocaleString("pt-BR")} label={`${totals.conversations.toLocaleString("pt-BR")} conversas · ${totals.formLeads.toLocaleString("pt-BR")} forms/site`} />}{show("cpl") && <CampaignTotalCell width={widths.cpl} value={money(totalCpl)} label="Por resultado" />}{show("spend") && <CampaignTotalCell width={widths.spend} value={money(totals.spend)} label="Total usado" />}{show("landingPageViews") && <CampaignTotalCell width={widths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}{show("costPerLandingPageView") && <CampaignTotalCell width={widths.costPerLandingPageView} value={money(totalCostPerLandingPageView)} label="Por visualização" />}{show("checkouts") && <CampaignTotalCell width={widths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} label="Total" />}{show("costPerCheckout") && <CampaignTotalCell width={widths.costPerCheckout} value={money(totalCostPerCheckout)} label="Por finalização" />}{show("metaPurchases") && <CampaignTotalCell width={widths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} label="Total" />}{show("metaCostPerPurchase") && <CampaignTotalCell width={widths.metaCostPerPurchase} value={money(totalMetaCostPerPurchase)} label="Por compra" />}{show("metaPurchaseRoas") && <CampaignTotalCell width={widths.metaPurchaseRoas} value={decimal(totalMetaPurchaseRoas, "x")} label="Retorno total" />}
+    {show("objective") && <CampaignTotalCell width={widths.objective} value="—" />}{show("clicks") && <CampaignTotalCell width={widths.clicks} value={totals.clicks.toLocaleString("pt-BR")} label="Total" />}{show("cpc") && <CampaignTotalCell width={widths.cpc} value={money(totalCpc)} label="Por clique" />}{show("ctr") && <CampaignTotalCell width={widths.ctr} value={decimal(totalCtr, "%")} label="Taxa total" />}{show("conversion") && <CampaignTotalCell width={widths.conversion} value={decimal(totalResultRate, "%")} label="Taxa total" />}{show("sales") && <CampaignTotalCell width={widths.sales} value={totals.salesCount.toLocaleString("pt-BR")} label="Total" />}{show("cpa") && <CampaignTotalCell width={widths.cpa} value={money(totals.salesCount ? totals.spend / totals.salesCount : 0)} label="Por venda" />}{show("revenue") && <CampaignTotalCell width={widths.revenue} value={money(totals.revenue)} label="Valor total" />}{show("roas") && <CampaignTotalCell width={widths.roas} value={decimal(totalRoas, "x")} label="Retorno total" />}{show("profit") && <CampaignTotalCell width={widths.profit} value={money(totals.profit)} label="Total" />}{show("roi") && <CampaignTotalCell width={widths.roi} value={decimal(totals.spend ? totals.profit / totals.spend * 100 : 0, "%")} label="Retorno total" />}{show("videoViews") && <CampaignTotalCell width={widths.videoViews} value="—" label="Não sincronizado" />}
+  </TableRow>;
 }
 
 function TotalMetric({ label, value }: { label: string; value: string }) {
