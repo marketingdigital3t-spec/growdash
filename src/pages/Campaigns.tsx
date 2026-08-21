@@ -1042,7 +1042,7 @@ export default function Campaigns() {
               </Card>
             ) : (
               <Card className={cn(
-                "flex min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none",
+                "grid min-h-0 grid-rows-[minmax(0,1fr)_4rem_auto] overflow-hidden rounded-none border-0 shadow-none",
                 analysisMode
                   ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
                   : "md:h-[clamp(300px,calc(100dvh-22rem),640px)] md:min-h-0",
