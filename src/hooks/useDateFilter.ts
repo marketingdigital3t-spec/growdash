@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   startOfDay,
   endOfDay,
@@ -42,9 +42,27 @@ export const PRESET_LABELS: Record<DatePreset, string> = {
   custom: "Personalizado",
 };
 
+export type CustomDateRange = { from: Date; to: Date };
+
+const isValidDate = (value: unknown): value is Date =>
+  value instanceof Date && !Number.isNaN(value.getTime());
+
+/**
+ * Browser storage is an optimization, never a source of truth. A malformed
+ * value must not propagate to a query key (`toISOString`) and take down the
+ * module before its own error boundary can be shown.
+ */
+export function normalizeCustomDateRange(value: Partial<CustomDateRange> | null | undefined): CustomDateRange {
+  const now = new Date();
+  const from = isValidDate(value?.from) ? value.from : subDays(now, 30);
+  const to = isValidDate(value?.to) ? value.to : now;
+  return from.getTime() <= to.getTime() ? { from, to } : { from: to, to: from };
+}
+
 export function resolvePreset(preset: DatePreset, customRange: { from: Date; to: Date }) {
   const today = startOfDay(new Date());
   const endToday = endOfDay(today);
+  const safeRange = normalizeCustomDateRange(customRange);
   switch (preset) {
     case "today_yesterday":
       return { startDate: subDays(today, 1), endDate: endToday };
@@ -82,7 +100,7 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
       // older RD/Meta data on its own.
       return { startDate: new Date(2000, 0, 1), endDate: endToday };
     case "custom":
-      return { startDate: startOfDay(customRange.from), endDate: endOfDay(customRange.to) };
+      return { startDate: startOfDay(safeRange.from), endDate: endOfDay(safeRange.to) };
     default:
       return { startDate: subDays(today, 29), endDate: new Date() };
   }
@@ -100,10 +118,13 @@ function readStored(): { preset: DatePreset; from: string; to: string } | null {
 export function useDateFilter() {
   const stored = readStored();
   const [preset, setPreset] = useState<DatePreset>(stored?.preset ?? "today_yesterday");
-  const [customRange, setCustomRange] = useState<{ from: Date; to: Date }>({
-    from: stored?.from ? new Date(stored.from) : subDays(new Date(), 30),
-    to: stored?.to ? new Date(stored.to) : new Date(),
-  });
+  const [customRange, setStoredCustomRange] = useState<CustomDateRange>(() => normalizeCustomDateRange({
+    from: stored?.from ? new Date(stored.from) : undefined,
+    to: stored?.to ? new Date(stored.to) : undefined,
+  }));
+  const setCustomRange = useCallback((value: CustomDateRange) => {
+    setStoredCustomRange(normalizeCustomDateRange(value));
+  }, []);
 
   useEffect(() => {
     try {

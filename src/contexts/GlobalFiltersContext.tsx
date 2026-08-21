@@ -1,6 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { subDays } from "date-fns";
-import { resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
+import { normalizeCustomDateRange, resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
 import { useWorkspace } from "@/hooks/useWorkspace";
 
 export type BusinessSegment = "infoproduto" | "saas";
@@ -31,10 +30,10 @@ function readStored() {
     return {
       adAccountId: typeof value.adAccountId === "string" ? value.adAccountId : "all",
       preset: (value.preset || "today_yesterday") as DatePreset,
-      customRange: {
-        from: value.customRange?.from ? new Date(value.customRange.from) : subDays(new Date(), 30),
-        to: value.customRange?.to ? new Date(value.customRange.to) : new Date(),
-      },
+      customRange: normalizeCustomDateRange({
+        from: value.customRange?.from ? new Date(value.customRange.from) : undefined,
+        to: value.customRange?.to ? new Date(value.customRange.to) : undefined,
+      }),
       segment: value.segment === "saas" ? "saas" as const : "infoproduto" as const,
     };
   } catch {
@@ -47,10 +46,10 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   const stored = typeof window === "undefined" ? null : readStored();
   const [adAccountId, setAdAccountId] = useState(stored?.adAccountId ?? "all");
   const [preset, setPreset] = useState<DatePreset>(stored?.preset ?? "today_yesterday");
-  const [customRange, setCustomRange] = useState(stored?.customRange ?? {
-    from: subDays(new Date(), 30),
-    to: new Date(),
-  });
+  const [customRange, setStoredCustomRange] = useState(() => normalizeCustomDateRange(stored?.customRange));
+  const setCustomRange = useCallback((value: { from: Date; to: Date }) => {
+    setStoredCustomRange(normalizeCustomDateRange(value));
+  }, []);
   const [segment, setSegment] = useState<BusinessSegment>(stored?.segment ?? "infoproduto");
 
   useEffect(() => {
@@ -83,7 +82,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
     setSegment,
     workspaceId: workspace?.id,
     businessUnitId,
-  }), [adAccountId, preset, customRange, dates.startDate, dates.endDate, segment, workspace?.id, businessUnitId]);
+  }), [adAccountId, preset, setCustomRange, customRange, dates.startDate, dates.endDate, segment, workspace?.id, businessUnitId]);
 
   return <GlobalFiltersContext.Provider value={value}>{children}</GlobalFiltersContext.Provider>;
 }
