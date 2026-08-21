@@ -1186,8 +1186,8 @@ export default function Campaigns() {
                         <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
                         <CampaignTotalCell
                           width={camp.colWidths.name}
-                          value={`Resultados de ${filtered.length} campanhas`}
-                          label="Totais do período e filtros selecionados"
+                          value={`Totais (${filtered.length})`}
+                          label="Linhas visíveis após filtros e busca"
                           align="left"
                           stickyLeft={camp.colWidths.check + camp.colWidths.delivery}
                           strongDivider
@@ -1755,7 +1755,7 @@ function aggregateLevelTotals(rows: Array<{ spend: number; impressions: number; 
 function LevelTotals({ label, count, totals }: { label: string; count: number; totals: ReturnType<typeof aggregateLevelTotals> }) {
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
-  return <div className="campaign-total-bar z-20 shrink-0 px-3 py-3"><div className="growdash-scrollbar flex gap-2 overflow-x-auto"><TotalMetric label="Total" value={`${count} ${label}`} /><TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><TotalMetric label="Alcance*" value={totals.reach.toLocaleString("pt-BR")} /><TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} /><TotalMetric label="CTR" value={`${ctr.toFixed(2).replace(".", ",")}%`} /><TotalMetric label="Resultados" value={totals.leads.toLocaleString("pt-BR")} /><TotalMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>;
+  return <div className="campaign-total-bar sticky bottom-0 z-30 shrink-0 border-b border-white/[.08] px-3 py-3"><div className="growdash-scrollbar flex gap-2 overflow-x-auto"><TotalMetric label="Totais" value={`Totais (${count})`} /><TotalMetric label="Investimento" value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><TotalMetric label="Impressões" value={totals.impressions.toLocaleString("pt-BR")} /><TotalMetric label="Alcance*" value={totals.reach.toLocaleString("pt-BR")} /><TotalMetric label="Cliques" value={totals.clicks.toLocaleString("pt-BR")} /><TotalMetric label="CTR" value={`${ctr.toFixed(2).replace(".", ",")}%`} /><TotalMetric label="Resultados" value={totals.leads.toLocaleString("pt-BR")} /><TotalMetric label="CPL" value={cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /></div></div>;
 }
 
 function BreakdownWorkspace({ label, supported, loading, rows, onSync }: { label: string; supported: boolean; loading: boolean; rows: Array<{ key: string; spend: number; impressions: number; clicks: number; leads: number; ctr: number; cpl: number }>; onSync: () => void }) {
