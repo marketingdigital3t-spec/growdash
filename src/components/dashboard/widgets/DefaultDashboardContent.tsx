@@ -1,5 +1,5 @@
 // Default "Padrão" dashboard. Reflects the user's requested layout:
-// 1) Faturamento Líquido / Gastos / ROAS / ROI
+// 1) Faturamento Bruto / Gastos / ROAS / ROI
 // 2) Vendas por Pagamento / Vendas por Plataforma / Margem / Recebíveis / Ticket Médio
 // 3) Performance de Campanhas (3 abas: Formulário Nativo / Landing page / Mensagens)
 // 4) Funil de Conversão (passos definidos por aba)
@@ -545,7 +545,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       {/* 1. KPIs principais. Em layouts novos estes cards são widgets
           independentes para permitir mover, redimensionar e ocultar um a um. */}
       {!hidePrimary && <div className="dashboard-primary-kpis gap-2 sm:gap-3">
-        <MetricCard title="Faturamento Líquido" value={salesMetrics.totalNet} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
+        <MetricCard title="Faturamento Bruto" value={salesMetrics.totalGross} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
         <MetricCard

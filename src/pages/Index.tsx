@@ -368,7 +368,7 @@ const Index = () => {
       </MotionItem>
 
       <div className="mx-3">
-        <DashboardGlassStrip revenue={glassSales.totalNet} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
       </div>
 
       {(isEditing ? draftView : activeView) && (
