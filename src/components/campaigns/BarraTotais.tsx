@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export type CampaignTotalColumn = {
@@ -21,6 +22,8 @@ type Totals = {
   conversations: number; sales: number; revenue: number; profit: number;
   landingPageViews: number; checkouts: number; metaPurchases: number; metaPurchaseValue: number;
 };
+
+type ResultMetric = "conversations" | "leads";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -54,7 +57,7 @@ function TotalCell({ column, value, detail, stickyLeft, divider }: { column: Cam
   </TableCell>;
 }
 
-function totalValue(key: string, totals: Totals) {
+function totalValue(key: string, totals: Totals, selectedResultTotal: number) {
   switch (key) {
     case "reach": return [integer.format(totals.reach), "Total"];
     case "impressions": return [integer.format(totals.impressions), "Total"];
@@ -64,7 +67,7 @@ function totalValue(key: string, totals: Totals) {
     case "uniqueLinkCtr": return [decimal(ratio(totals.uniqueLinkClicks, totals.reach, 100), "%"), "Taxa total"];
     case "cpm": return [money.format(ratio(totals.spend, totals.impressions, 1000)), "Por 1.000 impressões"];
     case "budget": return [money.format(totals.budget), "Orçamento somado"];
-    case "cpl": return [money.format(ratio(totals.spend, totals.results)), "Por resultado"];
+    case "cpl": return [money.format(ratio(totals.spend, selectedResultTotal)), "Por resultado"];
     case "spend": return [money.format(totals.spend), "Total usado"];
     case "landingPageViews": return [integer.format(totals.landingPageViews), "Total"];
     case "costPerLandingPageView": return [money.format(ratio(totals.spend, totals.landingPageViews)), "Por visualização"];
@@ -76,7 +79,7 @@ function totalValue(key: string, totals: Totals) {
     case "clicks": return [integer.format(totals.clicks), "Total"];
     case "cpc": return [money.format(ratio(totals.spend, totals.clicks)), "Por clique"];
     case "ctr": return [decimal(ratio(totals.clicks, totals.impressions, 100), "%"), "Taxa total"];
-    case "conversion": return [decimal(ratio(totals.sales, totals.results, 100), "%"), "Taxa total"];
+    case "conversion": return [decimal(ratio(totals.sales, selectedResultTotal, 100), "%"), "Taxa total"];
     case "sales": return [integer.format(totals.sales), "Total"];
     case "cpa": return [money.format(ratio(totals.spend, totals.sales)), "Por venda"];
     case "revenue": return [money.format(totals.revenue), "Valor total"];
@@ -89,6 +92,8 @@ function totalValue(key: string, totals: Totals) {
 
 export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: CampaignLike[]; columns: CampaignTotalColumn[]; scrollContainerRef: RefObject<HTMLDivElement | null> }) {
   const totals = useMemo(() => getTotals(rows), [rows]);
+  const [resultMetric, setResultMetric] = useState<ResultMetric>("conversations");
+  const selectedResultTotal = resultMetric === "conversations" ? totals.conversations : totals.formLeads;
   const visible = useMemo(() => columns.filter((column) => column.visible), [columns]);
   const leadingColumns = useMemo(() => visible.filter((column) => column.key === "check" || column.key === "delivery" || column.key === "name"), [visible]);
   const leadingWidth = useMemo(() => leadingColumns.reduce((sum, column) => sum + column.width, 0), [leadingColumns]);
@@ -117,8 +122,8 @@ export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: Campa
           </div>
         </TableCell>;
         if (column.key === "delivery" || column.key === "name") return null;
-        if (column.key === "leads") return <TableCell key={column.key} style={{ width: column.width, minWidth: column.width, maxWidth: column.width }} className="border-r border-primary/15 bg-[#0a0a09] px-3 py-1 text-right tabular-nums dark:bg-[#070706]"><Tooltip><TooltipTrigger asChild><button type="button" className="ml-auto block max-w-full rounded px-1 text-right hover:bg-primary/10"><strong className="block truncate text-sm font-semibold text-foreground">{integer.format(totals.results)} leads</strong><span className="mt-0.5 block truncate text-[10px] font-medium text-muted-foreground">Ver composição</span></button></TooltipTrigger><TooltipContent><p>{integer.format(totals.conversations)} conversas iniciadas · {integer.format(totals.formLeads)} forms/site</p></TooltipContent></Tooltip></TableCell>;
-        const [value, detail] = totalValue(column.key, totals);
+        if (column.key === "leads") return <TableCell key={column.key} style={{ width: column.width, minWidth: column.width, maxWidth: column.width }} className="border-r border-primary/15 bg-[#0a0a09] px-3 py-1 text-right tabular-nums dark:bg-[#070706]"><Tooltip><TooltipTrigger asChild><span tabIndex={0} className="ml-auto block max-w-full rounded px-1 text-right outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/60"><strong className="block truncate text-sm font-semibold text-foreground">{integer.format(selectedResultTotal)}</strong></span></TooltipTrigger><TooltipContent><p>{integer.format(totals.conversations)} conversas iniciadas · {integer.format(totals.formLeads)} forms/site</p></TooltipContent></Tooltip><Select value={resultMetric} onValueChange={(value) => setResultMetric(value as ResultMetric)}><SelectTrigger aria-label="Métrica de resultado exibida" className="ml-auto mt-0.5 h-5 w-full max-w-[150px] border-0 bg-transparent px-1 text-[10px] font-medium text-muted-foreground shadow-none hover:bg-primary/10 focus:ring-1 focus:ring-primary/60"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="conversations">Conversas iniciadas</SelectItem><SelectItem value="leads">Leads</SelectItem></SelectContent></Select></TableCell>;
+        const [value, detail] = totalValue(column.key, totals, selectedResultTotal);
         return <TotalCell key={column.key} column={column} value={value} detail={detail} />;
       })}
     </TableRow></tbody></table>
