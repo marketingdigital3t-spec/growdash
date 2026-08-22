@@ -81,11 +81,11 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.widgets.find((widget) => widget.id === "primary_profit")).toMatchObject({ title: "Lucro", config: { metric: "profit" } });
   });
 
-  it("remove a lacuna antes da performance em uma visualização canônica v16", () => {
+  it("remove a lacuna antes da performance em uma visualização canônica v15", () => {
     const migrated = ensureDefaultDashboardContent({
-      id: "view-v16-performance-gap",
+      id: "view-v15-performance-gap",
       widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
-        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 16 } }
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 15 } }
         : { ...widget }),
       layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 10 : item.y })),
     });

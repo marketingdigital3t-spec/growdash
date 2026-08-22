@@ -60,7 +60,7 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   // não consegue ocupar as três linhas vazias. Reancoramos apenas quando toda
   // a faixa padrão ainda corresponde exatamente ao layout canônico; qualquer
   // rearranjo manual do usuário permanece preservado.
-  if (currentVersion === 16 && existingDefault) {
+  if (currentVersion >= 14 && currentVersion < DASHBOARD_CANONICAL_LAYOUT_VERSION && existingDefault) {
     const canonicalItems = DEFAULT_VIEW.layout.filter((item) => item.i !== "default");
     const hasCanonicalAnalyticRow = canonicalItems.every((expected) => {
       const actual = layout.find((item) => item.i === expected.i);
