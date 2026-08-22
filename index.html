@@ -30,7 +30,7 @@
   </head>
   <body>
     <div id="root">
-      <div style="display:grid;min-height:100vh;place-items:center;background:#050505;color:#f5f5f5;font:700 14px Nunito,system-ui,sans-serif;letter-spacing:.08em">
+      <div style="display:grid;min-height:100vh;place-items:center;background:#0B0D10;color:#F5F7FA;font:700 14px Inter,system-ui,sans-serif;letter-spacing:.08em">
         <div style="display:grid;gap:13px;justify-items:center;text-align:center"><span style="width:28px;height:28px;border:2px solid #494949;border-top-color:#fff;border-radius:999px;animation:growdash-spin .7s linear infinite"></span><span>Carregando Growdash…</span></div>
       </div>
     </div>
@@ -46,7 +46,7 @@
         // used to throw after 15 seconds and leave the initial spinner on the
         // screen permanently.
         if (window.__GROWDASH_BOOTED__ || root.dataset.growdashBooted === "true") return;
-        root.innerHTML = '<div style="display:grid;min-height:100vh;place-items:center;background:#050505;color:#f5f5f5;font:600 15px Nunito,system-ui,sans-serif;text-align:center;padding:24px"><div style="max-width:420px;border:1px solid #383838;border-radius:18px;background:#111;padding:28px;box-shadow:0 24px 70px #000"><p style="font-weight:800">A Growdash demorou mais do que o esperado.</p><p style="opacity:.72;margin-top:8px;line-height:1.5">A recarga automática foi bloqueada para evitar loops. Confirme manualmente o carregamento da versão mais recente.</p><button type="button" onclick="location.reload()" style="margin-top:18px;border:1px solid #fff;border-radius:10px;background:#f5f5f5;color:#080808;padding:10px 16px;font-weight:800;cursor:pointer">Tentar novamente</button></div></div>';
+        root.innerHTML = '<div style="display:grid;min-height:100vh;place-items:center;background:#0B0D10;color:#F5F7FA;font:600 15px Inter,system-ui,sans-serif;text-align:center;padding:24px"><div style="max-width:420px;border:1px solid #2A313B;border-radius:14px;background:#12161C;padding:28px;box-shadow:0 24px 70px #000"><p style="font-weight:800">A Growdash demorou mais do que o esperado.</p><p style="opacity:.72;margin-top:8px;line-height:1.5">A recarga automática foi bloqueada para evitar loops. Confirme manualmente o carregamento da versão mais recente.</p><button type="button" onclick="location.reload()" style="margin-top:18px;border:1px solid #D5A84A;border-radius:10px;background:#D5A84A;color:#151A21;padding:10px 16px;font-weight:800;cursor:pointer">Tentar novamente</button></div></div>';
       }, 15000);
     </script>
     <style>@keyframes growdash-spin{to{transform:rotate(360deg)}}</style>

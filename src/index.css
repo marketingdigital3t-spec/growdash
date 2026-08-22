@@ -30,29 +30,29 @@
 
 @layer base {
   :root {
-    --background: 40 34% 96%;
-    --foreground: 34 32% 8%;
-    --card: 42 45% 99%;
-    --card-foreground: 34 32% 8%;
-    --popover: 42 45% 99%;
-    --popover-foreground: 34 32% 8%;
-    --secondary: 40 28% 91%;
-    --secondary-foreground: 34 28% 12%;
-    --muted: 40 24% 92%;
-    --muted-foreground: 34 10% 40%;
-    --accent: 42 86% 89%;
-    --accent-foreground: 34 62% 13%;
+    --background: 220 20% 97%;
+    --foreground: 214 22% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 214 22% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 214 22% 11%;
+    --secondary: 220 18% 95%;
+    --secondary-foreground: 214 22% 11%;
+    --muted: 220 18% 95%;
+    --muted-foreground: 214 13% 37%;
+    --accent: 42 100% 92%;
+    --accent-foreground: 34 80% 16%;
     --destructive: 4 68% 50%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 48% 40%;
     --success-foreground: 0 0% 100%;
     --warning: 40 88% 50%;
     --warning-foreground: 35 50% 12%;
-    --border: 39 28% 84%;
-    --input: 39 28% 84%;
-    --primary: 36 70% 42%;
-    --primary-foreground: 42 65% 98%;
-    --primary-soft: 42 86% 90%;
+    --border: 216 20% 88%;
+    --input: 216 20% 86%;
+    --primary: 36 81% 37%;
+    --primary-foreground: 42 100% 98%;
+    --primary-soft: 42 100% 92%;
     --accent-pink: 5 70% 60%;
     --accent-green: 145 35% 46%;
     --accent-yellow: 42 100% 58%;
@@ -60,46 +60,61 @@
     --sidebar-icon: 30 5% 52%;
     --sidebar-icon-active: 42 100% 58%;
     --ring: 42 100% 58%;
-    --radius: 0.9rem;
-    --sidebar-background: 42 45% 99%;
-    --sidebar-foreground: 34 32% 8%;
-    --sidebar-primary: 40 66% 37%;
+    --radius: 0.8rem;
+    --sidebar-background: 214 22% 10%;
+    --sidebar-foreground: 220 22% 94%;
+    --sidebar-primary: 41 62% 56%;
     --sidebar-primary-foreground: 42 65% 98%;
-    --sidebar-accent: 40 28% 91%;
-    --sidebar-accent-foreground: 34 32% 8%;
-    --sidebar-border: 39 28% 84%;
-    --sidebar-ring: 40 66% 37%;
-    --brand-black: #070503;
-    --brand-surface: #120d07;
-    --brand-gold: #b57a20;
-    --brand-gold-light: #f1c76b;
-    --brand-bronze: #653708;
-    --brand-ivory: #f7f0e2;
-    --brand-accent-rgb: 181, 122, 32;
+    --sidebar-accent: 214 19% 16%;
+    --sidebar-accent-foreground: 220 22% 98%;
+    --sidebar-border: 216 17% 20%;
+    --sidebar-ring: 41 62% 56%;
+    --brand-black: #0b0d10;
+    --brand-surface: #12161c;
+    --brand-gold: #d5a84a;
+    --brand-gold-light: #e6bf68;
+    --brand-bronze: #8c5c0e;
+    --brand-ivory: #f5f7fa;
+    --brand-accent-rgb: 213, 168, 74;
+    --color-canvas: #F7F8FA;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #F1F3F6;
+    --color-border: #D8DEE7;
+    --color-text-primary: #151A21;
+    --color-text-secondary: #5B6675;
+    --color-text-disabled: #9AA4B2;
+    --color-accent: #A86F12;
+    --color-accent-hover: #8C5C0E;
+    --color-accent-soft: #FFF3D7;
+    --color-success: #167B4B;
+    --color-warning: #A86900;
+    --color-error: #B4232C;
+    --color-info: #2563C9;
+    --color-focus: #8C5C0E;
     --gd-page-gutter: clamp(.7rem, 1.05vw, 1.15rem);
   }
 
   .dark {
-    --background: 36 18% 2.7%;
-    --foreground: 40 18% 94%;
-    --card: 35 14% 5.2%;
-    --card-foreground: 40 18% 94%;
-    --popover: 35 13% 5.8%;
-    --popover-foreground: 40 18% 94%;
-    --secondary: 35 10% 8%;
-    --secondary-foreground: 40 12% 91%;
-    --muted: 35 9% 9%;
-    --muted-foreground: 36 8% 62%;
-    --accent: 39 38% 14%;
-    --accent-foreground: 43 100% 76%;
-    --border: 37 12% 15%;
-    --input: 37 12% 15%;
-    --primary: 36 70% 42%;
-    --primary-foreground: 42 65% 98%;
-    --ring: 42 100% 58%;
-    --sidebar-background: 36 45% 2%;
-    --sidebar-foreground: 40 30% 94%;
-    --sidebar-primary: 40 66% 37%;
+    --background: 216 18% 5%;
+    --foreground: 218 29% 97%;
+    --card: 214 22% 9%;
+    --card-foreground: 218 29% 97%;
+    --popover: 216 20% 12%;
+    --popover-foreground: 218 29% 97%;
+    --secondary: 216 18% 12%;
+    --secondary-foreground: 218 24% 94%;
+    --muted: 216 18% 12%;
+    --muted-foreground: 214 16% 71%;
+    --accent: 39 44% 16%;
+    --accent-foreground: 43 78% 85%;
+    --border: 216 17% 20%;
+    --input: 216 17% 20%;
+    --primary: 41 62% 56%;
+    --primary-foreground: 214 22% 11%;
+    --ring: 43 80% 68%;
+    --sidebar-background: 216 22% 5%;
+    --sidebar-foreground: 220 22% 94%;
+    --sidebar-primary: 41 62% 56%;
     --sidebar-primary-foreground: 42 65% 98%;
     --sidebar-accent: 39 38% 13%;
     --sidebar-accent-foreground: 43 100% 75%;
@@ -255,54 +270,18 @@
      Keeping the scope lets charts/components use tokens without creating a
      second blue/dark theme inside the platform. */
   .analytics-module {
-    --background: 42 34% 96%;
-    --foreground: 34 32% 8%;
-    --card: 42 45% 99%;
-    --card-foreground: 34 32% 8%;
-    --popover: 42 45% 99%;
-    --popover-foreground: 34 32% 8%;
-    --primary-foreground: 42 100% 97%;
-    --secondary: 40 28% 91%;
-    --secondary-foreground: 34 28% 12%;
-    --muted: 40 24% 92%;
-    --muted-foreground: 34 10% 40%;
-    --accent: 42 56% 89%;
-    --accent-foreground: 34 62% 13%;
-    --destructive: 4 68% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 48% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 40 88% 50%;
-    --warning-foreground: 35 50% 12%;
-    --border: 39 28% 84%;
-    --input: 39 28% 84%;
-    --ring: 39 74% 54%;
-    --chart-1: 36 70% 42%;
-    --chart-2: 42 58% 36%;
-    --chart-3: 32 55% 28%;
-    --chart-4: 40 66% 52%;
-    --chart-5: 4 68% 50%;
+    /* Analytics inherits the same semantic palette as every other area.
+       This prevents a second, competing theme inside the application. */
+    --chart-1: 41 62% 56%;
+    --chart-2: 151 54% 46%;
+    --chart-3: 214 76% 64%;
+    --chart-4: 38 82% 58%;
+    --chart-5: 355 70% 62%;
     color-scheme: light;
-    font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
 
-  .dark .analytics-module {
-    --background: 36 18% 2.7%;
-    --foreground: 40 18% 94%;
-    --card: 35 14% 5.2%;
-    --card-foreground: 40 18% 94%;
-    --popover: 35 13% 5.8%;
-    --popover-foreground: 40 18% 94%;
-    --secondary: 35 10% 8%;
-    --secondary-foreground: 40 12% 91%;
-    --muted: 35 9% 9%;
-    --muted-foreground: 36 8% 62%;
-    --accent: 39 38% 14%;
-    --accent-foreground: 43 100% 76%;
-    --border: 37 12% 15%;
-    --input: 37 12% 15%;
-    color-scheme: dark;
-  }
+  .dark .analytics-module { color-scheme: dark; }
 
   /* Keep nested analytics, charts and maps on the chosen brand accent instead
      of falling back to the historical gold/blue palette. */
@@ -359,7 +338,7 @@
 
   body {
     @apply m-0 bg-background text-foreground;
-    font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
   }
@@ -385,31 +364,43 @@
   }
 }
 
-/*
- * Growdash Mono — the application has one intentional material language:
- * black, charcoal, smoke and white. We keep semantic success/warning/error
- * colors for data states, but navigation, surfaces and actions never inherit
- * a blue, purple or gold accent saved in an older browser session.
- */
+/* Premium gold is the default brand accent. Saved legacy palettes keep their
+   selection behaviour, but the base experience is no longer neutralized to
+   gray by an old local preference. */
 html,
 html[data-accent="monochrome"] {
-  --primary: 0 0% 92%;
-  --primary-foreground: 0 0% 7%;
-  --primary-soft: 0 0% 85%;
-  --ring: 0 0% 100%;
-  --accent: 0 0% 17%;
-  --accent-foreground: 0 0% 98%;
-  --sidebar-primary: 0 0% 92%;
-  --sidebar-primary-foreground: 0 0% 7%;
-  --sidebar-icon-active: 0 0% 100%;
-  --sidebar-ring: 0 0% 100%;
-  --brand-black: #050505;
-  --brand-surface: #111111;
-  --brand-gold: #d7d7d7;
-  --brand-gold-light: #ffffff;
-  --brand-bronze: #4a4a4a;
-  --brand-ivory: #ffffff;
-  --brand-accent-rgb: 226, 226, 226;
+  --primary: 41 62% 56%;
+  --primary-foreground: 214 22% 11%;
+  --primary-soft: 42 100% 92%;
+  --ring: 43 80% 68%;
+  --accent: 39 44% 16%;
+  --accent-foreground: 43 78% 85%;
+  --sidebar-primary: 41 62% 56%;
+  --sidebar-primary-foreground: 214 22% 11%;
+  --sidebar-icon-active: 43 80% 68%;
+    --sidebar-ring: 43 80% 68%;
+    --color-canvas: #0B0D10;
+    --color-surface: #12161C;
+    --color-surface-raised: #181D24;
+    --color-border: #2A313B;
+    --color-text-primary: #F5F7FA;
+    --color-text-secondary: #AAB4C2;
+    --color-text-disabled: #667181;
+    --color-accent: #D5A84A;
+    --color-accent-hover: #E6BF68;
+    --color-accent-soft: #2B2314;
+    --color-success: #35B77A;
+    --color-warning: #E7AE3A;
+    --color-error: #E35D67;
+    --color-info: #5E9CF6;
+    --color-focus: #F0C96A;
+  --brand-black: #0b0d10;
+  --brand-surface: #12161c;
+  --brand-gold: #d5a84a;
+  --brand-gold-light: #e6bf68;
+  --brand-bronze: #8c5c0e;
+  --brand-ivory: #f5f7fa;
+  --brand-accent-rgb: 213, 168, 74;
 }
 
 /* Opt-in premium material: warm metal on deep onyx. It stays isolated behind
@@ -464,44 +455,34 @@ html[data-accent="metallic-gold"].dark {
   --input: 37 22% 18%;
 }
 
-/* Old Tailwind warning colours were visually interpreted as brand yellow.
-   Preserve the semantic warning state, but render it in the same neutral
-   graphite/white system used by every Growdash control and icon. */
-.text-amber-400, .text-amber-500, .text-amber-600, .text-amber-700,
-.text-yellow-400, .text-yellow-500, .text-yellow-600, .text-yellow-700 { color: #d8d8d8 !important; }
-.bg-amber-400\/15, .bg-amber-500\/5, .bg-amber-500\/10, .bg-amber-500\/\[\.06\],
-.bg-yellow-400\/15, .bg-yellow-500\/5, .bg-yellow-500\/10 { background-color: rgba(255,255,255,.075) !important; }
-.border-amber-500\/20, .border-amber-500\/25, .border-amber-500\/30,
-.border-yellow-500\/20, .border-yellow-500\/25, .border-yellow-500\/30 { border-color: rgba(255,255,255,.18) !important; }
-
 html:not(.dark) {
-  --background: 0 0% 94%;
-  --foreground: 0 0% 8%;
+  --background: 220 20% 97%;
+  --foreground: 214 22% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 8%;
+  --card-foreground: 214 22% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 8%;
-  --secondary: 0 0% 89%;
-  --secondary-foreground: 0 0% 11%;
-  --muted: 0 0% 91%;
-  --muted-foreground: 0 0% 37%;
-  --border: 0 0% 80%;
-  --input: 0 0% 76%;
+  --popover-foreground: 214 22% 11%;
+  --secondary: 220 18% 95%;
+  --secondary-foreground: 214 22% 11%;
+  --muted: 220 18% 95%;
+  --muted-foreground: 214 13% 37%;
+  --border: 216 20% 88%;
+  --input: 216 20% 86%;
 }
 
 .dark {
-  --background: 0 0% 3%;
-  --foreground: 0 0% 95%;
-  --card: 0 0% 7%;
-  --card-foreground: 0 0% 95%;
-  --popover: 0 0% 9%;
-  --popover-foreground: 0 0% 95%;
-  --secondary: 0 0% 12%;
-  --secondary-foreground: 0 0% 93%;
-  --muted: 0 0% 13%;
-  --muted-foreground: 0 0% 63%;
-  --border: 0 0% 19%;
-  --input: 0 0% 21%;
+  --background: 216 18% 5%;
+  --foreground: 218 29% 97%;
+  --card: 214 22% 9%;
+  --card-foreground: 218 29% 97%;
+  --popover: 216 20% 12%;
+  --popover-foreground: 218 29% 97%;
+  --secondary: 216 18% 12%;
+  --secondary-foreground: 218 24% 94%;
+  --muted: 216 18% 12%;
+  --muted-foreground: 214 16% 71%;
+  --border: 216 17% 20%;
+  --input: 216 17% 20%;
 }
 
 @layer components {
@@ -562,7 +543,7 @@ html:not(.dark) {
       radial-gradient(ellipse at 82% -14%, rgba(var(--brand-accent-rgb), .105), transparent 36rem),
       radial-gradient(ellipse at 12% 46%, rgba(var(--brand-accent-rgb), .055), transparent 31rem),
       radial-gradient(ellipse at 60% 110%, rgba(var(--brand-accent-rgb), .035), transparent 34rem),
-      linear-gradient(128deg, #050504 0%, #080704 48%, #040403 100%);
+      linear-gradient(128deg, #0b0d10 0%, #10141a 48%, #080a0d 100%);
     background-attachment: fixed;
   }
 
@@ -671,7 +652,7 @@ html:not(.dark) {
   }
 
   .gd-panel {
-    @apply min-w-0 max-w-full rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_50px_-38px_rgba(24,70,100,.35)] dark:border-white/[.11] dark:bg-[#0b1728] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_24px_70px_-45px_rgba(0,0,0,.9)];
+    @apply min-w-0 max-w-full rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_50px_-38px_rgba(24,70,100,.35)] dark:border-white/[.11] dark:bg-[#12161C] dark:shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_24px_70px_-45px_rgba(0,0,0,.9)];
     position: relative;
     isolation: isolate;
     background-image: linear-gradient(145deg, rgba(255,255,255,.7), transparent 38%), radial-gradient(circle at 100% 0%, rgba(var(--brand-accent-rgb), .06), transparent 14rem);

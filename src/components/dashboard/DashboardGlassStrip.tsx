@@ -28,7 +28,7 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
   useEffect(() => { try { localStorage.setItem("growdash:glass-strip-collapsed", collapsed ? "1" : "0"); } catch {} }, [collapsed]);
   const compact = isMobile && collapsed;
   const metrics: GlassMetric[] = [
-    { label: "Faturamento líquido", value: brl.format(revenue), icon: <DollarSign /> },
+    { label: "Faturamento bruto", value: brl.format(revenue), icon: <DollarSign /> },
     { label: "Investimento", value: brl.format(spend), icon: <Coins /> },
     { label: "Leads", value: integer.format(leads), icon: <Users /> },
     { label: "CPL", value: brl.format(cpl), icon: <BarChart3 /> },

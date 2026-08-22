@@ -41,10 +41,9 @@ export function resolveCampaignResults(insightLeads: number, actionTotals: Recor
 }
 
 /**
- * A campaign table must show the result it was configured to pursue, rather
- * than adding unrelated Meta events together. Lead campaigns show leads;
- * message/other campaigns show only conversations started. The full event
- * breakdown remains available in the campaign detail tooltip.
+ * A tabela mostra sempre um único resultado principal: se há apenas um tipo
+ * de evento, ele próprio; se há mais de um, o de maior volume. Os demais
+ * continuam disponíveis na composição exibida ao passar o mouse.
  */
 export function resolveCampaignPrimaryResult(
   objective: string | null | undefined,
@@ -53,7 +52,14 @@ export function resolveCampaignPrimaryResult(
   const normalizedObjective = String(objective || "").toUpperCase();
   const isLeadCampaign = normalizedObjective.includes("LEAD");
 
-  return isLeadCampaign
-    ? { label: "Leads", value: results.leadCount }
-    : { label: "Conversas iniciadas", value: results.conversations };
+  const leads = Math.max(0, Number(results.leadCount || 0));
+  const conversations = Math.max(0, Number(results.conversations || 0));
+
+  if (leads === 0 && conversations === 0) {
+    return isLeadCampaign ? { label: "Leads", value: 0 } : { label: "Conversas iniciadas", value: 0 };
+  }
+  if (leads === 0) return { label: "Conversas iniciadas", value: conversations };
+  if (conversations === 0) return { label: "Leads", value: leads };
+  if (leads === conversations) return isLeadCampaign ? { label: "Leads", value: leads } : { label: "Conversas iniciadas", value: conversations };
+  return leads > conversations ? { label: "Leads", value: leads } : { label: "Conversas iniciadas", value: conversations };
 }

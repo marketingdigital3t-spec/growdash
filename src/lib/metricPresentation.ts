@@ -18,6 +18,7 @@ const descriptions: Record<string, string> = {
   "cac / roas": "CAC é o investimento dividido pelas vendas; ROAS é a receita atribuída dividida pelo investimento.",
   "cpl / cac": "CPL é o investimento por lead no RD; CAC é o investimento por venda confirmada.",
   "faturamento líquido": "Receita após descontos, taxas e ajustes registrados.",
+  "faturamento bruto": "Valor total das vendas confirmadas antes de descontos, taxas e ajustes.",
   "gastos com anúncios": "Valor investido em mídia paga no período selecionado.",
   investimento: "Valor consumido pelas campanhas no período selecionado.",
   leads: "Quantidade absoluta de leads atribuídos aos filtros atuais.",

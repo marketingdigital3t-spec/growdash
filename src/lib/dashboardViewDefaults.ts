@@ -7,6 +7,46 @@ interface DashboardViewShape {
 }
 
 /**
+ * Corrige somente a lacuna de uma composição padrão intacta. O bloco de
+ * conteúdo é estático no grid e, por isso, não participa da compactação
+ * vertical automática do react-grid-layout.
+ */
+export function alignCanonicalDefaultBlock(layout: any[], defaultId: string) {
+  const defaultLayout = DEFAULT_VIEW.layout.find((item) => item.i === "default")!;
+  const canonicalItems = DEFAULT_VIEW.layout.filter((item) => item.i !== "default");
+  const hasCanonicalAnalyticRow = canonicalItems.every((expected) => {
+    const actual = layout.find((item) => item.i === expected.i);
+    return actual
+      && actual.x === expected.x
+      && actual.y === expected.y
+      && actual.w === expected.w
+      && actual.h === expected.h;
+  });
+
+  if (!hasCanonicalAnalyticRow) return layout;
+
+  return layout.map((item) => item.i === defaultId
+    ? { ...item, x: defaultLayout.x, y: defaultLayout.y, w: defaultLayout.w, minW: defaultLayout.minW, minH: defaultLayout.minH }
+    : item);
+}
+
+/** Remove apenas uma pequena lacuna acidental antes do bloco estático padrão. */
+export function anchorDefaultBlockAfterPreviousWidgets(layout: any[], defaultId: string) {
+  const defaultItem = layout.find((item) => item.i === defaultId);
+  if (!defaultItem || Number(defaultItem.w) !== 12) return layout;
+
+  const previousEnd = layout
+    .filter((item) => item.i !== defaultId && Number(item.y) < Number(defaultItem.y))
+    .reduce((maximum, item) => Math.max(maximum, Number(item.y) + Number(item.h)), 0);
+  const gap = Number(defaultItem.y) - previousEnd;
+
+  // Uma folga de até três linhas é resíduo das versões anteriores do grid;
+  // posições com afastamento maior são consideradas uma escolha de layout.
+  if (previousEnd <= 0 || gap <= 0 || gap > 3) return layout;
+  return layout.map((item) => item.i === defaultId ? { ...item, y: previousEnd } : item);
+}
+
+/**
  * Restores the original Growdash dashboard once for legacy saved views.
  *
  * Some saved views received the complete widget catalog in addition to the
@@ -23,6 +63,57 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   const currentVersion = Number(existingDefault?.config?.canonicalLayoutVersion || 0);
   const defaultId = existingDefault?.id || defaultWidget.id;
   const hasDefaultLayout = layout.some((item) => item.i === defaultId);
+
+  // O primeiro KPI canônico representa faturamento bruto. A correção é
+  // propositalmente estreita: só alcança a combinação legada exata, sem
+  // sobrescrever um cartão que o usuário tenha personalizado.
+  const hasLegacyPrimaryRevenue = widgets.some((widget) => (
+    widget.id === "primary_revenue"
+    && widget.title === "Faturamento Líquido"
+    && widget.config?.metric === "revenue_net"
+  ));
+  const hasLegacyPrimaryProfit = widgets.some((widget) => (
+    widget.id === "primary_profit"
+    && widget.title === "Lucro Líquido"
+    && widget.config?.metric === "profit"
+  ));
+  if (hasLegacyPrimaryRevenue || hasLegacyPrimaryProfit) {
+    return {
+      ...view,
+      widgets: widgets.map((widget) => {
+        if (widget.id === "primary_revenue" && widget.title === "Faturamento Líquido" && widget.config?.metric === "revenue_net") {
+          return { ...widget, title: "Faturamento Bruto", config: { ...widget.config, metric: "revenue_gross" } };
+        }
+        if (widget.id === "primary_profit" && widget.title === "Lucro Líquido" && widget.config?.metric === "profit") {
+          return { ...widget, title: "Lucro" };
+        }
+        if (widget.id === defaultId) {
+          return { ...widget, config: { ...widget.config, ...defaultWidget.config } };
+        }
+        return widget;
+      }),
+    };
+  }
+
+  // Algumas visualizações já canônicas foram gravadas com o bloco estático
+  // abaixo da faixa analítica. Como o bloco é estático, o compactador do grid
+  // não consegue ocupar as três linhas vazias. Reancoramos apenas quando toda
+  // a faixa padrão ainda corresponde exatamente ao layout canônico; qualquer
+  // rearranjo manual do usuário permanece preservado.
+  if (currentVersion >= 14 && currentVersion < DASHBOARD_CANONICAL_LAYOUT_VERSION && existingDefault) {
+    const canonicalLayout = alignCanonicalDefaultBlock(layout, defaultId);
+    const alignedLayout = canonicalLayout === layout
+      ? layout
+      : anchorDefaultBlockAfterPreviousWidgets(canonicalLayout, defaultId);
+
+    return {
+      ...view,
+      widgets: widgets.map((widget) => widget.id === defaultId
+        ? { ...widget, config: { ...widget.config, ...defaultWidget.config } }
+        : widget),
+      layout: alignedLayout,
+    };
+  }
 
   if (currentVersion >= DASHBOARD_CANONICAL_LAYOUT_VERSION) {
     if (hasDefaultLayout) return view;

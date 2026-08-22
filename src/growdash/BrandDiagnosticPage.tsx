@@ -233,11 +233,11 @@ export default function BrandDiagnosticPage() {
             <Kpi label="Investimento Meta" value={totals.spend} kind="currency" icon={<CircleDollarSign />} detail={`${totals.activeCampaigns} campanha(s) ativa(s)`} />
             <Kpi label="Leads Meta" value={totals.leads} kind="count" icon={<UsersRound />} detail={`CPL ${formatMetric(totals.cpl, "currency")}`} />
             <Kpi label="Leads no RD" value={totals.rdLeads} kind="count" icon={<Route />} detail={`${totals.won} venda(s) ganha(s)`} />
-            <Kpi label="ROAS" value={totals.roas} kind="ratio" icon={<Gauge />} detail={`Receita ${formatMetric(totals.revenue, "currency")}`} />
+            <Kpi label="ROAS" value={totals.roas} kind="ratio" icon={<Gauge />} detail={`Receita líquida ${formatMetric(totals.revenue, "currency")}`} />
             <Kpi label="Impressões" value={totals.impressions} kind="count" icon={<Eye />} />
             <Kpi label="Cliques no link" value={totals.clicks} kind="count" icon={<MousePointerClick />} detail={`CTR ${formatMetric(totals.ctr, "percentage")}`} />
             <Kpi label="Taxa de conversão" value={totals.conversion} kind="percentage" icon={<Target />} detail="RD → vendas ganhas" />
-            <Kpi label="Receita gerada" value={totals.revenue} kind="currency" icon={<BadgeDollarSign />} />
+            <Kpi label="Receita líquida gerada" value={totals.revenue} kind="currency" icon={<BadgeDollarSign />} />
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]">

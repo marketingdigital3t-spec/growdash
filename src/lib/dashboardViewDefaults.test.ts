@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
+import { alignCanonicalDefaultBlock, anchorDefaultBlockAfterPreviousWidgets, ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
 import { DASHBOARD_CANONICAL_LAYOUT_VERSION, DEFAULT_VIEW } from "@/lib/widgetCatalog";
 
 describe("ensureDefaultDashboardContent", () => {
@@ -50,6 +50,83 @@ describe("ensureDefaultDashboardContent", () => {
       expect(item).toMatchObject({ minW: 2, minH: 2 });
       expect(item?.w).toBeLessThan(12);
     }
+  });
+
+  it("migra somente o KPI padrão de receita para faturamento bruto", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-gross-revenue",
+      widgets: [
+        { id: "primary_revenue", type: "kpi", title: "Faturamento Líquido", config: { metric: "revenue_net" } },
+        { id: "default", type: "default_block", title: "Padrão", config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION } },
+      ],
+      layout: [{ i: "primary_revenue", x: 0, y: 0, w: 3, h: 2 }, { i: "default", x: 0, y: 2, w: 12, h: 30 }],
+    });
+
+    expect(migrated.widgets.find((widget) => widget.id === "primary_revenue")).toMatchObject({
+      title: "Faturamento Bruto",
+      config: { metric: "revenue_gross" },
+    });
+  });
+
+  it("renomeia somente o KPI padrão de lucro", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-profit-label",
+      widgets: [
+        { id: "primary_profit", type: "kpi", title: "Lucro Líquido", config: { metric: "profit" } },
+        { id: "default", type: "default_block", title: "Padrão", config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION } },
+      ],
+      layout: [{ i: "primary_profit", x: 9, y: 0, w: 3, h: 2 }, { i: "default", x: 0, y: 2, w: 12, h: 30 }],
+    });
+
+    expect(migrated.widgets.find((widget) => widget.id === "primary_profit")).toMatchObject({ title: "Lucro", config: { metric: "profit" } });
+  });
+
+  it("remove a lacuna antes da performance em uma visualização canônica v15", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-v15-performance-gap",
+      widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 15 } }
+        : { ...widget }),
+      layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 10 : item.y })),
+    });
+
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+    });
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 7, w: 12 });
+  });
+
+  it("realinha o bloco padrão no render mesmo sem depender da versão salva", () => {
+    const aligned = alignCanonicalDefaultBlock(
+      DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 10 : item.y })),
+      "default",
+    );
+
+    expect(aligned.find((item) => item.i === "default")).toMatchObject({ y: 7 });
+  });
+
+  it("ancora o bloco estático após os widgets anteriores quando a lacuna é residual", () => {
+    const aligned = anchorDefaultBlockAfterPreviousWidgets([
+      { i: "top", x: 0, y: 0, w: 12, h: 7 },
+      { i: "default", x: 0, y: 10, w: 12, h: 30 },
+    ], "default");
+
+    expect(aligned.find((item) => item.i === "default")).toMatchObject({ y: 7 });
+  });
+
+  it("preserva o bloco padrão de uma visualização v16 reorganizada manualmente", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-v16-custom-layout",
+      widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 16 } }
+        : { ...widget }),
+      layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "payment_chart" ? 3 : item.i === "default" ? 10 : item.y })),
+    });
+
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ y: 10 });
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+    });
   });
 
   it("migra uma visão v5 sem apagar os ajustes e separa a visão financeira em widgets", () => {

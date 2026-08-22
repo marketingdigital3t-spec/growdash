@@ -527,7 +527,7 @@ export default function CrmPage() {
             />
             <CrmMetricCard
               source="Comercial · RD"
-              label="Faturamento ganho"
+              label="Faturamento líquido ganho"
               value={brl.format(stats.wonRevenue)}
               description={`${number.format(stats.won)} negociação(ões) marcada(s) como ganha(s)`}
               icon={<Trophy className="h-4 w-4" />}
