@@ -549,7 +549,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
         <MetricCard
-          title="Lucro Líquido"
+          title="Lucro"
           value={profit}
           icon={<BarChart3 className="h-4 w-4" />}
           prefix="R$ "

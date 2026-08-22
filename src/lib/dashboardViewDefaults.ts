@@ -32,12 +32,20 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     && widget.title === "Faturamento Líquido"
     && widget.config?.metric === "revenue_net"
   ));
-  if (hasLegacyPrimaryRevenue) {
+  const hasLegacyPrimaryProfit = widgets.some((widget) => (
+    widget.id === "primary_profit"
+    && widget.title === "Lucro Líquido"
+    && widget.config?.metric === "profit"
+  ));
+  if (hasLegacyPrimaryRevenue || hasLegacyPrimaryProfit) {
     return {
       ...view,
       widgets: widgets.map((widget) => {
         if (widget.id === "primary_revenue" && widget.title === "Faturamento Líquido" && widget.config?.metric === "revenue_net") {
           return { ...widget, title: "Faturamento Bruto", config: { ...widget.config, metric: "revenue_gross" } };
+        }
+        if (widget.id === "primary_profit" && widget.title === "Lucro Líquido" && widget.config?.metric === "profit") {
+          return { ...widget, title: "Lucro" };
         }
         if (widget.id === defaultId) {
           return { ...widget, config: { ...widget.config, ...defaultWidget.config } };

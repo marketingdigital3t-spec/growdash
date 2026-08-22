@@ -68,6 +68,19 @@ describe("ensureDefaultDashboardContent", () => {
     });
   });
 
+  it("renomeia somente o KPI padrão de lucro", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-profit-label",
+      widgets: [
+        { id: "primary_profit", type: "kpi", title: "Lucro Líquido", config: { metric: "profit" } },
+        { id: "default", type: "default_block", title: "Padrão", config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION } },
+      ],
+      layout: [{ i: "primary_profit", x: 9, y: 0, w: 3, h: 2 }, { i: "default", x: 0, y: 2, w: 12, h: 30 }],
+    });
+
+    expect(migrated.widgets.find((widget) => widget.id === "primary_profit")).toMatchObject({ title: "Lucro", config: { metric: "profit" } });
+  });
+
   it("migra uma visão v5 sem apagar os ajustes e separa a visão financeira em widgets", () => {
     const migrated = ensureDefaultDashboardContent({
       id: "view-financial-editor",
