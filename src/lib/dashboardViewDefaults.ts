@@ -24,19 +24,15 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   const defaultId = existingDefault?.id || defaultWidget.id;
   const hasDefaultLayout = layout.some((item) => item.i === defaultId);
 
-  if (currentVersion >= DASHBOARD_CANONICAL_LAYOUT_VERSION) {
-    if (hasDefaultLayout) return view;
-
-    return {
-      ...view,
-      layout: [{ ...defaultLayout, i: defaultId }, ...layout.filter((item) => item.i !== defaultId)],
-    };
-  }
-
-  // A v15 corrige a semântica do primeiro KPI padrão: ele representa o valor
-  // bruto das vendas. Só atualizamos o widget canônico ainda intacto; qualquer
-  // KPI que o usuário tenha renomeado ou reconfigurado permanece como está.
-  if (currentVersion === 14 && existingDefault) {
+  // O primeiro KPI canônico representa faturamento bruto. A correção é
+  // propositalmente estreita: só alcança a combinação legada exata, sem
+  // sobrescrever um cartão que o usuário tenha personalizado.
+  const hasLegacyPrimaryRevenue = widgets.some((widget) => (
+    widget.id === "primary_revenue"
+    && widget.title === "Faturamento Líquido"
+    && widget.config?.metric === "revenue_net"
+  ));
+  if (hasLegacyPrimaryRevenue) {
     return {
       ...view,
       widgets: widgets.map((widget) => {
@@ -48,6 +44,15 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
         }
         return widget;
       }),
+    };
+  }
+
+  if (currentVersion >= DASHBOARD_CANONICAL_LAYOUT_VERSION) {
+    if (hasDefaultLayout) return view;
+
+    return {
+      ...view,
+      layout: [{ ...defaultLayout, i: defaultId }, ...layout.filter((item) => item.i !== defaultId)],
     };
   }
 

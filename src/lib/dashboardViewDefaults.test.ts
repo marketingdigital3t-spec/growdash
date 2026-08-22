@@ -52,6 +52,22 @@ describe("ensureDefaultDashboardContent", () => {
     }
   });
 
+  it("migra somente o KPI padrão de receita para faturamento bruto", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-gross-revenue",
+      widgets: [
+        { id: "primary_revenue", type: "kpi", title: "Faturamento Líquido", config: { metric: "revenue_net" } },
+        { id: "default", type: "default_block", title: "Padrão", config: { canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION } },
+      ],
+      layout: [{ i: "primary_revenue", x: 0, y: 0, w: 3, h: 2 }, { i: "default", x: 0, y: 2, w: 12, h: 30 }],
+    });
+
+    expect(migrated.widgets.find((widget) => widget.id === "primary_revenue")).toMatchObject({
+      title: "Faturamento Bruto",
+      config: { metric: "revenue_gross" },
+    });
+  });
+
   it("migra uma visão v5 sem apagar os ajustes e separa a visão financeira em widgets", () => {
     const migrated = ensureDefaultDashboardContent({
       id: "view-financial-editor",
