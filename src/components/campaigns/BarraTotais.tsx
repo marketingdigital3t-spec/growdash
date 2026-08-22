@@ -103,7 +103,10 @@ export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: Campa
   }, [scrollContainerRef]);
 
   let stickyOffset = 0;
-  return <div ref={barRef} className="campaign-total-bar hidden h-16 shrink-0 overflow-x-auto overflow-y-hidden border-t border-primary/30 bg-[#0a0a09] shadow-[0_-10px_24px_-18px_rgba(255,193,7,.55)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block" aria-label="Totais das campanhas filtradas">
+  // This is deliberately not a second scroll area. The campaigns viewport is
+  // the single source of horizontal scrolling; assigning scrollLeft below
+  // mirrors that offset while this footer itself remains permanently visible.
+  return <div ref={barRef} className="campaign-total-bar block h-16 min-h-16 shrink-0 overflow-hidden border-t border-primary/30 bg-[#0a0a09] shadow-[0_-10px_24px_-18px_rgba(255,193,7,.55)]" aria-label="Totais das campanhas filtradas">
     <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><TableRow className="h-16 border-0 bg-[#0a0a09] hover:bg-[#0a0a09] dark:bg-[#070706] dark:hover:bg-[#070706]">
       {visible.map((column) => {
         const isSticky = column.key === "check" || column.key === "delivery" || column.key === "name";
