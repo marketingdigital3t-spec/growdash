@@ -319,7 +319,7 @@ export function getWidgetDef(type: WidgetType) {
 // original Growdash project. System widgets are appended by the renderer.
 // v14 equaliza toda a faixa analítica: os dois gráficos e a coluna de KPIs
 // terminam na mesma linha, eliminando áreas vazias e cortes visuais.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 16;
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 17;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",

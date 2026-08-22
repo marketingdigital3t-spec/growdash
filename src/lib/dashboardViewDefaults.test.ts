@@ -81,6 +81,36 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.widgets.find((widget) => widget.id === "primary_profit")).toMatchObject({ title: "Lucro", config: { metric: "profit" } });
   });
 
+  it("remove a lacuna antes da performance em uma visualização canônica v16", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-v16-performance-gap",
+      widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 16 } }
+        : { ...widget }),
+      layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 10 : item.y })),
+    });
+
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+    });
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 7, w: 12 });
+  });
+
+  it("preserva o bloco padrão de uma visualização v16 reorganizada manualmente", () => {
+    const migrated = ensureDefaultDashboardContent({
+      id: "view-v16-custom-layout",
+      widgets: DEFAULT_VIEW.widgets.map((widget) => widget.id === "default"
+        ? { ...widget, config: { ...widget.config, canonicalLayoutVersion: 16 } }
+        : { ...widget }),
+      layout: DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "payment_chart" ? 3 : item.i === "default" ? 10 : item.y })),
+    });
+
+    expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ y: 10 });
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({
+      canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
+    });
+  });
+
   it("migra uma visão v5 sem apagar os ajustes e separa a visão financeira em widgets", () => {
     const migrated = ensureDefaultDashboardContent({
       id: "view-financial-editor",

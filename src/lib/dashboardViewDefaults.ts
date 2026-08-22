@@ -55,6 +55,36 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // Algumas visualizações já canônicas foram gravadas com o bloco estático
+  // abaixo da faixa analítica. Como o bloco é estático, o compactador do grid
+  // não consegue ocupar as três linhas vazias. Reancoramos apenas quando toda
+  // a faixa padrão ainda corresponde exatamente ao layout canônico; qualquer
+  // rearranjo manual do usuário permanece preservado.
+  if (currentVersion === 16 && existingDefault) {
+    const canonicalItems = DEFAULT_VIEW.layout.filter((item) => item.i !== "default");
+    const hasCanonicalAnalyticRow = canonicalItems.every((expected) => {
+      const actual = layout.find((item) => item.i === expected.i);
+      return actual
+        && actual.x === expected.x
+        && actual.y === expected.y
+        && actual.w === expected.w
+        && actual.h === expected.h;
+    });
+    const alignedLayout = hasCanonicalAnalyticRow
+      ? layout.map((item) => item.i === defaultId
+        ? { ...item, x: defaultLayout.x, y: defaultLayout.y, w: defaultLayout.w, minW: defaultLayout.minW, minH: defaultLayout.minH }
+        : item)
+      : layout;
+
+    return {
+      ...view,
+      widgets: widgets.map((widget) => widget.id === defaultId
+        ? { ...widget, config: { ...widget.config, ...defaultWidget.config } }
+        : widget),
+      layout: alignedLayout,
+    };
+  }
+
   if (currentVersion >= DASHBOARD_CANONICAL_LAYOUT_VERSION) {
     if (hasDefaultLayout) return view;
 
