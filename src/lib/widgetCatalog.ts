@@ -319,7 +319,7 @@ export function getWidgetDef(type: WidgetType) {
 // original Growdash project. System widgets are appended by the renderer.
 // v14 equaliza toda a faixa analítica: os dois gráficos e a coluna de KPIs
 // terminam na mesma linha, eliminando áreas vazias e cortes visuais.
-export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 14;
+export const DASHBOARD_CANONICAL_LAYOUT_VERSION = 15;
 
 export const DEFAULT_VIEW = {
   name: "Padrão",
@@ -337,7 +337,7 @@ export const DEFAULT_VIEW = {
     { i: "default", x: 0, y: 7, w: 12, h: 30, minW: 6, minH: 10 },
   ],
   widgets: [
-    { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Líquido", config: { metric: "revenue_net" } },
+    { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Bruto", config: { metric: "revenue_gross" } },
     { id: "primary_spend", type: "kpi" as WidgetType, title: "Gastos com Anúncios", config: { metric: "spend" } },
     { id: "primary_roas", type: "kpi" as WidgetType, title: "ROAS", config: { metric: "roas" } },
     { id: "primary_profit", type: "kpi" as WidgetType, title: "Lucro Líquido", config: { metric: "profit" } },

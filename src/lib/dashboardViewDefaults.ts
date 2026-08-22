@@ -33,6 +33,24 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // A v15 corrige a semântica do primeiro KPI padrão: ele representa o valor
+  // bruto das vendas. Só atualizamos o widget canônico ainda intacto; qualquer
+  // KPI que o usuário tenha renomeado ou reconfigurado permanece como está.
+  if (currentVersion === 14 && existingDefault) {
+    return {
+      ...view,
+      widgets: widgets.map((widget) => {
+        if (widget.id === "primary_revenue" && widget.title === "Faturamento Líquido" && widget.config?.metric === "revenue_net") {
+          return { ...widget, title: "Faturamento Bruto", config: { ...widget.config, metric: "revenue_gross" } };
+        }
+        if (widget.id === defaultId) {
+          return { ...widget, config: { ...widget.config, ...defaultWidget.config } };
+        }
+        return widget;
+      }),
+    };
+  }
+
   // A versão 14 equaliza a altura da faixa analítica. A atualização reposiciona
   // somente os widgets padrão e mantém qualquer conteúdo adicionado pelo usuário
   // abaixo deles, sem deixar uma faixa vazia sob o gráfico de pagamento.
