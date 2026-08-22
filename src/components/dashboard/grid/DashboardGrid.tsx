@@ -17,6 +17,7 @@ import {
 } from "@/lib/responsiveDashboardLayout";
 import { DashboardWidgetConfigDialog } from "./DashboardWidgetConfigDialog";
 import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
+import { alignCanonicalDefaultBlock } from "@/lib/dashboardViewDefaults";
 
 const ResponsiveGrid = Responsive;
 const GRID_ROW_HEIGHT = 60;
@@ -115,9 +116,11 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
     setAutoHeightRows((current) => current[widgetId] === rows ? current : { ...current, [widgetId]: rows });
   }, []);
 
-  const desktopLayout = useMemo(() =>
-    normalizeDesktopDashboardLayout(layout, widgets, 12),
-  [layout, widgets]);
+  const desktopLayout = useMemo(() => {
+    const normalized = normalizeDesktopDashboardLayout(layout, widgets, 12);
+    const defaultWidget = widgets.find((widget) => widget.type === "default_block");
+    return defaultWidget ? alignCanonicalDefaultBlock(normalized, defaultWidget.id) : normalized;
+  }, [layout, widgets]);
 
   const responsiveLayouts = useMemo(() => {
     const widgetIds = new Set((widgets || []).map((widget) => widget.id));

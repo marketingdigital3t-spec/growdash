@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
+import { alignCanonicalDefaultBlock, ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
 import { DASHBOARD_CANONICAL_LAYOUT_VERSION, DEFAULT_VIEW } from "@/lib/widgetCatalog";
 
 describe("ensureDefaultDashboardContent", () => {
@@ -94,6 +94,15 @@ describe("ensureDefaultDashboardContent", () => {
       canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION,
     });
     expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 7, w: 12 });
+  });
+
+  it("realinha o bloco padrão no render mesmo sem depender da versão salva", () => {
+    const aligned = alignCanonicalDefaultBlock(
+      DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 10 : item.y })),
+      "default",
+    );
+
+    expect(aligned.find((item) => item.i === "default")).toMatchObject({ y: 7 });
   });
 
   it("preserva o bloco padrão de uma visualização v16 reorganizada manualmente", () => {

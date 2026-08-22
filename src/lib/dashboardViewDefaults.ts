@@ -7,6 +7,30 @@ interface DashboardViewShape {
 }
 
 /**
+ * Corrige somente a lacuna de uma composição padrão intacta. O bloco de
+ * conteúdo é estático no grid e, por isso, não participa da compactação
+ * vertical automática do react-grid-layout.
+ */
+export function alignCanonicalDefaultBlock(layout: any[], defaultId: string) {
+  const defaultLayout = DEFAULT_VIEW.layout.find((item) => item.i === "default")!;
+  const canonicalItems = DEFAULT_VIEW.layout.filter((item) => item.i !== "default");
+  const hasCanonicalAnalyticRow = canonicalItems.every((expected) => {
+    const actual = layout.find((item) => item.i === expected.i);
+    return actual
+      && actual.x === expected.x
+      && actual.y === expected.y
+      && actual.w === expected.w
+      && actual.h === expected.h;
+  });
+
+  if (!hasCanonicalAnalyticRow) return layout;
+
+  return layout.map((item) => item.i === defaultId
+    ? { ...item, x: defaultLayout.x, y: defaultLayout.y, w: defaultLayout.w, minW: defaultLayout.minW, minH: defaultLayout.minH }
+    : item);
+}
+
+/**
  * Restores the original Growdash dashboard once for legacy saved views.
  *
  * Some saved views received the complete widget catalog in addition to the
@@ -61,20 +85,7 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   // a faixa padrão ainda corresponde exatamente ao layout canônico; qualquer
   // rearranjo manual do usuário permanece preservado.
   if (currentVersion >= 14 && currentVersion < DASHBOARD_CANONICAL_LAYOUT_VERSION && existingDefault) {
-    const canonicalItems = DEFAULT_VIEW.layout.filter((item) => item.i !== "default");
-    const hasCanonicalAnalyticRow = canonicalItems.every((expected) => {
-      const actual = layout.find((item) => item.i === expected.i);
-      return actual
-        && actual.x === expected.x
-        && actual.y === expected.y
-        && actual.w === expected.w
-        && actual.h === expected.h;
-    });
-    const alignedLayout = hasCanonicalAnalyticRow
-      ? layout.map((item) => item.i === defaultId
-        ? { ...item, x: defaultLayout.x, y: defaultLayout.y, w: defaultLayout.w, minW: defaultLayout.minW, minH: defaultLayout.minH }
-        : item)
-      : layout;
+    const alignedLayout = alignCanonicalDefaultBlock(layout, defaultId);
 
     return {
       ...view,
