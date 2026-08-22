@@ -30,6 +30,22 @@ export function alignCanonicalDefaultBlock(layout: any[], defaultId: string) {
     : item);
 }
 
+/** Remove apenas uma pequena lacuna acidental antes do bloco estático padrão. */
+export function anchorDefaultBlockAfterPreviousWidgets(layout: any[], defaultId: string) {
+  const defaultItem = layout.find((item) => item.i === defaultId);
+  if (!defaultItem || Number(defaultItem.w) !== 12) return layout;
+
+  const previousEnd = layout
+    .filter((item) => item.i !== defaultId && Number(item.y) < Number(defaultItem.y))
+    .reduce((maximum, item) => Math.max(maximum, Number(item.y) + Number(item.h)), 0);
+  const gap = Number(defaultItem.y) - previousEnd;
+
+  // Uma folga de até três linhas é resíduo das versões anteriores do grid;
+  // posições com afastamento maior são consideradas uma escolha de layout.
+  if (previousEnd <= 0 || gap <= 0 || gap > 3) return layout;
+  return layout.map((item) => item.i === defaultId ? { ...item, y: previousEnd } : item);
+}
+
 /**
  * Restores the original Growdash dashboard once for legacy saved views.
  *
@@ -85,7 +101,10 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   // a faixa padrão ainda corresponde exatamente ao layout canônico; qualquer
   // rearranjo manual do usuário permanece preservado.
   if (currentVersion >= 14 && currentVersion < DASHBOARD_CANONICAL_LAYOUT_VERSION && existingDefault) {
-    const alignedLayout = alignCanonicalDefaultBlock(layout, defaultId);
+    const canonicalLayout = alignCanonicalDefaultBlock(layout, defaultId);
+    const alignedLayout = canonicalLayout === layout
+      ? layout
+      : anchorDefaultBlockAfterPreviousWidgets(canonicalLayout, defaultId);
 
     return {
       ...view,

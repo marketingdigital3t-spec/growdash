@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignCanonicalDefaultBlock, ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
+import { alignCanonicalDefaultBlock, anchorDefaultBlockAfterPreviousWidgets, ensureDefaultDashboardContent } from "@/lib/dashboardViewDefaults";
 import { DASHBOARD_CANONICAL_LAYOUT_VERSION, DEFAULT_VIEW } from "@/lib/widgetCatalog";
 
 describe("ensureDefaultDashboardContent", () => {
@@ -101,6 +101,15 @@ describe("ensureDefaultDashboardContent", () => {
       DEFAULT_VIEW.layout.map((item) => ({ ...item, y: item.i === "default" ? 10 : item.y })),
       "default",
     );
+
+    expect(aligned.find((item) => item.i === "default")).toMatchObject({ y: 7 });
+  });
+
+  it("ancora o bloco estático após os widgets anteriores quando a lacuna é residual", () => {
+    const aligned = anchorDefaultBlockAfterPreviousWidgets([
+      { i: "top", x: 0, y: 0, w: 12, h: 7 },
+      { i: "default", x: 0, y: 10, w: 12, h: 30 },
+    ], "default");
 
     expect(aligned.find((item) => item.i === "default")).toMatchObject({ y: 7 });
   });

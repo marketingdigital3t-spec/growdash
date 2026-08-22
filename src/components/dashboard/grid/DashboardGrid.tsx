@@ -17,7 +17,7 @@ import {
 } from "@/lib/responsiveDashboardLayout";
 import { DashboardWidgetConfigDialog } from "./DashboardWidgetConfigDialog";
 import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
-import { alignCanonicalDefaultBlock } from "@/lib/dashboardViewDefaults";
+import { alignCanonicalDefaultBlock, anchorDefaultBlockAfterPreviousWidgets } from "@/lib/dashboardViewDefaults";
 
 const ResponsiveGrid = Responsive;
 const GRID_ROW_HEIGHT = 60;
@@ -119,7 +119,9 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
   const desktopLayout = useMemo(() => {
     const normalized = normalizeDesktopDashboardLayout(layout, widgets, 12);
     const defaultWidget = widgets.find((widget) => widget.type === "default_block");
-    return defaultWidget ? alignCanonicalDefaultBlock(normalized, defaultWidget.id) : normalized;
+    return defaultWidget
+      ? anchorDefaultBlockAfterPreviousWidgets(alignCanonicalDefaultBlock(normalized, defaultWidget.id), defaultWidget.id)
+      : normalized;
   }, [layout, widgets]);
 
   const responsiveLayouts = useMemo(() => {
