@@ -33,13 +33,23 @@ describe("resolveCampaignResults", () => {
     })).toMatchObject({ total: 0, leadCount: 0, conversations: 8 });
   });
 
-  it("mostra apenas leads para campanha de geração de leads", () => {
+  it("mostra o maior evento mesmo em campanha de geração de leads", () => {
     const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 4 });
     expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Leads", value: 12 });
   });
 
   it("mostra apenas conversas iniciadas para campanha que não é de leads", () => {
     const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 4 });
-    expect(resolveCampaignPrimaryResult("OUTCOME_ENGAGEMENT", results)).toEqual({ label: "Conversas iniciadas", value: 4 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_ENGAGEMENT", results)).toEqual({ label: "Leads", value: 12 });
+  });
+
+  it("mantém o único evento disponível como resultado exibido", () => {
+    const results = resolveCampaignResults(0, { "onsite_conversion.messaging_conversation_started_7d": 18 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Conversas iniciadas", value: 18 });
+  });
+
+  it("prioriza conversas quando elas são o maior resultado", () => {
+    const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 18 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Conversas iniciadas", value: 18 });
   });
 });
