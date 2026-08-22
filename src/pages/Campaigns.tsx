@@ -1041,15 +1041,6 @@ export default function Campaigns() {
           <TabsContent value="campaigns" className={cn("m-0", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
             {isLoading ? (
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
-            ) : filtered.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <Megaphone className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="font-black">Nenhuma campanha encontrada</h3>
-                  <p className="mt-1 max-w-md text-sm text-muted-foreground">Revise os filtros ou conecte e sincronize uma conta Meta Ads para carregar campanhas reais.</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => { setSearch(""); setStatusFilter("all"); setHealthFilter("all"); }}><RotateCcw className="mr-2 h-4 w-4" />Limpar filtros</Button><Button onClick={() => navigate("/integracoes")}><Megaphone className="mr-2 h-4 w-4" />Conectar Meta Ads</Button></div>
-                </CardContent>
-              </Card>
             ) : (
               <Card className={cn(
                 "relative flex min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none",
@@ -1183,7 +1174,6 @@ export default function Campaigns() {
                         );})}
                       </AnimatePresence>
                     </TableBody>
-                    <BarraTotais rows={filtered} columns={campaignTotalColumns} />
                     {(() => {
                       const footer = <TableFooter className="hidden">
                       <TableRow data-campaign-totals className="h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
@@ -1239,6 +1229,7 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
+                <BarraTotais rows={filtered} columns={campaignTotalColumns} scrollContainerRef={campaignTableScrollRef} />
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}

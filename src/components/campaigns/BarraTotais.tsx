@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { TableCell, TableFooter, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 export type CampaignTotalColumn = {
@@ -87,13 +87,24 @@ function totalValue(key: string, totals: Totals) {
   }
 }
 
-export function BarraTotais({ rows, columns }: { rows: CampaignLike[]; columns: CampaignTotalColumn[] }) {
+export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: CampaignLike[]; columns: CampaignTotalColumn[]; scrollContainerRef: RefObject<HTMLDivElement | null> }) {
   const totals = useMemo(() => getTotals(rows), [rows]);
   const visible = useMemo(() => columns.filter((column) => column.visible), [columns]);
+  const barRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const source = scrollContainerRef.current;
+    const bar = barRef.current;
+    if (!source || !bar) return;
+    const syncHorizontalScroll = () => { bar.scrollLeft = source.scrollLeft; };
+    syncHorizontalScroll();
+    source.addEventListener("scroll", syncHorizontalScroll, { passive: true });
+    return () => source.removeEventListener("scroll", syncHorizontalScroll);
+  }, [scrollContainerRef]);
 
   let stickyOffset = 0;
-  return <TableFooter className="campaign-total-bar sticky bottom-0 z-30 border-t border-primary/30 bg-[#0a0a09] shadow-[0_-10px_24px_-18px_rgba(255,193,7,.55)] dark:bg-[#070706]" aria-label="Totais das campanhas filtradas">
-    <TableRow className="h-16 border-0 bg-[#0a0a09] hover:bg-[#0a0a09] dark:bg-[#070706] dark:hover:bg-[#070706]">
+  return <div ref={barRef} className="campaign-total-bar hidden h-16 shrink-0 overflow-x-auto overflow-y-hidden border-t border-primary/30 bg-[#0a0a09] shadow-[0_-10px_24px_-18px_rgba(255,193,7,.55)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block" aria-label="Totais das campanhas filtradas">
+    <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><TableRow className="h-16 border-0 bg-[#0a0a09] hover:bg-[#0a0a09] dark:bg-[#070706] dark:hover:bg-[#070706]">
       {visible.map((column) => {
         const isSticky = column.key === "check" || column.key === "delivery" || column.key === "name";
         const left = isSticky ? stickyOffset : undefined;
@@ -103,6 +114,6 @@ export function BarraTotais({ rows, columns }: { rows: CampaignLike[]; columns: 
         const [value, detail] = totalValue(column.key, totals);
         return <TotalCell key={column.key} column={column} value={value} detail={detail} stickyLeft={left} />;
       })}
-    </TableRow>
-  </TableFooter>;
+    </TableRow></tbody></table>
+  </div>;
 }
