@@ -111,7 +111,7 @@ export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: Campa
     <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><TableRow className="h-16 border-0 bg-[#0a0a09] hover:bg-[#0a0a09] dark:bg-[#070706] dark:hover:bg-[#070706]">
       {visible.map((column) => {
         if (column.key === "check") return <TableCell key="campaign-results-summary" style={{ width: leadingWidth, minWidth: leadingWidth, maxWidth: leadingWidth, left: 0 }} className="sticky z-20 border-r border-primary/15 bg-[#0a0a09] px-3 py-1 text-left shadow-[8px_0_14px_-14px_rgba(0,0,0,.9)] dark:bg-[#070706]">
-          <div className="ml-6">
+          <div className="ml-10">
             <strong className="block truncate text-sm font-semibold text-foreground">Resultados de {rows.length} campanhas</strong>
             <span className="mt-0.5 block truncate text-[10px] font-medium leading-tight text-muted-foreground">Totais do período e filtros</span>
           </div>
