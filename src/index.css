@@ -30,96 +30,96 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 214 22% 11%;
+    --background: 218 38% 97%;
+    --foreground: 220 28% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 214 22% 11%;
+    --card-foreground: 220 28% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 214 22% 11%;
-    --secondary: 220 18% 95%;
-    --secondary-foreground: 214 22% 11%;
-    --muted: 220 18% 95%;
-    --muted-foreground: 214 13% 37%;
-    --accent: 42 100% 92%;
-    --accent-foreground: 34 80% 16%;
-    --destructive: 4 68% 50%;
+    --popover-foreground: 220 28% 12%;
+    --secondary: 218 30% 94%;
+    --secondary-foreground: 220 28% 12%;
+    --muted: 218 28% 94%;
+    --muted-foreground: 218 16% 38%;
+    --accent: 40 100% 93%;
+    --accent-foreground: 29 84% 18%;
+    --destructive: 2 73% 48%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 48% 40%;
+    --success: 158 72% 32%;
     --success-foreground: 0 0% 100%;
-    --warning: 40 88% 50%;
+    --warning: 38 92% 46%;
     --warning-foreground: 35 50% 12%;
-    --border: 216 20% 88%;
-    --input: 216 20% 86%;
-    --primary: 36 81% 37%;
+    --border: 218 24% 86%;
+    --input: 218 24% 84%;
+    --primary: 32 88% 38%;
     --primary-foreground: 42 100% 98%;
-    --primary-soft: 42 100% 92%;
+    --primary-soft: 40 100% 93%;
     --accent-pink: 5 70% 60%;
     --accent-green: 145 35% 46%;
     --accent-yellow: 42 100% 58%;
     --accent-lime: 79 55% 62%;
     --sidebar-icon: 30 5% 52%;
     --sidebar-icon-active: 42 100% 58%;
-    --ring: 42 100% 58%;
+    --ring: 34 96% 48%;
     --radius: 0.8rem;
     --sidebar-background: 214 22% 10%;
     --sidebar-foreground: 220 22% 94%;
-    --sidebar-primary: 41 62% 56%;
+    --sidebar-primary: 36 88% 57%;
     --sidebar-primary-foreground: 42 65% 98%;
     --sidebar-accent: 214 19% 16%;
     --sidebar-accent-foreground: 220 22% 98%;
     --sidebar-border: 216 17% 20%;
-    --sidebar-ring: 41 62% 56%;
+    --sidebar-ring: 36 88% 57%;
     --brand-black: #0b0d10;
     --brand-surface: #12161c;
-    --brand-gold: #d5a84a;
-    --brand-gold-light: #e6bf68;
-    --brand-bronze: #8c5c0e;
+    --brand-gold: #d97b11;
+    --brand-gold-light: #f4ba54;
+    --brand-bronze: #974807;
     --brand-ivory: #f5f7fa;
-    --brand-accent-rgb: 213, 168, 74;
-    --color-canvas: #F7F8FA;
+    --brand-accent-rgb: 217, 123, 17;
+    --color-canvas: #F5F8FE;
     --color-surface: #FFFFFF;
-    --color-surface-raised: #F1F3F6;
-    --color-border: #D8DEE7;
-    --color-text-primary: #151A21;
-    --color-text-secondary: #5B6675;
+    --color-surface-raised: #EEF3FC;
+    --color-border: #D6E0EF;
+    --color-text-primary: #172033;
+    --color-text-secondary: #56647A;
     --color-text-disabled: #9AA4B2;
-    --color-accent: #A86F12;
-    --color-accent-hover: #8C5C0E;
-    --color-accent-soft: #FFF3D7;
-    --color-success: #167B4B;
-    --color-warning: #A86900;
-    --color-error: #B4232C;
-    --color-info: #2563C9;
-    --color-focus: #8C5C0E;
+    --color-accent: #C56508;
+    --color-accent-hover: #9C4606;
+    --color-accent-soft: #FFF0D6;
+    --color-success: #07845A;
+    --color-warning: #B45B00;
+    --color-error: #C62C36;
+    --color-info: #1670D2;
+    --color-focus: #C56508;
     --gd-page-gutter: clamp(.7rem, 1.05vw, 1.15rem);
   }
 
   .dark {
-    --background: 216 18% 5%;
-    --foreground: 218 29% 97%;
-    --card: 214 22% 9%;
+    --background: 220 30% 6%;
+    --foreground: 218 35% 97%;
+    --card: 220 26% 10%;
     --card-foreground: 218 29% 97%;
-    --popover: 216 20% 12%;
+    --popover: 220 24% 13%;
     --popover-foreground: 218 29% 97%;
-    --secondary: 216 18% 12%;
+    --secondary: 220 22% 14%;
     --secondary-foreground: 218 24% 94%;
-    --muted: 216 18% 12%;
-    --muted-foreground: 214 16% 71%;
-    --accent: 39 44% 16%;
-    --accent-foreground: 43 78% 85%;
-    --border: 216 17% 20%;
-    --input: 216 17% 20%;
-    --primary: 41 62% 56%;
-    --primary-foreground: 214 22% 11%;
-    --ring: 43 80% 68%;
+    --muted: 220 22% 14%;
+    --muted-foreground: 216 19% 73%;
+    --accent: 34 54% 17%;
+    --accent-foreground: 41 92% 86%;
+    --border: 220 20% 22%;
+    --input: 220 20% 22%;
+    --primary: 37 92% 57%;
+    --primary-foreground: 220 28% 10%;
+    --ring: 39 96% 67%;
     --sidebar-background: 216 22% 5%;
     --sidebar-foreground: 220 22% 94%;
-    --sidebar-primary: 41 62% 56%;
+    --sidebar-primary: 37 92% 57%;
     --sidebar-primary-foreground: 42 65% 98%;
     --sidebar-accent: 39 38% 13%;
     --sidebar-accent-foreground: 43 100% 75%;
     --sidebar-border: 39 33% 14%;
-    --sidebar-ring: 42 100% 58%;
+    --sidebar-ring: 39 96% 67%;
     color-scheme: dark;
   }
 
@@ -1037,9 +1037,9 @@ html:not(.dark) {
   .campaign-total-bar {
     border-top: 2px solid hsl(var(--primary) / .38);
     background:
-      linear-gradient(90deg, hsl(var(--primary) / .055), transparent 34%),
-      hsl(var(--muted) / .76);
-    box-shadow: 0 -10px 25px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255, 255, 255, .035);
+      linear-gradient(100deg, hsl(var(--primary) / .14), transparent 40%),
+      hsl(var(--card));
+    box-shadow: 0 -12px 28px rgba(59, 83, 117, .13), inset 0 1px 0 rgba(255, 255, 255, .85);
     backdrop-filter: blur(18px);
   }
 
@@ -1236,10 +1236,10 @@ html:not(.dark) {
   }
 
   .dark .campaign-total-bar {
-    border-top-color: rgba(222, 161, 35, .42);
+    border-top-color: hsl(var(--primary) / .55);
     background:
-      linear-gradient(90deg, rgba(210, 145, 22, .07), transparent 34%),
-      rgba(17, 17, 16, .97);
+      linear-gradient(100deg, hsl(var(--primary) / .16), transparent 40%),
+      hsl(var(--card));
   }
 
   .agent-office-shell {
