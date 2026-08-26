@@ -1652,7 +1652,7 @@ function CampaignResultCell({ campaign, onOpen }: { campaign: any; onOpen: () =>
         <span className="block text-[11px] font-medium leading-tight text-muted-foreground">{primary.value > 0 ? primary.label : "Sem resultado no período"}</span>
       </button>
     </TooltipTrigger>
-    <TooltipContent side="left" align="end" className="max-w-80 border-primary/25 bg-popover p-3 text-popover-foreground shadow-xl">
+    <TooltipContent side="left" align="end" className="campaign-result-tooltip max-w-80 border-primary/25 bg-popover p-3 text-popover-foreground shadow-xl">
       <p className="text-[10px] font-black uppercase tracking-wider text-primary">Resultados da campanha</p>
       <p className="mt-1 text-xs font-bold">{primary.value.toLocaleString("pt-BR")} {primary.label.toLocaleLowerCase()} no período</p>
       {breakdown.length > 0 ? <div className="mt-2 space-y-1 border-t border-border pt-2 text-[11px]">{breakdown.map((item: any) => <div key={item.label} className="flex justify-between gap-4"><span className="text-muted-foreground">{item.label}</span><b>{Number(item.value).toLocaleString("pt-BR")}</b></div>)}</div> : <p className="mt-2 text-[11px] text-muted-foreground">A Meta não registrou leads nem conversas iniciadas neste período.</p>}

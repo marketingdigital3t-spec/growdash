@@ -5105,6 +5105,35 @@ html[data-accent]:not(.dark) .campaigns-workspace :is(.campaign-account-select, 
   box-shadow: inset 0 1px rgba(255,255,255,.96), 0 4px 12px -10px rgba(35,40,47,.28) !important;
 }
 
+/* Final contrast contract: keep portal tooltips and interaction states paired
+   with their surface so no theme can produce black-on-black data. */
+.campaign-result-tooltip {
+  color: hsl(var(--popover-foreground)) !important;
+  background: hsl(var(--popover)) !important;
+}
+.campaign-result-tooltip :is(p, span, b, strong) { color: inherit; }
+.campaign-result-tooltip .text-primary { color: hsl(var(--primary)) !important; }
+.campaigns-workspace tbody tr { color: hsl(var(--foreground)); }
+.campaigns-workspace tbody tr:hover { background: hsl(var(--muted) / .55) !important; }
+.campaigns-workspace tbody tr:hover :is(td, span, b, strong) { color: hsl(var(--foreground)); }
+.campaigns-workspace tbody tr:hover .text-muted-foreground,
+.campaigns-workspace tbody tr:hover [class*="text-muted-foreground"] { color: hsl(var(--muted-foreground)) !important; }
+html:not(.dark) .campaigns-workspace tbody tr:hover { background: #edf0f3 !important; }
+html:not(.dark) .campaign-result-tooltip {
+  color: #17202a !important;
+  background: #ffffff !important;
+  border-color: rgba(23,32,42,.2) !important;
+  box-shadow: 0 18px 42px rgba(23,32,42,.18) !important;
+}
+html:not(.dark) .campaign-result-tooltip .text-muted-foreground,
+html:not(.dark) .campaign-result-tooltip [class*="text-muted-foreground"] { color: #536170 !important; }
+html:not(.dark) .campaign-result-tooltip .text-primary { color: #8a560b !important; }
+
+/* Calendar days stay plain until a real date/range selection exists. */
+.rdp-day:not([aria-selected="true"]) { background: transparent !important; color: hsl(var(--foreground)); }
+.rdp-day:not([aria-selected="true"]):hover { background: hsl(var(--accent)) !important; color: hsl(var(--accent-foreground)); }
+.rdp-day[aria-selected="true"] { border-radius: .45rem; }
+
 html[data-accent]:not(.dark) .campaigns-workspace .campaign-search-input::placeholder {
   color: #59616a !important;
 }
