@@ -11,6 +11,8 @@ type PresentationSlide = {
   note?: string;
 };
 
+const slideTones = ["dark", "light", "dark", "dark", "light", "dark", "light", "dark", "light", "dark", "dark", "dark"] as const;
+
 const slides: PresentationSlide[] = [
   {
     eyebrow: "Growdash · framework de tráfego pago",
@@ -21,15 +23,15 @@ const slides: PresentationSlide[] = [
   },
   {
     eyebrow: "A estratégia antes da captação",
-    title: "Não começa captando lead.",
-    description: "Ela constrói contexto. Quanto mais contexto, maior a chance de o lead avançar para atendimento, avaliação e venda.",
-    highlights: ["01 · Atrair descoberta", "02 · Educar confiança", "03 · Captar lead qualificado", "04 · Recuperar interesse"],
+    title: "A estratégia não começa captando lead.",
+    description: "Decisão com mais contexto = lead com mais chance de agenda. A jornada organiza atenção, confiança, intenção e recuperação.",
+    highlights: ["01 · Atrair (descoberta)", "02 · Educar (confiança)", "03 · Captar (lead qualificado)", "04 · Recuperar (remarketing)"],
   },
   {
     eyebrow: "A jornada completa",
-    title: "Atenção vira intenção com etapas claras.",
-    description: "Cada etapa tem objetivo, audiência e sinal de avanço. O comercial recebe um lead com mais contexto, não apenas um contato.",
-    highlights: ["Atrair · audiência e atenção", "Qualificar · autoridade e objeções", "Captar · Direct, formulário ou WhatsApp", "Recuperar · retomar contexto"],
+    title: "Da atenção ao lead qualificado.",
+    description: "Cada etapa tem objetivo, audiência e sinal de avanço. O comercial recebe contexto, não apenas um contato.",
+    highlights: ["Atrair · descoberta, audiência e atenção", "Qualificar + educar · autoridade e objeções", "Captar lead · oferta, Direct, formulário ou WhatsApp", "Remarketing · recuperar interesse"],
   },
   {
     eyebrow: "Etapa 1 · Atrair",
@@ -39,13 +41,13 @@ const slides: PresentationSlide[] = [
   },
   {
     eyebrow: "Etapa 2 · Qualificar e educar",
-    title: "Construa confiança antes de vender.",
+    title: "Qualifique e eduque antes de vender.",
     description: "Conteúdo que traz clareza, autoridade, segurança e responde objeções prepara a audiência para avançar.",
     highlights: ["Clareza do problema", "Autoridade do expert", "Quebra de objeções", "Sinais: retenção, respostas e cliques"],
   },
   {
     eyebrow: "Etapa 3 · Captar",
-    title: "Capte com qualificação conversacional.",
+    title: "Capte lead com qualificação conversacional.",
     description: "A jornada pode seguir por anúncio, Direct, ManyChat, perguntas, classificação e atendimento humano.",
     highlights: ["Interesse e procedimento", "Momento de decisão", "Capacidade de avançar", "Classificação: quente, morno ou frio"],
     note: "ManyChat é a ponte entre a intenção e o atendimento.",
@@ -77,7 +79,7 @@ const slides: PresentationSlide[] = [
   },
   {
     eyebrow: "O ecossistema Growdash",
-    title: "Uma aquisição previsível e mensurável.",
+    title: "Um ecossistema previsível de aquisição.",
     description: "Conteúdo, tráfego pago, audiência qualificada, captação, atendimento, avaliação e dados formam um ciclo de otimização contínua.",
     highlights: ["Conteúdo", "Tráfego pago", "Audiência qualificada", "Captação · atendimento · avaliação · dados"],
   },
@@ -85,8 +87,8 @@ const slides: PresentationSlide[] = [
     eyebrow: "Próximo passo",
     title: "Estruture o funil do expert.",
     description: "Tráfego pago não serve apenas para gerar leads: ele constrói intenção, confiança e previsibilidade comercial.",
-    highlights: ["Definir oferta e público", "Criar os criativos por etapa", "Configurar qualificação e atendimento", "Acompanhar métricas de avanço"],
-    note: "Growdash · framework padrão para experts.",
+    highlights: ["Definir oferta e público", "Criar criativos por etapa", "Configurar qualificação e atendimento", "Acompanhar métricas de avanço"],
+    note: "INICIAR ESTRUTURAÇÃO DO FUNIL · GRUPO ZNTT",
   },
 ];
 
@@ -94,6 +96,7 @@ export function PaidTrafficPresentation() {
   const [current, setCurrent] = useState(0);
   const slide = slides[current];
   const isBudgetSlide = current === 7;
+  const isDarkSlide = slideTones[current] === "dark";
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -109,26 +112,26 @@ export function PaidTrafficPresentation() {
         </div>
       </header>
 
-      <div className="relative overflow-hidden bg-zinc-950 px-5 py-8 text-zinc-50 sm:px-10 sm:py-12 lg:min-h-[570px] lg:px-16 lg:py-16">
+      <div className={cn("relative overflow-hidden px-5 py-8 sm:px-10 sm:py-12 lg:min-h-[570px] lg:px-16 lg:py-16", isDarkSlide ? "bg-[#050505] text-[#f5f5f5]" : "bg-[#f3f0ea] text-[#171717]")}>
         <div className="pointer-events-none absolute -right-28 -top-32 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
         <div className="relative mx-auto flex max-w-6xl flex-col justify-between gap-10 lg:min-h-[440px]">
           <div className="max-w-3xl">
-            <p className="text-[11px] font-black uppercase tracking-[.16em] text-primary">{slide.eyebrow}</p>
+            <p className={cn("text-[11px] font-black uppercase tracking-[.16em]", isDarkSlide ? "text-[#d4a449]" : "text-[#76551d]")}>{slide.eyebrow}</p>
             <h3 className="mt-4 text-3xl font-black leading-[1.02] tracking-tight sm:text-5xl lg:text-6xl">{slide.title}</h3>
-            <p className="mt-5 max-w-2xl text-base leading-relaxed text-zinc-300 sm:text-lg">{slide.description}</p>
+            <p className={cn("mt-5 max-w-2xl text-base leading-relaxed sm:text-lg", isDarkSlide ? "text-[#b7b9bd]" : "text-[#515151]")}>{slide.description}</p>
           </div>
 
           <div className={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-4", isBudgetSlide && "lg:grid-cols-4")}>
             {slide.highlights.map((highlight, index) => {
               const [label, value] = highlight.split(" · ");
-              return <article key={highlight} className={cn("min-h-28 rounded-xl border border-zinc-700/90 bg-zinc-900/90 p-4", isBudgetSlide && "border-primary/40 bg-primary/10")}>
-                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.12em] text-primary"><CircleDot className="h-3.5 w-3.5" />{isBudgetSlide ? label : `Etapa ${index + 1}`}</span>
-                <p className={cn("mt-3 text-sm font-bold leading-snug text-zinc-100", isBudgetSlide && "text-2xl")}>{isBudgetSlide ? value : highlight}</p>
+              return <article key={highlight} className={cn("min-h-28 rounded-xl border p-4", isDarkSlide ? "border-[#3b3d41] bg-[#17191c]" : "border-[#c9c4bb] bg-white/80", isBudgetSlide && (isDarkSlide ? "border-[#876820] bg-[#2a2111]" : "border-[#a18a5b] bg-[#fffaf0]"))}>
+                <span className={cn("flex items-center gap-2 text-[10px] font-black uppercase tracking-[.12em]", isDarkSlide ? "text-[#d4a449]" : "text-[#76551d]")}><CircleDot className="h-3.5 w-3.5" />{isBudgetSlide ? label : `Etapa ${index + 1}`}</span>
+                <p className={cn("mt-3 text-sm font-bold leading-snug", isDarkSlide ? "text-[#f5f5f5]" : "text-[#171717]", isBudgetSlide && "text-2xl")}>{isBudgetSlide ? value : highlight}</p>
               </article>;
             })}
           </div>
 
-          {slide.note && <p className="flex max-w-3xl items-start gap-2 rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs font-medium leading-relaxed text-zinc-200"><Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{slide.note}</p>}
+          {slide.note && <p className={cn("flex max-w-3xl items-start gap-2 rounded-lg border p-3 text-xs font-medium leading-relaxed", isDarkSlide ? "border-[#806326] bg-[#2a2111] text-[#e7e0cf]" : "border-[#c9c4bb] bg-white/80 text-[#383838]")}><Check className={cn("mt-0.5 h-4 w-4 shrink-0", isDarkSlide ? "text-[#d4a449]" : "text-[#76551d]")} />{slide.note}</p>}
         </div>
       </div>
 

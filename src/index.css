@@ -5134,6 +5134,28 @@ html:not(.dark) .campaign-result-tooltip .text-primary { color: #8a560b !importa
 .rdp-day:not([aria-selected="true"]):hover { background: hsl(var(--accent)) !important; color: hsl(var(--accent-foreground)); }
 .rdp-day[aria-selected="true"] { border-radius: .45rem; }
 
+/* Shared controls: an unchecked control is neutral; selection is the only
+   moment it receives the high-contrast foreground treatment. */
+.growdash-main :is(input, select, textarea, [role="combobox"]) {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+  border-color: hsl(var(--input));
+}
+.growdash-main :is(input, select, textarea, [role="combobox"]):focus-visible {
+  border-color: hsl(var(--ring));
+  outline: 2px solid hsl(var(--ring) / .35);
+  outline-offset: 1px;
+}
+.growdash-main [data-state="unchecked"] { border-color: hsl(var(--input)); }
+.growdash-main [data-state="checked"] { border-color: hsl(var(--foreground)); background-color: hsl(var(--foreground)); color: hsl(var(--background)); }
+html:not(.dark) .growdash-main :is(input, select, textarea, [role="combobox"]) { color: #17202a; background-color: #fff; border-color: #bcc6d1; }
+html:not(.dark) .growdash-main [data-state="unchecked"] { border-color: #bcc6d1; background: #fff; }
+html:not(.dark) .growdash-main [data-state="checked"] { border-color: #17202a; background: #17202a; color: #fff; }
+html:not(.dark) .growdash-main .bg-primary\/5,
+html:not(.dark) .growdash-main .bg-primary\/[\.035] { background-color: #eef1f4 !important; }
+html:not(.dark) [data-radix-popper-content-wrapper] [role="option"]:focus,
+html:not(.dark) [data-radix-popper-content-wrapper] [role="menuitem"]:focus { background: #e8edf2 !important; color: #17202a !important; }
+
 html[data-accent]:not(.dark) .campaigns-workspace .campaign-search-input::placeholder {
   color: #59616a !important;
 }

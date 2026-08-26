@@ -324,7 +324,7 @@ export default function FinancePage() {
             <DreRow label="(−) Outras despesas" value={-otherExpenses} />
             <DreRow label="= Resultado" value={dreResult} strong highlight />
             <DreRow label="Margem líquida" value={dreMargin} percentage />
-            <div className="border-t border-primary/20 bg-primary/[.035] p-5">
+            <div className="border-t border-border bg-muted/35 p-5">
               <p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conciliação do investimento em mídia</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <ReconciliationMetric label="Fundos adicionados nas contas" value={balanceAdded} accent />
