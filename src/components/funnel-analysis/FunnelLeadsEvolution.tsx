@@ -29,9 +29,9 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
                 contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted) / 0.25)", stroke: "hsl(var(--border))" }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="Leads" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="Oportunidades" stroke="hsl(45 93% 55%)" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="Vendas" stroke="hsl(142 71% 45%)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="Leads" stroke="#a855f7" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#a855f7" }} />
+              <Line type="monotone" dataKey="Oportunidades" stroke="#eab308" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#eab308" }} />
+              <Line type="monotone" dataKey="Vendas" stroke="#22c55e" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#22c55e" }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
