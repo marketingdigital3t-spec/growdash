@@ -9,6 +9,7 @@ type PresentationSlide = {
   description: string;
   highlights: string[];
   note?: string;
+  kind?: "cover" | "strategy" | "funnel" | "budget" | "cycle" | "cta";
 };
 
 const slideTones = ["dark", "light", "dark", "dark", "light", "dark", "light", "dark", "light", "dark", "dark", "dark"] as const;
@@ -20,18 +21,21 @@ const slides: PresentationSlide[] = [
     description: "Um modelo para criar aquisição previsível: atrair, educar, captar e recuperar com clareza operacional.",
     highlights: ["Atrair", "Educar", "Captar", "Remarketing"],
     note: "Apresentação padrão para experts Growdash.",
+    kind: "cover",
   },
   {
     eyebrow: "A estratégia antes da captação",
     title: "A estratégia não começa captando lead.",
     description: "Decisão com mais contexto = lead com mais chance de agenda. A jornada organiza atenção, confiança, intenção e recuperação.",
     highlights: ["01 · Atrair (descoberta)", "02 · Educar (confiança)", "03 · Captar (lead qualificado)", "04 · Recuperar (remarketing)"],
+    kind: "strategy",
   },
   {
     eyebrow: "A jornada completa",
     title: "Da atenção ao lead qualificado.",
     description: "Cada etapa tem objetivo, audiência e sinal de avanço. O comercial recebe contexto, não apenas um contato.",
     highlights: ["Atrair · descoberta, audiência e atenção", "Qualificar + educar · autoridade e objeções", "Captar lead · oferta, Direct, formulário ou WhatsApp", "Remarketing · recuperar interesse"],
+    kind: "funnel",
   },
   {
     eyebrow: "Etapa 1 · Atrair",
@@ -63,6 +67,7 @@ const slides: PresentationSlide[] = [
     title: "Invista em todas as etapas da decisão.",
     description: "A distribuição é um ponto de partida. Ajuste sempre pelo custo do lead qualificado, avaliação e taxa de fechamento.",
     highlights: ["Atrair · 20%", "Qualificar e educar · 25%", "Captar lead · 50%", "Remarketing · 5%"],
+    kind: "budget",
   },
   {
     eyebrow: "O que realmente medimos",
@@ -82,6 +87,7 @@ const slides: PresentationSlide[] = [
     title: "Um ecossistema previsível de aquisição.",
     description: "Conteúdo, tráfego pago, audiência qualificada, captação, atendimento, avaliação e dados formam um ciclo de otimização contínua.",
     highlights: ["Conteúdo", "Tráfego pago", "Audiência qualificada", "Captação · atendimento · avaliação · dados"],
+    kind: "cycle",
   },
   {
     eyebrow: "Próximo passo",
@@ -89,6 +95,7 @@ const slides: PresentationSlide[] = [
     description: "Tráfego pago não serve apenas para gerar leads: ele constrói intenção, confiança e previsibilidade comercial.",
     highlights: ["Definir oferta e público", "Criar criativos por etapa", "Configurar qualificação e atendimento", "Acompanhar métricas de avanço"],
     note: "INICIAR ESTRUTURAÇÃO DO FUNIL · GRUPO ZNTT",
+    kind: "cta",
   },
 ];
 
@@ -121,15 +128,18 @@ export function PaidTrafficPresentation() {
             <p className={cn("mt-5 max-w-2xl text-base leading-relaxed sm:text-lg", isDarkSlide ? "text-[#b7b9bd]" : "text-[#515151]")}>{slide.description}</p>
           </div>
 
-          <div className={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-4", isBudgetSlide && "lg:grid-cols-4")}>
-            {slide.highlights.map((highlight, index) => {
-              const [label, value] = highlight.split(" · ");
-              return <article key={highlight} className={cn("min-h-28 rounded-xl border p-4", isDarkSlide ? "border-[#3b3d41] bg-[#17191c]" : "border-[#c9c4bb] bg-white/80", isBudgetSlide && (isDarkSlide ? "border-[#876820] bg-[#2a2111]" : "border-[#a18a5b] bg-[#fffaf0]"))}>
-                <span className={cn("flex items-center gap-2 text-[10px] font-black uppercase tracking-[.12em]", isDarkSlide ? "text-[#d4a449]" : "text-[#76551d]")}><CircleDot className="h-3.5 w-3.5" />{isBudgetSlide ? label : `Etapa ${index + 1}`}</span>
-                <p className={cn("mt-3 text-sm font-bold leading-snug", isDarkSlide ? "text-[#f5f5f5]" : "text-[#171717]", isBudgetSlide && "text-2xl")}>{isBudgetSlide ? value : highlight}</p>
-              </article>;
-            })}
-          </div>
+          {slide.kind === "cover" && <div className="ml-auto flex w-full max-w-sm flex-col gap-3 sm:w-80">
+            {[["ATRAIR", "border-[#c9cdd1] bg-[#151619]"], ["EDUCAR", "border-[#aeb3b8] bg-[#232529]"], ["CAPTAR", "border-transparent bg-[#e8eaed] text-[#101114]"], ["RMKT", "border-[#aeb3b8] bg-[#151619] text-sm"]].map(([label, tone]) => <div key={label} className={cn("rounded-none border px-5 py-3 text-center text-2xl font-black tracking-tight", tone)}>{label}</div>)}
+          </div>}
+          {slide.kind === "strategy" && <div className="grid gap-4 sm:grid-cols-4">{["01  Atrair", "02  Educar", "03  Captar", "04  Recuperar"].map((x) => <div key={x} className="border-l-4 border-[#111] bg-white/70 px-4 py-3 text-lg font-black">{x}</div>)}</div>}
+          {slide.kind === "funnel" && <div className="grid items-center gap-8 lg:grid-cols-[1fr_280px]">
+            <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-2">{[["01", "ATRAIR", "descoberta / audiência / atenção", "w-full bg-[#9b9ea2]"], ["", "QUALIFICAR + EDUCAR", "autoridade / confiança / objeções", "w-[86%] bg-[#696d73]"], ["", "CAPTAR LEAD", "oferta / Direct / formulário / WhatsApp", "w-[67%] bg-[#363940]"], ["", "REMARKETING", "recuperar quem demonstrou interesse", "w-[47%] bg-[#1f2024]"]].map(([n,t,d,c]) => <div key={t} className={cn("border-2 border-[#c7c9cc] px-4 py-4 text-center text-white", c)}><div className="text-2xl font-black">{n && <small className="mr-2 text-base">{n}</small>}{t}</div><div className="text-sm text-[#e1e2e4]">{d}</div></div>)}</div>
+            <div className="rounded-2xl border-2 border-[#c7c9cc] bg-[#23252a] p-6 text-center text-white"><div className="text-2xl font-black">MANYCHAT</div><p className="mt-2 text-sm text-[#d8d9dc]">gateway da etapa 3<br/>qualificação inicial + handoff</p><div className="mt-5 text-sm font-bold text-[#d8d9dc]">RMKT<br/>não converteu?<br/>reimpacta com contexto</div></div>
+          </div>}
+          {slide.kind === "budget" && <div className="grid gap-4 sm:grid-cols-4">{slide.highlights.map((highlight) => { const [label, value] = highlight.split(" · "); return <article key={highlight} className="border border-[#aeb3b8] bg-[#1f2125] p-5 text-center text-white"><div className="text-xs font-black uppercase tracking-widest text-[#d4d6d9]">{label}</div><div className="mt-4 text-5xl font-black">{value}</div><div className="mt-3 h-2 rounded-full bg-[#55595f]"><div className="h-2 rounded-full bg-[#e8eaed]" style={{width:value}} /></div></article>; })}</div>}
+          {slide.kind === "cycle" && <div className="mx-auto grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4">{slide.highlights.map((x, i) => <div key={x} className="flex aspect-square items-center justify-center rounded-full border-2 border-[#c7c9cc] bg-[#1f2125] p-4 text-center text-sm font-black text-white">{x}</div>)}</div>}
+          {slide.kind === "cta" && <div className="flex flex-wrap gap-3">{slide.highlights.map((x) => <div key={x} className="border border-[#c7c9cc] bg-[#1f2125] px-5 py-3 text-sm font-bold text-white">{x}</div>)}</div>}
+          {!slide.kind && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{slide.highlights.map((highlight, index) => <article key={highlight} className={cn("min-h-28 rounded-xl border p-4", isDarkSlide ? "border-[#3b3d41] bg-[#17191c]" : "border-[#c9c4bb] bg-white/80")}><span className={cn("flex items-center gap-2 text-[10px] font-black uppercase tracking-[.12em]", isDarkSlide ? "text-[#d4a449]" : "text-[#76551d]")}><CircleDot className="h-3.5 w-3.5" />Etapa {index + 1}</span><p className={cn("mt-3 text-sm font-bold leading-snug", isDarkSlide ? "text-[#f5f5f5]" : "text-[#171717]")}>{highlight}</p></article>)}</div>}
 
           {slide.note && <p className={cn("flex max-w-3xl items-start gap-2 rounded-lg border p-3 text-xs font-medium leading-relaxed", isDarkSlide ? "border-[#806326] bg-[#2a2111] text-[#e7e0cf]" : "border-[#c9c4bb] bg-white/80 text-[#383838]")}><Check className={cn("mt-0.5 h-4 w-4 shrink-0", isDarkSlide ? "text-[#d4a449]" : "text-[#76551d]")} />{slide.note}</p>}
         </div>
