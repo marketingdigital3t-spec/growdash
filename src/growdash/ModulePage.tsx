@@ -798,7 +798,7 @@ function FunnelAIModule() {
 }
 
 function Page({ title, description, action, children }: { title: string; description: string; action?: ReactNode; children: ReactNode }) {
-  return <div className="mx-auto w-full max-w-[1600px]"><PageHeading title={title} description={description} actions={action} />{children}</div>;
+  return <div className="gd-module-shell mx-auto w-full max-w-[1600px] space-y-5"><PageHeading title={title} description={description} actions={action} />{children}</div>;
 }
 
 function Toolbar({ left, right }: { left: ReactNode; right: ReactNode }) {

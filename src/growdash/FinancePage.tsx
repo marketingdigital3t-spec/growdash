@@ -289,7 +289,7 @@ export default function FinancePage() {
   function exportCsv() { const header = ["Conta", "ID Meta", "Investimento", "Leads", "Vendas", "Faturamento líquido", "ROAS"]; const data = rows.map((row) => [row.account.name, row.account.account_id, row.spend, row.leads, row.sales, row.revenue, row.roas]); downloadCsv(`growdash-financeiro-${format(startDate, "yyyy-MM-dd")}-${format(endDate, "yyyy-MM-dd")}.csv`, [header, ...data]); }
 
   return (
-    <div className="mx-auto w-full max-w-[1920px]">
+    <div className="gd-module-shell mx-auto w-full max-w-[1920px] space-y-5">
       <PageHeading eyebrow="Gestão" title="Financeiro" description={`DRE, caixa, previsões e mídia da unidade ${segment === "saas" ? "SaaS" : "Infoproduto"}, com dados reais e filtros globais.`} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportCsv} disabled={!rows.length}><Download className="mr-2 h-4 w-4" />Exportar</Button><Button onClick={() => setEntryOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo lançamento</Button></div>} />
 
       <section aria-label="Filtros financeiros" className="mb-4 rounded-xl border border-border bg-card p-3 shadow-sm">

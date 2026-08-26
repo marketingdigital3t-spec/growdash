@@ -136,7 +136,7 @@ export default function CommercialPage() {
   const selectedRevenue = leaderboardAccount?.totalRevenue || 0;
   const selectedSales = leaderboardAccount?.totalCount || 0;
   return (
-    <div className="mx-auto max-w-[1600px] space-y-5">
+    <div className="gd-module-shell mx-auto max-w-[1600px] space-y-5">
       <PageHeading
         eyebrow="Performance de vendas"
         title="Ranking Comercial"

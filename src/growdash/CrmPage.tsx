@@ -432,7 +432,7 @@ export default function CrmPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1700px]">
+    <div className="gd-module-shell mx-auto max-w-[1700px] space-y-5">
       <PageHeading
         eyebrow="RD Station CRM"
         title="Negociações"

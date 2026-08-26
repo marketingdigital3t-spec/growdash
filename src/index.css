@@ -5185,6 +5185,9 @@ html:not(.dark) .analytics-module [role="combobox"] > :is(span, svg) {
 .dashboard-section-heading h2 { margin: .15rem 0 0; font-size: 1.05rem; line-height: 1.25; font-weight: 750; letter-spacing: -.015em; color: hsl(var(--foreground)); }
 .dashboard-section-eyebrow { margin: 0; font-size: .64rem; line-height: 1; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
 .dashboard-section-description { margin: 0; max-width: 22rem; font-size: .7rem; line-height: 1.4; color: hsl(var(--muted-foreground)); text-align: right; }
+.gd-module-shell { min-width: 0; }
+.gd-module-section { min-width: 0; }
+.gd-module-section + .gd-module-section { margin-top: 1rem; }
 @media (max-width: 640px) {
   .dashboard-section-heading { align-items: flex-start; flex-direction: column; }
   .dashboard-section-description { max-width: none; text-align: left; }

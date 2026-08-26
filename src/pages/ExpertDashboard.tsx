@@ -85,7 +85,7 @@ export default function ExpertDashboard() {
   const isLoading = loadingAccounts || loadingInsights;
 
   return (
-    <MotionPage className="expert-dashboard min-w-0 space-y-4 sm:space-y-6">
+    <MotionPage className="expert-dashboard gd-module-shell min-w-0 space-y-5 sm:space-y-6">
       <MotionItem>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -119,7 +119,9 @@ export default function ExpertDashboard() {
         leadBreakdown,
       }}>
         <MotionItem>
-          <section aria-label="Indicadores de performance" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <section aria-labelledby="expert-kpis-title" className="gd-module-section">
+            <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Visão executiva</p><h2 id="expert-kpis-title">Indicadores principais</h2></div><p className="dashboard-section-description">Resultados consolidados do período e das contas autorizadas.</p></div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[
               ["Faturamento bruto", "revenue_gross"], ["Investimento em tráfego", "spend"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
@@ -128,13 +130,17 @@ export default function ExpertDashboard() {
               ["CPL", "cpl"], ["ROAS", "roas"],
               ["Lucro", "profit"], ["Margem", "profit_margin"], ["Recebíveis", "receivables"], ["CTR", "ctr"], ["Taxa de conversão", "conversion_rate"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
+            </div>
           </section>
         </MotionItem>
 
         <MotionItem>
-          <section className="grid min-w-0 gap-4 xl:grid-cols-2">
+          <section aria-labelledby="expert-charts-title" className="gd-module-section">
+            <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Leitura visual</p><h2 id="expert-charts-title">Distribuição dos resultados</h2></div><p className="dashboard-section-description">Compare pagamentos e plataformas sem misturar fontes.</p></div>
+            <div className="grid min-w-0 gap-4 xl:grid-cols-2">
             <DashboardWidgetHelp type="payment_chart" title="Vendas por Pagamento" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PaymentChartWidget /></DashboardWidgetHelp>
             <DashboardWidgetHelp type="platform_distribution" title="Distribuição por Plataforma" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PlatformDistributionWidget /></DashboardWidgetHelp>
+            </div>
           </section>
         </MotionItem>
 

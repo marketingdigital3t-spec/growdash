@@ -389,7 +389,7 @@ export default function FunnelAnalysis() {
   const noStages = !loadingStages && stages.length === 0;
 
   return (
-    <MotionPage className="mx-auto max-w-[1700px] space-y-5">
+    <MotionPage className="gd-module-shell mx-auto max-w-[1700px] space-y-5">
       <MotionItem>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
