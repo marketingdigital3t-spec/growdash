@@ -5221,6 +5221,8 @@ html[data-accent] .analytics-module [role="tab"][data-state="active"] {
 }
 html[data-accent] .gd-neon-toggle [data-state="on"] :is(svg, span),
 html[data-accent] .analytics-module [role="tab"][data-state="active"] :is(svg, span) { color: inherit !important; }
+html[data-accent] .growdash-main .gd-neon-toggle [data-state="on"] { color: #fff !important; }
+html[data-accent] .growdash-main .gd-neon-toggle [data-state="on"] :is(svg, span) { color: #fff !important; }
 html:not(.dark) :is(.gd-button, .gold-action, .premium-button, .meta-toolbar-primary) {
   background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
   border-color: #7c3aed !important;
