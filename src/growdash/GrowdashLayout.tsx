@@ -315,19 +315,19 @@ export default function GrowdashLayout() {
         ) : <><TooltipProvider delayDuration={180}>
         <nav className={cn("grow overflow-y-auto px-2 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
           {visibleSections.map((section) => (
-            <section key={section.label} className="mb-5">
+            <section key={section.label} className="mb-3">
               {showSidebarLabels && (
                 <button
                   type="button"
                   onClick={() => setOpenSections((current) => ({ ...current, [section.label]: !current[section.label] }))}
-                  className="mb-1 flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[.19em] text-white/55 transition hover:bg-white/[.05] hover:text-white"
+                  className="mb-2 flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-[.12em] text-white/45 transition hover:bg-white/[.05] hover:text-white/70"
                   aria-expanded={openSections[section.label]}
                 >
                   <span>{section.label}</span>
                   <ChevronDown className={cn("h-3 w-3 transition-transform", !openSections[section.label] && "-rotate-90")} />
                 </button>
               )}
-              <div className={cn("space-y-1", showSidebarLabels && !openSections[section.label] && "hidden")}>
+              <div className={cn("space-y-0.5", showSidebarLabels && !openSections[section.label] && "hidden")}>
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const [itemPathname, itemSearch = ""] = item.path.split("?");
@@ -346,13 +346,13 @@ export default function GrowdashLayout() {
                       onPointerEnter={() => preloadRoute(item.path)}
                       onFocus={() => preloadRoute(item.path)}
                       className={cn(
-                        "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
+                        "group flex h-9 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
                         showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
                         !showSidebarLabels
                           ? "border border-transparent bg-transparent text-primary shadow-none hover:bg-transparent hover:text-primary"
                           : isActive
                           ? "border border-primary/30 bg-primary/15 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
-                          : "border border-transparent text-white/78 hover:bg-white/[.07] hover:text-white",
+                          : "border border-transparent text-white/68 hover:bg-white/[.07] hover:text-white",
                       )}
                     >
                       <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />

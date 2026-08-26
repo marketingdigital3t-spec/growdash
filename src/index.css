@@ -5176,3 +5176,7 @@ html:not(.dark) .analytics-module [role="combobox"] {
 html:not(.dark) .analytics-module [role="combobox"] > :is(span, svg) {
   color: #17202a !important;
 }
+
+/* Compact analytical matrix: preserves its data and tooltip while avoiding a
+   disproportionately tall widget in the funnel analysis page. */
+.gd-analysis-card.gd-analysis-card-compact { min-height: 16rem; }
