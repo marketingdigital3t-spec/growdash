@@ -17,9 +17,9 @@ interface PerformanceLineChartProps {
 }
 
 const METRICS = [
-  { key: "cpl", label: "CPL", color: "hsl(var(--primary))", yAxisId: "left", prefix: "R$ " },
-  { key: "spend", label: "Investimento", color: "hsl(var(--primary) / .70)", yAxisId: "left", prefix: "R$ " },
-  { key: "leads", label: "Leads", color: "hsl(var(--primary) / .42)", yAxisId: "right", prefix: "" },
+  { key: "cpl", label: "CPL", color: "#a855f7", yAxisId: "left", prefix: "R$ " },
+  { key: "spend", label: "Investimento", color: "#facc15", yAxisId: "left", prefix: "R$ " },
+  { key: "leads", label: "Leads", color: "#22c55e", yAxisId: "right", prefix: "" },
 ] as const;
 
 export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
@@ -54,7 +54,7 @@ export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
                 size="sm"
                 variant={active.has(m.key) ? "default" : "outline"}
                 className="h-7 text-xs px-2.5"
-                style={active.has(m.key) ? { backgroundColor: m.color, borderColor: m.color } : {}}
+                style={active.has(m.key) ? { backgroundColor: m.color, borderColor: m.color, color: m.key === "spend" ? "#171717" : "#fff" } : {}}
                 onClick={() => toggle(m.key)}
               >
                 {m.label}
