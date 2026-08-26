@@ -765,11 +765,11 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
 
       {/* 5. Gráficos diários */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="#a855f7" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
+        <ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="#38bdf8" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
         <ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="#facc15" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
         <ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="#22c55e" />
         <ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
-        <ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="#fb7185" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
+        <ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
       </div>
     </div>
   );

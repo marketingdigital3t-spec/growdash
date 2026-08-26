@@ -21,18 +21,18 @@ const fmtBRL = (v: number) =>
 export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversionRate, previousAvgDaysToConvert }: Props) {
   const timeChange = previousAvgDaysToConvert && previousAvgDaysToConvert > 0 ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100 : null;
   const cards = [
-    { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-cyan-400", format: "brl" as const },
-    { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-blue-400", format: "int" as const },
+    { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-yellow-400", format: "brl" as const },
+    { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-sky-400", format: "int" as const },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
-    { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-violet-400", format: "pct" as const, decimals: 2 },
+    { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-sky-400", format: "pct" as const, decimals: 2 },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: timeChange != null && timeChange > 0 ? "text-red-400" : "text-amber-400", format: "days" as const, detail: timeChange == null ? "Sem período anterior" : `${Math.abs(timeChange).toFixed(0)}% ${timeChange <= 0 ? "menor" : "maior"} que período anterior` },
-    { label: "Ticket médio", value: a.avgTicket, icon: Target, color: "text-cyan-400", format: "brl" as const },
+    { label: "Ticket médio", value: a.avgTicket, icon: Target, color: "text-sky-400", format: "brl" as const },
     { label: "Receita gerada", value: a.revenue, icon: DollarSign, color: "text-emerald-400", format: "brl" as const },
     {
       label: "CPL / CAC",
       value: 0,
       icon: TrendingUp,
-      color: "text-pink-400",
+      color: "text-yellow-400",
       format: "custom" as const,
       custom: `${fmtBRL(cpl ?? 0)} / ${fmtBRL(cac ?? 0)}`,
     },

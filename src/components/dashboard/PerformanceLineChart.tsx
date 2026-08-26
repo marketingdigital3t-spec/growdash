@@ -17,7 +17,7 @@ interface PerformanceLineChartProps {
 }
 
 const METRICS = [
-  { key: "cpl", label: "CPL", color: "#a855f7", yAxisId: "left", prefix: "R$ " },
+  { key: "cpl", label: "CPL", color: "#38bdf8", yAxisId: "left", prefix: "R$ " },
   { key: "spend", label: "Investimento", color: "#facc15", yAxisId: "left", prefix: "R$ " },
   { key: "leads", label: "Leads", color: "#22c55e", yAxisId: "right", prefix: "" },
 ] as const;
