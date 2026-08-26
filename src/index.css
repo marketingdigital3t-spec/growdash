@@ -5230,3 +5230,49 @@ html:not(.dark) :is(.gd-button, .gold-action, .premium-button, .meta-toolbar-pri
   box-shadow: 0 8px 18px -13px rgba(124,58,237,.85) !important;
 }
 html:not(.dark) :is(.gd-button, .gold-action, .premium-button, .meta-toolbar-primary) :is(svg, span) { color: inherit !important; }
+
+/* Platform-wide visual rebrand.  These rules intentionally sit at the end
+   of the cascade so legacy widget palettes cannot leak into the new system. */
+html:not(.dark) .brand-shell {
+  background: radial-gradient(ellipse at 82% -16%, rgba(196,181,253,.42), transparent 32rem), linear-gradient(135deg, #f7f5ff 0%, #f8fafc 48%, #f1edff 100%) !important;
+}
+html:not(.dark) .growdash-main {
+  background: linear-gradient(145deg, rgba(255,255,255,.72), rgba(245,243,255,.58)) !important;
+}
+html:not(.dark) .growdash-main :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .rounded-xl.border.bg-card, .rounded-2xl.border.bg-card) {
+  border-color: rgba(124,58,237,.20) !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(248,247,255,.92)) !important;
+  box-shadow: 0 10px 28px -24px rgba(76,29,149,.45) !important;
+}
+.dark .growdash-main {
+  background: radial-gradient(ellipse at 85% -10%, rgba(124,58,237,.12), transparent 30rem), #080a10 !important;
+}
+.dark .growdash-main :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-widget-shell .rounded-lg.border.bg-card, .rounded-xl.border.bg-card, .rounded-2xl.border.bg-card) {
+  border-color: rgba(168,133,255,.26) !important;
+  background: linear-gradient(145deg, rgba(23,18,37,.96), rgba(12,14,22,.96)) !important;
+  box-shadow: 0 16px 42px -30px rgba(139,92,246,.62) !important;
+}
+/* Semantic utility remap: blue becomes brand purple, green positive, amber
+   warning, red negative. This covers widgets that still carry old Tailwind
+   utility classes without changing their data or layout. */
+.growdash-main :is([class*="text-blue-"], [class*="text-sky-"]) { color: #7c3aed !important; }
+.growdash-main :is([class*="text-emerald-"], [class*="text-teal-"]) { color: #059669 !important; }
+.growdash-main :is([class*="text-amber-"], [class*="text-yellow-"]) { color: #b77900 !important; }
+.growdash-main :is([class*="text-red-"], [class*="text-rose-"]) { color: #dc263f !important; }
+.growdash-main :is([class*="bg-blue-"], [class*="bg-sky-"]) { background-color: rgba(124,58,237,.14) !important; }
+.growdash-main :is([class*="bg-emerald-"], [class*="bg-teal-"]) { background-color: rgba(5,150,105,.14) !important; }
+.growdash-main :is([class*="bg-amber-"], [class*="bg-yellow-"]) { background-color: rgba(234,179,8,.16) !important; }
+.growdash-main :is([class*="bg-red-"], [class*="bg-rose-"]) { background-color: rgba(220,38,63,.14) !important; }
+.growdash-main :is([class*="border-blue-"], [class*="border-sky-"]) { border-color: rgba(124,58,237,.38) !important; }
+.growdash-main :is([class*="border-emerald-"], [class*="border-teal-"]) { border-color: rgba(5,150,105,.38) !important; }
+.growdash-main :is([class*="border-amber-"], [class*="border-yellow-"]) { border-color: rgba(234,179,8,.46) !important; }
+.growdash-main :is([class*="border-red-"], [class*="border-rose-"]) { border-color: rgba(220,38,63,.42) !important; }
+.dark .growdash-main :is([class*="text-blue-"], [class*="text-sky-"]) { color: #c4b5fd !important; text-shadow: 0 0 12px rgba(167,139,250,.38); }
+.dark .growdash-main :is([class*="text-emerald-"], [class*="text-teal-"]) { color: #4ade80 !important; text-shadow: 0 0 12px rgba(74,222,128,.28); }
+.dark .growdash-main :is([class*="text-amber-"], [class*="text-yellow-"]) { color: #fde047 !important; text-shadow: 0 0 12px rgba(250,204,21,.28); }
+.dark .growdash-main :is([class*="text-red-"], [class*="text-rose-"]) { color: #fb7185 !important; text-shadow: 0 0 12px rgba(251,113,133,.28); }
+html[data-accent] .growdash-main [role="tab"][data-state="active"] { background: #111318 !important; color: #fff !important; border-color: #111318 !important; }
+html[data-accent] .growdash-main [role="tab"][data-state="active"] :is(svg, span) { color: #fff !important; }
+/* Legacy arbitrary-value utilities used by older commercial/creative cards. */
+html[data-accent] .growdash-main :is([class*="f6c94c"], [class*="d9a928"], [class*="d8b65c"], [class*="e0ad2d"]) { color: #8b5cf6 !important; border-color: rgba(139,92,246,.5) !important; }
+html[data-accent] .growdash-main :is([class*="f6c94c"], [class*="d9a928"]) { background-color: rgba(139,92,246,.16) !important; }
