@@ -133,6 +133,14 @@ export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
             </LineChart>
           </ResponsiveContainer>
         </div>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-border/60 pt-3" aria-label="Legenda das métricas do gráfico">
+          {METRICS.map((metric) => (
+            <span key={metric.key} className={`inline-flex items-center gap-2 text-xs font-semibold transition-opacity ${active.has(metric.key) ? "opacity-100" : "opacity-45"}`}>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: metric.color }} aria-hidden="true" />
+              <span>{metric.label}</span>
+            </span>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
