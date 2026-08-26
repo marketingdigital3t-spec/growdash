@@ -5176,3 +5176,55 @@ html:not(.dark) .analytics-module [role="combobox"] {
 html:not(.dark) .analytics-module [role="combobox"] > :is(span, svg) {
   color: #17202a !important;
 }
+
+/* Neon signal system ------------------------------------------------------
+   A final semantic layer keeps the application colourful without coupling a
+   status to the old gold/blue materials. Layout and data components continue
+   to use their existing tokens; only the visual meaning changes. */
+html[data-accent] {
+  --primary: 267 86% 62%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 267 92% 67%;
+  --accent: 267 70% 94%;
+  --accent-foreground: 267 70% 24%;
+  --sidebar-primary: 267 86% 62%;
+  --sidebar-icon-active: 267 90% 70%;
+  --sidebar-ring: 267 92% 67%;
+  --brand-gold: #8b5cf6;
+  --brand-gold-light: #c4b5fd;
+  --brand-bronze: #5b21b6;
+  --brand-accent-rgb: 139, 92, 246;
+}
+.analytics-module {
+  --chart-1: 267 86% 62%;
+  --chart-2: 158 84% 39%;
+  --chart-3: 48 96% 53%;
+  --chart-4: 348 90% 60%;
+  --chart-5: 267 86% 62%;
+}
+/* Positive, warning and negative signals remain legible on white as well as
+   dark surfaces; the glow is intentionally reserved for dark mode. */
+.analytics-module :is(.text-blue-400, .text-blue-500, .text-blue-600, .text-sky-500, .text-sky-600) { color: #7c3aed !important; }
+.analytics-module :is(.text-emerald-400, .text-emerald-500, .text-emerald-600, .text-teal-500, .text-teal-600) { color: #059669 !important; }
+.analytics-module :is(.text-amber-400, .text-amber-500, .text-amber-600, .text-yellow-500, .text-yellow-600) { color: #b77900 !important; }
+.analytics-module :is(.text-red-400, .text-red-500, .text-red-600, .text-rose-400, .text-rose-500, .text-rose-600) { color: #dc263f !important; }
+.dark .analytics-module :is(.text-blue-400, .text-blue-500, .text-blue-600, .text-sky-500, .text-sky-600) { color: #b99cff !important; text-shadow: 0 0 12px rgba(185,156,255,.45); }
+.dark .analytics-module :is(.text-emerald-400, .text-emerald-500, .text-emerald-600, .text-teal-500, .text-teal-600) { color: #42f5ae !important; text-shadow: 0 0 12px rgba(66,245,174,.34); }
+.dark .analytics-module :is(.text-amber-400, .text-amber-500, .text-amber-600, .text-yellow-500, .text-yellow-600) { color: #ffe56b !important; text-shadow: 0 0 12px rgba(255,229,107,.32); }
+.dark .analytics-module :is(.text-red-400, .text-red-500, .text-red-600, .text-rose-400, .text-rose-500, .text-rose-600) { color: #ff5b72 !important; text-shadow: 0 0 12px rgba(255,91,114,.32); }
+.gd-neon-toggle [data-state="on"],
+.analytics-module [role="tab"][data-state="active"] {
+  background: #111318 !important;
+  border-color: #111318 !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 2px rgba(139,92,246,.18), 0 6px 14px -10px rgba(17,19,24,.7) !important;
+}
+.gd-neon-toggle [data-state="on"] :is(svg, span),
+.analytics-module [role="tab"][data-state="active"] :is(svg, span) { color: inherit !important; }
+html:not(.dark) :is(.gd-button, .gold-action, .premium-button, .meta-toolbar-primary) {
+  background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+  border-color: #7c3aed !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px -13px rgba(124,58,237,.85) !important;
+}
+html:not(.dark) :is(.gd-button, .gold-action, .premium-button, .meta-toolbar-primary) :is(svg, span) { color: inherit !important; }

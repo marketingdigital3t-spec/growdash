@@ -128,7 +128,7 @@ export function GeoOriginWidget() {
               {mode === "leads" ? "Origem dos leads e custo por estado" : "Distribuição de vendas e receita por estado"}
             </p>
           </div>
-          <ToggleGroup type="single" value={mode} onValueChange={(v) => v && setMode(v as Mode)} size="sm">
+          <ToggleGroup type="single" value={mode} onValueChange={(v) => v && setMode(v as Mode)} size="sm" className="gd-neon-toggle">
             <ToggleGroupItem value="leads" aria-label="Leads">Leads</ToggleGroupItem>
             <ToggleGroupItem value="sales" aria-label="Vendas">Vendas</ToggleGroupItem>
           </ToggleGroup>
@@ -238,7 +238,7 @@ export function GeoOriginWidget() {
                       .map((r, i) => (
                       <tr key={r.uf} className="border-b last:border-0 hover:bg-muted/40">
                         <td className="py-2 px-3">
-                          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${mode === "leads" ? "bg-blue-500" : "bg-emerald-500"}`}>
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#111318] text-[10px] font-bold text-white shadow-sm">
                             {i + 1}
                           </span>
                         </td>
