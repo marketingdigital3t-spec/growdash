@@ -544,7 +544,9 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     <div className="min-w-0 space-y-6">
       {/* 1. KPIs principais. Em layouts novos estes cards são widgets
           independentes para permitir mover, redimensionar e ocultar um a um. */}
-      {!hidePrimary && <div className="dashboard-primary-kpis gap-2 sm:gap-3">
+      {!hidePrimary && <section className="dashboard-section" aria-labelledby="dashboard-summary-title">
+        <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Visão geral</p><h2 id="dashboard-summary-title">Resumo executivo</h2></div><p className="dashboard-section-description">Resultado consolidado no período selecionado.</p></div>
+        <div className="dashboard-primary-kpis gap-2 sm:gap-3">
         <MetricCard title="Faturamento Bruto" value={salesMetrics.totalGross} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
@@ -557,10 +559,13 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
           colorByValue
           tooltip="Faturamento líquido − gastos com anúncios − impostos. Não inclui custos de produto, equipe ou operação (não cadastrados no sistema)."
         />
-      </div>}
+        </div>
+      </section>}
 
       {/* 2. Visão financeira legada. Nas visualizações novas cada bloco é um widget do grid. */}
-      {!hideFinancialOverview && <div className="dashboard-financial-overview gap-3 sm:gap-4">
+      {!hideFinancialOverview && <section className="dashboard-section" aria-labelledby="dashboard-financial-title">
+        <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Financeiro</p><h2 id="dashboard-financial-title">Receita e distribuição</h2></div><p className="dashboard-section-description">Onde o resultado está concentrado.</p></div>
+        <div className="dashboard-financial-overview gap-3 sm:gap-4">
         <PaymentChart byPayment={salesMetrics.byPayment} />
 
         <Card>
@@ -712,12 +717,13 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
           <MetricCard title="Ticket Médio" value={ticketMedio} icon={<BadgeDollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
           <MetricCard title="Lucro" value={profit} icon={<PiggyBank className="h-4 w-4" />} prefix="R$ " decimals={2} colorByValue />
         </div>}
-      </div>}
+        </div>
+      </section>}
 
       {/* 3. Performance das Campanhas */}
-      <div>
+      <section className="dashboard-section" aria-labelledby="dashboard-campaign-title">
+        <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Aquisição</p><h2 id="dashboard-campaign-title">Performance de campanhas</h2></div><p className="dashboard-section-description">Compare objetivos e qualidade dos resultados.</p></div>
         <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-          <h2 className="text-lg font-semibold">Performance de Campanhas</h2>
           <div className="flex items-center gap-2 flex-wrap">
             <ObjectiveTabs value={objective} onChange={(v) => { setObjective(v); setPerfCampaignIds([]); }} />
             {objectiveCampaigns.length > 0 && (
@@ -752,25 +758,25 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
             />
           ))}
         </div>}
-      </div>
+      </section>
 
       {/* 4. Funil de Conversão */}
-      <CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} />
+      <section className="dashboard-section" aria-labelledby="dashboard-funnel-title"><div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Jornada</p><h2 id="dashboard-funnel-title">Funil de conversão</h2></div><p className="dashboard-section-description">Avanço entre cada etapa da aquisição.</p></div><CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} /></section>
 
       {/* 4.1 Origem geográfica (mapa por estado) */}
-      <GeoOriginWidget />
+      <section className="dashboard-section" aria-labelledby="dashboard-origin-title"><div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Distribuição</p><h2 id="dashboard-origin-title">Origem geográfica</h2></div><p className="dashboard-section-description">Leads e vendas por estado.</p></div><GeoOriginWidget /></section>
 
       <PlatformDrilldownSheet platform={drilldown} onClose={() => setDrilldown(null)} />
-      <PerformanceLineChart data={dailyData} />
+      <section className="dashboard-section" aria-labelledby="dashboard-trends-title"><div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Tendências</p><h2 id="dashboard-trends-title">Evolução e detalhamento diário</h2></div><p className="dashboard-section-description">Leia a direção dos indicadores antes de aprofundar.</p></div><PerformanceLineChart data={dailyData} />
 
       {/* 5. Gráficos diários */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="#38bdf8" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
         <ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="#facc15" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} />
         <ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="#22c55e" />
         <ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
         <ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} />
-      </div>
+      </div></section>
     </div>
   );
 }

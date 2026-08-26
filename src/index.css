@@ -5177,6 +5177,19 @@ html:not(.dark) .analytics-module [role="combobox"] > :is(span, svg) {
   color: #17202a !important;
 }
 
+/* Dashboard information architecture: each block has a quiet eyebrow,
+   primary title and optional context line, keeping the data cards as the
+   visual focus. */
+.dashboard-section { min-width: 0; }
+.dashboard-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
+.dashboard-section-heading h2 { margin: .15rem 0 0; font-size: 1.05rem; line-height: 1.25; font-weight: 750; letter-spacing: -.015em; color: hsl(var(--foreground)); }
+.dashboard-section-eyebrow { margin: 0; font-size: .64rem; line-height: 1; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.dashboard-section-description { margin: 0; max-width: 22rem; font-size: .7rem; line-height: 1.4; color: hsl(var(--muted-foreground)); text-align: right; }
+@media (max-width: 640px) {
+  .dashboard-section-heading { align-items: flex-start; flex-direction: column; }
+  .dashboard-section-description { max-width: none; text-align: left; }
+}
+
 /* Compact analytical matrix: preserves its data and tooltip while avoiding a
    disproportionately tall widget in the funnel analysis page. */
 .gd-analysis-card.gd-analysis-card-compact { min-height: 16rem; }
