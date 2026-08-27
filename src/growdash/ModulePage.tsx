@@ -275,6 +275,9 @@ function KanbanModule() {
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban"); // "kanban" for Trello, "list" for ClickUp
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editingListName, setEditingListName] = useState("");
+  const [savingListId, setSavingListId] = useState<string | null>(null);
   const { data: workspace } = useWorkspace();
   const { toast } = useToast();
 
@@ -371,6 +374,39 @@ function KanbanModule() {
     }
   };
 
+  const startEditingList = (list: any) => {
+    setEditingListId(list.id);
+    setEditingListName(list.name);
+  };
+
+  const cancelEditingList = () => {
+    if (savingListId) return;
+    setEditingListId(null);
+    setEditingListName("");
+  };
+
+  const saveListName = async (list: any) => {
+    const name = editingListName.trim();
+    if (!name || !selectedBoardId || savingListId) return;
+    setSavingListId(list.id);
+    try {
+      const { error } = await supabase
+        .from("kanban_lists" as any)
+        .update({ name })
+        .eq("id", list.id)
+        .eq("board_id", selectedBoardId);
+      if (error) throw error;
+      setEditingListId(null);
+      setEditingListName("");
+      boardDetailsQuery.refetch();
+      toast({ title: "Coluna atualizada" });
+    } catch (e: any) {
+      toast({ title: "Erro ao renomear coluna", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingListId(null);
+    }
+  };
+
   const deleteBoard = async (boardId: string) => {
     try {
       const { error } = await supabase.from("kanban_boards" as any).delete().eq("id", boardId);
@@ -404,8 +440,30 @@ function KanbanModule() {
               const listCards = details.cards.filter((c: any) => c.list_id === list.id);
               return (
                 <div key={list.id} className="min-w-64 max-w-64 gd-panel p-3 bg-muted/40 rounded-xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-sm">{list.name}</h3>
+                  <div className="flex items-center justify-between mb-3 gap-2">
+                    {editingListId === list.id ? (
+                      <div className="flex min-w-0 flex-1 items-center gap-1">
+                        <Input
+                          value={editingListName}
+                          onChange={(event) => setEditingListName(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") void saveListName(list);
+                            if (event.key === "Escape") cancelEditingList();
+                          }}
+                          aria-label={`Nome da coluna ${list.name}`}
+                          autoFocus
+                          disabled={savingListId === list.id}
+                          className="h-8 min-w-0 px-2 text-xs font-bold"
+                        />
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => void saveListName(list)} disabled={savingListId === list.id || !editingListName.trim()} aria-label="Salvar nome da coluna"><CheckCircle2 className="h-4 w-4" /></Button>
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={cancelEditingList} disabled={savingListId === list.id} aria-label="Cancelar edição da coluna"><XCircle className="h-4 w-4" /></Button>
+                      </div>
+                    ) : (
+                      <div className="flex min-w-0 items-center gap-1">
+                        <h3 className="truncate font-bold text-sm">{list.name}</h3>
+                        <Button type="button" size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => startEditingList(list)} aria-label={`Editar coluna ${list.name}`} title="Editar nome da coluna"><Pencil className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    )}
                     <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-black">{listCards.length}</span>
                   </div>
                   <div className="space-y-2 mb-3">
