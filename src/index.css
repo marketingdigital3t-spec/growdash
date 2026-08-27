@@ -4989,9 +4989,9 @@ html[data-accent="monochrome"] .growdash-main :is(.text-muted-foreground, [class
 /* Funnel KPI cards use their content height instead of stretching to the
    tallest grid row, keeping the metric values vertically compact. In dark
    mode the metric signal is intentionally monochrome for easier scanning. */
-.gd-funnel-kpi-grid { grid-auto-rows: auto; align-items: start; }
+.gd-funnel-kpi-grid { grid-auto-rows: minmax(7rem, auto); align-items: start; }
 .gd-funnel-kpi-grid > * { height: auto; }
-.gd-funnel-kpi-grid .gd-funnel-kpi { min-height: 0 !important; }
+.gd-funnel-kpi-grid .gd-funnel-kpi { min-height: 7rem !important; }
 .dark .gd-funnel-kpi-grid .gd-funnel-kpi { border-left-color: rgba(255,255,255,.28) !important; }
 .dark .gd-funnel-kpi-grid .gd-funnel-kpi :is(.text-yellow-400, .text-sky-400, .text-emerald-400, .text-amber-400, .text-red-400) { color: #fff !important; }
 
