@@ -4985,6 +4985,16 @@ html[data-accent="monochrome"] :is(.gd-panel, .gd-metric-card, .dashboard-glass-
 }
 
 html[data-accent="monochrome"] .growdash-main :is(.text-muted-foreground, [class*="text-muted-foreground"]) { color: #b9c0c8 !important; }
+
+/* Funnel KPI cards use their content height instead of stretching to the
+   tallest grid row, keeping the metric values vertically compact. In dark
+   mode the metric signal is intentionally monochrome for easier scanning. */
+.gd-funnel-kpi-grid { grid-auto-rows: auto; align-items: start; }
+.gd-funnel-kpi-grid > * { height: auto; }
+.gd-funnel-kpi-grid .gd-funnel-kpi { min-height: 0 !important; }
+.dark .gd-funnel-kpi-grid .gd-funnel-kpi { border-left-color: rgba(255,255,255,.28) !important; }
+.dark .gd-funnel-kpi-grid .gd-funnel-kpi :is(.text-yellow-400, .text-sky-400, .text-emerald-400, .text-amber-400, .text-red-400) { color: #fff !important; }
+
 html[data-accent="monochrome"] .growdash-main :is(.text-primary, [class*="text-primary"]) { color: #e6eaee !important; }
 html[data-accent="monochrome"] :is(.gd-filter-strip .gd-filter-control, .gd-filter-strip .gd-filter-refresh, .growdash-main input, .growdash-main select, .growdash-main textarea, [role="combobox"]) {
   color: #f2f4f6 !important;

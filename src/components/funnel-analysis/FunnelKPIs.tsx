@@ -39,18 +39,18 @@ export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversi
   ];
 
   return (
-    <div className="gd-kpi-grid grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="gd-kpi-grid gd-funnel-kpi-grid grid grid-cols-2 gap-3 md:grid-cols-4">
       {cards.map((c) => {
         const Icon = c.icon;
         return (
           <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} className="h-full" showHint>
-            <Card className={`gd-metric-card gd-funnel-kpi h-full cursor-default bg-card/75 border-border/60 border-l-2 backdrop-blur ${c.color.replace("text-", "border-")}`}>
+            <Card className={`gd-metric-card gd-funnel-kpi cursor-default bg-card/75 border-border/60 border-l-2 backdrop-blur ${c.color.replace("text-", "border-")}`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2 pr-5">
                   <span className="text-xs text-muted-foreground">{c.label}</span>
-                  <Icon className={`h-4 w-4 ${c.color}`} />
+                  <Icon className={`h-4 w-4 ${c.color} dark:text-white`} />
                 </div>
-                <div className={`text-2xl font-semibold ${c.color}`}>
+                <div className={`text-2xl font-semibold ${c.color} dark:text-white`}>
                   {c.format === "int" && <AnimatedNumber value={Math.round(c.value)} decimals={0} />}
                   {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={c.decimals ?? 1} />%</>}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
