@@ -3948,6 +3948,16 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
   position: absolute !important;
   top: .75rem !important;
   right: .75rem !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  background: rgba(255,255,255,.06) !important;
+  color: #f2f4f6 !important;
+  box-shadow: none !important;
+}
+.kanban-board-delete:hover:not(:disabled),
+.kanban-board-delete:focus-visible:not(:disabled) {
+  border-color: rgba(255,255,255,.42) !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #fff !important;
 }
 .kanban-column-action:hover:not(:disabled),
 .kanban-add-card:hover:not(:disabled) {
