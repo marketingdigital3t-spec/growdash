@@ -3944,6 +3944,16 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
   color: #f2f4f6 !important;
   box-shadow: none !important;
 }
+.kanban-column-action::before,
+.kanban-column-action::after,
+.kanban-add-card::before,
+.kanban-add-card::after,
+.kanban-board-delete::before,
+.kanban-board-delete::after {
+  display: none !important;
+  animation: none !important;
+  opacity: 0 !important;
+}
 .kanban-board-delete {
   position: absolute !important;
   top: .75rem !important;
