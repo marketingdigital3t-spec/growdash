@@ -3999,6 +3999,15 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
   color: hsl(var(--muted-foreground)) !important;
   opacity: 1 !important;
 }
+[draggable="true"] {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-drag: element;
+  touch-action: none;
+}
+[draggable="true"]:active {
+  cursor: grabbing;
+}
 .dark [aria-label="Buscar quadro"] {
   border-color: rgba(255,255,255,.18) !important;
   background: rgba(255,255,255,.06) !important;
