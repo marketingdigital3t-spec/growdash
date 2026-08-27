@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
-    let q = supabaseAdmin.from("ad_accounts").select("*");
+    let q = supabaseAdmin.from("ad_accounts").select("*").neq("connection_status", "disconnected");
     if (adAccountId) q = q.eq("id", adAccountId);
     else if (adAccountIds.length > 0) q = q.in("id", adAccountIds);
     if (userId) q = q.eq("user_id", userId);

@@ -2,7 +2,7 @@ import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "re
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, FolderOpen, Instagram, Mail, MessageCircle, RefreshCw, Search, Sparkles, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, FolderOpen, Instagram, Mail, MessageCircle, RefreshCw, Search, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
@@ -25,17 +25,16 @@ import { RDHealthCheckCard } from "@/components/settings/RDHealthCheckCard";
 import { RDReconcileCard } from "@/components/settings/RDReconcileCard";
 import { RDUTMDiagnosticsCard } from "@/components/settings/RDUTMDiagnosticsCard";
 import { RDObservabilityCard } from "@/components/settings/RDObservabilityCard";
-import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
 import { UTMConventionCard } from "@/components/settings/UTMConventionCard";
 import { UTMMappingCard } from "@/components/settings/UTMMappingCard";
 import { PlatformRulesSection } from "@/components/settings/PlatformRulesSection";
 import { CustomMetricsSection } from "@/components/settings/CustomMetricsSection";
 import { AccountConnectionStatus } from "@/components/settings/AccountConnectionStatus";
-import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGoogleWorkspaceOAuth } from "@/hooks/useGoogleWorkspaceOAuth";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 const tabs = [
@@ -108,10 +107,8 @@ function IntegrationsContent() {
   const [params, setParams] = useSearchParams();
   const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
   const [search, setSearch] = useState("");
-  const [metaDialogOpen, setMetaDialogOpen] = useState(false);
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
-  const [accountToDelete, setAccountToDelete] = useState<{ id: string; name: string; account_id: string } | null>(null);
-  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts();
+  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
   const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
   const { data: rdFunnelsData } = useRDFunnels(undefined, !!rdIntegration?.is_active);
   const connectMeta = useMetaOAuth();
@@ -182,7 +179,7 @@ function IntegrationsContent() {
 
       if (metaConnected) {
         try {
-          await syncMeta.mutateAsync({ startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd") });
+          await syncMeta.mutateAsync({ adAccountIds: adAccounts.filter((account) => account.connection_status !== "disconnected").map((account) => account.id), startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd") });
           completed.push("Meta Ads");
         } catch (error) {
           failures.push(`Meta Ads: ${error instanceof Error ? error.message : "falha na sincronização"}`);
@@ -225,28 +222,17 @@ function IntegrationsContent() {
     onError: (error: Error) => toast({ title: "Falha na sincronização", description: error.message, variant: "destructive" }),
   });
 
-  const deleteMetaAccount = useMutation({
-    mutationFn: async () => {
-      if (!accountToDelete) throw new Error("Selecione a conta que deseja excluir.");
-      const { data, error } = await supabase.functions.invoke("delete-integration-account", {
-        body: {
-          provider: "meta",
-          account_id: accountToDelete.id,
-          confirmation: accountToDelete.name,
-        },
-      });
+  const toggleMetaAccount = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase.from("ad_accounts").update({ connection_status: active ? "connected" : "disconnected" }).eq("id", id);
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      return { id, active };
     },
-    onSuccess: (data) => {
-      toast({ title: "Conta removida da Growdash", description: data?.message });
-      setAccountToDelete(null);
+    onSuccess: ({ active }) => {
       queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["rd_funnels"] });
+      toast({ title: active ? "Conta ativada" : "Conta desativada", description: active ? "A conta voltará a aparecer nos módulos e nas sincronizações." : "A conta permanece conectada à Meta, mas foi retirada dos módulos da Growdash." });
     },
-    onError: (error: Error) => toast({ title: "Não foi possível excluir", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => toast({ title: "Não foi possível alterar a conta", description: error.message, variant: "destructive" }),
   });
 
   const providerFilter = (name: string) => name.toLowerCase().includes(search.toLowerCase().trim());
@@ -272,7 +258,7 @@ function IntegrationsContent() {
 
         <TabsContent value="paid" className="space-y-4">
           <IntegrationPanelGuard name="Meta Ads e atribuição">
-          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="OAuth oficial, conexão manual legada, contas, métricas, saldos e sincronização." status={loadingMeta ? "Verificando" : metaConnected ? "Conectado" : "Disponível"} connected={metaConnected} /><div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => <div key={account.id} className="group rounded-xl border border-border bg-muted/20 p-4 transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[0_16px_45px_-28px_rgba(211,166,46,.8)]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><b className="block truncate text-sm">{account.name}</b><p className="truncate text-[10px] text-muted-foreground">{account.account_id}</p></div><div className="flex shrink-0 items-center gap-1">{account.connection_status === "error" || account.connection_status === "expired" ? <TriangleAlert className="h-5 w-5 text-amber-500" /> : <CheckCircle2 className="h-5 w-5 text-emerald-500" />}<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={() => setAccountToDelete(account)} title={`Excluir ${account.name}`} aria-label={`Excluir ${account.name}`}><Trash2 className="h-4 w-4" /></Button></div></div><div className="mt-3"><AccountConnectionStatus status={account.connection_status} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} onReconnect={() => reconnectStoredMetaToken.mutate({ id: account.id, name: account.name })} /></div></div>)}{!loadingMeta && !adAccounts.length && <EmptyState text="Nenhuma conta Meta conectada." />}</div><div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Continuar com Facebook/Meta"}</Button><Button variant="outline" onClick={() => setMetaDialogOpen(true)}>Conectar por ID e token</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Último sucesso: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
+          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="Conecte seu perfil Meta uma única vez e ative somente as contas de anúncio que deseja usar na Growdash." status={loadingMeta ? "Verificando" : metaConnected ? "Perfil conectado" : "Disponível"} connected={metaConnected} /><div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => { const active = account.connection_status !== "disconnected"; const unhealthy = account.connection_status === "error" || account.connection_status === "expired"; return <div key={account.id} className={cn("rounded-xl border p-4 transition", active ? "border-primary/30 bg-muted/20" : "border-border bg-muted/10 opacity-75")}><div className="flex items-start gap-3"><div className="min-w-0 grow"><b className="block truncate text-sm">{account.name}</b><p className="truncate text-[10px] text-muted-foreground">{account.account_id}</p></div>{unhealthy ? <TriangleAlert className="h-5 w-5 shrink-0 text-amber-500" /> : <CheckCircle2 className={cn("h-5 w-5 shrink-0", active ? "text-emerald-500" : "text-muted-foreground")} />}<Switch checked={active} disabled={toggleMetaAccount.isPending} onCheckedChange={(checked) => toggleMetaAccount.mutate({ id: account.id, active: checked })} aria-label={`${active ? "Desativar" : "Ativar"} ${account.name}`} /></div><div className="mt-3"><AccountConnectionStatus status={active ? account.connection_status : "disconnected"} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} onReconnect={() => reconnectStoredMetaToken.mutate({ id: account.id, name: account.name })} /></div><p className="mt-3 text-[10px] text-muted-foreground">{active ? "Ativa nos módulos e sincronizações" : "Desativada nos módulos; perfil Meta permanece conectado"}</p></div>; })}{!loadingMeta && !adAccounts.length && <EmptyState text="Nenhuma conta Meta disponível para este perfil." />}</div><div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Conectar / atualizar perfil Meta"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Última sincronização: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
           <div className="grid gap-4 md:grid-cols-2">{providerFilter("Google Ads") && <ProviderCard name="Google Ads" description="Pesquisa, Performance Max, vídeo, conversões e orçamento." status="Preparar OAuth" />}{providerFilter("TikTok Ads") && <ProviderCard name="TikTok Ads" description="Campanhas, criativos, conversões e custo por resultado." status="Preparar OAuth" />}</div>
           <IntegrationAccordion title="Padrão de UTMs" description="Padronize a identificação de campanhas e origens." defaultOpen={false}><IntegrationPanelGuard name="Padrão de UTMs"><UTMConventionCard /></IntegrationPanelGuard></IntegrationAccordion>
           <IntegrationAccordion title="Mapeamento de UTMs" description="Revise como os parâmetros são associados aos dados." defaultOpen={false}><IntegrationPanelGuard name="Mapeamento de UTMs"><UTMMappingCard /></IntegrationPanelGuard></IntegrationAccordion>
@@ -311,17 +297,7 @@ function IntegrationsContent() {
         <TabsContent value="health" className="space-y-4"><div className="grid gap-3 md:grid-cols-3"><HealthCard title="Meta Ads" value={metaConnected ? relativeDate(latestMetaSync as string | null) : "Não conectado"} ok={metaConnected} /><HealthCard title="RD Station" value={rdConnected ? relativeDate(latestRDDeal?.updated_at) : "Não conectado"} ok={rdConnected} /><HealthCard title="Filas e webhooks" value="Monitoramento por execução" ok /></div>{rdConnected && <><IntegrationAccordion title="Diagnóstico do RD" description="Verifique a saúde, credenciais e sincronizações." defaultOpen={false}><RDHealthCheckCard /></IntegrationAccordion><IntegrationAccordion title="Reconciliação de vendas" description="Compare os dados de vendas importados e do RD." defaultOpen={false}><RDReconcileCard /></IntegrationAccordion><IntegrationAccordion title="Diagnóstico de UTMs" description="Identifique falhas de identificação de origem e campanha." defaultOpen={false}><RDUTMDiagnosticsCard /></IntegrationAccordion><IntegrationAccordion title="Observabilidade do RD" description="Consulte eventos e o histórico operacional da integração." defaultOpen={false}><RDObservabilityCard /></IntegrationAccordion></>}</TabsContent>
       </Tabs>
 
-      <Dialog open={metaDialogOpen} onOpenChange={setMetaDialogOpen}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>Conectar conta Meta Ads por ID e token</DialogTitle></DialogHeader><MetaManualConnectionCard onConnected={() => setMetaDialogOpen(false)} /></DialogContent></Dialog>
       <Dialog open={googleDialogOpen} onOpenChange={setGoogleDialogOpen}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Google Drive e Gmail</DialogTitle></DialogHeader><GoogleWorkspaceManager /></DialogContent></Dialog>
-      <DestructiveConfirmationDialog
-        open={!!accountToDelete}
-        onOpenChange={(open) => !open && setAccountToDelete(null)}
-        title="Excluir conta de tráfego pago"
-        description="Isso remove da Growdash a credencial, campanhas, anúncios e métricas sincronizadas desta conexão. A conta real e as campanhas continuam existindo no Gerenciador de Anúncios da Meta."
-        confirmation={accountToDelete?.name ?? ""}
-        pending={deleteMetaAccount.isPending}
-        onConfirm={() => deleteMetaAccount.mutate()}
-      />
     </div>
   );
 }
