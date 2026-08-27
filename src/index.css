@@ -5254,6 +5254,17 @@ html:not(.dark) .growdash-main .bg-primary\/[\.035] { background-color: #eef1f4 
 html:not(.dark) [data-radix-popper-content-wrapper] [role="option"]:focus,
 html:not(.dark) [data-radix-popper-content-wrapper] [role="menuitem"]:focus { background: #e8edf2 !important; color: #17202a !important; }
 
+/* The monochrome accent owns a dark control palette by default; in light
+   mode the board search remains a neutral reading surface. */
+html[data-accent="monochrome"]:not(.dark) .growdash-main [aria-label="Buscar quadro"] {
+  color: #17202a !important;
+  border-color: #bcc6d1 !important;
+  background: #ffffff !important;
+}
+html[data-accent="monochrome"]:not(.dark) .growdash-main [aria-label="Buscar quadro"]::placeholder {
+  color: #59616a !important;
+}
+
 html[data-accent]:not(.dark) .campaigns-workspace .campaign-search-input::placeholder {
   color: #59616a !important;
 }
