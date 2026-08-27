@@ -4013,6 +4013,18 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
   background: rgba(255,255,255,.06) !important;
   color: #f2f4f6 !important;
 }
+button[aria-label="Prioridade do cartão"],
+button[aria-label="Coluna do cartão"] {
+  border-color: rgba(15,23,42,.16) !important;
+  background: rgba(15,23,42,.045) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.dark button[aria-label="Prioridade do cartão"],
+.dark button[aria-label="Coluna do cartão"] {
+  border-color: rgba(255,255,255,.18) !important;
+  background: rgba(255,255,255,.06) !important;
+  color: #f2f4f6 !important;
+}
 .premium-button:hover:not(:disabled), .gd-button:hover:not(:disabled), .meta-toolbar-button:hover:not(:disabled), .meta-toolbar-primary:hover:not(:disabled) { border-color: rgba(255,255,255,.55) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.26), 0 0 30px rgba(255,255,255,.12) !important; }
 
 /* Primary highlights follow the same premium CTA language as “Integrar conta”
