@@ -151,7 +151,7 @@ export default function EventClasses() {
         <StatCard icon={CalendarDays} label="Turmas" value={summary.total} />
         <StatCard icon={CheckCircle2} label="Abertas" value={summary.open} accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
         <StatCard icon={CheckCircle2} label="Esgotadas" value={summary.soldOut} accent="bg-muted text-muted-foreground" />
-        <StatCard icon={Users} label="Pessoas" value={summary.students} />
+        <StatCard icon={Users} label="Alunas" value={summary.students} />
         <StatCard icon={Stethoscope} label="Pacientes" value={summary.patients} />
         <StatCard icon={Users} label="Vagas disp." value={summary.vacancies} />
         <StatCard icon={AlertTriangle} label="Críticas" value={summary.critical} accent="bg-amber-500/10 text-amber-600 dark:text-amber-400" />

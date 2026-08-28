@@ -40,7 +40,7 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
   const [manualNames, setManualNames] = useState("");
 
   const max = memberType === "student" ? (eventClass.max_people || eventClass.max_students) : eventClass.max_model_patients;
-  const label = memberType === "student" ? "Pessoas" : "Pacientes-modelo";
+  const label = memberType === "student" ? "Alunas" : "Pacientes-modelo";
   const linkedCount = members?.length ?? 0;
   const manualCount = memberType === "student"
     ? Number(eventClass.manual_student_count || 0)

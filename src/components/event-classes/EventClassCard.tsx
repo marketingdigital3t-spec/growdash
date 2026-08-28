@@ -93,7 +93,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
           <div className="space-y-3">
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Pessoas</span>
+                <span className="text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Alunas</span>
                 <span className="font-medium">{ec.studentCount}/{peopleCap}</span>
               </div>
               <Progress value={Math.min(studentPct, 100)} className="h-1.5" />
