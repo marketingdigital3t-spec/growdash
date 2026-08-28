@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, Trash2, ExternalLink, RefreshCw } from "lucide-react";
 import {
   useEventClassMembers,
+  useAddEventClassMember,
   useRemoveEventClassMember,
   type EventClass,
   type MemberType,
@@ -31,8 +33,11 @@ interface Props {
 export function EventClassMembersDialog({ open, onOpenChange, eventClass, memberType }: Props) {
   const { data: members, isLoading } = useEventClassMembers(eventClass.id, memberType);
   const remove = useRemoveEventClassMember();
+  const addManual = useAddEventClassMember();
   const qc = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualNames, setManualNames] = useState("");
 
   const max = memberType === "student" ? (eventClass.max_people || eventClass.max_students) : eventClass.max_model_patients;
   const label = memberType === "student" ? "Pessoas" : "Pacientes-modelo";
@@ -52,6 +57,15 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
     }
   };
 
+  const addManualNames = async () => {
+    const names = manualNames.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
+    for (const name of names) {
+      const key = `manual:${name}:${Date.now()}`;
+      await addManual.mutateAsync({ eventClassId: eventClass.id, rdDealId: key, memberType, dealName: name });
+    }
+    setManualNames(""); setManualOpen(false); toast({ title: `${names.length} nome(s) adicionado(s)` });
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -68,7 +82,9 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
             <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: ["event_class_members", eventClass.id, memberType] })}>
               <RefreshCw className="h-4 w-4 mr-2" /> Sincronizar
             </Button>
+            <Button variant="outline" onClick={() => setManualOpen((value) => !value)}>Adicionar nomes</Button>
           </div>
+          {manualOpen && <div className="space-y-2 rounded-lg border border-dashed border-primary/40 bg-primary/[.04] p-3"><p className="text-xs text-muted-foreground">Cole um nome por linha. Esses nomes ficam registrados na turma e não serão removidos pela sincronização do RD.</p><Textarea value={manualNames} onChange={(event) => setManualNames(event.target.value)} placeholder="Eunice Rosa\nJeane Magalhães" rows={4} /><Button size="sm" onClick={() => void addManualNames()} disabled={!manualNames.trim() || addManual.isPending}>Salvar nomes</Button></div>}
 
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
             {isLoading && <div className="text-sm text-muted-foreground text-center py-8">Carregando...</div>}
@@ -85,7 +101,7 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
                 <div key={m.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3">
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{s.contact_name || `Deal ${m.rd_deal_id.slice(0, 8)}`}</span>
+                      <span className="font-medium text-sm">{s.contact_name || (m.rd_deal_id.startsWith("manual:") ? m.rd_deal_id.split(":")[1] : `Deal ${m.rd_deal_id.slice(0, 8)}`)}</span>
                       {d.rd_stage_name && <Badge variant="secondary" className="text-xs">{d.rd_stage_name}</Badge>}
                       {d.win && <Badge className="text-xs bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15">Ganho</Badge>}
                     </div>
