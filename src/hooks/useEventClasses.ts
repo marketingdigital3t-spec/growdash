@@ -218,7 +218,7 @@ export function useEventClassMembers(eventClassId: string | null, type: MemberTy
       const dealIds = list.map((m) => m.rd_deal_id);
       const { data: deals } = await supabase
         .from("rd_deals")
-        .select("rd_deal_id, rd_stage_name, rd_stage_id, deal_owner_name, amount_total, lead_state, lead_city, utm_campaign, utm_source, stage_bucket, win, closed_at, lead_created_at")
+        .select("rd_deal_id, rd_stage_name, rd_stage_id, deal_owner_name, amount_total, lead_state, lead_city, utm_campaign, utm_source, stage_bucket, win, closed_at, lead_created_at, custom_fields")
         .in("rd_deal_id", dealIds);
 
       const { data: sales } = await supabase

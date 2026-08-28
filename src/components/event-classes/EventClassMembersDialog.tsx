@@ -13,6 +13,14 @@ import { RDMemberPickerDialog } from "./RDMemberPickerDialog";
 import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
+function dealField(fields: unknown, aliases: string[]) {
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return "";
+  const normalize = (value: string) => value.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "");
+  const wanted = aliases.map(normalize);
+  const entry = Object.entries(fields as Record<string, unknown>).find(([key]) => wanted.includes(normalize(key)));
+  return entry?.[1] == null ? "" : String(entry[1]);
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -72,6 +80,7 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
             {(members || []).map((m: any) => {
               const d = m.deal || {};
               const s = m.sale || {};
+              const totalValue = d.amount_total || dealField(d.custom_fields, ["valor total", "valor da venda", "valor"]);
               return (
                 <div key={m.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3">
                   <div className="min-w-0 flex-1 space-y-1">
@@ -84,9 +93,14 @@ export function EventClassMembersDialog({ open, onOpenChange, eventClass, member
                       {s.contact_email && <span>{s.contact_email}</span>}
                       {s.contact_phone && <span>{s.contact_phone}</span>}
                       {(d.lead_city || d.lead_state) && <span>{[d.lead_city, d.lead_state].filter(Boolean).join("/")}</span>}
-                      {d.amount_total > 0 && <span>R$ {Number(d.amount_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>}
+                      {totalValue && <span>Valor total: {Number(String(totalValue).replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", ".") || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>}
                       {d.deal_owner_name && <span>Resp: {d.deal_owner_name}</span>}
                       {d.utm_campaign && <span>Camp: {d.utm_campaign}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {(dealField(d.custom_fields, ["data da turma", "data turma", "turma"])) && <Badge variant="outline" className="text-[10px]">Turma: {dealField(d.custom_fields, ["data da turma", "data turma", "turma"])}</Badge>}
+                      {(dealField(d.custom_fields, ["profissão", "profissao", "profissão / área de atuação", "area de atuacao"])) && <Badge variant="outline" className="text-[10px]">Profissão: {dealField(d.custom_fields, ["profissão", "profissao", "profissão / área de atuação", "area de atuacao"])}</Badge>}
+                      {(dealField(d.custom_fields, ["tipo de público", "tipo de publico", "publico"])) && <Badge variant="outline" className="text-[10px]">Público: {dealField(d.custom_fields, ["tipo de público", "tipo de publico", "publico"])}</Badge>}
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
