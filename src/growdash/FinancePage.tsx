@@ -52,6 +52,8 @@ export default function FinancePage() {
   const {
     adAccountId,
     setAdAccountId,
+    adAccountIds,
+    setAdAccountIds,
     preset,
     setPreset,
     customRange,
@@ -61,7 +63,7 @@ export default function FinancePage() {
     businessUnitId,
     segment,
   } = useGlobalFilters();
-  const accountFilter = adAccountId === "all" ? undefined : adAccountId;
+  const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
   const [entryOpen, setEntryOpen] = useState(false);
   const [includeMetaTax, setIncludeMetaTax] = useState(true);
   const [entry, setEntry] = useState({ entry_type: "expense" as EntryType, description: "", amount: "", competence_date: format(new Date(), "yyyy-MM-dd"), due_date: "", status: "pending", recurrence: "none", notes: "" });
@@ -76,12 +78,12 @@ export default function FinancePage() {
   const unitAccounts = businessUnitId
     ? allAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : allAccounts;
-  const accounts = accountFilter ? unitAccounts.filter((account) => account.id === accountFilter) : unitAccounts;
+  const accounts = adAccountIds.length ? unitAccounts.filter((account) => adAccountIds.includes(account.id)) : unitAccounts;
   const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
-  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, startDate: metaInsightsStartDate, endDate });
-  const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, startDate, endDate });
-  const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, startDate: twelveMonthsAgo, endDate: futureMonth });
-  const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, startDate: twelveMonthsAgo, endDate: futureMonth });
+  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: metaInsightsStartDate, endDate });
+  const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, adAccountIds, startDate, endDate });
+  const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
+  const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
 
   const { data: balanceEvents = [], isLoading: loadingBalanceEvents } = useQuery({
     queryKey: ["finance-balance-events", accountIds, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
@@ -303,6 +305,8 @@ export default function FinancePage() {
           adAccounts={unitAccounts}
           selectedAccount={adAccountId}
           onAccountChange={setAdAccountId}
+          selectedAccountIds={adAccountIds}
+          onAccountIdsChange={setAdAccountIds}
         />
       </section>
 

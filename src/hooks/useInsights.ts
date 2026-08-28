@@ -5,6 +5,7 @@ import { withRequestTimeout } from "@/lib/resilience";
 
 interface UseInsightsParams {
   adAccountId?: string;
+  adAccountIds?: string[];
   campaignId?: string;
   campaignIds?: string[];
   objectives?: string[];
@@ -56,9 +57,9 @@ export function dedupeDailyInsights(rows: InsightRow[]) {
   return Array.from(unique.values());
 }
 
-export function useInsights({ adAccountId, campaignId, campaignIds, objectives, startDate, endDate, enabled = true }: UseInsightsParams) {
+export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, startDate, endDate, enabled = true }: UseInsightsParams) {
   return useQuery({
-    queryKey: ["insights", adAccountId, campaignId, campaignIds?.join(","), objectives?.join(","), startDate.toISOString(), endDate.toISOString()],
+    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), startDate.toISOString(), endDate.toISOString()],
     queryFn: async () => {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
@@ -89,7 +90,9 @@ export function useInsights({ adAccountId, campaignId, campaignIds, objectives, 
         .lte("date", end)
         .order("date", { ascending: true });
 
-      if (adAccountId) {
+      if (adAccountIds && adAccountIds.length > 0) {
+        query = query.in("ads.adsets.campaigns.ad_account_id", adAccountIds);
+      } else if (adAccountId) {
         query = query.eq("ads.adsets.campaigns.ad_account_id", adAccountId);
       }
 

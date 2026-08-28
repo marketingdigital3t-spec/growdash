@@ -63,6 +63,7 @@ interface UseSalesParams {
   endDate?: Date;
   productId?: string;
   adAccountId?: string;
+  adAccountIds?: string[];
   enabled?: boolean;
 }
 
@@ -98,7 +99,7 @@ export function dedupeCanonicalSales<T extends Sale>(rows: T[]) {
 
 export function useSales(params?: UseSalesParams) {
   return useQuery({
-    queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId],
+    queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId, params?.adAccountIds?.slice().sort().join(",")],
     enabled: params?.enabled !== false,
     // Evita um valor zero transitório nos KPIs ao trocar conta ou período.
     // O resultado anterior permanece visível até a resposta da nova consulta.
@@ -116,7 +117,9 @@ export function useSales(params?: UseSalesParams) {
       if (params?.productId && params.productId !== "all") {
         query = query.eq("product_id", params.productId);
       }
-      if (params?.adAccountId && params.adAccountId !== "all") {
+      if (params?.adAccountIds?.length) {
+        query = query.in("ad_account_id", params.adAccountIds);
+      } else if (params?.adAccountId && params.adAccountId !== "all") {
         query = query.eq("ad_account_id", params.adAccountId);
       }
 

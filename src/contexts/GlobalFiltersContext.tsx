@@ -7,6 +7,8 @@ export type BusinessSegment = "infoproduto" | "saas";
 interface GlobalFiltersValue {
   adAccountId: string;
   setAdAccountId: (value: string) => void;
+  adAccountIds: string[];
+  setAdAccountIds: (values: string[]) => void;
   preset: DatePreset;
   setPreset: (value: DatePreset) => void;
   customRange: { from: Date; to: Date };
@@ -29,6 +31,7 @@ function readStored() {
     const value = JSON.parse(raw);
     return {
       adAccountId: typeof value.adAccountId === "string" ? value.adAccountId : "all",
+      adAccountIds: Array.isArray(value.adAccountIds) ? value.adAccountIds.filter((id: unknown): id is string => typeof id === "string") : [],
       preset: (value.preset || "today_yesterday") as DatePreset,
       customRange: normalizeCustomDateRange({
         from: value.customRange?.from ? new Date(value.customRange.from) : undefined,
@@ -44,7 +47,9 @@ function readStored() {
 export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   const { data: workspace } = useWorkspace();
   const stored = typeof window === "undefined" ? null : readStored();
-  const [adAccountId, setAdAccountId] = useState(stored?.adAccountId ?? "all");
+  const [adAccountIds, setAdAccountIds] = useState<string[]>(() => stored?.adAccountIds?.length ? stored.adAccountIds : stored?.adAccountId && stored.adAccountId !== "all" ? [stored.adAccountId] : []);
+  const adAccountId = adAccountIds.length === 1 ? adAccountIds[0] : "all";
+  const setAdAccountId = useCallback((value: string) => setAdAccountIds(value === "all" ? [] : [value]), []);
   const [preset, setPreset] = useState<DatePreset>(stored?.preset ?? "today_yesterday");
   const [customRange, setStoredCustomRange] = useState(() => normalizeCustomDateRange(stored?.customRange));
   const setCustomRange = useCallback((value: { from: Date; to: Date }) => {
@@ -54,7 +59,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ adAccountId, preset, customRange, segment }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ adAccountId, adAccountIds, preset, customRange, segment }));
       // Mantém compatibilidade com telas antigas durante a migração.
       localStorage.setItem("dash:account", adAccountId);
       localStorage.setItem("dash:date", JSON.stringify({
@@ -65,13 +70,15 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
     } catch {
       // A plataforma continua funcional quando o navegador bloqueia storage.
     }
-  }, [adAccountId, preset, customRange, segment]);
+  }, [adAccountId, adAccountIds, preset, customRange, segment]);
 
   const dates = useMemo(() => resolvePreset(preset, customRange), [preset, customRange]);
   const businessUnitId = workspace?.units.find((unit) => unit.kind === segment)?.id;
   const value = useMemo<GlobalFiltersValue>(() => ({
     adAccountId,
     setAdAccountId,
+    adAccountIds,
+    setAdAccountIds,
     preset,
     setPreset,
     customRange,
@@ -82,7 +89,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
     setSegment,
     workspaceId: workspace?.id,
     businessUnitId,
-  }), [adAccountId, preset, setCustomRange, customRange, dates.startDate, dates.endDate, segment, workspace?.id, businessUnitId]);
+  }), [adAccountId, setAdAccountId, adAccountIds, preset, setCustomRange, customRange, dates.startDate, dates.endDate, segment, workspace?.id, businessUnitId]);
 
   return <GlobalFiltersContext.Provider value={value}>{children}</GlobalFiltersContext.Provider>;
 }

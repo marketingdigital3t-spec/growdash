@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { BarChart3, LockKeyhole, ShieldCheck, UsersRound } from "lucide-react";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
@@ -7,7 +7,6 @@ import { KPIWidget } from "@/components/dashboard/widgets/KPIWidget";
 import { PaymentChartWidget, PlatformDistributionWidget } from "@/components/dashboard/widgets/FinancialOverviewWidgets";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useDateFilter } from "@/hooks/useDateFilter";
 import { useInsights } from "@/hooks/useInsights";
 import { useSales } from "@/hooks/useSales";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
@@ -15,6 +14,7 @@ import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp"
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { getExpertDashboardMetrics } from "@/lib/expertDashboardMetrics";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
@@ -25,23 +25,24 @@ const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
  * integrations, CRM details, campaign editor, or dashboard configuration.
  */
 export default function ExpertDashboard() {
-  const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
+  const { preset, setPreset, customRange, setCustomRange, startDate, endDate, adAccountIds, setAdAccountIds } = useGlobalFilters();
   const { data: accounts = [], isLoading: loadingAccounts } = useAdAccounts();
-  const [accountId, setAccountId] = useState("all");
+  const accountId = adAccountIds.length === 1 ? adAccountIds[0] : "all";
 
   useEffect(() => {
     if (loadingAccounts || accounts.length === 0) return;
-    if (accounts.length === 1) setAccountId(accounts[0].id);
-    else if (accountId !== "all" && !accounts.some((account) => account.id === accountId)) setAccountId("all");
-  }, [accountId, accounts, loadingAccounts]);
+    const allowed = new Set(accounts.map((account) => account.id));
+    const next = adAccountIds.filter((id) => allowed.has(id));
+    if (next.length !== adAccountIds.length) setAdAccountIds(next);
+  }, [adAccountIds, accounts, loadingAccounts, setAdAccountIds]);
 
   const selectedId = accountId === "all" ? undefined : accountId;
   // “Todas as contas” means the union of accounts authorized for this expert,
   // not every RD deal without attribution. The latter is a reconciliation item
   // and must never inflate the owner-facing dashboard total.
-  const selectedAccountIds = useMemo(() => accountId === "all" ? accounts.map((account) => account.id) : undefined, [accountId, accounts]);
-  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, startDate, endDate });
-  const { data: sales = [] } = useSales({ adAccountId: selectedId, startDate, endDate });
+  const selectedAccountIds = useMemo(() => adAccountIds.length ? adAccountIds : accounts.map((account) => account.id), [adAccountIds, accounts]);
+  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
+  const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
   const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
   const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
   const permittedAccounts = useMemo(() => accounts.map((account) => ({ id: account.id, name: account.name })), [accounts]);
@@ -52,14 +53,14 @@ export default function ExpertDashboard() {
     const accountIds = new Set(accounts.map((account) => account.id));
     return insights.filter((insight) => !!insight.ad_account_id
       && accountIds.has(insight.ad_account_id)
-      && (!selectedId || insight.ad_account_id === selectedId));
-  }, [accounts, insights, selectedId]);
+      && (adAccountIds.length === 0 || adAccountIds.includes(insight.ad_account_id)));
+  }, [accounts, insights, adAccountIds]);
   const permittedSales = useMemo(() => {
     const accountIds = new Set(accounts.map((account) => account.id));
     return sales.filter((sale) => !!sale.ad_account_id
       && accountIds.has(sale.ad_account_id)
-      && (!selectedId || sale.ad_account_id === selectedId));
-  }, [accounts, sales, selectedId]);
+      && (adAccountIds.length === 0 || adAccountIds.includes(sale.ad_account_id)));
+  }, [accounts, sales, adAccountIds]);
   const actionAdIds = useMemo(
     () => Array.from(new Set(permittedInsights.map((insight) => insight.ad_id).filter(Boolean))),
     [permittedInsights],
@@ -107,7 +108,9 @@ export default function ExpertDashboard() {
           endDate={endDate}
           adAccounts={permittedAccounts}
           selectedAccount={accountId}
-          onAccountChange={setAccountId}
+          onAccountChange={(id) => setAdAccountIds(id === "all" ? [] : [id])}
+          selectedAccountIds={adAccountIds}
+          onAccountIdsChange={setAdAccountIds}
           showSummary
         />
       </MotionItem>

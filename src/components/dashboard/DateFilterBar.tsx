@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { MetaDateRangePicker } from "./MetaDateRangePicker";
 import { CampaignMultiSelect } from "./CampaignMultiSelect";
+import { AccountMultiSelect } from "./AccountMultiSelect";
 
 interface DateFilterBarProps {
   preset: DatePreset;
@@ -18,6 +19,8 @@ interface DateFilterBarProps {
   adAccounts: { id: string; name: string }[];
   selectedAccount: string;
   onAccountChange: (id: string) => void;
+  selectedAccountIds?: string[];
+  onAccountIdsChange?: (ids: string[]) => void;
   campaigns?: { id: string; name: string }[];
   selectedCampaignIds?: string[];
   onCampaignIdsChange?: (ids: string[]) => void;
@@ -36,6 +39,8 @@ export function DateFilterBar({
   adAccounts,
   selectedAccount,
   onAccountChange,
+  selectedAccountIds,
+  onAccountIdsChange,
   campaigns = [],
   selectedCampaignIds = [],
   onCampaignIdsChange,
@@ -55,7 +60,7 @@ export function DateFilterBar({
         className="gd-filter-control gd-filter-date"
       />
 
-      {adAccounts.length > 0 && (
+      {adAccounts.length > 0 && selectedAccountIds && onAccountIdsChange ? <AccountMultiSelect accounts={adAccounts} selectedIds={selectedAccountIds} onChange={onAccountIdsChange} /> : adAccounts.length > 0 && (
         <Select value={selectedAccount} onValueChange={onAccountChange}>
           <SelectTrigger aria-label="Selecionar conta de anúncio" className="gd-filter-control gd-filter-account min-h-11 w-full min-w-0 bg-card sm:h-10 sm:min-h-0 sm:w-[200px]">
             <SelectValue placeholder="Todas as contas" />

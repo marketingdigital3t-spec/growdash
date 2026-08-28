@@ -13,6 +13,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { PageHeading } from "./shared";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
+import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { buildCommercialAccountRankings, type CommercialAccountRanking, type CommercialSaleRow } from "@/lib/commercialRanking";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -33,6 +34,8 @@ export default function CommercialPage() {
   const {
     adAccountId,
     setAdAccountId,
+    adAccountIds,
+    setAdAccountIds,
     startDate,
     endDate,
     preset,
@@ -42,9 +45,9 @@ export default function CommercialPage() {
     businessUnitId,
     segment,
   } = useGlobalFilters();
-  const accountFilter = adAccountId === "all" ? undefined : adAccountId;
-  const { data: sales = [], isLoading } = useSales({ startDate, endDate, adAccountId: accountFilter });
-  const { data: rdDeals = [] } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter });
+  const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
+  const { data: sales = [], isLoading } = useSales({ startDate, endDate, adAccountId: accountFilter, adAccountIds });
+  const { data: rdDeals = [] } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds });
   const { data: products = [] } = useProducts();
   const { data: adAccounts = [] } = useAdAccounts();
   const { data: goalData } = useSalesGoals(new Date());
@@ -144,10 +147,7 @@ export default function CommercialPage() {
         actions={(
           <div className="flex flex-wrap gap-2">
             <MetaDateRangePicker preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} className="min-w-[235px]" />
-            <select aria-label="Filtrar por conta de anúncio" className="gd-button min-w-44" value={adAccountId} onChange={(event) => setAdAccountId(event.target.value)}>
-              <option value="all">Todas as contas</option>
-              {accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-            </select>
+            <AccountMultiSelect accounts={accountOptions} selectedIds={adAccountIds} onChange={setAdAccountIds} className="min-w-44" />
             <select aria-label="Filtrar por vendedor" className="gd-button min-w-40" value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)}><option value="all">Todos os vendedores</option>{sellers.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
             <select aria-label="Filtrar por produto" className="gd-button min-w-40" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
           </div>

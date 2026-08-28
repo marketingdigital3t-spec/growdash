@@ -41,6 +41,7 @@ import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
 import { classifyLead, dedupeRDDeals, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
 import { useCreateRDDealNote, useRDDealNotes } from "@/hooks/useRDDealNotes";
 import { useSales } from "@/hooks/useSales";
+import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,6 +125,8 @@ export default function CrmPage() {
   const {
     adAccountId,
     setAdAccountId,
+    adAccountIds,
+    setAdAccountIds,
     preset,
     setPreset,
     customRange,
@@ -133,8 +136,8 @@ export default function CrmPage() {
     businessUnitId,
     segment,
   } = useGlobalFilters();
-  const accountFilter = adAccountId === "all" ? undefined : adAccountId;
-  const isConsolidatedView = adAccountId === "all";
+  const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
+  const isConsolidatedView = adAccountIds.length !== 1;
   const { data: adAccounts = [] } = useAdAccounts();
   const availableAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
@@ -162,8 +165,8 @@ export default function CrmPage() {
     canReadCrm && (!isConsolidatedView || availableAccountIdList.length > 0),
     isConsolidatedView ? availableAccountIdList : undefined,
   );
-  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter });
-  const { data: insightData = [], isLoading: loadingMetaInsights, isPlaceholderData: isPreviousInsightScope } = useInsights({ adAccountId: accountFilter, startDate, endDate });
+  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds });
+  const { data: insightData = [], isLoading: loadingMetaInsights, isPlaceholderData: isPreviousInsightScope } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate, endDate });
   const { data: products = [], isLoading: loadingProducts } = useProducts();
   const [view, setView] = useState<CRMView>(() => {
     if (searchParams.get("tab") === "ai") return "ai";
@@ -485,10 +488,7 @@ export default function CrmPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
-          <select aria-label="Filtrar por conta de anúncio" value={adAccountId} onChange={(event) => setAdAccountId(event.target.value)} className="gd-button h-11 min-w-0">
-            <option value="all">Todas as contas</option>
-            {availableAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-          </select>
+          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name }))} selectedIds={adAccountIds} onChange={setAdAccountIds} className="h-11" />
           <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}

@@ -42,6 +42,8 @@ const Index = () => {
     endDate,
     adAccountId: selectedAccount,
     setAdAccountId: setSelectedAccount,
+    adAccountIds: selectedAccountIds,
+    setAdAccountIds: setSelectedAccountIds,
     businessUnitId,
     segment,
   } = useGlobalFilters();
@@ -73,7 +75,8 @@ const Index = () => {
   // O filtro por campanha é aplicado em memória porque este universo completo já é
   // obrigatório para o seletor; assim evitamos uma segunda consulta idêntica ao banco.
   const { data: allInsights = [], isLoading } = useInsights({
-    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
+    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
     startDate,
     endDate,
     enabled: true,
@@ -81,7 +84,8 @@ const Index = () => {
   const { data: sales = [] } = useSales({
     startDate,
     endDate,
-    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
+    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
   });
   // O Dashboard separa duas leituras do RD: pipeline pelo período de criação
   // e vendas pelo momento do fechamento. A leitura de vendas é explícita para
@@ -90,15 +94,15 @@ const Index = () => {
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
-    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-    adAccountIds: selectedAccount === "all" ? visibleAccountIdList : undefined,
+    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
+    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : visibleAccountIdList,
     enabled: isRDAccountScopeReady,
   });
   const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
     startDate,
     endDate,
-    adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
-    adAccountIds: selectedAccount === "all" ? visibleAccountIdList : undefined,
+    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
+    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : visibleAccountIdList,
     enabled: isRDAccountScopeReady,
   });
   const { data: rdFunnels = [] } = useRDFunnels();
@@ -136,7 +140,7 @@ const Index = () => {
   const activeScopedFunnelIds = useMemo(() => new Set(
     rdFunnels
       .filter((funnel) => funnel.is_active && visibleAccountIds.has(funnel.ad_account_id)
-        && (selectedAccount === "all" || funnel.ad_account_id === selectedAccount))
+        && (selectedAccountIds.length === 0 || selectedAccountIds.includes(funnel.ad_account_id)))
       .map((funnel) => funnel.id),
   ), [rdFunnels, selectedAccount, visibleAccountIds]);
   // `sales` é a fonte canônica de vendas, receita, reembolso e chargeback.
@@ -145,7 +149,7 @@ const Index = () => {
   // de Funis exibam totais diferentes no mesmo período.
   const canonicalUnitSales = useMemo(() => dedupeCanonicalSales(sales.filter((sale) => {
     if (sale.ad_account_id) return visibleAccountIds.has(sale.ad_account_id)
-      && (selectedAccount === "all" || sale.ad_account_id === selectedAccount);
+      && (selectedAccountIds.length === 0 || selectedAccountIds.includes(sale.ad_account_id));
     return !!sale.rd_funnel_id && activeScopedFunnelIds.has(sale.rd_funnel_id);
   })), [activeScopedFunnelIds, sales, selectedAccount, visibleAccountIds]);
   const selectedCampaigns = useMemo(
@@ -161,10 +165,10 @@ const Index = () => {
     : canonicalUnitSales, [canonicalUnitSales, selectedCampaignIds.length, selectedCampaigns]);
   const dashboardDeals = useMemo(() => operationalRDDeals.filter((deal) => !!deal.ad_account_id
     && visibleAccountIds.has(deal.ad_account_id)
-    && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [operationalRDDeals, selectedAccount, visibleAccountIds]);
+    && (selectedAccountIds.length === 0 || selectedAccountIds.includes(deal.ad_account_id))), [operationalRDDeals, selectedAccountIds, visibleAccountIds]);
   const dashboardRevenueDeals = useMemo(() => operationalRDWonDeals.filter((deal) => !!deal.ad_account_id
     && visibleAccountIds.has(deal.ad_account_id)
-    && (selectedAccount === "all" || deal.ad_account_id === selectedAccount)), [operationalRDWonDeals, selectedAccount, visibleAccountIds]);
+    && (selectedAccountIds.length === 0 || selectedAccountIds.includes(deal.ad_account_id))), [operationalRDWonDeals, selectedAccountIds, visibleAccountIds]);
   // O Dashboard e a Análise de Funis usam a mesma fonte canônica. Os ganhos
   // do RD abaixo ficam apenas como reconciliação para registros que ainda não
   // chegaram a `sales`; uma venda de checkout nunca é descartada por o RD
@@ -189,7 +193,8 @@ const Index = () => {
     // consulta antes e depois da sincronização só competia por rede e fazia o
     // dashboard trocar desnecessariamente para estado de carregamento.
     syncMeta.mutate({
-      adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
+      adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
+      adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : visibleAccountIdList,
       startDate: format(startDate, "yyyy-MM-dd"),
       endDate: format(endDate, "yyyy-MM-dd"),
     });
@@ -331,6 +336,8 @@ const Index = () => {
               adAccounts={visibleAccounts.map((a) => ({ id: a.id, name: a.name }))}
               selectedAccount={selectedAccount}
               onAccountChange={(id) => { setSelectedAccount(id); setSelectedCampaignIds([]); }}
+              selectedAccountIds={selectedAccountIds}
+              onAccountIdsChange={(ids) => { setSelectedAccountIds(ids); setSelectedCampaignIds([]); }}
               campaigns={(() => {
                 const spendByCamp = new Map<string, number>();
                 const imprByCamp = new Map<string, number>();
