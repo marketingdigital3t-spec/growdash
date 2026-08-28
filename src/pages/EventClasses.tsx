@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, CalendarDays, Users, Stethoscope, AlertTriangle, CheckCircle2, Clock3, MapPin } from "lucide-react";
-import { useEventClasses, useRannielyClassSales, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
+import { useEventClasses, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { EventClassCard } from "@/components/event-classes/EventClassCard";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
@@ -41,7 +41,6 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: stri
 
 export default function EventClasses() {
   const { data: classes, isLoading } = useEventClasses();
-  const { data: rannielySales } = useRannielyClassSales();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [funnelFilter, setFunnelFilter] = useState<string>("all");
@@ -107,6 +106,23 @@ export default function EventClasses() {
     };
   }, [filtered]);
 
+  const classSales = useMemo(() => {
+    const totals = { studentSP: 0, studentTO: 0, modelPatientSP: 0, modelPatientTO: 0 };
+    for (const eventClass of classes || []) {
+      const location = `${eventClass.location || ""} ${eventClass.title}`.toLocaleLowerCase("pt-BR");
+      const region = /\b(sp|são paulo|sao paulo)\b/.test(location) ? "SP" : /\b(to|tocantins|aragua[ií]na)\b/.test(location) ? "TO" : null;
+      if (!region) continue;
+      if (region === "SP") {
+        totals.studentSP += eventClass.studentCount;
+        totals.modelPatientSP += eventClass.modelPatientCount;
+      } else {
+        totals.studentTO += eventClass.studentCount;
+        totals.modelPatientTO += eventClass.modelPatientCount;
+      }
+    }
+    return totals;
+  }, [classes]);
+
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6">
       <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
@@ -152,10 +168,10 @@ export default function EventClasses() {
             <span className="text-xs font-semibold text-muted-foreground">Somente vendas realizadas</span>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard icon={Users} label="Alunas · SP" value={rannielySales?.studentSP ?? 0} />
-            <StatCard icon={Users} label="Alunas · TO" value={rannielySales?.studentTO ?? 0} />
-            <StatCard icon={Stethoscope} label="Paciente modelo · SP" value={rannielySales?.modelPatientSP ?? 0} />
-            <StatCard icon={Stethoscope} label="Paciente modelo · TO" value={rannielySales?.modelPatientTO ?? 0} />
+            <StatCard icon={Users} label="Alunas · SP" value={classSales.studentSP} />
+            <StatCard icon={Users} label="Alunas · TO" value={classSales.studentTO} />
+            <StatCard icon={Stethoscope} label="Paciente modelo · SP" value={classSales.modelPatientSP} />
+            <StatCard icon={Stethoscope} label="Paciente modelo · TO" value={classSales.modelPatientTO} />
           </div>
         </CardContent>
       </Card>
