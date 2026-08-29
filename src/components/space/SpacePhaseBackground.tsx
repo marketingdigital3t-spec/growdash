@@ -21,6 +21,12 @@ export function SpacePhaseBackground({ phase }: { phase: SpacePhase }) {
       <div className="space-phase-stars">{Array.from({ length: starCount(phase) }, (_, index) => <i key={index} style={{ "--star-x": `${(index * 47) % 100}%`, "--star-y": `${(index * 71) % 100}%`, "--star-delay": `${(index % 9) * 0.45}s` } as CSSProperties} />)}</div>
       {phase !== "terra" && <div className="space-phase-meteors"><i /><i />{phase === "galaxia" && <><i /><i /></>}</div>}
       <div className="space-phase-planet"><span className="space-phase-atmosphere" /><span className="space-phase-rings" /></div>
+      <div className="space-phase-orbit-map" aria-hidden="true">
+        <i /><i /><i /><i />
+        <span className="space-phase-orbit-line space-phase-orbit-line-a" />
+        <span className="space-phase-orbit-line space-phase-orbit-line-b" />
+      </div>
+      <div className="space-phase-radar" aria-hidden="true"><span /><i /><i /><i /></div>
       <div className="space-phase-rocket"><Rocket /><span /></div>
       <div className="space-phase-badge"><Globe2 /><span><b>{copy.title}</b><small>{copy.subtitle}</small></span><em><Sparkles /> FASE: {phase === "orbita" ? "ÓRBITA" : phase.toUpperCase()}</em></div>
     </div>
