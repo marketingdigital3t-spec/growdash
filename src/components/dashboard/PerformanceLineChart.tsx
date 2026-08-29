@@ -41,7 +41,7 @@ export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
   const hasRight = METRICS.some((m) => m.yAxisId === "right" && active.has(m.key));
 
   return (
-    <Card>
+    <Card className="dashboard-terra-card">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-base flex items-center gap-2">

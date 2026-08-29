@@ -28,7 +28,7 @@ export function ChartCard({ title, data, type, dataKey, color = "hsl(var(--prima
   };
 
   return (
-    <Card className="transition-shadow duration-300 hover:shadow-lg">
+    <Card className="dashboard-terra-card transition-shadow duration-300 hover:shadow-lg">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
