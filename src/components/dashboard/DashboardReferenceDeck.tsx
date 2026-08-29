@@ -1,4 +1,5 @@
 import { Crosshair, Eye, Rocket, UserRound, UsersRound } from "lucide-react";
+import { SpaceRocket } from "@/components/space/SpaceRocket";
 
 type Props = {
   impressions: number;
@@ -34,7 +35,7 @@ export function DashboardReferenceDeck({ impressions, clicks, leads, clients, ro
   return <section className="dashboard-reference-deck" aria-label="Visão espacial do Dashboard">
     <div className="dashboard-reference-kpis">{cards.map((card) => <article key={card.label} className="dashboard-reference-kpi"><span className="dashboard-reference-icon">{card.icon}</span><div><p>{card.label}</p><strong>{card.value}</strong><small>{card.detail}</small></div><span className="dashboard-reference-spark" /></article>)}</div>
     <div className="dashboard-reference-panels">
-      <article className="dashboard-reference-funnel"><header><span><Rocket /> Funil orbital</span><small>Jornada em andamento</small></header><div className="dashboard-reference-funnel-body"><div className="dashboard-reference-funnel-steps">{funnel.map(([label, value], index) => <div key={label} className={`dashboard-reference-funnel-step step-${index + 1}`}><b>{label}</b><strong>{value}</strong></div>)}</div><div className="dashboard-reference-orbit-rocket"><Rocket /></div></div><footer>Jornada em andamento <span>— dados do período selecionado</span></footer></article>
+      <article className="dashboard-reference-funnel"><header><span><Rocket /> Funil orbital</span><small>Jornada em andamento</small></header><div className="dashboard-reference-funnel-body"><div className="dashboard-reference-funnel-steps">{funnel.map(([label, value], index) => <div key={label} className={`dashboard-reference-funnel-step step-${index + 1}`}><b>{label}</b><strong>{value}</strong></div>)}</div><div className="dashboard-reference-orbit-rocket"><SpaceRocket /></div></div><footer>Jornada em andamento <span>— dados do período selecionado</span></footer></article>
       <article className="dashboard-reference-radar"><header><span><Crosshair /> Radar de anomalias</span><small>Monitoramento</small></header><div className="dashboard-reference-radar-plot"><i /><i /><i /><span /></div><ul><li><b className="negative">!</b><span>CPL e eficiência de mídia</span><em>Verificar</em></li><li><b className="warning">!</b><span>Conversão por etapa</span><em>Acompanhar</em></li><li><b className="positive">i</b><span>Dados sincronizados</span><em>Estável</em></li></ul></article>
     </div>
   </section>;
