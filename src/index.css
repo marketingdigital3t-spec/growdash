@@ -2116,7 +2116,7 @@ html:not(.dark) {
 .space-phase-stars { position: absolute; inset: 0; }
 .space-phase-stars i { position: absolute; left: var(--star-x); top: var(--star-y); width: 2px; height: 2px; border-radius: 50%; background: rgba(255,255,255,.72); opacity: .35; }
 .space-phase-bg[data-phase="galaxia"] .space-phase-stars i { animation: phase-star-pulse 3.8s ease-in-out var(--star-delay) infinite; }
-.space-phase-planet { position: absolute; right: 7vw; bottom: 8vh; width: min(34vw, 420px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #4eb5ff, #2e86de 38%, #1a5276 72%, #09111f 100%); opacity: .22; filter: blur(.2px); box-shadow: 0 0 100px 24px var(--phase-glow); }
+.space-phase-planet { position: absolute; right: 8vw; top: 8vh; width: min(46vw, 620px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 34% 28%, #4eb5ff, #2e86de 38%, #1a5276 72%, #09111f 100%); opacity: .48; filter: blur(.2px); box-shadow: 0 0 100px 24px var(--phase-glow); }
 .space-phase-atmosphere { position: absolute; inset: -12%; border: 2px solid color-mix(in srgb, var(--phase-color) 42%, transparent); border-radius: 50%; box-shadow: 0 0 50px var(--phase-glow), inset 0 0 35px var(--phase-glow); }
 .space-phase-rings { display: none; position: absolute; left: -28%; top: 38%; width: 156%; height: 26%; border: 5px solid color-mix(in srgb, var(--phase-color) 68%, transparent); border-radius: 50%; transform: rotate(-18deg); box-shadow: 0 0 22px var(--phase-glow); }
 .space-phase-bg[data-phase="orbita"] .space-phase-rings, .space-phase-bg[data-phase="galaxia"] .space-phase-rings { display: block; }
@@ -2147,6 +2147,12 @@ html:not(.dark) {
 .brand-shell[data-space-phase] .space-phase-planet { opacity: .48; }
 .brand-shell[data-space-phase="orbita"] .space-phase-planet { opacity: .58; box-shadow: 0 0 125px 32px rgba(255,193,7,.24); }
 .brand-shell[data-space-phase="galaxia"] .space-phase-planet { opacity: .14; }
+.brand-shell[data-space-phase="galaxia"] .space-phase-planet { top: 17vh; right: 5vw; width: min(34vw, 470px); }
+.brand-shell[data-space-phase] .gd-module-section > .dashboard-section-heading,
+.brand-shell[data-space-phase] .dashboard-section-heading { border-color: color-mix(in srgb, var(--brand-gold) 30%, transparent); }
+.brand-shell[data-space-phase] .gd-metric-card { position: relative; overflow: hidden; }
+.brand-shell[data-space-phase] .gd-metric-card::before { position: absolute; inset: 0 0 auto; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-gold) 82%, transparent), transparent); content: ""; opacity: .72; }
+@media (max-width: 800px) { .space-phase-planet { top: auto; right: -12vw; bottom: 10vh; width: 55vw; } .brand-shell[data-space-phase="galaxia"] .space-phase-planet { top: auto; right: -12vw; width: 55vw; } }
 .brand-shell[data-space-phase] .brand-sidebar nav > section > button { color: color-mix(in srgb, var(--brand-gold-light) 82%, white); }
 .brand-shell[data-space-phase] .brand-sidebar nav a[aria-current="page"] { border-color: color-mix(in srgb, var(--brand-gold) 60%, transparent); background: color-mix(in srgb, var(--brand-gold) 17%, transparent); color: var(--brand-gold-light); }
 .brand-shell[data-space-phase] .campaign-total-bar { border-color: color-mix(in srgb, var(--brand-gold) 34%, transparent); }
