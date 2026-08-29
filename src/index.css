@@ -2125,7 +2125,7 @@ html:not(.dark) {
 .space-phase-rocket span { position: absolute; left: 8px; top: 23px; width: 5px; height: 34px; border-radius: 50%; background: linear-gradient(var(--phase-color), transparent); filter: blur(3px); }
 .space-phase-meteors i { position: absolute; width: 90px; height: 1px; background: linear-gradient(90deg, transparent, var(--phase-color), transparent); opacity: 0; transform: rotate(-28deg); animation: phase-meteor 9s linear infinite; }
 .space-phase-meteors i:nth-child(1) { left: 18%; top: 22%; animation-delay: 2s; }.space-phase-meteors i:nth-child(2) { left: 65%; top: 35%; animation-delay: 6s; }.space-phase-meteors i:nth-child(3) { left: 78%; top: 68%; animation-delay: 1s; }.space-phase-meteors i:nth-child(4) { left: 42%; top: 15%; animation-delay: 4s; }
-.space-phase-badge { position: absolute; right: 3vw; top: 62px; display: flex; align-items: center; gap: 9px; color: color-mix(in srgb, var(--phase-color) 78%, white); opacity: .78; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.space-phase-badge { position: absolute; right: 3vw; top: 50px; display: flex; align-items: center; gap: 9px; color: color-mix(in srgb, var(--phase-color) 78%, white); opacity: .9; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .space-phase-badge svg { width: 16px; height: 16px; }.space-phase-badge span { display: grid; gap: 2px; }.space-phase-badge b { font-size: 10px; }.space-phase-badge small { color: rgba(255,255,255,.58); font-size: 8px; letter-spacing: .04em; text-transform: none; }.space-phase-badge em { display: inline-flex; align-items: center; gap: 4px; border: 1px solid color-mix(in srgb, var(--phase-color) 48%, transparent); border-radius: 999px; padding: 4px 7px; font-style: normal; font-weight: 800; }.space-phase-badge em svg { width: 11px; height: 11px; }
 @keyframes phase-star-pulse { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: .9; transform: scale(1.5); } }
 @keyframes phase-meteor { 0% { opacity: 0; transform: translate3d(-30px,-30px,-0px) rotate(-28deg); } 12%,25% { opacity: .8; } 45%,100% { opacity: 0; transform: translate3d(180px,180px,0) rotate(-28deg); } }
@@ -2144,8 +2144,8 @@ html:not(.dark) {
 .brand-shell[data-space-phase] .dashboard-glass-card { background: linear-gradient(145deg, rgba(4,12,22,.84), rgba(3,7,14,.74)); border-color: color-mix(in srgb, var(--brand-gold) 28%, rgba(255,255,255,.14)); box-shadow: 0 18px 52px -38px color-mix(in srgb, var(--brand-gold) 70%, transparent); }
 .brand-shell[data-space-phase="orbita"] .gd-panel, .brand-shell[data-space-phase="orbita"] .gd-metric-card { background: linear-gradient(145deg, rgba(24,17,3,.74), rgba(6,6,5,.82)); }
 .brand-shell[data-space-phase="galaxia"] .gd-panel, .brand-shell[data-space-phase="galaxia"] .gd-metric-card { background: linear-gradient(145deg, rgba(19,7,30,.78), rgba(6,4,12,.84)); }
-.brand-shell[data-space-phase] .space-phase-planet { opacity: .48; }
-.brand-shell[data-space-phase="orbita"] .space-phase-planet { opacity: .58; box-shadow: 0 0 125px 32px rgba(255,193,7,.24); }
+.brand-shell[data-space-phase] .space-phase-planet { opacity: .32; }
+.brand-shell[data-space-phase="orbita"] .space-phase-planet { opacity: .42; box-shadow: 0 0 125px 32px rgba(255,193,7,.24); }
 .brand-shell[data-space-phase="galaxia"] .space-phase-planet { opacity: .14; }
 .brand-shell[data-space-phase="galaxia"] .space-phase-planet { top: 17vh; right: 5vw; width: min(34vw, 470px); }
 .brand-shell[data-space-phase] .gd-module-section > .dashboard-section-heading,
