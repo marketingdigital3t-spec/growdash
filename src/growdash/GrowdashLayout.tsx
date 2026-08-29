@@ -262,7 +262,7 @@ export default function GrowdashLayout() {
 
   return (
     <div className="brand-shell relative min-h-screen max-w-full overflow-x-clip text-foreground transition-colors" data-space-phase={spacePhase}>
-      <SpacePhaseBackground phase={spacePhase} />
+      <SpacePhaseBackground phase={spacePhase} dashboardScene={pathname === "/"} />
       <aside
         className={cn(
           "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
