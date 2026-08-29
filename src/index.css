@@ -2132,6 +2132,25 @@ html:not(.dark) {
 @media (prefers-reduced-motion: reduce) { .space-phase-bg, .space-phase-stars i, .space-phase-meteors i { animation: none !important; transition: none !important; }.space-phase-meteors { display: none; } }
 @media (max-width: 800px) { .space-phase-badge { left: 76px; top: 62px; }.space-phase-planet { right: -12vw; bottom: 10vh; width: 55vw; }.space-phase-rocket { left: 12%; } }
 
+/* Reference composition tuning: the phase owns the shell accent while all
+   existing widgets, data and interaction contracts remain unchanged. */
+.brand-shell[data-space-phase="terra"] { --brand-accent-rgb: 46,134,222; --brand-gold: #2e86de; --brand-gold-light: #63c5ff; --brand-bronze: #1a5276; background: #050505; }
+.brand-shell[data-space-phase="orbita"] { --brand-accent-rgb: 255,193,7; --brand-gold: #ffc107; --brand-gold-light: #ffe082; --brand-bronze: #a66b00; background: #050505; }
+.brand-shell[data-space-phase="galaxia"] { --brand-accent-rgb: 168,85,247; --brand-gold: #a855f7; --brand-gold-light: #d8b4fe; --brand-bronze: #6c3483; background: #050505; }
+.brand-shell[data-space-phase] .brand-sidebar { background: linear-gradient(180deg, rgba(3,7,15,.98), rgba(3,3,8,.98)); border-color: color-mix(in srgb, var(--brand-gold) 28%, rgba(255,255,255,.12)); }
+.brand-shell[data-space-phase] .brand-topbar { background: linear-gradient(90deg, rgba(3,7,15,.96), rgba(5,5,5,.88)); border-color: color-mix(in srgb, var(--brand-gold) 24%, rgba(255,255,255,.12)); }
+.brand-shell[data-space-phase] .gd-panel,
+.brand-shell[data-space-phase] .gd-metric-card,
+.brand-shell[data-space-phase] .dashboard-glass-card { background: linear-gradient(145deg, rgba(4,12,22,.84), rgba(3,7,14,.74)); border-color: color-mix(in srgb, var(--brand-gold) 28%, rgba(255,255,255,.14)); box-shadow: 0 18px 52px -38px color-mix(in srgb, var(--brand-gold) 70%, transparent); }
+.brand-shell[data-space-phase="orbita"] .gd-panel, .brand-shell[data-space-phase="orbita"] .gd-metric-card { background: linear-gradient(145deg, rgba(24,17,3,.74), rgba(6,6,5,.82)); }
+.brand-shell[data-space-phase="galaxia"] .gd-panel, .brand-shell[data-space-phase="galaxia"] .gd-metric-card { background: linear-gradient(145deg, rgba(19,7,30,.78), rgba(6,4,12,.84)); }
+.brand-shell[data-space-phase] .space-phase-planet { opacity: .48; }
+.brand-shell[data-space-phase="orbita"] .space-phase-planet { opacity: .58; box-shadow: 0 0 125px 32px rgba(255,193,7,.24); }
+.brand-shell[data-space-phase="galaxia"] .space-phase-planet { opacity: .14; }
+.brand-shell[data-space-phase] .brand-sidebar nav > section > button { color: color-mix(in srgb, var(--brand-gold-light) 82%, white); }
+.brand-shell[data-space-phase] .brand-sidebar nav a[aria-current="page"] { border-color: color-mix(in srgb, var(--brand-gold) 60%, transparent); background: color-mix(in srgb, var(--brand-gold) 17%, transparent); color: var(--brand-gold-light); }
+.brand-shell[data-space-phase] .campaign-total-bar { border-color: color-mix(in srgb, var(--brand-gold) 34%, transparent); }
+
 /* Growdash neural core v2: a contained, GPU-friendly 3D brain and an
    in-place operational inspector. The legacy jarvis selectors remain for
    backwards compatibility, while this scope removes their expensive filters

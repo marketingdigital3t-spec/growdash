@@ -317,7 +317,7 @@ export default function GrowdashLayout() {
           </div>
         ) : <><TooltipProvider delayDuration={180}>
         <nav className={cn("grow overflow-y-auto px-2 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
-          {visibleSections.map((section) => (
+          {visibleSections.map((section, sectionIndex) => (
             <section key={section.label} className="mb-3">
               {showSidebarLabels && (
                 <button
@@ -326,7 +326,7 @@ export default function GrowdashLayout() {
                   className="mb-2 flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-[.12em] text-white/45 transition hover:bg-white/[.05] hover:text-white/70"
                   aria-expanded={openSections[section.label]}
                 >
-                  <span>{section.label}</span>
+                  <span>{["MISSÃO", "NAVE", "TRIPULAÇÃO", "GESTÃO"][sectionIndex] || section.label}</span>
                   <ChevronDown className={cn("h-3 w-3 transition-transform", !openSections[section.label] && "-rotate-90")} />
                 </button>
               )}
