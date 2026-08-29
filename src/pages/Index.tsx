@@ -28,6 +28,7 @@ import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useToast } from "@/hooks/use-toast";
+import { DashboardReferenceDeck } from "@/components/dashboard/DashboardReferenceDeck";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
@@ -185,6 +186,8 @@ const Index = () => {
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
+  const glassImpressions = dashboardInsights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
+  const glassClicks = dashboardInsights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
 
@@ -376,6 +379,10 @@ const Index = () => {
 
       <div className="mx-3">
         <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
+      </div>
+
+      <div className="mx-3">
+        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} />
       </div>
 
       {(isEditing ? draftView : activeView) && (
