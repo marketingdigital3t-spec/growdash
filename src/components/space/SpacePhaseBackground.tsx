@@ -1,4 +1,4 @@
-import { Globe2, Rocket, Sparkles } from "lucide-react";
+import { Fuel, Globe2, Rocket, Sparkles } from "lucide-react";
 import type { CSSProperties } from "react";
 
 export type SpacePhase = "terra" | "orbita" | "galaxia";
@@ -24,5 +24,16 @@ export function SpacePhaseBackground({ phase }: { phase: SpacePhase }) {
       <div className="space-phase-rocket"><Rocket /><span /></div>
       <div className="space-phase-badge"><Globe2 /><span><b>{copy.title}</b><small>{copy.subtitle}</small></span><em><Sparkles /> FASE: {phase === "orbita" ? "ÓRBITA" : phase.toUpperCase()}</em></div>
     </div>
+  );
+}
+
+export function SpaceMissionStrip({ phase, realized, target }: { phase: SpacePhase; realized: number; target: number }) {
+  const progress = target > 0 ? Math.max(0, Math.min(100, (realized / target) * 100)) : 0;
+  return (
+    <section className="space-mission-strip" data-phase={phase} aria-label="Combustível da Missão">
+      <div className="space-mission-title"><Fuel /><span><b>COMBUSTÍVEL DA MISSÃO</b><small>{realized.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} de {target > 0 ? target.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "meta não definida"}</small></span></div>
+      <div className="space-mission-track"><span style={{ width: `${progress}%` }} /><Rocket className="space-mission-rocket" style={{ left: `${progress}%` }} /></div>
+      <strong>{target > 0 ? `${progress.toFixed(0)}%` : "—"}</strong>
+    </section>
   );
 }

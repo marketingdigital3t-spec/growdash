@@ -40,7 +40,7 @@ import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
-import { SpacePhaseBackground, type SpacePhase } from "@/components/space/SpacePhaseBackground";
+import { SpaceMissionStrip, SpacePhaseBackground, type SpacePhase } from "@/components/space/SpacePhaseBackground";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -478,6 +478,7 @@ export default function GrowdashLayout() {
               : "min-h-[calc(100vh-48px)]",
           )}
         >
+          {(pathname === "/" || pathname === "/painel-expert") && <SpaceMissionStrip phase={spacePhase} realized={goalRevenue} target={goalTarget} />}
           <div
             className={cn(
               "growdash-content-frame mx-auto w-full min-w-0 max-w-[1920px]",
