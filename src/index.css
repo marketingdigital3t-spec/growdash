@@ -4301,6 +4301,14 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
   color: rgba(255,255,255,.62) !important;
 }
 
+/* KPI density: keep the tile proportional to its value on the expert view. */
+.expert-dashboard .gd-metric-card { min-height: 6.15rem !important; }
+.expert-dashboard .gd-metric-card > div { padding: .75rem !important; }
+.expert-dashboard .gd-metric-card > div > div:first-child { gap: .5rem !important; }
+.expert-dashboard .gd-metric-card > div > div:first-child > div:first-child { gap: .25rem !important; }
+.expert-dashboard .gd-metric-card > div > div:first-child > div:last-child { width: 2rem !important; height: 2rem !important; border-radius: .55rem !important; }
+.expert-dashboard .gd-metric-card > div > div:first-child > div:first-child > p:last-child { font-size: 1.35rem !important; line-height: 1.2 !important; }
+
 .dashboard-video-glass,
 .dark .dashboard-video-glass,
 html:not(.dark) .dashboard-video-glass {
