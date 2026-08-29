@@ -2152,7 +2152,7 @@ html:not(.dark) {
 
 /* Reference composition tuning: the phase owns the shell accent while all
    existing widgets, data and interaction contracts remain unchanged. */
-.brand-shell[data-space-phase="terra"] { --brand-accent-rgb: 46,134,222; --brand-gold: #2e86de; --brand-gold-light: #63c5ff; --brand-bronze: #1a5276; background: #050505; }
+.brand-shell[data-space-phase="terra"] { --brand-accent-rgb: 46,134,222; --brand-gold: #2e86de; --brand-gold-light: #63c5ff; --brand-bronze: #1a5276; --primary: 205 80% 55%; --primary-foreground: 210 40% 98%; --ring: 198 92% 60%; --accent: 210 55% 18%; --accent-foreground: 198 92% 82%; --background: 214 42% 7%; --foreground: 210 40% 98%; --card: 213 38% 10%; --card-foreground: 210 40% 98%; --popover: 213 38% 10%; --popover-foreground: 210 40% 98%; --secondary: 213 32% 15%; --secondary-foreground: 210 40% 96%; --muted: 213 30% 14%; --muted-foreground: 210 25% 72%; --border: 210 42% 24%; --input: 210 42% 24%; --chart-1: 198 92% 60%; --chart-2: 205 80% 55%; --chart-3: 214 75% 48%; --chart-4: 190 85% 52%; --chart-5: 220 65% 62%; background: #050505; }
 .brand-shell[data-space-phase="orbita"] { --brand-accent-rgb: 255,193,7; --brand-gold: #ffc107; --brand-gold-light: #ffe082; --brand-bronze: #a66b00; background: #050505; }
 .brand-shell[data-space-phase="galaxia"] { --brand-accent-rgb: 168,85,247; --brand-gold: #a855f7; --brand-gold-light: #d8b4fe; --brand-bronze: #6c3483; background: #050505; }
 .brand-shell[data-space-phase] .brand-sidebar { background: linear-gradient(180deg, rgba(3,7,15,.98), rgba(3,3,8,.98)); border-color: color-mix(in srgb, var(--brand-gold) 28%, rgba(255,255,255,.12)); }
@@ -2180,6 +2180,27 @@ html:not(.dark) {
 .brand-shell[data-space-phase] .brand-sidebar nav > section > button { color: color-mix(in srgb, var(--brand-gold-light) 82%, white); }
 .brand-shell[data-space-phase] .brand-sidebar nav a[aria-current="page"] { border-color: color-mix(in srgb, var(--brand-gold) 60%, transparent); background: color-mix(in srgb, var(--brand-gold) 17%, transparent); color: var(--brand-gold-light); }
 .brand-shell[data-space-phase] .campaign-total-bar { border-color: color-mix(in srgb, var(--brand-gold) 34%, transparent); }
+
+/* Terra dashboard surface: replace neutral black/white blocks with the blue
+   mission palette while preserving semantic status colors (green/red/yellow). */
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-video-glass,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-glass-card,
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-panel,
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-metric-card {
+  border-color: rgba(56,189,248,.28);
+  background: linear-gradient(145deg, rgba(5,24,43,.94), rgba(3,12,25,.9));
+  box-shadow: inset 0 1px rgba(125,211,252,.1), 0 18px 42px -30px rgba(0,134,255,.72);
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-glass-metrics > * {
+  border-color: rgba(56,189,248,.24);
+  background: linear-gradient(145deg, rgba(8,34,58,.9), rgba(4,17,32,.88));
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .text-muted-foreground { color: #8fb8d8; }
+.brand-shell[data-space-phase="terra"] .dashboard-page .text-primary { color: #38bdf8; }
+.brand-shell[data-space-phase="terra"] .dashboard-page .border-border { border-color: rgba(56,189,248,.24); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .bg-card { background-color: rgba(7,27,47,.9); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .bg-background { background-color: rgba(3,15,29,.86); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .hover\:bg-accent:hover { background-color: rgba(56,189,248,.14); }
 
 /* Growdash neural core v2: a contained, GPU-friendly 3D brain and an
    in-place operational inspector. The legacy jarvis selectors remain for
