@@ -40,6 +40,7 @@ import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
+import { SpacePhaseBackground, type SpacePhase } from "@/components/space/SpacePhaseBackground";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -158,6 +159,7 @@ export default function GrowdashLayout() {
   const goalAccountLabel = adAccountId === "all"
     ? `Meta mensal · todas as contas · ${segment === "saas" ? "SaaS" : "Infoproduto"}`
     : `Meta mensal · ${visibleAccounts.find((account) => account.id === adAccountId)?.name || "Conta selecionada"}`;
+  const spacePhase: SpacePhase = goalRevenue >= 500_000 ? "galaxia" : goalRevenue >= 100_000 ? "orbita" : "terra";
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
@@ -259,7 +261,8 @@ export default function GrowdashLayout() {
   }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);
 
   return (
-    <div className="brand-shell min-h-screen max-w-full overflow-x-clip text-foreground transition-colors">
+    <div className="brand-shell relative min-h-screen max-w-full overflow-x-clip text-foreground transition-colors" data-space-phase={spacePhase}>
+      <SpacePhaseBackground phase={spacePhase} />
       <aside
         className={cn(
           "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
