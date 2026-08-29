@@ -107,6 +107,7 @@ function IntegrationsContent() {
   const [params, setParams] = useSearchParams();
   const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
   const [search, setSearch] = useState("");
+  const [accountOrder, setAccountOrder] = useState<"name-asc" | "name-desc" | "status">("name-asc");
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
   const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
   const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
@@ -157,7 +158,11 @@ function IntegrationsContent() {
   // Supabase normally returns arrays for select queries. Normalize at the
   // screen boundary as a final safeguard: a malformed/legacy response must
   // not take the whole integrations route down.
-  const adAccounts = useMemo(() => normalizeAdAccounts(adAccountsData), [adAccountsData]);
+  const rawAdAccounts = useMemo(() => normalizeAdAccounts(adAccountsData), [adAccountsData]);
+  const adAccounts = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return [...rawAdAccounts].filter((account) => !query || `${account.name} ${account.account_id}`.toLocaleLowerCase().includes(query)).sort((a, b) => accountOrder === "name-desc" ? b.name.localeCompare(a.name, "pt-BR") : accountOrder === "status" ? Number(b.connection_status !== "disconnected") - Number(a.connection_status !== "disconnected") || a.name.localeCompare(b.name, "pt-BR") : a.name.localeCompare(b.name, "pt-BR"));
+  }, [accountOrder, rawAdAccounts, search]);
   const rdFunnels = useMemo(
     () => (Array.isArray(rdFunnelsData) ? rdFunnelsData.filter(isPresent) : []),
     [rdFunnelsData],
@@ -248,7 +253,7 @@ function IntegrationsContent() {
 
       <div className="gd-panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
         <div className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar provedor ou recurso" value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Buscar provedor ou recurso…" /></div>
-        <div className="flex gap-3 text-[10px] text-muted-foreground"><StatusDot tone="connected" label={`${adAccounts.length} conta(s) Meta`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /></div>
+        <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><StatusDot tone="connected" label={`${adAccounts.length} conta(s) Meta`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /><label className="flex items-center gap-2">Ordenar<select aria-label="Ordenar contas de anúncio" value={accountOrder} onChange={(event) => setAccountOrder(event.target.value as typeof accountOrder)} className="h-8 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="name-asc">A–Z</option><option value="name-desc">Z–A</option><option value="status">Ativas</option></select></label></div>
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setParams({ tab: value })} className="space-y-4">

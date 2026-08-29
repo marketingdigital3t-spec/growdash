@@ -3868,6 +3868,17 @@ html:not(.dark) .dashboard-widget-shell .rounded-lg.border.bg-card {
 .gd-panel::before { background: linear-gradient(90deg, transparent, rgba(255,255,255,.52), transparent); }
 .gd-panel::after { background: radial-gradient(circle, rgba(255,255,255,.075), transparent 68%); }
 
+/* Cards stay clean and readable; no animated circular hotspot on hover. */
+.gd-panel::after { display: none !important; }
+
+.silver-action {
+  display: inline-flex; height: 2.25rem; align-items: center; justify-content: center; gap: .5rem;
+  border: 1px solid rgba(203, 213, 225, .65); border-radius: .375rem; padding: 0 1rem;
+  background: linear-gradient(135deg, #f8fafc, #cbd5e1 52%, #94a3b8); color: #111827;
+  font-size: 10px; font-weight: 900; transition: filter .2s ease, transform .2s ease;
+}
+.silver-action:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); }
+
 .gd-metric-card,
 .dark .gd-metric-card,
 .dashboard-widget-shell :is(.gd-metric-card, .dashboard-glass-card),
