@@ -2201,6 +2201,27 @@ html:not(.dark) {
 .brand-shell[data-space-phase="terra"] .dashboard-page .bg-card { background-color: rgba(7,27,47,.9); }
 .brand-shell[data-space-phase="terra"] .dashboard-page .bg-background { background-color: rgba(3,15,29,.86); }
 .brand-shell[data-space-phase="terra"] .dashboard-page .hover\:bg-accent:hover { background-color: rgba(56,189,248,.14); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section > .dashboard-financial-overview > *,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section > .dashboard-charts > *,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section > .dashboard-tables > * {
+  border-color: rgba(56,189,248,.25);
+  background: linear-gradient(145deg, rgba(5,24,43,.94), rgba(3,12,25,.9));
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page button[data-state="active"],
+.brand-shell[data-space-phase="terra"] .dashboard-page [role="tab"][aria-selected="true"] {
+  border-color: #38bdf8;
+  background: #38bdf8;
+  color: #04111f;
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page button[class*="variant-outline"],
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-filter-control {
+  border-color: rgba(56,189,248,.38);
+  background-color: rgba(4,18,34,.86);
+  color: #e5f5ff;
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .bg-muted { background-color: rgba(56,189,248,.13); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section-heading h2,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section-heading .dashboard-section-eyebrow { color: #e5f5ff; }
 
 /* Growdash neural core v2: a contained, GPU-friendly 3D brain and an
    in-place operational inspector. The legacy jarvis selectors remain for
