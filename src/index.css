@@ -2125,12 +2125,12 @@ html:not(.dark) {
 .space-phase-rocket span { position: absolute; left: 8px; top: 23px; width: 5px; height: 34px; border-radius: 50%; background: linear-gradient(var(--phase-color), transparent); filter: blur(3px); }
 .space-phase-meteors i { position: absolute; width: 90px; height: 1px; background: linear-gradient(90deg, transparent, var(--phase-color), transparent); opacity: 0; transform: rotate(-28deg); animation: phase-meteor 9s linear infinite; }
 .space-phase-meteors i:nth-child(1) { left: 18%; top: 22%; animation-delay: 2s; }.space-phase-meteors i:nth-child(2) { left: 65%; top: 35%; animation-delay: 6s; }.space-phase-meteors i:nth-child(3) { left: 78%; top: 68%; animation-delay: 1s; }.space-phase-meteors i:nth-child(4) { left: 42%; top: 15%; animation-delay: 4s; }
-.space-phase-badge { position: absolute; left: 250px; top: 76px; display: flex; align-items: center; gap: 9px; color: color-mix(in srgb, var(--phase-color) 78%, white); opacity: .65; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.space-phase-badge { position: absolute; right: 3vw; top: 62px; display: flex; align-items: center; gap: 9px; color: color-mix(in srgb, var(--phase-color) 78%, white); opacity: .78; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .space-phase-badge svg { width: 16px; height: 16px; }.space-phase-badge span { display: grid; gap: 2px; }.space-phase-badge b { font-size: 10px; }.space-phase-badge small { color: rgba(255,255,255,.58); font-size: 8px; letter-spacing: .04em; text-transform: none; }.space-phase-badge em { display: inline-flex; align-items: center; gap: 4px; border: 1px solid color-mix(in srgb, var(--phase-color) 48%, transparent); border-radius: 999px; padding: 4px 7px; font-style: normal; font-weight: 800; }.space-phase-badge em svg { width: 11px; height: 11px; }
 @keyframes phase-star-pulse { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: .9; transform: scale(1.5); } }
 @keyframes phase-meteor { 0% { opacity: 0; transform: translate3d(-30px,-30px,-0px) rotate(-28deg); } 12%,25% { opacity: .8; } 45%,100% { opacity: 0; transform: translate3d(180px,180px,0) rotate(-28deg); } }
 @media (prefers-reduced-motion: reduce) { .space-phase-bg, .space-phase-stars i, .space-phase-meteors i { animation: none !important; transition: none !important; }.space-phase-meteors { display: none; } }
-@media (max-width: 800px) { .space-phase-badge { left: 76px; top: 62px; }.space-phase-planet { right: -12vw; bottom: 10vh; width: 55vw; }.space-phase-rocket { left: 12%; } }
+@media (max-width: 800px) { .space-phase-badge { right: 14px; top: 58px; }.space-phase-badge span { display: none; }.space-phase-planet { right: -12vw; bottom: 10vh; width: 55vw; }.space-phase-rocket { left: 12%; } }
 
 /* Reference composition tuning: the phase owns the shell accent while all
    existing widgets, data and interaction contracts remain unchanged. */
