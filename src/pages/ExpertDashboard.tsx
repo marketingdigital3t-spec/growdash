@@ -22,6 +22,8 @@ const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
 function expertGreeting(name: string) {
   if (!name) return "Painel do Expert";
   const normalized = name.toLocaleLowerCase();
+  if (normalized.includes("jose") || normalized.includes("josé")) return "Bem-vindo Dr. José";
+  if (normalized.includes("ranniely")) return "Bem-vinda Dra. Ranniely";
   const feminine = /ranniely|dra\.?\s/.test(normalized);
   const clean = name.replace(/^\s*(ca\d+\s*[-–]\s*)/i, "").trim();
   return `${feminine ? "Bem-vinda" : "Bem-vindo"} ${clean}`;
