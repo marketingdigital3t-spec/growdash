@@ -768,7 +768,10 @@ html:not(.dark) {
 
   @media (min-width: 1440px) {
     .dashboard-financial-overview {
-      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.45fr) minmax(18rem, .72fr);
+      /* Keep the three financial panels on one visual grid. Previously the
+         KPI column was much narrower than payment/platform panels, making
+         the row look off-balance at desktop widths. */
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .dashboard-financial-overview > :last-child {
@@ -2139,7 +2142,7 @@ html:not(.dark) {
 .space-phase-radar span { position: absolute; inset: 50% 0 0 50%; transform-origin: 0 0; background: linear-gradient(90deg, color-mix(in srgb, var(--phase-color) 55%, transparent), transparent 72%); clip-path: polygon(0 0, 100% 0, 100% 3%, 0 3%); transform: rotate(-28deg); }
 .space-phase-radar i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--phase-color); box-shadow: 0 0 8px var(--phase-color); }.space-phase-radar i:nth-of-type(1) { left: 68%; top: 27%; }.space-phase-radar i:nth-of-type(2) { left: 31%; top: 64%; }.space-phase-radar i:nth-of-type(3) { left: 74%; top: 71%; }
 .space-phase-bg[data-phase="galaxia"] .space-phase-radar, .space-phase-bg[data-phase="galaxia"] .space-phase-orbit-map { opacity: .34; }
-@keyframes phase-rocket-rise { 0%,100% { transform: translateY(0) rotate(-35deg); } 50% { transform: translateY(-10px) rotate(-35deg); } }
+@keyframes phase-rocket-rise { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 .space-phase-rocket { animation: phase-rocket-rise 5s ease-in-out infinite; }
 .space-phase-meteors i { position: absolute; width: 90px; height: 1px; background: linear-gradient(90deg, transparent, var(--phase-color), transparent); opacity: 0; transform: rotate(-28deg); animation: phase-meteor 9s linear infinite; }
 .space-phase-meteors i:nth-child(1) { left: 18%; top: 22%; animation-delay: 2s; }.space-phase-meteors i:nth-child(2) { left: 65%; top: 35%; animation-delay: 6s; }.space-phase-meteors i:nth-child(3) { left: 78%; top: 68%; animation-delay: 1s; }.space-phase-meteors i:nth-child(4) { left: 42%; top: 15%; animation-delay: 4s; }
@@ -2222,6 +2225,162 @@ html:not(.dark) {
 .brand-shell[data-space-phase="terra"] .dashboard-page .bg-muted { background-color: rgba(56,189,248,.13); }
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section-heading h2,
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section-heading .dashboard-section-eyebrow { color: #e5f5ff; }
+
+/* Neutral production palette: the legacy Terra phase must not tint the
+   platform blue. Keep semantic status colors (success/warning/error) intact
+   while mapping its structural accents to black, white and neutral grays. */
+.brand-shell[data-space-phase="terra"] {
+  --brand-accent-rgb: 255,255,255;
+  --brand-gold: #f5f5f5;
+  --brand-gold-light: #ffffff;
+  --brand-bronze: #8a8a8a;
+  --primary: 0 0% 92%;
+  --primary-foreground: 0 0% 8%;
+  --ring: 0 0% 78%;
+  --accent: 0 0% 18%;
+  --accent-foreground: 0 0% 94%;
+  --background: 0 0% 5%;
+  --foreground: 0 0% 96%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 96%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 96%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 94%;
+  --muted: 0 0% 14%;
+  --muted-foreground: 0 0% 68%;
+  --border: 0 0% 27%;
+  --input: 0 0% 27%;
+  --chart-1: 0 0% 92%;
+  --chart-2: 0 0% 72%;
+  --chart-3: 0 0% 54%;
+  --chart-4: 0 0% 38%;
+  --chart-5: 0 0% 82%;
+}
+.space-phase-bg[data-phase="terra"] {
+  --phase-color: #f5f5f5;
+  --phase-glow: rgba(255,255,255,.12);
+  filter: grayscale(1);
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-video-glass,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-glass-card,
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-panel,
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-metric-card,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section > .dashboard-financial-overview > *,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section > .dashboard-charts > *,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section > .dashboard-tables > * {
+  border-color: rgba(255,255,255,.18);
+  background: linear-gradient(145deg, rgba(25,25,25,.96), rgba(10,10,10,.94));
+  box-shadow: inset 0 1px rgba(255,255,255,.08), 0 18px 42px -30px rgba(0,0,0,.9);
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-glass-metrics > * {
+  border-color: rgba(255,255,255,.16);
+  background: linear-gradient(145deg, rgba(30,30,30,.94), rgba(13,13,13,.92));
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .text-muted-foreground { color: rgba(255,255,255,.62); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .text-primary { color: #ffffff; }
+.brand-shell[data-space-phase="terra"] .dashboard-page .border-border { border-color: rgba(255,255,255,.18); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .bg-card { background-color: rgba(20,20,20,.94); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .bg-background { background-color: rgba(7,7,7,.94); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .hover\:bg-accent:hover { background-color: rgba(255,255,255,.1); }
+.brand-shell[data-space-phase="terra"] .dashboard-page button[data-state="active"],
+.brand-shell[data-space-phase="terra"] .dashboard-page [role="tab"][aria-selected="true"] {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #090909;
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page button[class*="variant-outline"],
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-filter-control {
+  border-color: rgba(255,255,255,.28);
+  background-color: rgba(15,15,15,.94);
+  color: #f5f5f5;
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .bg-muted { background-color: rgba(255,255,255,.1); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section-heading h2,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-section-heading .dashboard-section-eyebrow { color: #f5f5f5; }
+
+/* Shared neutral base for every Growdash route. The shell is intentionally
+   monochrome; semantic positive/attention/negative colors remain owned by
+   their status classes and are not overridden here. */
+.brand-shell[data-space-phase] {
+  --brand-accent-rgb: 255,255,255;
+  --brand-gold: #f5f5f5;
+  --brand-gold-light: #ffffff;
+  --brand-bronze: #8a8a8a;
+  --primary: 0 0% 92%;
+  --primary-foreground: 0 0% 8%;
+  --ring: 0 0% 78%;
+  --accent: 0 0% 18%;
+  --accent-foreground: 0 0% 94%;
+  --background: 0 0% 5%;
+  --foreground: 0 0% 96%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 96%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 96%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 94%;
+  --muted: 0 0% 14%;
+  --muted-foreground: 0 0% 68%;
+  --border: 0 0% 27%;
+  --input: 0 0% 27%;
+  --chart-1: 0 0% 92%;
+  --chart-2: 0 0% 72%;
+  --chart-3: 0 0% 54%;
+  --chart-4: 0 0% 38%;
+  --chart-5: 0 0% 82%;
+}
+.brand-shell[data-space-phase] .brand-sidebar {
+  background: linear-gradient(180deg, #101010, #050505);
+  border-color: rgba(255,255,255,.16);
+}
+.brand-shell[data-space-phase] .brand-topbar {
+  background: linear-gradient(90deg, #111111, #080808);
+  border-color: rgba(255,255,255,.16);
+}
+.brand-shell[data-space-phase] .gd-panel,
+.brand-shell[data-space-phase] .gd-metric-card,
+.brand-shell[data-space-phase] .dashboard-glass-card,
+.brand-shell[data-space-phase] .dashboard-video-glass,
+.brand-shell[data-space-phase] .dashboard-glass-metrics > *,
+.brand-shell[data-space-phase] .campaign-total-bar {
+  border-color: rgba(255,255,255,.18);
+  background: linear-gradient(145deg, rgba(25,25,25,.96), rgba(10,10,10,.94));
+  box-shadow: inset 0 1px rgba(255,255,255,.07), 0 18px 42px -30px rgba(0,0,0,.9);
+}
+.brand-shell[data-space-phase] .brand-sidebar nav a[aria-current="page"] {
+  border-color: rgba(255,255,255,.5);
+  background: rgba(255,255,255,.12);
+  color: #ffffff;
+}
+.brand-shell[data-space-phase] .brand-sidebar nav > section > button,
+.brand-shell[data-space-phase] .space-mission-title,
+.brand-shell[data-space-phase] .space-mission-strip > strong,
+.brand-shell[data-space-phase] .space-mission-rocket,
+.brand-shell[data-space-phase] .space-phase-badge { color: #f5f5f5; }
+.brand-shell[data-space-phase] .space-mission-strip {
+  border-color: rgba(255,255,255,.22);
+  background: linear-gradient(105deg, rgba(30,30,30,.96), rgba(9,9,9,.94));
+}
+.brand-shell[data-space-phase] .space-mission-track > span {
+  background: linear-gradient(90deg, #8a8a8a, #ffffff);
+  box-shadow: 0 0 14px rgba(255,255,255,.28);
+}
+.brand-shell[data-space-phase] .space-phase-planet,
+.brand-shell[data-space-phase] .space-phase-stars,
+.brand-shell[data-space-phase] .space-phase-meteors { filter: grayscale(1); }
+.brand-shell[data-space-phase] .space-phase-planet { opacity: .14; }
+.brand-shell[data-space-phase] .text-primary { color: #ffffff; }
+.brand-shell[data-space-phase] .border-primary,
+.brand-shell[data-space-phase] .border-border { border-color: rgba(255,255,255,.2); }
+.brand-shell[data-space-phase] .bg-card { background-color: rgba(20,20,20,.94); }
+.brand-shell[data-space-phase] .bg-muted { background-color: rgba(255,255,255,.1); }
+.brand-shell[data-space-phase] button[data-state="active"],
+.brand-shell[data-space-phase] [role="tab"][aria-selected="true"] {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #090909;
+}
 
 /* Growdash neural core v2: a contained, GPU-friendly 3D brain and an
    in-place operational inspector. The legacy jarvis selectors remain for
@@ -3157,6 +3316,175 @@ html:not(.dark) {
     border-radius: .625rem;
   }
 }
+
+/* Final monochrome contract: only black surfaces and white typography/actions. */
+.brand-shell[data-space-phase],
+.space-phase-bg {
+  --phase-color: #f8fafc;
+  --phase-glow: rgba(255,255,255,.14);
+  --brand-accent-rgb: 255,255,255;
+  --brand-gold: #f8fafc;
+  --brand-gold-light: #ffffff;
+  --brand-bronze: #64748b;
+  --primary: 0 0% 96%;
+  --primary-foreground: 0 0% 7%;
+  --ring: 0 0% 88%;
+  --accent: 0 0% 18%;
+  --accent-foreground: 0 0% 98%;
+  --border: 0 0% 26%;
+  --input: 0 0% 26%;
+}
+.brand-shell[data-space-phase] .gd-panel,
+.brand-shell[data-space-phase] .gd-metric-card,
+.brand-shell[data-space-phase] .dashboard-glass-card,
+.brand-shell[data-space-phase] .dashboard-terra-card {
+  background: #171717 !important;
+  border-color: rgba(255,255,255,.2) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.08), 0 18px 40px -30px rgba(0,0,0,.95) !important;
+  color: #ffffff !important;
+}
+.brand-shell[data-space-phase] :is(.gold-action, .silver-action, .gd-button, button.bg-primary, [class~="bg-primary"], [role="tab"][data-state="active"]) {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #0a0a0a !important;
+  box-shadow: none !important;
+}
+.brand-shell[data-space-phase] :is(.text-primary, [class*="text-primary"], .space-mission-title, .space-mission-strip > strong) { color: #ffffff !important; }
+.brand-shell[data-space-phase] .brand-sidebar,
+.brand-shell[data-space-phase] .brand-topbar { background: #0a0a0a !important; border-color: rgba(255,255,255,.18) !important; }
+.brand-shell[data-space-phase] .space-mission-strip { background: #111111; border-color: rgba(255,255,255,.24); }
+.brand-shell[data-space-phase] .space-mission-track > span { background: #ffffff; box-shadow: none; }
+.brand-shell[data-space-phase] .space-phase-planet { filter: grayscale(1) brightness(.78) contrast(1.1); }
+.traffic-class-alerts { border-color: rgba(255,255,255,.28); background: #171717; box-shadow: none; }
+.traffic-class-alerts > header { border-bottom-color: rgba(255,255,255,.14); }
+.traffic-class-alert-icon { border-color: rgba(255,255,255,.35); color: #ffffff; background: #242424; }
+.traffic-class-alerts header p,
+.traffic-class-alerts header h2,
+.traffic-class-alert-count,
+.traffic-class-alert-main,
+.traffic-class-alert-main strong,
+.traffic-class-alert-copy,
+.traffic-class-alert-copy b,
+.traffic-class-alert-action { color: #ffffff; }
+.traffic-class-alert-count,
+.traffic-class-alert-list article { border-color: rgba(255,255,255,.18); }
+.traffic-class-alert-list article { background: #101010; }
+
+/* Restore the Terra reference treatment requested by the dashboard capture. */
+.brand-shell[data-space-phase="terra"],
+.space-phase-bg[data-phase="terra"] {
+  --phase-color: #2e86de;
+  --phase-glow: rgba(0,212,255,.18);
+  --brand-accent-rgb: 46,134,222;
+  --brand-gold: #2e86de;
+  --brand-gold-light: #63c5ff;
+  --brand-bronze: #1a5276;
+  --primary: 205 80% 55%;
+  --primary-foreground: 210 40% 98%;
+  --ring: 198 92% 60%;
+  --accent: 210 55% 18%;
+  --accent-foreground: 198 92% 82%;
+  --border: 210 42% 24%;
+  --input: 210 42% 24%;
+}
+.brand-shell[data-space-phase="terra"] .brand-sidebar { background: linear-gradient(180deg, rgba(3,7,15,.98), rgba(3,3,8,.98)) !important; border-color: rgba(73,165,255,.28) !important; }
+.brand-shell[data-space-phase="terra"] .brand-topbar { background: linear-gradient(90deg, rgba(3,7,15,.96), rgba(5,5,5,.88)) !important; border-color: rgba(73,165,255,.24) !important; }
+.brand-shell[data-space-phase="terra"] .gd-panel,
+.brand-shell[data-space-phase="terra"] .gd-metric-card,
+.brand-shell[data-space-phase="terra"] .dashboard-glass-card,
+.brand-shell[data-space-phase="terra"] .dashboard-terra-card {
+  background: linear-gradient(145deg, rgba(5,24,48,.92), rgba(3,10,22,.88)) !important;
+  border-color: rgba(53,156,255,.38) !important;
+  box-shadow: inset 0 1px rgba(101,194,255,.12), 0 20px 42px -34px rgba(0,119,255,.72) !important;
+}
+.brand-shell[data-space-phase="terra"] :is(.gold-action, .silver-action, .gd-button, button.bg-primary, [class~="bg-primary"], [role="tab"][data-state="active"]) {
+  color: #07111f !important;
+  border-color: #9edcff !important;
+  background: linear-gradient(135deg, #e8f7ff, #8fd3ff 52%, #3ca7ff) !important;
+  box-shadow: 0 8px 22px -14px rgba(0,149,255,.72) !important;
+}
+.brand-shell[data-space-phase="terra"] :is(.text-primary, [class*="text-primary"], .space-mission-title, .space-mission-strip > strong) { color: #56b7ff !important; }
+.brand-shell[data-space-phase="terra"] .space-mission-strip { border-color: rgba(73,165,255,.38); background: linear-gradient(105deg, rgba(12,53,96,.72), rgba(3,16,33,.78)); }
+.brand-shell[data-space-phase="terra"] .space-mission-track > span { background: linear-gradient(90deg, #176aa3, #63c5ff); box-shadow: 0 0 14px rgba(56,168,255,.55); }
+.brand-shell[data-space-phase="terra"] .space-mission-rocket { color: #dff6ff; filter: drop-shadow(0 0 8px #168dff); }
+.brand-shell[data-space-phase="terra"] .space-phase-planet { filter: brightness(.78) saturate(1.35) contrast(1.14); }
+.brand-shell[data-space-phase="terra"] .space-phase-atmosphere { border-color: rgba(86,205,255,.78); box-shadow: 0 0 22px rgba(83,193,255,.95), 0 0 72px rgba(0,134,255,.54), inset 0 0 24px rgba(78,181,255,.38); }
+.brand-shell[data-space-phase="terra"] .space-phase-rings { border-color: rgba(56,168,255,.55); }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card { background: linear-gradient(145deg, #303030, #262626) !important; border-color: rgba(56,189,248,.68) !important; }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-metric-value { color: #7dd3fc !important; }
+
+/* Neutral legacy mode: remove the space scene and all Terra color accents. */
+.space-phase-bg { display: none !important; }
+.brand-shell[data-space-phase] {
+  --brand-accent-rgb: 255,255,255;
+  --brand-gold: #ffffff;
+  --brand-gold-light: #ffffff;
+  --brand-bronze: #666666;
+  --primary: 0 0% 96%;
+  --primary-foreground: 0 0% 8%;
+  --ring: 0 0% 80%;
+  --accent: 0 0% 18%;
+  --accent-foreground: 0 0% 98%;
+  --border: 0 0% 26%;
+  --input: 0 0% 26%;
+  background: #090909 !important;
+}
+.brand-shell[data-space-phase] .brand-sidebar,
+.brand-shell[data-space-phase] .brand-topbar { background: #0d0d0d !important; border-color: rgba(255,255,255,.16) !important; }
+.brand-shell[data-space-phase] :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card) {
+  background: #171717 !important;
+  border-color: rgba(255,255,255,.18) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.07), 0 18px 40px -30px rgba(0,0,0,.95) !important;
+  color: #ffffff !important;
+}
+.brand-shell[data-space-phase] :is(.gold-action, .silver-action, .gd-button, button.bg-primary, [class~="bg-primary"], [role="tab"][data-state="active"]) {
+  color: #0a0a0a !important;
+  border-color: #ffffff !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+.brand-shell[data-space-phase] :is(.text-primary, [class*="text-primary"], .space-mission-title, .space-mission-strip > strong) { color: #ffffff !important; }
+.brand-shell[data-space-phase] .space-mission-strip { background: #111111 !important; border-color: rgba(255,255,255,.2) !important; }
+.brand-shell[data-space-phase] .space-mission-track > span { background: #ffffff !important; box-shadow: none !important; }
+.brand-shell[data-space-phase] .dashboard-page .dashboard-terra-metric-value { color: #ffffff !important; }
+
+/* Remove the Terra-era presentation layer entirely in legacy mode. */
+.dashboard-reference-deck,
+.space-mission-strip,
+.space-phase-badge { display: none !important; }
+
+/* Eliminate residual blue utility colors from the legacy dashboard surface. */
+.brand-shell .dashboard-page :is(
+  [class*="text-sky"], [class*="text-blue"], [class*="text-cyan"],
+  [class*="text-primary"], [class*="border-sky"], [class*="border-blue"],
+  [class*="border-cyan"], [class*="bg-sky"], [class*="bg-blue"],
+  [class*="bg-cyan"], [class*="bg-primary"]
+) {
+  color: #ffffff !important;
+  border-color: rgba(255,255,255,.28) !important;
+  background-color: transparent !important;
+}
+.brand-shell .dashboard-page :is(button[data-state="active"], [role="tab"][aria-selected="true"], .bg-primary, [class~="bg-primary"]) {
+  color: #0a0a0a !important;
+  border-color: #ffffff !important;
+  background: #ffffff !important;
+}
+.brand-shell .dashboard-page :is(.dashboard-glass-metrics > *, .dashboard-grid-container .gd-metric-card) {
+  border-color: rgba(255,255,255,.2) !important;
+  background: #171717 !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.07), 0 18px 40px -30px rgba(0,0,0,.95) !important;
+}
+
+/* Hard monochrome guard for legacy components that still carry literal color
+   classes (charts, maps, and third-party widgets). */
+.brand-shell { filter: grayscale(1) !important; }
+
+/* High-contrast summary strip: labels and values stay white on black cards. */
+.brand-shell .dashboard-glass-metrics > :is(article, button),
+.brand-shell .dashboard-glass-metrics > :is(article, button) > div { color: #ffffff !important; }
+.brand-shell .dashboard-glass-metrics > :is(article, button) :is(p, span, svg) { color: #ffffff !important; }
+.brand-shell .dashboard-glass-metrics > :is(article, button) { background: #171717 !important; border-color: rgba(255,255,255,.22) !important; }
+.brand-shell { filter: none !important; }
 
 .growdash-flow-control,
 .growdash-flow-danger-control,
@@ -5386,6 +5714,7 @@ html:not(.dark) .growdash-main [data-state="unchecked"] { border-color: #bcc6d1;
 html:not(.dark) .growdash-main [data-state="checked"] { border-color: #17202a; background: #17202a; color: #fff; }
 html:not(.dark) .growdash-main .bg-primary\/5,
 html:not(.dark) .growdash-main .bg-primary\/[\.035] { background-color: #eef1f4 !important; }
+
 html:not(.dark) [data-radix-popper-content-wrapper] [role="option"]:focus,
 html:not(.dark) [data-radix-popper-content-wrapper] [role="menuitem"]:focus { background: #e8edf2 !important; color: #17202a !important; }
 
@@ -5437,7 +5766,7 @@ html:not(.dark) .dashboard-reference-kpi, html:not(.dark) .dashboard-reference-f
 @keyframes dashboard-funnel-pulse { 0%,100% { box-shadow: 0 0 17px rgba(28,149,255,.24), inset 0 0 22px rgba(28,149,255,.1); } 50% { box-shadow: 0 0 28px rgba(28,149,255,.48), inset 0 0 28px rgba(28,149,255,.18); } }
 @keyframes dashboard-radar-sweep { from { transform: rotate(-36deg); } to { transform: rotate(324deg); } }
 @keyframes dashboard-kpi-glow { 0%,100% { opacity: .55; transform: translateX(-5px); } 50% { opacity: 1; transform: translateX(4px); } }
-@keyframes dashboard-mission-rocket { 0%,100% { transform: translate(-50%,-50%) rotate(45deg); } 50% { transform: translate(calc(-50% + 2px),calc(-50% - 3px)) rotate(45deg); } }
+@keyframes dashboard-mission-rocket { 0%,100% { transform: translate(-50%,-50%); } 50% { transform: translate(calc(-50% + 2px),calc(-50% - 3px)); } }
 .space-phase-bg[data-dashboard-scene="true"] .space-phase-planet { animation: dashboard-planet-drift 12s ease-in-out infinite; }
 .space-phase-bg[data-dashboard-scene="true"] .space-phase-stars i { animation: dashboard-star-drift 6s ease-in-out var(--star-delay) infinite; }
 .dashboard-reference-kpi .dashboard-reference-spark { animation: dashboard-kpi-glow 3.8s ease-in-out infinite; }
@@ -5476,11 +5805,28 @@ html:not(.dark) .dashboard-reference-kpi, html:not(.dark) .dashboard-reference-f
    Dashboard cards, so their blue surface cannot fall back to the neutral
    silver/black palette used elsewhere in the application. */
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card {
-  border-color: rgba(56,189,248,.42) !important;
-  background: linear-gradient(145deg, rgba(6,42,76,.96), rgba(3,20,42,.94)) !important;
+  border-color: rgba(56,189,248,.68) !important;
+  background: linear-gradient(145deg, #303030, #262626) !important;
   color: #e5f5ff;
   box-shadow: inset 0 1px rgba(186,230,253,.13), 0 18px 38px -28px rgba(0,149,255,.88) !important;
 }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-video-glass,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-glass-card,
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-panel,
+.brand-shell[data-space-phase="terra"] .dashboard-page .gd-metric-card {
+  border-color: rgba(56,189,248,.38) !important;
+  background: linear-gradient(145deg, #303030, #262626) !important;
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-glass-metrics > :is(article, button) {
+  border-color: rgba(56,189,248,.34) !important;
+  background: #2c2c2c !important;
+}
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card > header,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card h3 { color: #dff6ff; }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .text-muted-foreground { color: #9fd0eb !important; }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .text-foreground,
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .text-card-foreground { color: #e8f7ff !important; }
+.brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .bg-muted { background-color: rgba(56,189,248,.2) !important; }
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .dashboard-terra-metric-value { color: #7dd3fc; }
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .bg-primary\/10,
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .bg-primary\/15 { background-color: rgba(56,189,248,.18) !important; }
@@ -5491,3 +5837,171 @@ html:not(.dark) .dashboard-reference-kpi, html:not(.dark) .dashboard-reference-f
 }
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .recharts-cartesian-grid line { stroke: rgba(125,211,252,.22); }
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card .recharts-text { fill: #9ccdea; }
+.brand-shell[data-space-phase="terra"] .gold-action,
+.brand-shell[data-space-phase="terra"] .silver-action,
+.brand-shell[data-space-phase="terra"] .gd-button {
+  border-color: rgba(56,189,248,.5) !important;
+  background: linear-gradient(135deg, #0d5d91, #0b416d) !important;
+  color: #e8f7ff !important;
+  box-shadow: 0 10px 24px -16px rgba(56,189,248,.85);
+}
+.brand-shell[data-space-phase="terra"] .gold-action:hover,
+.brand-shell[data-space-phase="terra"] .silver-action:hover,
+.brand-shell[data-space-phase="terra"] .gd-button:hover { border-color: #7dd3fc !important; background: linear-gradient(135deg, #1476ad, #0d5687) !important; }
+.traffic-class-alerts { overflow: hidden; border: 1px solid rgba(251,191,36,.48); border-radius: 14px; background: linear-gradient(145deg, rgba(54,38,8,.84), rgba(25,22,7,.9)); box-shadow: 0 18px 42px -30px rgba(245,158,11,.6); }
+.traffic-class-alerts > header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid rgba(251,191,36,.25); }
+.traffic-class-alert-icon { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(251,191,36,.55); border-radius: 10px; color: #fbbf24; background: rgba(251,191,36,.13); }
+.traffic-class-alert-icon svg { width: 18px; height: 18px; }.traffic-class-alerts header p { margin: 0; color: #fbbf24; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }.traffic-class-alerts header h2 { margin: 3px 0 0; color: #fff7d6; font-size: 14px; font-weight: 800; }.traffic-class-alert-count { margin-left: auto; border: 1px solid rgba(251,191,36,.4); border-radius: 999px; padding: 4px 9px; color: #fcd34d; font-size: 10px; font-weight: 800; }
+.traffic-class-alert-list { display: grid; gap: 10px; padding: 12px; }.traffic-class-alert-list article { border: 1px solid rgba(251,191,36,.2); border-radius: 10px; padding: 12px; background: rgba(12,10,4,.3); }.traffic-class-alert-main { display: flex; align-items: center; gap: 9px; color: #fcd34d; }.traffic-class-alert-main svg { width: 17px; height: 17px; }.traffic-class-alert-main strong { display: block; color: #fff7d6; font-size: 13px; }.traffic-class-alert-main span { display: block; margin-top: 2px; color: rgba(255,247,214,.64); font-size: 10px; }.traffic-class-alert-copy { margin: 10px 0; color: rgba(255,247,214,.82); font-size: 11px; line-height: 1.55; }.traffic-class-alert-copy b { color: #fde68a; }.traffic-class-alert-action { display: inline-flex; align-items: center; gap: 6px; color: #fbbf24; font-size: 10px; font-weight: 800; }.traffic-class-alert-action svg { width: 14px; height: 14px; }.traffic-class-alert-action svg:last-child { margin-left: 2px; width: 12px; }
+
+/* Metallic silver identity: phase backgrounds remain decorative, while the
+   application chrome and controls use the original neutral silver system. */
+.brand-shell[data-space-phase] {
+  --brand-accent-rgb: 203, 213, 225;
+  --brand-gold: #cbd5e1;
+  --brand-gold-light: #f8fafc;
+  --brand-bronze: #64748b;
+  --primary: 210 20% 82%;
+  --primary-foreground: 222 47% 11%;
+  --ring: 214 20% 72%;
+  --accent: 215 16% 24%;
+  --accent-foreground: 210 20% 96%;
+  --border: 215 16% 28%;
+  --input: 215 16% 28%;
+  --chart-1: 210 20% 82%;
+  --chart-2: 215 16% 65%;
+  --chart-3: 215 14% 52%;
+  --chart-4: 210 12% 42%;
+  --chart-5: 220 10% 92%;
+}
+.brand-shell[data-space-phase] .brand-sidebar,
+.brand-shell[data-space-phase] .brand-topbar {
+  background: linear-gradient(180deg, rgba(17,18,21,.98), rgba(8,9,11,.98));
+  border-color: rgba(203,213,225,.24);
+}
+.brand-shell[data-space-phase] .brand-topbar { background: linear-gradient(90deg, rgba(17,18,21,.97), rgba(8,9,11,.9)); }
+.brand-shell[data-space-phase] .gd-panel,
+.brand-shell[data-space-phase] .gd-metric-card,
+.brand-shell[data-space-phase] .dashboard-glass-card {
+  background: linear-gradient(145deg, rgba(40,42,46,.86), rgba(19,20,23,.9));
+  border-color: rgba(203,213,225,.28);
+  box-shadow: inset 0 1px rgba(255,255,255,.12), 0 18px 52px -38px rgba(0,0,0,.9);
+}
+.brand-shell[data-space-phase] :is(.gold-action, .silver-action, .gd-button, button.bg-primary, [class~="bg-primary"], [role="tab"][data-state="active"]) {
+  color: #111827 !important;
+  border-color: rgba(248,250,252,.82) !important;
+  background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 52%, #94a3b8 100%) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), 0 8px 22px -14px rgba(0,0,0,.8) !important;
+}
+.brand-shell[data-space-phase] :is(.text-primary, [class*="text-primary"], .space-mission-title, .space-mission-strip > strong) { color: #e2e8f0 !important; }
+.brand-shell[data-space-phase] .space-mission-strip { border-color: rgba(203,213,225,.32); background: linear-gradient(105deg, rgba(203,213,225,.1), rgba(10,11,14,.88)); }
+.brand-shell[data-space-phase] .space-mission-track > span { background: linear-gradient(90deg, #64748b, #f8fafc); box-shadow: 0 0 14px rgba(203,213,225,.42); }
+.brand-shell[data-space-phase] .space-mission-rocket { color: #f8fafc; filter: drop-shadow(0 0 7px rgba(203,213,225,.62)); }
+.brand-shell[data-space-phase] .space-phase-planet { filter: grayscale(.92) brightness(1.08) saturate(.18); }
+.brand-shell[data-space-phase] .space-phase-atmosphere,
+.brand-shell[data-space-phase] .space-phase-rings { border-color: rgba(203,213,225,.5); box-shadow: 0 0 50px rgba(203,213,225,.16), inset 0 0 35px rgba(203,213,225,.12); }
+
+/* Compact KPI hierarchy shared by Dashboard, Expert and Funnel Analysis. */
+.dashboard-page .dashboard-primary-kpis,
+.expert-dashboard section[aria-labelledby="expert-kpis-title"] > .grid { gap: .7rem; }
+.dashboard-page .dashboard-primary-kpis .gd-metric-card,
+.expert-dashboard .gd-metric-card { min-height: 5.7rem !important; }
+.dashboard-page .dashboard-primary-kpis .gd-metric-card > div,
+.expert-dashboard .gd-metric-card > div { padding: .72rem !important; }
+.dashboard-page .dashboard-primary-kpis .dashboard-terra-metric-value,
+.expert-dashboard .gd-metric-card > div > div:first-child > div:first-child > p:last-child { font-size: 1.2rem !important; line-height: 1.15 !important; }
+.dashboard-page .dashboard-primary-kpis .gd-metric-card > div > div:first-child > div:last-child,
+.expert-dashboard .gd-metric-card > div > div:first-child > div:last-child { width: 1.85rem !important; height: 1.85rem !important; }
+.dashboard-page .dashboard-grid-container .gd-metric-card { min-height: 5.5rem; }
+.gd-funnel-kpi-grid { grid-auto-rows: 6.7rem; gap: .65rem; }
+.gd-funnel-kpi-grid .gd-funnel-kpi > div { padding: .72rem !important; }
+.gd-funnel-kpi-grid .gd-funnel-kpi > div > div:last-of-type { font-size: 1.2rem; line-height: 1.15; }
+.gd-funnel-kpi-grid .gd-funnel-kpi > div > div:first-child { margin-bottom: .35rem; }
+.gd-module-section + .gd-module-section { margin-top: .8rem; }
+.dashboard-section-heading { margin-bottom: .55rem; }
+.dashboard-daily-charts { align-items: stretch; }
+.dashboard-daily-charts > .dashboard-terra-card { min-width: 0; height: 100%; }
+.dashboard-daily-charts .recharts-wrapper { max-width: 100%; }
+.gd-aligned-grid { align-items: start; }
+.gd-aligned-grid > * { height: auto; align-self: start; }
+
+/* Campaign manager contrast guard: the legacy palette overrides can otherwise
+   leave table labels and toolbar controls black on the graphite surface. */
+html.dark .brand-shell .campaigns-workspace {
+  color: #f5f5f4;
+}
+html.dark .brand-shell .campaigns-workspace :is(button, [role="tab"], input, select, textarea, label, td, th, span, p) {
+  color: #e5e7eb;
+}
+html.dark .brand-shell .campaigns-workspace :is(button, [role="tab"])[data-state="active"],
+html.dark .brand-shell .campaigns-workspace [role="tab"][aria-selected="true"] {
+  color: #111827 !important;
+}
+html.dark .brand-shell .campaigns-workspace :is(input, select, textarea) {
+  color: #f9fafb;
+  caret-color: #f9fafb;
+}
+html.dark .brand-shell .campaigns-workspace :is(td, th) {
+  color: #d1d5db;
+}
+@media (max-width: 640px) {
+  .dashboard-page .dashboard-primary-kpis,
+  .expert-dashboard section[aria-labelledby="expert-kpis-title"] > .grid { gap: .55rem; }
+  .gd-funnel-kpi-grid { grid-auto-rows: 6.35rem; gap: .5rem; }
+  .gd-funnel-kpi-grid .gd-funnel-kpi > div { padding: .6rem !important; }
+  .gd-funnel-kpi-grid .gd-funnel-kpi > div > div:last-of-type { font-size: 1.05rem; }
+}
+
+/* Final color restoration: never desaturate user avatars or semantic data. */
+.brand-shell,
+.brand-shell img,
+.brand-shell picture,
+.brand-shell video { filter: none !important; }
+
+/* Final monochrome guard: no blue identity color may leak into the
+   authenticated Growdash shell. Semantic green/red states remain untouched. */
+html[data-accent="blue"] .brand-shell,
+html[data-accent="sapphire"] .brand-shell,
+.brand-shell {
+  --primary: 210 20% 82%;
+  --primary-foreground: 222 47% 11%;
+  --ring: 214 20% 72%;
+  --sidebar-primary: 210 20% 82%;
+  --sidebar-icon-active: 210 20% 82%;
+  --sidebar-ring: 214 20% 72%;
+  --brand-accent-rgb: 203, 213, 225;
+}
+.brand-shell :is([class*="text-blue-"], [class*="text-sky-"], [class*="text-cyan-"], [class*="text-indigo-"]) {
+  color: #f8fafc !important;
+}
+.brand-shell :is([class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-cyan-"], [class*="bg-indigo-"]) {
+  background-color: rgba(203,213,225,.12) !important;
+}
+.brand-shell :is([class*="border-blue-"], [class*="border-sky-"], [class*="border-cyan-"], [class*="border-indigo-"]) {
+  border-color: rgba(203,213,225,.38) !important;
+}
+.brand-shell :is(.dashboard-terra-card, .dashboard-glass-card, .gd-panel, .gd-metric-card) {
+  --primary: 210 20% 82%;
+}
+/* Legacy dashboard selectors have higher specificity than utility guards;
+   repeat the neutral rule here so KPI values/icons and their borders cannot
+   remain cyan/blue. */
+.brand-shell .dashboard-page .dashboard-glass-metrics > :is(article, button) {
+  border-color: rgba(203,213,225,.28) !important;
+  background: linear-gradient(135deg, rgba(42,43,46,.95), rgba(20,21,24,.96)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.1), 0 10px 24px -20px rgba(0,0,0,.75) !important;
+}
+.brand-shell .dashboard-page .dashboard-glass-metrics > :is(article, button) :is(p, span, svg) {
+  color: #f8fafc !important;
+}
+.brand-shell .dashboard-page .dashboard-glass-metrics > :is(article, button) :is(.text-muted-foreground) {
+  color: #aeb6c2 !important;
+}
+.brand-shell .dashboard-page .dashboard-grid-container .gd-metric-card {
+  border-color: rgba(203,213,225,.28) !important;
+  background: linear-gradient(145deg, rgba(42,43,46,.95), rgba(20,21,24,.96)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.1), 0 20px 42px -34px rgba(0,0,0,.8) !important;
+}
+.brand-shell .dashboard-page .dashboard-grid-container .gd-metric-card::before {
+  background: linear-gradient(90deg, transparent, rgba(203,213,225,.5), transparent) !important;
+}
