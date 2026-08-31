@@ -135,9 +135,14 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id).in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
       .gte("sale_date", dataStartStr).lte("sale_date", endStr);
     if (salesError) throw salesError;
+    // Pending orders are intentionally excluded from sales KPIs. Counting
+    // them here made the AI report "sales" that had no confirmed revenue and
+    // inflated campaign/month comparisons while ROAS still used confirmed
+    // revenue only.
     const usableSales = (allSales || []).filter((sale) => sale.status === "confirmed" || sale.status === "pending");
-    const currentSales = usableSales.filter((sale) => sale.sale_date >= startStr && sale.sale_date <= endStr);
-    const previousSales = usableSales.filter((sale) => sale.sale_date >= previousStartStr && sale.sale_date <= previousEndStr);
+    const confirmedSales = usableSales.filter((sale) => sale.status === "confirmed");
+    const currentSales = confirmedSales.filter((sale) => sale.sale_date >= startStr && sale.sale_date <= endStr);
+    const previousSales = confirmedSales.filter((sale) => sale.sale_date >= previousStartStr && sale.sale_date <= previousEndStr);
     const currentRevenue = currentSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
     const previousRevenue = previousSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
     const currentMetrics = derived(totals(currentInsights), currentRevenue);
@@ -146,10 +151,10 @@ Deno.serve(async (req) => {
     const twoMonthInsights = allInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= endStr);
     const currentMonthInsights = twoMonthInsights.filter((row) => row.date >= dateString(currentMonthStart) && row.date <= endStr);
     const previousMonthInsights = twoMonthInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= previousMonthEndStr);
-    const currentMonthSales = usableSales.filter((sale) => sale.sale_date >= dateString(currentMonthStart) && sale.sale_date <= endStr);
-    const previousMonthSales = usableSales.filter((sale) => sale.sale_date >= twoMonthStartStr && sale.sale_date <= previousMonthEndStr);
-    const currentMonthRevenue = currentMonthSales.filter((sale) => sale.status === "confirmed").reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
-    const previousMonthRevenue = previousMonthSales.filter((sale) => sale.status === "confirmed").reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
+    const currentMonthSales = confirmedSales.filter((sale) => sale.sale_date >= dateString(currentMonthStart) && sale.sale_date <= endStr);
+    const previousMonthSales = confirmedSales.filter((sale) => sale.sale_date >= twoMonthStartStr && sale.sale_date <= previousMonthEndStr);
+    const currentMonthRevenue = currentMonthSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
+    const previousMonthRevenue = previousMonthSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
     const monthlyComparison = [
       { month: "previous", from: twoMonthStartStr, to: previousMonthEndStr, days: Math.floor((previousMonthEnd.getTime() - previousMonthStart.getTime()) / DAY) + 1, ...derived(totals(previousMonthInsights), previousMonthRevenue), sales: previousMonthSales.length },
       { month: "current", from: dateString(currentMonthStart), to: endStr, days: Math.floor((requestedEnd.getTime() - currentMonthStart.getTime()) / DAY) + 1, ...derived(totals(currentMonthInsights), currentMonthRevenue), sales: currentMonthSales.length },
@@ -170,7 +175,7 @@ Deno.serve(async (req) => {
     const weeklyComparison = Array.from(weeklyMap.values()).sort((a, b) => a.from.localeCompare(b.from)).map((row) => {
       const weekEnd = dateString(new Date(new Date(`${row.from}T12:00:00Z`).getTime() + 6 * DAY));
       const revenue = row.sales.filter((sale) => sale.status === "confirmed").reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
-      return { week: row.from, from: row.from, to: weekEnd > endStr ? endStr : weekEnd, month: row.from >= dateString(currentMonthStart) ? "current" : "previous", ...derived(totals(row.insights), revenue), sales: row.sales.filter((sale) => sale.status === "confirmed").length };
+      return { week: row.from, from: row.from, to: weekEnd > endStr ? endStr : weekEnd, month: row.from >= dateString(currentMonthStart) ? "current" : "previous", ...derived(totals(row.insights), revenue), sales: row.sales.length };
     });
 
     const comparison = Object.fromEntries(["spend", "impressions", "reach", "clicks", "leads", "cpl", "ctr", "cpm", "frequency", "revenue", "roas"].map((key) => {
