@@ -518,10 +518,11 @@ export default function FunnelAnalysis() {
             <HelpBlock help={blockHelp.states}><FunnelStateMap a={periodAnalytics} /></HelpBlock>
           </MotionItem>
 
-          <MotionItem><HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]}><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock></MotionItem>
-
           <MotionItem>
-            <HelpBlock help={blockHelp.attribution}><FunnelSalesAttribution sales={periodFunnelSales} /></HelpBlock>
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]}><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock>
+              <HelpBlock help={blockHelp.attribution}><FunnelSalesAttribution sales={periodFunnelSales} /></HelpBlock>
+            </div>
           </MotionItem>
         </>
       )}
