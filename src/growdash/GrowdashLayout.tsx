@@ -351,7 +351,7 @@ export default function GrowdashLayout() {
                         !showSidebarLabels
                           ? "border border-transparent bg-transparent text-primary shadow-none hover:bg-transparent hover:text-primary"
                           : isActive
-                          ? "border border-primary/30 bg-primary/15 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
+                          ? "border border-white/20 bg-white/[.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
                           : "border border-transparent text-white/68 hover:bg-white/[.07] hover:text-white",
                       )}
                     >
