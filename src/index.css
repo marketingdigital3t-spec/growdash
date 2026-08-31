@@ -5083,6 +5083,17 @@ html[data-accent="monochrome"] .growdash-main :is(.text-muted-foreground, [class
 .dark .gd-funnel-kpi-grid .gd-funnel-kpi { border-left-color: rgba(255,255,255,.28) !important; }
 .dark .gd-funnel-kpi-grid .gd-funnel-kpi :is(.text-yellow-400, .text-sky-400, .text-emerald-400, .text-amber-400, .text-red-400) { color: #fff !important; }
 
+/* Compact funnel KPI rhythm: wrappers must size to their content instead of
+   stretching every card to the tallest row. */
+.gd-funnel-kpi-grid { grid-auto-rows: unset !important; align-items: start !important; gap: 16px !important; }
+.gd-funnel-kpi-grid > * { height: auto !important; min-height: 0 !important; align-self: start !important; }
+.gd-funnel-kpi-grid .gd-funnel-kpi { height: auto !important; min-height: 118px !important; }
+.gd-funnel-kpi-grid .gd-funnel-kpi > [class*="p-"] { min-height: 118px; justify-content: center !important; }
+@media (max-width: 767px) {
+  .gd-funnel-kpi-grid .gd-funnel-kpi,
+  .gd-funnel-kpi-grid .gd-funnel-kpi > [class*="p-"] { min-height: 112px !important; }
+}
+
 html[data-accent="monochrome"] .growdash-main :is(.text-primary, [class*="text-primary"]) { color: #e6eaee !important; }
 html[data-accent="monochrome"] :is(.gd-filter-strip .gd-filter-control, .gd-filter-strip .gd-filter-refresh, .growdash-main input, .growdash-main select, .growdash-main textarea, [role="combobox"]) {
   color: #f2f4f6 !important;
