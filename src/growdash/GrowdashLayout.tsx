@@ -77,7 +77,7 @@ function ContentLoadingFallback() {
     return () => window.clearTimeout(timer);
   }, []);
   return <div className="grid min-h-[42vh] place-items-center rounded-2xl border border-border/70 bg-card/35 p-6 motion-safe:animate-in motion-safe:fade-in" role="status" aria-live="polite">
-    {slow ? <div className="max-w-sm text-center"><p className="font-bold text-foreground">Este módulo demorou mais do que o esperado.</p><p className="mt-2 text-sm text-muted-foreground">A navegação continua disponível. Escolha outra tela ou atualize esta versão manualmente.</p><button type="button" onClick={() => window.location.reload()} className="gd-button mt-4">Atualizar versão</button></div> : <div className="flex items-center gap-3 text-sm font-semibold text-muted-foreground"><span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />Abrindo módulo…</div>}
+    {slow ? <div className="max-w-sm text-center"><p className="font-bold text-foreground">Este módulo demorou mais do que o esperado.</p><p className="mt-2 text-sm text-muted-foreground">A navegação continua disponível. Escolha outra tela ou atualize esta versão manualmente.</p><button type="button" onClick={() => window.location.reload()} className="gd-button mt-4">Atualizar versão</button></div> : <div className="flex items-center gap-3 text-sm font-semibold text-muted-foreground"><span className="gd-loading-spinner h-5 w-5 animate-spin rounded-full border-2" />Abrindo módulo…</div>}
   </div>;
 }
 
