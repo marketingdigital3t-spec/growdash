@@ -1103,19 +1103,19 @@ export default function Campaigns() {
                     <TableBody>
                       <AnimatePresence mode="popLayout">
                         {visibleCampaigns.map((c: any, rowIndex: number) => {
-                          const stickySurface = selectedIds.has(c.id) ? "bg-accent dark:bg-[#201b0d]" : rowIndex % 2 ? "bg-muted dark:bg-[#0c0c0b]" : "bg-card dark:bg-[#070706]";
+                          const stickySurface = selectedIds.has(c.id) ? "bg-muted dark:bg-[#202020]" : rowIndex % 2 ? "bg-muted dark:bg-[#0c0c0b]" : "bg-card dark:bg-[#070706]";
                           return (
                           <motion.tr
                             key={c.id}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className={`group h-11 cursor-pointer border-b border-border transition-colors hover:bg-primary/5 [&>td]:px-3 [&>td]:py-1 dark:border-[#24221c] dark:hover:bg-[#18150c] ${selectedIds.has(c.id) ? "bg-primary/10" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
+                            className={`group h-11 cursor-pointer border-b border-border transition-colors hover:bg-muted/60 [&>td]:px-3 [&>td]:py-1 dark:border-[#242424] dark:hover:bg-[#181818] ${selectedIds.has(c.id) ? "bg-muted/70" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
                             onClick={() => setDetailCampaignId(c.id)}
                           >
-                            <TableCell style={{ ...cellW("check"), left: 0 }} className={cn("sticky z-20 transition-colors group-hover:bg-accent", stickySurface)} onClick={(e) => e.stopPropagation()}>
+                            <TableCell style={{ ...cellW("check"), left: 0 }} className={cn("sticky z-20 transition-colors group-hover:bg-muted", stickySurface)} onClick={(e) => e.stopPropagation()}>
                               <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
                             </TableCell>
-                            <TableCell style={{ ...cellW("delivery"), left: camp.colWidths.check }} className={cn("sticky z-20 transition-colors group-hover:bg-accent", stickySurface)} onClick={(event) => event.stopPropagation()}>
+                            <TableCell style={{ ...cellW("delivery"), left: camp.colWidths.check }} className={cn("sticky z-20 transition-colors group-hover:bg-muted", stickySurface)} onClick={(event) => event.stopPropagation()}>
                               <div className="flex items-center gap-2 text-xs font-semibold">
                                 <button
                                   type="button"
@@ -1135,7 +1135,7 @@ export default function Campaigns() {
                                 </button>
                               </div>
                             </TableCell>
-                            <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] transition-colors group-hover:bg-accent", stickySurface)}>
+                            <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] transition-colors group-hover:bg-muted", stickySurface)}>
                               <span className="block truncate font-medium text-foreground" title={c.name}>{c.name}</span>
                             </TableCell>
                             {showColumn("deliveryStatus") && <TableCell style={cellW("deliveryStatus")} className="text-xs"><span className="inline-flex items-center gap-2"><StatusDot status={c.status} />{getStatusBadge(c.status).label}</span></TableCell>}
