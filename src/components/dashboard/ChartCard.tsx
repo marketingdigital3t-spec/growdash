@@ -32,13 +32,13 @@ export function ChartCard({ title, data, type, dataKey, color = "hsl(var(--prima
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="pb-4">
+      <CardContent className="pb-3">
         {data.length === 0 ? (
-          <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-[180px] items-center justify-center text-sm text-muted-foreground">
             Sem dados para o período
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={180}>
             {type === "line" ? (
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />

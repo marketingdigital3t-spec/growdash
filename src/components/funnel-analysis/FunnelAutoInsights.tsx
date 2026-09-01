@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lightbulb, TrendingUp, MapPin, Clock, AlertTriangle, Trophy } from "lucide-react";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 
-export function FunnelAutoInsights({ a }: { a: FunnelAnalytics }) {
+export function FunnelAutoInsights({ a, compact = false }: { a: FunnelAnalytics; compact?: boolean }) {
   const insights: { icon: any; color: string; text: string }[] = [];
 
   // Melhor origem por conversão (com volume mínimo)
@@ -67,10 +67,10 @@ export function FunnelAutoInsights({ a }: { a: FunnelAnalytics }) {
 
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
-      <CardHeader>
+      <CardHeader className={compact ? "pb-2" : undefined}>
         <CardTitle className="text-base flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-amber-400" />
-          7. Insights automáticos
+          {compact ? "Insights automáticos · Solução" : "7. Insights automáticos"}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">

@@ -36,22 +36,6 @@ export default defineConfig({
         // Content hashes still provide deterministic cache busting.
         entryFileNames: "assets/app-[hash].js",
         chunkFileNames: "assets/chunk-[hash].js",
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-          // Recharts imports many small CommonJS lodash modules. Keeping them in
-          // their own cacheable chunk prevents the charts bundle from crossing
-          // the browser's 500 kB warning threshold without splitting React.
-          if (id.includes("/node_modules/lodash/")) return "vendor-lodash";
-          if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
-          if (id.includes("@supabase")) return "vendor-supabase";
-          if (id.includes("react-grid-layout") || id.includes("react-resizable") || id.includes("react-resizable-panels")) return "vendor-layout";
-          if (id.includes("@radix-ui") || id.includes("lucide-react")) return "vendor-ui";
-          // Let Rollup group the remaining shared dependencies. Forcing React and
-          // every transitive package into separate buckets creates circular chunks
-          // (charts -> React -> shared helpers -> charts) and makes cold starts less
-          // predictable instead of faster.
-          return undefined;
-        },
       },
     },
   },

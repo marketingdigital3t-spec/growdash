@@ -475,7 +475,7 @@ export function TrafficInvestmentPlanner({
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-[#a77a19] bg-[#d0a624]/15 font-black text-primary">
+              <tr className="border-t border-border bg-muted/45 font-black text-foreground">
                 <td className="px-3 py-3">TOTAL</td>
                 <td className="px-3 py-3">{brl.format(totals.monthly)}</td>
                 <td className="px-3 py-3">{brl.format(totalActualSpend)}</td>
@@ -656,17 +656,15 @@ export function TrafficInvestmentPlanner({
           <Summary
             label={spendLoading ? "Investimento sincronizando" : "Investimento realizado"}
             value={brl.format(totalActualSpend)}
-            gold
           />
           <Summary
             label="Disponível para uso"
             value={brl.format(Math.max(totals.monthly - Math.max(totalContributed, totalActualSpend), 0))}
-            gold
           />
           <Summary label="Semanal total" value={brl.format(totals.weekly)} />
           <Summary label="Meta Ads / sem" value={brl.format(totals.meta)} />
           <Summary label="Google Ads / sem" value={brl.format(totals.google)} />
-          <Summary label="Leads/mês projetados" value={String(Math.round(totals.leads))} gold />
+          <Summary label="Leads/mês projetados" value={String(Math.round(totals.leads))} />
           <Summary label="Leads/dia (média)" value={(totals.leads / 28).toFixed(1)} />
         </div>
         <p className="mt-4 text-[10px] text-muted-foreground">
@@ -784,17 +782,15 @@ function Summary({
   label,
   value,
   good,
-  gold,
 }: {
   label: string;
   value: string;
   good?: boolean;
-  gold?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-border bg-background p-4">
       <span className="text-[9px] font-black uppercase text-muted-foreground">{label}</span>
-      <b className={`mt-2 block text-lg ${good ? "text-emerald-500" : gold ? "text-primary" : ""}`}>
+      <b className={`mt-2 block text-lg ${good ? "text-emerald-500" : ""}`}>
         {value}
       </b>
     </div>

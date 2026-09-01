@@ -44,4 +44,16 @@ describe("canonical funnel revenue", () => {
     const sales = [makeSale(), makeSale({ id: "pending", status: "pending" }), makeSale({ id: "other", rd_funnel_id: "funnel-2" })];
     expect(filterCanonicalFunnelSales(sales, { funnelId: "funnel-1" })).toHaveLength(1);
   });
+
+  it("usa o negócio RD como fallback quando a venda ainda não tem rd_funnel_id", () => {
+    const sale = makeSale({ rd_funnel_id: null });
+    expect(filterCanonicalFunnelSales([sale], {
+      funnelId: "funnel-1",
+      scopedDealIds: new Set(["deal-1"]),
+    })).toHaveLength(1);
+    expect(filterCanonicalFunnelSales([sale], {
+      funnelId: "funnel-1",
+      scopedDealIds: new Set(["other-deal"]),
+    })).toHaveLength(0);
+  });
 });

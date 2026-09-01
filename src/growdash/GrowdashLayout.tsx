@@ -108,7 +108,10 @@ export default function GrowdashLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarState);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(getInitialSectionState);
-  const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  // `navigator.onLine` can be false briefly (or be inaccurate) while Chrome is
+  // still connected. Start optimistic and only show the warning after the
+  // browser emits a real offline transition.
+  const [isOnline, setIsOnline] = useState(true);
   const [loadBackgroundData, setLoadBackgroundData] = useState(false);
   const { editor } = useDashboardEditor();
   const { pathname, search } = useLocation();
@@ -184,6 +187,7 @@ export default function GrowdashLayout() {
       // Navigation keeps its normal resilient retry path if a preload fails.
     });
   }, []);
+
   const permittedPath = (path: string) => {
     const pathnameOnly = path.split("?")[0];
     const guarded: Record<string, boolean> = {
@@ -218,6 +222,36 @@ export default function GrowdashLayout() {
   const visibleSections = NAV_SECTIONS
     .map((section) => ({ ...section, items: section.items.filter((item) => permittedPath(item.path)) }))
     .filter((section) => section.items.length > 0);
+
+  // Baixa os chunks das telas visíveis quando o shell já está interativo.
+  // Antes disso o preload dependia exclusivamente de hover/foco, deixando o
+  // primeiro clique em algumas abas sujeito a uma tela de carregamento fria.
+  // A fila é sequencial para não disputar banda com a sessão e os dados da
+  // tela atual; falhas continuam sendo tratadas pelo lazyWithRetry na rota.
+  useEffect(() => {
+    if (permissions.loading || visibleSections.length === 0) return;
+    const paths = visibleSections.flatMap((section) => section.items.map((item) => item.path));
+    const idleWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    let cancelled = false;
+    const preloadAll = async () => {
+      for (const path of paths) {
+        if (cancelled) return;
+        preloadRoute(path);
+        // Yield between chunks so opening the current module remains fast.
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 60));
+      }
+    };
+    const idleHandle = idleWindow.requestIdleCallback?.(() => void preloadAll(), { timeout: 2_000 });
+    const timeoutHandle = idleHandle === undefined ? window.setTimeout(() => void preloadAll(), 1_200) : undefined;
+    return () => {
+      cancelled = true;
+      if (idleHandle !== undefined) idleWindow.cancelIdleCallback?.(idleHandle);
+      if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
+    };
+  }, [permissions.loading, preloadRoute, visibleSections]);
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {
@@ -316,9 +350,9 @@ export default function GrowdashLayout() {
             </div>
           </div>
         ) : <><TooltipProvider delayDuration={180}>
-        <nav className={cn("grow overflow-y-auto px-2 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
+        <nav className={cn("grow overflow-y-auto px-3 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
           {visibleSections.map((section, sectionIndex) => (
-            <section key={section.label} className="mb-3">
+            <section key={section.label} className="mb-4">
               {showSidebarLabels && (
                 <button
                   type="button"
@@ -348,14 +382,15 @@ export default function GrowdashLayout() {
                       aria-label={item.label}
                       onPointerEnter={() => preloadRoute(item.path)}
                       onFocus={() => preloadRoute(item.path)}
+                      onPointerDown={() => preloadRoute(item.path)}
                       className={cn(
-                        "group flex h-9 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
+                        "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
                         showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
                         !showSidebarLabels
-                          ? "border border-transparent bg-transparent text-primary shadow-none hover:bg-transparent hover:text-primary"
+                          ? "bg-transparent text-white/75 shadow-none hover:bg-white/[.06] hover:text-white"
                           : isActive
-                          ? "border border-primary/30 bg-primary/15 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
-                          : "border border-transparent text-white/68 hover:bg-white/[.07] hover:text-white",
+                          ? "bg-white/[.10] text-white shadow-none"
+                          : "text-white/68 hover:bg-white/[.07] hover:text-white",
                       )}
                     >
                       <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />

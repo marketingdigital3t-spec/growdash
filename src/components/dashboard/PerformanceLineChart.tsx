@@ -17,7 +17,7 @@ interface PerformanceLineChartProps {
 }
 
 const METRICS = [
-  { key: "cpl", label: "CPL", color: "#38bdf8", yAxisId: "left", prefix: "R$ " },
+  { key: "cpl", label: "CPL", color: "#ef4444", yAxisId: "left", prefix: "R$ " },
   { key: "spend", label: "Investimento", color: "#facc15", yAxisId: "left", prefix: "R$ " },
   { key: "leads", label: "Leads", color: "#22c55e", yAxisId: "right", prefix: "" },
 ] as const;
@@ -64,7 +64,7 @@ export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px]">
+        <div className="h-[260px] sm:h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />

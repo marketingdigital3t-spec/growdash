@@ -29,6 +29,8 @@ import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardReferenceDeck } from "@/components/dashboard/DashboardReferenceDeck";
+import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
+import { useEventClasses } from "@/hooks/useEventClasses";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
@@ -108,6 +110,7 @@ const Index = () => {
   });
   const { data: rdFunnels = [] } = useRDFunnels();
   const { data: alerts = [] } = useAlerts();
+  const { data: eventClasses = [] } = useEventClasses();
   const syncMeta = useSyncMeta();
 
   const { data: activeView } = useGlobalView();
@@ -383,6 +386,10 @@ const Index = () => {
 
       <div className="mx-3">
         <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} />
+      </div>
+
+      <div className="mx-3">
+        <TrafficClassAlerts classes={eventClasses} insights={dashboardInsights} />
       </div>
 
       {(isEditing ? draftView : activeView) && (

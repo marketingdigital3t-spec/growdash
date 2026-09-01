@@ -25,6 +25,7 @@ export function PageHeading({ eyebrow, title, description, actions }: { eyebrow?
 
 export function MetricCard({ label, value, change, emphasis }: { label: string; value: string; change: string; emphasis?: boolean }) {
   const negative = change.startsWith("-") || change === "revisar" || change === "agora";
+  const tone = metricTone(label, value);
   return (
     <div className={cn("gd-panel gd-metric-card min-w-0 cursor-default overflow-hidden p-4", emphasis && "border-primary/60 bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/15 dark:to-primary/5")} title={metricDescription(label)} aria-label={`${label}. ${metricDescription(label)}`}>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
@@ -34,9 +35,19 @@ export function MetricCard({ label, value, change, emphasis }: { label: string; 
           {change}
         </span>
       </div>
-      <div className="mt-3 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,2vw,1.375rem)] font-black tracking-tight text-[#211e1a] dark:text-[#f4f1e9]" title={value}>{value}</div>
+      <div className={cn("mt-3 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.05rem,2vw,1.375rem)] font-black tracking-tight", tone === "positive" ? "text-emerald-400" : tone === "negative" ? "text-rose-400" : "text-[#211e1a] dark:text-[#f4f1e9]")} title={value}>{value}</div>
     </div>
   );
+}
+
+function metricTone(label: string, value: string): "positive" | "negative" | "neutral" {
+  const normalized = label.toLocaleLowerCase();
+  const numeric = Number(value.replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", "."));
+  if (!Number.isFinite(numeric)) return "neutral";
+  if (numeric < 0) return "negative";
+  if (/sa[ií]das?|despesas?|investimento|tr[aá]fego pago|a pagar/.test(normalized)) return "negative";
+  if (/receita|entrada|fluxo l[ií]quido|saldo|lucro|margem|roas|a receber|resultado/.test(normalized)) return numeric > 0 ? "positive" : "neutral";
+  return "neutral";
 }
 
 export function MiniBars({ values = [45, 68, 52, 86, 64, 92, 78, 100, 84, 96] }: { values?: number[] }) {

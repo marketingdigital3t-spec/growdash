@@ -1,6 +1,5 @@
 import {
   Activity,
-  AlertTriangle,
   BarChart3,
   BadgeDollarSign,
   Building2,
@@ -111,19 +110,6 @@ export const NAV_SECTIONS: NavSection[] = [
           { label: "Vendas", value: "42", change: "+11%" },
         ],
         highlights: ["Conversão por etapa", "Principais pontos de abandono", "Canais que mais convertem"],
-      },
-      {
-        label: "Alertas",
-        path: "/alertas",
-        icon: AlertTriangle,
-        description: "Centralize desvios de performance e eventos críticos da operação.",
-        metrics: [
-          { label: "Críticos", value: "1", change: "agora" },
-          { label: "Atenção", value: "4", change: "+2" },
-          { label: "Resolvidos", value: "19", change: "+7" },
-          { label: "Tempo médio", value: "2h 14m", change: "-18%" },
-        ],
-        highlights: ["Campanhas fora da meta", "Integrações sem sincronizar", "Queda de conversão"],
       },
       {
         label: "Automações",

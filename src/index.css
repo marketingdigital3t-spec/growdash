@@ -5690,10 +5690,13 @@ html:not(.dark) .campaign-result-tooltip .text-muted-foreground,
 html:not(.dark) .campaign-result-tooltip [class*="text-muted-foreground"] { color: #536170 !important; }
 html:not(.dark) .campaign-result-tooltip .text-primary { color: #8a560b !important; }
 
-/* Calendar days stay plain until a real date/range selection exists. */
-.rdp-day:not([aria-selected="true"]) { background: transparent !important; color: hsl(var(--foreground)); }
-.rdp-day:not([aria-selected="true"]):hover { background: hsl(var(--accent)) !important; color: hsl(var(--accent-foreground)); }
-.rdp-day[aria-selected="true"] { border-radius: .45rem; }
+/* Meta Ads-style calendar: normal days are plain; only the chosen date or
+   selected interval receives a surface. */
+.rdp-day:not([aria-selected="true"]) { background: transparent !important; color: hsl(var(--foreground)); box-shadow: none !important; outline: 0 !important; }
+.rdp-day:not([aria-selected="true"]):hover { background: hsl(var(--muted)) !important; color: hsl(var(--foreground)); }
+.rdp-day_range_middle[aria-selected="true"] { border-radius: 0 !important; background: rgba(255,255,255,.1) !important; color: hsl(var(--foreground)) !important; }
+.rdp-day_range_start[aria-selected="true"], .rdp-day_range_end[aria-selected="true"], .rdp-day_selected[aria-selected="true"] { border-radius: 999px !important; background: #f8fafc !important; color: #111827 !important; }
+.rdp-button:focus-visible { outline: 2px solid rgba(255,255,255,.65) !important; outline-offset: 2px; }
 
 /* Shared controls: an unchecked control is neutral; selection is the only
    moment it receives the high-contrast foreground treatment. */
@@ -5919,11 +5922,19 @@ html:not(.dark) .dashboard-reference-kpi, html:not(.dark) .dashboard-reference-f
 .gd-funnel-kpi-grid .gd-funnel-kpi > div > div:first-child { margin-bottom: .35rem; }
 .gd-module-section + .gd-module-section { margin-top: .8rem; }
 .dashboard-section-heading { margin-bottom: .55rem; }
-.dashboard-daily-charts { align-items: stretch; }
-.dashboard-daily-charts > .dashboard-terra-card { min-width: 0; height: 100%; }
+.dashboard-daily-charts { align-items: stretch; column-gap: 1rem; row-gap: 1rem; }
+.dashboard-daily-charts > * { min-width: 0; height: 100%; }
+.dashboard-daily-charts > * > .dashboard-terra-card { min-width: 0; height: 100%; }
 .dashboard-daily-charts .recharts-wrapper { max-width: 100%; }
 .gd-aligned-grid { align-items: start; }
 .gd-aligned-grid > * { height: auto; align-self: start; }
+
+/* Compact funnel metric blocks: the card footprint follows the content so
+   labels and values stay proportional instead of leaving a tall empty area. */
+.gd-funnel-media-kpi { min-height: 6.5rem !important; padding: .75rem !important; }
+.gd-funnel-kpi-grid { grid-auto-rows: 6.25rem; gap: .75rem; }
+.gd-funnel-kpi-grid .gd-funnel-kpi > div { padding: .65rem !important; }
+.gd-funnel-kpi-grid .gd-funnel-kpi > div > div:last-of-type { font-size: 1.1rem; line-height: 1.15; }
 
 /* Campaign manager contrast guard: the legacy palette overrides can otherwise
    leave table labels and toolbar controls black on the graphite surface. */
@@ -6004,4 +6015,198 @@ html[data-accent="sapphire"] .brand-shell,
 }
 .brand-shell .dashboard-page .dashboard-grid-container .gd-metric-card::before {
   background: linear-gradient(90deg, transparent, rgba(203,213,225,.5), transparent) !important;
+}
+
+/* Sidebar navigation uses text and spacing as hierarchy; individual links do
+   not carry boxed borders. The active state is communicated by a soft fill. */
+.brand-shell .brand-sidebar nav a,
+.brand-shell .brand-sidebar nav a[aria-current="page"] {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.brand-shell .brand-sidebar nav a[aria-current="page"] {
+  background: rgba(255,255,255,.10) !important;
+  color: #f8fafc !important;
+}
+
+/* Final sidebar neutralization: remove the residual blue inset/edge applied
+   by the legacy dark-mode rule and keep the active item monochrome. */
+.brand-shell .brand-sidebar {
+  background: #0d0d0d !important;
+  border-right-color: rgba(255,255,255,.16) !important;
+  box-shadow: 16px 0 54px rgba(0,0,0,.3) !important;
+}
+.brand-shell .brand-sidebar nav a[aria-current="page"] {
+  background: rgba(255,255,255,.12) !important;
+  border-color: transparent !important;
+}
+
+/* Last-resort monochrome guard for legacy Terra utility classes that appear
+   on dashboard KPIs, tabs and controls with higher specificity. */
+.brand-shell .dashboard-page :is([class*="text-sky-"], [class*="text-blue-"], [class*="text-cyan-"], [class*="text-indigo-"]) {
+  color: #f8fafc !important;
+}
+.brand-shell .dashboard-page :is([class*="bg-sky-"], [class*="bg-blue-"], [class*="bg-cyan-"], [class*="bg-indigo-"]) {
+  background-color: rgba(255,255,255,.12) !important;
+}
+.brand-shell .dashboard-page :is([class*="border-sky-"], [class*="border-blue-"], [class*="border-cyan-"], [class*="border-indigo-"]) {
+  border-color: rgba(255,255,255,.25) !important;
+}
+.brand-shell .dashboard-page :is(.dashboard-terra-card, .dashboard-glass-card, .gd-panel, .gd-metric-card) {
+  background: #171717 !important;
+  border-color: rgba(255,255,255,.18) !important;
+}
+.brand-shell .dashboard-page :is(button, [role="tab"])[data-state="active"] {
+  background: #f8fafc !important;
+  border-color: #f8fafc !important;
+  color: #111111 !important;
+}
+
+/* Neutralize semantic primary utilities in every dashboard widget. */
+.brand-shell .dashboard-page :is([class*="text-primary"], [class~="text-primary"]) {
+  color: #f8fafc !important;
+}
+.brand-shell .dashboard-page :is([class*="border-primary"]) {
+  border-color: rgba(255,255,255,.25) !important;
+}
+.brand-shell .dashboard-page :is([class*="bg-primary"]) {
+  background-color: rgba(255,255,255,.12) !important;
+}
+.brand-shell .dashboard-page :is([class*="from-blue-"], [class*="to-blue-"], [class*="from-violet-"], [class*="to-violet-"], [class*="from-cyan-"], [class*="to-cyan-"], [class*="from-pink-"], [class*="to-pink-"]) {
+  --tw-gradient-from: rgba(255,255,255,.16) !important;
+  --tw-gradient-to: rgba(255,255,255,.04) !important;
+}
+
+/* Override phase-specific !important rules left by the former Terra theme. */
+.brand-shell[data-space-phase] .brand-sidebar {
+  background: #0d0d0d !important;
+  border-color: rgba(255,255,255,.16) !important;
+  box-shadow: 16px 0 54px rgba(0,0,0,.3) !important;
+}
+.brand-shell[data-space-phase] .dashboard-page :is(.dashboard-terra-card, .dashboard-glass-card, .gd-panel, .gd-metric-card) {
+  background: #171717 !important;
+  border-color: rgba(255,255,255,.18) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.07), 0 18px 40px -30px rgba(0,0,0,.95) !important;
+}
+.brand-shell[data-space-phase] .dashboard-page .dashboard-terra-card .dashboard-terra-metric-value,
+.brand-shell[data-space-phase] .dashboard-page .dashboard-terra-card :is(h3, .text-foreground, .text-card-foreground) {
+  color: #ffffff !important;
+}
+.brand-shell[data-space-phase] .dashboard-page .dashboard-terra-card .text-muted-foreground {
+  color: #b9c0c8 !important;
+}
+
+/* Global layout rhythm: every primary page uses the same breathing room
+   between blocks while nested controls keep their own spacing rules. */
+:root {
+  --gd-layout-gap: 1rem;
+  --gd-layout-gutter: clamp(.9rem, 1.2vw, 1.35rem);
+}
+.growdash-main {
+  padding-left: var(--gd-layout-gutter) !important;
+  padding-right: var(--gd-layout-gutter) !important;
+}
+.growdash-main .gd-module-shell > * + *,
+.growdash-main .dashboard-page > * + *,
+.growdash-main .expert-dashboard > * + *,
+.growdash-main .analytics-module > * + * {
+  margin-top: var(--gd-layout-gap) !important;
+}
+.growdash-main .gd-module-shell > .grid,
+.growdash-main .dashboard-page > .grid,
+.growdash-main .expert-dashboard > .grid,
+.growdash-main .analytics-module > .grid {
+  column-gap: var(--gd-layout-gap) !important;
+  row-gap: var(--gd-layout-gap) !important;
+}
+
+/* Unified visual system (final layer). The legacy Terra selectors above are
+   intentionally left intact for backwards compatibility; this layer owns the
+   rendered appearance for both themes and keeps layout rhythm deterministic. */
+:root {
+  --gd-space-card: 16px;
+  --gd-space-section: 24px;
+  --gd-page-gutter: clamp(16px, 2vw, 32px);
+  --gd-card-padding: clamp(14px, 1.25vw, 20px);
+  --gd-card-radius: 14px;
+  --gd-kpi-height: 112px;
+  --gd-ink: #171717;
+  --gd-ink-muted: #666;
+  --gd-surface: #fff;
+  --gd-surface-raised: #f3f3f3;
+  --gd-line: #d6d6d6;
+  --gd-positive: #1f9d55;
+  --gd-negative: #d64545;
+  --gd-warning: #c58a00;
+}
+.dark {
+  --gd-ink: #f5f5f5;
+  --gd-ink-muted: #a6a6a6;
+  --gd-surface: #171717;
+  --gd-surface-raised: #202020;
+  --gd-line: #3a3a3a;
+}
+
+/* All primary modules share the same outer gutter, section rhythm and grid
+   gap. This also neutralizes Tailwind space-y/grid defaults that previously
+   produced glued cards or oversized empty rows. */
+.growdash-main {
+  padding-inline: var(--gd-page-gutter) !important;
+}
+.growdash-main :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) {
+  width: 100%;
+  max-width: none;
+}
+.growdash-main :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) > * + * {
+  margin-top: var(--gd-space-section) !important;
+}
+.growdash-main :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) :is(.grid, .dashboard-grid-container, .dashboard-kpi-grid, .gd-kpi-grid) {
+  gap: var(--gd-space-card) !important;
+}
+
+/* Cards and KPIs: proportional sizing, compact hierarchy, no decorative blue
+   or phase-specific gradients. */
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *) {
+  border: 1px solid var(--gd-line) !important;
+  border-radius: var(--gd-card-radius) !important;
+  background: var(--gd-surface) !important;
+  color: var(--gd-ink) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.06) !important;
+}
+.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *) {
+  background: var(--gd-surface) !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,.28) !important;
+}
+.brand-shell .gd-metric-card {
+  min-height: var(--gd-kpi-height) !important;
+}
+.brand-shell .gd-metric-card .gd-metric-icon,
+.brand-shell .gd-glass-metric-icon {
+  border: 1px solid var(--gd-line) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-ink) !important;
+  box-shadow: none !important;
+}
+.brand-shell .gd-metric-card :is(.text-muted-foreground, p:first-child) { color: var(--gd-ink-muted) !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-ink) !important; font-size: clamp(1.25rem, 1.8vw, 1.65rem) !important; line-height: 1.15 !important; }
+.brand-shell .gd-metric-card .text-emerald-500,
+.brand-shell .gd-metric-card .text-emerald-400,
+.brand-shell .gd-metric-card .text-emerald-600 { color: var(--gd-positive) !important; }
+.brand-shell .gd-metric-card .text-red-500,
+.brand-shell .gd-metric-card .text-red-400 { color: var(--gd-negative) !important; }
+
+/* Neutralize structural blue/purple/pink/cyan utilities while retaining the
+   semantic green/red/yellow classes used for KPI states. */
+.brand-shell :is([class*="text-blue-"], [class*="text-sky-"], [class*="text-cyan-"], [class*="text-indigo-"], [class*="text-violet-"], [class*="text-purple-"], [class*="text-pink-"]) { color: var(--gd-ink) !important; }
+.brand-shell :is([class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-cyan-"], [class*="bg-indigo-"], [class*="bg-violet-"], [class*="bg-purple-"], [class*="bg-pink-"]) { background-color: var(--gd-surface-raised) !important; }
+.brand-shell :is([class*="border-blue-"], [class*="border-sky-"], [class*="border-cyan-"], [class*="border-indigo-"], [class*="border-violet-"], [class*="border-purple-"], [class*="border-pink-"]) { border-color: var(--gd-line) !important; }
+.brand-shell :is([class*="from-blue-"], [class*="to-blue-"], [class*="from-sky-"], [class*="to-sky-"], [class*="from-cyan-"], [class*="to-cyan-"], [class*="from-violet-"], [class*="to-violet-"], [class*="from-purple-"], [class*="to-purple-"], [class*="from-pink-"], [class*="to-pink-"]) { --tw-gradient-from: var(--gd-surface-raised) !important; --tw-gradient-to: var(--gd-surface) !important; }
+
+/* Sidebar is text-first: no individual boxed borders. */
+.brand-shell .brand-sidebar nav a { border: 0 !important; box-shadow: none !important; }
+.brand-shell .brand-sidebar nav a[aria-current="page"] { background: var(--gd-surface-raised) !important; color: var(--gd-ink) !important; }
+
+@media (max-width: 767px) {
+  :root { --gd-page-gutter: 12px; --gd-space-section: 20px; }
+  .brand-shell .gd-metric-card { min-height: 96px !important; }
 }

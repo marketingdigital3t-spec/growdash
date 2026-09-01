@@ -19,6 +19,7 @@ const SUGGESTIONS = [
 ];
 
 export function AskAICard() {
+  const unavailable = true;
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,6 +106,7 @@ export function AskAICard() {
           <CardTitle className="text-base flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" /> Pergunte à IA
           </CardTitle>
+          {unavailable && <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Indisponível no momento</span>}
           {messages.length > 0 && (
             <Button variant="ghost" size="sm" onClick={() => setMessages([])} className="text-xs h-7">
               <Trash2 className="h-3 w-3 mr-1" /> Limpar
@@ -113,6 +115,8 @@ export function AskAICard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {unavailable && <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground" role="status">Este recurso está indisponível no momento. A consulta inteligente será liberada em uma próxima atualização.</div>}
+        {!unavailable && <>
         <div className="flex gap-2">
           <Input
             value={question}
@@ -139,6 +143,7 @@ export function AskAICard() {
             ))}
           </div>
         )}
+        </>}
 
         <AnimatePresence initial={false}>
           {messages.length > 0 && (

@@ -41,6 +41,9 @@ function periodOfHour(hour: number): "Manhã" | "Tarde" | "Noite" | "Madrugada" 
 export interface FunnelSaleFilters {
   funnelId?: string;
   funnelIds?: string[];
+  /** IDs de negócios RD já limitados ao funil ativo. Usado como fallback
+   * seguro quando a venda canônica ainda não recebeu rd_funnel_id. */
+  scopedDealIds?: Set<string>;
   source?: string;
   campaign?: string;
   state?: string;
@@ -55,8 +58,16 @@ export interface FunnelSaleFilters {
  */
 export function filterCanonicalFunnelSales(sales: Sale[], filters: FunnelSaleFilters) {
   return realizedSales(sales).filter((sale) => {
-    if (filters.funnelIds?.length && (!sale.rd_funnel_id || !filters.funnelIds.includes(sale.rd_funnel_id))) return false;
-    if (!filters.funnelIds?.length && filters.funnelId && sale.rd_funnel_id !== filters.funnelId) return false;
+    if (filters.funnelIds?.length) {
+      const matchesFunnel = !!sale.rd_funnel_id && filters.funnelIds.includes(sale.rd_funnel_id);
+      const matchesScopedDeal = !sale.rd_funnel_id && !!sale.rd_deal_id && !!filters.scopedDealIds?.has(sale.rd_deal_id);
+      if (!matchesFunnel && !matchesScopedDeal) return false;
+    }
+    if (!filters.funnelIds?.length && filters.funnelId) {
+      const matchesFunnel = sale.rd_funnel_id === filters.funnelId;
+      const matchesScopedDeal = !sale.rd_funnel_id && !!sale.rd_deal_id && !!filters.scopedDealIds?.has(sale.rd_deal_id);
+      if (!matchesFunnel && !matchesScopedDeal) return false;
+    }
     if (filters.allowedDealIds && (!sale.rd_deal_id || !filters.allowedDealIds.has(sale.rd_deal_id))) return false;
     if (filters.source && filters.source !== "all" && normalized(sale.utm_source) !== normalized(filters.source)) return false;
     if (filters.campaign && filters.campaign !== "all") {

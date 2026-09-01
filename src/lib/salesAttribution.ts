@@ -132,12 +132,22 @@ export function attributeSalesToAds(
     // foi validada dentro da mesma conta de anúncio e não deve ser refeita por
     // aproximação no navegador.
     if (sale.matched_campaign_id) {
-      const existsInAccount = insights.some((row) =>
+      const campaignRows = insights.filter((row) =>
         row.campaign_id === sale.matched_campaign_id
         && (!sale.ad_account_id || row.ad_account_id === sale.ad_account_id));
-      if (existsInAccount) {
+      if (campaignRows.length > 0) {
+        // The canonical campaign match is authoritative, but enrich it with
+        // the ad set/creative only when the sale carries a direct ad id or a
+        // matching UTM content. Never guess a creative from the first row.
+        const resolvedAd = (sale.ad_id && campaignRows.find((row) => row.ad_id === sale.ad_id))
+          ?? (sale.utm_content && campaignRows.find((row) => matches(row.ad_name, sale.utm_content)));
         bump(byCampaign, sale.matched_campaign_id, sale);
-        perSale.push({ sale, ad_id: null, adset_id: null, campaign_id: sale.matched_campaign_id, level: "campaign" });
+        if (resolvedAd) {
+          bump(byAd, resolvedAd.ad_id, sale);
+          perSale.push({ sale, ad_id: resolvedAd.ad_id, adset_id: resolvedAd.adset_name, campaign_id: sale.matched_campaign_id, level: "ad" });
+        } else {
+          perSale.push({ sale, ad_id: sale.ad_id ?? null, adset_id: sale.adset_id ?? null, campaign_id: sale.matched_campaign_id, level: "campaign" });
+        }
         continue;
       }
     }
@@ -187,7 +197,7 @@ export function attributeSalesToAds(
         pushAd(hit.ad_id, sale);
         bump(byAd, hit.ad_id, sale);
         if (hit.campaign_id) bump(byCampaign, hit.campaign_id, sale);
-        perSale.push({ sale, ad_id: hit.ad_id, adset_id: null, campaign_id: hit.campaign_id ?? null, level: "ad" });
+        perSale.push({ sale, ad_id: hit.ad_id, adset_id: hit.adset_name, campaign_id: hit.campaign_id ?? null, level: "ad" });
         continue;
       }
     }
@@ -203,7 +213,7 @@ export function attributeSalesToAds(
         pushAd(hit.ad_id, sale);
         bump(byAd, hit.ad_id, sale);
         if (hit.campaign_id) bump(byCampaign, hit.campaign_id, sale);
-        perSale.push({ sale, ad_id: hit.ad_id, adset_id: null, campaign_id: hit.campaign_id ?? null, level: "ad" });
+        perSale.push({ sale, ad_id: hit.ad_id, adset_id: hit.adset_name, campaign_id: hit.campaign_id ?? null, level: "ad" });
         continue;
       }
     }

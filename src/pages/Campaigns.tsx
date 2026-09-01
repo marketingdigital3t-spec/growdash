@@ -84,8 +84,8 @@ import { BarraTotais, type CampaignTotalColumn } from "@/components/campaigns/Ba
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
-type AdsetColKey = "name" | "campaign" | "budget" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
-type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm";
+type AdsetColKey = "name" | "campaign" | "budget" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm" | "sales" | "revenue";
+type AdColKey = "name" | "adset" | "campaign" | "spend" | "leads" | "cpl" | "clicks" | "ctr" | "cpc" | "impressions" | "reach" | "frequency" | "cpm" | "sales" | "revenue";
 const HEALTH_OPTIONS: Array<{ id: CampaignHealth; label: string; dot: string; active: string }> = [
   { id: "critical", label: "Crítico", dot: "bg-red-500", active: "border-red-500/55 bg-red-500/10 text-red-500" },
   { id: "warning", label: "Atenção", dot: "bg-amber-400", active: "border-amber-400/55 bg-amber-400/10 text-amber-500" },
@@ -198,11 +198,11 @@ const CAMP_MIN_WIDTHS: Record<CampColKey, number> = {
 };
 const ADSET_DEFAULTS: Record<AdsetColKey, number> = {
   name: 260, campaign: 220, budget: 130, spend: 120, leads: 90, cpl: 110, clicks: 100, ctr: 90,
-  cpc: 100, impressions: 120, reach: 110, frequency: 100, cpm: 110,
+  cpc: 100, impressions: 120, reach: 110, frequency: 100, cpm: 110, sales: 90, revenue: 120,
 };
 const AD_DEFAULTS: Record<AdColKey, number> = {
   name: 260, adset: 200, campaign: 200, spend: 120, leads: 90, cpl: 110, clicks: 100, ctr: 100,
-  cpc: 100, impressions: 120, reach: 110, frequency: 100, cpm: 110,
+  cpc: 100, impressions: 120, reach: 110, frequency: 100, cpm: 110, sales: 90, revenue: 120,
 };
 
 function levelMetricValue(entity: any, key: AdsetColKey | AdColKey) {
@@ -320,6 +320,20 @@ export default function Campaigns() {
 
   const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount, adAccountIds: selectedAccountIds });
 
+  const salesForAd = useMemo(() => {
+    const map = new Map<string, { count: number; revenue: number }>();
+    for (const sale of sales) {
+      if (sale.status !== "confirmed") continue;
+      const adId = sale.manual_override ? sale.manual_ad_id : sale.ad_id;
+      if (!adId) continue;
+      const current = map.get(adId) ?? { count: 0, revenue: 0 };
+      current.count += Math.max(1, Number(sale.quantity || 1));
+      current.revenue += Number(sale.net_revenue || 0);
+      map.set(adId, current);
+    }
+    return map;
+  }, [sales]);
+
   // v4 descarta preferências antigas que permitiam salvar larguras ilegíveis.
   const camp = useColWidths<CampColKey>(CAMP_DEFAULTS, "campaigns-cols-v4", CAMP_MIN_WIDTHS);
   const adset = useColWidths<AdsetColKey>(ADSET_DEFAULTS, "campaigns-adset-cols-v1");
@@ -410,7 +424,7 @@ export default function Campaigns() {
           name: c.name,
           ad_account_id: c.ad_account_id,
         }));
-        const salesCount = campaignSales.length;
+        const salesCount = campaignSales.reduce((sum, sale) => sum + Math.max(1, Number(sale.quantity || 1)), 0);
         const revenue = campaignSales.reduce((sum, s) => sum + (s.net_revenue ?? 0), 0);
         const profit = revenue - spend;
         const roi = spend > 0 ? ((revenue - spend) / spend) * 100 : 0;
@@ -792,18 +806,24 @@ export default function Campaigns() {
         const campaign = firstRelation(currentAdset.campaigns);
         const embeddedAdset = embeddedAdsetsById.get(currentAdset.id);
         const metrics = aggregateInsights(embeddedAdset?.ads || [], startDate, endDate);
+        const saleMetrics = (embeddedAdset?.ads || []).reduce((sum: { count: number; revenue: number }, currentAd: any) => {
+          const value = salesForAd.get(currentAd.id);
+          return { count: sum.count + (value?.count || 0), revenue: sum.revenue + (value?.revenue || 0) };
+        }, { count: 0, revenue: 0 });
         return {
           ...currentAdset,
           ...metrics,
           campaignId: currentAdset.campaign_id,
           campaignName: campaign?.name || "Campanha sem nome",
+          sales: saleMetrics.count,
+          revenue: saleMetrics.revenue,
         };
       })
       .filter((currentAdset: any) => !descendantCampaignIds || descendantCampaignIds.has(currentAdset.campaignId))
       .filter((currentAdset: any) => statusFilter === "all" || normalizeStatus(currentAdset.status) === statusFilter)
       .filter((currentAdset: any) => !query || currentAdset.name.toLowerCase().includes(query) || currentAdset.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adsetSortKey, adsetSortAsc);
-  }, [accountAdsets, adsetSortAsc, adsetSortKey, descendantCampaignIds, embeddedAdsetsById, endDate, search, startDate, statusFilter]);
+  }, [accountAdsets, adsetSortAsc, adsetSortKey, descendantCampaignIds, embeddedAdsetsById, endDate, salesForAd, search, startDate, statusFilter]);
 
   const selectedAds = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -818,6 +838,7 @@ export default function Campaigns() {
         // resultados apesar de a campanha ter conversas iniciadas.
         const results = resolveCampaignResults(metrics.leads, actionData?.totalsByAd[currentAd.id] || {});
         const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results);
+        const saleMetrics = salesForAd.get(currentAd.id) ?? { count: 0, revenue: 0 };
         return {
           ...currentAd,
           ...metrics,
@@ -831,13 +852,15 @@ export default function Campaigns() {
           campaignId: currentAdset?.campaign_id,
           adsetName: currentAdset?.name || "Conjunto sem nome",
           campaignName: campaign?.name || "Campanha sem nome",
+          sales: saleMetrics.count,
+          revenue: saleMetrics.revenue,
         };
       })
       .filter((currentAd: any) => !descendantCampaignIds || descendantCampaignIds.has(currentAd.campaignId))
       .filter((currentAd: any) => statusFilter === "all" || normalizeStatus(currentAd.status) === statusFilter)
       .filter((currentAd: any) => !query || currentAd.name.toLowerCase().includes(query) || currentAd.adsetName.toLowerCase().includes(query) || currentAd.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adSortKey, adSortAsc);
-  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, search, startDate, statusFilter]);
+  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, salesForAd, search, startDate, statusFilter]);
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
@@ -1261,6 +1284,8 @@ export default function Campaigns() {
                       <ResizableHead colKey="cpc" width={adset.colWidths.cpc} onResize={adset.startResize("cpc")} sortable sortableKey="cpc" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">CPC</ResizableHead>
                       <ResizableHead colKey="leads" width={adset.colWidths.leads} onResize={adset.startResize("leads")} sortable sortableKey="leads" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Resultados</ResizableHead>
                       <ResizableHead colKey="cpl" width={adset.colWidths.cpl} onResize={adset.startResize("cpl")} sortable sortableKey="cpl" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Custo por resultado</ResizableHead>
+                      <ResizableHead colKey="sales" width={adset.colWidths.sales} onResize={adset.startResize("sales")} sortable sortableKey="sales" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Vendas</ResizableHead>
+                      <ResizableHead colKey="revenue" width={adset.colWidths.revenue} onResize={adset.startResize("revenue")} sortable sortableKey="revenue" sortKey={adsetSortKey} sortAsc={adsetSortAsc} onSort={handleAdsetSort} align="right">Valor das vendas</ResizableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1287,6 +1312,8 @@ export default function Campaigns() {
                         <TableCell style={adsetCellW("cpc")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.clicks > 0 ? a.spend / a.clicks : 0} prefix="R$ " decimals={2} /></TableCell>
                         <TableCell style={adsetCellW("leads")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.leads} decimals={0} /></TableCell>
                         <TableCell style={adsetCellW("cpl")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.leads > 0 ? a.spend / a.leads : 0} prefix="R$ " decimals={2} /></TableCell>
+                        <TableCell style={adsetCellW("sales")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.sales} decimals={0} /></TableCell>
+                        <TableCell style={adsetCellW("revenue")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.revenue} prefix="R$ " decimals={2} /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1319,6 +1346,8 @@ export default function Campaigns() {
                       <ResizableHead colKey="cpc" width={ad.colWidths.cpc} onResize={ad.startResize("cpc")} sortable sortableKey="cpc" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">CPC</ResizableHead>
                       <ResizableHead colKey="leads" width={ad.colWidths.leads} onResize={ad.startResize("leads")} sortable sortableKey="leads" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Leads</ResizableHead>
                       <ResizableHead colKey="cpl" width={ad.colWidths.cpl} onResize={ad.startResize("cpl")} sortable sortableKey="cpl" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">CPL</ResizableHead>
+                      <ResizableHead colKey="sales" width={ad.colWidths.sales} onResize={ad.startResize("sales")} sortable sortableKey="sales" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Vendas</ResizableHead>
+                      <ResizableHead colKey="revenue" width={ad.colWidths.revenue} onResize={ad.startResize("revenue")} sortable sortableKey="revenue" sortKey={adSortKey} sortAsc={adSortAsc} onSort={handleAdSort} align="right">Valor da venda</ResizableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1350,6 +1379,8 @@ export default function Campaigns() {
                         <TableCell style={adCellW("cpc")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.clicks > 0 ? a.spend / a.clicks : 0} prefix="R$ " decimals={2} /></TableCell>
                         <TableCell style={adCellW("leads")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.leads} decimals={0} /></TableCell>
                         <TableCell style={adCellW("cpl")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.leads > 0 ? a.spend / a.leads : 0} prefix="R$ " decimals={2} /></TableCell>
+                        <TableCell style={adCellW("sales")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.sales} decimals={0} /></TableCell>
+                        <TableCell style={adCellW("revenue")} className="text-right tabular-nums text-sm"><AnimatedNumber value={a.revenue} prefix="R$ " decimals={2} /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

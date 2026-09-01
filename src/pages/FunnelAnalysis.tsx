@@ -16,9 +16,7 @@ import { FunnelBottlenecks } from "@/components/funnel-analysis/FunnelBottleneck
 import { FunnelSourceTable } from "@/components/funnel-analysis/FunnelSourceTable";
 import { FunnelLostReasons } from "@/components/funnel-analysis/FunnelLostReasons";
 import { FunnelStateMap } from "@/components/funnel-analysis/FunnelStateMap";
-import { FunnelAutoInsights } from "@/components/funnel-analysis/FunnelAutoInsights";
 import { FunnelConversionHeatmap } from "@/components/funnel-analysis/FunnelConversionHeatmap";
-import { FunnelSuggestedActions } from "@/components/funnel-analysis/FunnelSuggestedActions";
 import { FunnelMediaOverview } from "@/components/funnel-analysis/FunnelMediaOverview";
 import { FunnelSalesAttribution } from "@/components/funnel-analysis/FunnelSalesAttribution";
 import { RefreshCw, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
@@ -38,6 +36,9 @@ import { filterCanonicalFunnelSales, reconcileFunnelRevenue } from "@/lib/funnel
 import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
+import { useEventClasses } from "@/hooks/useEventClasses";
+import { DecisionAlertsPanel } from "@/components/funnel-analysis/DecisionAlertsPanel";
+import { FunnelGrowthRecommendations } from "@/components/funnel-analysis/FunnelGrowthRecommendations";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
@@ -67,6 +68,7 @@ function HelpBlock({ help, children, className }: { help: readonly string[]; chi
 export default function FunnelAnalysis() {
   const { adAccountId, setAdAccountId, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
+  const { data: eventClasses = [] } = useEventClasses();
   const visibleAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
@@ -214,6 +216,7 @@ export default function FunnelAnalysis() {
   );
   const funnelSales = useMemo(() => filterCanonicalFunnelSales(historicalSales, {
     funnelIds: funnelScopeIds,
+    scopedDealIds: new Set(operationalDeals.map((deal) => deal.rd_deal_id)),
     source: selectedSource,
     campaign: selectedCampaign,
     state: selectedState,
@@ -230,6 +233,7 @@ export default function FunnelAnalysis() {
   );
   const periodFunnelSales = useMemo(() => filterCanonicalFunnelSales(periodSales, {
     funnelIds: funnelScopeIds,
+    scopedDealIds: new Set(operationalPeriodDeals.map((deal) => deal.rd_deal_id)),
     source: selectedSource,
     campaign: selectedCampaign,
     state: selectedState,
@@ -493,24 +497,29 @@ export default function FunnelAnalysis() {
             />
           </MotionItem>
 
-          <MotionItem><HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock></MotionItem>
-
-          <MotionItem><FunnelSuggestedActions a={periodAnalytics} /></MotionItem>
+          <MotionItem>
+            <DecisionAlertsPanel classes={eventClasses} insights={scopedInsights} analytics={periodAnalytics} />
+          </MotionItem>
 
           <MotionItem>
-            <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <FunnelGrowthRecommendations analytics={periodAnalytics} media={mediaMetrics} />
+          </MotionItem>
+
+          <MotionItem>
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
               <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={periodAnalytics} /></HelpBlock>
             </div>
           </MotionItem>
+
+          <MotionItem><HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={periodAnalytics} /></HelpBlock></MotionItem>
 
           <MotionItem><HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={periodAnalytics} /></HelpBlock></MotionItem>
 
           <MotionItem>
-            <div className="gd-aligned-grid grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <HelpBlock help={blockHelp.sources}><FunnelSourceTable a={periodAnalytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.losses}><FunnelLostReasons a={periodAnalytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.insights}><FunnelAutoInsights a={periodAnalytics} /></HelpBlock>
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+              <HelpBlock help={blockHelp.sources} className="h-auto"><FunnelSourceTable a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.losses} className="h-auto"><FunnelLostReasons a={periodAnalytics} /></HelpBlock>
             </div>
           </MotionItem>
 
@@ -521,7 +530,7 @@ export default function FunnelAnalysis() {
           <MotionItem><HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]}><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock></MotionItem>
 
           <MotionItem>
-            <HelpBlock help={blockHelp.attribution}><FunnelSalesAttribution sales={periodFunnelSales} /></HelpBlock>
+            <HelpBlock help={blockHelp.attribution}><FunnelSalesAttribution sales={periodFunnelSales} insights={scopedInsights} /></HelpBlock>
           </MotionItem>
         </>
       )}

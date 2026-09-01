@@ -156,7 +156,9 @@ Deno.serve(async (req) => {
       if (key) accountsById.set(key, account);
     }
 
-    if (accountsById.size === 0) {
+    // Merge Business Manager assets as well: /me/adaccounts may omit client
+    // accounts that the profile can still manage.
+    {
       const businessesResponse = await fetch(
         `https://graph.facebook.com/${graphVersion}/me/businesses?fields=id&limit=100&access_token=${encodeURIComponent(accessToken)}`,
         { headers: { Accept: "application/json" } },
@@ -191,6 +193,13 @@ Deno.serve(async (req) => {
       const rawId = String(account.account_id ?? account.id ?? "").replace(/^act_/, "").trim();
       if (!/^\d+$/.test(rawId)) continue;
       const accountId = `act_${rawId}`;
+      const { data: existing } = await admin
+        .from("ad_accounts")
+        .select("id,connection_status")
+        .eq("user_id", oauthState.user_id)
+        .eq("account_id", accountId)
+        .limit(1)
+        .maybeSingle();
       const values = {
         user_id: oauthState.user_id,
         account_id: accountId,
@@ -201,20 +210,14 @@ Deno.serve(async (req) => {
         timezone_name: account.timezone_name ? String(account.timezone_name).slice(0, 100) : null,
         timezone_offset_hours_utc: Number.isFinite(Number(account.timezone_offset_hours_utc)) ? Number(account.timezone_offset_hours_utc) : null,
         metadata: { connection_method: "oauth", connected_at: new Date().toISOString() },
-        connection_status: "connected",
+        // Preserve an explicit Growdash deactivation when refreshing OAuth.
+        connection_status: existing?.connection_status === "disconnected" ? "disconnected" : "connected",
         last_sync_error: null,
         last_sync_error_code: null,
         last_sync_success_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      const { data: existing } = await admin
-        .from("ad_accounts")
-        .select("id")
-        .eq("user_id", oauthState.user_id)
-        .eq("account_id", accountId)
-        .limit(1)
-        .maybeSingle();
       const operation = existing
         ? admin.from("ad_accounts").update(values).eq("id", existing.id)
         : admin.from("ad_accounts").insert(values);
