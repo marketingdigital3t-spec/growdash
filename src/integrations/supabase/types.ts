@@ -2277,6 +2277,7 @@ export type Database = {
           position: number
           due_date: string | null
           priority: string
+          banner_url: string | null
           created_at: string
           updated_at: string
         }
@@ -2288,6 +2289,7 @@ export type Database = {
           position?: number
           due_date?: string | null
           priority?: string
+          banner_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -2299,6 +2301,7 @@ export type Database = {
           position?: number
           due_date?: string | null
           priority?: string
+          banner_url?: string | null
           created_at?: string
           updated_at?: string
         }
