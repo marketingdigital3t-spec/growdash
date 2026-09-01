@@ -39,13 +39,13 @@ export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversi
   ];
 
   return (
-    <div className="gd-kpi-grid gd-funnel-kpi-grid grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="gd-kpi-grid gd-funnel-kpi-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((c) => {
         const Icon = c.icon;
         return (
-          <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} className="h-full" showHint>
+          <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} showHint>
             <Card className={`gd-metric-card gd-funnel-kpi cursor-default bg-card/75 border-border/60 border-l-2 backdrop-blur ${c.color.replace("text-", "border-")}`}>
-              <CardContent className="p-4">
+              <CardContent className="flex min-h-[118px] flex-col justify-center p-4">
                 <div className="flex items-center justify-between mb-2 pr-5">
                   <span className="text-xs text-muted-foreground">{c.label}</span>
                   <Icon className={`h-4 w-4 ${c.color} dark:text-white`} />
