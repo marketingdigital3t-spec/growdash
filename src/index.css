@@ -6265,3 +6265,202 @@ html[data-accent="sapphire"] .brand-shell,
   :root { --gd-page-gutter: 12px; --gd-space-section: 20px; }
   .brand-shell .gd-metric-card { min-height: 96px !important; }
 }
+
+/* -------------------------------------------------------------------------
+   Growdash theme contract — final authority
+
+   The application accumulated phase and accent CSS over several iterations.
+   This final, token-only layer deliberately comes last so an old saved accent
+   or a revenue phase cannot turn the authenticated interface blue, gold or
+   purple again. Images, logos and semantic result colours are not targeted.
+   ------------------------------------------------------------------------- */
+:root,
+html[data-accent],
+html[data-accent="metallic-gold"],
+.brand-shell,
+.brand-shell[data-space-phase] {
+  color-scheme: light;
+  --background: 0 0% 96%;
+  --foreground: 0 0% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 9%;
+  --secondary: 0 0% 93%;
+  --secondary-foreground: 0 0% 13%;
+  --muted: 0 0% 94%;
+  --muted-foreground: 0 0% 38%;
+  --accent: 0 0% 89%;
+  --accent-foreground: 0 0% 10%;
+  --border: 0 0% 82%;
+  --input: 0 0% 82%;
+  --primary: 0 0% 12%;
+  --primary-foreground: 0 0% 100%;
+  --primary-soft: 0 0% 92%;
+  --ring: 0 0% 25%;
+  --chart-1: 0 0% 20%;
+  --chart-2: 0 0% 35%;
+  --chart-3: 0 0% 50%;
+  --chart-4: 0 0% 65%;
+  --chart-5: 0 0% 78%;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 0 0% 12%;
+  --sidebar-primary: 0 0% 12%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 93%;
+  --sidebar-accent-foreground: 0 0% 10%;
+  --sidebar-border: 0 0% 84%;
+  --sidebar-ring: 0 0% 25%;
+  --brand-black: #111111;
+  --brand-surface: #ffffff;
+  --brand-gold: #222222;
+  --brand-gold-light: #f1f1f1;
+  --brand-bronze: #555555;
+  --brand-accent-rgb: 34, 34, 34;
+  --color-canvas: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f0f0f0;
+  --color-border: #d1d1d1;
+  --color-text-primary: #171717;
+  --color-text-secondary: #616161;
+  --color-text-disabled: #8a8a8a;
+  --color-accent: #252525;
+  --color-accent-hover: #000000;
+  --color-accent-soft: #eeeeee;
+  --color-info: #595959;
+  --color-focus: #353535;
+  --gd-ink: #171717;
+  --gd-ink-muted: #666666;
+  --gd-surface: #ffffff;
+  --gd-surface-raised: #f1f1f1;
+  --gd-line: #d4d4d4;
+}
+
+.dark,
+.dark[data-accent],
+.dark .brand-shell,
+.dark .brand-shell[data-space-phase] {
+  color-scheme: dark;
+  --background: 0 0% 5%;
+  --foreground: 0 0% 96%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 96%;
+  --popover: 0 0% 12%;
+  --popover-foreground: 0 0% 96%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 94%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 66%;
+  --accent: 0 0% 19%;
+  --accent-foreground: 0 0% 96%;
+  --border: 0 0% 24%;
+  --input: 0 0% 24%;
+  --primary: 0 0% 96%;
+  --primary-foreground: 0 0% 9%;
+  --primary-soft: 0 0% 16%;
+  --ring: 0 0% 74%;
+  --chart-1: 0 0% 88%;
+  --chart-2: 0 0% 72%;
+  --chart-3: 0 0% 56%;
+  --chart-4: 0 0% 42%;
+  --chart-5: 0 0% 30%;
+  --sidebar-background: 0 0% 7%;
+  --sidebar-foreground: 0 0% 95%;
+  --sidebar-primary: 0 0% 96%;
+  --sidebar-primary-foreground: 0 0% 9%;
+  --sidebar-accent: 0 0% 15%;
+  --sidebar-accent-foreground: 0 0% 96%;
+  --sidebar-border: 0 0% 22%;
+  --sidebar-ring: 0 0% 74%;
+  --brand-black: #080808;
+  --brand-surface: #171717;
+  --brand-gold: #e5e5e5;
+  --brand-gold-light: #ffffff;
+  --brand-bronze: #a3a3a3;
+  --brand-accent-rgb: 229, 229, 229;
+  --color-canvas: #0d0d0d;
+  --color-surface: #171717;
+  --color-surface-raised: #202020;
+  --color-border: #3d3d3d;
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #aaaaaa;
+  --color-text-disabled: #707070;
+  --color-accent: #eeeeee;
+  --color-accent-hover: #ffffff;
+  --color-accent-soft: #242424;
+  --color-info: #b5b5b5;
+  --color-focus: #d4d4d4;
+  --gd-ink: #f5f5f5;
+  --gd-ink-muted: #a6a6a6;
+  --gd-surface: #171717;
+  --gd-surface-raised: #222222;
+  --gd-line: #3d3d3d;
+}
+
+/* Shell and shared surfaces must follow the active theme; former phase rules
+   above used !important and were the reason light pages could render dark. */
+.brand-shell,
+.brand-shell[data-space-phase],
+.growdash-main {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.brand-shell :is(.brand-sidebar, .brand-topbar, .gd-panel, .gd-metric-card,
+  .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card,
+  .campaign-total-bar, .dashboard-widget-shell > *) {
+  background: var(--gd-surface) !important;
+  border-color: var(--gd-line) !important;
+  color: var(--gd-ink) !important;
+}
+.brand-shell .brand-sidebar {
+  box-shadow: none !important;
+}
+.brand-shell :is(.bg-background, .bg-card, .bg-popover) {
+  background-color: hsl(var(--background)) !important;
+}
+.brand-shell .bg-card { background-color: hsl(var(--card)) !important; }
+.brand-shell :is(.text-foreground, .text-card-foreground, .text-popover-foreground) {
+  color: hsl(var(--foreground)) !important;
+}
+.brand-shell :is(.text-muted-foreground, .text-secondary-foreground) {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.brand-shell :is(.border-border, .border-input) { border-color: hsl(var(--border)) !important; }
+
+/* Primary is a neutral selection/focus colour in both themes. */
+.brand-shell :is(.bg-primary, [data-state="active"].bg-primary) {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+.brand-shell :is(.text-primary, .border-primary) { color: hsl(var(--primary)) !important; }
+.brand-shell .border-primary { border-color: hsl(var(--primary)) !important; }
+.brand-shell :is([role="tab"][data-state="active"], [role="button"][data-state="active"]) {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-color: hsl(var(--primary)) !important;
+}
+
+/* A saved legacy accent must not recolour components structurally. */
+.brand-shell :is([class*="text-blue-"], [class*="text-sky-"], [class*="text-cyan-"],
+  [class*="text-indigo-"], [class*="text-violet-"], [class*="text-purple-"],
+  [class*="text-pink-"], [class*="text-orange-"], [class*="text-amber-"]) {
+  color: var(--gd-ink) !important;
+}
+.brand-shell :is([class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-cyan-"],
+  [class*="bg-indigo-"], [class*="bg-violet-"], [class*="bg-purple-"],
+  [class*="bg-pink-"], [class*="bg-orange-"]) {
+  background-color: var(--gd-surface-raised) !important;
+}
+.brand-shell :is([class*="border-blue-"], [class*="border-sky-"], [class*="border-cyan-"],
+  [class*="border-indigo-"], [class*="border-violet-"], [class*="border-purple-"],
+  [class*="border-pink-"], [class*="border-orange-"]) {
+  border-color: var(--gd-line) !important;
+}
+
+/* Keep business meaning visible after structural neutralisation. */
+.brand-shell :is(.text-emerald-400, .text-emerald-500, .text-emerald-600,
+  .text-green-400, .text-green-500, .text-green-600) { color: var(--gd-positive) !important; }
+.brand-shell :is(.text-red-400, .text-red-500, .text-red-600,
+  .text-rose-400, .text-rose-500, .text-rose-600) { color: var(--gd-negative) !important; }
+.brand-shell :is(.text-yellow-400, .text-yellow-500, .text-yellow-600,
+  .text-amber-400, .text-amber-500, .text-amber-600) { color: var(--gd-warning) !important; }
