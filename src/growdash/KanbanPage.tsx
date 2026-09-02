@@ -34,7 +34,7 @@ type BoardTemplate = {
   name: string;
   description: string;
   columns: string[];
-  cards: Array<{ column: string; title: string; priority?: string }>;
+  cards: Array<{ column: string; title: string; description?: string; priority?: string }>;
   icon: typeof BriefcaseBusiness;
 };
 
@@ -69,6 +69,43 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
       { column: "Aguardando dados", title: "Aguardar janela mínima de aprendizado", priority: "low" },
     ],
     icon: Megaphone,
+  },
+  {
+    id: "expert-implementation",
+    name: "Implementação de expert",
+    description: "Checklist completo para colocar um novo expert em operação: acessos, oferta, copy, criativos, tracking e lançamento.",
+    columns: ["Kickoff e diagnóstico", "Acessos e tracking", "Estratégia e copy", "Criativos", "Campanha e QA", "No ar e otimização"],
+    cards: [
+      { column: "Kickoff e diagnóstico", title: "Agendar kickoff com o expert", description: "Definir objetivo do projeto, canal principal, oferta prioritária, metas e responsáveis.", priority: "urgent" },
+      { column: "Kickoff e diagnóstico", title: "Coletar briefing comercial e posicionamento", description: "Público, dores, diferenciais, prova, objeções, concorrentes e tom de voz.", priority: "high" },
+      { column: "Kickoff e diagnóstico", title: "Mapear oferta, ticket e capacidade de atendimento", description: "Validar produto, preço, condições, vagas, agenda e quem fará o fechamento.", priority: "high" },
+      { column: "Kickoff e diagnóstico", title: "Definir meta de leads, vendas, CPL e CAC", description: "Registrar a meta mensal e os limites de investimento para a primeira fase.", priority: "high" },
+      { column: "Acessos e tracking", title: "Solicitar acesso ao Business Manager", description: "Solicitar acesso de parceiro/administrador ao BM correto do expert.", priority: "urgent" },
+      { column: "Acessos e tracking", title: "Solicitar conta de anúncios, página e Instagram", description: "Confirmar que os ativos certos estão vinculados e liberados para o time.", priority: "urgent" },
+      { column: "Acessos e tracking", title: "Validar pixel, API de conversões e domínio", description: "Conferir eventos, priorização, domínio verificado e qualidade de correspondência.", priority: "high" },
+      { column: "Acessos e tracking", title: "Conectar RD Station e mapear funil", description: "Definir origem, etapas, campos obrigatórios e responsável por cada avanço do lead.", priority: "high" },
+      { column: "Acessos e tracking", title: "Criar padrão de UTMs e origem de venda", description: "Padronizar campanha, conjunto, anúncio e identificadores para atribuição dentro da Growdash.", priority: "high" },
+      { column: "Acessos e tracking", title: "Testar formulário e chegada do lead", description: "Enviar lead teste e confirmar entrada no RD, planilha/CRM e distribuição comercial.", priority: "urgent" },
+      { column: "Estratégia e copy", title: "Escolher funil e página de destino", description: "Definir se a campanha levará para formulário, WhatsApp, página, VSL ou evento.", priority: "high" },
+      { column: "Estratégia e copy", title: "Criar promessa, mecanismo e ângulos", description: "Transformar briefing em hipóteses de comunicação para teste de mídia.", priority: "high" },
+      { column: "Estratégia e copy", title: "Escrever copy de anúncios e CTAs", description: "Produzir variações por ângulo, formato e etapa de consciência.", priority: "high" },
+      { column: "Estratégia e copy", title: "Revisar página, formulário e script comercial", description: "Garantir coerência entre anúncio, captura, qualificação e atendimento.", priority: "medium" },
+      { column: "Criativos", title: "Solicitar briefing de criativos ao designer", description: "Enviar oferta, ângulos, referências, formatos, prioridade e data de entrega.", priority: "urgent" },
+      { column: "Criativos", title: "Solicitar materiais ao expert", description: "Vídeos, fotos, provas, antes/depois autorizado, depoimentos e identidade visual.", priority: "high" },
+      { column: "Criativos", title: "Produzir matriz de testes criativos", description: "Planejar pelo menos três ângulos e variações de abertura, prova e CTA.", priority: "high" },
+      { column: "Criativos", title: "Aprovar criativos e variações de copy", description: "Conferir legibilidade, conformidade, CTA, formato e aderência à oferta.", priority: "medium" },
+      { column: "Criativos", title: "Subir criativos na biblioteca de anúncios", description: "Organizar nomenclatura para identificar criativo, ângulo e versão nas análises.", priority: "medium" },
+      { column: "Campanha e QA", title: "Montar estrutura de campanhas e conjuntos", description: "Configurar objetivo, orçamento, públicos, posicionamentos e janela de atribuição.", priority: "urgent" },
+      { column: "Campanha e QA", title: "Configurar evento de conversão e formulário", description: "Usar o evento e o formulário corretos; validar perguntas, consentimento e destino.", priority: "urgent" },
+      { column: "Campanha e QA", title: "Preencher nomenclatura e UTMs", description: "Aplicar padrão de campanha, conjunto e anúncio para rastrear cada venda.", priority: "high" },
+      { column: "Campanha e QA", title: "Fazer QA ponta a ponta", description: "Clicar no anúncio de teste e validar página, formulário, CRM, automação e origem registrada.", priority: "urgent" },
+      { column: "Campanha e QA", title: "Preparar dashboard e alertas", description: "Definir meta, indicadores, responsáveis e regras de alerta para CPL, CAC e vendas.", priority: "medium" },
+      { column: "No ar e otimização", title: "Solicitar aprovação final do expert", description: "Apresentar campanha, criativos, orçamento e plano de acompanhamento antes de publicar.", priority: "urgent" },
+      { column: "No ar e otimização", title: "Publicar campanha e registrar marco de início", description: "Confirmar publicação, orçamento ativo e início da coleta de dados.", priority: "urgent" },
+      { column: "No ar e otimização", title: "Monitorar primeiras 24 horas", description: "Checar entrega, reprovação, eventos, leads, custo inicial e erros de rastreamento.", priority: "high" },
+      { column: "No ar e otimização", title: "Fazer leitura diária e plano de testes", description: "Documentar decisões sobre criativo, público, copy e verba com base nos dados.", priority: "high" },
+    ],
+    icon: BriefcaseBusiness,
   },
   {
     id: "management",
@@ -272,7 +309,7 @@ export default function KanbanPage() {
       const listByName = new Map((createdLists || []).map((list: { id: string; name: string }) => [list.name, list.id]));
       const starterCards = template.cards.flatMap((card, position) => {
         const listId = listByName.get(card.column);
-        return listId ? [{ list_id: listId, title: card.title, description: null, due_date: null, priority: card.priority || "none", position }] : [];
+        return listId ? [{ list_id: listId, title: card.title, description: card.description || null, due_date: null, priority: card.priority || "none", position }] : [];
       });
       if (starterCards.length) {
         const { error: cardError } = await supabase.from("kanban_cards").insert(starterCards);
