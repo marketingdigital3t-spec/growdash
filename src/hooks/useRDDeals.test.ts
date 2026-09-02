@@ -78,6 +78,33 @@ describe("RD deals date scope", () => {
     expect(labels).not.toContain("Em atendimento → Oportunidades");
   });
 
+  it("keeps advancement pairs in the RD stage order instead of alphabetical label order", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "one", rd_stage_id: "lead", name: "Novos leads", order: 1, is_won: false, is_lost: false },
+      { rd_funnel_id: "one", rd_stage_id: "contact", name: "Em atendimento", order: 2, is_won: false, is_lost: false },
+      { rd_funnel_id: "one", rd_stage_id: "opportunity", name: "Oportunidades", order: 3, is_won: false, is_lost: false },
+      { rd_funnel_id: "one", rd_stage_id: "won", name: "Venda realizada", order: 4, is_won: true, is_lost: false },
+    ];
+    const deal = (id: string, stageId: string): RDDeal => ({
+      id, rd_deal_id: id, rd_funnel_id: "one", rd_stage_id: stageId, rd_stage_name: stageId, rd_stage_order: 1,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "lead", win: stageId === "won", lost_reason: null, amount_total: 0,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: null, lead_city: null, lead_created_at: "2026-08-01T12:00:00Z", stage_updated_at: null, closed_at: null,
+    });
+    const analytics = computeFunnelAnalytics([
+      deal("one", "lead"),
+      deal("two", "contact"),
+      deal("three", "opportunity"),
+      deal("four", "won"),
+    ], stages);
+
+    expect(analytics.stageConversion.map((stage) => stage.label)).toEqual([
+      "Novos leads → Em atendimento",
+      "Em atendimento → Oportunidades",
+      "Oportunidades → Vendas ganhas",
+    ]);
+  });
+
   it("separates Stand By reasons from lost-deal reasons", () => {
     const stages: FunnelStage[] = [
       { rd_funnel_id: "one", rd_stage_id: "standby", name: "Stand By", order: 3, is_won: false, is_lost: false },

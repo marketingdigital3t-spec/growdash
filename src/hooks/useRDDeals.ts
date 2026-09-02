@@ -429,7 +429,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   // movimentações, a progressão é inferida pelo estágio atual, mas somente
   // dentro da sequência real do funil daquele negócio.
   const cumulativeByCanonicalStage = new Map<string, number>();
-  const pairCounts = new Map<string, { from: string; to: string; fromCount: number; toCount: number }>();
+  const pairCounts = new Map<string, { from: string; to: string; fromCount: number; toCount: number; order: number }>();
   const stagesByFunnel = new Map<string, FunnelStage[]>();
   for (const stage of stages) {
     const list = stagesByFunnel.get(stage.rd_funnel_id) || [];
@@ -468,7 +468,11 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
         const toDefinition = sortedStages.find((stage) => stage.rd_stage_id === toStage);
         if (!fromDefinition || !toDefinition) continue;
         const key = `${fromStage}:${toStage}`;
-        const current = pairCounts.get(key) || { from: fromDefinition.name, to: toDefinition.name, fromCount: 0, toCount: 0 };
+        const current = pairCounts.get(key) || { from: fromDefinition.name, to: toDefinition.name, fromCount: 0, toCount: 0, order: position };
+        // The same canonical pair can exist in more than one RD funnel. Keep
+        // its earliest native position so the aggregated view preserves the
+        // RD sequence instead of falling back to alphabetical label order.
+        current.order = Math.min(current.order, position);
         current.fromCount += 1;
         if (index >= position + 1) current.toCount += 1;
         pairCounts.set(key, current);
@@ -507,7 +511,7 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   // Taxa de avanço: cada par é agregado apenas entre funis que contêm as
   // duas etapas adjacentes, sem criar uma sequência global entre contas.
   const stageConversion: FunnelAnalytics["stageConversion"] = [];
-  for (const pair of pairCounts.values()) {
+  for (const pair of Array.from(pairCounts.values()).sort((a, b) => a.order - b.order || a.from.localeCompare(b.from, "pt-BR") || a.to.localeCompare(b.to, "pt-BR"))) {
     const rate = pair.fromCount > 0 ? (pair.toCount / pair.fromCount) * 100 : 0;
     const lost = Math.max(0, pair.fromCount - pair.toCount);
     const lossPct = pair.fromCount > 0 ? (lost / pair.fromCount) * 100 : 0;
@@ -521,7 +525,6 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
       isBottleneck: false,
     });
   }
-  stageConversion.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   // marcar maior queda
   if (stageConversion.length > 0) {
     const worst = stageConversion.reduce((a, b) => (b.lossPct > a.lossPct ? b : a));
