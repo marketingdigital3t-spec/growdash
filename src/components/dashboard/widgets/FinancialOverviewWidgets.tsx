@@ -102,7 +102,7 @@ export function PlatformDistributionWidget() {
           <CardTitle className="flex items-center gap-2 text-base"><Globe2 className="h-4 w-4" />Distribuição por Plataforma</CardTitle>
           <span className="text-xs tabular-nums text-muted-foreground">{headerLabel}</span>
         </div>
-        <Tabs value={platformView} onValueChange={(value) => setPlatformView(value as typeof platformView)}>
+        <Tabs className="gd-platform-tabs" value={platformView} onValueChange={(value) => setPlatformView(value as typeof platformView)}>
           <TabsList className="mx-auto grid h-9 w-full max-w-md grid-cols-3 place-items-stretch p-1">
             <TabsTrigger value="leads" className="w-full justify-center text-xs">Leads</TabsTrigger>
             <TabsTrigger value="revenue" className="w-full justify-center text-xs">Receita</TabsTrigger>

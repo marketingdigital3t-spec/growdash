@@ -584,7 +584,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
                 return <span className="text-xs text-muted-foreground tabular-nums">{label}</span>;
               })()}
             </div>
-            <Tabs value={platformView} onValueChange={(v) => setPlatformView(v as any)}>
+            <Tabs className="gd-platform-tabs" value={platformView} onValueChange={(v) => setPlatformView(v as any)}>
               <TabsList className="mx-auto grid h-9 w-full max-w-md grid-cols-3 place-items-stretch p-1">
                 <TabsTrigger value="leads" className="w-full justify-center text-xs">Leads</TabsTrigger>
                 <TabsTrigger value="revenue" className="w-full justify-center text-xs">Receita</TabsTrigger>

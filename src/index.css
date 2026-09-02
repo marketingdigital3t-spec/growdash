@@ -6202,6 +6202,30 @@ html[data-accent="sapphire"] .brand-shell,
 .brand-shell :is([class*="border-blue-"], [class*="border-sky-"], [class*="border-cyan-"], [class*="border-indigo-"], [class*="border-violet-"], [class*="border-purple-"], [class*="border-pink-"]) { border-color: var(--gd-line) !important; }
 .brand-shell :is([class*="from-blue-"], [class*="to-blue-"], [class*="from-sky-"], [class*="to-sky-"], [class*="from-cyan-"], [class*="to-cyan-"], [class*="from-violet-"], [class*="to-violet-"], [class*="from-purple-"], [class*="to-purple-"], [class*="from-pink-"], [class*="to-pink-"]) { --tw-gradient-from: var(--gd-surface-raised) !important; --tw-gradient-to: var(--gd-surface) !important; }
 
+/* Platform distribution: TabsTrigger defaults to the old primary colour.
+   Keep the selected view readable without reintroducing blue into either
+   dashboard implementation (the configurable widget and the legacy block). */
+.brand-shell .gd-platform-tabs [role="tablist"] {
+  border: 1px solid var(--gd-line) !important;
+  background: var(--gd-surface-raised) !important;
+}
+.brand-shell .gd-platform-tabs [role="tab"] {
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--gd-ink-muted) !important;
+  box-shadow: none !important;
+}
+.brand-shell .gd-platform-tabs [role="tab"][data-state="active"] {
+  border-color: var(--gd-line) !important;
+  background: var(--gd-ink) !important;
+  color: var(--gd-surface) !important;
+  box-shadow: none !important;
+}
+.brand-shell .gd-platform-tabs [role="tab"]:hover:not([data-state="active"]) {
+  background: color-mix(in srgb, var(--gd-ink) 8%, transparent) !important;
+  color: var(--gd-ink) !important;
+}
+
 /* Sidebar is text-first: no individual boxed borders. */
 .brand-shell .brand-sidebar nav a { border: 0 !important; box-shadow: none !important; }
 .brand-shell .brand-sidebar nav a[aria-current="page"] { background: var(--gd-surface-raised) !important; color: var(--gd-ink) !important; }
