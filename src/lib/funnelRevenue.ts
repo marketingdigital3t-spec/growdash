@@ -49,6 +49,7 @@ export interface FunnelSaleFilters {
   state?: string;
   product?: string;
   allowedDealIds?: Set<string>;
+  stateByDealId?: ReadonlyMap<string, string | null | undefined>;
 }
 
 export interface FunnelRevenueContext {
@@ -80,7 +81,8 @@ export function filterCanonicalFunnelSales(sales: Sale[], filters: FunnelSaleFil
       const expected = normalized(filters.campaign);
       if (![sale.utm_campaign, sale.rd_campaign_name].some((value) => normalized(value) === expected)) return false;
     }
-    if (filters.state && filters.state !== "all" && normalizeUF(sale.lead_state) !== normalizeUF(filters.state)) return false;
+    const saleState = sale.lead_state || (sale.rd_deal_id ? filters.stateByDealId?.get(sale.rd_deal_id) : null);
+    if (filters.state && filters.state !== "all" && normalizeUF(saleState) !== normalizeUF(filters.state)) return false;
     if (filters.product && filters.product !== "all" && normalized(sale.rd_product_name) !== normalized(filters.product)) return false;
     return true;
   });

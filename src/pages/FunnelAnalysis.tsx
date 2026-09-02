@@ -211,6 +211,10 @@ export default function FunnelAnalysis() {
     () => selectedOwner === "all" ? undefined : new Set(operationalDeals.map((deal) => deal.rd_deal_id)),
     [operationalDeals, selectedOwner],
   );
+  const historicalStateByDealId = useMemo(
+    () => new Map(operationalDeals.map((deal) => [deal.rd_deal_id, deal.lead_state])),
+    [operationalDeals],
+  );
   const funnelSales = useMemo(() => filterCanonicalFunnelSales(historicalSales, {
     funnelIds: funnelScopeIds,
     scopedDealIds: new Set(operationalDeals.map((deal) => deal.rd_deal_id)),
@@ -219,10 +223,11 @@ export default function FunnelAnalysis() {
     state: selectedState,
     product: selectedProduct,
     allowedDealIds,
-  }), [allowedDealIds, funnelScopeIds, historicalSales, selectedCampaign, selectedProduct, selectedSource, selectedState]);
+    stateByDealId: historicalStateByDealId,
+  }), [allowedDealIds, funnelScopeIds, historicalSales, historicalStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
   const analytics = useMemo(
-    () => reconcileFunnelRevenue(baseAnalytics, funnelSales),
-    [baseAnalytics, funnelSales],
+    () => reconcileFunnelRevenue(baseAnalytics, funnelSales, { stateByDealId: historicalStateByDealId }),
+    [baseAnalytics, funnelSales, historicalStateByDealId],
   );
   const periodAllowedDealIds = useMemo(
     () => selectedOwner === "all" ? undefined : new Set([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => deal.rd_deal_id)),
@@ -244,7 +249,8 @@ export default function FunnelAnalysis() {
     state: selectedState,
     product: selectedProduct,
     allowedDealIds: periodAllowedDealIds,
-  }), [funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, selectedCampaign, selectedProduct, selectedSource, selectedState]);
+    stateByDealId: periodStateByDealId,
+  }), [funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
   const periodAnalytics = useMemo(
     () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales, { stateByDealId: periodStateByDealId }),
     [periodBaseAnalytics, periodFunnelSales, periodStateByDealId],

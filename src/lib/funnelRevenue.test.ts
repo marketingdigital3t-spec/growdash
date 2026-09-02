@@ -63,4 +63,10 @@ describe("canonical funnel revenue", () => {
     });
     expect(result.stateBreakdown).toEqual([expect.objectContaining({ state: "BA", leads: 0, conversions: 1, conversionRate: 0 })]);
   });
+
+  it("aplica o filtro de UF usando o negócio RD quando a venda ainda não foi enriquecida", () => {
+    expect(filterCanonicalFunnelSales([makeSale({ lead_state: null, rd_deal_id: "deal-ba" })], {
+      funnelId: "funnel-1", state: "BA", stateByDealId: new Map([["deal-ba", "BA"]]),
+    })).toHaveLength(1);
+  });
 });
