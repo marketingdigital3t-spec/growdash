@@ -6195,6 +6195,12 @@ html[data-accent="sapphire"] .brand-shell,
 .brand-shell .gd-metric-card .text-red-500,
 .brand-shell .gd-metric-card .text-red-400 { color: var(--gd-negative) !important; }
 
+/* Expert dashboard is a read-only executive view. Its KPI values are neutral
+   so colour is not misread as a change in the underlying metric definition. */
+.brand-shell .expert-dashboard .gd-metric-card .dashboard-terra-metric-value {
+  color: var(--gd-ink) !important;
+}
+
 /* Neutralize structural blue/purple/pink/cyan utilities while retaining the
    semantic green/red/yellow classes used for KPI states. */
 .brand-shell :is([class*="text-blue-"], [class*="text-sky-"], [class*="text-cyan-"], [class*="text-indigo-"], [class*="text-violet-"], [class*="text-purple-"], [class*="text-pink-"]) { color: var(--gd-ink) !important; }
