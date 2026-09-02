@@ -6470,3 +6470,26 @@ html[data-accent="metallic-gold"],
   .text-rose-400, .text-rose-500, .text-rose-600) { color: var(--gd-negative) !important; }
 .brand-shell :is(.text-yellow-400, .text-yellow-500, .text-yellow-600,
   .text-amber-400, .text-amber-500, .text-amber-600) { color: var(--gd-warning) !important; }
+
+/* Funnel Analysis is a flowing report, not a dashboard masonry. Its previous
+   20rem minimum height plus stretched grid rows made a small table inherit a
+   neighbouring chart's empty space. Cards now own only the space their actual
+   analysis needs; desktop pairs remain side by side and align at the top. */
+.gd-funnel-analysis .gd-analysis-card {
+  height: auto;
+  min-height: 0;
+}
+.gd-funnel-analysis .gd-analysis-card > :last-child {
+  flex: 0 1 auto;
+}
+.gd-funnel-analysis .gd-aligned-grid {
+  align-items: start;
+  gap: var(--gd-space-card);
+}
+.gd-funnel-analysis .gd-aligned-grid > * {
+  align-self: start;
+  height: auto !important;
+}
+.gd-funnel-analysis .gd-aligned-grid .gd-analysis-card {
+  height: auto !important;
+}
