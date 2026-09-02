@@ -45,19 +45,19 @@ export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversi
         return (
           <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} showHint>
             <Card className={`gd-metric-card gd-funnel-kpi cursor-default bg-card/75 border-border/60 border-l-2 backdrop-blur ${c.color.replace("text-", "border-")}`}>
-              <CardContent className="flex min-h-[118px] flex-col justify-center p-4">
-                <div className="flex items-center justify-between mb-2 pr-5">
-                  <span className="text-xs text-muted-foreground">{c.label}</span>
-                  <Icon className={`h-4 w-4 ${c.color} dark:text-white`} />
+              <CardContent className="gd-funnel-kpi-content flex flex-col justify-start">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="gd-funnel-kpi-label text-muted-foreground">{c.label}</span>
+                  <Icon className={`gd-funnel-kpi-icon shrink-0 ${c.color} dark:text-white`} />
                 </div>
-                <div className={`text-2xl font-semibold ${c.color} dark:text-white`}>
+                <div className={`gd-funnel-kpi-value ${c.color} dark:text-white`}>
                   {c.format === "int" && <AnimatedNumber value={Math.round(c.value)} decimals={0} />}
                   {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={c.decimals ?? 1} />%</>}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
                   {c.format === "brl" && fmtBRL(c.value)}
-                  {c.format === "custom" && <span className="text-base">{c.custom}</span>}
+                  {c.format === "custom" && <span>{c.custom}</span>}
                 </div>
-                {c.detail && <p className="mt-1 text-[10px] text-muted-foreground">{c.detail}</p>}
+                {c.detail && <p className="gd-funnel-kpi-detail text-muted-foreground">{c.detail}</p>}
               </CardContent>
             </Card>
           </MetricHelpTooltip>
