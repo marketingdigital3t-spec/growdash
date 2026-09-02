@@ -6201,6 +6201,31 @@ html[data-accent="sapphire"] .brand-shell,
   color: var(--gd-ink) !important;
 }
 
+/* Funnel overview: these eight summary KPIs are scan targets, not content
+   panels. Keep them compact even after the shared metric-card minimum applies. */
+.brand-shell .gd-funnel-kpi-grid {
+  grid-auto-rows: 6rem !important;
+  gap: .75rem !important;
+}
+.brand-shell .gd-funnel-kpi-grid > * {
+  height: 6rem !important;
+}
+.brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi {
+  height: 6rem !important;
+  min-height: 6rem !important;
+}
+.brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi > div {
+  min-height: 0 !important;
+  padding: .7rem .85rem !important;
+}
+.brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi > div > div:first-child {
+  margin-bottom: .25rem !important;
+}
+.brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi > div > div:last-of-type {
+  font-size: 1.15rem !important;
+  line-height: 1.1 !important;
+}
+
 /* Neutralize structural blue/purple/pink/cyan utilities while retaining the
    semantic green/red/yellow classes used for KPI states. */
 .brand-shell :is([class*="text-blue-"], [class*="text-sky-"], [class*="text-cyan-"], [class*="text-indigo-"], [class*="text-violet-"], [class*="text-purple-"], [class*="text-pink-"]) { color: var(--gd-ink) !important; }
