@@ -5929,6 +5929,10 @@ html:not(.dark) .dashboard-reference-kpi, html:not(.dark) .dashboard-reference-f
 }
 .dashboard-daily-charts > * { min-width: 0; height: auto; }
 .dashboard-daily-charts > * > .dashboard-terra-card { min-width: 0; height: auto; }
+.dashboard-daily-charts > :last-child { grid-column: 1 / -1; }
+@media (max-width: 767px) {
+  .dashboard-daily-charts > :last-child { grid-column: auto; }
+}
 .dashboard-daily-charts .recharts-wrapper { max-width: 100%; }
 .gd-aligned-grid { align-items: start; }
 .gd-aligned-grid > * { height: auto; align-self: start; }
