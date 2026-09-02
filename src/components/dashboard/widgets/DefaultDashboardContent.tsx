@@ -770,7 +770,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       <section className="dashboard-section" aria-labelledby="dashboard-trends-title"><div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Tendências</p><h2 id="dashboard-trends-title">Evolução e detalhamento diário</h2></div><p className="dashboard-section-description">Leia a direção dos indicadores antes de aprofundar.</p></div><PerformanceLineChart data={dailyData} />
 
       {/* 5. Gráficos diários */}
-      <div className="dashboard-daily-charts grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
+      <div className="dashboard-daily-charts mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
         <div className="lg:col-span-2"><ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="#38bdf8" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
         <div className="lg:col-span-2"><ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="#facc15" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
         <div className="lg:col-span-2"><ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="#22c55e" /></div>

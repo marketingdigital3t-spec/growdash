@@ -5922,9 +5922,13 @@ html:not(.dark) .dashboard-reference-kpi, html:not(.dark) .dashboard-reference-f
 .gd-funnel-kpi-grid .gd-funnel-kpi > div > div:first-child { margin-bottom: .35rem; }
 .gd-module-section + .gd-module-section { margin-top: .8rem; }
 .dashboard-section-heading { margin-bottom: .55rem; }
-.dashboard-daily-charts { align-items: stretch; column-gap: 1rem; row-gap: 1rem; }
-.dashboard-daily-charts > * { min-width: 0; height: 100%; }
-.dashboard-daily-charts > * > .dashboard-terra-card { min-width: 0; height: 100%; }
+.dashboard-daily-charts {
+  align-items: start;
+  column-gap: var(--gd-space-card, 16px) !important;
+  row-gap: var(--gd-space-card, 16px) !important;
+}
+.dashboard-daily-charts > * { min-width: 0; height: auto; }
+.dashboard-daily-charts > * > .dashboard-terra-card { min-width: 0; height: auto; }
 .dashboard-daily-charts .recharts-wrapper { max-width: 100%; }
 .gd-aligned-grid { align-items: start; }
 .gd-aligned-grid > * { height: auto; align-self: start; }
