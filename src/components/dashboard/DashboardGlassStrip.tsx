@@ -37,8 +37,8 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
     { label: "Vendas", value: integer.format(sales), icon: <ShoppingCart /> },
   ];
 
-  return <section className="sticky top-[calc(88px+env(safe-area-inset-top))] z-20 min-w-0 lg:top-[49px]" aria-label="Resumo fixo do Dashboard">
-    <div className="dashboard-video-glass overflow-hidden rounded-[18px] border border-white/20 bg-background/72 shadow-[0_10px_36px_rgba(0,0,0,.18)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/58 dark:border-white/[.11] dark:bg-[#050506]/92 dark:shadow-[0_10px_38px_rgba(0,0,0,.42),inset_0_1px_0_rgba(255,255,255,.035)]">
+  return <section className="dashboard-summary-strip sticky top-[calc(88px+env(safe-area-inset-top))] z-20 min-w-0 lg:top-[49px]" aria-label="Resumo fixo do Dashboard">
+    <div className="dashboard-summary-strip-surface overflow-visible">
       <button type="button" onClick={() => setCollapsed((value) => !value)} className="flex min-h-11 w-full items-center gap-2 px-3 text-left md:hidden" aria-expanded={!compact}><span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary"><BarChart3 className="h-4 w-4" /></span><span className="min-w-0 grow truncate text-xs font-black">Resumo da operação</span><span className="text-[10px] text-muted-foreground">{brl.format(revenue)} · {roas.toFixed(2)}x</span><ChevronDown className={cn("h-4 w-4 shrink-0 transition", !compact && "rotate-180")} /></button>
       {!compact && <>
         <div className="dashboard-glass-metrics grid min-w-0 grid-cols-2 gap-1.5 border-t border-border/40 bg-transparent p-1.5 md:grid-cols-7 md:gap-1.5 md:border-t-0 md:p-2">

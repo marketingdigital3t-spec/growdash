@@ -6508,3 +6508,24 @@ html[data-accent="metallic-gold"],
 .gd-funnel-analysis .gd-aligned-grid .gd-analysis-card {
   height: auto !important;
 }
+
+/* The dashboard summary is a transparent layout strip. Individual KPI cards
+   retain their own surfaces; the strip must never look like a single giant card. */
+.brand-shell .dashboard-summary-strip-surface {
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.brand-shell .dashboard-summary-strip-surface::before,
+.brand-shell .dashboard-summary-strip-surface::after {
+  display: none !important;
+}
+.brand-shell .dashboard-summary-strip .dashboard-glass-metrics {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  gap: var(--gd-space-card) !important;
+}
