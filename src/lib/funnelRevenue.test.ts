@@ -56,4 +56,11 @@ describe("canonical funnel revenue", () => {
       scopedDealIds: new Set(["other-deal"]),
     })).toHaveLength(0);
   });
+
+  it("preserva a conversão por UF de uma venda fechada no período mesmo sem lead novo no período", () => {
+    const result = reconcileFunnelRevenue({ ...base, stateBreakdown: [] }, [makeSale({ lead_state: null, rd_deal_id: "old-deal" })], {
+      stateByDealId: new Map([["old-deal", "BA"]]),
+    });
+    expect(result.stateBreakdown).toEqual([expect.objectContaining({ state: "BA", leads: 0, conversions: 1, conversionRate: 0 })]);
+  });
 });

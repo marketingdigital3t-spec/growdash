@@ -53,6 +53,31 @@ describe("RD deals date scope", () => {
     expect(analytics.stageConversion[0].label).toBe("Novos leads → Vendas ganhas");
   });
 
+  it("does not create an advancement pair from stages that belong to different funnels", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "a", rd_stage_id: "a-lead", name: "Lead novo", order: 1, is_won: false, is_lost: false },
+      { rd_funnel_id: "a", rd_stage_id: "a-contact", name: "Em atendimento", order: 2, is_won: false, is_lost: false },
+      { rd_funnel_id: "a", rd_stage_id: "a-won", name: "Venda realizada", order: 3, is_won: true, is_lost: false },
+      { rd_funnel_id: "b", rd_stage_id: "b-lead", name: "Lead novo", order: 1, is_won: false, is_lost: false },
+      { rd_funnel_id: "b", rd_stage_id: "b-opportunity", name: "Oportunidade", order: 2, is_won: false, is_lost: false },
+      { rd_funnel_id: "b", rd_stage_id: "b-won", name: "Venda realizada", order: 3, is_won: true, is_lost: false },
+    ];
+    const deal = (id: string, funnel: string, stageId: string, stageName: string): RDDeal => ({
+      id, rd_deal_id: id, rd_funnel_id: funnel, rd_stage_id: stageId, rd_stage_name: stageName, rd_stage_order: 2,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "lead", win: false, lost_reason: null, amount_total: 0,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: "SP", lead_city: null, lead_created_at: "2026-08-01T12:00:00Z", stage_updated_at: null, closed_at: null,
+    });
+    const analytics = computeFunnelAnalytics([
+      deal("a-1", "a", "a-contact", "Em atendimento"),
+      deal("b-1", "b", "b-opportunity", "Oportunidade"),
+    ], stages);
+    const labels = analytics.stageConversion.map((stage) => stage.label);
+    expect(labels).toContain("Novos leads → Em atendimento");
+    expect(labels).toContain("Novos leads → Oportunidades");
+    expect(labels).not.toContain("Em atendimento → Oportunidades");
+  });
+
   it("separates Stand By reasons from lost-deal reasons", () => {
     const stages: FunnelStage[] = [
       { rd_funnel_id: "one", rd_stage_id: "standby", name: "Stand By", order: 3, is_won: false, is_lost: false },

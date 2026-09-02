@@ -36,8 +36,6 @@ import { filterCanonicalFunnelSales, reconcileFunnelRevenue } from "@/lib/funnel
 import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
-import { useEventClasses } from "@/hooks/useEventClasses";
-import { DecisionAlertsPanel } from "@/components/funnel-analysis/DecisionAlertsPanel";
 import { FunnelGrowthRecommendations } from "@/components/funnel-analysis/FunnelGrowthRecommendations";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
@@ -68,7 +66,6 @@ function HelpBlock({ help, children, className }: { help: readonly string[]; chi
 export default function FunnelAnalysis() {
   const { adAccountId, setAdAccountId, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
-  const { data: eventClasses = [] } = useEventClasses();
   const visibleAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
@@ -228,21 +225,29 @@ export default function FunnelAnalysis() {
     [baseAnalytics, funnelSales],
   );
   const periodAllowedDealIds = useMemo(
-    () => selectedOwner === "all" ? undefined : new Set(operationalPeriodDeals.map((deal) => deal.rd_deal_id)),
-    [operationalPeriodDeals, selectedOwner],
+    () => selectedOwner === "all" ? undefined : new Set([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => deal.rd_deal_id)),
+    [operationalPeriodClosedDeals, operationalPeriodDeals, selectedOwner],
+  );
+  const periodScopedDealIds = useMemo(
+    () => new Set([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => deal.rd_deal_id)),
+    [operationalPeriodClosedDeals, operationalPeriodDeals],
+  );
+  const periodStateByDealId = useMemo(
+    () => new Map([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => [deal.rd_deal_id, deal.lead_state])),
+    [operationalPeriodClosedDeals, operationalPeriodDeals],
   );
   const periodFunnelSales = useMemo(() => filterCanonicalFunnelSales(periodSales, {
     funnelIds: funnelScopeIds,
-    scopedDealIds: new Set(operationalPeriodDeals.map((deal) => deal.rd_deal_id)),
+    scopedDealIds: periodScopedDealIds,
     source: selectedSource,
     campaign: selectedCampaign,
     state: selectedState,
     product: selectedProduct,
     allowedDealIds: periodAllowedDealIds,
-  }), [funnelScopeIds, periodAllowedDealIds, periodSales, selectedCampaign, selectedProduct, selectedSource, selectedState]);
+  }), [funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, selectedCampaign, selectedProduct, selectedSource, selectedState]);
   const periodAnalytics = useMemo(
-    () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales),
-    [periodBaseAnalytics, periodFunnelSales],
+    () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales, { stateByDealId: periodStateByDealId }),
+    [periodBaseAnalytics, periodFunnelSales, periodStateByDealId],
   );
   const previousAvgDaysToConvert = useMemo(() => {
     const span = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
@@ -495,10 +500,6 @@ export default function FunnelAnalysis() {
               salesConversionRate={mediaMetrics.salesConversionRate}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
             />
-          </MotionItem>
-
-          <MotionItem>
-            <DecisionAlertsPanel classes={eventClasses} insights={scopedInsights} analytics={periodAnalytics} />
           </MotionItem>
 
           <MotionItem>

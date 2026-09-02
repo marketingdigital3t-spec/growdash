@@ -424,18 +424,55 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     }
   }
 
-  // Cumulativo: chegou neste estágio = está aqui OU em algum estágio posterior na sequência
-  // Considera perdidos (lost) como atribuídos à última etapa em que estavam? Sem rastro, contamos como ao menos lead.
-  const cumulativeBySeqIdx = sequence.map(() => 0);
-  for (const d of deals) {
-    const idx = indexInSeq.get(canonicalDealStageId(d)) ?? -1;
-    if (idx >= 0) {
-      for (let i = 0; i <= idx; i++) cumulativeBySeqIdx[i] += 1;
-    } else if (d.stage_bucket !== "lost") {
-      cumulativeBySeqIdx[0] += 1;
-    } else {
-      // lost: ao menos passou pela primeira etapa
-      if (cumulativeBySeqIdx.length > 0) cumulativeBySeqIdx[0] += 1;
+  // Cada funil tem sua própria sequência. A união de estágios de funis
+  // diferentes criava pares artificiais na taxa de avanço. Sem histórico de
+  // movimentações, a progressão é inferida pelo estágio atual, mas somente
+  // dentro da sequência real do funil daquele negócio.
+  const cumulativeByCanonicalStage = new Map<string, number>();
+  const pairCounts = new Map<string, { from: string; to: string; fromCount: number; toCount: number }>();
+  const stagesByFunnel = new Map<string, FunnelStage[]>();
+  for (const stage of stages) {
+    const list = stagesByFunnel.get(stage.rd_funnel_id) || [];
+    list.push(stage);
+    stagesByFunnel.set(stage.rd_funnel_id, list);
+  }
+  const dealsByFunnel = new Map<string, RDDeal[]>();
+  for (const deal of deals) {
+    const list = dealsByFunnel.get(deal.rd_funnel_id) || [];
+    list.push(deal);
+    dealsByFunnel.set(deal.rd_funnel_id, list);
+  }
+  for (const [funnelId, funnelDeals] of dealsByFunnel) {
+    const funnelSequence = (stagesByFunnel.get(funnelId) || [])
+      .filter((stage) => !stage.is_lost)
+      .sort((a, b) => a.order - b.order)
+      .map((stage) => sourceToCanonicalId.get(stage.rd_stage_id) || stage.rd_stage_id)
+      .filter((stageId, index, list) => list.indexOf(stageId) === index);
+    if (!funnelSequence.length) continue;
+    const stageIndex = new Map(funnelSequence.map((stageId, index) => [stageId, index]));
+    for (const deal of funnelDeals) {
+      const index = stageIndex.get(canonicalDealStageId(deal));
+      if (index == null) {
+        if (deal.stage_bucket === "lost") cumulativeByCanonicalStage.set(funnelSequence[0], (cumulativeByCanonicalStage.get(funnelSequence[0]) || 0) + 1);
+        continue;
+      }
+      for (let position = 0; position <= index; position++) {
+        const stageId = funnelSequence[position];
+        cumulativeByCanonicalStage.set(stageId, (cumulativeByCanonicalStage.get(stageId) || 0) + 1);
+      }
+      for (let position = 0; position < funnelSequence.length - 1; position++) {
+        if (index < position) continue;
+        const fromStage = funnelSequence[position];
+        const toStage = funnelSequence[position + 1];
+        const fromDefinition = sortedStages.find((stage) => stage.rd_stage_id === fromStage);
+        const toDefinition = sortedStages.find((stage) => stage.rd_stage_id === toStage);
+        if (!fromDefinition || !toDefinition) continue;
+        const key = `${fromStage}:${toStage}`;
+        const current = pairCounts.get(key) || { from: fromDefinition.name, to: toDefinition.name, fromCount: 0, toCount: 0 };
+        current.fromCount += 1;
+        if (index >= position + 1) current.toCount += 1;
+        pairCounts.set(key, current);
+      }
     }
   }
 
@@ -444,11 +481,11 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   const semanticQualified = deals.filter((deal) => ["mql", "sql", "opportunity", "client"].includes(deal.stage_bucket)).length;
   qualifiedLeads = semanticQualified > 0
     ? semanticQualified
-    : sequence.length > 0 ? cumulativeBySeqIdx[Math.max(1, midIdx)] || 0 : 0;
+    : sequence.length > 0 ? cumulativeByCanonicalStage.get(sequence[Math.max(1, midIdx)]?.rd_stage_id) || 0 : 0;
 
   const stagesOut = sortedStages.map((s) => {
     const idx = indexInSeq.get(s.rd_stage_id);
-    const cumulative = idx != null ? cumulativeBySeqIdx[idx] : 0;
+    const cumulative = idx != null ? cumulativeByCanonicalStage.get(s.rd_stage_id) || 0 : 0;
     const count = currentCount.get(s.rd_stage_id) || 0;
     const value = valueByStage.get(s.rd_stage_id) || 0;
     const daysSum = daysSumByStage.get(s.rd_stage_id) || 0;
@@ -467,24 +504,24 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
     };
   });
 
-  // Taxa de avanço entre etapas (apenas estágios não perdidos)
+  // Taxa de avanço: cada par é agregado apenas entre funis que contêm as
+  // duas etapas adjacentes, sem criar uma sequência global entre contas.
   const stageConversion: FunnelAnalytics["stageConversion"] = [];
-  for (let i = 0; i < sequence.length - 1; i++) {
-    const from = cumulativeBySeqIdx[i];
-    const to = cumulativeBySeqIdx[i + 1];
-    const rate = from > 0 ? (to / from) * 100 : 0;
-    const lost = Math.max(0, from - to);
-    const lossPct = from > 0 ? (lost / from) * 100 : 0;
+  for (const pair of pairCounts.values()) {
+    const rate = pair.fromCount > 0 ? (pair.toCount / pair.fromCount) * 100 : 0;
+    const lost = Math.max(0, pair.fromCount - pair.toCount);
+    const lossPct = pair.fromCount > 0 ? (lost / pair.fromCount) * 100 : 0;
     stageConversion.push({
-      from: sequence[i].name,
-      to: sequence[i + 1].name,
-      label: `${sequence[i].name} → ${sequence[i + 1].name}`,
+      from: pair.from,
+      to: pair.to,
+      label: `${pair.from} → ${pair.to}`,
       rate,
       lost,
       lossPct,
       isBottleneck: false,
     });
   }
+  stageConversion.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   // marcar maior queda
   if (stageConversion.length > 0) {
     const worst = stageConversion.reduce((a, b) => (b.lossPct > a.lossPct ? b : a));

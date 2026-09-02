@@ -19,6 +19,7 @@ export function FunnelStageConversion({ a }: Props) {
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base">3. Taxa de avanço entre etapas</CardTitle>
+        <p className="text-xs text-muted-foreground">Estimativa pelo estágio atual de cada negociação no RD. Cada taxa considera apenas funis que possuem exatamente esse par de etapas; o histórico individual de movimentações não é armazenado.</p>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (

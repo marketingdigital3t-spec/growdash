@@ -51,6 +51,12 @@ export interface FunnelSaleFilters {
   allowedDealIds?: Set<string>;
 }
 
+export interface FunnelRevenueContext {
+  /** Estado do negócio no RD é o fallback quando a venda canônica ainda não
+   * recebeu `lead_state` durante a sincronização. */
+  stateByDealId?: ReadonlyMap<string, string | null | undefined>;
+}
+
 /**
  * Aplica aos faturamentos os mesmos filtros visíveis na análise de funil.
  * Vendas RD sem correspondência com o funil selecionado nunca vazam para
@@ -85,7 +91,7 @@ export function filterCanonicalFunnelSales(sales: Sale[], filters: FunnelSaleFil
  * substitui todas as medidas monetárias/de conversão pela fonte canônica
  * `sales`. Assim todos os módulos exibem exatamente o mesmo faturamento.
  */
-export function reconcileFunnelRevenue(base: FunnelAnalytics, inputSales: Sale[]): FunnelAnalytics {
+export function reconcileFunnelRevenue(base: FunnelAnalytics, inputSales: Sale[], context: FunnelRevenueContext = {}): FunnelAnalytics {
   const sales = realizedSales(inputSales);
   const conversions = sales.reduce((sum, sale) => sum + Math.max(1, Number(sale.quantity || 1)), 0);
   const revenue = sales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
@@ -113,9 +119,13 @@ export function reconcileFunnelRevenue(base: FunnelAnalytics, inputSales: Sale[]
     sourceRow.revenue += amount;
     sourceMap.set(sourceId, sourceRow);
 
-    const stateId = normalized(normalizeUF(sale.lead_state));
-    const stateRow = stateMap.get(stateId);
-    if (stateRow) stateRow.conversions += quantity;
+    const state = normalizeUF(sale.lead_state || (sale.rd_deal_id ? context.stateByDealId?.get(sale.rd_deal_id) : null));
+    const stateId = normalized(state);
+    // Vendas fechadas no período podem pertencer a leads que entraram antes
+    // dele. Preservar a UF com zero leads evita descartar conversões reais.
+    const stateRow = stateMap.get(stateId) || { state, leads: 0, conversions: 0, conversionRate: 0 };
+    stateRow.conversions += quantity;
+    stateMap.set(stateId, stateRow);
 
     const weekday = weekdayForSale(sale);
     const weekdayRow = weekdayMap.get(weekday) || { weekday, label: WEEKDAYS[weekday], leads: 0, conversions: 0, conversionRate: 0, revenue: 0 };
