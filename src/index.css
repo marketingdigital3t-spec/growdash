@@ -6258,6 +6258,13 @@ html[data-accent="sapphire"] .brand-shell,
   color: var(--gd-surface) !important;
   box-shadow: none !important;
 }
+.brand-shell[data-space-phase] .dashboard-page .gd-platform-tabs [role="tab"][data-state="active"] {
+  /* Overrides the legacy Terra selector that still painted this tab cyan. */
+  border-color: var(--gd-line) !important;
+  background: var(--gd-ink) !important;
+  color: var(--gd-surface) !important;
+  box-shadow: none !important;
+}
 .brand-shell .gd-platform-tabs [role="tab"]:hover:not([data-state="active"]) {
   background: color-mix(in srgb, var(--gd-ink) 8%, transparent) !important;
   color: var(--gd-ink) !important;
