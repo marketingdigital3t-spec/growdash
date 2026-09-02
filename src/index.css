@@ -6130,6 +6130,7 @@ html[data-accent="sapphire"] .brand-shell,
   --gd-card-padding: clamp(14px, 1.25vw, 20px);
   --gd-card-radius: 14px;
   --gd-kpi-height: 112px;
+  --gd-kpi-content-offset: 6px;
   --gd-ink: #171717;
   --gd-ink-muted: #666;
   --gd-surface: #fff;
@@ -6179,6 +6180,11 @@ html[data-accent="sapphire"] .brand-shell,
 }
 .brand-shell .gd-metric-card {
   min-height: var(--gd-kpi-height) !important;
+}
+/* Keep the metric hierarchy optically centred: labels and values travel
+   together, while the card frame and its icon keep their established rhythm. */
+.brand-shell .gd-metric-card > div:first-child {
+  transform: translateY(var(--gd-kpi-content-offset));
 }
 .brand-shell .gd-metric-card .gd-metric-icon,
 .brand-shell .gd-glass-metric-icon {
@@ -6262,7 +6268,7 @@ html[data-accent="sapphire"] .brand-shell,
 .brand-shell .brand-sidebar nav a[aria-current="page"] { background: var(--gd-surface-raised) !important; color: var(--gd-ink) !important; }
 
 @media (max-width: 767px) {
-  :root { --gd-page-gutter: 12px; --gd-space-section: 20px; }
+  :root { --gd-page-gutter: 12px; --gd-space-section: 20px; --gd-kpi-content-offset: 4px; }
   .brand-shell .gd-metric-card { min-height: 96px !important; }
 }
 
