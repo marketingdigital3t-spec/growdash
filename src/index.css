@@ -6741,6 +6741,19 @@ html[data-accent="metallic-gold"],
 .campaigns-workspace .campaign-total-bar > table > tbody > tr {
   height: 66px;
 }
+@media (min-width: 768px) {
+  .campaigns-workspace [data-campaign-table-scroll] {
+    height: calc(100% - 68px) !important;
+    flex: none !important;
+  }
+  .campaigns-workspace .campaign-total-bar {
+    position: absolute !important;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60 !important;
+  }
+}
 
 @media (max-width: 767px) {
   :root {
