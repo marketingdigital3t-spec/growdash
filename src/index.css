@@ -6803,6 +6803,30 @@ html[data-accent="metallic-gold"],
   }
 }
 
+/* Totals footer: give the fixed results strip enough vertical breathing room
+   for its value and descriptor, while keeping its top edge flush with the
+   scrolling campaign body. Only the lower corners are rounded, matching the
+   table frame without clipping the first line of content. */
+@media (min-width: 768px) {
+  .campaigns-workspace [data-campaign-totals-bar] {
+    height: 76px !important;
+    min-height: 76px !important;
+    max-height: 76px !important;
+    border-radius: 0 0 14px 14px !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+  }
+  .campaigns-workspace [data-campaign-totals-bar] [data-campaign-totals] {
+    height: 76px !important;
+  }
+  .campaigns-workspace [data-campaign-totals-bar] [data-campaign-totals] > td {
+    height: 76px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    vertical-align: middle !important;
+  }
+}
+
 /* The header is part of the permanent application chrome, exactly like the
    sidebar. It never switches to a light surface; only the content area below
    it follows the selected appearance mode. */
