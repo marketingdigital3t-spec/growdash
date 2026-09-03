@@ -58,9 +58,10 @@ interface Props {
   hideFinancialKpis?: boolean;
   hideCampaignKpis?: boolean;
   showAcquisitionAnalytics?: boolean;
+  showCampaignFunnel?: boolean;
 }
 
-export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false, showAcquisitionAnalytics = false }: Props) {
+export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false, showAcquisitionAnalytics = false, showCampaignFunnel = true }: Props) {
   const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
@@ -762,7 +763,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       </section>
 
       {/* 4. Funil de Conversão */}
-      <section className="dashboard-section" aria-labelledby="dashboard-funnel-title"><div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Jornada</p><h2 id="dashboard-funnel-title">Funil de conversão</h2></div><p className="dashboard-section-description">Avanço entre cada etapa da aquisição.</p></div><CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} /></section>
+      {showCampaignFunnel && <section className="dashboard-section" aria-labelledby="dashboard-funnel-title"><div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Jornada</p><h2 id="dashboard-funnel-title">Funil de conversão</h2></div><p className="dashboard-section-description">Avanço entre cada etapa da aquisição.</p></div><CampaignFunnel steps={funnelSteps} visibleKeys={visibleStepKeys} /></section>}
 
       {/* 4.1 Origem geográfica (mapa por estado) */}
       <section className="dashboard-section" aria-labelledby="dashboard-origin-title"><div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Distribuição</p><h2 id="dashboard-origin-title">Origem geográfica</h2></div><p className="dashboard-section-description">Leads e vendas por estado.</p></div><GeoOriginWidget /></section>

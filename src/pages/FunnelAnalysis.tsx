@@ -577,6 +577,7 @@ export default function FunnelAnalysis() {
                   hidePrimary
                   hideFinancialOverview
                   showAcquisitionAnalytics
+                  showCampaignFunnel={false}
                 />
                 <div className="space-y-6">
                   <CampaignResultsTable />
