@@ -6751,42 +6751,22 @@ html[data-accent="metallic-gold"],
   white-space: nowrap;
 }
 
-/* The campaign totals footer has its own fixed grid row. It cannot collapse
-   beneath the scroll viewport, so every result column remains visible. */
-.campaigns-workspace .campaign-total-bar {
-  display: block !important;
-  height: 68px !important;
-  min-height: 68px !important;
-  max-height: 68px !important;
-  overflow: hidden !important;
-}
-.campaigns-workspace .campaign-total-bar > table {
-  height: 66px;
-}
-.campaigns-workspace .campaign-total-bar > table > tbody > tr {
-  height: 66px;
-}
+/* The totals row lives in the same scroll plane as the campaign columns. This
+   avoids a duplicate footer and prevents an empty fixed-height strip below it. */
 @media (min-width: 768px) {
   .campaigns-workspace .campaign-table-frame {
-    display: grid !important;
-    grid-template-rows: minmax(0, 1fr) 68px !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] {
-    grid-row: 1 !important;
     height: auto !important;
     min-height: 0 !important;
-    flex: none !important;
+    flex: 1 1 auto !important;
     overflow: auto !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] [data-campaign-totals] > td {
     border-top: 2px solid var(--gd-line) !important;
     background: var(--gd-surface) !important;
-  }
-  .campaigns-workspace .campaign-total-bar {
-    grid-row: 2 !important;
-    align-self: stretch !important;
-    position: static !important;
-    z-index: 40 !important;
   }
 }
 

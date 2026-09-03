@@ -80,7 +80,7 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
 import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
-import { BarraTotais, type CampaignTotalColumn } from "@/components/campaigns/BarraTotais";
+import type { CampaignTotalColumn } from "@/components/campaigns/BarraTotais";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -1070,7 +1070,7 @@ export default function Campaigns() {
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : (
               <Card className={cn(
-                "campaign-table-frame relative min-h-0 overflow-hidden rounded-none border-0 shadow-none md:grid md:grid-rows-[minmax(0,1fr)_68px]",
+                "campaign-table-frame relative min-h-0 overflow-hidden rounded-none border-0 shadow-none md:flex md:flex-col",
                 analysisMode
                   ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
                   : "md:h-[clamp(300px,calc(100dvh-26rem),640px)] md:min-h-0",
@@ -1203,7 +1203,7 @@ export default function Campaigns() {
                     </TableBody>
                     {(() => {
                       const footer = <TableFooter className="sticky bottom-0 z-40">
-                      <TableRow data-campaign-totals className="sticky bottom-0 z-40 h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
+                      <TableRow data-campaign-totals className="sticky bottom-0 z-40 h-14 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
                         <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
                         <CampaignTotalCell
@@ -1256,7 +1256,6 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <BarraTotais rows={filtered} columns={campaignTotalColumns} scrollContainerRef={campaignTableScrollRef} />
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}
