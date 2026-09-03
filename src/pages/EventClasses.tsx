@@ -124,7 +124,7 @@ export default function EventClasses() {
   }, [classes]);
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-6">
+    <div className="event-classes-page mx-auto w-full max-w-[1600px] space-y-6">
       <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
         <button type="button" role="tab" aria-selected={activeView === "classes"} onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" aria-hidden="true" />Datas & Turmas</button>
         <button type="button" role="tab" aria-selected={activeView === "agenda"} onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" aria-hidden="true" />Agenda</button>
