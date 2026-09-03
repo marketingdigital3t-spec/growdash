@@ -6910,3 +6910,22 @@ html:not(.dark) .brand-shell .gd-filter-strip .gd-filter-account .bg-secondary {
   background-color: hsl(var(--secondary)) !important;
   color: hsl(var(--secondary-foreground)) !important;
 }
+
+/* Funnel evolution: each series keeps its own readable chart color. The
+   global monochrome chart fallback must not collapse the three lines into a
+   single gray stroke; colors are limited to the data-series marks/legend. */
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-leads .recharts-line-curve,
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-leads .recharts-active-dot {
+  stroke: #2563eb !important;
+  fill: #2563eb !important;
+}
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-opportunities .recharts-line-curve,
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-opportunities .recharts-active-dot {
+  stroke: #d97706 !important;
+  fill: #d97706 !important;
+}
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-sales .recharts-line-curve,
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-sales .recharts-active-dot {
+  stroke: #16a34a !important;
+  fill: #16a34a !important;
+}

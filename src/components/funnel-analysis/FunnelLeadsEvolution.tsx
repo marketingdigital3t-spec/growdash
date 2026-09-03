@@ -21,7 +21,7 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
       <CardContent>
         <div className="h-72">
           <ResponsiveContainer>
-            <LineChart data={data}>
+            <LineChart data={data} className="funnel-evolution-chart">
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
               <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -29,9 +29,9 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
                 contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted) / 0.25)", stroke: "hsl(var(--border))" }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="Leads" stroke="#38bdf8" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#38bdf8" }} />
-              <Line type="monotone" dataKey="Oportunidades" stroke="#eab308" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#eab308" }} />
-              <Line type="monotone" dataKey="Vendas" stroke="#22c55e" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#22c55e" }} />
+              <Line className="funnel-line-leads" type="monotone" dataKey="Leads" stroke="#2563eb" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#2563eb" }} />
+              <Line className="funnel-line-opportunities" type="monotone" dataKey="Oportunidades" stroke="#d97706" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#d97706" }} />
+              <Line className="funnel-line-sales" type="monotone" dataKey="Vendas" stroke="#16a34a" strokeWidth={2.2} dot={false} activeDot={{ r: 4, fill: "#16a34a" }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
