@@ -48,6 +48,15 @@ export const Canvas = memo(function Canvas({
 }) {
   const ordered = useMemo(() => [...elements].sort((a, b) => a.layerIndex - b.layerIndex), [elements]);
   const selectedBounds = getSelectionBounds(elements, selectedIds);
+  // Keep the visual selection inside the element's real bounds. The previous
+  // frame and handles extended past the element, which made compact blocks
+  // look as if they had a much larger selectable area.
+  const selectionHandleSize = 8 / zoom;
+  const selectionHandleInset = (bounds: { width: number; height: number }) => Math.min(
+    selectionHandleSize / 2,
+    bounds.width / 2,
+    bounds.height / 2,
+  );
   const selection = selectionBox ? {
     x: Math.min(selectionBox.start.x, selectionBox.end.x),
     y: Math.min(selectionBox.start.y, selectionBox.end.y),
@@ -88,17 +97,24 @@ export const Canvas = memo(function Canvas({
           >
             <rect x={bounds.x - 8} y={bounds.y - 8} width={Math.max(16, bounds.width + 16)} height={Math.max(16, bounds.height + 16)} fill="transparent" stroke="transparent" />
             <ShapeRenderer element={element} elements={elements} editing={editingId === element.id} onTextChange={(value) => onTextChange(element.id, value)} onFinishEditing={onFinishEditing} />
-            {selected && selectedIds.length === 1 && <rect x={bounds.x - 2 / zoom} y={bounds.y - 2 / zoom} width={bounds.width + 4 / zoom} height={bounds.height + 4 / zoom} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${4 / zoom}`} pointerEvents="none" />}
+            {selected && selectedIds.length === 1 && <rect x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} fill="none" stroke="hsl(var(--primary))" strokeWidth={1 / zoom} strokeDasharray={`${4 / zoom} ${3 / zoom}`} pointerEvents="none" />}
           </g>;
         })}
 
         {selectedBounds && <>
           {selectedIds.length > 1 && <rect x={selectedBounds.x - 5 / zoom} y={selectedBounds.y - 5 / zoom} width={selectedBounds.width + 10 / zoom} height={selectedBounds.height + 10 / zoom} fill="hsl(var(--primary) / .04)" stroke="hsl(var(--primary))" strokeWidth={1.5 / zoom} strokeDasharray={`${5 / zoom} ${4 / zoom}`} pointerEvents="none" />}
-          {selectedIds.length === 1 && ([
-            ["nw", selectedBounds.x, selectedBounds.y], ["n", selectedBounds.x + selectedBounds.width / 2, selectedBounds.y], ["ne", selectedBounds.x + selectedBounds.width, selectedBounds.y],
-            ["e", selectedBounds.x + selectedBounds.width, selectedBounds.y + selectedBounds.height / 2], ["se", selectedBounds.x + selectedBounds.width, selectedBounds.y + selectedBounds.height],
-            ["s", selectedBounds.x + selectedBounds.width / 2, selectedBounds.y + selectedBounds.height], ["sw", selectedBounds.x, selectedBounds.y + selectedBounds.height], ["w", selectedBounds.x, selectedBounds.y + selectedBounds.height / 2],
-          ] as Array<[ResizeHandle, number, number]>).map(([handle, x, y]) => <rect key={handle} x={x - 5 / zoom} y={y - 5 / zoom} width={10 / zoom} height={10 / zoom} rx={2 / zoom} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={2 / zoom} data-resize-handle={handle} onPointerDown={(event) => onResizePointerDown(event, handle)} style={{ cursor: `${handle}-resize` }} />)}
+          {selectedIds.length === 1 && (() => {
+            const inset = selectionHandleInset(selectedBounds);
+            const left = selectedBounds.x + inset;
+            const right = selectedBounds.x + selectedBounds.width - inset;
+            const top = selectedBounds.y + inset;
+            const bottom = selectedBounds.y + selectedBounds.height - inset;
+            return ([
+              ["nw", left, top], ["n", selectedBounds.x + selectedBounds.width / 2, top], ["ne", right, top],
+              ["e", right, selectedBounds.y + selectedBounds.height / 2], ["se", right, bottom],
+              ["s", selectedBounds.x + selectedBounds.width / 2, bottom], ["sw", left, bottom], ["w", left, selectedBounds.y + selectedBounds.height / 2],
+            ] as Array<[ResizeHandle, number, number]>).map(([handle, x, y]) => <rect key={handle} x={x - selectionHandleSize / 2} y={y - selectionHandleSize / 2} width={selectionHandleSize} height={selectionHandleSize} rx={1.5 / zoom} fill="#ffffff" stroke="hsl(var(--primary))" strokeWidth={1.5 / zoom} data-resize-handle={handle} onPointerDown={(event) => onResizePointerDown(event, handle)} style={{ cursor: `${handle}-resize` }} />);
+          })()}
         </>}
 
         {selection && <rect x={selection.x} y={selection.y} width={selection.width} height={selection.height} fill="hsl(var(--primary) / .10)" stroke="hsl(var(--primary))" strokeWidth={1 / zoom} strokeDasharray={`${5 / zoom} ${4 / zoom}`} pointerEvents="none" />}
