@@ -6755,27 +6755,28 @@ html[data-accent="metallic-gold"],
    avoids a duplicate footer and prevents an empty fixed-height strip below it. */
 @media (min-width: 768px) {
   .campaigns-workspace .campaign-table-frame {
-    display: grid !important;
-    grid-template-rows: minmax(0, 1fr) 56px !important;
+    display: block !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] {
-    grid-row: 1 !important;
-    height: auto !important;
+    height: 100% !important;
     min-height: 0 !important;
     flex: none !important;
     overflow: auto !important;
+    padding-bottom: 56px !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] [data-campaign-totals] > td {
     border-top: 2px solid var(--gd-line) !important;
     background: var(--gd-surface) !important;
   }
   .campaigns-workspace .campaign-total-bar {
-    grid-row: 2 !important;
     display: block !important;
     height: 56px !important;
     min-height: 56px !important;
     max-height: 56px !important;
-    position: static !important;
+    position: absolute !important;
+    inset-inline: 0 !important;
+    bottom: 0 !important;
+    z-index: 50 !important;
   }
 }
 
