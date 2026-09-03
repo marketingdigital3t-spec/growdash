@@ -6747,11 +6747,15 @@ html[data-accent="metallic-gold"],
     grid-template-rows: minmax(0, 1fr) 68px !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] {
+    grid-row: 1 !important;
     height: auto !important;
     min-height: 0 !important;
     flex: none !important;
+    overflow: auto !important;
   }
   .campaigns-workspace .campaign-total-bar {
+    grid-row: 2 !important;
+    align-self: stretch !important;
     position: static !important;
     z-index: 40 !important;
   }
