@@ -253,6 +253,7 @@ export default function Campaigns() {
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
   const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
+  const campaignTotalsScrollRef = useRef<HTMLDivElement | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
     const requested = searchParams.get("analise");
@@ -858,6 +859,16 @@ export default function Campaigns() {
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
+  useEffect(() => {
+    const table = campaignTableScrollRef.current;
+    const totalsBar = campaignTotalsScrollRef.current;
+    if (!table || !totalsBar) return;
+
+    const syncHorizontalPosition = () => { totalsBar.scrollLeft = table.scrollLeft; };
+    syncHorizontalPosition();
+    table.addEventListener("scroll", syncHorizontalPosition, { passive: true });
+    return () => table.removeEventListener("scroll", syncHorizontalPosition);
+  }, [activeTab, filtered.length, camp.colWidths]);
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const showColumn = (key: CampaignColumnKey) => visibleColumns.has(key);
@@ -1070,6 +1081,7 @@ export default function Campaigns() {
                 <div
                   ref={campaignTableScrollRef}
                   data-campaign-table-scroll
+                  style={{ paddingBottom: "64px" }}
                   className={cn(
                     "growdash-scrollbar-hidden hidden min-h-0 flex-1 overflow-auto md:block",
                   )}
@@ -1190,7 +1202,7 @@ export default function Campaigns() {
                         );})}
                       </AnimatePresence>
                     </TableBody>
-                    {(() => {
+                    {false && (() => {
                       const footer = <TableFooter className="sticky bottom-0 z-40">
                       <TableRow data-campaign-totals className="sticky bottom-0 z-40 h-14 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
@@ -1244,6 +1256,35 @@ export default function Campaigns() {
                       return footer;
                     })()}
                   </table>
+                </div>
+                <div
+                  ref={campaignTotalsScrollRef}
+                  className="campaign-fixed-total-bar overflow-hidden border-t bg-card"
+                  style={{ position: "absolute", insetInline: 0, bottom: 0, zIndex: 100, height: "64px" }}
+                  aria-label="Totais das campanhas filtradas"
+                >
+                  <Table style={{ tableLayout: "fixed", width: "max-content" }}>
+                    <TableBody>
+                      <CampaignTotalsRow
+                        widths={camp.colWidths}
+                        visibleColumns={visibleColumns}
+                        count={filtered.length}
+                        totals={totals}
+                        totalCpm={totalCpm}
+                        totalCpl={totalCpl}
+                        totalCpc={totalCpc}
+                        totalCtr={totalCtr}
+                        totalRoas={totalRoas}
+                        totalLinkCpc={totalLinkCpc}
+                        totalUniqueLinkCtr={totalUniqueLinkCtr}
+                        totalCostPerLandingPageView={totalCostPerLandingPageView}
+                        totalCostPerCheckout={totalCostPerCheckout}
+                        totalMetaCostPerPurchase={totalMetaCostPerPurchase}
+                        totalMetaPurchaseRoas={totalMetaPurchaseRoas}
+                        totalResultRate={totalResultRate}
+                      />
+                    </TableBody>
+                  </Table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
