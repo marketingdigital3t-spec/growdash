@@ -254,7 +254,7 @@ export default function Campaigns() {
   const [campaignPage, setCampaignPage] = useState(0);
   const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
   const campaignTotalsScrollRef = useRef<HTMLDivElement | null>(null);
-  const [campaignTotalsViewport, setCampaignTotalsViewport] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [campaignTotalsViewport, setCampaignTotalsViewport] = useState<{ left: number; width: number } | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
     const requested = searchParams.get("analise");
@@ -875,8 +875,8 @@ export default function Campaigns() {
     if (!table || activeTab !== "campaigns") { setCampaignTotalsViewport(null); return; }
     const updateViewport = () => {
       const rect = table.getBoundingClientRect();
-      const next = { left: rect.left, top: Math.min(rect.bottom - 64, window.innerHeight - 16 - 64), width: rect.width };
-      setCampaignTotalsViewport((current) => current && current.left === next.left && current.top === next.top && current.width === next.width ? current : next);
+      const next = { left: rect.left, width: rect.width };
+      setCampaignTotalsViewport((current) => current && current.left === next.left && current.width === next.width ? current : next);
     };
     updateViewport();
     const observer = new ResizeObserver(updateViewport);
@@ -1276,7 +1276,7 @@ export default function Campaigns() {
                   <div
                     ref={campaignTotalsScrollRef}
                     className="campaign-fixed-total-bar hidden overflow-hidden border border-border bg-card shadow-2xl md:block dark:border-[#2a271f] dark:bg-[#070706]"
-                    style={{ position: "fixed", left: campaignTotalsViewport.left, top: campaignTotalsViewport.top, width: campaignTotalsViewport.width, height: "64px", zIndex: 1000 }}
+                    style={{ position: "fixed", left: campaignTotalsViewport.left, bottom: "1rem", width: campaignTotalsViewport.width, height: "64px", zIndex: 1000 }}
                     aria-label="Totais das campanhas filtradas"
                   >
                     <Table style={{ tableLayout: "fixed", width: "max-content" }}>
