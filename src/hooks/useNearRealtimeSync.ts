@@ -9,10 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 const REFRESH_INTERVAL_MS = 60_000;
 const LOCAL_DEDUP_WINDOW_MS = 55_000;
 const STORAGE_PREFIX = "growdash:last-background-sync";
-// Realtime events are batched for one second. This makes every open sidebar
-// module reflect writes promptly without polling every endpoint or hammering
-// Meta/RD APIs (which would trigger rate limits and duplicate work).
-const REALTIME_UI_BATCH_MS = 1_000;
+// A Meta/RD sync can write several related rows in rapid succession. Waiting
+// for a quiet window prevents each write from reloading the same heavy traffic
+// queries and making every tab appear to refresh continuously.
+const REALTIME_UI_BATCH_MS = 15_000;
 
 const LIVE_TABLES = [
   "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",
