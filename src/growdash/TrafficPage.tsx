@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { lazy, Suspense, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -31,8 +31,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
+import CampaignsManager from "@/pages/Campaigns";
 
-const CampaignsManager = lazy(() => import("@/pages/Campaigns"));
 const validTabs = new Set(["campaigns", "budget", "ai", "funnels", "presentation", "tools"]);
 const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
@@ -78,7 +78,7 @@ export default function TrafficPage() {
         <span className="text-[10px] text-muted-foreground sm:ml-auto"><CalendarRange className="mr-1 inline h-3.5 w-3.5" />{format(startDate, "dd/MM/yyyy")}–{format(endDate, "dd/MM/yyyy")}</span>
       </section>}
 
-      {activeTab === "campaigns" && <Suspense fallback={<Loading />}><CampaignsManager /></Suspense>}
+      {activeTab === "campaigns" && <CampaignsManager />}
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
       {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accountName={account?.name} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} onAccountChange={setAdAccountId} />}
       {activeTab === "funnels" && <TrafficFunnels />}
@@ -356,4 +356,3 @@ function TrafficFunnels() {
 function Kpi({ label, value, note, emphasis }: { label: string; value: string; note: string; emphasis?: boolean }) { return <article className={cn("gd-metric-card min-w-0 cursor-default overflow-hidden rounded-xl border border-border bg-card p-4", emphasis && "border-primary/60 bg-primary/5")} title={metricDescription(label)}><p className="min-h-[2.25em] break-words text-[9px] font-black uppercase leading-tight tracking-[.12em] text-muted-foreground">{label}</p><p className="mt-2 truncate text-xl font-black" title={value}>{value}</p><p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground">{note}</p></article>; }
 function SmallMetric({ label, value }: { label: string; value: string }) { return <div className="min-w-0 overflow-hidden rounded-lg border border-border bg-background p-3"><span className="line-clamp-2 text-[9px] font-bold text-muted-foreground">{label}</span><strong className="mt-1 block truncate text-xs" title={value}>{value}</strong></div>; }
 function Empty({ text }: { text: string }) { return <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border bg-card p-6 text-center text-xs text-muted-foreground">{text}</div>; }
-function Loading() { return <div className="grid min-h-[320px] place-items-center"><div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>; }
