@@ -282,7 +282,10 @@ export default function FunnelAnalysis() {
     enabled: visibleAccounts.length > 0,
   });
   const { data: campaignRows = [] } = useCampaigns(effectiveAdAccountId);
-  const { data: products = [] } = useProducts();
+  // Produtos do dashboard são uma fonte distinta das opções de produto do RD
+  // usadas no filtro acima. Mantê-los com nomes explícitos evita que um
+  // sobrescreva o outro durante a compilação da página de funis.
+  const { data: dashboardProducts = [] } = useProducts();
   const visibleCampaignRows = useMemo(
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
@@ -566,7 +569,7 @@ export default function FunnelAnalysis() {
                 alerts: [],
                 campaigns: visibleCampaignRows,
                 adAccounts: visibleAccounts,
-                products,
+                products: dashboardProducts,
                 isLoading: loadingInsights || loadingMetaActions,
               }}>
                 <DefaultDashboardContent
