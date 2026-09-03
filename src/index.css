@@ -6453,6 +6453,10 @@ html[data-accent="metallic-gold"],
   --gd-sidebar-ink: #f5f5f5;
   --gd-sidebar-muted: rgba(245,245,245,.62);
   --gd-sidebar-line: rgba(255,255,255,.14);
+  --gd-chrome-surface: #0d0d0d;
+  --gd-chrome-ink: #f5f5f5;
+  --gd-chrome-muted: rgba(245,245,245,.62);
+  --gd-chrome-line: rgba(255,255,255,.14);
 }
 
 /* Shell and shared surfaces must follow the active theme; former phase rules
@@ -6796,17 +6800,23 @@ html[data-accent="metallic-gold"],
   }
 }
 
-/* The horizontal divider beneath the global goal/header bar is structural,
-   never an accent. Legacy Terra rules could still paint it blue. */
+/* The header is part of the permanent application chrome, exactly like the
+   sidebar. It never switches to a light surface; only the content area below
+   it follows the selected appearance mode. */
 .brand-shell .brand-topbar.growdash-global-header {
-  border-bottom: 1px solid var(--gd-line) !important;
-  box-shadow: 0 1px 0 var(--gd-line) !important;
+  background: var(--gd-chrome-surface) !important;
+  border-color: var(--gd-chrome-line) !important;
+  border-bottom: 1px solid var(--gd-chrome-line) !important;
+  color: var(--gd-chrome-ink) !important;
+  box-shadow: 0 1px 0 var(--gd-chrome-line) !important;
 }
-
-/* Clear mode keeps the content header light. The sidebar remains graphite so
-   navigation has a stable, high-contrast home in either appearance mode. */
-html:not(.dark) .brand-shell .brand-topbar {
-  background: var(--gd-surface) !important;
-  border-color: var(--gd-line) !important;
-  color: var(--gd-ink) !important;
+.brand-shell .brand-topbar :is(.text-foreground, .text-card-foreground,
+  .text-popover-foreground, .text-primary) {
+  color: var(--gd-chrome-ink) !important;
+}
+.brand-shell .brand-topbar :is(.text-muted-foreground, .text-secondary-foreground) {
+  color: var(--gd-chrome-muted) !important;
+}
+.brand-shell .brand-topbar :is(a, button):not(.bg-primary) {
+  color: var(--gd-chrome-muted);
 }
