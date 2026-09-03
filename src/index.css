@@ -4899,18 +4899,13 @@ html:not(.dark) .growdash-main .recharts-cartesian-axis-tick-value {
 }
 
 html:not(.dark) .growdash-main .recharts-cartesian-grid line {
-  stroke: #d8cdbd !important;
+  stroke: #d8d8d8 !important;
   stroke-opacity: .9;
 }
 
 html:not(.dark) .growdash-main .recharts-line-curve {
-  stroke: #684600 !important;
+  stroke: #555555 !important;
   stroke-opacity: .95 !important;
-}
-
-html:not(.dark) .growdash-main .recharts-bar-rectangle path {
-  fill: #795000 !important;
-  fill-opacity: .9 !important;
 }
 
 /* Dashboard theme contract -------------------------------------------------
@@ -6780,4 +6775,22 @@ html[data-accent="metallic-gold"],
 .brand-shell .brand-topbar.growdash-global-header {
   border-bottom: 1px solid var(--gd-line) !important;
   box-shadow: 0 1px 0 var(--gd-line) !important;
+}
+
+/* Clear mode is a complete light interface. Historical phase selectors kept
+   the chrome graphite even after the page surface switched to light. */
+html:not(.dark) .brand-shell :is(.brand-sidebar, .brand-topbar) {
+  background: var(--gd-surface) !important;
+  border-color: var(--gd-line) !important;
+  color: var(--gd-ink) !important;
+}
+html:not(.dark) .brand-shell .brand-sidebar {
+  box-shadow: 1px 0 0 var(--gd-line) !important;
+}
+html:not(.dark) .brand-shell .brand-sidebar :is(a, button, span, p) {
+  color: var(--gd-ink) !important;
+}
+html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"] {
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-ink) !important;
 }
