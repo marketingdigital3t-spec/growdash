@@ -6565,17 +6565,17 @@ html[data-accent="metallic-gold"],
    hierarchy as the larger dashboard cards. This overrides former five-column
    and compact-card rules without changing any metric calculation. */
 .brand-shell .gd-funnel-kpi-grid {
-  grid-auto-rows: 9.5rem !important;
+  grid-auto-rows: 4.75rem !important;
   gap: var(--gd-space-card) !important;
 }
 .brand-shell .gd-funnel-kpi-grid > *,
 .brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi {
-  height: 9.5rem !important;
-  min-height: 9.5rem !important;
+  height: 4.75rem !important;
+  min-height: 4.75rem !important;
 }
 .brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi-content {
   min-height: 0 !important;
-  padding: 1.2rem 1.25rem !important;
+  padding: .55rem 1.25rem !important;
   transform: none !important;
 }
 .brand-shell .gd-funnel-kpi-label {
@@ -6607,14 +6607,14 @@ html[data-accent="metallic-gold"],
 }
 @media (max-width: 640px) {
   .brand-shell .gd-funnel-kpi-grid {
-    grid-auto-rows: 8.25rem !important;
+    grid-auto-rows: 4.125rem !important;
   }
   .brand-shell .gd-funnel-kpi-grid > *,
   .brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi {
-    height: 8.25rem !important;
-    min-height: 8.25rem !important;
+    height: 4.125rem !important;
+    min-height: 4.125rem !important;
   }
   .brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi-content {
-    padding: 1rem !important;
+    padding: .5rem 1rem !important;
   }
 }
