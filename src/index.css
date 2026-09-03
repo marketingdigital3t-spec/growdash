@@ -6444,6 +6444,17 @@ html[data-accent="metallic-gold"],
   --gd-line: #3d3d3d;
 }
 
+/* The navigation is deliberately a stable graphite surface in both modes.
+   This keeps the shell recognizable while the page surface follows light or
+   dark mode, and prevents the final generic card selector from washing the
+   sidebar out in light mode. */
+.brand-shell {
+  --gd-sidebar-surface: #0d0d0d;
+  --gd-sidebar-ink: #f5f5f5;
+  --gd-sidebar-muted: rgba(245,245,245,.62);
+  --gd-sidebar-line: rgba(255,255,255,.14);
+}
+
 /* Shell and shared surfaces must follow the active theme; former phase rules
    above used !important and were the reason light pages could render dark. */
 .brand-shell,
@@ -6460,7 +6471,22 @@ html[data-accent="metallic-gold"],
   color: var(--gd-ink) !important;
 }
 .brand-shell .brand-sidebar {
+  background: var(--gd-sidebar-surface) !important;
+  border-color: var(--gd-sidebar-line) !important;
+  color: var(--gd-sidebar-ink) !important;
   box-shadow: none !important;
+}
+.brand-shell .brand-sidebar :is(a, button) {
+  color: var(--gd-sidebar-muted);
+}
+.brand-shell .brand-sidebar nav a[aria-current="page"] {
+  background: rgba(255,255,255,.12) !important;
+  color: var(--gd-sidebar-ink) !important;
+}
+.brand-shell .brand-sidebar nav a:hover,
+.brand-shell .brand-sidebar nav > section > button:hover {
+  color: var(--gd-sidebar-ink) !important;
+  background-color: rgba(255,255,255,.07) !important;
 }
 .brand-shell :is(.bg-background, .bg-card, .bg-popover) {
   background-color: hsl(var(--background)) !important;
@@ -6777,23 +6803,10 @@ html[data-accent="metallic-gold"],
   box-shadow: 0 1px 0 var(--gd-line) !important;
 }
 
-/* Clear mode is a complete light interface. Historical phase selectors kept
-   the chrome graphite even after the page surface switched to light. */
-html:not(.dark) .brand-shell :is(.brand-sidebar, .brand-topbar) {
+/* Clear mode keeps the content header light. The sidebar remains graphite so
+   navigation has a stable, high-contrast home in either appearance mode. */
+html:not(.dark) .brand-shell .brand-topbar {
   background: var(--gd-surface) !important;
   border-color: var(--gd-line) !important;
   color: var(--gd-ink) !important;
-}
-html:not(.dark) .brand-shell .brand-sidebar {
-  box-shadow: 1px 0 0 var(--gd-line) !important;
-}
-html:not(.dark) .brand-shell .brand-sidebar :is(a, button, span, p) {
-  color: var(--gd-ink) !important;
-}
-html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"] {
-  background: var(--gd-surface-raised) !important;
-  color: var(--gd-ink) !important;
-}
-html:not(.dark) .brand-shell .brand-sidebar .brand-logo-image {
-  filter: invert(1) !important;
 }
