@@ -106,6 +106,23 @@ export default function EventClasses() {
     };
   }, [filtered]);
 
+  const classSales = useMemo(() => {
+    const totals = { studentSP: 0, studentTO: 0, modelPatientSP: 0, modelPatientTO: 0 };
+    for (const eventClass of classes || []) {
+      const location = `${eventClass.location || ""} ${eventClass.title}`.toLocaleLowerCase("pt-BR");
+      const region = /\b(sp|são paulo|sao paulo)\b/.test(location) ? "SP" : /\b(to|tocantins|aragua[ií]na)\b/.test(location) ? "TO" : null;
+      if (!region) continue;
+      if (region === "SP") {
+        totals.studentSP += eventClass.studentCount;
+        totals.modelPatientSP += eventClass.modelPatientCount;
+      } else {
+        totals.studentTO += eventClass.studentCount;
+        totals.modelPatientTO += eventClass.modelPatientCount;
+      }
+    }
+    return totals;
+  }, [classes]);
+
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6">
       <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
@@ -121,7 +138,7 @@ export default function EventClasses() {
               <CalendarDays className="h-6 w-6 text-primary" /> Datas & Turmas
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Gerencie turmas, vagas, alunos e pacientes-modelo manualmente.
+              Gerencie turmas, vagas, alunos e pacientes-modelo vinculados aos funis comerciais do RD Station.
             </p>
           </div>
           <Button onClick={() => setFormOpen(true)}>
@@ -139,6 +156,25 @@ export default function EventClasses() {
         <StatCard icon={Users} label="Vagas disp." value={summary.vacancies} />
         <StatCard icon={AlertTriangle} label="Críticas" value={summary.critical} accent="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
       </div>
+
+      <Card className="border-primary/20 bg-primary/[0.03]">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[.14em] text-primary">Preenchimento automático pelo CRM</p>
+              <h2 className="mt-1 text-base font-bold">Vendas confirmadas · Dra. Ranniely Silva</h2>
+              <p className="text-xs text-muted-foreground">Atualiza a cada 30 segundos e vincula automaticamente as vendas ganhas à turma da mesma região.</p>
+            </div>
+            <span className="text-xs font-semibold text-muted-foreground">Somente vendas realizadas</span>
+          </div>
+          <div className="gd-kpi-grid mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard icon={Users} label="Alunas · SP" value={classSales.studentSP} />
+            <StatCard icon={Users} label="Alunas · TO" value={classSales.studentTO} />
+            <StatCard icon={Stethoscope} label="Paciente modelo · SP" value={classSales.modelPatientSP} />
+            <StatCard icon={Stethoscope} label="Paciente modelo · TO" value={classSales.modelPatientTO} />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">

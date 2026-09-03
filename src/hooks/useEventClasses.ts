@@ -126,6 +126,9 @@ export function useEventClasses() {
     queryKey: ["event_classes"],
     refetchInterval: 30_000,
     queryFn: async () => {
+      // Adds only confirmed, region-compatible RD deals and never changes a
+      // manually linked member. This keeps occupancy current after every sync.
+      await (supabase as any).rpc("sync_event_class_members_from_rd");
       const { data: classes, error } = await (supabase as any)
         .from("event_classes")
         .select("*")
@@ -182,12 +185,10 @@ export function useEventClasses() {
         const sources = (sourcesByClass.get(c.id) || []).map((source) => ({ ...source, funnel_name: funnelMap.get(source.rd_funnel_id) }));
         return ({
         ...c,
-        // Turma occupancy is intentionally manual. RD deals remain available
-        // in the member history, but never change these counters implicitly.
-        linkedStudentCount: 0,
-        linkedModelPatientCount: 0,
-        studentCount: Number(c.manual_student_count || 0),
-        modelPatientCount: Number(c.manual_model_patient_count || 0),
+        linkedStudentCount: countMap.get(c.id)?.s ?? 0,
+        linkedModelPatientCount: countMap.get(c.id)?.p ?? 0,
+        studentCount: (countMap.get(c.id)?.s ?? 0) + Number(c.manual_student_count || 0),
+        modelPatientCount: (countMap.get(c.id)?.p ?? 0) + Number(c.manual_model_patient_count || 0),
         rd_funnel_name: funnelMap.get(c.rd_funnel_id) as string | undefined,
         rd_model_patient_funnel_name: c.rd_model_patient_funnel_id
           ? (funnelMap.get(c.rd_model_patient_funnel_id) as string | undefined)
@@ -196,39 +197,6 @@ export function useEventClasses() {
       });
       }) as EventClassWithCounts[];
     },
-  });
-}
-
-export function useAdjustEventClassCount() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: async ({ id, type, delta, current }: { id: string; type: MemberType; delta: number; current: number }) => {
-      const field = type === "student" ? "manual_student_count" : "manual_model_patient_count";
-      const next = Math.max(0, current + delta);
-      const { error } = await (supabase as any).from("event_classes").update({ [field]: next }).eq("id", id);
-      if (error) throw error;
-      await (supabase as any).from("event_class_history").insert({
-        event_class_id: id, actor_id: user?.id,
-        action: type === "student" ? "manual_student_count_changed" : "manual_model_patient_count_changed",
-        description: `${type === "student" ? "Alunas" : "Pacientes-modelo"}: ${next}`,
-        metadata: { source: "manual_counter", delta, value: next },
-      });
-    },
-    onMutate: async ({ id, type, delta, current }) => {
-      await qc.cancelQueries({ queryKey: ["event_classes"] });
-      const previous = qc.getQueryData<EventClassWithCounts[]>(["event_classes"]);
-      const next = Math.max(0, current + delta);
-      qc.setQueryData<EventClassWithCounts[]>(["event_classes"], (rows) => rows?.map((row) => row.id !== id ? row : {
-        ...row,
-        ...(type === "student" ? { manual_student_count: next, studentCount: next } : { manual_model_patient_count: next, modelPatientCount: next }),
-      }));
-      return { previous };
-    },
-    onError: (_error, _variables, context) => {
-      if (context?.previous) qc.setQueryData(["event_classes"], context.previous);
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["event_classes"] }),
   });
 }
 
