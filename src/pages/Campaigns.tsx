@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { addDays, format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -253,6 +254,7 @@ export default function Campaigns() {
   const [campaignPage, setCampaignPage] = useState(0);
   const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
   const campaignTotalsScrollRef = useRef<HTMLDivElement | null>(null);
+  const [campaignTotalsViewport, setCampaignTotalsViewport] = useState<{ left: number; top: number; width: number } | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
     const requested = searchParams.get("analise");
@@ -868,6 +870,21 @@ export default function Campaigns() {
     table.addEventListener("scroll", syncHorizontalPosition, { passive: true });
     return () => table.removeEventListener("scroll", syncHorizontalPosition);
   }, [activeTab, filtered.length, camp.colWidths]);
+  useEffect(() => {
+    const table = campaignTableScrollRef.current;
+    if (!table || activeTab !== "campaigns") { setCampaignTotalsViewport(null); return; }
+    const updateViewport = () => {
+      const rect = table.getBoundingClientRect();
+      const next = { left: rect.left, top: Math.min(rect.bottom - 64, window.innerHeight - 16 - 64), width: rect.width };
+      setCampaignTotalsViewport((current) => current && current.left === next.left && current.top === next.top && current.width === next.width ? current : next);
+    };
+    updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(table);
+    window.addEventListener("resize", updateViewport);
+    window.addEventListener("scroll", updateViewport, true);
+    return () => { observer.disconnect(); window.removeEventListener("resize", updateViewport); window.removeEventListener("scroll", updateViewport, true); };
+  }, [activeTab, camp.colWidths, filtered.length, isLoading]);
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const showColumn = (key: CampaignColumnKey) => visibleColumns.has(key);
@@ -1255,34 +1272,38 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <div
-                  ref={campaignTotalsScrollRef}
-                  className="campaign-fixed-total-bar hidden h-16 min-h-16 w-full shrink-0 overflow-hidden border-t border-border bg-card shadow-[0_-8px_20px_rgba(0,0,0,.12)] md:block dark:border-[#2a271f] dark:bg-[#070706]"
-                  aria-label="Totais das campanhas filtradas"
-                >
-                  <Table style={{ tableLayout: "fixed", width: "max-content" }}>
-                    <TableBody>
-                      <CampaignTotalsRow
-                        widths={camp.colWidths}
-                        visibleColumns={visibleColumns}
-                        count={filtered.length}
-                        totals={totals}
-                        totalCpm={totalCpm}
-                        totalCpl={totalCpl}
-                        totalCpc={totalCpc}
-                        totalCtr={totalCtr}
-                        totalRoas={totalRoas}
-                        totalLinkCpc={totalLinkCpc}
-                        totalUniqueLinkCtr={totalUniqueLinkCtr}
-                        totalCostPerLandingPageView={totalCostPerLandingPageView}
-                        totalCostPerCheckout={totalCostPerCheckout}
-                        totalMetaCostPerPurchase={totalMetaCostPerPurchase}
-                        totalMetaPurchaseRoas={totalMetaPurchaseRoas}
-                        totalResultRate={totalResultRate}
-                      />
-                    </TableBody>
-                  </Table>
-                </div>
+                {activeTab === "campaigns" && campaignTotalsViewport && createPortal(
+                  <div
+                    ref={campaignTotalsScrollRef}
+                    className="campaign-fixed-total-bar hidden overflow-hidden border border-border bg-card shadow-2xl md:block dark:border-[#2a271f] dark:bg-[#070706]"
+                    style={{ position: "fixed", left: campaignTotalsViewport.left, top: campaignTotalsViewport.top, width: campaignTotalsViewport.width, height: "64px", zIndex: 1000 }}
+                    aria-label="Totais das campanhas filtradas"
+                  >
+                    <Table style={{ tableLayout: "fixed", width: "max-content" }}>
+                      <TableBody>
+                        <CampaignTotalsRow
+                          widths={camp.colWidths}
+                          visibleColumns={visibleColumns}
+                          count={filtered.length}
+                          totals={totals}
+                          totalCpm={totalCpm}
+                          totalCpl={totalCpl}
+                          totalCpc={totalCpc}
+                          totalCtr={totalCtr}
+                          totalRoas={totalRoas}
+                          totalLinkCpc={totalLinkCpc}
+                          totalUniqueLinkCtr={totalUniqueLinkCtr}
+                          totalCostPerLandingPageView={totalCostPerLandingPageView}
+                          totalCostPerCheckout={totalCostPerCheckout}
+                          totalMetaCostPerPurchase={totalMetaCostPerPurchase}
+                          totalMetaPurchaseRoas={totalMetaPurchaseRoas}
+                          totalResultRate={totalResultRate}
+                        />
+                      </TableBody>
+                    </Table>
+                  </div>,
+                  document.body,
+                )}
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}
