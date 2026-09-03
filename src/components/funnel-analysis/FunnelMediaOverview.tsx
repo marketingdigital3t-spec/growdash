@@ -19,11 +19,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
     { label: "CAC / ROAS", value: `${fmtBRL(metrics.cac)} / ${metrics.roas == null ? "—" : `${metrics.roas.toFixed(2)}x`}`, detail: `${metrics.sales} venda(s)`, icon: Gauge },
   ];
 
-  const coverageTone = metrics.rdCoverage == null
-    ? "text-muted-foreground"
-    : metrics.rdCoverage >= 85 && metrics.rdCoverage <= 115
-      ? "text-emerald-400"
-      : "text-amber-400";
+  const coverageTone = "text-foreground";
 
   return (
     <Card className="gd-panel border-border/50 bg-card/70">
@@ -45,7 +41,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
               <div className="gd-metric-card gd-funnel-media-kpi h-full min-w-0 cursor-default rounded-xl border border-border/50 bg-background/70 p-3">
                 <div className="flex items-start justify-between gap-2 pr-5">
                   <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
-                  <Icon className="h-4 w-4 shrink-0 text-primary" />
+                  <Icon className="h-4 w-4 shrink-0 text-foreground" />
                 </div>
                 <p className="mt-2 truncate text-lg font-bold text-foreground">{value}</p>
                 <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
@@ -55,7 +51,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
         </div>
         {metrics.metaLeads > 0 && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Diferença de leads RD − Meta: <strong className={Math.abs(metrics.leadGap) <= Math.max(1, metrics.metaLeads * 0.15) ? "text-emerald-400" : "text-amber-400"}>{metrics.leadGap > 0 ? "+" : ""}{fmtInt(metrics.leadGap)}</strong>. A comparação respeita o mesmo período, mas pode variar conforme atribuição e preenchimento de UTMs.
+            Diferença de leads RD − Meta: <strong className="text-foreground">{metrics.leadGap > 0 ? "+" : ""}{fmtInt(metrics.leadGap)}</strong>. A comparação respeita o mesmo período, mas pode variar conforme atribuição e preenchimento de UTMs.
           </p>
         )}
       </CardContent>
