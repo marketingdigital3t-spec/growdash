@@ -37,6 +37,10 @@ import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
 import { FunnelGrowthRecommendations } from "@/components/funnel-analysis/FunnelGrowthRecommendations";
+import { DashboardProvider } from "@/contexts/DashboardContext";
+import { DefaultDashboardContent } from "@/components/dashboard/widgets/DefaultDashboardContent";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { useProducts } from "@/hooks/useProducts";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
@@ -275,6 +279,12 @@ export default function FunnelAnalysis() {
     endDate,
     enabled: visibleAccounts.length > 0,
   });
+  const { data: campaignRows = [] } = useCampaigns(effectiveAdAccountId);
+  const { data: products = [] } = useProducts();
+  const visibleCampaignRows = useMemo(
+    () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
+    [campaignRows, integratedAccountIds],
+  );
 
   const { scopedInsights, campaignWithoutMediaMatch } = useMemo(() => {
     const allowedAccountIds = adAccountId === "all" ? integratedAccountIds : new Set([adAccountId]);
@@ -506,6 +516,32 @@ export default function FunnelAnalysis() {
               salesConversionRate={mediaMetrics.salesConversionRate}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
             />
+          </MotionItem>
+
+          <MotionItem>
+            <section aria-label="Performance de campanhas e funil de mídia">
+              <DashboardProvider value={{
+                startDate,
+                endDate,
+                adAccountId: effectiveAdAccountId,
+                insights: scopedInsights,
+                sales: periodFunnelSales,
+                rdDeals: operationalPeriodDeals,
+                revenueDeals: operationalPeriodDeals,
+                alerts: [],
+                campaigns: visibleCampaignRows,
+                adAccounts: visibleAccounts,
+                products,
+                isLoading: loadingInsights || loadingMetaActions,
+              }}>
+                <DefaultDashboardContent
+                  onEditSale={() => undefined}
+                  hidePrimary
+                  hideFinancialOverview
+                  showAcquisitionAnalytics
+                />
+              </DashboardProvider>
+            </section>
           </MotionItem>
 
           <MotionItem>

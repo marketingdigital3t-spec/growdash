@@ -1,10 +1,9 @@
 // Default "Padrão" dashboard. Reflects the user's requested layout:
 // 1) Faturamento Bruto / Gastos / ROAS / ROI
 // 2) Vendas por Pagamento / Vendas por Plataforma / Margem / Recebíveis / Ticket Médio
-// 3) Performance de Campanhas (3 abas: Formulário Nativo / Landing page / Mensagens)
-// 4) Funil de Conversão (passos definidos por aba)
-// 5) Gráficos diários
-// + CampaignsDetailWidget no fim (system widget)
+// A leitura de aquisição (performance, funil de mídia e tendências) é
+// reutilizada pela Análise de Funis. O Dashboard mantém somente a visão
+// executiva e financeira para não duplicar essas análises.
 
 import { useMemo, useState } from "react";
 import {
@@ -58,9 +57,10 @@ interface Props {
   hideFinancialOverview?: boolean;
   hideFinancialKpis?: boolean;
   hideCampaignKpis?: boolean;
+  showAcquisitionAnalytics?: boolean;
 }
 
-export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false }: Props) {
+export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false, showAcquisitionAnalytics = false }: Props) {
   const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
@@ -720,7 +720,8 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         </div>
       </section>}
 
-      {/* 3. Performance das Campanhas */}
+      {showAcquisitionAnalytics && <>
+      {/* Performance das Campanhas */}
       <section className="dashboard-section" aria-labelledby="dashboard-campaign-title">
         <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Aquisição</p><h2 id="dashboard-campaign-title">Performance de campanhas</h2></div><p className="dashboard-section-description">Compare objetivos e qualidade dos resultados.</p></div>
         <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
@@ -777,6 +778,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         <div><ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
         <div className="md:col-span-2"><ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
       </div></section>
+      </>}
     </div>
   );
 }
