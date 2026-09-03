@@ -6618,3 +6618,13 @@ html[data-accent="metallic-gold"],
     padding: .5rem 1rem !important;
   }
 }
+
+/* The default Dashboard renders a sequence of independent sections. Keep its
+   structural wrapper open so global shared-surface rules cannot turn the
+   entire Acquisition-to-Performance area into one large card. */
+.brand-shell .dashboard-widget-shell.dashboard-default-widget-shell > * {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
