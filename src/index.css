@@ -6668,8 +6668,8 @@ html[data-accent="metallic-gold"],
    at the right. This final layer deliberately replaces legacy transforms and
    one-off paddings without changing what each metric calculates. */
 :root {
-  --gd-kpi-card-height: 112px;
-  --gd-kpi-pad-y: 16px;
+  --gd-kpi-card-height: 96px;
+  --gd-kpi-pad-y: 12px;
   --gd-kpi-pad-x: 20px;
   --gd-kpi-label-size: 12px;
   --gd-kpi-value-size: clamp(1.35rem, 1.65vw, 1.8rem);
@@ -6751,6 +6751,13 @@ html[data-accent="metallic-gold"],
   white-space: nowrap;
 }
 
+/* Funnel KPIs in the black-and-white presentation use the same neutral
+   foreground in dark mode as in the light cards. Keeping this override at the
+   final layer prevents legacy semantic accent classes from tinting text. */
+.dark .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel-kpi-value, .gd-funnel-kpi-detail, .gd-funnel-kpi-icon, .text-muted-foreground) {
+  color: #000 !important;
+}
+
 /* Campaign totals use the same widths as their table columns, but remain in a
    dedicated footer. The list can scroll without hiding the aggregate values. */
 @media (min-width: 768px) {
@@ -6795,8 +6802,8 @@ html[data-accent="metallic-gold"],
 
 @media (max-width: 767px) {
   :root {
-    --gd-kpi-card-height: 96px;
-    --gd-kpi-pad-y: 13px;
+    --gd-kpi-card-height: 88px;
+    --gd-kpi-pad-y: 11px;
     --gd-kpi-pad-x: 15px;
     --gd-kpi-label-size: 11px;
     --gd-kpi-value-size: 1.35rem;
