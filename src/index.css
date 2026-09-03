@@ -6794,3 +6794,6 @@ html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"] {
   background: var(--gd-surface-raised) !important;
   color: var(--gd-ink) !important;
 }
+html:not(.dark) .brand-shell .brand-sidebar .brand-logo-image {
+  filter: invert(1) !important;
+}
