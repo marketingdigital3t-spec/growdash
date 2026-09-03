@@ -1003,6 +1003,7 @@ Deno.serve(async (req) => {
             utm_term,
             utm_id,
             contact_name: contactName,
+            contact_phone: contactPhone,
             contact_email: contactEmail,
             lead_state: contactState,
             lead_city: contactCity,

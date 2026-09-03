@@ -54,6 +54,9 @@ export interface Sale {
   source_closed_at: string | null;
   attribution_confidence: number | null;
   attribution_reason: string | null;
+  meta_lead_id: string | null;
+  meta_form_id: string | null;
+  meta_attribution_method: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -4118,6 +4118,13 @@ export type Database = {
           manual_override_by: string | null
           manual_override_enabled: boolean
           manual_override_reason: string | null
+          meta_ad_id: string | null
+          meta_adset_id: string | null
+          meta_attributed_at: string | null
+          meta_attribution_method: string | null
+          meta_campaign_id: string | null
+          meta_form_id: string | null
+          meta_lead_id: string | null
           name: string | null
           owner_id: string | null
           owner_name: string | null
@@ -4181,6 +4188,13 @@ export type Database = {
           manual_override_by?: string | null
           manual_override_enabled?: boolean
           manual_override_reason?: string | null
+          meta_ad_id?: string | null
+          meta_adset_id?: string | null
+          meta_attributed_at?: string | null
+          meta_attribution_method?: string | null
+          meta_campaign_id?: string | null
+          meta_form_id?: string | null
+          meta_lead_id?: string | null
           name?: string | null
           owner_id?: string | null
           owner_name?: string | null
@@ -4244,6 +4258,13 @@ export type Database = {
           manual_override_by?: string | null
           manual_override_enabled?: boolean
           manual_override_reason?: string | null
+          meta_ad_id?: string | null
+          meta_adset_id?: string | null
+          meta_attributed_at?: string | null
+          meta_attribution_method?: string | null
+          meta_campaign_id?: string | null
+          meta_form_id?: string | null
+          meta_lead_id?: string | null
           name?: string | null
           owner_id?: string | null
           owner_name?: string | null
@@ -4621,6 +4642,9 @@ export type Database = {
           manual_platform: string | null
           match_method: string | null
           matched_campaign_id: string | null
+          meta_attribution_method: string | null
+          meta_form_id: string | null
+          meta_lead_id: string | null
           net_revenue: number
           notes: string | null
           payment_method: string
@@ -4674,6 +4698,9 @@ export type Database = {
           manual_platform?: string | null
           match_method?: string | null
           matched_campaign_id?: string | null
+          meta_attribution_method?: string | null
+          meta_form_id?: string | null
+          meta_lead_id?: string | null
           net_revenue?: number
           notes?: string | null
           payment_method?: string
@@ -4727,6 +4754,9 @@ export type Database = {
           manual_platform?: string | null
           match_method?: string | null
           matched_campaign_id?: string | null
+          meta_attribution_method?: string | null
+          meta_form_id?: string | null
+          meta_lead_id?: string | null
           net_revenue?: number
           notes?: string | null
           payment_method?: string
@@ -6359,6 +6389,7 @@ export type Database = {
       }
       get_shared_lead_report: { Args: { p_token: string }; Returns: Json }
       growdash_normalize_key: { Args: { _value: string }; Returns: string }
+      growdash_normalize_phone: { Args: { _value: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -86,7 +86,7 @@ export function attributeLeadsToCampaigns(
     const campVal = readDealField(deal, mapping.campaign_utm);
     const adsetVal = readDealField(deal, mapping.adset_utm);
     const creativeVal = readDealField(deal, mapping.creative_utm);
-    const nativeAdId = deal.utm_id?.trim();
+    const nativeAdId = deal.meta_ad_id?.trim() || deal.utm_id?.trim();
 
     const sameAccount = deal.ad_account_id
       ? insights.filter((r) => r.ad_account_id === deal.ad_account_id)
@@ -95,8 +95,23 @@ export function attributeLeadsToCampaigns(
 
     let entry: LeadDealAttribution | null = null;
 
+    // Native Meta Lead Ads IDs are immutable. They take priority over UTMs,
+    // whose fields may be absent when the RD deal was created by automation.
+    if (deal.meta_campaign_id) {
+      const hit = universeAds.find((row) => row.ad_id === deal.meta_ad_id)
+        ?? universeAds.find((row) => row.campaign_id === deal.meta_campaign_id);
+      entry = {
+        deal,
+        bucket,
+        campaign_id: deal.meta_campaign_id,
+        campaign_name: hit?.campaign_name ?? deal.meta_campaign_id,
+        adset_id: deal.meta_adset_id ?? hit?.adset_name ?? null,
+        ad_id: deal.meta_ad_id ?? hit?.ad_id ?? null,
+      };
+    }
+
     // utm_id={{ad.id}} is immutable and therefore takes precedence over names.
-    if (nativeAdId) {
+    if (!entry && nativeAdId) {
       const hit = universeAds.find((row) => row.ad_id === nativeAdId);
       if (hit) entry = { deal, bucket, campaign_id: hit.campaign_id ?? null, campaign_name: hit.campaign_name, adset_id: hit.adset_name, ad_id: hit.ad_id };
     }

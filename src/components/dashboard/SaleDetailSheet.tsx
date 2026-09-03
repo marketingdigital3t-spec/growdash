@@ -129,6 +129,11 @@ function SaleDetail({ sale }: { sale: Sale }) {
           <Row label="utm_campaign" value={<EditableIfEmpty value={sale.utm_campaign} onSave={save("utm_campaign")} />} />
           <Row label="utm_term"     value={<EditableIfEmpty value={sale.utm_term}     onSave={save("utm_term")} />} />
           <Row label="utm_content"  value={<EditableIfEmpty value={sale.utm_content}  onSave={save("utm_content")} />} />
+          {sale.meta_lead_id && <>
+            <Row label="Lead Meta" value={sale.meta_lead_id} />
+            <Row label="Formulário Meta" value={sale.meta_form_id} />
+            <Row label="Método de vínculo" value={sale.meta_attribution_method} />
+          </>}
 
           <div className="flex justify-between items-center gap-4 py-3 mt-2 border-t">
             <div className="flex items-center gap-2">
