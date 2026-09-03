@@ -1070,7 +1070,7 @@ export default function Campaigns() {
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : (
               <Card className={cn(
-                "relative grid min-h-0 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden rounded-none border-0 shadow-none",
+                "relative grid min-h-0 grid-rows-[minmax(0,1fr)_68px_auto] overflow-hidden rounded-none border-0 shadow-none",
                 analysisMode
                   ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
                   : "md:h-[clamp(300px,calc(100dvh-26rem),640px)] md:min-h-0",

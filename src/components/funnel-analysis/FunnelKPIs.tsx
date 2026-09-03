@@ -45,7 +45,7 @@ export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversi
         return (
           <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} showHint>
             <Card className={`gd-metric-card gd-funnel-kpi cursor-default bg-card/75 border-border/60 border-l-2 backdrop-blur ${c.color.replace("text-", "border-")}`}>
-              <CardContent className="gd-funnel-kpi-content flex flex-col justify-start">
+              <CardContent className="gd-funnel-kpi-content flex h-full flex-col">
                 <div className="flex items-start justify-between gap-3">
                   <span className="gd-funnel-kpi-label text-muted-foreground">{c.label}</span>
                   <Icon className={`gd-funnel-kpi-icon shrink-0 ${c.color} dark:text-white`} />

@@ -6638,6 +6638,120 @@ html[data-accent="metallic-gold"],
   box-shadow: none !important;
 }
 
+/* Metric composition contract. Every shared KPI keeps a predictable reading
+   order: label at the upper-left, value directly below it, and icon isolated
+   at the right. This final layer deliberately replaces legacy transforms and
+   one-off paddings without changing what each metric calculates. */
+:root {
+  --gd-kpi-card-height: 112px;
+  --gd-kpi-pad-y: 16px;
+  --gd-kpi-pad-x: 20px;
+  --gd-kpi-label-size: 12px;
+  --gd-kpi-value-size: clamp(1.35rem, 1.65vw, 1.8rem);
+}
+.brand-shell .gd-metric-card {
+  min-height: var(--gd-kpi-card-height) !important;
+}
+.brand-shell .gd-metric-card > .gd-metric-card-content {
+  min-height: var(--gd-kpi-card-height) !important;
+  padding: var(--gd-kpi-pad-y) var(--gd-kpi-pad-x) !important;
+  transform: none !important;
+}
+.brand-shell .gd-metric-card-content > div:first-child {
+  align-items: center;
+}
+.brand-shell .gd-metric-card-content .dashboard-terra-metric-value {
+  margin-top: 3px;
+  font-size: var(--gd-kpi-value-size) !important;
+  line-height: 1.08 !important;
+}
+.brand-shell .gd-metric-card-content p:first-child {
+  min-height: 0 !important;
+  font-size: var(--gd-kpi-label-size) !important;
+  line-height: 1.25 !important;
+  letter-spacing: .04em !important;
+}
+.brand-shell .gd-metric-card-content .gd-metric-icon {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+/* Funnel summary follows the same contract, while keeping eight cards compact
+   enough to preserve four columns on desktop. The optional detail occupies a
+   reserved final line instead of pushing the value out of position. */
+.brand-shell .gd-funnel-kpi-grid {
+  grid-auto-rows: var(--gd-kpi-card-height) !important;
+  gap: var(--gd-space-card) !important;
+}
+.brand-shell .gd-funnel-kpi-grid > *,
+.brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi {
+  height: var(--gd-kpi-card-height) !important;
+  min-height: var(--gd-kpi-card-height) !important;
+}
+.brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi-content {
+  display: grid !important;
+  grid-template-rows: auto 1fr auto;
+  min-height: var(--gd-kpi-card-height) !important;
+  padding: var(--gd-kpi-pad-y) var(--gd-kpi-pad-x) !important;
+  transform: none !important;
+}
+.brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi-content > div:first-child {
+  margin: 0 !important;
+  align-items: flex-start;
+}
+.brand-shell .gd-funnel-kpi-label {
+  font-size: var(--gd-kpi-label-size) !important;
+  font-weight: 650 !important;
+  line-height: 1.25 !important;
+}
+.brand-shell .gd-funnel-kpi-icon {
+  width: 20px !important;
+  height: 20px !important;
+}
+.brand-shell .gd-funnel-kpi-value {
+  align-self: end;
+  margin: 0 !important;
+  font-size: var(--gd-kpi-value-size) !important;
+  font-weight: 700 !important;
+  line-height: 1.08 !important;
+  letter-spacing: -.025em;
+}
+.brand-shell .gd-funnel-kpi-detail {
+  min-height: 12px;
+  margin-top: 3px !important;
+  overflow: hidden;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The campaign totals footer has its own fixed grid row. It cannot collapse
+   beneath the scroll viewport, so every result column remains visible. */
+.campaigns-workspace .campaign-total-bar {
+  display: block !important;
+  height: 68px !important;
+  min-height: 68px !important;
+  max-height: 68px !important;
+  overflow: hidden !important;
+}
+.campaigns-workspace .campaign-total-bar > table {
+  height: 66px;
+}
+.campaigns-workspace .campaign-total-bar > table > tbody > tr {
+  height: 66px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --gd-kpi-card-height: 96px;
+    --gd-kpi-pad-y: 13px;
+    --gd-kpi-pad-x: 15px;
+    --gd-kpi-label-size: 11px;
+    --gd-kpi-value-size: 1.35rem;
+  }
+}
+
 /* The horizontal divider beneath the global goal/header bar is structural,
    never an accent. Legacy Terra rules could still paint it blue. */
 .brand-shell .brand-topbar.growdash-global-header {
