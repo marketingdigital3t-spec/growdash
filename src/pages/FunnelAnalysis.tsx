@@ -248,7 +248,13 @@ export default function FunnelAnalysis() {
     excludedDealIds,
   }), [allowedDealIds, excludedDealIds, funnelScopeIds, historicalSales, historicalStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
   const analytics = useMemo(
-    () => reconcileFunnelRevenue(baseAnalytics, funnelSales, { stateByDealId: historicalStateByDealId }),
+    () => reconcileFunnelRevenue(baseAnalytics, funnelSales, {
+      stateByDealId: historicalStateByDealId,
+      // Conversões pertencem ao snapshot de negócios ganhos do RD. A tabela
+      // `sales` é usada para receita/atribuição e pode receber esses eventos
+      // depois da atualização do pipeline.
+      conversionCount: baseAnalytics.conversions,
+    }),
     [baseAnalytics, funnelSales, historicalStateByDealId],
   );
   const periodAllowedDealIds = useMemo(
@@ -275,7 +281,10 @@ export default function FunnelAnalysis() {
     excludedDealIds,
   }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
   const periodAnalytics = useMemo(
-    () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales, { stateByDealId: periodStateByDealId }),
+    () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales, {
+      stateByDealId: periodStateByDealId,
+      conversionCount: periodBaseAnalytics.conversions,
+    }),
     [periodBaseAnalytics, periodFunnelSales, periodStateByDealId],
   );
   const previousAvgDaysToConvert = useMemo(() => {

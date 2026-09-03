@@ -40,6 +40,12 @@ describe("canonical funnel revenue", () => {
     expect(result.sourceBreakdown[0]).toMatchObject({ source: "meta", sales: 1, revenue: 180 });
   });
 
+  it("preserva a contagem do RD quando a sincronização de vendas está atrasada", () => {
+    const result = reconcileFunnelRevenue(base, [makeSale()], { conversionCount: 2 });
+    expect(result.conversions).toBe(2);
+    expect(result.revenue).toBe(180);
+  });
+
   it("ignora pendências e não mistura funis", () => {
     const sales = [makeSale(), makeSale({ id: "pending", status: "pending" }), makeSale({ id: "other", rd_funnel_id: "funnel-2" })];
     expect(filterCanonicalFunnelSales(sales, { funnelId: "funnel-1" })).toHaveLength(1);

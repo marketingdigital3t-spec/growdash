@@ -58,6 +58,13 @@ export interface FunnelRevenueContext {
   /** Estado do negócio no RD é o fallback quando a venda canônica ainda não
    * recebeu `lead_state` durante a sincronização. */
   stateByDealId?: ReadonlyMap<string, string | null | undefined>;
+  /**
+   * Quantidade de vendas confirmadas no snapshot do RD. A tabela `sales`
+   * pode estar alguns eventos atrás da sincronização do RD; nesse caso ela
+   * continua sendo a fonte de receita, mas não deve reduzir a contagem real
+   * de conversões exibida no funil.
+   */
+  conversionCount?: number;
 }
 
 /**
@@ -98,7 +105,10 @@ export function filterCanonicalFunnelSales(sales: Sale[], filters: FunnelSaleFil
  */
 export function reconcileFunnelRevenue(base: FunnelAnalytics, inputSales: Sale[], context: FunnelRevenueContext = {}): FunnelAnalytics {
   const sales = realizedSales(inputSales);
-  const conversions = sales.reduce((sum, sale) => sum + Math.max(1, Number(sale.quantity || 1)), 0);
+  const salesConversions = sales.reduce((sum, sale) => sum + Math.max(1, Number(sale.quantity || 1)), 0);
+  const conversions = Number.isFinite(context.conversionCount)
+    ? Math.max(0, Number(context.conversionCount))
+    : salesConversions;
   const revenue = sales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
 
   const sourceMap = new Map(base.sourceBreakdown.map((row) => [normalized(row.source), { ...row, sales: 0, revenue: 0 }]));
