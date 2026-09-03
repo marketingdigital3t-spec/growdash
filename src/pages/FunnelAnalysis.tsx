@@ -542,6 +542,7 @@ export default function FunnelAnalysis() {
               cac={mediaMetrics.cac}
               salesConversionRate={mediaMetrics.salesConversionRate}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
+              conversionsOverride={analytics.conversions}
             />
           </MotionItem>
 

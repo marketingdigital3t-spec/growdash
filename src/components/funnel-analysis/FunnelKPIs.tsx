@@ -13,17 +13,19 @@ interface Props {
   cac?: number | null;
   salesConversionRate?: number | null;
   previousAvgDaysToConvert?: number | null;
+  /** Total histórico de negócios ganhos no RD, independente do período de mídia. */
+  conversionsOverride?: number;
 }
 
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversionRate, previousAvgDaysToConvert }: Props) {
+export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversionRate, previousAvgDaysToConvert, conversionsOverride }: Props) {
   const timeChange = previousAvgDaysToConvert && previousAvgDaysToConvert > 0 ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100 : null;
   const cards = [
     { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-yellow-400", format: "brl" as const },
     { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-sky-400", format: "int" as const },
-    { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
+    { label: "Conversões / Vendas", value: conversionsOverride ?? a.conversions, icon: Trophy, color: "text-emerald-400", format: "int" as const },
     { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-sky-400", format: "pct" as const, decimals: 2 },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: timeChange != null && timeChange > 0 ? "text-red-400" : "text-amber-400", format: "days" as const, detail: timeChange == null ? "Sem período anterior" : `${Math.abs(timeChange).toFixed(0)}% ${timeChange <= 0 ? "menor" : "maior"} que período anterior` },
     { label: "Ticket médio", value: a.avgTicket, icon: Target, color: "text-sky-400", format: "brl" as const },
