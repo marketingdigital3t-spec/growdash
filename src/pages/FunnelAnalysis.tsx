@@ -8,6 +8,7 @@ import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
+import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { FunnelKPIs } from "@/components/funnel-analysis/FunnelKPIs";
 import { FunnelStageDistribution } from "@/components/funnel-analysis/FunnelStageDistribution";
 import { FunnelStageConversion } from "@/components/funnel-analysis/FunnelStageConversion";
@@ -70,7 +71,7 @@ function HelpBlock({ help, children, className }: { help: readonly string[]; chi
 }
 
 export default function FunnelAnalysis() {
-  const { adAccountId, setAdAccountId, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
+  const { adAccountIds, setAdAccountIds, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
@@ -79,7 +80,13 @@ export default function FunnelAnalysis() {
     () => new Set(visibleAccounts.map((account) => account.id)),
     [visibleAccounts],
   );
-  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels(adAccountId === "all" ? undefined : adAccountId);
+  const selectedAccountIds = useMemo(
+    () => adAccountIds.filter((accountId) => integratedAccountIds.has(accountId)),
+    [adAccountIds, integratedAccountIds],
+  );
+  const selectedAccountIdSet = useMemo(() => new Set(selectedAccountIds), [selectedAccountIds]);
+  const allAccountsSelected = selectedAccountIds.length === 0;
+  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels();
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
   const [selectedState, setSelectedState] = useState<string>("all");
@@ -99,15 +106,19 @@ export default function FunnelAnalysis() {
   // Uma conta selecionada só pode consultar os funis vinculados ao seu UUID.
   // Fallback por nome/"primeiro funil" misturava a análise quando o vínculo de
   // uma conta estava ausente ou tinha nome parecido com outro.
-  const selectedFunnelRecord = adAccountId === "all"
-    ? undefined
-    : activeFunnels.find((funnel) => funnel.ad_account_id === adAccountId);
-  const funnelId = selectedFunnelRecord?.id || "";
-  const funnelScopeIds = useMemo(
-    () => adAccountId === "all" ? activeFunnels.map((funnel) => funnel.id) : funnelId ? [funnelId] : [],
-    [activeFunnels, adAccountId, funnelId],
+  const scopedActiveFunnels = useMemo(
+    () => allAccountsSelected ? activeFunnels : activeFunnels.filter((funnel) => selectedAccountIdSet.has(funnel.ad_account_id)),
+    [activeFunnels, allAccountsSelected, selectedAccountIdSet],
   );
-  const effectiveAdAccountId = adAccountId === "all" ? undefined : adAccountId;
+  const funnelId = selectedAccountIds.length === 1
+    ? scopedActiveFunnels.find((funnel) => funnel.ad_account_id === selectedAccountIds[0])?.id || ""
+    : "";
+  const funnelScopeIds = useMemo(
+    () => scopedActiveFunnels.map((funnel) => funnel.id),
+    [scopedActiveFunnels],
+  );
+  const effectiveAdAccountId = selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined;
+  const effectiveAdAccountIds = selectedAccountIds.length > 1 ? selectedAccountIds : undefined;
 
   // "Todas as contas" é uma escolha válida e não pode ser regravada pelo
   // carregamento de funis. Alterar o filtro global aqui fazia o Select alternar
@@ -177,11 +188,13 @@ export default function FunnelAnalysis() {
   });
   const { data: historicalSales = [], isLoading: loadingHistoricalSales } = useSales({
     adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
   });
   const { data: periodSales = [], isLoading: loadingPeriodSales } = useSales({
     startDate,
     endDate,
     adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
   });
 
   // A mesma regra operacional do CRM vale para relatórios: o lote legado de
@@ -277,11 +290,12 @@ export default function FunnelAnalysis() {
     // In "Todas as contas", undefined intentionally aggregates all accounts
     // authorized by RLS instead of silently selecting the first funnel.
     adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     enabled: visibleAccounts.length > 0,
   });
-  const { data: campaignRows = [] } = useCampaigns(effectiveAdAccountId);
+  const { data: campaignRows = [] } = useCampaigns(effectiveAdAccountId, effectiveAdAccountIds);
   // Produtos do dashboard são uma fonte distinta das opções de produto do RD
   // usadas no filtro acima. Mantê-los com nomes explícitos evita que um
   // sobrescreva o outro durante a compilação da página de funis.
@@ -292,7 +306,7 @@ export default function FunnelAnalysis() {
   );
 
   const { scopedInsights, campaignWithoutMediaMatch } = useMemo(() => {
-    const allowedAccountIds = adAccountId === "all" ? integratedAccountIds : new Set([adAccountId]);
+    const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     // Mesmo que a política do banco permita consultar histórico legado, a
     // mídia exibida aqui deve pertencer exclusivamente às contas integradas.
     const accountScopedInsights = insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
@@ -305,7 +319,7 @@ export default function FunnelAnalysis() {
     // UTMs e campanhas Meta podem ter nomes diferentes. Exibir todas as
     // campanhas neste caso distorce investimento, CPL e ROAS do funil.
     return { scopedInsights: matches, campaignWithoutMediaMatch: matches.length === 0 };
-  }, [adAccountId, integratedAccountIds, insightRows, selectedCampaign]);
+  }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet, selectedCampaign]);
 
   // O total de aquisição da Análise de Funis é uma métrica da Meta: cada
   // conversa iniciada por anúncio é um lead a ser trabalhado. Buscamos os
@@ -339,18 +353,17 @@ export default function FunnelAnalysis() {
       // filtro visual, mas fica nos 36 meses completos mais recentes para não
       // ser recusada pela API nem inverter o intervalo em filtros antigos.
       const metaSyncRange = getMetaSyncRange();
-      const funnelsToSync = effectiveAdAccountId
-        ? activeFunnels.filter((funnel) => funnel.ad_account_id === effectiveAdAccountId)
-        : activeFunnels;
+      const funnelsToSync = scopedActiveFunnels;
 
       let metaResult: PromiseSettledResult<unknown>;
       try {
         metaResult = {
           status: "fulfilled",
           value: await syncMeta.mutateAsync({
-          adAccountId: effectiveAdAccountId,
-          startDate: metaSyncRange.startDate,
-          endDate: metaSyncRange.endDate,
+            adAccountId: effectiveAdAccountId,
+            adAccountIds: effectiveAdAccountIds,
+            startDate: metaSyncRange.startDate,
+            endDate: metaSyncRange.endDate,
           }),
         };
       } catch (reason) {
@@ -451,16 +464,12 @@ export default function FunnelAnalysis() {
 
       <MotionItem>
         <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
-          <Select value={adAccountId} onValueChange={setAdAccountId}>
-            <SelectTrigger className="gd-filter-control gd-filter-account w-full bg-background/60 sm:w-[230px]">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Conta de anúncio" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as contas</SelectItem>
-              {visibleAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <AccountMultiSelect
+            accounts={visibleAccounts.map((account) => ({ id: account.id, name: account.name }))}
+            selectedIds={selectedAccountIds}
+            onChange={setAdAccountIds}
+            className="gd-filter-account bg-background/60"
+          />
           <MetaDateRangePicker
             preset={preset}
             onPresetChange={setPreset}
@@ -510,7 +519,7 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {adAccountId === "all" ? `em ${funnelScopeIds.length} funil(is) conectado(s)` : "neste funil"}. Os KPIs e gráficos abaixo usam somente o período selecionado.
+              <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {selectedAccountIds.length === 1 ? "neste funil" : `em ${funnelScopeIds.length} funil(is) conectado(s)`}. Os KPIs e gráficos abaixo usam somente o período selecionado.
             </div>
             <FunnelKPIs
               a={periodAnalytics}

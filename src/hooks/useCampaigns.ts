@@ -1,16 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useCampaigns(adAccountId?: string) {
+export function useCampaigns(adAccountId?: string, adAccountIds?: string[]) {
   return useQuery({
-    queryKey: ["campaigns", adAccountId],
+    queryKey: ["campaigns", adAccountId, adAccountIds?.slice().sort().join(",")],
     queryFn: async () => {
       let query = supabase
         .from("campaigns")
         .select("id, name, ad_account_id, status, objective, daily_budget, lifetime_budget, created_at")
         .order("created_at", { ascending: false });
 
-      if (adAccountId) {
+      if (adAccountIds?.length) {
+        query = query.in("ad_account_id", adAccountIds);
+      } else if (adAccountId) {
         query = query.eq("ad_account_id", adAccountId);
       }
 
