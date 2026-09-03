@@ -6823,3 +6823,29 @@ html[data-accent="metallic-gold"],
 .brand-shell .brand-topbar :is(a, button):not(.bg-primary) {
   color: var(--gd-chrome-muted);
 }
+
+/* Account selection is a regular structural control. A legacy white-gradient
+   treatment could combine with the final dark surface override and render its
+   black label on black. Bind every visible layer to the active theme tokens. */
+.brand-shell .gd-filter-strip .gd-filter-account {
+  border-color: hsl(var(--border)) !important;
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  box-shadow: none !important;
+}
+.brand-shell .gd-filter-strip .gd-filter-account > span,
+.brand-shell .gd-filter-strip .gd-filter-account > svg {
+  color: inherit !important;
+  opacity: .78;
+}
+.brand-shell .gd-filter-strip .gd-filter-account::before,
+.brand-shell .gd-filter-strip .gd-filter-account::after {
+  display: none !important;
+}
+.brand-shell .gd-filter-strip .gd-filter-account:hover,
+.brand-shell .gd-filter-strip .gd-filter-account:focus-visible,
+.brand-shell .gd-filter-strip .gd-filter-account[data-state="open"] {
+  border-color: hsl(var(--ring)) !important;
+  background: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
