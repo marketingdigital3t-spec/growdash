@@ -302,7 +302,7 @@ export function CampaignResultsTable() {
   };
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
           <h2 className="text-lg font-semibold">Resultados Campanhas e Criativos</h2>

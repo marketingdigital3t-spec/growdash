@@ -78,7 +78,7 @@ export function WidgetRenderer({ type, title, config, onEditSale }: Props) {
     case "rd_custom_field_pie":
       return <RDCustomFieldPieWidget />;
     case "ask_ai":
-      return <div className="h-full overflow-auto"><AskAICard /></div>;
+      return <div className="min-w-0"><AskAICard /></div>;
     case "budget_bm":
       return <div className="h-full overflow-auto"><BudgetAnalysis /></div>;
     case "campaigns_detail":

@@ -6629,6 +6629,15 @@ html[data-accent="metallic-gold"],
   box-shadow: none !important;
 }
 
+/* Widgets finais do Dashboard organizam seções independentes: o espaço da
+   página é aberto e apenas KPIs, filtros e tabelas recebem uma superfície. */
+.brand-shell .dashboard-widget-shell.dashboard-open-widget-shell > * {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 /* The horizontal divider beneath the global goal/header bar is structural,
    never an accent. Legacy Terra rules could still paint it blue. */
 .brand-shell .brand-topbar.growdash-global-header {

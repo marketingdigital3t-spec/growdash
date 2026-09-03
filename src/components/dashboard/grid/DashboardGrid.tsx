@@ -70,13 +70,22 @@ function AutoHeightWidget({
   return <div ref={contentRef} className="min-w-0 w-full">{children}</div>;
 }
 
-function appendSystemTail(baseLayout: DashboardGridItem[], columns: number, widgetIds: Set<string>) {
+function appendSystemTail(
+  baseLayout: DashboardGridItem[],
+  columns: number,
+  widgetIds: Set<string>,
+  autoHeightRows: Record<string, number>,
+  isEditing: boolean,
+) {
   const visibleLayout = baseLayout.filter((item) => widgetIds.has(item.i));
   const maxY = visibleLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
   let y = maxY;
   const tail = SYSTEM_TAIL.map((systemWidget) => {
-    const item = { i: systemWidget.id, x: 0, y, w: columns, h: systemWidget.layoutDefault.h, static: true };
-    y += systemWidget.layoutDefault.h;
+    const h = !isEditing && autoHeightRows[systemWidget.id]
+      ? autoHeightRows[systemWidget.id]
+      : systemWidget.layoutDefault.h;
+    const item = { i: systemWidget.id, x: 0, y, w: columns, h, static: true };
+    y += h;
     return item;
   });
   return [...visibleLayout, ...tail];
@@ -136,9 +145,9 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
     const md = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 8));
     const sm = applyAutoHeight(buildResponsiveDashboardLayout(desktopLayout, 12, 4));
     return {
-      lg: appendSystemTail(lg, 12, widgetIds),
-      md: appendSystemTail(md, 8, widgetIds),
-      sm: appendSystemTail(sm, 4, widgetIds),
+      lg: appendSystemTail(lg, 12, widgetIds, autoHeightRows, isEditing),
+      md: appendSystemTail(md, 8, widgetIds, autoHeightRows, isEditing),
+      sm: appendSystemTail(sm, 4, widgetIds, autoHeightRows, isEditing),
     };
   }, [autoHeightRows, desktopLayout, isEditing, widgets]);
 
@@ -187,7 +196,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
         const isSystem = widget.id.startsWith("__sys_") || widget.type === "default_block";
         return <section key={widget.id} className="relative min-w-0 max-w-full overflow-hidden rounded-xl">
           {isEditing && !isSystem && <div className="no-drag absolute right-2 top-2 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${widget.title}`}><Settings2 className="h-4 w-4" /></button><button onClick={() => removeWidget(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-destructive/90 text-destructive-foreground shadow" aria-label="Remover"><X className="h-4 w-4" /></button></div>}
-          <DashboardWidgetHelp type={widget.type} title={widget.title} className={`${widget.type === "default_block" ? "dashboard-default-widget-shell " : ""}min-w-0 max-w-full overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} /></DashboardWidgetHelp>
+          <DashboardWidgetHelp type={widget.type} title={widget.title} className={`${widget.type === "default_block" ? "dashboard-default-widget-shell " : ""}${widget.id.startsWith("__sys_") ? "dashboard-open-widget-shell " : ""}min-w-0 max-w-full overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} /></DashboardWidgetHelp>
         </section>;
       })}
     </div><DashboardWidgetConfigDialog widget={configuringWidget} open={!!configuringWidget} onOpenChange={(open) => !open && setConfiguringWidgetId(null)} onSave={(patch) => { if (configuringWidget) updateWidget(configuringWidget.id, patch); }} /></>;
@@ -223,8 +232,8 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
           return (
             <div key={w.id} className={w.type === "default_block" ? "dashboard-default-static overflow-hidden" : "overflow-hidden"}>
               {isEditing && !isSystem && <div className="no-drag absolute right-1 top-1 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${w.title}`}><Settings2 className="h-3 w-3" /></button><button onClick={() => removeWidget(w.id)} className="flex h-6 w-6 items-center justify-center rounded-full bg-destructive/90 text-destructive-foreground shadow hover:bg-destructive" aria-label="Remover"><X className="h-3 w-3" /></button></div>}
-              <DashboardWidgetHelp type={w.type} title={w.title} className={`dashboard-widget-shell ${w.type === "default_block" ? "dashboard-default-widget-shell " : ""}h-full w-full no-drag-children outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}>
-                {w.type === "default_block" ? (
+              <DashboardWidgetHelp type={w.type} title={w.title} className={`dashboard-widget-shell ${w.type === "default_block" ? "dashboard-default-widget-shell " : ""}${w.id.startsWith("__sys_") ? "dashboard-open-widget-shell " : ""}h-full w-full no-drag-children outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}>
+                {w.type === "default_block" || w.id.startsWith("__sys_") ? (
                   <AutoHeightWidget widgetId={w.id} onHeightChange={handleAutoHeight}>
                     <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
                   </AutoHeightWidget>
