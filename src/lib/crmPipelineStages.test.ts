@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consolidateCRMPipeline, consolidatedCRMStage, filterOperationalRDDeals, isExcludedLegacyRannielyStage } from "./crmPipelineStages";
+import { consolidateCRMPipeline, consolidatedCRMStage, excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages, isExcludedLegacyRannielyStage } from "./crmPipelineStages";
 
 describe("CRM consolidated pipeline", () => {
   it("puts equivalent new-lead labels in one column", () => {
@@ -47,5 +47,21 @@ describe("CRM consolidated pipeline", () => {
     ]);
 
     expect(rows.map((row) => row.id)).toEqual(["sale", "model"]);
+  });
+
+  it("removes matching canonical revenue IDs and the empty legacy column", () => {
+    const funnels = [
+      { id: "aluna", name: "Dra. Ranniely Silva – Aluna" },
+      { id: "model", name: "Dra. Ranniely Silva – Paciente Modelo" },
+    ];
+    const deals = [
+      { rd_funnel_id: "aluna", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "legacy" },
+      { rd_funnel_id: "model", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "valid" },
+    ];
+    expect(excludedOperationalRDDealIds(deals, funnels)).toEqual(new Set(["legacy"]));
+    expect(filterOperationalRDFunnelStages([
+      { rd_funnel_id: "aluna", name: "Leads Antigos do Junior" },
+      { rd_funnel_id: "aluna", name: "Novos Leads" },
+    ], funnels).map((stage) => stage.name)).toEqual(["Novos Leads"]);
   });
 });

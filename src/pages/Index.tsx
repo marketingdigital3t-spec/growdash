@@ -13,7 +13,7 @@ import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
-import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
+import { excludedOperationalRDDealIds, filterOperationalRDDeals } from "@/lib/crmPipelineStages";
 import { differenceInCalendarDays, format } from "date-fns";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
@@ -141,6 +141,10 @@ const Index = () => {
   const visibleCampaigns = useMemo(() => campaigns.filter((campaign: any) => visibleAccountIds.has(campaign.ad_account_id)), [campaigns, visibleAccountIds]);
   const operationalRDDeals = useMemo(() => filterOperationalRDDeals(rdDeals, rdFunnels), [rdDeals, rdFunnels]);
   const operationalRDWonDeals = useMemo(() => filterOperationalRDDeals(rdWonDeals, rdFunnels), [rdFunnels, rdWonDeals]);
+  const excludedRDDealIds = useMemo(
+    () => excludedOperationalRDDealIds([...rdDeals, ...rdWonDeals], rdFunnels),
+    [rdDeals, rdFunnels, rdWonDeals],
+  );
   const activeScopedFunnelIds = useMemo(() => new Set(
     rdFunnels
       .filter((funnel) => funnel.is_active && visibleAccountIds.has(funnel.ad_account_id)
@@ -152,10 +156,11 @@ const Index = () => {
   // conta pelo funil. Incluí-la por esse vínculo evita que Dashboard e Análise
   // de Funis exibam totais diferentes no mesmo período.
   const canonicalUnitSales = useMemo(() => dedupeCanonicalSales(sales.filter((sale) => {
+    if (sale.rd_deal_id && excludedRDDealIds.has(sale.rd_deal_id)) return false;
     if (sale.ad_account_id) return visibleAccountIds.has(sale.ad_account_id)
       && (selectedAccountIds.length === 0 || selectedAccountIds.includes(sale.ad_account_id));
     return !!sale.rd_funnel_id && activeScopedFunnelIds.has(sale.rd_funnel_id);
-  })), [activeScopedFunnelIds, sales, selectedAccount, visibleAccountIds]);
+  })), [activeScopedFunnelIds, excludedRDDealIds, sales, selectedAccount, visibleAccountIds]);
   const selectedCampaigns = useMemo(
     () => visibleCampaigns.filter((campaign: any) => selectedCampaignIds.includes(campaign.id)),
     [selectedCampaignIds, visibleCampaigns],

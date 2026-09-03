@@ -57,6 +57,13 @@ describe("canonical funnel revenue", () => {
     })).toHaveLength(0);
   });
 
+  it("exclui a venda canônica de uma negociação removida do funil operacional", () => {
+    expect(filterCanonicalFunnelSales([makeSale()], {
+      funnelId: "funnel-1",
+      excludedDealIds: new Set(["deal-1"]),
+    })).toHaveLength(0);
+  });
+
   it("preserva a conversão por UF de uma venda fechada no período mesmo sem lead novo no período", () => {
     const result = reconcileFunnelRevenue({ ...base, stateBreakdown: [] }, [makeSale({ lead_state: null, rd_deal_id: "old-deal" })], {
       stateByDealId: new Map([["old-deal", "BA"]]),

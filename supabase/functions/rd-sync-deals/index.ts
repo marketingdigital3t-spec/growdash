@@ -16,6 +16,19 @@ function normalize(s: string) {
     .trim();
 }
 
+// Imported records in this legacy RD stage belong to a previous operation.
+// They must never enter the operational Aluna funnel or create a sale in
+// Growdash. The scope is deliberately strict: same stage names in other
+// Ranniely funnels remain valid.
+function isExcludedLegacyRannielyStage(funnelName: string | null | undefined, stageName: string | null | undefined) {
+  const funnel = normalize(String(funnelName || ""));
+  const stage = normalize(String(stageName || ""));
+  return funnel.includes("ranniely")
+    && funnel.includes("aluna")
+    && stage.includes("leads antigos")
+    && stage.includes("junior");
+}
+
 function keyNorm(s: string) {
   return (s || "")
     .toLowerCase()
@@ -826,6 +839,26 @@ Deno.serve(async (req) => {
       return { ...detail, _contacts: dealContacts };
     }
 
+    async function removeExcludedLegacyDeal(rdDealId: string) {
+      // Marking a possibly existing sale as cancelled preserves its external
+      // audit trail but removes it from every realized-sales aggregation.
+      const { error: saleError } = await admin
+        .from("sales")
+        .update({ status: "cancelled", attribution_reason: "excluded_legacy_ranniely_aluna_stage" })
+        .eq("user_id", userId!)
+        .eq("rd_funnel_id", funnel!.id)
+        .eq("rd_deal_id", rdDealId);
+      if (saleError) throw saleError;
+
+      const { error: dealError } = await admin
+        .from("rd_deals")
+        .delete()
+        .eq("user_id", userId!)
+        .eq("rd_funnel_id", funnel!.id)
+        .eq("rd_deal_id", rdDealId);
+      if (dealError) throw dealError;
+    }
+
     async function persistDeal(d: any) {
       const rdDealId = String(d.id || d._id);
       const amountTotal = parseFloat(d.amount_total || d.amount || "0") || 0;
@@ -839,6 +872,12 @@ Deno.serve(async (req) => {
         !won && (Boolean(stageId && stageLostMap.get(stageId)) || d.deal_lost_reason != null);
       const bucket = bucketFromStage(stageName, won, lost);
       const lostReason = d.deal_lost_reason?.name || d.deal_lost_reason || null;
+
+      if (isExcludedLegacyRannielyStage(funnel!.name, stageName)) {
+        await removeExcludedLegacyDeal(rdDealId);
+        totalSkipped++;
+        return;
+      }
 
       const baseContact = d.contact || d.deal_contact || {};
       const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
@@ -1153,7 +1192,22 @@ Deno.serve(async (req) => {
         hydratedItems.push(...items);
       }
 
-      const rows = hydratedItems.map((d) => {
+      // Analytics refreshes use the paginated endpoint rather than
+      // `persistDeal`. Apply the same exclusion here so this alternative path
+      // cannot recreate the imported legacy records.
+      const excludedLegacyIds = hydratedItems
+        .filter((deal) => isExcludedLegacyRannielyStage(funnel!.name, deal.deal_stage?.name || null))
+        .map((deal) => String(deal.id || deal._id || ""))
+        .filter(Boolean);
+      for (const rdDealId of excludedLegacyIds) {
+        await removeExcludedLegacyDeal(rdDealId);
+        totalSkipped++;
+      }
+      const operationalItems = hydratedItems.filter(
+        (deal) => !isExcludedLegacyRannielyStage(funnel!.name, deal.deal_stage?.name || null),
+      );
+
+      const rows = operationalItems.map((d) => {
         const rdDealId = String(d.id || d._id);
         seenAnalyticsDealIds.add(rdDealId);
         const stageName = d.deal_stage?.name || null;

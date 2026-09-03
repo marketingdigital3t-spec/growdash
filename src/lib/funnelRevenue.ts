@@ -44,6 +44,8 @@ export interface FunnelSaleFilters {
   /** IDs de negócios RD já limitados ao funil ativo. Usado como fallback
    * seguro quando a venda canônica ainda não recebeu rd_funnel_id. */
   scopedDealIds?: Set<string>;
+  /** Deals retained by an external source but intentionally excluded from the operational funnel. */
+  excludedDealIds?: Set<string>;
   source?: string;
   campaign?: string;
   state?: string;
@@ -65,6 +67,7 @@ export interface FunnelRevenueContext {
  */
 export function filterCanonicalFunnelSales(sales: Sale[], filters: FunnelSaleFilters) {
   return realizedSales(sales).filter((sale) => {
+    if (sale.rd_deal_id && filters.excludedDealIds?.has(sale.rd_deal_id)) return false;
     if (filters.funnelIds?.length) {
       const matchesFunnel = !!sale.rd_funnel_id && filters.funnelIds.includes(sale.rd_funnel_id);
       const matchesScopedDeal = !sale.rd_funnel_id && !!sale.rd_deal_id && !!filters.scopedDealIds?.has(sale.rd_deal_id);

@@ -17,6 +17,7 @@ export type CRMConsolidatedStage = {
 export type RDDealStageSource = {
   rd_funnel_id: string | null;
   rd_stage_name: string | null;
+  rd_deal_id?: string | null;
 };
 
 export type RDFunnelStageSource = {
@@ -60,6 +61,32 @@ export function filterOperationalRDDeals<T extends RDDealStageSource>(deals: T[]
   return deals.filter((deal) => !isExcludedLegacyRannielyStage(
     funnelNameById.get(deal.rd_funnel_id ?? ""),
     deal.rd_stage_name,
+  ));
+}
+
+/**
+ * Revenue is persisted separately from the RD pipeline. Keep the corresponding
+ * sale rows out of KPIs when their current deal belongs to an excluded stage.
+ */
+export function excludedOperationalRDDealIds(deals: RDDealStageSource[], funnels: RDFunnelStageSource[]) {
+  const funnelNameById = new Map(funnels.map((funnel) => [funnel.id, funnel.name]));
+  return new Set(deals.flatMap((deal) => {
+    const isExcluded = isExcludedLegacyRannielyStage(
+      funnelNameById.get(deal.rd_funnel_id ?? ""),
+      deal.rd_stage_name,
+    );
+    return isExcluded && deal.rd_deal_id ? [deal.rd_deal_id] : [];
+  }));
+}
+
+type RDFunnelStageRecord = { rd_funnel_id: string | null; name: string | null };
+
+/** The excluded legacy stage must not remain as an empty pipeline column. */
+export function filterOperationalRDFunnelStages<T extends RDFunnelStageRecord>(stages: T[], funnels: RDFunnelStageSource[]) {
+  const funnelNameById = new Map(funnels.map((funnel) => [funnel.id, funnel.name]));
+  return stages.filter((stage) => !isExcludedLegacyRannielyStage(
+    funnelNameById.get(stage.rd_funnel_id ?? ""),
+    stage.name,
   ));
 }
 

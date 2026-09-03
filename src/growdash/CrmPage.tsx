@@ -52,7 +52,7 @@ import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
-import { isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
+import { excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
 import { isRDDealInCrmPeriod } from "@/lib/crmDateScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { PageHeading } from "./shared";
@@ -209,6 +209,10 @@ export default function CrmPage() {
     () => new Map(connectedFunnels.map((funnel) => [funnel.id, funnel.name])),
     [connectedFunnels],
   );
+  const excludedDealIds = useMemo(
+    () => excludedOperationalRDDealIds(allDeals, connectedFunnels),
+    [allDeals, connectedFunnels],
+  );
   const scopedDeals = useMemo(
     () => dedupeRDDeals(allDeals.filter((deal) =>
       !!deal.ad_account_id
@@ -220,8 +224,10 @@ export default function CrmPage() {
     [allDeals, availableAccountIds, connectedFunnelIdSet, connectedFunnelNameById],
   );
   const scopedSales = useMemo(() => canonicalSales.filter((sale) =>
-    !!sale.ad_account_id && availableAccountIds.has(sale.ad_account_id),
-  ), [availableAccountIds, canonicalSales]);
+    !!sale.ad_account_id
+    && availableAccountIds.has(sale.ad_account_id)
+    && (!sale.rd_deal_id || !excludedDealIds.has(sale.rd_deal_id)),
+  ), [availableAccountIds, canonicalSales, excludedDealIds]);
   const scopedMetaInsights = useMemo(
     () => metaInsights.filter((insight) => !!insight.ad_account_id && availableAccountIds.has(insight.ad_account_id)),
     [availableAccountIds, metaInsights],

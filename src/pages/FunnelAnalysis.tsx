@@ -34,7 +34,7 @@ import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFun
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 import { useSales } from "@/hooks/useSales";
 import { filterCanonicalFunnelSales, reconcileFunnelRevenue } from "@/lib/funnelRevenue";
-import { filterOperationalRDDeals } from "@/lib/crmPipelineStages";
+import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
 import { FunnelGrowthRecommendations } from "@/components/funnel-analysis/FunnelGrowthRecommendations";
@@ -205,6 +205,8 @@ export default function FunnelAnalysis() {
   const operationalFilterDeals = useMemo(() => filterOperationalRDDeals(filterDeals, activeFunnels), [activeFunnels, filterDeals]);
   const operationalClosedDeals = useMemo(() => filterOperationalRDDeals(closedDeals, activeFunnels), [activeFunnels, closedDeals]);
   const operationalPeriodClosedDeals = useMemo(() => filterOperationalRDDeals(periodClosedDeals, activeFunnels), [activeFunnels, periodClosedDeals]);
+  const operationalStages = useMemo(() => filterOperationalRDFunnelStages(stages, activeFunnels), [activeFunnels, stages]);
+  const excludedDealIds = useMemo(() => excludedOperationalRDDealIds(deals, activeFunnels), [activeFunnels, deals]);
 
   const sources = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_source).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
   const campaigns = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_campaign).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
@@ -221,10 +223,10 @@ export default function FunnelAnalysis() {
     if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
   }, [campaigns, loadingFilterDeals, owners, products, selectedCampaign, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
 
-  const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, stages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, stages]);
+  const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
-    () => computeFunnelAnalytics(operationalPeriodDeals, stages, operationalPeriodClosedDeals),
-    [operationalPeriodClosedDeals, operationalPeriodDeals, stages],
+    () => computeFunnelAnalytics(operationalPeriodDeals, operationalStages, operationalPeriodClosedDeals),
+    [operationalPeriodClosedDeals, operationalPeriodDeals, operationalStages],
   );
   const allowedDealIds = useMemo(
     () => selectedOwner === "all" ? undefined : new Set(operationalDeals.map((deal) => deal.rd_deal_id)),
@@ -243,7 +245,8 @@ export default function FunnelAnalysis() {
     product: selectedProduct,
     allowedDealIds,
     stateByDealId: historicalStateByDealId,
-  }), [allowedDealIds, funnelScopeIds, historicalSales, historicalStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
+    excludedDealIds,
+  }), [allowedDealIds, excludedDealIds, funnelScopeIds, historicalSales, historicalStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
   const analytics = useMemo(
     () => reconcileFunnelRevenue(baseAnalytics, funnelSales, { stateByDealId: historicalStateByDealId }),
     [baseAnalytics, funnelSales, historicalStateByDealId],
@@ -269,7 +272,8 @@ export default function FunnelAnalysis() {
     product: selectedProduct,
     allowedDealIds: periodAllowedDealIds,
     stateByDealId: periodStateByDealId,
-  }), [funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
+    excludedDealIds,
+  }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
   const periodAnalytics = useMemo(
     () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales, { stateByDealId: periodStateByDealId }),
     [periodBaseAnalytics, periodFunnelSales, periodStateByDealId],
@@ -429,7 +433,7 @@ export default function FunnelAnalysis() {
     }
   }
 
-  const noStages = !loadingStages && stages.length === 0;
+  const noStages = !loadingStages && operationalStages.length === 0;
 
   return (
     <MotionPage className="gd-module-shell gd-funnel-analysis mx-auto max-w-[1700px] space-y-5">
