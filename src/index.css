@@ -6757,10 +6757,14 @@ html[data-accent="metallic-gold"],
   .campaigns-workspace .campaign-table-frame {
     display: flex !important;
     flex-direction: column !important;
+    /* This frame, rather than the document, owns the campaign-list scroll.
+       Keeping a finite height reserves the final 64px for the totals row. */
+    height: clamp(300px, calc(100dvh - 26rem), 640px) !important;
+    max-height: clamp(300px, calc(100dvh - 26rem), 640px) !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] {
     min-height: 0 !important;
-    flex: 1 1 auto !important;
+    flex: 1 1 0 !important;
     overflow: auto !important;
   }
   .campaigns-workspace .campaign-total-bar {
