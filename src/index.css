@@ -6540,13 +6540,13 @@ html[data-accent="metallic-gold"],
   height: auto !important;
 }
 
-/* The dashboard summary is a transparent layout strip. Individual KPI cards
-   retain their own surfaces; the strip must never look like a single giant card. */
+/* The top KPI summary is one deliberate compact group. It is distinct from
+   the open dashboard sections below, which must remain without a giant card. */
 .brand-shell .dashboard-summary-strip-surface {
-  background: transparent !important;
-  border-color: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+  background: var(--gd-surface) !important;
+  border: 1px solid var(--gd-line) !important;
+  border-radius: var(--gd-card-radius) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.16) !important;
   backdrop-filter: none !important;
 }
 .brand-shell .dashboard-summary-strip-surface::before,
@@ -6557,7 +6557,7 @@ html[data-accent="metallic-gold"],
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
-  padding: 0 !important;
+  padding: .5rem !important;
   gap: var(--gd-space-card) !important;
 }
 
