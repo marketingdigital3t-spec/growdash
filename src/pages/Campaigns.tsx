@@ -1202,8 +1202,8 @@ export default function Campaigns() {
                       </AnimatePresence>
                     </TableBody>
                     {(() => {
-                      const footer = <TableFooter className="hidden">
-                      <TableRow data-campaign-totals className="h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
+                      const footer = <TableFooter className="sticky bottom-0 z-40">
+                      <TableRow data-campaign-totals className="sticky bottom-0 z-40 h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
                         <CampaignTotalCell width={camp.colWidths.delivery} stickyLeft={camp.colWidths.check} />
                         <CampaignTotalCell
