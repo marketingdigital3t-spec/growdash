@@ -95,8 +95,6 @@ export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: Campa
   const [resultMetric, setResultMetric] = useState<ResultMetric>("conversations");
   const selectedResultTotal = resultMetric === "conversations" ? totals.conversations : totals.formLeads;
   const visible = useMemo(() => columns.filter((column) => column.visible), [columns]);
-  const leadingColumns = useMemo(() => visible.filter((column) => column.key === "check" || column.key === "delivery" || column.key === "name"), [visible]);
-  const leadingWidth = useMemo(() => leadingColumns.reduce((sum, column) => sum + column.width, 0), [leadingColumns]);
   const barRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -112,16 +110,16 @@ export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: Campa
   // This is deliberately not a second scroll area. The campaigns viewport is
   // the single source of horizontal scrolling; assigning scrollLeft below
   // mirrors that offset while this footer itself remains permanently visible.
-  return <div ref={barRef} className="campaign-total-bar relative z-40 flex h-[68px] min-h-[68px] w-full shrink-0 items-center overflow-hidden border-t border-primary/30" aria-label="Totais das campanhas filtradas">
-    <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><TableRow className="h-16 border-0 bg-transparent hover:bg-transparent">
+  return <div ref={barRef} className="campaign-total-bar relative z-40 block h-14 min-h-14 w-full shrink-0 overflow-hidden border-t border-primary/30" aria-label="Totais das campanhas filtradas">
+    <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><TableRow className="h-14 border-0 bg-transparent hover:bg-transparent">
       {visible.map((column) => {
-        if (column.key === "check") return <TableCell key="campaign-results-summary" style={{ width: leadingWidth, minWidth: leadingWidth, maxWidth: leadingWidth, left: 0 }} className="sticky z-20 border-r border-primary/15 bg-card px-3 py-1 text-left shadow-[8px_0_14px_-14px_rgba(0,0,0,.22)]">
-          <div className="ml-10">
-            <strong className="block truncate text-sm font-semibold text-foreground">Resultados de {rows.length} campanhas</strong>
-            <span className="mt-0.5 block truncate text-[10px] font-medium leading-tight text-muted-foreground">Totais do período e filtros</span>
-          </div>
-        </TableCell>;
-        if (column.key === "delivery" || column.key === "name") return null;
+        if (column.key === "check") return <TableCell key={column.key} style={{ width: column.width, minWidth: column.width, maxWidth: column.width, left: 0 }} className="sticky z-20 border-r border-primary/15 bg-card px-3 py-1" />;
+        if (column.key === "delivery") return <TableCell key={column.key} style={{ width: column.width, minWidth: column.width, maxWidth: column.width, left: column.width * 0 + visible.find((item) => item.key === "check")!.width }} className="sticky z-20 border-r border-primary/15 bg-card px-3 py-1" />;
+        if (column.key === "name") {
+          const checkWidth = visible.find((item) => item.key === "check")!.width;
+          const deliveryWidth = visible.find((item) => item.key === "delivery")!.width;
+          return <TableCell key={column.key} style={{ width: column.width, minWidth: column.width, maxWidth: column.width, left: checkWidth + deliveryWidth }} className="sticky z-20 border-r border-border bg-card px-3 py-1 text-left shadow-[8px_0_14px_-14px_rgba(0,0,0,.22)]"><strong className="block truncate text-sm font-semibold text-foreground">Totais ({rows.length})</strong><span className="mt-0.5 block truncate text-[10px] font-medium leading-tight text-muted-foreground">Linhas visíveis após filtros e busca</span></TableCell>;
+        }
         if (column.key === "leads") return <TableCell key={column.key} style={{ width: column.width, minWidth: column.width, maxWidth: column.width }} className="border-r border-primary/15 bg-card px-3 py-1 text-right tabular-nums"><Tooltip><TooltipTrigger asChild><span tabIndex={0} className="ml-auto block max-w-full rounded px-1 text-right outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/60"><strong className="block truncate text-sm font-semibold text-foreground">{integer.format(selectedResultTotal)}</strong></span></TooltipTrigger><TooltipContent><p>{integer.format(totals.conversations)} conversas iniciadas · {integer.format(totals.formLeads)} forms/site</p></TooltipContent></Tooltip><Select value={resultMetric} onValueChange={(value) => setResultMetric(value as ResultMetric)}><SelectTrigger aria-label="Métrica de resultado exibida" className="ml-auto mt-0.5 h-5 w-full max-w-[150px] border-0 bg-transparent px-1 text-[10px] font-medium text-muted-foreground shadow-none hover:bg-primary/10 focus:ring-1 focus:ring-primary/60"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="conversations">Conversas iniciadas</SelectItem><SelectItem value="leads">Leads</SelectItem></SelectContent></Select></TableCell>;
         const [value, detail] = totalValue(column.key, totals, selectedResultTotal);
         return <TotalCell key={column.key} column={column} value={value} detail={detail} />;

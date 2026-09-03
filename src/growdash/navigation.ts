@@ -138,14 +138,6 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: ["Jornadas em execução", "Pontos de espera", "Próximas ações automáticas"],
       },
       {
-        label: "Estratégia",
-        path: "/estrategia",
-        icon: Compass,
-        description: "Planeje posicionamento, direção, conteúdo e prioridades de cada marca.",
-        metrics: [],
-        highlights: ["Posicionamento", "Pilares de conteúdo", "Banco de ideias"],
-      },
-      {
         label: "Análise de Mídia Social",
         path: "/midia-social",
         icon: BarChart3,
