@@ -3,12 +3,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, MapPin, Users, Stethoscope, MoreVertical, RefreshCw, Edit, Trash2 } from "lucide-react";
+import { Calendar, MapPin, Users, Stethoscope, MoreVertical, RefreshCw, Edit, Trash2, Minus, Plus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { EventClassWithCounts, EventClassStatus } from "@/hooks/useEventClasses";
-import { useDeleteEventClass } from "@/hooks/useEventClasses";
+import { useAdjustEventClassCount, useDeleteEventClass } from "@/hooks/useEventClasses";
 import { EventClassMembersDialog } from "./EventClassMembersDialog";
 import { EventClassFormDialog } from "./EventClassFormDialog";
 import { toast } from "@/hooks/use-toast";
@@ -27,6 +27,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
   const [patientsOpen, setPatientsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const remove = useDeleteEventClass();
+  const adjustCount = useAdjustEventClassCount();
   const qc = useQueryClient();
 
   const peopleCap = ec.max_people || ec.max_students || 0;
@@ -36,6 +37,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
 
   const formatDate = (d: string) => format(parseISO(d), "dd 'de' MMM", { locale: ptBR });
   const dateLabel = ec.date_end ? `${formatDate(ec.date_start)} - ${formatDate(ec.date_end)}` : formatDate(ec.date_start);
+  const adjust = (type: "student" | "model_patient", delta: number) => adjustCount.mutate({ id: ec.id, type, delta });
 
   const alerts: string[] = [];
   if (studentPct >= 100) alerts.push("Vagas de pessoas esgotadas");
@@ -92,21 +94,21 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <div className="flex justify-between text-xs">
+              <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Alunas</span>
-                <span className="font-medium">{ec.studentCount}/{peopleCap}</span>
+                <span className="flex items-center gap-1"><button type="button" className="grid h-6 w-6 place-items-center rounded border border-border text-muted-foreground hover:bg-muted disabled:opacity-40" onClick={() => adjust("student", -1)} disabled={ec.studentCount <= 0 || adjustCount.isPending} aria-label="Remover aluna"><Minus className="h-3 w-3" /></button><span className="min-w-12 text-center font-medium tabular-nums">{ec.studentCount}/{peopleCap}</span><button type="button" className="grid h-6 w-6 place-items-center rounded border border-border text-foreground hover:bg-muted disabled:opacity-40" onClick={() => adjust("student", 1)} disabled={adjustCount.isPending} aria-label="Adicionar aluna"><Plus className="h-3 w-3" /></button></span>
               </div>
               <Progress value={Math.min(studentPct, 100)} className="h-1.5" />
-              {ec.manual_student_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedStudentCount} · Manual: {ec.manual_student_count}</p>}
+              <p className="text-[11px] text-muted-foreground">Preenchimento manual</p>
             </div>
             {ec.has_model_patients && (
               <div className="space-y-1">
-                <div className="flex justify-between text-xs">
+                <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-muted-foreground flex items-center gap-1"><Stethoscope className="h-3 w-3" /> Pacientes-modelo</span>
-                  <span className="font-medium">{ec.modelPatientCount}/{ec.max_model_patients}</span>
+                  <span className="flex items-center gap-1"><button type="button" className="grid h-6 w-6 place-items-center rounded border border-border text-muted-foreground hover:bg-muted disabled:opacity-40" onClick={() => adjust("model_patient", -1)} disabled={ec.modelPatientCount <= 0 || adjustCount.isPending} aria-label="Remover paciente-modelo"><Minus className="h-3 w-3" /></button><span className="min-w-12 text-center font-medium tabular-nums">{ec.modelPatientCount}/{ec.max_model_patients}</span><button type="button" className="grid h-6 w-6 place-items-center rounded border border-border text-foreground hover:bg-muted disabled:opacity-40" onClick={() => adjust("model_patient", 1)} disabled={adjustCount.isPending} aria-label="Adicionar paciente-modelo"><Plus className="h-3 w-3" /></button></span>
                 </div>
                 <Progress value={Math.min(patientPct, 100)} className="h-1.5" />
-                {ec.manual_model_patient_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedModelPatientCount} · Manual: {ec.manual_model_patient_count}</p>}
+                <p className="text-[11px] text-muted-foreground">Preenchimento manual</p>
               </div>
             )}
           </div>
