@@ -80,7 +80,7 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
 import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
-import { BarraTotais, type CampaignTotalColumn } from "@/components/campaigns/BarraTotais";
+import type { CampaignTotalColumn } from "@/components/campaigns/BarraTotais";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -1201,7 +1201,7 @@ export default function Campaigns() {
                         );})}
                       </AnimatePresence>
                     </TableBody>
-                    {false && (() => {
+                    {(() => {
                       const footer = <TableFooter className="sticky bottom-0 z-40">
                       <TableRow data-campaign-totals className="sticky bottom-0 z-40 h-14 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
@@ -1256,7 +1256,6 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <BarraTotais rows={filtered} columns={campaignTotalColumns} scrollContainerRef={campaignTableScrollRef} />
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}

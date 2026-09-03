@@ -112,8 +112,8 @@ export function BarraTotais({ rows, columns, scrollContainerRef }: { rows: Campa
   // This is deliberately not a second scroll area. The campaigns viewport is
   // the single source of horizontal scrolling; assigning scrollLeft below
   // mirrors that offset while this footer itself remains permanently visible.
-  return <div ref={barRef} className="campaign-total-bar relative z-40 flex h-14 min-h-14 w-full shrink-0 items-center overflow-hidden border-t border-primary/30" aria-label="Totais das campanhas filtradas">
-    <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><TableRow className="h-14 border-0 bg-transparent hover:bg-transparent">
+  return <div ref={barRef} className="campaign-total-bar relative z-40 flex h-[68px] min-h-[68px] w-full shrink-0 items-center overflow-hidden border-t border-primary/30" aria-label="Totais das campanhas filtradas">
+    <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}><tbody><TableRow className="h-16 border-0 bg-transparent hover:bg-transparent">
       {visible.map((column) => {
         if (column.key === "check") return <TableCell key="campaign-results-summary" style={{ width: leadingWidth, minWidth: leadingWidth, maxWidth: leadingWidth, left: 0 }} className="sticky z-20 border-r border-primary/15 bg-card px-3 py-1 text-left shadow-[8px_0_14px_-14px_rgba(0,0,0,.22)]">
           <div className="ml-10">
