@@ -31,11 +31,9 @@ interface Props {
   onEditSale: (s: Sale) => void;
 }
 
-// System widgets always appended at the end (not persisted in view.widgets)
-const SYSTEM_TAIL = [
-  { id: "__sys_campaigns", type: "campaigns_detail", title: "Detalhamento por Campanha", config: {}, layoutDefault: { w: 12, h: 6 } },
-  { id: "__sys_ask_ai", type: "ask_ai", title: "Pergunte à IA", config: {}, layoutDefault: { w: 12, h: 4 } },
-];
+// A leitura operacional de campanhas e a consulta à IA pertencem à Análise
+// de Funis. O grid do Dashboard não anexa mais widgets depois da aquisição.
+const SYSTEM_TAIL: Array<{ id: string; type: never; title: string; config: Record<string, never>; layoutDefault: { w: number; h: number } }> = [];
 
 function pixelsToGridRows(height: number) {
   return Math.max(1, Math.ceil((height + GRID_MARGIN_Y) / (GRID_ROW_HEIGHT + GRID_MARGIN_Y)));

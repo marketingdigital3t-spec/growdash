@@ -41,6 +41,8 @@ import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DefaultDashboardContent } from "@/components/dashboard/widgets/DefaultDashboardContent";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useProducts } from "@/hooks/useProducts";
+import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
+import { AskAICard } from "@/components/dashboard/AskAICard";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
@@ -540,6 +542,10 @@ export default function FunnelAnalysis() {
                   hideFinancialOverview
                   showAcquisitionAnalytics
                 />
+                <div className="space-y-6">
+                  <CampaignResultsTable />
+                  <AskAICard />
+                </div>
               </DashboardProvider>
             </section>
           </MotionItem>
