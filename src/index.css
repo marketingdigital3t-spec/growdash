@@ -6641,5 +6641,6 @@ html[data-accent="metallic-gold"],
 /* The horizontal divider beneath the global goal/header bar is structural,
    never an accent. Legacy Terra rules could still paint it blue. */
 .brand-shell .brand-topbar.growdash-global-header {
-  border-bottom-color: var(--gd-line) !important;
+  border-bottom: 1px solid var(--gd-line) !important;
+  box-shadow: 0 1px 0 var(--gd-line) !important;
 }
