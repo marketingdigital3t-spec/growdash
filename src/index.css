@@ -6200,7 +6200,7 @@ html[data-accent="sapphire"] .brand-shell,
 .growdash-main :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) > * + * {
   margin-top: var(--gd-space-section) !important;
 }
-.growdash-main :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) :is(.grid, .dashboard-grid-container, .dashboard-kpi-grid, .gd-kpi-grid) {
+.growdash-main :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) :is(.dashboard-primary-kpis, .dashboard-kpi-grid, .gd-kpi-grid, .dashboard-daily-charts, .gd-aligned-grid) {
   gap: var(--gd-space-card) !important;
 }
 
@@ -6222,7 +6222,7 @@ html[data-accent="sapphire"] .brand-shell,
 }
 /* Keep the metric hierarchy optically centred: labels and values travel
    together, while the card frame and its icon keep their established rhythm. */
-.brand-shell .gd-metric-card > div:first-child {
+.brand-shell .gd-metric-card > .gd-metric-card-content {
   transform: translateY(var(--gd-kpi-content-offset));
 }
 .brand-shell .gd-metric-card .gd-metric-icon,
@@ -6676,21 +6676,23 @@ html[data-accent="metallic-gold"],
   height: 34px !important;
 }
 
-/* Funnel summary follows the same contract, while keeping eight cards compact
-   enough to preserve four columns on desktop. The optional detail occupies a
-   reserved final line instead of pushing the value out of position. */
+/* Funnel summary follows the same contract as the shared KPI. Do not use a
+   fixed grid row or a flexible middle row: both push labels and values to
+   opposite ends of cards when neighbouring items have different content. */
 .brand-shell .gd-funnel-kpi-grid {
-  grid-auto-rows: var(--gd-kpi-card-height) !important;
+  grid-auto-rows: auto !important;
   gap: var(--gd-space-card) !important;
 }
 .brand-shell .gd-funnel-kpi-grid > *,
 .brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi {
-  height: var(--gd-kpi-card-height) !important;
+  height: auto !important;
   min-height: var(--gd-kpi-card-height) !important;
 }
 .brand-shell .gd-funnel-kpi-grid .gd-funnel-kpi-content {
-  display: grid !important;
-  grid-template-rows: auto 1fr auto;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
   min-height: var(--gd-kpi-card-height) !important;
   padding: var(--gd-kpi-pad-y) var(--gd-kpi-pad-x) !important;
   transform: none !important;
@@ -6709,7 +6711,6 @@ html[data-accent="metallic-gold"],
   height: 20px !important;
 }
 .brand-shell .gd-funnel-kpi-value {
-  align-self: end;
   margin: 0 !important;
   font-size: var(--gd-kpi-value-size) !important;
   font-weight: 700 !important;
@@ -6717,8 +6718,7 @@ html[data-accent="metallic-gold"],
   letter-spacing: -.025em;
 }
 .brand-shell .gd-funnel-kpi-detail {
-  min-height: 12px;
-  margin-top: 3px !important;
+  margin: 0 !important;
   overflow: hidden;
   font-size: 10px !important;
   line-height: 1.2 !important;

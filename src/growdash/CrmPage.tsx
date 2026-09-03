@@ -93,27 +93,20 @@ type CrmMetricCardProps = {
   tone: "meta" | "rd" | "revenue" | "success";
 };
 
-function CrmMetricCard({ source, label, value, description, icon, tone }: CrmMetricCardProps) {
-  const tones = {
-    meta: "border-sky-500/30 bg-sky-500/[0.07] dark:bg-sky-400/[0.10] text-sky-700 dark:text-sky-300",
-    rd: "border-violet-500/30 bg-violet-500/[0.07] dark:bg-violet-400/[0.10] text-violet-700 dark:text-violet-300",
-    revenue: "border-amber-500/30 bg-amber-500/[0.08] dark:bg-amber-400/[0.10] text-amber-800 dark:text-amber-200",
-    success: "border-emerald-500/30 bg-emerald-500/[0.07] dark:bg-emerald-400/[0.10] text-emerald-800 dark:text-emerald-200",
-  } as const;
-
+function CrmMetricCard({ source, label, value, description, icon, tone: _tone }: CrmMetricCardProps) {
   return (
-    <article className={cn("min-w-0 rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md", tones[tone])}>
+    <article className="gd-panel gd-metric-card gd-crm-metric-card min-w-0 overflow-hidden p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="inline-flex rounded-full border border-current/20 bg-background/65 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em]">
+          <span className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
             {source}
           </span>
-          <h3 className="mt-3 text-sm font-black text-foreground">{label}</h3>
+          <h3 className="mt-2 text-xs font-black uppercase tracking-[.08em] text-muted-foreground">{label}</h3>
         </div>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-background/70 shadow-sm">{icon}</span>
+        <span className="gd-metric-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl">{icon}</span>
       </div>
-      <p className="mt-4 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight text-foreground" title={value}>{value}</p>
-      <p className="mt-2 min-h-8 text-xs font-medium leading-4 text-muted-foreground">{description}</p>
+      <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight text-foreground" title={value}>{value}</p>
+      <p className="mt-1 line-clamp-2 text-xs font-medium leading-4 text-muted-foreground">{description}</p>
     </article>
   );
 }
@@ -523,7 +516,7 @@ export default function CrmPage() {
             </div>
             <p className="text-xs text-muted-foreground">Cada card informa a fonte e o critério do dado.</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="gd-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <CrmMetricCard
               source="Meta Ads"
               label="Leads Meta"

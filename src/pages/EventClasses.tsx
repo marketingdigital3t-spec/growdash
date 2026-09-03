@@ -23,15 +23,15 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 
 function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: string; value: number | string; accent?: string }) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${accent || "bg-primary/10 text-primary"}`}>
-            <Icon className="h-4 w-4" />
+    <Card className="gd-metric-card min-w-0 overflow-hidden">
+      <CardContent className="gd-metric-card-content p-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-bold uppercase tracking-[.08em] text-muted-foreground">{label}</div>
+            <div className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-xl font-semibold tabular-nums">{value}</div>
           </div>
-          <div>
-            <div className="text-xs text-muted-foreground">{label}</div>
-            <div className="text-lg font-semibold">{value}</div>
+          <div className={`gd-metric-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${accent || "bg-primary/10 text-primary"}`}>
+            <Icon className="h-4 w-4" />
           </div>
         </div>
       </CardContent>
@@ -147,7 +147,7 @@ export default function EventClasses() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
+      <div className="gd-kpi-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
         <StatCard icon={CalendarDays} label="Turmas" value={summary.total} />
         <StatCard icon={CheckCircle2} label="Abertas" value={summary.open} accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
         <StatCard icon={CheckCircle2} label="Esgotadas" value={summary.soldOut} accent="bg-muted text-muted-foreground" />
@@ -167,7 +167,7 @@ export default function EventClasses() {
             </div>
             <span className="text-xs font-semibold text-muted-foreground">Somente vendas realizadas</span>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="gd-kpi-grid mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard icon={Users} label="Alunas · SP" value={classSales.studentSP} />
             <StatCard icon={Users} label="Alunas · TO" value={classSales.studentTO} />
             <StatCard icon={Stethoscope} label="Paciente modelo · SP" value={classSales.modelPatientSP} />

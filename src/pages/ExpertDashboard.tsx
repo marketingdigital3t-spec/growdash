@@ -138,7 +138,7 @@ export default function ExpertDashboard() {
         <MotionItem>
           <section aria-labelledby="expert-kpis-title" className="gd-module-section">
             <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Visão executiva</p><h2 id="expert-kpis-title">Indicadores principais</h2></div><p className="dashboard-section-description">Resultados consolidados do período e das contas autorizadas.</p></div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            <div className="gd-kpi-grid grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[
               ["Faturamento bruto", "revenue_gross"], ["Investimento em tráfego", "spend"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
