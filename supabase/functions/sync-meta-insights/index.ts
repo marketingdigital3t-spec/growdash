@@ -127,7 +127,10 @@ Deno.serve(async (req) => {
               last_sync_error_code: campaignsRes.errorCode ?? null,
               last_sync_attempt_at: attemptedAt,
             })
-            .eq("id", account.id);
+            // A user may disable an account while this request is in flight.
+            // Never replace that explicit choice with an automatic sync state.
+            .eq("id", account.id)
+            .neq("connection_status", "disconnected");
           continue;
         }
         const campaigns = campaignsRes.data;
@@ -349,7 +352,9 @@ Deno.serve(async (req) => {
               last_sync_error_code: insightsRes.errorCode ?? null,
               last_sync_attempt_at: attemptedAt,
             })
-            .eq("id", account.id);
+            // Preserve an explicit manual deactivation made during the sync.
+            .eq("id", account.id)
+            .neq("connection_status", "disconnected");
           continue;
         }
         const allInsights = insightsRes.data;
@@ -553,7 +558,9 @@ Deno.serve(async (req) => {
             last_sync_attempt_at: attemptedAt,
             last_sync_success_at: attemptedAt,
           })
-          .eq("id", account.id);
+          // A completed sync is not authorization to reactivate an account.
+          .eq("id", account.id)
+          .neq("connection_status", "disconnected");
       } catch (e) {
         failedAccounts++;
         const msg = (e as Error).message;
@@ -565,7 +572,10 @@ Deno.serve(async (req) => {
             last_sync_error: msg,
             last_sync_attempt_at: attemptedAt,
           })
-          .eq("id", account.id);
+          // Keep a manual deactivation authoritative even when an unexpected
+          // error is handled after the account has been switched off.
+          .eq("id", account.id)
+          .neq("connection_status", "disconnected");
       }
     }
 
