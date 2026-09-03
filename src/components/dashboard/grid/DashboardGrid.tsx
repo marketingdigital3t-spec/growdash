@@ -35,6 +35,20 @@ interface Props {
 // de Funis. O grid do Dashboard não anexa mais widgets depois da aquisição.
 const SYSTEM_TAIL: Array<{ id: string; type: never; title: string; config: Record<string, never>; layoutDefault: { w: number; h: number } }> = [];
 
+/**
+ * The former default block is retained in saved dashboard views for backwards
+ * compatibility, but the current Dashboard hides every section inside it.
+ * Rendering that empty static grid item still reserves its legacy 30 rows and
+ * creates a large, scrollable blank area after the visible cards.
+ */
+function isEmptyDefaultPlaceholder(widget: any) {
+  return widget.type === "default_block"
+    && widget.config?.hidePrimary === true
+    && widget.config?.hideFinancialOverview === true
+    && widget.config?.hideFinancialKpis === true
+    && widget.config?.hideCampaignKpis === true;
+}
+
 function pixelsToGridRows(height: number) {
   return Math.max(1, Math.ceil((height + GRID_MARGIN_Y) / (GRID_ROW_HEIGHT + GRID_MARGIN_Y)));
 }
@@ -119,21 +133,29 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
     setAutoHeightRows({});
   }, [view.id, view.layout, view.widgets]);
 
+  // Do not allocate grid space for the legacy, intentionally empty default
+  // block. The persisted item remains untouched, so a user-customised block
+  // with content is never removed or overwritten.
+  const renderedWidgets = useMemo(
+    () => widgets.filter((widget) => !isEmptyDefaultPlaceholder(widget)),
+    [widgets],
+  );
+
   const handleAutoHeight = useCallback((widgetId: string, rows: number) => {
     setAutoHeightRows((current) => current[widgetId] === rows ? current : { ...current, [widgetId]: rows });
   }, []);
 
   const desktopLayout = useMemo(() => {
-    const normalized = normalizeDesktopDashboardLayout(layout, widgets, 12);
-    const defaultWidget = widgets.find((widget) => widget.type === "default_block");
+    const normalized = normalizeDesktopDashboardLayout(layout, renderedWidgets, 12);
+    const defaultWidget = renderedWidgets.find((widget) => widget.type === "default_block");
     return defaultWidget
       ? anchorDefaultBlockAfterPreviousWidgets(alignCanonicalDefaultBlock(normalized, defaultWidget.id), defaultWidget.id)
       : normalized;
-  }, [layout, widgets]);
+  }, [layout, renderedWidgets]);
 
   const responsiveLayouts = useMemo(() => {
-    const widgetIds = new Set((widgets || []).map((widget) => widget.id));
-    const defaultIds = new Set((widgets || []).filter((widget) => widget.type === "default_block").map((widget) => widget.id));
+    const widgetIds = new Set(renderedWidgets.map((widget) => widget.id));
+    const defaultIds = new Set(renderedWidgets.filter((widget) => widget.type === "default_block").map((widget) => widget.id));
     const applyAutoHeight = (items: DashboardGridItem[]) => items.map((item) => ({
       ...item,
       ...(!isEditing && autoHeightRows[item.i] ? { h: autoHeightRows[item.i] } : {}),
@@ -147,9 +169,9 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
       md: appendSystemTail(md, 8, widgetIds, autoHeightRows, isEditing),
       sm: appendSystemTail(sm, 4, widgetIds, autoHeightRows, isEditing),
     };
-  }, [autoHeightRows, desktopLayout, isEditing, widgets]);
+  }, [autoHeightRows, desktopLayout, isEditing, renderedWidgets]);
 
-  const fullWidgets = useMemo(() => [...widgets, ...SYSTEM_TAIL], [widgets]);
+  const fullWidgets = useMemo(() => [...renderedWidgets, ...SYSTEM_TAIL], [renderedWidgets]);
 
   function layoutsEqual(a: any[], b: any[]) {
     if (a.length !== b.length) return false;
@@ -186,7 +208,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) 
     onChange(layout, nextWidgets);
   }
 
-  const configuringWidget = widgets.find((widget) => widget.id === configuringWidgetId) || null;
+  const configuringWidget = renderedWidgets.find((widget) => widget.id === configuringWidgetId) || null;
 
   if (isMobile) {
     return <><div className="min-w-0 space-y-4 overflow-x-clip">
