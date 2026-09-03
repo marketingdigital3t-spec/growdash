@@ -521,36 +521,6 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-            <section aria-label="Performance de campanhas e funil de mídia">
-              <DashboardProvider value={{
-                startDate,
-                endDate,
-                adAccountId: effectiveAdAccountId,
-                insights: scopedInsights,
-                sales: periodFunnelSales,
-                rdDeals: operationalPeriodDeals,
-                revenueDeals: operationalPeriodDeals,
-                alerts: [],
-                campaigns: visibleCampaignRows,
-                adAccounts: visibleAccounts,
-                products,
-                isLoading: loadingInsights || loadingMetaActions,
-              }}>
-                <DefaultDashboardContent
-                  onEditSale={() => undefined}
-                  hidePrimary
-                  hideFinancialOverview
-                  showAcquisitionAnalytics
-                />
-                <div className="space-y-6">
-                  <CampaignResultsTable />
-                  <AskAICard />
-                </div>
-              </DashboardProvider>
-            </section>
-          </MotionItem>
-
-          <MotionItem>
             <FunnelGrowthRecommendations analytics={periodAnalytics} media={mediaMetrics} />
           </MotionItem>
 
@@ -581,6 +551,36 @@ export default function FunnelAnalysis() {
               <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock>
               <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} insights={scopedInsights} /></HelpBlock>
             </div>
+          </MotionItem>
+
+          <MotionItem>
+            <section aria-label="Performance de campanhas e funil de mídia">
+              <DashboardProvider value={{
+                startDate,
+                endDate,
+                adAccountId: effectiveAdAccountId,
+                insights: scopedInsights,
+                sales: periodFunnelSales,
+                rdDeals: operationalPeriodDeals,
+                revenueDeals: operationalPeriodDeals,
+                alerts: [],
+                campaigns: visibleCampaignRows,
+                adAccounts: visibleAccounts,
+                products,
+                isLoading: loadingInsights || loadingMetaActions,
+              }}>
+                <DefaultDashboardContent
+                  onEditSale={() => undefined}
+                  hidePrimary
+                  hideFinancialOverview
+                  showAcquisitionAnalytics
+                />
+                <div className="space-y-6">
+                  <CampaignResultsTable />
+                  <AskAICard />
+                </div>
+              </DashboardProvider>
+            </section>
           </MotionItem>
         </>
       )}
