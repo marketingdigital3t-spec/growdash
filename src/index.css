@@ -6767,6 +6767,16 @@ html[data-accent="metallic-gold"],
     flex: 1 1 0 !important;
     overflow: auto !important;
   }
+  .campaigns-workspace [data-campaign-table-scroll] [data-campaign-totals] > td {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 60 !important;
+    border-top: 2px solid var(--gd-line) !important;
+    background: var(--gd-surface) !important;
+  }
+  .campaigns-workspace [data-campaign-table-scroll] [data-campaign-totals] > td:nth-child(-n + 3) {
+    z-index: 70 !important;
+  }
   .campaigns-workspace .campaign-total-bar {
     display: block !important;
     height: 64px !important;
