@@ -119,6 +119,7 @@ export function PerformanceLineChart({ data }: PerformanceLineChartProps) {
                   active.has(m.key) && (
                     <Line
                       key={m.key}
+                      className={`dashboard-line-${m.key}`}
                       yAxisId={hasLeft && hasRight ? m.yAxisId : hasLeft ? "left" : "right"}
                       type="monotone"
                       dataKey={m.key}

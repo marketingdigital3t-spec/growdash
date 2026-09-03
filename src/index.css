@@ -6929,3 +6929,43 @@ html:not(.dark) .brand-shell .gd-filter-strip .gd-filter-account .bg-secondary {
   stroke: #16a34a !important;
   fill: #16a34a !important;
 }
+
+/* Dashboard performance chart: the global monochrome fallback may style the
+   SVG curves, but each metric series must remain visually distinguishable.
+   These are data-series colors only; all surrounding controls stay neutral. */
+.brand-shell .dashboard-line-cpl .recharts-line-curve,
+.brand-shell .dashboard-line-cpl .recharts-active-dot { stroke: #ef4444 !important; fill: #ef4444 !important; }
+.brand-shell .dashboard-line-spend .recharts-line-curve,
+.brand-shell .dashboard-line-spend .recharts-active-dot { stroke: #facc15 !important; fill: #facc15 !important; }
+.brand-shell .dashboard-line-leads .recharts-line-curve,
+.brand-shell .dashboard-line-leads .recharts-active-dot { stroke: #22c55e !important; fill: #22c55e !important; }
+
+/* The phase attribute is retained for compatibility, but it must never force
+   dark Terra cards into the light content area. The chrome (sidebar/topbar)
+   remains black; only the page content follows the selected theme. */
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page :is(.dashboard-terra-card, .dashboard-glass-card, .gd-panel, .gd-metric-card),
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page .dashboard-glass-metrics > :is(article, button) {
+  background: #ffffff !important;
+  border-color: #d4d4d4 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.08) !important;
+  color: #171717 !important;
+}
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page :is(.dashboard-terra-card, .dashboard-glass-card, .gd-panel, .gd-metric-card) :is(h1,h2,h3,h4,h5,p,span,strong,label,small,td,th),
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page .dashboard-glass-metrics > :is(article, button) :is(p,span,svg) {
+  color: #171717 !important;
+}
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page :is(.dashboard-terra-card, .dashboard-glass-card, .gd-panel, .gd-metric-card) .text-muted-foreground {
+  color: #666666 !important;
+}
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page :is(button, [role="tab"])[data-state="active"] {
+  background: #252525 !important;
+  border-color: #252525 !important;
+  color: #ffffff !important;
+}
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page :is(button, [role="tab"]):not([data-state="active"]) {
+  background: #f1f1f1 !important;
+  border-color: #d4d4d4 !important;
+  color: #252525 !important;
+}
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page .recharts-cartesian-grid line { stroke: #d8d8d8 !important; }
+html:not(.dark) .brand-shell[data-space-phase] .dashboard-page .recharts-text { fill: #666666 !important; }
