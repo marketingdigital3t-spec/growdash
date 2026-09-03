@@ -42,11 +42,18 @@ const SYSTEM_TAIL: Array<{ id: string; type: never; title: string; config: Recor
  * creates a large, scrollable blank area after the visible cards.
  */
 function isEmptyDefaultPlaceholder(widget: any) {
-  return widget.type === "default_block"
-    && widget.config?.hidePrimary === true
-    && widget.config?.hideFinancialOverview === true
-    && widget.config?.hideFinancialKpis === true
-    && widget.config?.hideCampaignKpis === true;
+  if (widget.type !== "default_block") return false;
+
+  const config = widget.config ?? {};
+  const hidesPrimaryAndFinancial = config.hidePrimary === true
+    && config.hideFinancialOverview === true;
+  // Campaign KPIs only render inside the acquisition section. Older saved
+  // views can leave hideCampaignKpis unset while that section is disabled,
+  // which creates an otherwise empty 30-row static grid item.
+  const rendersCampaignContent = config.showAcquisitionAnalytics === true
+    && config.hideCampaignKpis !== true;
+
+  return hidesPrimaryAndFinancial && !rendersCampaignContent;
 }
 
 function pixelsToGridRows(height: number) {
