@@ -1257,35 +1257,38 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <div
-                  ref={campaignTotalsScrollRef}
-                  className="campaign-fixed-total-bar overflow-hidden border-t bg-card"
-                  style={{ position: "absolute", insetInline: 0, bottom: 0, zIndex: 100, height: "64px" }}
-                  aria-label="Totais das campanhas filtradas"
-                >
-                  <Table style={{ tableLayout: "fixed", width: "max-content" }}>
-                    <TableBody>
-                      <CampaignTotalsRow
-                        widths={camp.colWidths}
-                        visibleColumns={visibleColumns}
-                        count={filtered.length}
-                        totals={totals}
-                        totalCpm={totalCpm}
-                        totalCpl={totalCpl}
-                        totalCpc={totalCpc}
-                        totalCtr={totalCtr}
-                        totalRoas={totalRoas}
-                        totalLinkCpc={totalLinkCpc}
-                        totalUniqueLinkCtr={totalUniqueLinkCtr}
-                        totalCostPerLandingPageView={totalCostPerLandingPageView}
-                        totalCostPerCheckout={totalCostPerCheckout}
-                        totalMetaCostPerPurchase={totalMetaCostPerPurchase}
-                        totalMetaPurchaseRoas={totalMetaPurchaseRoas}
-                        totalResultRate={totalResultRate}
-                      />
-                    </TableBody>
-                  </Table>
-                </div>
+                {createPortal(
+                  <div
+                    ref={campaignTotalsScrollRef}
+                    className="campaign-fixed-total-bar overflow-hidden border bg-card shadow-2xl"
+                    style={{ position: "fixed", left: "10.5rem", right: "1rem", bottom: "1rem", zIndex: 1000, height: "64px" }}
+                    aria-label="Totais das campanhas filtradas"
+                  >
+                    <Table style={{ tableLayout: "fixed", width: "max-content" }}>
+                      <TableBody>
+                        <CampaignTotalsRow
+                          widths={camp.colWidths}
+                          visibleColumns={visibleColumns}
+                          count={filtered.length}
+                          totals={totals}
+                          totalCpm={totalCpm}
+                          totalCpl={totalCpl}
+                          totalCpc={totalCpc}
+                          totalCtr={totalCtr}
+                          totalRoas={totalRoas}
+                          totalLinkCpc={totalLinkCpc}
+                          totalUniqueLinkCtr={totalUniqueLinkCtr}
+                          totalCostPerLandingPageView={totalCostPerLandingPageView}
+                          totalCostPerCheckout={totalCostPerCheckout}
+                          totalMetaCostPerPurchase={totalMetaCostPerPurchase}
+                          totalMetaPurchaseRoas={totalMetaPurchaseRoas}
+                          totalResultRate={totalResultRate}
+                        />
+                      </TableBody>
+                    </Table>
+                  </div>,
+                  document.body,
+                )}
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}
