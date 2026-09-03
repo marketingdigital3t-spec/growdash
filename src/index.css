@@ -6742,6 +6742,10 @@ html[data-accent="metallic-gold"],
   height: 66px;
 }
 @media (min-width: 768px) {
+  .campaigns-workspace .campaign-table-frame {
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) 68px !important;
+  }
   .campaigns-workspace [data-campaign-table-scroll] {
     height: auto !important;
     min-height: 0 !important;
