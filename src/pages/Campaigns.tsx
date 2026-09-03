@@ -80,7 +80,6 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
 import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
-import { BarraTotais, type CampaignTotalColumn } from "@/components/campaigns/BarraTotais";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -111,11 +110,6 @@ const CAMPAIGN_COLUMN_FILTERS: Array<{ key: string; label: string; column?: Camp
   { key: "roi", label: "ROI", column: "roi" }, { key: "landingPageViews", label: "Visualizações da página", column: "landingPageViews" },
   { key: "checkouts", label: "Finalizações iniciadas", column: "checkouts" }, { key: "metaPurchases", label: "Compras", column: "metaPurchases" },
   { key: "metaPurchaseRoas", label: "ROAS de compras", column: "metaPurchaseRoas" },
-];
-
-const CAMPAIGN_TOTAL_COLUMN_META: Array<Omit<CampaignTotalColumn, "width" | "visible">> = [
-  { key: "check", label: "Seleção", type: "text" }, { key: "delivery", label: "Status", type: "text" }, { key: "name", label: "Campanha", type: "text" },
-  { key: "deliveryStatus", label: "Veiculação", type: "text" }, { key: "actions", label: "Ações", type: "text" }, { key: "reach", label: "Alcance", type: "number" }, { key: "impressions", label: "Impressões", type: "number" }, { key: "frequency", label: "Frequência", type: "number" }, { key: "linkClicks", label: "Cliques no link", type: "number" }, { key: "linkCpc", label: "CPC do link", type: "currency" }, { key: "uniqueLinkCtr", label: "CTR único", type: "percentage" }, { key: "cpm", label: "CPM", type: "currency" }, { key: "budget", label: "Orçamento", type: "currency" }, { key: "leads", label: "Resultado", type: "number" }, { key: "cpl", label: "Custo por resultado", type: "currency" }, { key: "spend", label: "Valor usado", type: "currency" }, { key: "landingPageViews", label: "Visualizações da página", type: "number" }, { key: "costPerLandingPageView", label: "Custo por visualização", type: "currency" }, { key: "checkouts", label: "Finalizações iniciadas", type: "number" }, { key: "costPerCheckout", label: "Custo por finalização", type: "currency" }, { key: "metaPurchases", label: "Compras", type: "number" }, { key: "metaCostPerPurchase", label: "Custo por compra", type: "currency" }, { key: "metaPurchaseRoas", label: "ROAS de compras", type: "ratio" }, { key: "objective", label: "Objetivo", type: "text" }, { key: "clicks", label: "Cliques", type: "number" }, { key: "cpc", label: "CPC", type: "currency" }, { key: "ctr", label: "CTR", type: "percentage" }, { key: "conversion", label: "Taxa de conversão", type: "percentage" }, { key: "sales", label: "Vendas", type: "number" }, { key: "cpa", label: "CPA", type: "currency" }, { key: "revenue", label: "Receita", type: "currency" }, { key: "roas", label: "ROAS", type: "ratio" }, { key: "profit", label: "Lucro", type: "currency" }, { key: "roi", label: "ROI", type: "percentage" }, { key: "videoViews", label: "Reproduções de vídeo", type: "number" },
 ];
 
 function campaignColumnValue(campaign: any, key: string) {
@@ -259,6 +253,7 @@ export default function Campaigns() {
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
   const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
+  const campaignTotalsScrollRef = useRef<HTMLDivElement | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
     const requested = searchParams.get("analise");
@@ -864,14 +859,19 @@ export default function Campaigns() {
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
+  useEffect(() => {
+    const table = campaignTableScrollRef.current;
+    const totalsBar = campaignTotalsScrollRef.current;
+    if (!table || !totalsBar) return;
+
+    const syncHorizontalPosition = () => { totalsBar.scrollLeft = table.scrollLeft; };
+    syncHorizontalPosition();
+    table.addEventListener("scroll", syncHorizontalPosition, { passive: true });
+    return () => table.removeEventListener("scroll", syncHorizontalPosition);
+  }, [activeTab, filtered.length, camp.colWidths]);
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const showColumn = (key: CampaignColumnKey) => visibleColumns.has(key);
-  const campaignTotalColumns = useMemo<CampaignTotalColumn[]>(() => CAMPAIGN_TOTAL_COLUMN_META.map((column) => ({
-    ...column,
-    width: camp.colWidths[column.key as CampColKey],
-    visible: column.key === "check" || column.key === "delivery" || column.key === "name" || visibleColumns.has(column.key as CampaignColumnKey),
-  })), [camp.colWidths, visibleColumns]);
   const availableColumnFilters = useMemo(() => CAMPAIGN_COLUMN_FILTERS.filter((item) => !item.column || visibleColumns.has(item.column)), [visibleColumns]);
   const activeColumnFilterCount = Object.values(columnFilters).filter((value) => value.trim()).length;
   const cellW = (k: CampColKey) => ({ width: camp.colWidths[k], minWidth: camp.colWidths[k], maxWidth: camp.colWidths[k] });
@@ -1070,7 +1070,7 @@ export default function Campaigns() {
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : (
               <Card className={cn(
-                "campaign-table-frame relative min-h-0 overflow-hidden rounded-none border-0 shadow-none md:grid md:grid-rows-[minmax(0,1fr)_56px]",
+                "campaign-table-frame relative min-h-0 overflow-hidden rounded-none border-0 shadow-none md:flex md:flex-col",
                 analysisMode
                   ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
                   : "md:h-[clamp(300px,calc(100dvh-26rem),640px)] md:min-h-0",
@@ -1256,7 +1256,34 @@ export default function Campaigns() {
                     })()}
                   </table>
                 </div>
-                <BarraTotais rows={filtered} columns={campaignTotalColumns} scrollContainerRef={campaignTableScrollRef} />
+                <div
+                  ref={campaignTotalsScrollRef}
+                  className="campaign-total-bar hidden overflow-hidden border-t md:block"
+                  aria-label="Totais das campanhas filtradas"
+                >
+                  <Table style={{ tableLayout: "fixed", width: "max-content" }}>
+                    <TableBody>
+                      <CampaignTotalsRow
+                        widths={camp.colWidths}
+                        visibleColumns={visibleColumns}
+                        count={filtered.length}
+                        totals={totals}
+                        totalCpm={totalCpm}
+                        totalCpl={totalCpl}
+                        totalCpc={totalCpc}
+                        totalCtr={totalCtr}
+                        totalRoas={totalRoas}
+                        totalLinkCpc={totalLinkCpc}
+                        totalUniqueLinkCtr={totalUniqueLinkCtr}
+                        totalCostPerLandingPageView={totalCostPerLandingPageView}
+                        totalCostPerCheckout={totalCostPerCheckout}
+                        totalMetaCostPerPurchase={totalMetaCostPerPurchase}
+                        totalMetaPurchaseRoas={totalMetaPurchaseRoas}
+                        totalResultRate={totalResultRate}
+                      />
+                    </TableBody>
+                  </Table>
+                </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
             )}

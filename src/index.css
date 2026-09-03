@@ -6751,32 +6751,28 @@ html[data-accent="metallic-gold"],
   white-space: nowrap;
 }
 
-/* The totals row lives in the same scroll plane as the campaign columns. This
-   avoids a duplicate footer and prevents an empty fixed-height strip below it. */
+/* Campaign totals use the same widths as their table columns, but remain in a
+   dedicated footer. The list can scroll without hiding the aggregate values. */
 @media (min-width: 768px) {
   .campaigns-workspace .campaign-table-frame {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] {
-    height: 100% !important;
     min-height: 0 !important;
-    flex: none !important;
+    flex: 1 1 auto !important;
     overflow: auto !important;
-    padding-bottom: 56px !important;
-  }
-  .campaigns-workspace [data-campaign-table-scroll] [data-campaign-totals] > td {
-    border-top: 2px solid var(--gd-line) !important;
-    background: var(--gd-surface) !important;
   }
   .campaigns-workspace .campaign-total-bar {
     display: block !important;
-    height: 56px !important;
-    min-height: 56px !important;
-    max-height: 56px !important;
-    position: absolute !important;
-    inset-inline: 0 !important;
-    bottom: 0 !important;
+    height: 64px !important;
+    min-height: 64px !important;
+    max-height: 64px !important;
+    position: relative !important;
+    flex: 0 0 64px !important;
     z-index: 50 !important;
+    background: var(--gd-surface) !important;
+    border-color: var(--gd-line) !important;
   }
 }
 
