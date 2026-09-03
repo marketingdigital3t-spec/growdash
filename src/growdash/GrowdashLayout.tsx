@@ -350,7 +350,7 @@ export default function GrowdashLayout() {
             </div>
           </div>
         ) : <><TooltipProvider delayDuration={180}>
-        <nav className={cn("grow overflow-y-auto px-3 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
+        <nav className={cn("grow overflow-y-auto px-3 py-4 lg:overflow-y-visible", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
           {visibleSections.map((section, sectionIndex) => (
             <section key={section.label} className="mb-4">
               {showSidebarLabels && (
