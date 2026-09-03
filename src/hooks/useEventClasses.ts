@@ -203,12 +203,9 @@ export function useAdjustEventClassCount() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ id, type, delta }: { id: string; type: MemberType; delta: number }) => {
+    mutationFn: async ({ id, type, delta, current }: { id: string; type: MemberType; delta: number; current: number }) => {
       const field = type === "student" ? "manual_student_count" : "manual_model_patient_count";
-      const { data: current, error: readError } = await (supabase as any)
-        .from("event_classes").select(field).eq("id", id).single();
-      if (readError) throw readError;
-      const next = Math.max(0, Number(current?.[field] || 0) + delta);
+      const next = Math.max(0, current + delta);
       const { error } = await (supabase as any).from("event_classes").update({ [field]: next }).eq("id", id);
       if (error) throw error;
       await (supabase as any).from("event_class_history").insert({
@@ -218,7 +215,20 @@ export function useAdjustEventClassCount() {
         metadata: { source: "manual_counter", delta, value: next },
       });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }),
+    onMutate: async ({ id, type, delta, current }) => {
+      await qc.cancelQueries({ queryKey: ["event_classes"] });
+      const previous = qc.getQueryData<EventClassWithCounts[]>(["event_classes"]);
+      const next = Math.max(0, current + delta);
+      qc.setQueryData<EventClassWithCounts[]>(["event_classes"], (rows) => rows?.map((row) => row.id !== id ? row : {
+        ...row,
+        ...(type === "student" ? { manual_student_count: next, studentCount: next } : { manual_model_patient_count: next, modelPatientCount: next }),
+      }));
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) qc.setQueryData(["event_classes"], context.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["event_classes"] }),
   });
 }
 

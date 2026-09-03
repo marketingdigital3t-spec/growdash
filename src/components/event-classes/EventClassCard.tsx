@@ -37,7 +37,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
 
   const formatDate = (d: string) => format(parseISO(d), "dd 'de' MMM", { locale: ptBR });
   const dateLabel = ec.date_end ? `${formatDate(ec.date_start)} - ${formatDate(ec.date_end)}` : formatDate(ec.date_start);
-  const adjust = (type: "student" | "model_patient", delta: number) => adjustCount.mutate({ id: ec.id, type, delta });
+  const adjust = (type: "student" | "model_patient", delta: number) => adjustCount.mutate({ id: ec.id, type, delta, current: type === "student" ? ec.studentCount : ec.modelPatientCount });
 
   const alerts: string[] = [];
   if (studentPct >= 100) alerts.push("Vagas de pessoas esgotadas");
