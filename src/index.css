@@ -7212,3 +7212,81 @@ html[data-accent] { --brand-gold: #fff !important; --brand-gold-light: #fff !imp
 .brand-shell :is(.gd-metric-card,.gd-panel,.dashboard-glass-card) .text-muted-foreground { color: var(--gd-content-muted) !important; }
 .brand-shell :is(button,[role="tab"],.gd-filter-control,.gd-filter-account)[data-state="active"], .brand-shell [role="tab"][aria-selected="true"] { background: var(--gd-content-text) !important; color: var(--gd-content-bg) !important; }
 @media (max-width: 767px) { .brand-shell .gd-metric-card-content { min-height: 112px !important; padding: 16px !important; } }
+
+/* Final palette authority. Legacy accent preferences may remain in storage for
+   compatibility, but never get to recolor the authenticated application
+   structure. Data-series and semantic state colours are intentionally not
+   targeted here. */
+html:not(.dark) .brand-shell .growdash-main {
+  --background: 0 0% 100% !important;
+  --foreground: 0 0% 7% !important;
+  --card: 60 4% 94% !important;
+  --card-foreground: 0 0% 7% !important;
+  --popover: 0 0% 100% !important;
+  --popover-foreground: 0 0% 7% !important;
+  --secondary: 60 3% 91% !important;
+  --secondary-foreground: 0 0% 12% !important;
+  --muted: 60 3% 94% !important;
+  --muted-foreground: 0 0% 40% !important;
+  --accent: 0 0% 91% !important;
+  --accent-foreground: 0 0% 9% !important;
+  --border: 60 3% 84% !important;
+  --input: 60 3% 84% !important;
+  --ring: 0 0% 28% !important;
+  --primary: 0 0% 12% !important;
+  --primary-foreground: 0 0% 100% !important;
+}
+
+.dark .brand-shell .growdash-main {
+  --background: 0 0% 4% !important;
+  --foreground: 0 0% 100% !important;
+  --card: 0 0% 11% !important;
+  --card-foreground: 0 0% 100% !important;
+  --popover: 0 0% 11% !important;
+  --popover-foreground: 0 0% 100% !important;
+  --secondary: 0 0% 15% !important;
+  --secondary-foreground: 0 0% 100% !important;
+  --muted: 0 0% 14% !important;
+  --muted-foreground: 0 0% 71% !important;
+  --accent: 0 0% 18% !important;
+  --accent-foreground: 0 0% 100% !important;
+  --border: 0 0% 21% !important;
+  --input: 0 0% 21% !important;
+  --ring: 0 0% 62% !important;
+  --primary: 0 0% 96% !important;
+  --primary-foreground: 0 0% 8% !important;
+}
+
+html[data-accent] .brand-shell::before,
+html[data-accent] .brand-shell .growdash-main::before {
+  display: none !important;
+}
+
+.brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account) {
+  background: var(--gd-content-panel) !important;
+  border-color: var(--gd-content-border) !important;
+  color: var(--gd-content-text) !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account):hover,
+.brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account):focus-visible {
+  background: var(--gd-content-surface) !important;
+  border-color: var(--gd-content-text) !important;
+}
+
+.brand-shell .growdash-main .bg-primary {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+.brand-shell .growdash-main .text-primary {
+  color: hsl(var(--primary)) !important;
+}
+
+.brand-shell .growdash-main .gd-filter-account .gd-account-count {
+  background: color-mix(in srgb, var(--gd-content-panel) 76%, var(--gd-content-text)) !important;
+  border-color: var(--gd-content-border) !important;
+  color: var(--gd-content-text) !important;
+  box-shadow: none !important;
+}
