@@ -3418,6 +3418,20 @@ html:not(.dark) {
 .brand-shell .gd-metric-card .gd-metric-icon { background: rgba(127,127,127,.14) !important; color: var(--gd-content-text) !important; }
 @media (max-width: 767px) { .brand-shell .gd-metric-card-content { min-height: 112px !important; padding: 16px !important; } }
 
+/* Selected-account count: compact neutral indicator, not a solid black badge. */
+.brand-shell .gd-filter-account .gd-account-count {
+  background: rgba(255, 255, 255, .58) !important;
+  border-color: rgba(0, 0, 0, .16) !important;
+  color: #202020 !important;
+  box-shadow: none !important;
+}
+
+.dark .brand-shell .gd-filter-account .gd-account-count {
+  background: rgba(255, 255, 255, .12) !important;
+  border-color: rgba(255, 255, 255, .18) !important;
+  color: #ffffff !important;
+}
+
 /* Funnel evolution uses color only on the data strokes. Never paint filled
    areas behind the series, even if a legacy chart style is still present. */
 .brand-shell .funnel-evolution-chart :is(.recharts-area-area, .recharts-area-curve) { fill: none !important; }
