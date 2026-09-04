@@ -111,7 +111,10 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
           .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`)
           .order("lead_created_at", { ascending: false });
         if (adAccountId) q = q.eq("ad_account_id", adAccountId);
-        else if (adAccountIds) q = q.in("ad_account_id", adAccountIds);
+        // An empty selection means "all accounts". Passing [] to PostgREST
+        // generates an invalid `in.()` filter and makes the module fail to
+        // load for users whose filters have not been initialized yet.
+        else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await q.range(from, to);
@@ -167,7 +170,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
             ? query.is("closed_at", null).gte("stage_updated_at", rangeStart).lte("stage_updated_at", rangeEnd)
             : query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd);
           if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-          else if (adAccountIds) query = query.in("ad_account_id", adAccountIds);
+          else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
           const { data, error } = await query.range(page * PAGE, (page + 1) * PAGE - 1);
           if (error) {
             if (page > 0 && rows.length > 0) {
