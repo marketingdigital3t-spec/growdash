@@ -3423,6 +3423,27 @@ html:not(.dark) {
 .brand-shell .funnel-evolution-chart :is(.recharts-area-area, .recharts-area-curve) { fill: none !important; }
 .brand-shell .funnel-evolution-chart .recharts-line-curve { fill: none !important; }
 
+/* Keep module/page wrappers open. Surfaces belong to the metric or analytic
+   component itself, never to the container that groups an entire screen. */
+.brand-shell .growdash-main,
+.brand-shell :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .gd-funnel-analysis, .analytics-module) {
+  background: var(--gd-content-bg) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.brand-shell :is(.dashboard-widget-shell, .dashboard-default-widget-shell, .dashboard-open-widget-shell) {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.brand-shell :is(.gd-module-section, .dashboard-section, .funnel-section) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
 /* Neutral structural controls; semantic colors remain available to results. */
 .brand-shell :is(button, [role="tab"], .gd-filter-control, .gd-filter-account):not(.text-emerald-500):not(.text-red-500) {
   border-color: var(--gd-content-border) !important;
