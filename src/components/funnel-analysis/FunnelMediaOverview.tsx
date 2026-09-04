@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { FunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
 import { BadgeDollarSign, Eye, Gauge, MousePointerClick, Users } from "lucide-react";
 import { metricDescription } from "@/lib/metricPresentation";
@@ -22,19 +21,17 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
   const coverageTone = "text-foreground";
 
   return (
-    <Card className="gd-panel border-border/50 bg-card/70">
-      <CardHeader className="space-y-2 pb-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <section className="space-y-3" aria-labelledby="funnel-media-overview-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-base">Meta Ads × RD Station</CardTitle>
+            <h2 id="funnel-media-overview-title" className="text-base font-semibold">Meta Ads × RD Station</h2>
             <p className="mt-1 text-xs text-muted-foreground">Mídia e funil reconciliados para a conta, campanha e período selecionados.</p>
           </div>
           <div className={`rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-semibold ${coverageTone}`}>
             Cobertura RD: {metrics.rdCoverage == null ? "sem base Meta" : fmtPct(metrics.rdCoverage)}
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           {cards.map(({ label, value, detail, icon: Icon }) => (
             <MetricHelpTooltip key={label} title={label} description={metricDescription(label)} detail={`Fonte e contexto: ${detail}.`} className="h-full" showHint>
@@ -54,7 +51,7 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
             Diferença de leads RD − Meta: <strong className="text-foreground">{metrics.leadGap > 0 ? "+" : ""}{fmtInt(metrics.leadGap)}</strong>. A comparação respeita o mesmo período, mas pode variar conforme atribuição e preenchimento de UTMs.
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

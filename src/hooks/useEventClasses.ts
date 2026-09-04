@@ -87,7 +87,8 @@ function normalizeClassRegion(value: string | null) {
 export function useRannielyClassSales() {
   return useQuery({
     queryKey: ["ranniely-class-sales"],
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
     queryFn: async (): Promise<RannielyClassSales> => {
       const { data: funnels, error: funnelError } = await supabase
         .from("rd_funnels")
@@ -124,7 +125,8 @@ export function useRannielyClassSales() {
 export function useEventClasses() {
   return useQuery({
     queryKey: ["event_classes"],
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       // Adds only confirmed, region-compatible RD deals and never changes a
       // manually linked member. This keeps occupancy current after every sync.

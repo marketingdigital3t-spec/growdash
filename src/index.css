@@ -7359,6 +7359,16 @@ html[data-accent] .brand-shell .growdash-main::before {
   height: 36px !important;
 }
 
+/* Page controls and KPI headings remain open to the page canvas. Only the
+   individual controls and metric/analytic cards carry a surface. */
+.brand-shell .gd-funnel-analysis .gd-funnel-filter-strip,
+.brand-shell .gd-funnel-analysis .gd-funnel-filter-strip.gd-filter-strip {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  padding-inline: 0 !important;
+}
+
 /* The content canvas is one uninterrupted surface. The outer responsive
    gutters belong to the canvas too; only actual widgets receive a card
    surface. This prevents the legacy shell colour from showing as side bands

@@ -2,12 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-// External APIs have rate limits; one minute is the fastest sustained cadence
-// that keeps the current-day sync useful without turning every open tab into
-// a duplicate Meta/RD poller. Database writes themselves remain realtime and
-// are applied to the screen in one-second batches below.
-const REFRESH_INTERVAL_MS = 60_000;
-const LOCAL_DEDUP_WINDOW_MS = 55_000;
+// Realtime database writes keep visible data current. The external Meta/RD
+// reconciliation is deliberately less frequent so it does not monopolise the
+// browser whenever someone changes tabs or returns to the application.
+const REFRESH_INTERVAL_MS = 5 * 60_000;
+const LOCAL_DEDUP_WINDOW_MS = 4 * 60_000;
 const STORAGE_PREFIX = "growdash:last-background-sync";
 // A Meta/RD sync can write several related rows in rapid succession. Waiting
 // for a quiet window prevents each write from reloading the same heavy traffic
@@ -113,10 +112,7 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
     // só entra depois que a tela já ficou utilizável.
     const initial = window.setTimeout(() => void refresh(false), 4_000);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
-    const onFocus = () => {
-      invalidateLiveQueries();
-      void refresh(false);
-    };
+    const onFocus = () => void refresh(false);
     const onVisibility = () => {
       if (document.visibilityState === "visible") onFocus();
     };

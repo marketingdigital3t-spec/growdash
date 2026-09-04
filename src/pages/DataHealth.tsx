@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Activity, AlertTriangle, CalendarRange, Database, KeyRound, Loader2, MapPin, RefreshCw } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DuplicatesCard } from "@/components/data-health/DuplicatesCard";
 import { RevenueDriftCard } from "@/components/data-health/RevenueDriftCard";
@@ -25,6 +25,12 @@ interface HealthData {
   accountsMissingLpConfig: { id: string; name: string }[];
   lastSyncs: { id: string; name: string; last_sync_success_at: string | null; connection_status: string }[];
   oauthIntegrations: { id: string; provider: string; is_active: boolean | null; token_expires_at: string | null; permission_health: string | null; last_permission_check_at: string | null; last_health_error: string | null }[];
+}
+
+function formatSafeDate(value: string | Date | null | undefined, pattern: string) {
+  if (!value) return "não informada";
+  const date = value instanceof Date ? value : parseISO(value);
+  return isValid(date) ? format(date, pattern, { locale: ptBR }) : "data inválida";
 }
 
 function useHealth() {
@@ -194,7 +200,7 @@ export default function DataHealth() {
       <Card>
         <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div><span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Diagnóstico por conta e período</span><p className="mt-1 text-sm font-bold">{adAccountId === "all" ? "Todas as contas" : data.lastSyncs.find((item) => item.id === adAccountId)?.name || "Conta selecionada"}</p></div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarRange className="h-4 w-4 text-primary" />{format(startDate, "dd/MM/yyyy")} — {format(endDate, "dd/MM/yyyy")}</div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarRange className="h-4 w-4 text-primary" />{formatSafeDate(startDate, "dd/MM/yyyy")} — {formatSafeDate(endDate, "dd/MM/yyyy")}</div>
         </CardContent>
       </Card>
 
@@ -274,7 +280,7 @@ export default function DataHealth() {
           {data.oauthIntegrations.length ? data.oauthIntegrations.map((integration) => {
             const status = integration.permission_health || "unchecked";
             const unhealthy = ["expired", "permission_removed", "error"].includes(status);
-            return <div key={integration.id} className="flex flex-col gap-2 border-b border-border/40 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><Badge variant={unhealthy ? "destructive" : "outline"}>{status}</Badge><b className="text-sm capitalize">{integration.provider.replaceAll("_", " ")}</b></div><div className="text-xs text-muted-foreground">{integration.token_expires_at ? `Expira ${format(parseISO(integration.token_expires_at), "dd/MM/yyyy HH:mm")}` : "Expiração não informada"}{integration.last_health_error ? ` · ${integration.last_health_error}` : ""}</div></div>;
+            return <div key={integration.id} className="flex flex-col gap-2 border-b border-border/40 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><Badge variant={unhealthy ? "destructive" : "outline"}>{status}</Badge><b className="text-sm capitalize">{integration.provider.replaceAll("_", " ")}</b></div><div className="text-xs text-muted-foreground">{integration.token_expires_at ? `Expira ${formatSafeDate(integration.token_expires_at, "dd/MM/yyyy HH:mm")}` : "Expiração não informada"}{integration.last_health_error ? ` · ${integration.last_health_error}` : ""}</div></div>;
           }) : <p className="py-4 text-sm text-muted-foreground">Nenhuma integração OAuth cadastrada.</p>}
         </CardContent>
       </Card>
@@ -298,7 +304,7 @@ export default function DataHealth() {
                   </div>
                   <span className="text-xs tabular-nums text-muted-foreground">
                     {a.last_sync_success_at
-                      ? format(parseISO(a.last_sync_success_at), "dd/MM HH:mm", { locale: ptBR })
+                      ? formatSafeDate(a.last_sync_success_at, "dd/MM HH:mm")
                       : "nunca"}
                   </span>
                 </div>

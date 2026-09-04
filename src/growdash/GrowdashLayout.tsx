@@ -223,35 +223,9 @@ export default function GrowdashLayout() {
     .map((section) => ({ ...section, items: section.items.filter((item) => permittedPath(item.path)) }))
     .filter((section) => section.items.length > 0);
 
-  // Baixa os chunks das telas visíveis quando o shell já está interativo.
-  // Antes disso o preload dependia exclusivamente de hover/foco, deixando o
-  // primeiro clique em algumas abas sujeito a uma tela de carregamento fria.
-  // A fila é sequencial para não disputar banda com a sessão e os dados da
-  // tela atual; falhas continuam sendo tratadas pelo lazyWithRetry na rota.
-  useEffect(() => {
-    if (permissions.loading || visibleSections.length === 0) return;
-    const paths = visibleSections.flatMap((section) => section.items.map((item) => item.path));
-    const idleWindow = window as Window & typeof globalThis & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-    let cancelled = false;
-    const preloadAll = async () => {
-      for (const path of paths) {
-        if (cancelled) return;
-        preloadRoute(path);
-        // Yield between chunks so opening the current module remains fast.
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 60));
-      }
-    };
-    const idleHandle = idleWindow.requestIdleCallback?.(() => void preloadAll(), { timeout: 2_000 });
-    const timeoutHandle = idleHandle === undefined ? window.setTimeout(() => void preloadAll(), 1_200) : undefined;
-    return () => {
-      cancelled = true;
-      if (idleHandle !== undefined) idleWindow.cancelIdleCallback?.(idleHandle);
-      if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
-    };
-  }, [permissions.loading, preloadRoute, visibleSections]);
+  // Route chunks are fetched only after a person points at or focuses a menu
+  // item (see the handlers below). Loading every module after login made
+  // unrelated pages compete with the active screen for network and memory.
 
   useEffect(() => setMobileOpen(false), [pathname]);
   useEffect(() => {

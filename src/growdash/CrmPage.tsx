@@ -514,7 +514,7 @@ export default function CrmPage() {
       </section>
 
       {view !== "ai" && (
-        <section className="mb-4 rounded-2xl border border-border bg-card/80 p-3 shadow-sm sm:p-4" aria-labelledby="crm-metrics-title">
+        <section className="mb-4" aria-labelledby="crm-metrics-title">
           <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Resumo do período selecionado</p>
