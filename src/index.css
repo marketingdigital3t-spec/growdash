@@ -7388,3 +7388,13 @@ html[data-accent] .brand-shell .growdash-main::before {
   border-radius: 0 !important;
   box-shadow: none !important;
 }
+
+/* The root shell is also part of the content canvas. Without this final
+   authority, legacy phase/accent rules paint a second graphite strip beside
+   the black content area on wide screens. Chrome elements keep their own
+   permanently-black rules above. */
+.brand-shell,
+.brand-shell[data-space-phase] {
+  background-color: var(--gd-content-bg) !important;
+  background-image: none !important;
+}
