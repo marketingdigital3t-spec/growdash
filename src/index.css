@@ -7424,3 +7424,29 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   background-color: #ffffff !important;
   background-image: none !important;
 }
+
+/* Exception: the seven executive KPIs form one intentional compact control
+   group. It is the only Dashboard wrapper that joins metric cards; analytic
+   sections below remain open on the page canvas. */
+.brand-shell .dashboard-summary-strip-surface {
+  background: var(--gd-content-panel) !important;
+  border: 1px solid var(--gd-content-border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  padding: 8px !important;
+}
+
+.brand-shell .dashboard-summary-strip .dashboard-glass-metrics {
+  gap: 8px !important;
+  padding: 0 !important;
+}
+
+.brand-shell .dashboard-summary-strip .gd-glass-metric {
+  min-height: 72px !important;
+  padding: 10px !important;
+}
+
+.brand-shell .dashboard-summary-strip .gd-glass-metric-icon {
+  width: 32px !important;
+  height: 32px !important;
+}
