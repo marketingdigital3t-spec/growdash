@@ -7290,3 +7290,46 @@ html[data-accent] .brand-shell .growdash-main::before {
   color: var(--gd-content-text) !important;
   box-shadow: none !important;
 }
+
+/* Dashboard alignment: the summary is a row of independent metric cards, not
+   a card containing other cards. Widgets in the RGL keep their cell height so
+   analytic columns end on the same baseline without inventing blank panels. */
+.brand-shell .dashboard-summary-strip-surface {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .dashboard-summary-strip .dashboard-glass-metrics {
+  padding: 0 !important;
+  gap: var(--gd-space-card) !important;
+}
+
+.brand-shell .dashboard-summary-strip .gd-glass-metric {
+  min-height: 76px !important;
+  border: 1px solid var(--gd-content-border) !important;
+  border-radius: var(--gd-card-radius) !important;
+  background: var(--gd-content-surface) !important;
+  box-shadow: none !important;
+  padding: 12px !important;
+}
+
+.brand-shell .dashboard-summary-strip .gd-glass-metric:hover {
+  background: var(--gd-content-panel) !important;
+  border-color: var(--gd-content-text) !important;
+}
+
+.brand-shell .dashboard-grid-container .react-grid-item:not(.dashboard-default-static) > .dashboard-widget-shell {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.brand-shell .dashboard-grid-container .react-grid-item:not(.dashboard-default-static) > .dashboard-widget-shell > * {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.brand-shell .dashboard-grid-container .react-grid-item:not(.dashboard-default-static) :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card) {
+  height: 100% !important;
+}
