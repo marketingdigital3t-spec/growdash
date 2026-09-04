@@ -7333,3 +7333,28 @@ html[data-accent] .brand-shell .growdash-main::before {
 .brand-shell .dashboard-grid-container .react-grid-item:not(.dashboard-default-static) :is(.gd-metric-card, .dashboard-glass-card, .dashboard-terra-card) {
   height: 100% !important;
 }
+
+/* The content canvas belongs to the application shell, not to a centred
+   dashboard card. It therefore reaches every edge of the usable content area
+   while the page gutter continues to protect the cards themselves. */
+.brand-shell .growdash-main {
+  min-height: calc(100dvh - 49px) !important;
+  background: var(--gd-content-bg) !important;
+}
+
+.brand-shell .dashboard-page {
+  min-height: calc(100dvh - 49px) !important;
+  max-width: none !important;
+}
+
+/* Give the executive summary enough presence without changing the desktop
+   grid or creating an enclosing surface again. */
+.brand-shell .dashboard-summary-strip .gd-glass-metric {
+  min-height: 88px !important;
+  padding: 14px !important;
+}
+
+.brand-shell .dashboard-summary-strip .gd-glass-metric-icon {
+  width: 36px !important;
+  height: 36px !important;
+}
