@@ -76,8 +76,8 @@ export default function CommercialPage() {
     return accounts;
   }, [adAccounts, businessUnitId, segment]);
   const visibleAccounts = useMemo(() => accountFilter ? accessibleAccounts.filter((account) => account.id === accountFilter) : accessibleAccounts, [accessibleAccounts, accountFilter]);
-  const accountOptions = useMemo(() => accessibleAccounts.map((account) => ({ id: account.id, name: account.name })), [accessibleAccounts]);
-  const rankingAccountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: account.name })), [visibleAccounts]);
+  const accountOptions = useMemo(() => accessibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [accessibleAccounts]);
+  const rankingAccountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [visibleAccounts]);
 
   useEffect(() => {
     if (adAccountId !== "all" && accessibleAccounts.length && !accessibleAccounts.some((account) => account.id === adAccountId)) setAdAccountId("all");

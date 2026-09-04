@@ -291,7 +291,10 @@ export default function FunnelAnalysis() {
     if (selectedCampaign === "all") return { scopedInsights: accountScopedInsights, campaignWithoutMediaMatch: false };
     const campaign = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
     const matches = accountScopedInsights.filter((row) => {
-      const metaName = row.campaign_name.trim().toLocaleLowerCase("pt-BR");
+      // Older Meta insight rows may have no campaign name. They must not
+      // crash the whole analysis while a campaign filter is active.
+      const metaName = String(row.campaign_name ?? "").trim().toLocaleLowerCase("pt-BR");
+      if (!metaName) return false;
       return metaName === campaign || metaName.includes(campaign) || campaign.includes(metaName);
     });
     // UTMs e campanhas Meta podem ter nomes diferentes. Exibir todas as
@@ -443,7 +446,7 @@ export default function FunnelAnalysis() {
       <MotionItem>
         <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
           <AccountMultiSelect
-            accounts={visibleAccounts.map((account) => ({ id: account.id, name: account.name }))}
+            accounts={visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") }))}
             selectedIds={selectedAccountIds}
             onChange={setAdAccountIds}
             className="gd-filter-account bg-background/60"
