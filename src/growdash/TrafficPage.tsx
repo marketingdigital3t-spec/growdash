@@ -87,7 +87,7 @@ export default function TrafficPage() {
       </section>}
 
       {activeTab === "campaigns" && <CampaignsManager />}
-      {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
+      {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
       {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accountName={account?.name} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} onAccountChange={setAdAccountId} />}
       {activeTab === "funnels" && <TrafficFunnels />}
       {activeTab === "presentation" && <PaidTrafficPresentation />}
@@ -143,13 +143,18 @@ function MetaToolsWorkspace({ providerAccountId, accountName, onCampaigns, onMis
   );
 }
 
-function BudgetWorkspace({ accountId, accounts, startDate, endDate }: { accountId: string; accounts: Array<{ id: string; name: string }>; startDate: Date; endDate: Date }) {
+function BudgetWorkspace({ accountId, selectedAccountIds, accounts, startDate, endDate }: { accountId: string; selectedAccountIds: string[]; accounts: Array<{ id: string; name: string }>; startDate: Date; endDate: Date }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [severityFilter, setSeverityFilter] = useState<"all" | BudgetAnalysisItem["severity"]>("all");
   const all = useBudgetAnalysis();
-  const visibleAccountIds = accounts.map((account) => account.id);
-  const scopedRows = all.filter((item) => visibleAccountIds.includes(item.id) && (accountId === "all" || item.id === accountId));
+  // The budget analysis hook intentionally returns all authorized BMs. Apply
+  // both the business-unit scope and the user's multi-select here so the
+  // totals/cards never show unselected accounts.
+  const visibleAccountIds = useMemo(() => new Set(accounts.map((account) => account.id)), [accounts]);
+  const selectedIds = useMemo(() => new Set(selectedAccountIds), [selectedAccountIds]);
+  const scopedRows = all.filter((item) => visibleAccountIds.has(item.id) && (selectedIds.size === 0 || selectedIds.has(item.id)) && (accountId === "all" || item.id === accountId));
+  const scopedAccounts = useMemo(() => selectedIds.size === 0 ? accounts : accounts.filter((account) => selectedIds.has(account.id)), [accounts, selectedIds]);
   const severityCounts = scopedRows.reduce((counts, item) => ({
     ...counts,
     [item.severity]: counts[item.severity] + 1,
@@ -223,7 +228,7 @@ function BudgetWorkspace({ accountId, accounts, startDate, endDate }: { accountI
           {rows.length === 0 && <Empty text={severityFilter === "all" ? "Nenhuma conta com orçamento ou saldo disponível." : "Nenhuma conta encontrada neste estado."} />}
         </div>
       </section>
-      <CampaignAttentionPanel accountId={accountId} accounts={accounts} startDate={startDate} endDate={endDate} />
+      <CampaignAttentionPanel accountId={accountId} accounts={scopedAccounts} startDate={startDate} endDate={endDate} />
     </div>
   );
 }
