@@ -116,7 +116,9 @@ export function useRDHealthCheck() {
           supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("created_at", since30),
           supabase.from("rd_deals").select("updated_at").eq("rd_funnel_id", f.id).order("updated_at", { ascending: false }).limit(1),
           supabase.from("rd_deals").select("amount_total").eq("rd_funnel_id", f.id).eq("win", true).gte("closed_at", since30),
-          supabase.from("sales").select("gross_revenue, matched_campaign_id, rd_deal_id").eq("rd_funnel_id", f.id).gte("sale_date", since30.slice(0, 10)),
+          // A data oficial de comparação é o fechamento vindo do RD; sale_date
+          // só é usada como fallback para registros antigos sem essa origem.
+          supabase.from("sales").select("gross_revenue, matched_campaign_id, rd_deal_id, source_closed_at, sale_date, status").eq("rd_funnel_id", f.id),
         ]);
 
         if (!stageCount || stageCount === 0) {
@@ -153,7 +155,13 @@ export function useRDHealthCheck() {
 
         // Confronto
         const rdWins = rdWinsAgg.data ?? [];
-        const sales = salesAgg.data ?? [];
+        const sales = (salesAgg.data ?? []).filter((sale: any) => {
+          if (sale.status && sale.status !== "confirmed") return false;
+          const rawDate = sale.source_closed_at || sale.sale_date;
+          if (!rawDate) return false;
+          const timestamp = new Date(rawDate).getTime();
+          return Number.isFinite(timestamp) && timestamp >= new Date(since30).getTime();
+        });
         const revenueRD = rdWins.reduce((s, r) => s + Number(r.amount_total || 0), 0);
         const linkedSales = sales.filter((s) => s.rd_deal_id);
         const revenueSales = linkedSales.reduce((s, r) => s + Number(r.gross_revenue || 0), 0);

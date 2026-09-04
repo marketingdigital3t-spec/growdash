@@ -33,7 +33,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 import { useSales } from "@/hooks/useSales";
-import { filterCanonicalFunnelSales, reconcileFunnelRevenue } from "@/lib/funnelRevenue";
+import { filterCanonicalFunnelSales } from "@/lib/funnelRevenue";
 import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
@@ -186,10 +186,6 @@ export default function FunnelAnalysis() {
     product: selectedProduct,
     enabled: funnelScopeIds.length > 0,
   });
-  const { data: historicalSales = [], isLoading: loadingHistoricalSales } = useSales({
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
-  });
   const { data: periodSales = [], isLoading: loadingPeriodSales } = useSales({
     startDate,
     endDate,
@@ -228,35 +224,10 @@ export default function FunnelAnalysis() {
     () => computeFunnelAnalytics(operationalPeriodDeals, operationalStages, operationalPeriodClosedDeals),
     [operationalPeriodClosedDeals, operationalPeriodDeals, operationalStages],
   );
-  const allowedDealIds = useMemo(
-    () => selectedOwner === "all" ? undefined : new Set(operationalDeals.map((deal) => deal.rd_deal_id)),
-    [operationalDeals, selectedOwner],
-  );
-  const historicalStateByDealId = useMemo(
-    () => new Map(operationalDeals.map((deal) => [deal.rd_deal_id, deal.lead_state])),
-    [operationalDeals],
-  );
-  const funnelSales = useMemo(() => filterCanonicalFunnelSales(historicalSales, {
-    funnelIds: funnelScopeIds,
-    scopedDealIds: new Set(operationalDeals.map((deal) => deal.rd_deal_id)),
-    source: selectedSource,
-    campaign: selectedCampaign,
-    state: selectedState,
-    product: selectedProduct,
-    allowedDealIds,
-    stateByDealId: historicalStateByDealId,
-    excludedDealIds,
-  }), [allowedDealIds, excludedDealIds, funnelScopeIds, historicalSales, historicalStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
-  const analytics = useMemo(
-    () => reconcileFunnelRevenue(baseAnalytics, funnelSales, {
-      stateByDealId: historicalStateByDealId,
-      // Conversões pertencem ao snapshot de negócios ganhos do RD. A tabela
-      // `sales` é usada para receita/atribuição e pode receber esses eventos
-      // depois da atualização do pipeline.
-      conversionCount: baseAnalytics.conversions,
-    }),
-    [baseAnalytics, funnelSales, historicalStateByDealId],
-  );
+  // RD é a fonte canônica do funil: vendas, receita, etapas e evolução usam
+  // o mesmo snapshot de negócios ganhos. A tabela `sales` fica restrita à
+  // atribuição de campanha/criativo, para não atrasar ou alterar os KPIs RD.
+  const analytics = baseAnalytics;
   const periodAllowedDealIds = useMemo(
     () => selectedOwner === "all" ? undefined : new Set([...operationalPeriodDeals, ...operationalPeriodClosedDeals].map((deal) => deal.rd_deal_id)),
     [operationalPeriodClosedDeals, operationalPeriodDeals, selectedOwner],
@@ -280,13 +251,7 @@ export default function FunnelAnalysis() {
     stateByDealId: periodStateByDealId,
     excludedDealIds,
   }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
-  const periodAnalytics = useMemo(
-    () => reconcileFunnelRevenue(periodBaseAnalytics, periodFunnelSales, {
-      stateByDealId: periodStateByDealId,
-      conversionCount: periodBaseAnalytics.conversions,
-    }),
-    [periodBaseAnalytics, periodFunnelSales, periodStateByDealId],
-  );
+  const periodAnalytics = periodBaseAnalytics;
   const previousAvgDaysToConvert = useMemo(() => {
     const span = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
     const previousStart = subDays(startDate, span);
@@ -501,7 +466,7 @@ export default function FunnelAnalysis() {
         </div>
       </MotionItem>
 
-      {loadingFunnels || isLoading || loadingMetaActions || loadingPeriodDeals || loadingClosedDeals || loadingPeriodClosedDeals || loadingStages || loadingHistoricalSales || loadingPeriodSales ? (
+      {loadingFunnels || isLoading || loadingMetaActions || loadingPeriodDeals || loadingClosedDeals || loadingPeriodClosedDeals || loadingStages || loadingPeriodSales ? (
         <MotionItem>
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>
@@ -542,7 +507,6 @@ export default function FunnelAnalysis() {
               cac={mediaMetrics.cac}
               salesConversionRate={mediaMetrics.salesConversionRate}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
-              conversionsOverride={analytics.conversions}
             />
           </MotionItem>
 

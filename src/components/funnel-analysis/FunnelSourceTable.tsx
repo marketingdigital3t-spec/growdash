@@ -24,7 +24,7 @@ export function FunnelSourceTable({ a }: { a: FunnelAnalytics }) {
                 <th className="text-right py-2 font-medium">Leads</th>
                 <th className="text-right py-2 font-medium">Vendas</th>
                 <th className="text-right py-2 font-medium">Conv.</th>
-                <th className="text-right py-2 font-medium">Receita</th>
+                <th className="text-right py-2 font-medium">Receita RD</th>
               </tr>
             </thead>
             <tbody>
