@@ -23,11 +23,9 @@ import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 import { CampaignAttentionPanel } from "@/components/campaigns/CampaignAttentionPanel";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getTrafficFunnelTemplates, type TrafficObjectiveId } from "@/lib/trafficFunnelTemplates";
+import { getTrafficFunnelTemplates, type TrafficFunnelTemplate } from "@/lib/trafficFunnelTemplates";
 import { useToast } from "@/hooks/use-toast";
-import { useWorkspace } from "@/hooks/useWorkspace";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
@@ -256,59 +254,9 @@ function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAcco
 }
 
 function TrafficFunnels() {
-  const objective: TrafficObjectiveId = "leads";
-  const [saving, setSaving] = useState<string | null>(null);
-  const { data: workspace } = useWorkspace();
-  const { user } = useAuth();
-  const { businessUnitId } = useGlobalFilters();
-  const { toast } = useToast();
+  const [previewTemplate, setPreviewTemplate] = useState<TrafficFunnelTemplate | null>(null);
   const templates = getTrafficFunnelTemplates();
   const templateCount = templates.length;
-
-  async function selectTemplate(template: (typeof templates)[number]) {
-    if (!workspace?.id || workspace.id.startsWith("legacy-") || !user?.id) {
-      toast({ title: "Estrutura pronta para configurar", description: "Aplique as migrações do banco para salvar este playbook como rascunho." });
-      return;
-    }
-    setSaving(template.id);
-    try {
-      const payload = {
-        workspace_id: workspace.id,
-        business_unit_id: businessUnitId?.startsWith("legacy-") ? null : businessUnitId || null,
-        created_by: user.id,
-        name: template.name.replace(/^\d+\.\s*/, ""),
-        objective,
-        template_key: template.id,
-        status: "draft",
-        config: {
-          stages: template.stages,
-          strategy: template.strategy,
-          best_for: template.bestFor,
-          primary_kpi: template.primaryKpi,
-          guardrail: template.guardrail,
-        },
-      };
-      const { data: existing, error: findError } = await (supabase as any)
-        .from("traffic_playbooks")
-        .select("id")
-        .eq("workspace_id", workspace.id)
-        .eq("template_key", template.id)
-        .in("status", ["draft", "active", "paused"])
-        .maybeSingle();
-      if (findError) throw findError;
-      const request = existing?.id
-        ? (supabase as any).from("traffic_playbooks").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", existing.id)
-        : (supabase as any).from("traffic_playbooks").insert(payload);
-      const { error } = await request;
-      if (error) throw error;
-      toast({ title: "Funil salvo como rascunho", description: "Revise público, orçamento, criativos e eventos antes de executar o playbook." });
-    } catch (error: any) {
-      const pending = /does not exist|schema cache|traffic_playbooks/i.test(error?.message || "");
-      toast({ variant: "destructive", title: pending ? "Migração pendente" : "Não foi possível salvar", description: pending ? "Aplique a migração da biblioteca de playbooks no Supabase." : error?.message || "Tente novamente." });
-    } finally {
-      setSaving(null);
-    }
-  }
 
   return <div className="space-y-4">
     <section className="overflow-hidden rounded-xl border border-border bg-card">
@@ -322,7 +270,7 @@ function TrafficFunnels() {
             <span className="w-fit rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">ZNTT-{String(templateIndex + 1).padStart(2, "0")}</span>
             <h4 className="mt-3 text-lg font-black leading-tight">{template.name.replace(/^\d+\.\s*/, "")}</h4>
             <ul className="mt-3 space-y-1.5 text-[11px] text-muted-foreground"><li>→ {template.bestFor}</li><li>→ {template.primaryKpi}</li><li>→ Rascunho seguro</li></ul>
-            <Button variant="outline" size="sm" className="mt-5 w-full" disabled={saving === template.id} onClick={() => selectTemplate(template)}>{saving === template.id ? "Salvando…" : "Selecionar este funil"}</Button>
+            <Button variant="outline" size="sm" className="mt-5 w-full" onClick={() => setPreviewTemplate(template)}>Visualizar funil</Button>
           </aside>
           <div className="growdash-scrollbar flex items-stretch gap-2 overflow-x-auto p-5">
             {template.stages.map((stage, index) => {
@@ -342,6 +290,11 @@ function TrafficFunnels() {
           <footer className="border-t border-border px-5 py-3 text-[10px] text-muted-foreground xl:col-span-2"><CircleAlert className="mr-1 inline h-3.5 w-3.5 text-amber-500" /><b className="text-foreground">Regra de segurança:</b> {template.guardrail}</footer>
         </article>)}
       </div>
+      <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplate(null)}>
+        <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto">
+          {previewTemplate && <><DialogHeader><DialogTitle>{previewTemplate.name}</DialogTitle><DialogDescription>{previewTemplate.strategy}</DialogDescription></DialogHeader><div className="grid gap-3 md:grid-cols-2"><div className="rounded-xl border border-border p-4"><h3 className="text-xs font-black uppercase tracking-[.12em]">Indicado para</h3><p className="mt-2 text-sm text-muted-foreground">{previewTemplate.bestFor}</p></div><div className="rounded-xl border border-border p-4"><h3 className="text-xs font-black uppercase tracking-[.12em]">Indicadores</h3><p className="mt-2 text-sm text-muted-foreground">{previewTemplate.primaryKpi}</p></div></div><ol className="grid gap-3 md:grid-cols-3">{previewTemplate.stages.map((stage, index) => <li key={stage} className="rounded-xl border border-border bg-muted/20 p-4"><span className="text-[10px] font-black text-muted-foreground">ETAPA {index + 1}</span><p className="mt-2 text-sm font-bold">{stage}</p></li>)}</ol><div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm"><b>Regra de segurança:</b> {previewTemplate.guardrail}</div></>}
+        </DialogContent>
+      </Dialog>
     </section>
   </div>;
 }
