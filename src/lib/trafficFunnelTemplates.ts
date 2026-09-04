@@ -29,27 +29,44 @@ export const trafficObjectives: TrafficObjective[] = [
 ];
 
 const blueprints = [
-  { name: "Funil direto", strategy: "Oferta objetiva para uma audiência com intenção já formada.", bestFor: "Produtos validados e demanda quente", stages: ["Audiência de intenção", "Criativo de oferta", "{optimization}", "{outcome}"], guardrail: "Não escalar antes de volume mínimo de conversões." },
-  { name: "Conteúdo → conversão", strategy: "Educa primeiro e apresenta a oferta ao público que consumiu o conteúdo.", bestFor: "Mercados que exigem consciência", stages: ["Conteúdo educativo", "Audiência engajada", "Prova e mecanismo", "{optimization}", "{outcome}"], guardrail: "Separar aquisição e remarketing no orçamento." },
-  { name: "Vídeo em 3 níveis", strategy: "Sequência de vídeos para descoberta, consideração e decisão.", bestFor: "Especialistas, serviços e infoprodutos", stages: ["Vídeo de descoberta", "Vídeo de prova", "Vídeo de objeção", "{optimization}", "{outcome}"], guardrail: "Trocar criativo quando CTR cair e CPM/CPL subirem juntos." },
-  { name: "Isca digital", strategy: "Entrega valor imediato e conduz o lead por nutrição.", bestFor: "Geração de demanda e lista própria", stages: ["Isca de alto valor", "{optimization}", "Nutrição CRM", "Oferta principal", "{outcome}"], guardrail: "Medir qualidade no CRM, não somente volume." },
-  { name: "Webinar ou evento", strategy: "Captação para evento com prova ao vivo e janela de oferta.", bestFor: "Lançamentos e venda consultiva", stages: ["Convite para evento", "{optimization}", "Comparecimento", "Oferta com prazo", "{outcome}"], guardrail: "Acompanhar custo por participante, não apenas cadastro." },
-  { name: "Mensagens qualificadas", strategy: "Inicia conversa e usa perguntas para filtrar intenção.", bestFor: "Serviços locais e venda de ticket alto", stages: ["Anúncio de problema", "Início da conversa", "Qualificação automática", "Atendimento comercial", "{outcome}"], guardrail: "Definir SLA e excluir conversas sem resposta." },
-  { name: "Prova social", strategy: "Usa casos, depoimentos e demonstrações antes da ação final.", bestFor: "Ofertas com objeção de confiança", stages: ["Dor reconhecida", "Caso real", "Demonstração", "{optimization}", "{outcome}"], guardrail: "Validar autorização e autenticidade das provas." },
-  { name: "Lookalike progressivo", strategy: "Expande públicos semelhantes em camadas, preservando controle.", bestFor: "Contas com base de conversão confiável", stages: ["Base de alta qualidade", "Semelhante 1%", "Semelhante 2–5%", "{optimization}", "{outcome}"], guardrail: "Não criar semelhante com base pequena ou contaminada." },
-  { name: "Remarketing por intenção", strategy: "Separa visitantes conforme profundidade e recência.", bestFor: "Recuperação de oportunidades", stages: ["Visitante 30 dias", "Alta intenção 14 dias", "Objeção específica", "Urgência legítima", "{outcome}"], guardrail: "Controlar frequência e excluir quem já converteu." },
-  { name: "Always-on completo", strategy: "Opera aquisição, consideração e recuperação continuamente.", bestFor: "Operações maduras e verba recorrente", stages: ["Aquisição ampla", "Conteúdo de consideração", "{optimization}", "Remarketing 7–30 dias", "{outcome}"], guardrail: "Definir orçamento e meta separados por estágio." },
+  {
+    name: "FUNIL 01 — CAPTAÇÃO DIRETA",
+    strategy: "Gere demanda com rastreabilidade ponta a ponta: anúncio → formulário ou landing page → qualificação → CRM → closer → diagnóstico → oferta → follow-up → venda.",
+    bestFor: "Alunos, imersões e pacientes-modelo com intenção de compra.",
+    stages: ["Criativo", "Formulário / LP", "Qualificação", "Integração", "Negociação", "Closer", "Ligação + WhatsApp", "Diagnóstico + oferta", "Follow-up → venda"],
+    guardrail: "Não otimizar apenas para lead barato: medir receita por criativo, CAC e ROAS com campanha, conjunto, anúncio e data de entrada.",
+  },
+  {
+    name: "FUNIL 02 — PÍLULA DE CONHECIMENTO + AULA GRATUITA",
+    strategy: "Entregue uma pílula de conhecimento, capture o contato e conduza para uma aula gratuita que prova método, diferenciais e oportunidade profissional antes da oferta.",
+    bestFor: "Experts e formações que precisam educar o mercado antes de vender.",
+    stages: ["Pílula de conhecimento", "Vídeo view", "Perfil do expert", "3 fixados", "Link da bio", "Aula gratuita", "Cadastro", "CRM", "Closer → venda"],
+    guardrail: "Separar aquisição, comparecimento e remarketing; acompanhar taxa de presença, avanço no RD e receita por origem.",
+  },
+  {
+    name: "FUNIL 03 — DEMANDA REPRIMIDA",
+    strategy: "Transforme desejo latente em oportunidade: comunicação de sonho e resultado, condição especial real, prova social e escassez operacional sem promessas enganosas.",
+    bestFor: "Paciente-modelo, turmas extraordinárias e ofertas com vagas limitadas.",
+    stages: ["Expert nos stories", "Story 1 — decisão", "Story 2 — problema", "Story 3 — revelação", "Story 4 — microcompromisso", "Link / formulário", "Cadastro", "CRM", "Closer → venda"],
+    guardrail: "Paciente-modelo não é gratuito; evitar imagens sexualizadas que geram clique ruim e validar cidade, investimento, supervisão e sigilo.",
+  },
+  {
+    name: "FUNIL 04 — SOCIAL SELLER / PROSPECÇÃO ATIVA",
+    strategy: "Combine prospecção ativa, conteúdo e conversas consultivas para transformar contatos qualificados em diagnóstico, proposta e fechamento acompanhado pelo comercial.",
+    bestFor: "Ticket alto, profissionais de saúde e operações com closer dedicado.",
+    stages: ["Inbound — pessoa interage", "Social seller identifica", "Abordagem pelo perfil do expert", "Conversa natural", "Identifica interesse", "Qualifica", "Encaminha ao closer", "Venda"],
+    guardrail: "Definir SLA, registrar vendedor e origem no CRM e medir conversão entre conversa, reunião, proposta e venda.",
+  },
 ] as const;
 
-export function getTrafficFunnelTemplates(objectiveId: TrafficObjectiveId): TrafficFunnelTemplate[] {
-  const objective = trafficObjectives.find((item) => item.id === objectiveId) ?? trafficObjectives[0];
+export function getTrafficFunnelTemplates(_objectiveId?: TrafficObjectiveId): TrafficFunnelTemplate[] {
   return blueprints.map((blueprint, index) => ({
-    id: `${objective.id}-${index + 1}`,
-    name: `${index + 1}. ${blueprint.name}`,
+    id: `zntt-funnel-${index + 1}`,
+    name: blueprint.name,
     strategy: blueprint.strategy,
     bestFor: blueprint.bestFor,
-    primaryKpi: objective.primaryKpi,
+    primaryKpi: index === 0 ? "CPL, CAC e ROAS" : index === 1 ? "CPV, cadastros e vendas" : index === 2 ? "Respostas, cadastros e vendas" : "Conversas, oportunidades e receita",
     guardrail: blueprint.guardrail,
-    stages: blueprint.stages.map((stage) => stage.replace("{optimization}", objective.optimization).replace("{outcome}", objective.outcome)),
+    stages: [...blueprint.stages],
   }));
 }

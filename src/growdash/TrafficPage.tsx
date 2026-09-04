@@ -23,7 +23,7 @@ import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 import { CampaignAttentionPanel } from "@/components/campaigns/CampaignAttentionPanel";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getTrafficFunnelTemplates, trafficObjectives, type TrafficObjectiveId } from "@/lib/trafficFunnelTemplates";
+import { getTrafficFunnelTemplates, type TrafficObjectiveId } from "@/lib/trafficFunnelTemplates";
 import { useToast } from "@/hooks/use-toast";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/contexts/AuthContext";
@@ -256,18 +256,14 @@ function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAcco
 }
 
 function TrafficFunnels() {
-  const [objective, setObjective] = useState<TrafficObjectiveId>("leads");
+  const objective: TrafficObjectiveId = "leads";
   const [saving, setSaving] = useState<string | null>(null);
   const { data: workspace } = useWorkspace();
   const { user } = useAuth();
   const { businessUnitId } = useGlobalFilters();
   const { toast } = useToast();
-  const current = trafficObjectives.find((item) => item.id === objective)!;
-  const templates = getTrafficFunnelTemplates(objective);
-
-  const prefix: Record<TrafficObjectiveId, string> = {
-    awareness: "AW", traffic: "TR", engagement: "EN", leads: "LD", app: "AP", sales: "SL",
-  };
+  const templates = getTrafficFunnelTemplates();
+  const templateCount = templates.length;
 
   async function selectTemplate(template: (typeof templates)[number]) {
     if (!workspace?.id || workspace.id.startsWith("legacy-") || !user?.id) {
@@ -317,16 +313,13 @@ function TrafficFunnels() {
   return <div className="space-y-4">
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <header className="border-b border-border px-4 py-5 sm:px-6">
-        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/15 text-primary"><GitBranch className="h-5 w-5" /></span><div><h2 className="text-xl font-black">Funis de tráfego</h2><p className="text-xs text-muted-foreground">10 funis prontos para cada objetivo do gerenciador de anúncios. Escolha o playbook de cada campanha.</p></div></div>
-        <div className="growdash-scrollbar mt-5 flex gap-1 overflow-x-auto rounded-xl bg-muted/55 p-1" role="tablist" aria-label="Objetivos de campanha">
-          {trafficObjectives.map((item) => <button key={item.id} role="tab" aria-selected={objective === item.id} onClick={() => setObjective(item.id)} className={cn("flex min-w-max items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition", objective === item.id ? "border border-primary/50 bg-background text-primary shadow-sm" : "text-muted-foreground hover:bg-background/70 hover:text-foreground")}><span>{item.label}</span><span className="grid h-5 min-w-5 place-items-center rounded-full border border-border bg-muted px-1 text-[9px]">10</span></button>)}
-        </div>
+        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/15 text-primary"><GitBranch className="h-5 w-5" /></span><div><h2 className="text-xl font-black">Funis de tráfego</h2><p className="text-xs text-muted-foreground">{templateCount} playbooks oficiais da ZNTT Academy. Escolha o processo que a campanha irá executar.</p></div></div>
       </header>
       <div className="space-y-4 p-4 sm:p-6">
-        <div className="rounded-xl border border-primary/25 bg-primary/[0.035] px-4 py-3"><h3 className="font-black">{current.label}</h3><p className="mt-1 text-xs text-muted-foreground">{current.description} Otimização: <b className="text-foreground">{current.optimization}</b> · KPI: <b className="text-foreground">{current.primaryKpi}</b>.</p></div>
+        <div className="rounded-xl border border-border bg-muted/[0.035] px-4 py-3"><h3 className="font-black">Biblioteca ZNTT Academy</h3><p className="mt-1 text-xs text-muted-foreground">Os quatro processos abaixo substituem os modelos genéricos. Cada funil mantém seu próprio caminho, operação comercial e indicadores.</p></div>
         {templates.map((template, templateIndex) => <article key={template.id} className="grid overflow-hidden rounded-2xl border border-border bg-muted/[0.08] xl:grid-cols-[230px_minmax(0,1fr)]">
           <aside className="flex flex-col border-b border-border p-5 xl:border-b-0 xl:border-r">
-            <span className="w-fit rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">{prefix[objective]}-{templateIndex + 1}</span>
+            <span className="w-fit rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">ZNTT-{String(templateIndex + 1).padStart(2, "0")}</span>
             <h4 className="mt-3 text-lg font-black leading-tight">{template.name.replace(/^\d+\.\s*/, "")}</h4>
             <ul className="mt-3 space-y-1.5 text-[11px] text-muted-foreground"><li>→ {template.bestFor}</li><li>→ {template.primaryKpi}</li><li>→ Rascunho seguro</li></ul>
             <Button variant="outline" size="sm" className="mt-5 w-full" disabled={saving === template.id} onClick={() => selectTemplate(template)}>{saving === template.id ? "Salvando…" : "Selecionar este funil"}</Button>
@@ -339,8 +332,8 @@ function TrafficFunnels() {
                 <div className="flex min-h-[145px] w-[205px] flex-col rounded-xl border border-border bg-background p-4">
                   <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><StageIcon className="h-4 w-4" /></span>
                   <strong className="mt-3 text-sm leading-tight">{index + 1}. {stage}</strong>
-                  <span className="mt-1 text-[9px] font-black uppercase tracking-[.08em] text-primary">{index === 0 ? "Aquisição" : index === template.stages.length - 1 ? current.outcome : "Progressão"}</span>
-                  <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{index === 0 ? template.strategy : index === template.stages.length - 1 ? `Conclusão orientada a ${current.primaryKpi}.` : "Avance somente quem cumpriu o sinal de intenção desta etapa."}</p>
+                  <span className="mt-1 text-[9px] font-black uppercase tracking-[.08em] text-primary">{index === 0 ? "Entrada" : index === template.stages.length - 1 ? "Resultado" : "Progressão"}</span>
+                  <p className="mt-2 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{index === 0 ? template.strategy : index === template.stages.length - 1 ? `Conclusão acompanhada por ${template.primaryKpi}.` : "Avance somente quem cumpriu o sinal de intenção desta etapa."}</p>
                 </div>
                 {index < template.stages.length - 1 && <ChevronRight className="h-5 w-5 shrink-0 text-primary" />}
               </div>;
