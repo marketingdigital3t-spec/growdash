@@ -26,7 +26,7 @@ export function DashboardWidgetHelp({ title, type, children, className }: Props)
       <TooltipTrigger asChild>
         <div
           tabIndex={0}
-          className={className}
+          className={`dashboard-widget-help ${className ?? ""}`}
           aria-label={`${title}. ${description}`}
         >
           {children}

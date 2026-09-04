@@ -3438,6 +3438,16 @@ html:not(.dark) {
   border-radius: 0 !important;
   box-shadow: none !important;
 }
+.brand-shell .dashboard-widget-help {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
 .brand-shell :is(.gd-module-section, .dashboard-section, .funnel-section) {
   background: transparent !important;
   border: 0 !important;
