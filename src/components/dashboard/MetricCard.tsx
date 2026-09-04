@@ -23,7 +23,7 @@ export function MetricCard({ title, value, variation, icon, prefix, suffix, deci
   const valueTone = metricValueTone(title, value);
 
   return (
-    <Card className="dashboard-terra-card gd-metric-card group h-full min-w-0 cursor-default overflow-hidden" title={description} aria-label={`${title}. ${description}`}>
+    <Card className="dashboard-terra-card gd-metric-card group min-w-0 cursor-default overflow-hidden" title={description} aria-label={`${title}. ${description}`}>
       <CardContent className="gd-metric-card-content flex min-h-[96px] min-w-0 flex-col justify-center p-3 sm:min-h-[104px] sm:p-4 xl:min-h-[112px] xl:p-5">
         <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="flex min-w-0 flex-col items-start justify-center gap-1 text-left">

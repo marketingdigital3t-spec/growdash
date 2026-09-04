@@ -3317,6 +3317,115 @@ html:not(.dark) {
   }
 }
 
+/* Growdash visual contract (final layer)
+   The application chrome is intentionally invariant; theme switching applies
+   only to the content canvas. These tokens supersede legacy Terra/accent
+   values without changing data or component behavior. */
+:root {
+  --gd-content-bg-light: #ffffff;
+  --gd-content-surface-light: #f1f1ef;
+  --gd-content-panel-light: #f7f7f5;
+  --gd-content-border-light: #dededb;
+  --gd-content-text-light: #111111;
+  --gd-content-muted-light: #666666;
+  --gd-content-bg-dark: #0b0b0b;
+  --gd-content-surface-dark: #1b1b1b;
+  --gd-content-panel-dark: #222222;
+  --gd-content-border-dark: #353535;
+  --gd-content-text-dark: #ffffff;
+  --gd-content-muted-dark: #b5b5b5;
+  --gd-space-card: 16px;
+  --gd-space-section: 24px;
+  --gd-page-gutter: clamp(20px, 3vw, 40px);
+  --gd-card-radius: 10px;
+  --gd-card-padding: 20px;
+}
+
+/* Legacy accent preferences are retained for storage compatibility only. */
+html[data-accent] {
+  --primary: 0 0% 18% !important;
+  --ring: 0 0% 35% !important;
+  --accent: 0 0% 93% !important;
+  --accent-foreground: 0 0% 12% !important;
+  --sidebar-primary: 0 0% 100% !important;
+  --sidebar-icon-active: 0 0% 100% !important;
+  --sidebar-ring: 0 0% 70% !important;
+  --brand-gold: #ffffff !important;
+  --brand-gold-light: #ffffff !important;
+  --brand-bronze: #777777 !important;
+  --brand-accent-rgb: 255, 255, 255 !important;
+}
+
+.dark {
+  --gd-content-bg: var(--gd-content-bg-dark);
+  --gd-content-surface: var(--gd-content-surface-dark);
+  --gd-content-panel: var(--gd-content-panel-dark);
+  --gd-content-border: var(--gd-content-border-dark);
+  --gd-content-text: var(--gd-content-text-dark);
+  --gd-content-muted: var(--gd-content-muted-dark);
+}
+
+html:not(.dark) {
+  --gd-content-bg: var(--gd-content-bg-light);
+  --gd-content-surface: var(--gd-content-surface-light);
+  --gd-content-panel: var(--gd-content-panel-light);
+  --gd-content-border: var(--gd-content-border-light);
+  --gd-content-text: var(--gd-content-text-light);
+  --gd-content-muted: var(--gd-content-muted-light);
+}
+
+/* Invariant black chrome. */
+.brand-shell .brand-sidebar,
+.brand-shell .brand-topbar,
+.brand-shell .brand-topbar.growdash-global-header {
+  background: #080808 !important;
+  color: #ffffff !important;
+  border-color: #292929 !important;
+}
+.brand-shell .brand-sidebar :is(a,button,span,svg),
+.brand-shell .brand-topbar :is(a,button,span,svg) { color: #ffffff !important; }
+.brand-shell .brand-sidebar :is(a,button):hover,
+.brand-shell .brand-topbar :is(a,button):hover { background: #202020 !important; }
+.brand-shell .brand-sidebar nav a[aria-current="page"],
+.brand-shell .brand-sidebar nav a[data-state="active"] { background: #2b2b2b !important; border-color: #555 !important; color: #fff !important; }
+
+/* Content canvas and named section grids only; never style every .grid. */
+.brand-shell :is(.dashboard-page, .gd-funnel-analysis, .event-classes-page, .expert-dashboard,
+  .crm-page, .commercial-page, .paid-traffic-page, .agenda-page, .kanban-page, .finance-page) {
+  background: var(--gd-content-bg) !important;
+  color: var(--gd-content-text) !important;
+}
+.brand-shell :is(.dashboard-page, .gd-funnel-analysis, .event-classes-page, .expert-dashboard,
+  .crm-page, .commercial-page, .paid-traffic-page, .agenda-page, .kanban-page, .finance-page)
+  :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card, .gd-metric-card, .dashboard-video-glass) {
+  background: var(--gd-content-surface) !important;
+  color: var(--gd-content-text) !important;
+  border-color: var(--gd-content-border) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.06) !important;
+}
+.dark .brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card, .gd-metric-card, .dashboard-video-glass) {
+  box-shadow: 0 12px 28px rgba(0,0,0,.24) !important;
+}
+.brand-shell :is(.gd-metric-card, .gd-panel, .dashboard-glass-card) :is(h1,h2,h3,h4,h5,p,span,strong,label,td,th) { color: var(--gd-content-text) !important; }
+.brand-shell :is(.gd-metric-card, .gd-panel, .dashboard-glass-card) .text-muted-foreground { color: var(--gd-content-muted) !important; }
+.brand-shell :is(.gd-kpi-grid, .dashboard-primary-kpis, .dashboard-glass-metrics, .dashboard-daily-charts, .gd-aligned-grid) { gap: var(--gd-space-card) !important; }
+.brand-shell :is(.dashboard-section, .gd-module-section, .funnel-section) + :is(.dashboard-section, .gd-module-section, .funnel-section) { margin-top: var(--gd-space-section) !important; }
+
+/* Compact, proportional KPI contract. */
+.brand-shell .gd-metric-card { min-height: 0 !important; height: auto !important; border-radius: var(--gd-card-radius) !important; }
+.brand-shell .gd-metric-card-content { min-height: 126px !important; padding: var(--gd-card-padding) !important; justify-content: center !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-content-text) !important; font-size: clamp(1.45rem, 2.2vw, 2rem) !important; line-height: 1.1 !important; }
+.brand-shell .gd-metric-card .gd-metric-icon { background: rgba(127,127,127,.14) !important; color: var(--gd-content-text) !important; }
+@media (max-width: 767px) { .brand-shell .gd-metric-card-content { min-height: 112px !important; padding: 16px !important; } }
+
+/* Neutral structural controls; semantic colors remain available to results. */
+.brand-shell :is(button, [role="tab"], .gd-filter-control, .gd-filter-account):not(.text-emerald-500):not(.text-red-500) {
+  border-color: var(--gd-content-border) !important;
+}
+.brand-shell :is(button, [role="tab"])[data-state="active"],
+.brand-shell [role="tab"][aria-selected="true"] { background: var(--gd-content-text) !important; color: var(--gd-content-bg) !important; }
+.brand-shell :is(.recharts-cartesian-grid line, .dashboard-section-heading) { stroke: var(--gd-content-border) !important; border-color: var(--gd-content-border) !important; }
+
 /* The funnel route can render outside the shell selector while it hydrates.
    Keep the KPI contract local to the component so its 4 x 2 layout never
    depends on that ancestor being present. */
@@ -7014,3 +7123,30 @@ html:not(.dark) .brand-shell .event-classes-page > button {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+
+/* Final visual contract: content hierarchy only; chrome stays black. */
+:root {
+  --gd-content-bg-light: #ffffff; --gd-content-surface-light: #f1f1ef; --gd-content-panel-light: #f7f7f5;
+  --gd-content-border-light: #dededb; --gd-content-text-light: #111111; --gd-content-muted-light: #666666;
+  --gd-content-bg-dark: #0b0b0b; --gd-content-surface-dark: #1b1b1b; --gd-content-panel-dark: #222222;
+  --gd-content-border-dark: #353535; --gd-content-text-dark: #ffffff; --gd-content-muted-dark: #b5b5b5;
+  --gd-space-card: 16px; --gd-space-section: 24px; --gd-page-gutter: clamp(20px, 3vw, 40px); --gd-card-radius: 10px; --gd-card-padding: 20px;
+}
+html:not(.dark) { --gd-content-bg: var(--gd-content-bg-light); --gd-content-surface: var(--gd-content-surface-light); --gd-content-panel: var(--gd-content-panel-light); --gd-content-border: var(--gd-content-border-light); --gd-content-text: var(--gd-content-text-light); --gd-content-muted: var(--gd-content-muted-light); }
+.dark { --gd-content-bg: var(--gd-content-bg-dark); --gd-content-surface: var(--gd-content-surface-dark); --gd-content-panel: var(--gd-content-panel-dark); --gd-content-border: var(--gd-content-border-dark); --gd-content-text: var(--gd-content-text-dark); --gd-content-muted: var(--gd-content-muted-dark); }
+html[data-accent] { --brand-gold: #fff !important; --brand-gold-light: #fff !important; --brand-bronze: #777 !important; --brand-accent-rgb: 255,255,255 !important; --primary: 0 0% 18% !important; --ring: 0 0% 35% !important; }
+.brand-shell .brand-sidebar, .brand-shell .brand-topbar, .brand-shell .brand-topbar.growdash-global-header { background: #080808 !important; color: #fff !important; border-color: #292929 !important; }
+.brand-shell .brand-sidebar :is(a,button,span,svg), .brand-shell .brand-topbar :is(a,button,span,svg) { color: #fff !important; }
+.brand-shell .brand-sidebar nav a[aria-current="page"], .brand-shell .brand-sidebar nav a[data-state="active"] { background: #2b2b2b !important; border-color: #555 !important; color: #fff !important; }
+.brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page) { background: var(--gd-content-bg) !important; color: var(--gd-content-text) !important; }
+.brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page) :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { background: var(--gd-content-surface) !important; color: var(--gd-content-text) !important; border-color: var(--gd-content-border) !important; box-shadow: 0 8px 24px rgba(0,0,0,.06) !important; }
+.dark .brand-shell :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { box-shadow: 0 12px 28px rgba(0,0,0,.24) !important; }
+.brand-shell :is(.gd-kpi-grid,.dashboard-primary-kpis,.dashboard-glass-metrics,.dashboard-daily-charts,.gd-aligned-grid) { gap: var(--gd-space-card) !important; }
+.brand-shell .gd-metric-card { min-height: 0 !important; height: auto !important; border-radius: var(--gd-card-radius) !important; }
+.brand-shell .gd-metric-card-content { min-height: 126px !important; padding: var(--gd-card-padding) !important; justify-content: center !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-content-text) !important; font-size: clamp(1.45rem,2.2vw,2rem) !important; line-height: 1.1 !important; }
+.brand-shell .gd-metric-card .gd-metric-icon { background: rgba(127,127,127,.14) !important; color: var(--gd-content-text) !important; }
+.brand-shell :is(.gd-metric-card,.gd-panel,.dashboard-glass-card) :is(h1,h2,h3,h4,h5,p,span,strong,label,td,th) { color: var(--gd-content-text) !important; }
+.brand-shell :is(.gd-metric-card,.gd-panel,.dashboard-glass-card) .text-muted-foreground { color: var(--gd-content-muted) !important; }
+.brand-shell :is(button,[role="tab"],.gd-filter-control,.gd-filter-account)[data-state="active"], .brand-shell [role="tab"][aria-selected="true"] { background: var(--gd-content-text) !important; color: var(--gd-content-bg) !important; }
+@media (max-width: 767px) { .brand-shell .gd-metric-card-content { min-height: 112px !important; padding: 16px !important; } }
