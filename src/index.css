@@ -6909,7 +6909,10 @@ html[data-accent="metallic-gold"],
    foreground in dark mode as in the light cards. Keeping this override at the
    final layer prevents legacy semantic accent classes from tinting text. */
 .dark .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel-kpi-value, .gd-funnel-kpi-detail, .gd-funnel-kpi-icon, .text-muted-foreground) {
-  color: #000 !important;
+  color: #fff !important;
+}
+html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel-kpi-value, .gd-funnel-kpi-detail, .gd-funnel-kpi-icon, .text-muted-foreground) {
+  color: #111 !important;
 }
 
 /* Campaign totals use the same widths as their table columns, but remain in a
