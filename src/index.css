@@ -3418,6 +3418,11 @@ html:not(.dark) {
 .brand-shell .gd-metric-card .gd-metric-icon { background: rgba(127,127,127,.14) !important; color: var(--gd-content-text) !important; }
 @media (max-width: 767px) { .brand-shell .gd-metric-card-content { min-height: 112px !important; padding: 16px !important; } }
 
+/* Funnel evolution uses color only on the data strokes. Never paint filled
+   areas behind the series, even if a legacy chart style is still present. */
+.brand-shell .funnel-evolution-chart :is(.recharts-area-area, .recharts-area-curve) { fill: none !important; }
+.brand-shell .funnel-evolution-chart .recharts-line-curve { fill: none !important; }
+
 /* Neutral structural controls; semantic colors remain available to results. */
 .brand-shell :is(button, [role="tab"], .gd-filter-control, .gd-filter-account):not(.text-emerald-500):not(.text-red-500) {
   border-color: var(--gd-content-border) !important;
