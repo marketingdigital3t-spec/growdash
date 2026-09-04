@@ -7411,3 +7411,16 @@ html[data-accent] .brand-shell .growdash-main::before {
   background-color: #080808 !important;
   background-image: none !important;
 }
+
+/* Light mode follows the same one-canvas rule. Legacy phase/accent gradients
+   must not make the outer gutter a second shade of gray: white belongs to the
+   entire content canvas, while soft gray remains limited to real cards. */
+html:not(.dark) .brand-shell,
+html:not(.dark) .brand-shell[data-space-phase],
+html:not(.dark) .brand-shell .growdash-content-shell,
+html:not(.dark) .brand-shell .growdash-content-shell > .growdash-main,
+html:not(.dark) .brand-shell .growdash-content-shell .growdash-content-frame,
+html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-module-shell, .gd-funnel-analysis, .expert-dashboard, .crm-page, .commercial-page, .paid-traffic-page, .agenda-page, .kanban-page, .finance-page) {
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
