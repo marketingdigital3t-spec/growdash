@@ -7457,3 +7457,27 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
 .brand-shell .dashboard-page .dashboard-primary-kpis .gd-metric-card-content > div:first-child {
   transform: translateY(10px);
 }
+
+/* CRM native selects must use the same neutral control treatment as the
+   custom filters. Browser defaults otherwise reintroduce a blue focused or
+   selected surface inside the dark palette. */
+.brand-shell .crm-page select.gd-button {
+  appearance: none;
+  -webkit-appearance: none;
+  color: var(--gd-content-text) !important;
+  background: var(--gd-content-panel) !important;
+  border-color: var(--gd-content-border) !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .crm-page select.gd-button:focus,
+.brand-shell .crm-page select.gd-button:focus-visible {
+  outline: 2px solid var(--gd-content-text) !important;
+  outline-offset: 1px;
+  background: var(--gd-content-panel) !important;
+}
+
+.brand-shell .crm-page select.gd-button option {
+  color: var(--gd-content-text) !important;
+  background: var(--gd-content-surface) !important;
+}
