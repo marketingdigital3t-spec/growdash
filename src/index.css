@@ -3443,6 +3443,15 @@ html:not(.dark) {
   border: 0 !important;
   box-shadow: none !important;
 }
+.brand-shell :is(.dashboard-widget-shell, .dashboard-default-widget-shell, .dashboard-open-widget-shell) {
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: start !important;
+}
+.brand-shell :is(.dashboard-primary-kpis, .dashboard-kpi-grid, .gd-kpi-grid, .dashboard-daily-charts, .gd-aligned-grid) {
+  align-items: start !important;
+  grid-auto-rows: auto !important;
+}
 
 /* Neutral structural controls; semantic colors remain available to results. */
 .brand-shell :is(button, [role="tab"], .gd-filter-control, .gd-filter-account):not(.text-emerald-500):not(.text-red-500) {

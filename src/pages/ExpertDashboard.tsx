@@ -141,12 +141,12 @@ export default function ExpertDashboard() {
             <div className="gd-kpi-grid grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[
               ["Faturamento bruto", "revenue_gross"], ["Investimento em tráfego", "spend"],
-            ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
-            <DashboardWidgetHelp type="kpi" title="Leads Meta" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
+            ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
+            <DashboardWidgetHelp type="kpi" title="Leads Meta" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
             {[
               ["CPL", "cpl"], ["ROAS", "roas"],
               ["Lucro", "profit"], ["Margem", "profit_margin"], ["Recebíveis", "receivables"], ["CTR", "ctr"], ["Taxa de conversão", "conversion_rate"],
-            ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
+            ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
             </div>
           </section>
         </MotionItem>
