@@ -7450,3 +7450,10 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   width: 32px !important;
   height: 32px !important;
 }
+
+/* The four executive cards below the strip are intentionally taller. Nudge
+   their internal row down so the title/value/icon sit on the optical centre
+   instead of leaving all of the spare space below the metric. */
+.brand-shell .dashboard-page .dashboard-primary-kpis .gd-metric-card-content > div:first-child {
+  transform: translateY(10px);
+}
