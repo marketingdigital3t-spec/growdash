@@ -464,7 +464,7 @@ export default function GrowdashLayout() {
         />
       )}
 
-      <div className={cn("min-h-screen min-w-0 max-w-full transition-[padding] duration-300", effectiveCollapsed ? "lg:pl-16" : "lg:pl-[220px]")}>
+      <div className={cn("growdash-content-shell min-h-screen min-w-0 max-w-full transition-[padding] duration-300", effectiveCollapsed ? "lg:pl-16" : "lg:pl-[220px]")}>
         <header className="brand-topbar growdash-global-header sticky top-0 z-30 flex min-h-12 min-w-0 flex-wrap items-center gap-2 border-b px-2 py-2 text-foreground shadow-sm sm:px-5">
           <button
             type="button"

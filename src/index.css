@@ -7358,3 +7358,23 @@ html[data-accent] .brand-shell .growdash-main::before {
   width: 36px !important;
   height: 36px !important;
 }
+
+/* The content canvas is one uninterrupted surface. The outer responsive
+   gutters belong to the canvas too; only actual widgets receive a card
+   surface. This prevents the legacy shell colour from showing as side bands
+   around the Dashboard. */
+.brand-shell .growdash-content-shell,
+.brand-shell .growdash-content-shell > .growdash-main,
+.brand-shell .growdash-content-shell .growdash-content-frame,
+.brand-shell .growdash-content-shell .dashboard-page {
+  background-color: var(--gd-content-bg) !important;
+  background-image: none !important;
+}
+
+.brand-shell .growdash-content-shell > .growdash-main,
+.brand-shell .growdash-content-shell .growdash-content-frame {
+  min-height: calc(100dvh - 49px) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
