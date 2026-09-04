@@ -7398,3 +7398,16 @@ html[data-accent] .brand-shell .growdash-main::before {
   background-color: var(--gd-content-bg) !important;
   background-image: none !important;
 }
+
+/* Wide layouts expose the shell gutter beside the sidebar. Make every layer
+   of the dark content canvas the same black, rather than relying on inherited
+   phase/background tokens that can differ by a few shades. */
+.dark .brand-shell,
+.dark .brand-shell[data-space-phase],
+.dark .brand-shell .growdash-content-shell,
+.dark .brand-shell .growdash-content-shell > .growdash-main,
+.dark .brand-shell .growdash-content-shell .growdash-content-frame,
+.dark .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-module-shell, .gd-funnel-analysis, .expert-dashboard, .crm-page, .commercial-page, .paid-traffic-page, .agenda-page, .kanban-page, .finance-page) {
+  background-color: #080808 !important;
+  background-image: none !important;
+}
