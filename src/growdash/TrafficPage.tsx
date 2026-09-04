@@ -30,6 +30,10 @@ import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import CampaignsManager from "@/pages/Campaigns";
+import funnelCaptacaoDireta from "@/assets/zntt-funnels/01-captacao-direta.png";
+import funnelPilulaAulaGratuita from "@/assets/zntt-funnels/02-pilula-aula-gratuita.png";
+import funnelDemandaReprimida from "@/assets/zntt-funnels/03-demanda-reprimida.png";
+import funnelSocialSeller from "@/assets/zntt-funnels/04-social-seller.png";
 
 const validTabs = new Set(["campaigns", "budget", "ai", "funnels", "presentation", "tools"]);
 const tabs = [
@@ -42,6 +46,12 @@ const tabs = [
 ] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+const funnelPreviewImages: Record<string, string> = {
+  "zntt-funnel-1": funnelCaptacaoDireta,
+  "zntt-funnel-2": funnelPilulaAulaGratuita,
+  "zntt-funnel-3": funnelDemandaReprimida,
+  "zntt-funnel-4": funnelSocialSeller,
+};
 
 export default function TrafficPage() {
   const [params, setParams] = useSearchParams();
@@ -291,8 +301,8 @@ function TrafficFunnels() {
         </article>)}
       </div>
       <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplate(null)}>
-        <DialogContent className="max-h-[88vh] max-w-5xl overflow-y-auto">
-          {previewTemplate && <><DialogHeader><DialogTitle>{previewTemplate.name}</DialogTitle><DialogDescription>{previewTemplate.strategy}</DialogDescription></DialogHeader><div className="grid gap-3 md:grid-cols-2"><div className="rounded-xl border border-border p-4"><h3 className="text-xs font-black uppercase tracking-[.12em]">Indicado para</h3><p className="mt-2 text-sm text-muted-foreground">{previewTemplate.bestFor}</p></div><div className="rounded-xl border border-border p-4"><h3 className="text-xs font-black uppercase tracking-[.12em]">Indicadores</h3><p className="mt-2 text-sm text-muted-foreground">{previewTemplate.primaryKpi}</p></div></div><ol className="grid gap-3 md:grid-cols-3">{previewTemplate.stages.map((stage, index) => <li key={stage} className="rounded-xl border border-border bg-muted/20 p-4"><span className="text-[10px] font-black text-muted-foreground">ETAPA {index + 1}</span><p className="mt-2 text-sm font-bold">{stage}</p></li>)}</ol><div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm"><b>Regra de segurança:</b> {previewTemplate.guardrail}</div></>}
+        <DialogContent className="max-h-[92vh] max-w-[96vw] overflow-y-auto p-4 sm:p-6">
+          {previewTemplate && <><DialogHeader><DialogTitle>{previewTemplate.name}</DialogTitle><DialogDescription>Playbook visual oficial da ZNTT Academy.</DialogDescription></DialogHeader><img src={funnelPreviewImages[previewTemplate.id]} alt={`Playbook visual: ${previewTemplate.name}`} className="mt-4 h-auto w-full rounded-lg border border-border" /></>}
         </DialogContent>
       </Dialog>
     </section>
