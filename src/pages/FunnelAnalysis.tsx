@@ -221,8 +221,8 @@ export default function FunnelAnalysis() {
 
   const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
-    () => computeFunnelAnalytics(operationalPeriodDeals, operationalStages, operationalPeriodClosedDeals),
-    [operationalPeriodClosedDeals, operationalPeriodDeals, operationalStages],
+    () => computeFunnelAnalytics(operationalPeriodDeals, operationalStages, operationalPeriodClosedDeals, { startDate, endDate }),
+    [endDate, operationalPeriodClosedDeals, operationalPeriodDeals, operationalStages, startDate],
   );
   // RD é a fonte canônica do funil: vendas, receita, etapas e evolução usam
   // o mesmo snapshot de negócios ganhos. A tabela `sales` fica restrita à

@@ -7117,11 +7117,17 @@ html:not(.dark) .brand-shell .gd-filter-strip .gd-filter-account .bg-secondary {
    SVG curves, but each metric series must remain visually distinguishable.
    These are data-series colors only; all surrounding controls stay neutral. */
 .brand-shell .dashboard-line-cpl .recharts-line-curve,
-.brand-shell .dashboard-line-cpl .recharts-active-dot { stroke: #ef4444 !important; fill: #ef4444 !important; }
+.brand-shell .dashboard-line-cpl .recharts-active-dot { stroke: #ef4444 !important; }
 .brand-shell .dashboard-line-spend .recharts-line-curve,
-.brand-shell .dashboard-line-spend .recharts-active-dot { stroke: #facc15 !important; fill: #facc15 !important; }
+.brand-shell .dashboard-line-spend .recharts-active-dot { stroke: #facc15 !important; }
 .brand-shell .dashboard-line-leads .recharts-line-curve,
-.brand-shell .dashboard-line-leads .recharts-active-dot { stroke: #22c55e !important; fill: #22c55e !important; }
+.brand-shell .dashboard-line-leads .recharts-active-dot { stroke: #22c55e !important; }
+.brand-shell .dashboard-line-cpl .recharts-line-curve,
+.brand-shell .dashboard-line-spend .recharts-line-curve,
+.brand-shell .dashboard-line-leads .recharts-line-curve { fill: none !important; }
+.brand-shell .dashboard-line-cpl .recharts-active-dot { fill: #ef4444 !important; }
+.brand-shell .dashboard-line-spend .recharts-active-dot { fill: #facc15 !important; }
+.brand-shell .dashboard-line-leads .recharts-active-dot { fill: #22c55e !important; }
 
 /* The phase attribute is retained for compatibility, but it must never force
    dark Terra cards into the light content area. The chrome (sidebar/topbar)

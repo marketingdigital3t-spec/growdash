@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { endOfDay } from "date-fns";
+import { eachDayOfInterval, endOfDay, format } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 
@@ -367,7 +367,12 @@ function periodOfHour(h: number): "Manhã" | "Tarde" | "Noite" | "Madrugada" {
   return "Madrugada";
 }
 
-export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], closedDeals: RDDeal[] = deals.filter((deal) => deal.win)): FunnelAnalytics {
+export function computeFunnelAnalytics(
+  deals: RDDeal[],
+  stages: FunnelStage[],
+  closedDeals: RDDeal[] = deals.filter((deal) => deal.win),
+  dateRange?: { startDate: Date; endDate: Date },
+): FunnelAnalytics {
   const totalLeads = deals.length;
 
   const { stages: sortedStages, sourceToCanonicalId } = consolidateFunnelStages(stages);
@@ -546,12 +551,18 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
         }, 0) / wonWithDates.length
       : 0;
 
-  // Evolução diária — leads, oportunidades (a partir do meio da sequência), vendas
+  // Evolução diária — leads, oportunidades (a partir do meio da sequência), vendas.
+  // Use the browser-local calendar day instead of slicing the UTC ISO string;
+  // otherwise a selected day can appear under the previous/next date.
+  const dayKey = (value: string) => {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value.slice(0, 10) : format(parsed, "yyyy-MM-dd");
+  };
   const oppIdxThreshold = Math.max(1, Math.floor(sequence.length * 0.6));
   const evoMap = new Map<string, { leads: number; opportunities: number; conversions: number }>();
   for (const d of deals) {
     if (d.lead_created_at) {
-      const day = d.lead_created_at.slice(0, 10);
+      const day = dayKey(d.lead_created_at);
       const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
       cur.leads += 1;
       const idx = indexInSeq.get(canonicalDealStageId(d)) ?? -1;
@@ -561,10 +572,16 @@ export function computeFunnelAnalytics(deals: RDDeal[], stages: FunnelStage[], c
   }
   for (const d of confirmedClosedDeals) {
     if (!d.closed_at) continue;
-    const day = d.closed_at.slice(0, 10);
+    const day = dayKey(d.closed_at);
     const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
     cur.conversions += 1;
     evoMap.set(day, cur);
+  }
+  if (dateRange) {
+    for (const day of eachDayOfInterval({ start: dateRange.startDate, end: dateRange.endDate })) {
+      const key = format(day, "yyyy-MM-dd");
+      if (!evoMap.has(key)) evoMap.set(key, { leads: 0, opportunities: 0, conversions: 0 });
+    }
   }
   const evolution = Array.from(evoMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
