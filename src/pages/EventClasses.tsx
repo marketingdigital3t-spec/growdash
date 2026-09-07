@@ -11,6 +11,7 @@ import { EventClassFormDialog } from "@/components/event-classes/EventClassFormD
 import { motion } from "framer-motion";
 import { parseISO, isAfter, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Todos os status" },
@@ -44,15 +45,19 @@ export default function EventClasses() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [funnelFilter, setFunnelFilter] = useState<string>("all");
+  const [expertFilters, setExpertFilters] = useState<string[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<"classes" | "agenda">("classes");
   const { data: funnels } = useRDFunnels(undefined, activeView === "classes");
+  const expertOptions = useMemo(() => Array.from(new Set((funnels || []).map((funnel) => funnel.expert_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")).map((name) => ({ id: name, name })), [funnels]);
+  const expertByFunnel = useMemo(() => new Map((funnels || []).map((funnel) => [funnel.id, funnel.expert_name || funnel.name])), [funnels]);
 
   const filtered = useMemo(() => {
     const list = classes || [];
     return list
       .filter((c) => statusFilter === "all" || c.status === statusFilter)
       .filter((c) => funnelFilter === "all" || c.sources.some((source) => source.rd_funnel_id === funnelFilter))
+      .filter((c) => expertFilters.length === 0 || c.sources.some((source) => expertFilters.includes(expertByFunnel.get(source.rd_funnel_id) || "")))
       .filter((c) => {
         if (!query.trim()) return true;
         const ql = query.toLowerCase();
@@ -79,7 +84,7 @@ export default function EventClasses() {
         if (sa !== sb) return sa - sb;
         return a.date_start.localeCompare(b.date_start);
       });
-  }, [classes, query, statusFilter, funnelFilter]);
+  }, [classes, query, statusFilter, funnelFilter, expertFilters, expertByFunnel]);
 
   const summary = useMemo(() => {
     const list = filtered;
@@ -106,23 +111,6 @@ export default function EventClasses() {
     };
   }, [filtered]);
 
-  const classSales = useMemo(() => {
-    const totals = { studentSP: 0, studentTO: 0, modelPatientSP: 0, modelPatientTO: 0 };
-    for (const eventClass of classes || []) {
-      const location = `${eventClass.location || ""} ${eventClass.title}`.toLocaleLowerCase("pt-BR");
-      const region = /\b(sp|são paulo|sao paulo)\b/.test(location) ? "SP" : /\b(to|tocantins|aragua[ií]na)\b/.test(location) ? "TO" : null;
-      if (!region) continue;
-      if (region === "SP") {
-        totals.studentSP += eventClass.studentCount;
-        totals.modelPatientSP += eventClass.modelPatientCount;
-      } else {
-        totals.studentTO += eventClass.studentCount;
-        totals.modelPatientTO += eventClass.modelPatientCount;
-      }
-    }
-    return totals;
-  }, [classes]);
-
   return (
     <div className="event-classes-page mx-auto w-full max-w-[1600px] space-y-6">
       <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
@@ -147,7 +135,7 @@ export default function EventClasses() {
         </div>
       </motion.div>
 
-      <div className="gd-kpi-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
+      <div className="gd-kpi-grid grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         <StatCard icon={CalendarDays} label="Turmas" value={summary.total} />
         <StatCard icon={CheckCircle2} label="Abertas" value={summary.open} accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
         <StatCard icon={CheckCircle2} label="Esgotadas" value={summary.soldOut} accent="bg-muted text-muted-foreground" />
@@ -157,26 +145,7 @@ export default function EventClasses() {
         <StatCard icon={AlertTriangle} label="Críticas" value={summary.critical} accent="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
       </div>
 
-      <Card className="border-primary/20 bg-primary/[0.03]">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[.14em] text-primary">Preenchimento automático pelo CRM</p>
-              <h2 className="mt-1 text-base font-bold">Vendas confirmadas · Dra. Ranniely Silva</h2>
-              <p className="text-xs text-muted-foreground">Atualiza a cada 30 segundos e vincula automaticamente as vendas ganhas à turma da mesma região.</p>
-            </div>
-            <span className="text-xs font-semibold text-muted-foreground">Somente vendas realizadas</span>
-          </div>
-          <div className="gd-kpi-grid mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard icon={Users} label="Alunas · SP" value={classSales.studentSP} />
-            <StatCard icon={Users} label="Alunas · TO" value={classSales.studentTO} />
-            <StatCard icon={Stethoscope} label="Paciente modelo · SP" value={classSales.modelPatientSP} />
-            <StatCard icon={Stethoscope} label="Paciente modelo · TO" value={classSales.modelPatientTO} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -199,6 +168,7 @@ export default function EventClasses() {
             {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        {expertOptions.length > 0 && <AccountMultiSelect accounts={expertOptions} selectedIds={expertFilters} onChange={setExpertFilters} className="w-full sm:w-[230px]" emptyLabel="Todos os experts" singularLabel="expert" pluralLabel="experts" ariaLabel="Filtrar por experts" searchPlaceholder="Pesquisar expert…" />}
       </div>
 
       {isLoading && (
