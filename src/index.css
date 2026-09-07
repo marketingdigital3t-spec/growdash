@@ -7088,16 +7088,28 @@ html:not(.dark) .brand-shell .gd-filter-strip .gd-filter-account .bg-secondary {
 .brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-leads .recharts-line-curve,
 .brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-leads .recharts-active-dot {
   stroke: #2563eb !important;
-  fill: #2563eb !important;
 }
 .brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-opportunities .recharts-line-curve,
 .brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-opportunities .recharts-active-dot {
   stroke: #d97706 !important;
-  fill: #d97706 !important;
 }
 .brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-sales .recharts-line-curve,
 .brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-sales .recharts-active-dot {
   stroke: #16a34a !important;
+}
+
+/* The curve itself is an unfilled SVG path. Only the optional active point
+   receives the series fill color, avoiding an area-chart appearance. */
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .recharts-line-curve {
+  fill: none !important;
+}
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-leads .recharts-active-dot {
+  fill: #2563eb !important;
+}
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-opportunities .recharts-active-dot {
+  fill: #d97706 !important;
+}
+.brand-shell .gd-funnel-analysis .funnel-evolution-chart .funnel-line-sales .recharts-active-dot {
   fill: #16a34a !important;
 }
 
