@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, CalendarDays, Users, Stethoscope, AlertTriangle, CheckCircle2, Clock3, MapPin } from "lucide-react";
-import { useEventClasses, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
+import { useCreateEventClass, useEventClasses, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { EventClassCard } from "@/components/event-classes/EventClassCard";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
@@ -12,6 +12,22 @@ import { motion } from "framer-motion";
 import { parseISO, isAfter, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
+import { toast } from "sonner";
+
+const STRUCTURE_TEMPLATES = [
+  ["Ranniely — 12/09 — Araguaína", "2026-09-12", "Araguaína - TO"],
+  ["Ranniely — 02/10 — Alpha", "2026-10-02", "Alpha - SP"],
+  ["Ranniely — 09/11 — Alpha", "2026-11-09", "Alpha - SP"],
+  ["José — 17 a 19/10 — CTA Brasília", "2026-10-17", "CTA Brasília"],
+  ["Natália — 17/10 — Alpha", "2026-10-17", "Alpha - SP"],
+  ["Natália — 07/11 — Alpha", "2026-11-07", "Alpha - SP"],
+  ["Natália — 28/11 — Adamantina", "2026-11-28", "Adamantina - SP"],
+  ["Ste — 17/10 — São José do Rio Preto", "2026-10-17", "São José do Rio Preto - SP"],
+  ["Ste — 24/10 — São José do Rio Preto", "2026-10-24", "São José do Rio Preto - SP"],
+  ["Ste — 21/11 — Alpha", "2026-11-21", "Alpha - SP"],
+  ["Ste — 28/11 — Alpha", "2026-11-28", "Alpha - SP"],
+  ["J.App — 21/10 — CENESP", "2026-10-21", "CENESP - SP"],
+] as const;
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Todos os status" },
@@ -48,6 +64,9 @@ export default function EventClasses() {
   const [expertFilters, setExpertFilters] = useState<string[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<"classes" | "agenda">("classes");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const create = useCreateEventClass();
   const { data: funnels } = useRDFunnels(undefined, activeView === "classes");
   const expertOptions = useMemo(() => Array.from(new Set((funnels || []).map((funnel) => funnel.expert_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")).map((name) => ({ id: name, name })), [funnels]);
   const expertByFunnel = useMemo(() => new Map((funnels || []).map((funnel) => [funnel.id, funnel.expert_name || funnel.name])), [funnels]);
@@ -58,6 +77,8 @@ export default function EventClasses() {
       .filter((c) => statusFilter === "all" || c.status === statusFilter)
       .filter((c) => funnelFilter === "all" || c.sources.some((source) => source.rd_funnel_id === funnelFilter))
       .filter((c) => expertFilters.length === 0 || c.sources.some((source) => expertFilters.includes(expertByFunnel.get(source.rd_funnel_id) || "")))
+      .filter((c) => !dateFrom || c.date_start >= dateFrom)
+      .filter((c) => !dateTo || c.date_start <= dateTo)
       .filter((c) => {
         if (!query.trim()) return true;
         const ql = query.toLowerCase();
@@ -84,7 +105,7 @@ export default function EventClasses() {
         if (sa !== sb) return sa - sb;
         return a.date_start.localeCompare(b.date_start);
       });
-  }, [classes, query, statusFilter, funnelFilter, expertFilters, expertByFunnel]);
+  }, [classes, query, statusFilter, funnelFilter, expertFilters, expertByFunnel, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
     const list = filtered;
@@ -111,6 +132,43 @@ export default function EventClasses() {
     };
   }, [filtered]);
 
+  const importOperationalClasses = async () => {
+    const existingTitles = new Set((classes || []).map((eventClass) => eventClass.title.trim().toLocaleLowerCase("pt-BR")));
+    const missing = STRUCTURE_TEMPLATES.filter(([title]) => !existingTitles.has(title.toLocaleLowerCase("pt-BR")));
+    if (missing.length === 0) {
+      toast.info("As turmas com data definida dessa grade já estão cadastradas.");
+      return;
+    }
+
+    try {
+      for (const [title, date_start, location] of missing) {
+        await create.mutateAsync({
+          title,
+          date_start,
+          date_end: null,
+          location,
+          max_people: 0,
+          max_students: 0,
+          max_model_patients: 0,
+          manual_student_count: 0,
+          manual_model_patient_count: 0,
+          has_model_patients: false,
+          ad_account_id: null,
+          rd_funnel_id: null,
+          rd_model_patient_funnel_id: null,
+          allowed_student_stage_ids: [],
+          allowed_model_patient_stage_ids: [],
+          status: "upcoming",
+          notes: "Importada da grade operacional. Vincule conta e funil do RD para contabilização automática; use os controles manuais enquanto o vínculo não estiver definido.",
+          sources: [],
+        });
+      }
+      toast.success(`${missing.length} turma(s) criada(s). Configure o funil RD em cada turma quando quiser automatizar a ocupação.`);
+    } catch (error: any) {
+      toast.error(error?.message || "Não foi possível importar todas as turmas.");
+    }
+  };
+
   return (
     <div className="event-classes-page mx-auto w-full max-w-[1600px] space-y-6">
       <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
@@ -129,9 +187,14 @@ export default function EventClasses() {
               Gerencie turmas, vagas, alunos e pacientes-modelo vinculados aos funis comerciais do RD Station.
             </p>
           </div>
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Nova turma
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={importOperationalClasses} disabled={create.isPending}>
+              Importar grade de turmas
+            </Button>
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Nova turma
+            </Button>
+          </div>
         </div>
       </motion.div>
 
@@ -155,6 +218,8 @@ export default function EventClasses() {
             className="pl-9"
           />
         </div>
+        <Input aria-label="Data inicial das turmas" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="w-full sm:w-40" />
+        <Input aria-label="Data final das turmas" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="w-full sm:w-40" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger aria-label="Filtrar turmas por status" className="w-full sm:w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
