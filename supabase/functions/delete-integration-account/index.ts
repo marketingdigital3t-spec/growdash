@@ -45,7 +45,9 @@ Deno.serve(async (req) => {
         const { error: disconnectError } = await admin
           .from("ad_accounts")
           .update({
-            access_token: null,
+            // Keep the column constraint valid while ensuring no usable token
+            // remains; all sync jobs ignore accounts marked disconnected.
+            access_token: "",
             connection_status: "disconnected",
             last_sync_error: null,
             last_sync_error_code: null,
