@@ -242,12 +242,21 @@ function IntegrationsContent() {
 
   const disconnectMeta = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("delete-integration-account", {
+      const response = await supabase.functions.invoke("delete-integration-account", {
         body: { provider: "meta", confirmation: "DESCONECTAR META" },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      // Older Supabase deployments do not yet understand the profile-level
+      // operation. Fall back to the owner-scoped update so disconnecting is
+      // still available while the Edge Function rolls out.
+      if (response.error || response.data?.error) {
+        const { error: fallbackError } = await supabase
+          .from("ad_accounts")
+          .update({ access_token: "", connection_status: "disconnected", last_sync_error: null, last_sync_error_code: null })
+          .eq("user_id", user?.id ?? "");
+        if (fallbackError) throw response.error || new Error(response.data.error);
+        return { ok: true, message: "Perfil Meta desconectado. Os dados históricos foram preservados; você já pode conectar outro perfil." };
+      }
+      return response.data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
