@@ -38,6 +38,28 @@ Deno.serve(async (req) => {
     const { data: isMaster } = await admin.rpc("is_master", { _user_id: user.id });
 
     if (provider === "meta") {
+      // A disconnect operation revokes the stored OAuth credentials without
+      // deleting historical campaigns/insights. This lets the operator sign
+      // in with a different Meta profile while preserving reporting data.
+      if (!accountId && confirmation === "DESCONECTAR META") {
+        const { error: disconnectError } = await admin
+          .from("ad_accounts")
+          .update({
+            access_token: null,
+            connection_status: "disconnected",
+            last_sync_error: null,
+            last_sync_error_code: null,
+            metadata: { connection_method: "disconnected", disconnected_at: new Date().toISOString() },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
+        if (disconnectError) throw disconnectError;
+        return json({
+          ok: true,
+          provider: "meta",
+          message: "Perfil Meta desconectado. Os dados históricos foram preservados; você já pode conectar outro perfil.",
+        });
+      }
       if (!accountId) return json({ error: "Conta Meta não informada" }, 400);
       const { data: account, error: accountError } = await admin
         .from("ad_accounts")
