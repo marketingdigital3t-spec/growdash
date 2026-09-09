@@ -49,6 +49,8 @@ Deno.serve(async (req) => {
       ? body.adAccountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
     const includeBreakdowns = body.includeBreakdowns === true;
+    const requestedBreakdownStartDate = typeof body.breakdownStartDate === "string" ? body.breakdownStartDate : undefined;
+    const requestedBreakdownEndDate = typeof body.breakdownEndDate === "string" ? body.breakdownEndDate : undefined;
     const incremental = body.incremental === true;
     // A sincronização sem intervalo é sempre incremental. Backfills continuam
     // enviando startDate/endDate explicitamente e preservam todo o histórico.
@@ -85,6 +87,10 @@ Deno.serve(async (req) => {
         }).format(new Date());
         const startDate = requestedStartDate || accountToday;
         const endDate = requestedEndDate || accountToday;
+        // Audience reports multiply Graph API calls. Keep their range scoped
+        // to the visible dashboard period, independent from media backfills.
+        const breakdownStartDate = requestedBreakdownStartDate || startDate;
+        const breakdownEndDate = requestedBreakdownEndDate || endDate;
         const attributionWindows = account.attribution_window && account.attribution_window !== "account_default"
           ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
           : ["7d_click", "1d_view"];
@@ -507,7 +513,7 @@ Deno.serve(async (req) => {
           const breakdownTypes = ["age", "gender", "publisher_platform", "platform_position", "country", "region"];
           for (const bt of breakdownTypes) {
             const bRes = await fetchMetaPaginated(
-              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
             if (bRes.error) {
               console.warn(`Breakdown ${bt} error: ${bRes.error}`);

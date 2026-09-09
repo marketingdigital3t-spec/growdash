@@ -9,6 +9,8 @@ interface SyncParams {
   startDate: string;
   endDate: string;
   includeBreakdowns?: boolean;
+  breakdownStartDate?: string;
+  breakdownEndDate?: string;
 }
 
 type SyncResponse = {
@@ -54,6 +56,8 @@ export function useSyncMeta() {
         startDate: params.startDate,
         endDate: params.endDate,
         includeBreakdowns: params.includeBreakdowns === true,
+        breakdownStartDate: params.breakdownStartDate,
+        breakdownEndDate: params.breakdownEndDate,
       };
       // Hourly reconciliation reads the daily rows. Running both in parallel
       // caused races, inflated API usage and occasional non-2xx responses.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { differenceInCalendarDays, subDays } from "date-fns";
+import { differenceInCalendarDays, format, subDays } from "date-fns";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, computeFunnelAnalytics } from "@/hooks/useRDDeals";
@@ -352,6 +352,9 @@ export default function FunnelAnalysis() {
             adAccountIds: effectiveAdAccountIds,
             startDate: metaSyncRange.startDate,
             endDate: metaSyncRange.endDate,
+            includeBreakdowns: true,
+            breakdownStartDate: format(startDate, "yyyy-MM-dd"),
+            breakdownEndDate: format(endDate, "yyyy-MM-dd"),
           }),
         };
       } catch (reason) {
@@ -390,6 +393,7 @@ export default function FunnelAnalysis() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["insights"] });
+      await queryClient.invalidateQueries({ queryKey: ["funnel-audience-breakdowns"] });
       await queryClient.invalidateQueries({ queryKey: ["rd_deals"] });
       await queryClient.invalidateQueries({ queryKey: ["rd_closed_deals"] });
       await queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] });
