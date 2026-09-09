@@ -266,6 +266,20 @@ function IntegrationsContent() {
     onError: (error: Error) => toast({ title: "Não foi possível desconectar a Meta", description: error.message, variant: "destructive" }),
   });
 
+  const disconnectInstagram = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke("delete-integration-account", { body: { provider: "instagram", account_id: id, confirmation: "DESCONECTAR INSTAGRAM" } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["social_accounts"] });
+      toast({ title: "Instagram desconectado", description: data?.message || "Você já pode conectar outro perfil." });
+    },
+    onError: (error: Error) => toast({ title: "Não foi possível desconectar o Instagram", description: error.message, variant: "destructive" }),
+  });
+
   const providerFilter = (name: string) => name.toLowerCase().includes(search.toLowerCase().trim());
 
   return (
@@ -302,7 +316,7 @@ function IntegrationsContent() {
           <section className="gd-panel overflow-hidden">
             <SectionHeader icon={<Instagram />} title="Instagram profissional" description="Conteúdos, Reels, alcance, interações, salvamentos, compartilhamentos e crescimento de audiência via OAuth oficial." status={socialAccounts.length ? `${socialAccounts.length} conectado(s)` : "Disponível"} connected={socialAccounts.length > 0} />
             <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
-              {socialAccounts.map((account) => <article key={account.id} className="rounded-xl border border-border bg-muted/20 p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span><div className="min-w-0"><b className="block truncate text-sm">{account.display_name}</b><p className="truncate text-xs text-muted-foreground">@{account.username || "perfil"}</p></div><CheckCircle2 className="ml-auto h-5 w-5 text-emerald-500" /></div></article>)}
+              {socialAccounts.map((account) => <article key={account.id} className="rounded-xl border border-border bg-muted/20 p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Instagram className="h-5 w-5" /></span><div className="min-w-0"><b className="block truncate text-sm">{account.display_name}</b><p className="truncate text-xs text-muted-foreground">@{account.username || "perfil"}</p></div><CheckCircle2 className="h-5 w-5 text-emerald-500" /><Button type="button" size="sm" variant="outline" onClick={() => disconnectInstagram.mutate(account.id)} disabled={disconnectInstagram.isPending}>Desconectar</Button></div></article>)}
               {loadingSocial ? <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-border p-5 text-xs text-muted-foreground" role="status" aria-live="polite">Verificando perfis conectados…</div> : !socialAccounts.length && <EmptyState text="Nenhum perfil profissional conectado." />}
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border p-4"><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Abrindo Instagram…" : "Conectar Instagram"}</Button><Button asChild variant="outline"><Link to="/midia-social">Abrir análise de mídia social</Link></Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Somente contas Business ou Creator são suportadas pela API oficial.</span></div>

@@ -109,6 +109,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (provider === "instagram") {
+      if (!accountId) return json({ error: "Perfil Instagram não informado" }, 400);
+      const { data: account, error: accountError } = await admin
+        .from("social_accounts")
+        .select("id, user_id, provider_account_id")
+        .eq("id", accountId)
+        .maybeSingle();
+      if (accountError) throw accountError;
+      if (!account) return json({ error: "O perfil Instagram já foi removido ou não existe" }, 404);
+      if (account.user_id !== user.id && !isMaster) return json({ error: "Você não pode remover este perfil" }, 403);
+      if (confirmation !== "DESCONECTAR INSTAGRAM") return json({ error: "Confirmação inválida" }, 400);
+      const { error: disableError } = await admin.from("social_accounts").update({ connection_status: "disconnected", last_error: "Perfil desconectado pelo usuário" }).eq("id", account.id);
+      if (disableError) throw disableError;
+      await admin.from("integrations").update({ is_active: false, updated_at: new Date().toISOString() }).eq("user_id", account.user_id).eq("provider", "instagram_business").eq("provider_account_id", account.provider_account_id);
+      return json({ ok: true, provider: "instagram", message: "Perfil Instagram desconectado. Publicações e métricas históricas foram preservadas." });
+    }
+
     return json({ error: "Provedor de integração inválido" }, 400);
   } catch (error) {
     console.error("delete-integration-account", error);
