@@ -515,10 +515,11 @@ Deno.serve(async (req) => {
             { type: "gender", apiBreakdowns: "gender" },
             { type: "publisher_platform", apiBreakdowns: "publisher_platform" },
             // The Marketing API only permits placement at this granularity
-            // together with its publisher platform. Persist both in the
+            // together with publisher platform and impression device. Persist
+            // platform plus placement in the
             // label so the dashboard can distinguish Instagram Reels from
             // Facebook Feed instead of losing that context.
-            { type: "platform_position", apiBreakdowns: "publisher_platform,platform_position" },
+            { type: "platform_position", apiBreakdowns: "publisher_platform,platform_position,impression_device" },
             { type: "country", apiBreakdowns: "country" },
             { type: "region", apiBreakdowns: "region" },
           ];
