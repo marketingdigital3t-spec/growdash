@@ -169,7 +169,7 @@ function IntegrationsContent() {
     [rdFunnelsData],
   );
   const socialAccounts = useMemo(
-    () => (Array.isArray(socialAccountsData) ? socialAccountsData.filter(isPresent) : []),
+    () => (Array.isArray(socialAccountsData) ? socialAccountsData.filter((account) => isPresent(account) && account.connection_status !== "disconnected") : []),
     [socialAccountsData],
   );
   const metaConnected = adAccounts.length > 0;
