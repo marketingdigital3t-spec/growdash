@@ -11,11 +11,11 @@ export function useInstagramOAuth() {
 
   const connect = useMutation({
     mutationFn: async () => {
-      const popup = window.open("about:blank", "growdash-instagram-oauth", "popup,width=620,height=760");
+      // Never read popup.document: Safari can return an existing cross-origin
+      // OAuth window for a named target and throws a security exception.
+      const popup = window.open("about:blank", "_blank", "popup,width=620,height=760");
       if (!popup) throw new Error("Libere pop-ups para a Growdash e tente novamente.");
       popupRef.current = popup;
-      popup.document.title = "Conectando Instagram";
-      popup.document.body.innerHTML = '<p style="font:16px system-ui;padding:32px">Preparando conexão segura com o Instagram…</p>';
       const { data, error } = await supabase.functions.invoke("instagram-oauth-start", { body: {} });
       if (error || !data?.authUrl) {
         popup.close();

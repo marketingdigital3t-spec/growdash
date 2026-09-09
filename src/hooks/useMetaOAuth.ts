@@ -15,15 +15,15 @@ export function useMetaOAuth() {
     mutationFn: async () => {
       if (!user) throw new Error("Entre na Growdash antes de conectar a Meta.");
 
-      const popup = window.open("about:blank", "growdash-meta-oauth", "popup,width=620,height=760");
+      // Safari may reuse a named popup that is already on facebook.com. Do
+      // not access popup.document after opening: that cross-origin read throws
+      // and prevents the OAuth URL from ever being assigned.
+      const popup = window.open("about:blank", "_blank", "popup,width=620,height=760");
       if (!popup) {
         throw new Error("O navegador bloqueou a janela da Meta. Libere pop-ups para a Growdash e tente novamente.");
       }
 
       oauthPopup.current = popup;
-      popup.document.title = "Conectando à Meta";
-      popup.document.body.innerHTML = '<p style="font:16px system-ui;padding:32px">Preparando conexão segura com a Meta…</p>';
-
       const { data, error } = await supabase.functions.invoke("meta-oauth-start", { body: {} });
       if (error || !data?.authUrl) {
         popup.close();
