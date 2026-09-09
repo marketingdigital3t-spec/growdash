@@ -9,6 +9,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
     if (s.state && s.state.length === 2 && s.state !== "—") leadMap[s.state] = s.leads;
   }
   const topStates = a.stateBreakdown.filter((s) => s.state !== "—").slice(0, 10);
+  const hasStateData = topStates.length > 0;
 
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
@@ -18,7 +19,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
-            <BrazilMap data={leadMap} metricLabel="Leads" colorScheme="brand" />
+            {hasStateData ? <BrazilMap data={leadMap} metricLabel="Leads" colorScheme="brand" /> : <div className="grid min-h-56 place-items-center rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">Sem estado preenchido nos negócios do RD deste período. Nenhum mapa ou ranking é calculado sem essa fonte.</div>}
           </div>
           <div className="space-y-3">
             <div className="overflow-x-auto max-h-64">
@@ -47,7 +48,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
               </table>
             </div>
             <p className="text-[10px] text-muted-foreground">* Leads são contados pela data de entrada e vendas pela data de fechamento. Vendas de leads antigos aparecem na UF sem uma taxa artificial.</p>
-            <div className="h-40">
+            {hasStateData && <div className="h-40">
               <ResponsiveContainer>
                 <BarChart data={topStates.slice(0, 8).map((s) => ({ uf: s.state, conv: s.conversions }))}>
                   <XAxis dataKey="uf" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -60,7 +61,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </div>}
           </div>
         </div>
       </CardContent>

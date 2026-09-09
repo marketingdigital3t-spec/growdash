@@ -599,10 +599,6 @@ export function computeFunnelAnalytics(
     else if (days > 3) agingBuckets.gt3 += 1;
   }
 
-  const bottleneck = stageConversion.find((s) => s.isBottleneck)
-    ? { from: stageConversion.find((s) => s.isBottleneck)!.from, to: stageConversion.find((s) => s.isBottleneck)!.to, lossPct: stageConversion.find((s) => s.isBottleneck)!.lossPct }
-    : null;
-
   // Source breakdown
   const srcMap = new Map<string, { leads: number; sales: number; revenue: number }>();
   for (const d of deals) {
@@ -771,10 +767,13 @@ export function computeFunnelAnalytics(
     avgTicket,
     revenue,
     stages: stagesOut,
-    stageConversion,
+    // O RD sincronizado contém somente a etapa atual, não o histórico de
+    // movimentações. Portanto não há base para afirmar uma taxa de avanço ou
+    // uma perda entre etapas; exibir essa estimativa criaria um falso funil.
+    stageConversion: [],
     evolution,
     agingBuckets,
-    bottleneck,
+    bottleneck: null,
     sourceBreakdown,
     lostReasons,
     standbyReasons,

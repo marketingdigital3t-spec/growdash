@@ -39,9 +39,7 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
 import { FunnelGrowthRecommendations } from "@/components/funnel-analysis/FunnelGrowthRecommendations";
 import { DashboardProvider } from "@/contexts/DashboardContext";
-import { DefaultDashboardContent } from "@/components/dashboard/widgets/DefaultDashboardContent";
 import { useCampaigns } from "@/hooks/useCampaigns";
-import { useProducts } from "@/hooks/useProducts";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
 import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
@@ -51,9 +49,9 @@ const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_s
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
   distribution: ["Distribuição por etapa do funil", "Mostra quantos leads estão em cada etapa do RD, sua participação, tempo médio e valor em negociação."],
-  conversion: ["Taxa de avanço entre etapas", "Calcula a passagem entre etapas consecutivas e destaca onde o funil perde mais leads."],
+  conversion: ["Taxa de avanço entre etapas", "Exige histórico de movimentações do RD. Enquanto a integração fornecer apenas a etapa atual, este bloco não estima conversões ou perdas."],
   evolution: ["Evolução do funil", "Exibe a variação diária de leads, oportunidades e vendas no período selecionado."],
-  bottlenecks: ["Gargalos do funil", "Aponta a maior queda de conversão e quantos leads estão parados há mais de 3, 7 e 15 dias."],
+  bottlenecks: ["Gargalos do funil", "Mostra somente negócios atualmente parados por faixa de tempo. Não infere perdas entre etapas sem o histórico de movimentações do RD."],
   sources: ["Origem dos leads", "Compara volume, vendas, conversão e receita por origem para revelar os canais de maior qualidade."],
   losses: ["Motivos de perda", "Agrupa os motivos registrados no RD para mostrar por que as negociações não avançaram."],
   insights: ["Insights automáticos", "Transforma padrões do funil em observações acionáveis sobre origem, gargalos, região e tempo parado."],
@@ -275,10 +273,6 @@ export default function FunnelAnalysis() {
     enabled: visibleAccounts.length > 0,
   });
   const { data: campaignRows = [] } = useCampaigns(effectiveAdAccountId, effectiveAdAccountIds);
-  // Produtos do dashboard são uma fonte distinta das opções de produto do RD
-  // usadas no filtro acima. Mantê-los com nomes explícitos evita que um
-  // sobrescreva o outro durante a compilação da página de funis.
-  const { data: dashboardProducts = [] } = useProducts();
   const visibleCampaignRows = useMemo(
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
@@ -574,16 +568,8 @@ export default function FunnelAnalysis() {
                 alerts: [],
                 campaigns: visibleCampaignRows,
                 adAccounts: visibleAccounts,
-                products: dashboardProducts,
                 isLoading: loadingInsights || loadingMetaActions,
               }}>
-                <DefaultDashboardContent
-                  onEditSale={() => undefined}
-                  hidePrimary
-                  hideFinancialOverview
-                  showAcquisitionAnalytics
-                  showCampaignFunnel={false}
-                />
                 <div className="space-y-6">
                   <CampaignResultsTable />
                   <AskAICard />

@@ -19,11 +19,11 @@ export function FunnelStageConversion({ a }: Props) {
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <CardTitle className="text-base">3. Taxa de avanço entre etapas</CardTitle>
-        <p className="text-xs text-muted-foreground">Estimativa pelo estágio atual de cada negociação no RD. Cada taxa considera apenas funis que possuem exatamente esse par de etapas; o histórico individual de movimentações não é armazenado.</p>
+        <p className="text-xs text-muted-foreground">A Growdash não calcula avanço por etapa sem o histórico de movimentações do RD. A sincronização disponível informa apenas a etapa atual de cada negócio.</p>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
-          <div className="text-sm text-muted-foreground py-8 text-center">Sem etapas suficientes para calcular.</div>
+          <div className="text-sm text-muted-foreground py-8 text-center">Sem histórico de movimentações para calcular avanço entre etapas.</div>
         ) : (
           <>
             <div className="w-full overflow-x-auto">
