@@ -44,6 +44,7 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useProducts } from "@/hooks/useProducts";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
 import { AskAICard } from "@/components/dashboard/AskAICard";
+import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
@@ -282,6 +283,12 @@ export default function FunnelAnalysis() {
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
   );
+  const audienceCampaignIds = useMemo(() => {
+    const filter = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
+    return visibleCampaignRows
+      .filter((campaign: any) => selectedCampaign === "all" || String(campaign.name || "").toLocaleLowerCase("pt-BR").includes(filter) || filter.includes(String(campaign.name || "").toLocaleLowerCase("pt-BR")))
+      .map((campaign: any) => String(campaign.id)).filter(Boolean);
+  }, [selectedCampaign, visibleCampaignRows]);
 
   const { scopedInsights, campaignWithoutMediaMatch } = useMemo(() => {
     const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
@@ -537,6 +544,10 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <HelpBlock help={blockHelp.states}><FunnelStateMap a={periodAnalytics} /></HelpBlock>
+          </MotionItem>
+
+          <MotionItem>
+            <FunnelAudienceProfile deals={operationalPeriodDeals} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} />
           </MotionItem>
 
           <MotionItem>
