@@ -510,17 +510,28 @@ Deno.serve(async (req) => {
         // 5. Buscar breakdowns somente quando explicitamente solicitado. Eles
         // multiplicam o consumo da Graph API e não devem rodar em todo refresh.
         if (includeBreakdowns) try {
-          const breakdownTypes = ["age", "gender", "publisher_platform", "platform_position", "country", "region"];
-          for (const bt of breakdownTypes) {
+          const breakdownRequests = [
+            { type: "age", apiBreakdowns: "age" },
+            { type: "gender", apiBreakdowns: "gender" },
+            { type: "publisher_platform", apiBreakdowns: "publisher_platform" },
+            // The Marketing API only permits placement at this granularity
+            // together with its publisher platform. Persist both in the
+            // label so the dashboard can distinguish Instagram Reels from
+            // Facebook Feed instead of losing that context.
+            { type: "platform_position", apiBreakdowns: "publisher_platform,platform_position" },
+            { type: "country", apiBreakdowns: "country" },
+            { type: "region", apiBreakdowns: "region" },
+          ];
+          for (const breakdown of breakdownRequests) {
             const bRes = await fetchMetaPaginated(
-              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${bt}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
             if (bRes.error) {
-              console.warn(`Breakdown ${bt} error: ${bRes.error}`);
+              console.warn(`Breakdown ${breakdown.type} error: ${bRes.error}`);
               continue;
             }
             const bRows = (bRes.data || [])
-              .filter((r: any) => r.campaign_id && r[bt])
+              .filter((r: any) => r.campaign_id && r[breakdown.type])
               .map((r: any) => {
                 const actions = r.actions || [];
                 const findVal = (type: string): number => {
@@ -533,8 +544,10 @@ Deno.serve(async (req) => {
                 return {
                   campaign_id: r.campaign_id,
                   date: r.date_start,
-                  breakdown_type: bt,
-                  segment_key: String(r[bt]),
+                  breakdown_type: breakdown.type,
+                  segment_key: breakdown.type === "platform_position" && r.publisher_platform
+                    ? `${r.publisher_platform} · ${r.platform_position}`
+                    : String(r[breakdown.type]),
                   spend: Number(r.spend || 0),
                   impressions: Number(r.impressions || 0),
                   clicks: Number(r.clicks || 0),
@@ -546,9 +559,9 @@ Deno.serve(async (req) => {
               const { error: bErr } = await supabaseAdmin
                 .from("insights_breakdowns")
                 .upsert(chunk, { onConflict: "campaign_id,date,breakdown_type,segment_key", ignoreDuplicates: false });
-              if (bErr) console.error(`Breakdown ${bt} upsert error:`, bErr.message);
+              if (bErr) console.error(`Breakdown ${breakdown.type} upsert error:`, bErr.message);
             }
-            console.log(`Breakdown ${bt}: ${bRows.length} rows`);
+            console.log(`Breakdown ${breakdown.type}: ${bRows.length} rows`);
           }
         } catch (bErr) {
           console.warn(`Breakdowns failed for ${account.name}: ${(bErr as Error).message}`);
