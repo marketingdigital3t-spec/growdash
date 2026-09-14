@@ -45,6 +45,13 @@ import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
+const MESSAGING_CONVERSATION_EVENTS = [
+  MESSAGING_CONVERSATION_EVENT,
+  "onsite_conversion.messaging_conversation_started_28d",
+  "onsite_conversion.messaging_conversation_started",
+  "onsite_conversion.total_messaging_connection",
+  "onsite_conversion.messaging_first_reply",
+] as const;
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -334,7 +341,10 @@ export default function FunnelAnalysis() {
   const mediaMetrics = useMemo(
     () => computeFunnelMediaMetrics(
       scopedInsights,
-      actionData?.totals?.[MESSAGING_CONVERSATION_EVENT] ?? 0,
+      // Meta changes the conversation action label by API version and
+      // attribution window. Use the first available canonical variant rather
+      // than silently reporting zero when the account returns another label.
+      MESSAGING_CONVERSATION_EVENTS.map((event) => Number(actionData?.totals?.[event] || 0)).find((value) => value > 0) || 0,
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,

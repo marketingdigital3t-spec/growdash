@@ -478,9 +478,11 @@ Deno.serve(async (req) => {
             const a = actions.find((x: any) => x.action_type === type);
             return a ? Number(a.value || 0) : 0;
           };
-          // Leads = Formulário Instantâneo (lead_grouped) + LP configurado da conta.
-          // NUNCA somar `lead` (inflado) ou `fb_pixel_lead` automaticamente.
-          const nativeLeads = findVal("onsite_conversion.lead_grouped");
+          // Leads = Formulário Instantâneo + LP configurada. Algumas contas/API
+          // antigas retornam apenas `lead` (sem `lead_grouped`); nesse caso ele
+          // é o único resultado de formulário disponível e não pode ser perdido.
+          const groupedLeads = findVal("onsite_conversion.lead_grouped");
+          const nativeLeads = groupedLeads > 0 ? groupedLeads : findVal("lead");
           const lpLeads = lpAction ? findVal(lpAction) : 0;
           const leads = nativeLeads + lpLeads;
           const cpl = leads > 0 ? spend / leads : 0;
@@ -547,7 +549,8 @@ Deno.serve(async (req) => {
                 // type: native forms, configured landing pages, and click-to-
                 // message campaigns. Do not drop message campaigns from the
                 // audience report simply because they have no form action.
-                const nLeads = findVal("onsite_conversion.lead_grouped");
+                const groupedLeads = findVal("onsite_conversion.lead_grouped");
+                const nLeads = groupedLeads > 0 ? groupedLeads : findVal("lead");
                 const lLeads = lpAction ? findVal(lpAction) : 0;
                 // Meta varies the messaging action name by objective/API
                 // version. Count every known conversation-start action so
