@@ -52,9 +52,25 @@ export function useAudienceProfileData({ deals, campaignIds, startDate, endDate 
     queryKey: ["funnel-audience-breakdowns", campaignIds.slice().sort().join(","), format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
     enabled: campaignIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("insights_breakdowns").select("breakdown_type, segment_key, leads, spend, impressions, clicks, date").in("campaign_id", campaignIds).in("breakdown_type", audienceBreakdowns.map((item) => item.type)).gte("date", format(startDate, "yyyy-MM-dd")).lte("date", format(endDate, "yyyy-MM-dd"));
-      if (error) throw error;
-      const rows = data || [];
+      // Supabase/PostgREST caps responses at 1,000 rows by default. A broad
+      // account/date selection can exceed that cap (6 breakdowns x days x
+      // campaigns), silently dropping segments from the audience profile.
+      const PAGE = 1000;
+      const rows: any[] = [];
+      for (let page = 0; ; page += 1) {
+        const { data, error } = await (supabase as any)
+          .from("insights_breakdowns")
+          .select("breakdown_type, segment_key, leads, spend, impressions, clicks, date")
+          .in("campaign_id", campaignIds)
+          .in("breakdown_type", audienceBreakdowns.map((item) => item.type))
+          .gte("date", format(startDate, "yyyy-MM-dd"))
+          .lte("date", format(endDate, "yyyy-MM-dd"))
+          .order("date", { ascending: true })
+          .range(page * PAGE, page * PAGE + PAGE - 1);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
       return Object.fromEntries(audienceBreakdowns.map((item) => [item.type, aggregate(rows.filter((row: any) => row.breakdown_type === item.type))])) as Record<BreakdownType, AudienceSegment[]>;
     },
     staleTime: 15 * 60 * 1000,

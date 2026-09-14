@@ -682,7 +682,7 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
 }
 
 // Segue paging.next até o fim (ou hard-cap), retornando erro estruturado sem expor token.
-async function fetchMetaPaginated(url: string, maxPages = 50): Promise<{
+async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY): Promise<{
   data: any[];
   error?: string;
   errorCode?: number;
@@ -693,7 +693,15 @@ async function fetchMetaPaginated(url: string, maxPages = 50): Promise<{
   const all: any[] = [];
   let next: string | undefined = url;
   let pages = 0;
+  const seen = new Set<string>();
   while (next && pages < maxPages) {
+    // Protect against a malformed Graph paging cursor repeating forever while
+    // still allowing arbitrarily large account/date ranges to fully drain.
+    if (seen.has(next)) {
+      console.warn("fetchMetaPaginated detected a repeated paging cursor");
+      break;
+    }
+    seen.add(next);
     const res = await fetchMeta(next);
     if (res.error) {
       return {
@@ -709,7 +717,7 @@ async function fetchMetaPaginated(url: string, maxPages = 50): Promise<{
     next = res.paging?.next;
     pages++;
   }
-  if (next) console.warn(`fetchMetaPaginated hit maxPages=${maxPages}`);
+  if (next && Number.isFinite(maxPages)) console.warn(`fetchMetaPaginated hit maxPages=${maxPages}`);
   return { data: all };
 }
 

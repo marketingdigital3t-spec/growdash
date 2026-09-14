@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { eachDayOfInterval, endOfDay, format } from "date-fns";
+import { eachDayOfInterval, endOfDay, format, startOfDay } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 
@@ -177,8 +177,15 @@ export function useRDDeals(params: Params) {
         .order("lead_created_at", { ascending: false });
       query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
 
-      if (shouldApplyRDDateRange(includeHistory) && startDate) query = query.gte("lead_created_at", startDate.toISOString());
-      if (shouldApplyRDDateRange(includeHistory) && endDate) query = query.lte("lead_created_at", endOfDay(endDate).toISOString());
+      if (shouldApplyRDDateRange(includeHistory) && (startDate || endDate)) {
+        // Older RD imports may not have lead_created_at. Keep those leads in
+        // the selected period using the next trustworthy event timestamp,
+        // matching useRDDealsForPeriod and preventing silent under-counting
+        // in Perfil do público e entrega.
+        const rangeStart = startOfDay(startDate ?? endDate!).toISOString();
+        const rangeEnd = endOfDay(endDate ?? startDate!).toISOString();
+        query = query.or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`);
+      }
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
       if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
@@ -186,9 +193,8 @@ export function useRDDeals(params: Params) {
       if (product && product !== "all") query = query.eq("rd_product_name", product);
 
       const PAGE = 1000;
-      const MAX = 50;
       let all: RDDeal[] = [];
-      for (let p = 0; p < MAX; p++) {
+      for (let p = 0; ; p++) {
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await query.range(from, to);

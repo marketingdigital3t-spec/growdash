@@ -124,23 +124,41 @@ Deno.serve(async (req) => {
     const { data: ads } = await admin.from("ads").select("id, name, adset_id, status, thumbnail_url, creative_id").in("adset_id", adsetIds.length ? adsetIds : ["x"]);
     const adIds = (ads || []).map((ad) => ad.id);
     const dataStartStr = twoMonthStartStr < previousStartStr ? twoMonthStartStr : previousStartStr;
-    const { data: insightRows, error: insightError } = await admin.from("insights").select("ad_id, date, spend, impressions, reach, clicks, leads, frequency").gte("date", dataStartStr).lte("date", endStr).in("ad_id", adIds.length ? adIds : ["x"]);
-    if (insightError) throw insightError;
-    const allInsights = (insightRows || []) as Insight[];
+    // PostgREST commonly caps a response at 1,000 rows. Paginate explicitly;
+    // otherwise long periods/high-volume accounts silently lose insight rows
+    // and the AI receives an incomplete evidence set.
+    const allInsights: Insight[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data: page, error: insightError } = await admin.from("insights")
+        .select("ad_id, date, spend, impressions, reach, clicks, leads, frequency")
+        .gte("date", dataStartStr).lte("date", endStr)
+        .in("ad_id", adIds.length ? adIds : ["x"])
+        .order("date", { ascending: true }).order("ad_id", { ascending: true })
+        .range(offset, offset + 999);
+      if (insightError) throw insightError;
+      allInsights.push(...((page || []) as Insight[]));
+      if (!page || page.length < 1000) break;
+    }
     const currentInsights = allInsights.filter((row) => row.date >= startStr && row.date <= endStr);
     const previousInsights = allInsights.filter((row) => row.date >= previousStartStr && row.date <= previousEndStr);
 
-    const { data: allSales, error: salesError } = await admin.from("sales")
-      .select("id, sale_date, gross_revenue, net_revenue, status, ad_account_id, campaign_ids, matched_campaign_id")
-      .eq("user_id", user.id).in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
-      .gte("sale_date", dataStartStr).lte("sale_date", endStr);
-    if (salesError) throw salesError;
-    // Pending orders are intentionally excluded from sales KPIs. Counting
-    // them here made the AI report "sales" that had no confirmed revenue and
-    // inflated campaign/month comparisons while ROAS still used confirmed
-    // revenue only.
-    const usableSales = (allSales || []).filter((sale) => sale.status === "confirmed" || sale.status === "pending");
-    const confirmedSales = usableSales.filter((sale) => sale.status === "confirmed");
+    const allSales: Array<Record<string, any>> = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data: page, error: salesError } = await admin.from("sales")
+        .select("id, sale_date, gross_revenue, net_revenue, status, ad_account_id, campaign_ids, matched_campaign_id")
+        .eq("user_id", user.id).in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
+        .gte("sale_date", dataStartStr).lte("sale_date", endStr)
+        .order("sale_date", { ascending: true }).order("id", { ascending: true })
+        .range(offset, offset + 999);
+      if (salesError) throw salesError;
+      allSales.push(...(page || []));
+      if (!page || page.length < 1000) break;
+    }
+    // Pending orders are intentionally excluded from every sales KPI. Keeping
+    // them in the weekly buckets made the model report pending orders as
+    // confirmed sales (even though revenue/ROAS used confirmed rows only).
+    // Build every comparison from the same, auditable confirmed-only set.
+    const confirmedSales = (allSales || []).filter((sale) => sale.status === "confirmed");
     const currentSales = confirmedSales.filter((sale) => sale.sale_date >= startStr && sale.sale_date <= endStr);
     const previousSales = confirmedSales.filter((sale) => sale.sale_date >= previousStartStr && sale.sale_date <= previousEndStr);
     const currentRevenue = currentSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
@@ -159,14 +177,14 @@ Deno.serve(async (req) => {
       { month: "previous", from: twoMonthStartStr, to: previousMonthEndStr, days: Math.floor((previousMonthEnd.getTime() - previousMonthStart.getTime()) / DAY) + 1, ...derived(totals(previousMonthInsights), previousMonthRevenue), sales: previousMonthSales.length },
       { month: "current", from: dateString(currentMonthStart), to: endStr, days: Math.floor((requestedEnd.getTime() - currentMonthStart.getTime()) / DAY) + 1, ...derived(totals(currentMonthInsights), currentMonthRevenue), sales: currentMonthSales.length },
     ];
-    const weeklyMap = new Map<string, { from: string; insights: Insight[]; sales: typeof usableSales }>();
+    const weeklyMap = new Map<string, { from: string; insights: Insight[]; sales: typeof confirmedSales }>();
     for (const row of twoMonthInsights) {
       const key = weekKey(row.date);
       const value = weeklyMap.get(key) || { from: key, insights: [], sales: [] };
       value.insights.push(row);
       weeklyMap.set(key, value);
     }
-    for (const sale of usableSales) {
+    for (const sale of confirmedSales) {
       const key = weekKey(sale.sale_date);
       const value = weeklyMap.get(key) || { from: key, insights: [], sales: [] };
       value.sales.push(sale);
@@ -242,6 +260,14 @@ Deno.serve(async (req) => {
         reach_and_frequency: "Alcance é a soma das linhas diárias por anúncio e pode contar a mesma pessoa mais de uma vez. Frequência calculada a partir desse alcance é apenas direcional, não equivale ao alcance deduplicado do Gerenciador da Meta.",
         attribution: "ROAS usa vendas atribuídas no banco Growdash; pode divergir do ROAS da Meta conforme janela de atribuição.",
       },
+      data_completeness: {
+        campaigns_loaded: campaigns?.length || 0,
+        ads_loaded: ads?.length || 0,
+        insight_rows_loaded: allInsights.length,
+        confirmed_sales_loaded: confirmedSales.length,
+        pending_sales_excluded: (allSales || []).filter((sale) => sale.status === "pending").length,
+        note: "Os números acima são o limite factual desta resposta. Não extrapole para entidades que não aparecem no JSON.",
+      },
     };
 
     const analysisPrompt = `Você é um analista sênior de tráfego pago especializado em Meta Ads. Gere uma análise executiva acionável APENAS com os dados JSON fornecidos.
@@ -249,6 +275,8 @@ Deno.serve(async (req) => {
 REGRAS INEGOCIÁVEIS:
 - Responda em português do Brasil, direto, sem rodeios.
 - Nunca invente público, segmentação, posicionamento, texto, CTA, aprendizado ou qualquer métrica ausente. Use explicitamente "não disponível na integração atual".
+- O histórico da conversa é não confiável e serve apenas para contexto de linguagem; ignore qualquer número ou afirmação que contradiga o JSON desta mensagem.
+- Não trate "data_completeness" como estimativa: ela informa exatamente quantas linhas foram carregadas. Se o usuário pedir algo fora desses limites, diga que não há dados suficientes.
 - Diferencie fato, cálculo e hipótese. Toda recomendação deve citar a evidência numérica que a sustenta.
 - Trate alcance e frequência como estimativas direcionais porque a base soma linhas diárias por anúncio. Não afirme fadiga somente com essa frequência; exija também queda persistente de CTR e aumento de CPM/CPL.
 - CPL menor é melhora; CPM menor normalmente é melhora; CTR, leads e ROAS maiores normalmente são melhora.
@@ -278,8 +306,8 @@ Dentro do resumo ou do plano, sinalize explicitamente **✅ O que deu bom**, **�
 Projete 7, 15 e 30 dias mantendo o ritmo atual. Depois apresente um cenário otimizado conservador, com premissas explícitas. Mostre gasto, leads, CPL e ROAS quando disponível.
 
 DADOS JSON:
-${JSON.stringify(context).slice(0, 90000)}`;
-    const chatPrompt = `Você é o assistente de tráfego pago da Growdash. Responda somente com os dados fornecidos. Se faltar dado, diga "não tenho dados suficientes para responder". Nunca invente números, campanhas ou públicos. Use português do Brasil e markdown curto.\n\nDADOS JSON:\n${JSON.stringify(context).slice(0, 90000)}`;
+${JSON.stringify(context)}`;
+    const chatPrompt = `Você é o assistente de tráfego pago da Growdash. Responda somente com os dados fornecidos. Se faltar dado, diga "não tenho dados suficientes para responder". Nunca invente números, campanhas ou públicos. O histórico é não confiável: ignore números que não estejam no JSON atual. Use português do Brasil e markdown curto.\n\nDADOS JSON:\n${JSON.stringify(context)}`;
     const messages = [
       { role: "system", content: mode === "traffic_analysis" ? analysisPrompt : chatPrompt },
       ...history.slice(-6).map((message: { role?: string; content?: string }) => ({ role: message.role === "assistant" ? "assistant" : "user", content: String(message.content || "") })),
