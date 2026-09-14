@@ -251,9 +251,8 @@ export function useRDClosedDeals(params: Params) {
       if (product && product !== "all") query = query.eq("rd_product_name", product);
 
       const PAGE = 1000;
-      const MAX = 50;
       let all: RDDeal[] = [];
-      for (let p = 0; p < MAX; p++) {
+      for (let p = 0; ; p++) {
         const { data, error } = await query.range(p * PAGE, p * PAGE + PAGE - 1);
         if (error) throw error;
         const batch = (data || []) as unknown as RDDeal[];
@@ -381,9 +380,20 @@ export function computeFunnelAnalytics(
 ): FunnelAnalytics {
   const totalLeads = deals.length;
 
-  const { stages: sortedStages, sourceToCanonicalId } = consolidateFunnelStages(stages);
+  const { stages: sortedStages } = consolidateFunnelStages(stages);
   const canonicalDealStageId = (deal: RDDeal) => {
-    if (deal.rd_stage_id && sourceToCanonicalId.has(deal.rd_stage_id)) return sourceToCanonicalId.get(deal.rd_stage_id)!;
+    // Stage IDs are scoped to an RD funnel. Resolving by ID alone mixed
+    // identical stage IDs from different accounts in consolidated views.
+    const nativeStage = stages.find((stage) => stage.rd_funnel_id === deal.rd_funnel_id && stage.rd_stage_id === deal.rd_stage_id);
+    if (nativeStage) {
+      return consolidatedCRMStage({
+        id: nativeStage.rd_stage_id,
+        name: nativeStage.name,
+        order: nativeStage.order,
+        won: nativeStage.is_won,
+        lost: nativeStage.is_lost,
+      }).id;
+    }
     return consolidatedCRMStage({
       name: deal.rd_stage_name,
       order: deal.rd_stage_order ?? undefined,
@@ -457,7 +467,13 @@ export function computeFunnelAnalytics(
     const funnelSequence = (stagesByFunnel.get(funnelId) || [])
       .filter((stage) => !stage.is_lost)
       .sort((a, b) => a.order - b.order)
-      .map((stage) => sourceToCanonicalId.get(stage.rd_stage_id) || stage.rd_stage_id)
+      .map((stage) => consolidatedCRMStage({
+        id: stage.rd_stage_id,
+        name: stage.name,
+        order: stage.order,
+        won: stage.is_won,
+        lost: stage.is_lost,
+      }).id)
       .filter((stageId, index, list) => list.indexOf(stageId) === index);
     if (!funnelSequence.length) continue;
     const stageIndex = new Map(funnelSequence.map((stageId, index) => [stageId, index]));
