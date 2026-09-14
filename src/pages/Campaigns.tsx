@@ -1095,7 +1095,7 @@ export default function Campaigns() {
                     "growdash-scrollbar-hidden hidden min-h-0 flex-1 overflow-auto md:block",
                   )}
                 >
-                  <table className="w-full caption-bottom text-sm" style={{ tableLayout: "fixed", width: "max-content" }}>
+                  <table className="w-full caption-bottom text-sm [&_td]:overflow-hidden [&_td]:whitespace-nowrap" style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-50 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
                       <TableRow className="campaign-metric-header h-10 border-b border-border hover:bg-transparent [&>th]:h-10 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e]">
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted dark:bg-[#11110f]">
@@ -1211,7 +1211,7 @@ export default function Campaigns() {
                         );})}
                       </AnimatePresence>
                     </TableBody>
-                    {false && (() => {
+                    {activeTab === "legacy-totals" && (() => {
                       const footer = <TableFooter className="sticky bottom-0 z-40">
                       <TableRow data-campaign-totals className="sticky bottom-0 z-40 h-14 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
@@ -1269,10 +1269,10 @@ export default function Campaigns() {
                 <div
                   ref={campaignTotalsScrollRef}
                   data-campaign-totals-bar
-                  className="hidden shrink-0 overflow-hidden border-t-2 border-border bg-card md:block dark:border-[#2a271f] dark:bg-[#070706]"
+                  className="growdash-scrollbar-hidden hidden shrink-0 overflow-x-auto overflow-y-hidden border-t-2 border-border bg-card md:block dark:border-[#2a271f] dark:bg-[#070706]"
                   aria-label="Totais das campanhas filtradas"
                 >
-                  <Table style={{ tableLayout: "fixed", width: "max-content" }}>
+                  <Table className="[&_td]:overflow-hidden [&_td]:whitespace-nowrap" style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}>
                     <TableBody>
                       <CampaignTotalsRow
                         widths={camp.colWidths}
