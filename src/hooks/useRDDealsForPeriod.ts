@@ -118,19 +118,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await q.range(from, to);
-        // Algumas respostas grandes do PostgREST falham no offset seguinte
-        // com 500 apesar de a página anterior ter sido entregue com sucesso.
-        // Nunca descarte negociações reais já sincronizadas por uma falha de
-        // paginação posterior: mantenha o conjunto válido e deixe o próximo
-        // refetch buscar a continuação. Só falhe quando nenhuma página pôde
-        // ser obtida, pois nesse caso não há uma base confiável para exibir.
-        if (error) {
-          if (p > 0 && all.length > 0) {
-            console.warn("[useRDDealsForPeriod] página posterior indisponível; mantendo dados já carregados", error);
-            break;
-          }
-          throw error;
-        }
+        // Nunca transforme uma página ausente em um resultado aparentemente
+        // completo: isso era a causa de contagens parciais no funil.
+        if (error) throw error;
         const batch = ((data ?? []) as any[]).map((d): RDDealLite => ({
           ...d,
           rd_campaign_name: d.last_touch_utm_campaign ?? d.first_touch_utm_campaign ?? d.utm_campaign ?? null,
@@ -172,13 +162,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
           if (adAccountId) query = query.eq("ad_account_id", adAccountId);
           else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
           const { data, error } = await query.range(page * PAGE, (page + 1) * PAGE - 1);
-          if (error) {
-            if (page > 0 && rows.length > 0) {
-              console.warn("[useRDWonDealsForPeriod] página posterior indisponível; mantendo vendas já carregadas", error);
-              break;
-            }
-            throw error;
-          }
+          if (error) throw error;
           const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
             ...deal,
             rd_campaign_name: deal.last_touch_utm_campaign ?? deal.first_touch_utm_campaign ?? deal.utm_campaign ?? null,
@@ -226,13 +210,7 @@ export function useRDCRMDeals(adAccountId?: string, enabled = true, adAccountIds
 
         const from = page * pageSize;
         const { data, error } = await query.range(from, from + pageSize - 1);
-        if (error) {
-          if (page > 0 && all.length > 0) {
-            console.warn("[useRDCRMDeals] página posterior indisponível; mantendo negociações já carregadas", error);
-            break;
-          }
-          throw error;
-        }
+        if (error) throw error;
         const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
           ...deal,
           rd_campaign_name: deal.last_touch_utm_campaign

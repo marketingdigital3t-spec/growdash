@@ -178,12 +178,17 @@ function pickField(fd: any[], wants: string[]): string | null {
 
 async function fetchAll(
   url: string,
-  maxPages = 80,
+  maxPages = Number.POSITIVE_INFINITY,
 ): Promise<{ data: any[]; error?: string }> {
   const all: any[] = [];
   let next: string | undefined = url;
   let pages = 0;
+  const seen = new Set<string>();
   while (next && pages < maxPages) {
+    if (seen.has(next)) {
+      return { data: all, error: "A Meta repetiu o cursor de paginação; sincronização interrompida para evitar duplicação." };
+    }
+    seen.add(next);
     const r: Response = await fetch(next);
     const json: any = await r.json();
     if (json.error) {
@@ -290,14 +295,14 @@ Deno.serve(async (req) => {
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
           `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id&limit=200&access_token=${token}`;
-        const adsRes = await fetchAll(adsUrl, 20);
+        const adsRes = await fetchAll(adsUrl);
         const formIds = new Set<string>();
         const discoveryWarnings: string[] = [];
         if (adsRes.error) discoveryWarnings.push(`ads: ${adsRes.error}`);
         // Also discover via /leadgen_forms on the account (covers forms not bound to specific ads)
         const formsUrl =
           `${GRAPH}/${actId}/leadgen_forms?fields=id&limit=200&access_token=${token}`;
-        const formsRes = await fetchAll(formsUrl, 10);
+        const formsRes = await fetchAll(formsUrl);
         if (formsRes.error) discoveryWarnings.push(`forms: ${formsRes.error}`);
         for (const f of formsRes.data || []) {
           if (f?.id) formIds.add(String(f.id));
@@ -324,7 +329,7 @@ Deno.serve(async (req) => {
           const filtering = encodeURIComponent(JSON.stringify(filters));
           const leadsUrl =
             `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
-          const r = await fetchAll(leadsUrl, 50);
+          const r = await fetchAll(leadsUrl);
           if (r.error) {
             formErrors.push(`form ${formId}: ${r.error}`);
             continue;

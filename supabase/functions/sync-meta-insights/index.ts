@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
           const since = Math.floor((Date.now() - 60 * 86400000) / 1000); // last 60d
           const until = Math.floor(Date.now() / 1000);
           let activitiesUrl = `${graphBase}/${metaAccountId}/activities?fields=event_time,event_type,translated_event_type,object_id,object_name,object_type,extra_data&since=${since}&until=${until}&access_token=${accessToken}&limit=200`;
-          let pageGuard = 0;
+          const seenActivityPages = new Set<string>();
           const activityRows: any[] = [];
           // map adset->campaign and ad->campaign for activity attribution
           const { data: allAdsets } = await supabaseAdmin.from("adsets").select("id, campaign_id");
@@ -277,7 +277,12 @@ Deno.serve(async (req) => {
           );
           const validCampaignIds = new Set(campaigns.map((c: any) => String(c.id)));
 
-          while (activitiesUrl && pageGuard < 10) {
+          while (activitiesUrl) {
+            if (seenActivityPages.has(activitiesUrl)) {
+              console.warn("Activities pagination cursor repeated; stopping safely.");
+              break;
+            }
+            seenActivityPages.add(activitiesUrl);
             const actData = await fetchMeta(activitiesUrl);
             if (actData.error) {
               console.warn(`Activities error: ${actData.error.message}`);
@@ -312,7 +317,6 @@ Deno.serve(async (req) => {
               });
             }
             activitiesUrl = actData.paging?.next || "";
-            pageGuard++;
           }
 
           if (activityRows.length > 0) {

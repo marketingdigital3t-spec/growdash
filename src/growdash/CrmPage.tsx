@@ -411,13 +411,13 @@ export default function CrmPage() {
             // "Máximo" is a full RD pipeline reconciliation, not a synthetic
             // date interval beginning in 2000. The RD API's date filter can
             // omit legacy/open negotiations in some accounts.
-            full_history: preset === "max",
+            // A manual refresh is explicit user intent: reconcile the entire
+            // RD history instead of truncating at a page/deal ceiling.
+            full_history: true,
             ...(preset === "max" ? {} : {
               start_date: format(startDate, "yyyy-MM-dd"),
               end_date: format(endDate, "yyyy-MM-dd"),
             }),
-            max_pages: preset === "max" ? 250 : 50,
-            max_deals: preset === "max" ? 50_000 : 10_000,
             trigger_source: "crm_history_refresh",
           },
         });

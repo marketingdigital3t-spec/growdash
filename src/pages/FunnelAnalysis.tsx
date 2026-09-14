@@ -377,12 +377,9 @@ export default function FunnelAnalysis() {
             body: {
               funnel_id: funnel.id,
               analytics_mode: true,
-              // Sem intervalo, a Edge Function percorre os segmentos aberto,
-              // ganho, perdido e pausado até o histórico completo. Passar o
-              // período do calendário aqui era a causa de negócios antigos
-              // desaparecerem da análise.
-              max_deals: 10000,
-              max_pages: 50,
+              // A análise de funil precisa reconciliar todos os segmentos e
+              // páginas do RD; a Edge Function encerra somente no fim real.
+              full_history: true,
             },
           });
           if (error) {

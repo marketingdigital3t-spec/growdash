@@ -1310,7 +1310,9 @@ Deno.serve(async (req) => {
       // CRM. Do not silently reduce it to the daily/interactive limits. The
       // regular realtime and date-range paths intentionally stay bounded.
       fullHistoryRequested = analytics_mode && full_history === true;
-      const maxPages = realtime
+      const maxPages = fullHistoryRequested
+        ? Number.POSITIVE_INFINITY
+        : realtime
         ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
         : analytics_mode
           ? Math.max(
@@ -1323,10 +1325,11 @@ Deno.serve(async (req) => {
           : 50;
       const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
       const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
-      const maxAnalyticsDeals = Math.max(
-        1,
-        Math.min(Number(max_deals) || (fullHistoryRequested ? 50_000 : 10_000), fullHistoryRequested ? 50_000 : 10_000),
-      );
+      // A full-history reconciliation must drain every RD page. The API itself
+      // is the boundary; an arbitrary page/deal ceiling silently loses leads.
+      const maxAnalyticsDeals = fullHistoryRequested
+        ? Number.POSITIVE_INFINITY
+        : Math.max(1, Math.min(Number(max_deals) || 10_000, 10_000));
       const periodParams =
         analytics_mode && !fullHistoryRequested && start_date && end_date
           ? `&created_at_period=true&start_date=${encodeURIComponent(`${start_date}T00:00:00-03:00`)}&end_date=${encodeURIComponent(`${end_date}T23:59:59-03:00`)}`
