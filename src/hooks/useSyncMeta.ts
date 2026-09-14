@@ -20,6 +20,7 @@ type SyncResponse = {
   errors?: string[];
   needs_reauth?: boolean;
   error?: string;
+  leads?: number;
 };
 
 async function invokeSyncFunction(name: string, body: Record<string, unknown>): Promise<SyncResponse> {
@@ -62,6 +63,21 @@ export function useSyncMeta() {
       // Hourly reconciliation reads the daily rows. Running both in parallel
       // caused races, inflated API usage and occasional non-2xx responses.
       const insights = await invokeSyncFunction("sync-meta-insights", body);
+      let leads: SyncResponse = {};
+      let leadsWarning: string | undefined;
+      try {
+        // Leads are a separate Meta Graph resource from insights. Pull the
+        // exact selected interval so form, message and native lead campaigns
+        // are reconciled instead of leaving the audience profile partial.
+        leads = await invokeSyncFunction("sync-meta-leads", {
+          adAccountId: params.adAccountId,
+          adAccountIds: params.adAccountIds,
+          startDate: params.startDate,
+          endDate: params.endDate,
+        });
+      } catch (error) {
+        leadsWarning = error instanceof Error ? error.message : "Leads Meta pendentes.";
+      }
       let hourly: SyncResponse = {};
       let hourlyWarning: string | undefined;
       try {
@@ -74,7 +90,8 @@ export function useSyncMeta() {
         synced: Number(insights.synced ?? 0),
         accounts: Number(insights.accounts ?? 0),
         hourly_synced: Number(hourly.synced ?? 0),
-        errors: [...(insights.errors ?? []), ...(hourly.errors ?? []), ...(hourlyWarning ? [hourlyWarning] : [])],
+        leads_synced: Number(leads.synced ?? leads.leads ?? 0),
+        errors: [...(insights.errors ?? []), ...(leads.errors ?? []), ...(hourly.errors ?? []), ...(leadsWarning ? [leadsWarning] : []), ...(hourlyWarning ? [hourlyWarning] : [])],
       };
     },
     onSuccess: (data) => {
@@ -87,6 +104,7 @@ export function useSyncMeta() {
       void queryClient.invalidateQueries({ queryKey: ["action-totals-by-ads"] });
       void queryClient.invalidateQueries({ queryKey: ["campaign-breakdown-workspace"] });
       void queryClient.invalidateQueries({ queryKey: ["campaign-breakdowns"] });
+      void queryClient.invalidateQueries({ queryKey: ["meta_leads"] });
       void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
       toast({
         title: "Sincronização concluída!",

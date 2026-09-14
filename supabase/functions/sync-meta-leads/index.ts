@@ -269,6 +269,9 @@ Deno.serve(async (req) => {
 
     const adAccountId: string | undefined = body.ad_account_id ||
       body.adAccountId;
+    const adAccountIds = Array.isArray(body.ad_account_ids || body.adAccountIds)
+      ? (body.ad_account_ids || body.adAccountIds).filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+      : [];
     const exactRange = parseExactDateRange(body);
     const days: number = Math.max(1, Math.min(90, Number(body.days ?? 7)));
     const since = exactRange?.startEpoch ??
@@ -277,7 +280,8 @@ Deno.serve(async (req) => {
     let q = admin.from("ad_accounts").select(
       "id,name,account_id,access_token,user_id",
     );
-    if (adAccountId) q = q.eq("id", adAccountId);
+    if (adAccountIds.length) q = q.in("id", adAccountIds);
+    else if (adAccountId) q = q.eq("id", adAccountId);
     if (userId) q = q.eq("user_id", userId);
     const { data: accounts, error: accErr } = await q;
     if (accErr) throw accErr;
