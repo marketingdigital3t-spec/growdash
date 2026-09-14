@@ -2,12 +2,9 @@ import { ArrowUpRight, CircleDollarSign, LayoutDashboard, MousePointerClick, Tar
 import { Link } from "react-router-dom";
 import { MetricCard, MiniBars, PageHeading } from "./shared";
 
-const activities = [
-  ["Meta Ads", "Campanha VIDALERVE atualizada", "há 12 min"],
-  ["RD Station", "9 novos leads sincronizados", "há 28 min"],
-  ["Comercial", "Venda de R$ 3.500 registrada", "há 1h"],
-  ["Automação", "Fluxo Recuperação executado", "há 2h"],
-];
+// This legacy shell is kept for compatibility, but must never present
+// fabricated business metrics. The data-backed dashboard is /dashboard.
+const activities: Array<[string, string, string]> = [];
 
 export default function DashboardPage() {
   return (
@@ -24,10 +21,10 @@ export default function DashboardPage() {
       />
 
       <div className="gd-auto-grid gap-3">
-        <MetricCard label="Receita no período" value="R$ 126.400" change="+18,2%" emphasis />
-        <MetricCard label="Leads gerados" value="1.286" change="+12,4%" />
-        <MetricCard label="Investimento em mídia" value="R$ 18.540" change="+6,8%" />
-        <MetricCard label="ROAS" value="6,82x" change="+0,74x" />
+        <MetricCard label="Receita no período" value="—" change="sem dados" emphasis />
+        <MetricCard label="Leads gerados" value="—" change="sem dados" />
+        <MetricCard label="Investimento em mídia" value="—" change="sem dados" />
+        <MetricCard label="ROAS" value="—" change="sem dados" />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.5fr_.8fr]">
@@ -50,7 +47,7 @@ export default function DashboardPage() {
             <p className="text-xs text-[#817b74]">Atualizações das integrações</p>
           </div>
           <div className="divide-y divide-[#eeeae4]">
-            {activities.map(([source, text, time]) => (
+            {activities.length ? activities.map(([source, text, time]) => (
               <div key={text} className="flex items-start gap-3 p-4">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <div className="min-w-0 grow">
@@ -59,7 +56,7 @@ export default function DashboardPage() {
                 </div>
                 <span className="shrink-0 text-[9px] text-[#9c958d]">{time}</span>
               </div>
-            ))}
+            )) : <p className="p-5 text-xs text-[#77716a]">Nenhuma atividade oficial disponível nesta visão.</p>}
           </div>
         </section>
       </div>

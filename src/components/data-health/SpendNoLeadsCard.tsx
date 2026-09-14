@@ -10,15 +10,19 @@ export function SpendNoLeadsCard() {
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
       // Fetch insights joined with campaign objective
-      const { data: rows } = await supabase
-        .from("insights")
-        .select("spend, leads, ads!inner(adsets!inner(campaigns!inner(id, name, objective)))")
-        .gte("date", since)
-        .gt("spend", 0)
-        .limit(10000);
+      const rows: any[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from("insights")
+          .select("spend, leads, ads!inner(adsets!inner(campaigns!inner(id, name, objective)))")
+          .gte("date", since).gt("spend", 0)
+          .range(offset, offset + 999);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
 
       const byCampaign = new Map<string, { name: string; objective: string; spend: number; leads: number }>();
-      for (const r of (rows || []) as any[]) {
+      for (const r of rows) {
         const c = r.ads?.adsets?.campaigns;
         if (!c) continue;
         const cur = byCampaign.get(c.id) || { name: c.name, objective: c.objective || "—", spend: 0, leads: 0 };

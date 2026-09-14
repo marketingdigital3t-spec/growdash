@@ -12,7 +12,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 const RECENT_DAYS = 7;
-const MAX_PER_FUNNEL = 200;
+const PAGE_SIZE = 1000;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -59,14 +59,18 @@ Deno.serve(async (req) => {
     for (const f of funnels || []) {
       try {
         // Pull deal ids that are either recently updated or still open/won (so stage changes propagate)
-        const { data: rows } = await admin
-          .from("rd_deals")
-          .select("rd_deal_id, stage_updated_at, lead_created_at, stage_bucket")
-          .eq("rd_funnel_id", f.id)
-          .or(`stage_updated_at.gte.${cutoff},lead_created_at.gte.${cutoff},stage_bucket.in.(open,won)`)
-          .limit(MAX_PER_FUNNEL);
-
-        const ids = (rows || []).map((r: any) => r.rd_deal_id).filter(Boolean);
+        const ids: string[] = [];
+        for (let offset = 0; ; offset += PAGE_SIZE) {
+          const { data: rows, error: rowsError } = await admin
+            .from("rd_deals")
+            .select("rd_deal_id, stage_updated_at, lead_created_at, stage_bucket")
+            .eq("rd_funnel_id", f.id)
+            .or(`stage_updated_at.gte.${cutoff},lead_created_at.gte.${cutoff},stage_bucket.in.(open,won)`)
+            .range(offset, offset + PAGE_SIZE - 1);
+          if (rowsError) throw rowsError;
+          ids.push(...(rows || []).map((r: any) => r.rd_deal_id).filter(Boolean));
+          if (!rows || rows.length < PAGE_SIZE) break;
+        }
         if (ids.length === 0) {
           summary.push({ funnel_id: f.id, name: f.name, dispatched: 0 });
           continue;

@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const history = Array.isArray(body?.history) ? body.history : [];
     const accountId = typeof body?.account_id === "string" ? body.account_id : undefined;
     const selectedCampaignIds = Array.isArray(body?.selected_campaign_ids)
-      ? body.selected_campaign_ids.filter((id: unknown) => typeof id === "string").slice(0, 100)
+      ? body.selected_campaign_ids.filter((id: unknown) => typeof id === "string")
       : [];
     const question = typeof body?.question === "string" && body.question.trim()
       ? body.question.trim()
@@ -230,7 +230,18 @@ Deno.serve(async (req) => {
     }).filter((item) => item.spend > 0 || item.status === "ACTIVE").sort((a, b) => b.leads - a.leads || (a.cpl || Infinity) - (b.cpl || Infinity));
 
     const daily = Array.from(new Set(currentInsights.map((row) => row.date))).sort().map((date) => ({ date, ...derived(totals(currentInsights.filter((row) => row.date === date))) }));
-    const { data: changes } = await admin.from("campaign_changes").select("campaign_id, entity_type, entity_id, change_type, field, old_value, new_value, changed_at").in("campaign_id", campaignIds.length ? campaignIds : ["x"]).gte("changed_at", requestedStart.toISOString()).order("changed_at", { ascending: false }).limit(50);
+    const changes: Array<Record<string, unknown>> = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data: page, error: changesError } = await admin.from("campaign_changes")
+        .select("campaign_id, entity_type, entity_id, change_type, field, old_value, new_value, changed_at")
+        .in("campaign_id", campaignIds.length ? campaignIds : ["x"])
+        .gte("changed_at", requestedStart.toISOString())
+        .order("changed_at", { ascending: false })
+        .range(offset, offset + 999);
+      if (changesError) throw changesError;
+      changes.push(...((page || []) as Array<Record<string, unknown>>));
+      if (!page || page.length < 1000) break;
+    }
 
     const context = {
       generated_at: today.toISOString(),
@@ -251,7 +262,7 @@ Deno.serve(async (req) => {
       campaigns: campaignSummary,
       adsets: adsetSummary,
       ads: adSummary,
-      recent_changes: changes || [],
+      recent_changes: changes,
       data_limitations: {
         targeting: "A base atual não armazena idade, gênero, interesses, localização ou sobreposição de públicos.",
         placements: "A base atual não armazena breakdown por posicionamento.",

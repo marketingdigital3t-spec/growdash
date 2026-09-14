@@ -103,12 +103,8 @@ export const NAV_SECTIONS: NavSection[] = [
         path: "/analise-de-funis",
         icon: GitBranch,
         description: "Visualize gargalos e conversões em cada etapa da jornada.",
-        metrics: [
-          { label: "Visitantes", value: "18.420", change: "+16%" },
-          { label: "Leads", value: "1.286", change: "+12%" },
-          { label: "Oportunidades", value: "214", change: "+8%" },
-          { label: "Vendas", value: "42", change: "+11%" },
-        ],
+        // Navigation metadata must not masquerade as live analytics.
+        metrics: [],
         highlights: ["Conversão por etapa", "Principais pontos de abandono", "Canais que mais convertem"],
       },
       {

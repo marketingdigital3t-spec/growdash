@@ -42,18 +42,31 @@ export function useHourlyCoverage(): HourlyCoverage {
     enabled: scopedIds.length > 0,
     queryFn: async () => {
       // Per-account rows + distribution signal in window
-      const { data: inWindow } = await supabase
-        .from("insights_hourly")
-        .select("ad_account_id, leads, clicks, spend")
-        .in("ad_account_id", scopedIds)
-        .gte("date", start)
-        .lte("date", end);
+      const inWindow: HourlyCoverageRow[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase
+          .from("insights_hourly")
+          .select("ad_account_id, leads, clicks, spend")
+          .in("ad_account_id", scopedIds)
+          .gte("date", start)
+          .lte("date", end)
+          .range(offset, offset + 999);
+        if (error) throw error;
+        inWindow.push(...((data || []) as HourlyCoverageRow[]));
+        if (!data || data.length < 1000) break;
+      }
       // Per-account presence anywhere
-      const { data: anywhere } = await supabase
-        .from("insights_hourly")
-        .select("ad_account_id")
-        .in("ad_account_id", scopedIds)
-        .limit(1000);
+      const anywhere: AccountRefRow[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase
+          .from("insights_hourly")
+          .select("ad_account_id")
+          .in("ad_account_id", scopedIds)
+          .range(offset, offset + 999);
+        if (error) throw error;
+        anywhere.push(...((data || []) as AccountRefRow[]));
+        if (!data || data.length < 1000) break;
+      }
       // LP config presence per account
       const { data: lpRows } = await supabase
         .from("account_lp_config")
@@ -61,14 +74,14 @@ export function useHourlyCoverage(): HourlyCoverage {
         .in("ad_account_id", scopedIds);
 
       const rowsByAcct = new Map<string, { rows: number; leads: number; activity: number }>();
-      for (const r of (inWindow || []) as HourlyCoverageRow[]) {
+      for (const r of inWindow) {
         const cur = rowsByAcct.get(r.ad_account_id) || { rows: 0, leads: 0, activity: 0 };
         cur.rows += 1;
         cur.leads += Number(r.leads || 0);
         cur.activity += Number(r.leads || 0) + Number(r.clicks || 0) + Number(r.spend || 0);
         rowsByAcct.set(r.ad_account_id, cur);
       }
-      const everSet = new Set(((anywhere || []) as AccountRefRow[]).map((r) => r.ad_account_id));
+      const everSet = new Set(anywhere.map((r) => r.ad_account_id));
       const lpSet = new Set(((lpRows || []) as Array<AccountRefRow & { action_type: string | null }>).filter((r) => r.action_type).map((r) => r.ad_account_id));
 
       const missing: MissingAccount[] = [];

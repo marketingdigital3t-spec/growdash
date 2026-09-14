@@ -38,15 +38,18 @@ function useReconciliation(days: number) {
       const rows: AccountRow[] = [];
       for (const acc of (accounts || []) as any[]) {
         // meta_leads count + coverage
-        const { data: mlRows } = await supabase
-          .from("meta_leads" as any)
-          .select("lead_state")
-          .eq("ad_account_id", acc.id)
-          .gte("created_time", startISO)
-          .lte("created_time", endISO)
-          .limit(10000);
-        const metaLeads = (mlRows || []).length;
-        const withState = (mlRows || []).filter((r: any) => r.lead_state).length;
+        const mlRows: any[] = [];
+        for (let offset = 0; ; offset += 1000) {
+          const { data, error } = await supabase.from("meta_leads" as any)
+            .select("lead_state").eq("ad_account_id", acc.id)
+            .gte("created_time", startISO).lte("created_time", endISO)
+            .range(offset, offset + 999);
+          if (error) throw error;
+          mlRows.push(...(data || []));
+          if (!data || data.length < 1000) break;
+        }
+        const metaLeads = mlRows.length;
+        const withState = mlRows.filter((r: any) => r.lead_state).length;
         const coveragePct = metaLeads > 0 ? (withState / metaLeads) * 100 : 0;
 
         // insights leads (sum) via campaigns join
@@ -90,14 +93,17 @@ function useReconciliation(days: number) {
         }
 
         // hourly leads
-        const { data: hourly } = await supabase
-          .from("insights_hourly" as any)
-          .select("leads")
-          .eq("ad_account_id", acc.id)
-          .gte("date", startStr)
-          .lte("date", endStr)
-          .limit(10000);
-        const hourlyLeads = (hourly || []).reduce((s: number, r: any) => s + Number(r.leads || 0), 0);
+        const hourly: any[] = [];
+        for (let offset = 0; ; offset += 1000) {
+          const { data, error } = await supabase.from("insights_hourly" as any)
+            .select("leads").eq("ad_account_id", acc.id)
+            .gte("date", startStr).lte("date", endStr)
+            .range(offset, offset + 999);
+          if (error) throw error;
+          hourly.push(...(data || []));
+          if (!data || data.length < 1000) break;
+        }
+        const hourlyLeads = hourly.reduce((s: number, r: any) => s + Number(r.leads || 0), 0);
 
         // rd_deals count
         const { count: rdCount } = await supabase
