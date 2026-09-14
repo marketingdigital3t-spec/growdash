@@ -128,9 +128,8 @@ export function useSales(params?: UseSalesParams) {
 
       // Paginar para evitar o corte de 1000 linhas do Supabase.
       const PAGE = 1000;
-      const MAX_PAGES = 50;
       let all: Sale[] = [];
-      for (let page = 0; page < MAX_PAGES; page++) {
+      for (let page = 0; ; page++) {
         const from = page * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await query.range(from, to);
@@ -138,9 +137,6 @@ export function useSales(params?: UseSalesParams) {
         const batch = (data || []).map((row) => ({ ...row, campaign_ids: row.campaign_ids || [] })) as Sale[];
         all = all.concat(batch);
         if (batch.length < PAGE) break;
-        if (page === MAX_PAGES - 1) {
-          console.warn(`[useSales] hit MAX_PAGES (${MAX_PAGES}) — possible truncation`);
-        }
       }
       return dedupeCanonicalSales(all);
     },
