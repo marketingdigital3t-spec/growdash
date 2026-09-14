@@ -42,7 +42,9 @@ Deno.serve(async (req) => {
     }
 
     // Fetch accounts: if user authenticated, only their accounts; otherwise (cron) all
-    let accountsQuery = supabaseAdmin.from("ad_accounts").select("id, account_id, name, access_token");
+    // A manual deactivation is authoritative. Balance sync must not even
+    // fetch, update, or reactivate accounts marked as disconnected.
+    let accountsQuery = supabaseAdmin.from("ad_accounts").select("id, account_id, name, access_token, connection_status").neq("connection_status", "disconnected");
     if (userId) {
       accountsQuery = accountsQuery.eq("user_id", userId);
     }
@@ -83,7 +85,8 @@ Deno.serve(async (req) => {
               last_sync_error_code: code,
               last_sync_attempt_at: attemptedAt,
             })
-            .eq("id", account.id);
+            .eq("id", account.id)
+            .neq("connection_status", "disconnected");
           continue;
         }
 
@@ -138,7 +141,8 @@ Deno.serve(async (req) => {
               last_sync_attempt_at: attemptedAt,
               last_sync_success_at: attemptedAt,
             })
-            .eq("id", account.id);
+            .eq("id", account.id)
+            .neq("connection_status", "disconnected");
 
           if (updateError) {
             errors.push(`${account.name}: update failed - ${updateError.message}`);
@@ -169,7 +173,8 @@ Deno.serve(async (req) => {
               last_sync_attempt_at: attemptedAt,
               last_sync_success_at: attemptedAt,
             })
-            .eq("id", account.id);
+            .eq("id", account.id)
+            .neq("connection_status", "disconnected");
         }
       } catch (e) {
         const msg = (e as Error).message;
@@ -181,7 +186,8 @@ Deno.serve(async (req) => {
             last_sync_error: msg,
             last_sync_attempt_at: attemptedAt,
           })
-          .eq("id", account.id);
+          .eq("id", account.id)
+          .neq("connection_status", "disconnected");
       }
     }
 
