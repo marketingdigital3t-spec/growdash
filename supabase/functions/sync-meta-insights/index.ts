@@ -539,9 +539,23 @@ Deno.serve(async (req) => {
                   const a = actions.find((x: any) => x.action_type === type);
                   return a ? Number(a.value || 0) : 0;
                 };
-                // Mesma regra do sync principal: lead_grouped + LP configurada.
+                // Reuse the canonical acquisition rules for every campaign
+                // type: native forms, configured landing pages, and click-to-
+                // message campaigns. Do not drop message campaigns from the
+                // audience report simply because they have no form action.
                 const nLeads = findVal("onsite_conversion.lead_grouped");
                 const lLeads = lpAction ? findVal(lpAction) : 0;
+                // Meta varies the messaging action name by objective/API
+                // version. Count every known conversation-start action so
+                // click-to-message campaigns also populate the audience
+                // breakdowns (without double-counting the same action type).
+                const messagingActions = [
+                  "onsite_conversion.messaging_conversation_started_7d",
+                  "onsite_conversion.messaging_conversation_started",
+                  "onsite_conversion.total_messaging_connection",
+                  "onsite_conversion.messaging_first_reply",
+                ];
+                const conversations = messagingActions.map(findVal).find((value) => value > 0) || 0;
                 return {
                   campaign_id: r.campaign_id,
                   date: r.date_start,
@@ -552,7 +566,7 @@ Deno.serve(async (req) => {
                   spend: Number(r.spend || 0),
                   impressions: Number(r.impressions || 0),
                   clicks: Number(r.clicks || 0),
-                  leads: nLeads + lLeads,
+                  leads: nLeads + lLeads + conversations,
                 };
               });
             for (let i = 0; i < bRows.length; i += 200) {

@@ -277,13 +277,6 @@ export default function FunnelAnalysis() {
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
   );
-  const audienceCampaignIds = useMemo(() => {
-    const filter = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
-    return visibleCampaignRows
-      .filter((campaign: any) => selectedCampaign === "all" || String(campaign.name || "").toLocaleLowerCase("pt-BR").includes(filter) || filter.includes(String(campaign.name || "").toLocaleLowerCase("pt-BR")))
-      .map((campaign: any) => String(campaign.id)).filter(Boolean);
-  }, [selectedCampaign, visibleCampaignRows]);
-
   const { scopedInsights, campaignWithoutMediaMatch } = useMemo(() => {
     const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     // Mesmo que a política do banco permita consultar histórico legado, a
@@ -302,6 +295,28 @@ export default function FunnelAnalysis() {
     // campanhas neste caso distorce investimento, CPL e ROAS do funil.
     return { scopedInsights: matches, campaignWithoutMediaMatch: matches.length === 0 };
   }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet, selectedCampaign]);
+
+  // O filtro de campanha do RD usa UTM e nem sempre tem o mesmo nome da
+  // campanha na Meta. Use os IDs reais das campanhas visíveis e, como
+  // fallback, os IDs presentes nos insights sincronizados; assim o perfil de
+  // público continua carregando para campanhas de formulário, mensagem e
+  // outros objetivos mesmo quando os nomes divergem.
+  const audienceCampaignIds = useMemo(() => {
+    const filter = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
+    const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
+    const candidates = visibleCampaignRows.filter((campaign: any) => accountIds.has(campaign.ad_account_id));
+    const matching = selectedCampaign === "all"
+      ? candidates
+      : candidates.filter((campaign: any) => {
+        const name = String(campaign.name || "").toLocaleLowerCase("pt-BR");
+        return name.includes(filter) || filter.includes(name);
+      });
+    const insightIds = scopedInsights
+      .filter((row) => !!row.campaign_id && !!row.ad_account_id && accountIds.has(row.ad_account_id))
+      .map((row) => String(row.campaign_id));
+    const ids = (matching.length ? matching.map((campaign: any) => String(campaign.id)) : candidates.map((campaign: any) => String(campaign.id))).concat(insightIds).filter(Boolean);
+    return Array.from(new Set(ids));
+  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, selectedCampaign, visibleCampaignRows]);
 
   // O total de aquisição da Análise de Funis é uma métrica da Meta: cada
   // conversa iniciada por anúncio é um lead a ser trabalhado. Buscamos os
