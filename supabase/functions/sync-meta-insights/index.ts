@@ -681,7 +681,7 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
   return { error: { message: lastMessage, is_transient: true }, __retryable: true };
 }
 
-// Segue paging.next até o fim (ou hard-cap), retornando erro estruturado sem expor token.
+// Segue paging.next até o fim, retornando erro estruturado sem expor token.
 async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY): Promise<{
   data: any[];
   error?: string;
