@@ -1285,11 +1285,21 @@ Deno.serve(async (req) => {
         if (d.deal_products?.[0]?.name) row.rd_product_name = d.deal_products[0].name;
         return row;
       });
-      const { error } = await admin
-        .from("rd_deals")
-        .upsert(rows, { onConflict: "user_id,rd_deal_id" });
-      if (error) throw error;
-      totalUpdated += rows.length;
+      // Do not send an entire RD page (and its raw payloads) in one request.
+      // Large pipelines routinely contain verbose custom fields; one 200-row
+      // upsert can exceed the Edge Function CPU/memory budget even though the
+      // remote pagination itself succeeded. Micro-batches preserve the full
+      // history while bounding peak serialization and PostgREST work.
+      const PERSIST_BATCH_SIZE = 25;
+      for (let offset = 0; offset < rows.length; offset += PERSIST_BATCH_SIZE) {
+        const batch = rows.slice(offset, offset + PERSIST_BATCH_SIZE);
+        const { error } = await admin
+          .from("rd_deals")
+          .upsert(batch, { onConflict: "user_id,rd_deal_id" });
+        if (error) throw error;
+        totalUpdated += batch.length;
+        if (offset + PERSIST_BATCH_SIZE < rows.length) await sleep(20);
+      }
     }
 
     const BATCH_SIZE = 2;
