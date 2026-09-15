@@ -52,6 +52,15 @@ const MESSAGING_CONVERSATION_EVENTS = [
   "onsite_conversion.total_messaging_connection",
   "onsite_conversion.messaging_first_reply",
 ] as const;
+const FORM_LEAD_EVENTS = ["onsite_conversion.lead_grouped", "lead", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"] as const;
+
+function preferredActionTotal(totals: Record<string, number> | undefined, aliases: readonly string[]) {
+  if (!totals) return null;
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(totals, alias)) return Math.max(0, Number(totals[alias] || 0));
+  }
+  return null;
+}
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -348,6 +357,7 @@ export default function FunnelAnalysis() {
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,
+      preferredActionTotal(actionData?.totals, FORM_LEAD_EVENTS) ?? undefined,
     ),
     [actionData?.totals, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
   );

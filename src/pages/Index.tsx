@@ -34,6 +34,15 @@ import { useEventClasses } from "@/hooks/useEventClasses";
 
 const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
+const FORM_LEAD_EVENTS = [NATIVE_FORM_LEAD_EVENT, "lead", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"] as const;
+
+function preferredActionTotal(totals: Record<string, number> | undefined, aliases: readonly string[]) {
+  if (!totals) return null;
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(totals, alias)) return Math.max(0, Number(totals[alias] || 0));
+  }
+  return null;
+}
 
 const Index = () => {
   const {
@@ -189,7 +198,8 @@ const Index = () => {
   const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
   const { data: dashboardActionData } = useActionTotalsByAds(dashboardActionAdIds, startDate, endDate, dashboardActionAccountMap);
   const glassConversations = dashboardActionData?.totals?.[MESSAGING_CONVERSATION_EVENT] || 0;
-  const glassForms = Math.min(glassLeadsFromInsights, dashboardActionData?.totals?.[NATIVE_FORM_LEAD_EVENT] || 0);
+  const canonicalForms = preferredActionTotal(dashboardActionData?.totals, FORM_LEAD_EVENTS);
+  const glassForms = canonicalForms == null ? glassLeadsFromInsights : canonicalForms;
   const leadBreakdown = useMemo(() => ({ forms: glassForms, site: Math.max(0, glassLeadsFromInsights - glassForms), conversations: glassConversations, total: glassLeadsFromInsights + glassConversations }), [glassConversations, glassForms, glassLeadsFromInsights]);
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
@@ -203,11 +213,16 @@ const Index = () => {
     // A mutation já invalida as consultas de insights ao terminar. Refazer a
     // consulta antes e depois da sincronização só competia por rede e fazia o
     // dashboard trocar desnecessariamente para estado de carregamento.
+    const syncStart = format(startDate, "yyyy-MM-dd");
+    const syncEnd = format(endDate, "yyyy-MM-dd");
     syncMeta.mutate({
       adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
       adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : visibleAccountIdList,
-      startDate: format(startDate, "yyyy-MM-dd"),
-      endDate: format(endDate, "yyyy-MM-dd"),
+      startDate: syncStart,
+      endDate: syncEnd,
+      includeBreakdowns: true,
+      breakdownStartDate: syncStart,
+      breakdownEndDate: syncEnd,
     });
   };
 

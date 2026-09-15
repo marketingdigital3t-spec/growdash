@@ -33,6 +33,7 @@ export function computeFunnelMediaMetrics(
   rdLeads: number,
   sales: number,
   revenue: number,
+  formLeadsOverride?: number,
 ): FunnelMediaMetrics {
   const totals = insights.reduce(
     (acc, row) => {
@@ -46,7 +47,10 @@ export function computeFunnelMediaMetrics(
     { spend: 0, impressions: 0, reach: 0, clicks: 0, metaLeads: 0 },
   );
   const safeConversations = Math.max(0, Number(conversations) || 0);
-  const formLeads = totals.metaLeads;
+  // Prefer the canonical Meta action event when available. The daily
+  // `insights.leads` column can be stale after an account is resynced and was
+  // the source of under-counts (e.g. 7 shown vs 13 forms in Ads Manager).
+  const formLeads = formLeadsOverride == null ? totals.metaLeads : Math.max(0, Number(formLeadsOverride) || 0);
   const metaLeads = formLeads + safeConversations;
 
   return {
