@@ -38,10 +38,8 @@ const FORM_LEAD_EVENTS = [NATIVE_FORM_LEAD_EVENT, "lead", "omni_lead", "leadgen_
 
 function preferredActionTotal(totals: Record<string, number> | undefined, aliases: readonly string[]) {
   if (!totals) return null;
-  for (const alias of aliases) {
-    if (Object.prototype.hasOwnProperty.call(totals, alias)) return Math.max(0, Number(totals[alias] || 0));
-  }
-  return null;
+  const values = aliases.filter((alias) => Object.prototype.hasOwnProperty.call(totals, alias)).map((alias) => Math.max(0, Number(totals[alias] || 0)));
+  return values.length ? Math.max(...values) : null;
 }
 
 const Index = () => {

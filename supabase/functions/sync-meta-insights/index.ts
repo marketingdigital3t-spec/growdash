@@ -481,8 +481,12 @@ Deno.serve(async (req) => {
           // Leads = Formulário Instantâneo + LP configurada. Algumas contas/API
           // antigas retornam apenas `lead` (sem `lead_grouped`); nesse caso ele
           // é o único resultado de formulário disponível e não pode ser perdido.
-          const groupedLeads = findVal("onsite_conversion.lead_grouped");
-          const nativeLeads = groupedLeads > 0 ? groupedLeads : findVal("lead");
+          const nativeLeads = Math.max(
+            findVal("onsite_conversion.lead_grouped"),
+            findVal("lead"),
+            findVal("omni_lead"),
+            findVal("leadgen_grouped"),
+          );
           const lpLeads = lpAction ? findVal(lpAction) : 0;
           const leads = nativeLeads + lpLeads;
           const cpl = leads > 0 ? spend / leads : 0;
@@ -549,8 +553,12 @@ Deno.serve(async (req) => {
                 // type: native forms, configured landing pages, and click-to-
                 // message campaigns. Do not drop message campaigns from the
                 // audience report simply because they have no form action.
-                const groupedLeads = findVal("onsite_conversion.lead_grouped");
-                const nLeads = groupedLeads > 0 ? groupedLeads : findVal("lead");
+                const nLeads = Math.max(
+                  findVal("onsite_conversion.lead_grouped"),
+                  findVal("lead"),
+                  findVal("omni_lead"),
+                  findVal("leadgen_grouped"),
+                );
                 const lLeads = lpAction ? findVal(lpAction) : 0;
                 // Meta varies the messaging action name by objective/API
                 // version. Count every known conversation-start action so
@@ -562,7 +570,7 @@ Deno.serve(async (req) => {
                   "onsite_conversion.total_messaging_connection",
                   "onsite_conversion.messaging_first_reply",
                 ];
-                const conversations = messagingActions.map(findVal).find((value) => value > 0) || 0;
+                const conversations = Math.max(...messagingActions.map(findVal));
                 return {
                   campaign_id: r.campaign_id,
                   date: r.date_start,

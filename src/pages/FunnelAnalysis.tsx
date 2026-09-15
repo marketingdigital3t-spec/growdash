@@ -56,10 +56,8 @@ const FORM_LEAD_EVENTS = ["onsite_conversion.lead_grouped", "lead", "omni_lead",
 
 function preferredActionTotal(totals: Record<string, number> | undefined, aliases: readonly string[]) {
   if (!totals) return null;
-  for (const alias of aliases) {
-    if (Object.prototype.hasOwnProperty.call(totals, alias)) return Math.max(0, Number(totals[alias] || 0));
-  }
-  return null;
+  const values = aliases.filter((alias) => Object.prototype.hasOwnProperty.call(totals, alias)).map((alias) => Math.max(0, Number(totals[alias] || 0)));
+  return values.length ? Math.max(...values) : null;
 }
 
 const blockHelp = {
@@ -353,7 +351,7 @@ export default function FunnelAnalysis() {
       // Meta changes the conversation action label by API version and
       // attribution window. Use the first available canonical variant rather
       // than silently reporting zero when the account returns another label.
-      MESSAGING_CONVERSATION_EVENTS.map((event) => Number(actionData?.totals?.[event] || 0)).find((value) => value > 0) || 0,
+      preferredActionTotal(actionData?.totals, MESSAGING_CONVERSATION_EVENTS) || 0,
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,

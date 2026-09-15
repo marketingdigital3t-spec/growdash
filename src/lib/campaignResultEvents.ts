@@ -16,10 +16,8 @@ const CONVERSATION_ACTION_TYPES = [
 ] as const;
 
 function preferredActionTotal(actionTotals: Record<string, number>, aliases: readonly string[]) {
-  for (const alias of aliases) {
-    if (Object.prototype.hasOwnProperty.call(actionTotals, alias)) return Math.max(0, Number(actionTotals[alias] || 0));
-  }
-  return 0;
+  const values = aliases.filter((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias)).map((alias) => Math.max(0, Number(actionTotals[alias] || 0)));
+  return values.length ? Math.max(...values) : 0;
 }
 
 /**
