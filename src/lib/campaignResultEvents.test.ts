@@ -7,7 +7,7 @@ describe("resolveCampaignResults", () => {
       link_click: 900,
       "onsite_conversion.messaging_conversation_started_7d": 4,
     })).toEqual({
-      total: 12,
+      total: 16,
       leadCount: 12,
       conversations: 4,
       breakdown: [
@@ -30,7 +30,7 @@ describe("resolveCampaignResults", () => {
       "onsite_conversion.messaging_conversation_started_7d": 8,
       "onsite_conversion.messaging_conversation_started_28d": 8,
       "onsite_conversion.messaging_first_reply": 8,
-    })).toMatchObject({ total: 0, leadCount: 0, conversations: 8 });
+    })).toMatchObject({ total: 8, leadCount: 0, conversations: 8 });
   });
 
   it("mostra o maior evento mesmo em campanha de geração de leads", () => {
@@ -51,5 +51,14 @@ describe("resolveCampaignResults", () => {
   it("prioriza conversas quando elas são o maior resultado", () => {
     const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 18 });
     expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Conversas iniciadas", value: 18 });
+  });
+
+  it("compõe formulários e conversas sem somar aliases duplicados", () => {
+    expect(resolveCampaignResults(0, {
+      "onsite_conversion.lead_grouped": 3,
+      lead: 5,
+      "onsite_conversion.messaging_conversation_started_7d": 7,
+      "onsite_conversion.messaging_conversation_started": 11,
+    })).toMatchObject({ total: 16, leadCount: 5, conversations: 11 });
   });
 });

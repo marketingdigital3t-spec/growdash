@@ -5,7 +5,7 @@ const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 export function FunnelSourceTable({ a }: { a: FunnelAnalytics }) {
-  const rows = a.sourceBreakdown.slice(0, 10);
+  const rows = a.sourceBreakdown;
   const totalLeads = a.sourceBreakdown.reduce((sum, row) => sum + row.leads, 0);
   const filledLeads = a.sourceBreakdown.filter((row) => row.source !== "Não informado").reduce((sum, row) => sum + row.leads, 0);
   const quality = totalLeads ? (filledLeads / totalLeads) * 100 : 0;

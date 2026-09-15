@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveMetaActionMetrics } from "./metaActionMetrics";
+import { resolveMetaActionMetrics, resolveMetaLeadActions } from "./metaActionMetrics";
 
 describe("Meta action metrics", () => {
   it("prioriza a ação omni para não duplicar checkout e compra", () => {
@@ -35,5 +35,16 @@ describe("Meta action metrics", () => {
     expect(metrics.checkouts).toBe(4);
     expect(metrics.purchases).toBe(2);
     expect(metrics.purchaseValue).toBe(500);
+  });
+
+  it("usa o maior alias compatível por mecanismo sem duplicar o mesmo resultado", () => {
+    expect(resolveMetaLeadActions({
+      "onsite_conversion.lead_grouped": 3,
+      lead: 5,
+      omni_lead: 5,
+      "onsite_conversion.messaging_conversation_started_7d": 7,
+      "onsite_conversion.messaging_conversation_started": 11,
+      "onsite_conversion.total_messaging_connection": 11,
+    })).toEqual({ forms: 5, conversations: 11 });
   });
 });

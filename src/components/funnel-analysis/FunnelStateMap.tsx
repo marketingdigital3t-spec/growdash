@@ -8,7 +8,7 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
   for (const s of a.stateBreakdown) {
     if (s.state && s.state.length === 2 && s.state !== "—") leadMap[s.state] = s.leads;
   }
-  const topStates = a.stateBreakdown.filter((s) => s.state !== "—").slice(0, 10);
+  const topStates = a.stateBreakdown.filter((s) => s.state !== "—");
   const hasStateData = topStates.length > 0;
 
   return (
@@ -50,14 +50,14 @@ export function FunnelStateMap({ a }: { a: FunnelAnalytics }) {
             <p className="text-[10px] text-muted-foreground">* Leads são contados pela data de entrada e vendas pela data de fechamento. Vendas de leads antigos aparecem na UF sem uma taxa artificial.</p>
             {hasStateData && <div className="h-40">
               <ResponsiveContainer>
-                <BarChart data={topStates.slice(0, 8).map((s) => ({ uf: s.state, conv: s.conversions }))}>
+                <BarChart data={topStates.map((s) => ({ uf: s.state, conv: s.conversions }))}>
                   <XAxis dataKey="uf" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                   <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                   <Tooltip
                     contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted) / 0.25)", stroke: "hsl(var(--border))" }}
                   />
                   <Bar dataKey="conv" radius={[4, 4, 0, 0]}>
-                    {topStates.slice(0, 8).map((_, i) => <Cell key={i} fill="hsl(var(--primary))" />)}
+                    {topStates.map((_, i) => <Cell key={i} fill="hsl(var(--primary))" />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

@@ -31,16 +31,8 @@ import { useToast } from "@/hooks/use-toast";
 import { DashboardReferenceDeck } from "@/components/dashboard/DashboardReferenceDeck";
 import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
 import { useEventClasses } from "@/hooks/useEventClasses";
+import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
-const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
-const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
-const FORM_LEAD_EVENTS = [NATIVE_FORM_LEAD_EVENT, "lead", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"] as const;
-
-function preferredActionTotal(totals: Record<string, number> | undefined, aliases: readonly string[]) {
-  if (!totals) return null;
-  const values = aliases.filter((alias) => Object.prototype.hasOwnProperty.call(totals, alias)).map((alias) => Math.max(0, Number(totals[alias] || 0)));
-  return values.length ? Math.max(...values) : null;
-}
 
 const Index = () => {
   const {
@@ -195,9 +187,9 @@ const Index = () => {
   const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
   const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
   const { data: dashboardActionData } = useActionTotalsByAds(dashboardActionAdIds, startDate, endDate, dashboardActionAccountMap);
-  const glassConversations = dashboardActionData?.totals?.[MESSAGING_CONVERSATION_EVENT] || 0;
-  const canonicalForms = preferredActionTotal(dashboardActionData?.totals, FORM_LEAD_EVENTS);
-  const glassForms = canonicalForms == null ? glassLeadsFromInsights : canonicalForms;
+  const dashboardActions = resolveMetaLeadActions(dashboardActionData?.totals);
+  const glassConversations = dashboardActions.conversations;
+  const glassForms = dashboardActionData ? dashboardActions.forms : glassLeadsFromInsights;
   const leadBreakdown = useMemo(() => ({ forms: glassForms, site: Math.max(0, glassLeadsFromInsights - glassForms), conversations: glassConversations, total: glassLeadsFromInsights + glassConversations }), [glassConversations, glassForms, glassLeadsFromInsights]);
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;

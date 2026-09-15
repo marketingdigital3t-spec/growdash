@@ -22,7 +22,9 @@ const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 export function FunnelStageDistribution({ a }: Props) {
-  const stages = a.stages.filter((s) => !s.is_lost);
+  // Include lost and won stages so the distribution reconciles exactly to the
+  // RD deal count for the selected account and period.
+  const stages = a.stages;
   const total = stages.reduce((s, x) => s + x.count, 0);
 
   const data = stages.map((s, i) => ({

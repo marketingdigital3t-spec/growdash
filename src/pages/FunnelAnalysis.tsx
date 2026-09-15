@@ -43,22 +43,7 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
 import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
-
-const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
-const MESSAGING_CONVERSATION_EVENTS = [
-  MESSAGING_CONVERSATION_EVENT,
-  "onsite_conversion.messaging_conversation_started_28d",
-  "onsite_conversion.messaging_conversation_started",
-  "onsite_conversion.total_messaging_connection",
-  "onsite_conversion.messaging_first_reply",
-] as const;
-const FORM_LEAD_EVENTS = ["onsite_conversion.lead_grouped", "lead", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"] as const;
-
-function preferredActionTotal(totals: Record<string, number> | undefined, aliases: readonly string[]) {
-  if (!totals) return null;
-  const values = aliases.filter((alias) => Object.prototype.hasOwnProperty.call(totals, alias)).map((alias) => Math.max(0, Number(totals[alias] || 0)));
-  return values.length ? Math.max(...values) : null;
-}
+import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -346,17 +331,17 @@ export default function FunnelAnalysis() {
   const { data: actionData, isLoading: loadingMetaActions } = useActionTotalsByAds(actionAdIds, startDate, endDate, actionAccountMap);
 
   const mediaMetrics = useMemo(
-    () => computeFunnelMediaMetrics(
+    () => {
+      const actions = resolveMetaLeadActions(actionData?.totals);
+      return computeFunnelMediaMetrics(
       scopedInsights,
-      // Meta changes the conversation action label by API version and
-      // attribution window. Use the first available canonical variant rather
-      // than silently reporting zero when the account returns another label.
-      preferredActionTotal(actionData?.totals, MESSAGING_CONVERSATION_EVENTS) || 0,
+      actions.conversations,
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,
-      preferredActionTotal(actionData?.totals, FORM_LEAD_EVENTS) ?? undefined,
-    ),
+      actions.forms,
+    );
+    },
     [actionData?.totals, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
   );
 

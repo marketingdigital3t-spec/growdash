@@ -2,13 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 
 export function FunnelLostReasons({ a }: { a: FunnelAnalytics }) {
-  const data = a.lostReasons.slice(0, 8).map((r) => ({
+  const data = a.lostReasons.map((r) => ({
     name: r.reason,
     count: r.count,
     pct: Number(r.pct.toFixed(1)),
   }));
   const maxLossCount = Math.max(...data.map((row) => row.count), 1);
-  const standby = a.standbyReasons.slice(0, 5);
+  const standby = a.standbyReasons;
   const reasonList = (rows: typeof a.lostReasons, empty: string, tone: "loss" | "standby") => rows.length === 0 ? (
     <p className="py-4 text-center text-xs text-muted-foreground">{empty}</p>
   ) : (

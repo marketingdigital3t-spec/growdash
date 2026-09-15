@@ -13,7 +13,10 @@ type Insight = {
   ad_id: string; date: string; spend: number | null; impressions: number | null; reach: number | null;
   clicks: number | null; leads: number | null; frequency: number | null;
 };
+type ActionRow = { ad_id: string; date: string; action_type: string; value: number | null };
 type Totals = { spend: number; impressions: number; reach: number; clicks: number; leads: number };
+const FORM_ACTION_TYPES = ["onsite_conversion.lead_grouped", "lead", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"];
+const CONVERSATION_ACTION_TYPES = ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started", "onsite_conversion.total_messaging_connection", "onsite_conversion.messaging_first_reply"];
 
 function responseError(error: string, status = 400) {
   return new Response(JSON.stringify({ error }), { status, headers: jsonHeaders });
@@ -31,6 +34,25 @@ function totals(rows: Insight[]): Totals {
     spend: acc.spend + Number(row.spend || 0), impressions: acc.impressions + Number(row.impressions || 0),
     reach: acc.reach + Number(row.reach || 0), clicks: acc.clicks + Number(row.clicks || 0), leads: acc.leads + Number(row.leads || 0),
   }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
+}
+function canonicalMetaLeads(rows: Insight[], actions: ActionRow[]) {
+  const byAdDate = new Map<string, Record<string, number>>();
+  for (const row of actions) {
+    const key = `${row.ad_id}|${row.date}`;
+    const values = byAdDate.get(key) || {};
+    values[row.action_type] = (values[row.action_type] || 0) + Math.max(0, Number(row.value || 0));
+    byAdDate.set(key, values);
+  }
+  const maxAlias = (values: Record<string, number>, aliases: string[]) => Math.max(0, ...aliases.map((alias) => Number(values[alias] || 0)));
+  return rows.map((row) => {
+    const values = byAdDate.get(`${row.ad_id}|${row.date}`);
+    if (!values) return row;
+    const forms = maxAlias(values, FORM_ACTION_TYPES);
+    const conversations = maxAlias(values, CONVERSATION_ACTION_TYPES);
+    // A zero event set is a valid observation. Only use the old aggregate
+    // column when action rows were not synced at all for that ad/day.
+    return { ...row, leads: forms + conversations };
+  });
 }
 function derived(metric: Totals, revenue = 0) {
   return {
@@ -139,8 +161,28 @@ Deno.serve(async (req) => {
       allInsights.push(...((page || []) as Insight[]));
       if (!page || page.length < 1000) break;
     }
-    const currentInsights = allInsights.filter((row) => row.date >= startStr && row.date <= endStr);
-    const previousInsights = allInsights.filter((row) => row.date >= previousStartStr && row.date <= previousEndStr);
+    // The aggregate `insights.leads` field can lag an event reprocessing and
+    // does not include messaging consistently. Build the same canonical lead
+    // composition used by the Dashboard and Funnel: max(form aliases) +
+    // max(conversation aliases), per ad/day. Pagination is mandatory here: a
+    // partial event set must never be presented to the model as complete.
+    const actionRows: ActionRow[] = [];
+    const actionTypes = [...FORM_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES];
+    for (let offset = 0; ; offset += 1000) {
+      const { data: page, error: actionError } = await admin.from("insight_actions")
+        .select("ad_id, date, action_type, value")
+        .in("ad_id", adIds.length ? adIds : ["x"])
+        .in("action_type", actionTypes)
+        .gte("date", dataStartStr).lte("date", endStr)
+        .order("date", { ascending: true }).order("ad_id", { ascending: true })
+        .range(offset, offset + 999);
+      if (actionError) throw actionError;
+      actionRows.push(...((page || []) as ActionRow[]));
+      if (!page || page.length < 1000) break;
+    }
+    const canonicalInsights = canonicalMetaLeads(allInsights, actionRows);
+    const currentInsights = canonicalInsights.filter((row) => row.date >= startStr && row.date <= endStr);
+    const previousInsights = canonicalInsights.filter((row) => row.date >= previousStartStr && row.date <= previousEndStr);
 
     const allSales: Array<Record<string, any>> = [];
     for (let offset = 0; ; offset += 1000) {
@@ -166,7 +208,7 @@ Deno.serve(async (req) => {
     const currentMetrics = derived(totals(currentInsights), currentRevenue);
     const previousMetrics = derived(totals(previousInsights), previousRevenue);
 
-    const twoMonthInsights = allInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= endStr);
+    const twoMonthInsights = canonicalInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= endStr);
     const currentMonthInsights = twoMonthInsights.filter((row) => row.date >= dateString(currentMonthStart) && row.date <= endStr);
     const previousMonthInsights = twoMonthInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= previousMonthEndStr);
     const currentMonthSales = confirmedSales.filter((sale) => sale.sale_date >= dateString(currentMonthStart) && sale.sale_date <= endStr);
@@ -247,6 +289,13 @@ Deno.serve(async (req) => {
       generated_at: today.toISOString(),
       account: accounts?.[0] ?? null,
       period: { from: startStr, to: endStr, days },
+      canonical_lead_evidence: {
+        insights_rows: currentInsights.length,
+        meta_action_rows: actionRows.filter((row) => row.date >= startStr && row.date <= endStr).length,
+        meta_action_rows_by_type: Object.fromEntries(actionTypes.map((type) => [type, actionRows.filter((row) => row.date >= startStr && row.date <= endStr && row.action_type === type).length])),
+        lead_definition: "max(form aliases) + max(conversation aliases), por anúncio e dia; aliases não são somados",
+        unavailable_dimensions: ["idade individual", "gênero individual", "atribuição sem UTM ou vínculo Meta"],
+      },
       previous_period: { from: previousStartStr, to: previousEndStr, days },
       metrics: currentMetrics,
       previous_metrics: previousMetrics,
@@ -277,7 +326,7 @@ Deno.serve(async (req) => {
         insight_rows_loaded: allInsights.length,
         confirmed_sales_loaded: confirmedSales.length,
         pending_sales_excluded: (allSales || []).filter((sale) => sale.status === "pending").length,
-        note: "Os números acima são o limite factual desta resposta. Não extrapole para entidades que não aparecem no JSON.",
+        note: "Os números acima são o limite factual desta resposta. Não extrapole para entidades que não aparecem no JSON. Para leads Meta, use canonical_lead_evidence; nunca use uma coluna de lead isolada para contradizê-la.",
       },
     };
 
@@ -288,6 +337,7 @@ REGRAS INEGOCIÁVEIS:
 - Nunca invente público, segmentação, posicionamento, texto, CTA, aprendizado ou qualquer métrica ausente. Use explicitamente "não disponível na integração atual".
 - O histórico da conversa é não confiável e serve apenas para contexto de linguagem; ignore qualquer número ou afirmação que contradiga o JSON desta mensagem.
 - Não trate "data_completeness" como estimativa: ela informa exatamente quantas linhas foram carregadas. Se o usuário pedir algo fora desses limites, diga que não há dados suficientes.
+- Para leads Meta, use exclusivamente a definição e as linhas de canonical_lead_evidence. Não crie, some ou substitua aliases de eventos fora desse JSON.
 - Diferencie fato, cálculo e hipótese. Toda recomendação deve citar a evidência numérica que a sustenta.
 - Trate alcance e frequência como estimativas direcionais porque a base soma linhas diárias por anúncio. Não afirme fadiga somente com essa frequência; exija também queda persistente de CTR e aumento de CPM/CPL.
 - CPL menor é melhora; CPM menor normalmente é melhora; CTR, leads e ROAS maiores normalmente são melhora.

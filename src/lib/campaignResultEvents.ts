@@ -1,25 +1,6 @@
 export type CampaignResultBreakdown = { label: string; value: number };
 export type CampaignPrimaryResult = { label: "Leads" | "Conversas iniciadas"; value: number };
 
-const LEAD_ACTION_TYPES = [
-  "lead",
-  "omni_lead",
-  "leadgen_grouped",
-  "onsite_conversion.lead_grouped",
-  "offsite_conversion.fb_pixel_lead",
-] as const;
-
-const CONVERSATION_ACTION_TYPES = [
-  "onsite_conversion.messaging_conversation_started_7d",
-  "onsite_conversion.messaging_conversation_started_28d",
-  "onsite_conversion.messaging_first_reply",
-] as const;
-
-function preferredActionTotal(actionTotals: Record<string, number>, aliases: readonly string[]) {
-  const values = aliases.filter((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias)).map((alias) => Math.max(0, Number(actionTotals[alias] || 0)));
-  return values.length ? Math.max(...values) : 0;
-}
-
 /**
  * Meta can expose a campaign outcome in `insights.leads` or only through an
  * action event. Conversations are a separate, valid lead origin and must be
@@ -27,15 +8,18 @@ function preferredActionTotal(actionTotals: Record<string, number>, aliases: rea
  */
 export function resolveCampaignResults(insightLeads: number, actionTotals: Record<string, number>) {
   const leadsFromInsights = Math.max(0, Number(insightLeads || 0));
-  const leadsFromEvents = preferredActionTotal(actionTotals, LEAD_ACTION_TYPES);
-  const leadCount = leadsFromInsights > 0 ? leadsFromInsights : leadsFromEvents;
-  const conversations = preferredActionTotal(actionTotals, CONVERSATION_ACTION_TYPES);
+  const actionLeads = resolveMetaLeadActions(actionTotals);
+  const leadsFromEvents = actionLeads.forms;
+  // The action rows are the auditable Meta event source. `insights.leads` is
+  // retained strictly as a fallback for legacy rows not yet reprocessed.
+  const leadCount = leadsFromEvents > 0 ? leadsFromEvents : leadsFromInsights;
+  const conversations = actionLeads.conversations;
   const breakdown: CampaignResultBreakdown[] = [];
 
-  if (leadCount > 0) breakdown.push({ label: leadsFromInsights > 0 ? "Leads Meta" : "Leads por evento", value: leadCount });
+  if (leadCount > 0) breakdown.push({ label: leadsFromEvents > 0 ? "Leads por evento" : "Leads Meta", value: leadCount });
   if (conversations > 0) breakdown.push({ label: "Conversas iniciadas", value: conversations });
 
-  return { total: leadCount, leadCount, conversations, breakdown };
+  return { total: leadCount + conversations, leadCount, conversations, breakdown };
 }
 
 /**
@@ -61,3 +45,4 @@ export function resolveCampaignPrimaryResult(
   if (leads === conversations) return isLeadCampaign ? { label: "Leads", value: leads } : { label: "Conversas iniciadas", value: conversations };
   return leads > conversations ? { label: "Leads", value: leads } : { label: "Conversas iniciadas", value: conversations };
 }
+import { resolveMetaLeadActions } from "./metaActionMetrics";
