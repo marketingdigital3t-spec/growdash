@@ -435,6 +435,20 @@ Deno.serve(async (req) => {
           if (lpCfg?.action_type) lpAction = lpCfg.action_type;
         } catch (_) { /* ignore */ }
 
+        const nativeFormValue = (actions: any[]): number => {
+          const valueOf = (type: string) => Number(actions.find((item: any) => item.action_type === type)?.value || 0);
+          const canonical = [
+            valueOf("onsite_conversion.lead_grouped"),
+            valueOf("omni_lead"),
+            valueOf("leadgen_grouped"),
+            valueOf("offsite_conversion.fb_pixel_lead"),
+          ];
+          // Meta sometimes exposes only `lead` for older form accounts. It is
+          // a fallback, never an additive alias: on messaging campaigns it can
+          // be an auxiliary action and must not inflate forms.
+          return canonical.some((value) => value > 0) ? Math.max(...canonical) : valueOf("lead");
+        };
+
         // 4.3 Persistir TODOS os action_types em insight_actions
         const actionRows: any[] = [];
         for (const insight of allInsights) {
@@ -481,13 +495,8 @@ Deno.serve(async (req) => {
           // Leads = Formulário Instantâneo + LP configurada. Algumas contas/API
           // antigas retornam apenas `lead` (sem `lead_grouped`); nesse caso ele
           // é o único resultado de formulário disponível e não pode ser perdido.
-          const nativeLeads = Math.max(
-            findVal("onsite_conversion.lead_grouped"),
-            findVal("lead"),
-            findVal("omni_lead"),
-            findVal("leadgen_grouped"),
-          );
-          const lpLeads = lpAction ? findVal(lpAction) : 0;
+          const nativeLeads = nativeFormValue(actions);
+          const lpLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
           const leads = nativeLeads + lpLeads;
           const cpl = leads > 0 ? spend / leads : 0;
           const conversionRate = clicks > 0 ? (leads / clicks) * 100 : 0;
@@ -553,13 +562,8 @@ Deno.serve(async (req) => {
                 // type: native forms, configured landing pages, and click-to-
                 // message campaigns. Do not drop message campaigns from the
                 // audience report simply because they have no form action.
-                const nLeads = Math.max(
-                  findVal("onsite_conversion.lead_grouped"),
-                  findVal("lead"),
-                  findVal("omni_lead"),
-                  findVal("leadgen_grouped"),
-                );
-                const lLeads = lpAction ? findVal(lpAction) : 0;
+                const nLeads = nativeFormValue(actions);
+                const lLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
                 // Meta varies the messaging action name by objective/API
                 // version. Count every known conversation-start action so
                 // click-to-message campaigns also populate the audience

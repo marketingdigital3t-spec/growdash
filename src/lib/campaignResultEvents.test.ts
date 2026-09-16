@@ -59,6 +59,6 @@ describe("resolveCampaignResults", () => {
       lead: 5,
       "onsite_conversion.messaging_conversation_started_7d": 7,
       "onsite_conversion.messaging_conversation_started": 11,
-    })).toMatchObject({ total: 16, leadCount: 5, conversations: 11 });
+    })).toMatchObject({ total: 14, leadCount: 3, conversations: 11 });
   });
 });

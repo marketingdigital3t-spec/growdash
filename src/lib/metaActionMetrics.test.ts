@@ -47,4 +47,9 @@ describe("Meta action metrics", () => {
       "onsite_conversion.total_messaging_connection": 11,
     })).toEqual({ forms: 5, conversations: 11 });
   });
+
+  it("usa lead somente quando não existe evento nativo de formulário", () => {
+    expect(resolveMetaLeadActions({ lead: 5, "onsite_conversion.messaging_conversation_started_7d": 2 }))
+      .toEqual({ forms: 5, conversations: 2 });
+  });
 });
