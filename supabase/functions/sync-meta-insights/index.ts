@@ -571,8 +571,7 @@ Deno.serve(async (req) => {
                 const messagingActions = [
                   "onsite_conversion.messaging_conversation_started_7d",
                   "onsite_conversion.messaging_conversation_started",
-                  "onsite_conversion.total_messaging_connection",
-                  "onsite_conversion.messaging_first_reply",
+                  "onsite_conversion.messaging_conversation_started_28d",
                 ];
                 const conversations = Math.max(...messagingActions.map(findVal));
                 return {

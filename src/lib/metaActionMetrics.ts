@@ -2,7 +2,7 @@ export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
   // native form events and only use it as a fallback when none is present.
   forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"],
-  conversations: ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started", "onsite_conversion.total_messaging_connection", "onsite_conversion.messaging_first_reply"],
+  conversations: ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started"],
   linkClick: ["link_click"],
   landingPageView: ["landing_page_view"],
   checkout: [
