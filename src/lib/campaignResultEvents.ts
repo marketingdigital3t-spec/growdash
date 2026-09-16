@@ -6,17 +6,19 @@ export type CampaignPrimaryResult = { label: "Leads" | "Conversas iniciadas"; va
  * action event. Conversations are a separate, valid lead origin and must be
  * exposed separately, without counting clicks, page views, checkout or purchases.
  */
-export function resolveCampaignResults(insightLeads: number, actionTotals: Record<string, number>) {
+export function resolveCampaignResults(insightLeads: number, actionTotals: Record<string, number>, siteAction?: string | null) {
   const leadsFromInsights = Math.max(0, Number(insightLeads || 0));
-  const actionLeads = resolveMetaLeadActions(actionTotals);
-  const leadsFromEvents = actionLeads.forms;
+  const actionLeads = resolveMetaLeadActions(actionTotals, siteAction);
+  const leadsFromEvents = actionLeads.forms + actionLeads.site;
   // The action rows are the auditable Meta event source. `insights.leads` is
   // retained strictly as a fallback for legacy rows not yet reprocessed.
-  const leadCount = leadsFromEvents > 0 ? leadsFromEvents : leadsFromInsights;
+  const hasAuditableEvent = Object.keys(actionTotals).length > 0;
+  const leadCount = hasAuditableEvent ? leadsFromEvents : leadsFromInsights;
   const conversations = actionLeads.conversations;
   const breakdown: CampaignResultBreakdown[] = [];
 
-  if (leadCount > 0) breakdown.push({ label: leadsFromEvents > 0 ? "Leads por evento" : "Leads Meta", value: leadCount });
+  if (leadCount > 0) breakdown.push({ label: hasAuditableEvent ? "Leads por evento" : "Leads Meta (fallback não reprocessado)", value: leadCount });
+  if (actionLeads.site > 0) breakdown.push({ label: "Leads de site", value: actionLeads.site });
   if (conversations > 0) breakdown.push({ label: "Conversas iniciadas", value: conversations });
 
   return { total: leadCount + conversations, leadCount, conversations, breakdown };

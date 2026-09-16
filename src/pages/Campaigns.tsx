@@ -76,6 +76,7 @@ import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { pruneCampaignSelection, scopeCampaignHierarchy } from "@/lib/metaHierarchy";
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
 import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
@@ -301,6 +302,7 @@ export default function Campaigns() {
     segment,
   } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
+  const { data: lpConfigs = {} } = useAccountLpConfigs();
   const visibleAdAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
@@ -442,7 +444,11 @@ export default function Campaigns() {
 
   const campaignAdIds = useMemo(() => campaignBaseRows.flatMap((campaign: any) =>
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => currentAd.id))), [campaignBaseRows]);
-  const { data: actionData } = useActionTotalsByAds(campaignAdIds, startDate, endDate);
+  const campaignAdAccountMap = useMemo(() => Object.fromEntries(campaignBaseRows.flatMap((campaign: any) =>
+    (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => [currentAd.id, campaign.ad_account_id])))), [campaignBaseRows]);
+  const { data: actionData } = useActionTotalsByAds(campaignAdIds, startDate, endDate, campaignAdAccountMap, {
+    adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : [selectedAccount],
+  });
   const campaigns = useMemo(() => campaignBaseRows.map((campaign: any) => {
     const actionMetrics = { linkClicks: 0, landingPageViews: 0, checkouts: 0, purchases: 0, purchaseValue: 0 };
     const actionEventTotals: Record<string, number> = {};
@@ -461,7 +467,7 @@ export default function Campaigns() {
     }
 
     const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
-    const results = resolveCampaignResults(campaign.leads, actionEventTotals);
+    const results = resolveCampaignResults(campaign.leads, actionEventTotals, lpConfigs[campaign.ad_account_id]?.action_type);
     const primaryResult = resolveCampaignPrimaryResult(campaign.objective, results).value;
     return {
       ...campaign,
@@ -487,7 +493,7 @@ export default function Campaigns() {
       primaryResult,
       costPerResult: primaryResult > 0 ? campaign.spend / primaryResult : 0,
     };
-  }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignBaseRows]);
+  }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignBaseRows, lpConfigs]);
 
   // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
   // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
@@ -735,7 +741,7 @@ export default function Campaigns() {
           for (const date of dates) {
             const insight = insightsByDate.get(date);
             const current = byDate.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
-            const dailyResults = resolveCampaignResults(Number(insight?.leads || 0), actionDays[date] || {});
+            const dailyResults = resolveCampaignResults(Number(insight?.leads || 0), actionDays[date] || {}, lpConfigs[campaign.ad_account_id]?.action_type);
             current.leads += dailyResults.total;
             current.hasData = true;
             byDate.set(date, current);
@@ -752,7 +758,7 @@ export default function Campaigns() {
       cpl: item.leads > 0 ? item.spend / item.leads : 0,
       resultRate: item.clicks > 0 ? item.leads / item.clicks * 100 : 0,
     }));
-  }, [actionData?.dailyByAd, endDate, filtered, startDate]);
+  }, [actionData?.dailyByAd, endDate, filtered, lpConfigs, startDate]);
 
   const selectedCampaign = useMemo(() => {
     if (selectedIds.size !== 1) return null;
@@ -830,7 +836,7 @@ export default function Campaigns() {
         // Meta registram o resultado em insight_actions. Sem esta composição,
         // os criativos exibiam cliques e investimento corretos, porém zero
         // resultados apesar de a campanha ter conversas iniciadas.
-        const results = resolveCampaignResults(metrics.leads, actionData?.totalsByAd[currentAd.id] || {});
+        const results = resolveCampaignResults(metrics.leads, actionData?.totalsByAd[currentAd.id] || {}, lpConfigs[campaign?.ad_account_id]?.action_type);
         const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results);
         const saleMetrics = salesForAd.get(currentAd.id) ?? { count: 0, revenue: 0 };
         return {
@@ -854,7 +860,7 @@ export default function Campaigns() {
       .filter((currentAd: any) => statusFilter === "all" || normalizeStatus(currentAd.status) === statusFilter)
       .filter((currentAd: any) => !query || currentAd.name.toLowerCase().includes(query) || currentAd.adsetName.toLowerCase().includes(query) || currentAd.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adSortKey, adSortAsc);
-  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, salesForAd, search, startDate, statusFilter]);
+  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, lpConfigs, salesForAd, search, startDate, statusFilter]);
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
@@ -1829,5 +1835,5 @@ function LevelTotals({ label, count, totals }: { label: string; count: number; t
 
 function BreakdownWorkspace({ label, supported, loading, rows, onSync }: { label: string; supported: boolean; loading: boolean; rows: Array<{ key: string; spend: number; impressions: number; clicks: number; leads: number; ctr: number; cpl: number }>; onSync: () => void }) {
   if (!supported) return <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/20 px-3 py-2 text-[11px]"><Layers3 className="h-4 w-4 text-primary" /><span><b>{label}</b> está disponível como opção de análise, mas a Meta não disponibiliza este recorte de forma confiável para todas as contas via API. Nenhum dado é estimado.</span>{label === "Criativo" && <span className="ml-auto text-primary">Use a aba Anúncios para analisar por criativo.</span>}</div>;
-  return <section className="border-b border-border bg-primary/[.035] px-3 py-3" aria-label={`Detalhamento por ${label}`}><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-xs font-black"><Layers3 className="h-4 w-4 text-primary" />Detalhamento por {label}</h2><p className="mt-1 text-[10px] text-muted-foreground">Recorte consolidado das campanhas e período atuais. Atualize somente quando precisar de dados novos.</p></div><Button variant="outline" size="sm" className="h-8 text-[10px]" disabled={loading} onClick={onSync}><RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />{loading ? "Atualizando…" : "Atualizar recorte"}</Button></div>{rows.length ? <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full min-w-[650px] text-xs"><thead className="bg-muted/45 text-[9px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-2.5 text-left">{label}</th><th className="p-2.5 text-right">Investimento</th><th className="p-2.5 text-right">Impressões</th><th className="p-2.5 text-right">Cliques</th><th className="p-2.5 text-right">CTR</th><th className="p-2.5 text-right">Resultados</th><th className="p-2.5 text-right">Custo / resultado</th></tr></thead><tbody className="divide-y divide-border">{rows.slice(0, 20).map((row) => <tr key={row.key}><td className="p-2.5 font-bold">{row.key}</td><td className="p-2.5 text-right tabular-nums">{row.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="p-2.5 text-right tabular-nums">{row.impressions.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.clicks.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.ctr.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</td><td className="p-2.5 text-right tabular-nums">{row.leads.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td></tr>)}</tbody></table></div> : <div className="rounded-lg border border-dashed border-border bg-background/40 p-4 text-xs text-muted-foreground">Ainda não há dados de {label.toLocaleLowerCase("pt-BR")} para este período. Clique em “Atualizar recorte” para solicitar a leitura à Meta.</div>}</section>;
+  return <section className="border-b border-border bg-primary/[.035] px-3 py-3" aria-label={`Detalhamento por ${label}`}><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-xs font-black"><Layers3 className="h-4 w-4 text-primary" />Detalhamento por {label}</h2><p className="mt-1 text-[10px] text-muted-foreground">Recorte consolidado das campanhas e período atuais. Atualize somente quando precisar de dados novos.</p></div><Button variant="outline" size="sm" className="h-8 text-[10px]" disabled={loading} onClick={onSync}><RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />{loading ? "Atualizando…" : "Atualizar recorte"}</Button></div>{rows.length ? <div className="overflow-x-auto rounded-lg border border-border bg-card"><table className="w-full min-w-[650px] text-xs"><thead className="bg-muted/45 text-[9px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-2.5 text-left">{label}</th><th className="p-2.5 text-right">Investimento</th><th className="p-2.5 text-right">Impressões</th><th className="p-2.5 text-right">Cliques</th><th className="p-2.5 text-right">CTR</th><th className="p-2.5 text-right">Resultados</th><th className="p-2.5 text-right">Custo / resultado</th></tr></thead><tbody className="divide-y divide-border">{rows.map((row) => <tr key={row.key}><td className="p-2.5 font-bold">{row.key}</td><td className="p-2.5 text-right tabular-nums">{row.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td><td className="p-2.5 text-right tabular-nums">{row.impressions.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.clicks.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.ctr.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</td><td className="p-2.5 text-right tabular-nums">{row.leads.toLocaleString("pt-BR")}</td><td className="p-2.5 text-right tabular-nums">{row.cpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td></tr>)}</tbody></table></div> : <div className="rounded-lg border border-dashed border-border bg-background/40 p-4 text-xs text-muted-foreground">Ainda não há dados de {label.toLocaleLowerCase("pt-BR")} para este período. Clique em “Atualizar recorte” para solicitar a leitura à Meta.</div>}</section>;
 }

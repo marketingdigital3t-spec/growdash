@@ -45,16 +45,21 @@ describe("Meta action metrics", () => {
       "onsite_conversion.messaging_conversation_started_7d": 7,
       "onsite_conversion.messaging_conversation_started": 11,
       "onsite_conversion.total_messaging_connection": 11,
-    })).toEqual({ forms: 5, conversations: 11 });
+    })).toEqual({ forms: 5, site: 0, conversations: 11, total: 16 });
   });
 
   it("usa lead somente quando não existe evento nativo de formulário", () => {
     expect(resolveMetaLeadActions({ lead: 5 }))
-      .toEqual({ forms: 5, conversations: 0 });
+      .toEqual({ forms: 5, site: 0, conversations: 0, total: 5 });
   });
 
   it("não trata lead auxiliar de campanha de mensagem como formulário", () => {
     expect(resolveMetaLeadActions({ lead: 9, "onsite_conversion.messaging_conversation_started_7d": 3 }))
-      .toEqual({ forms: 0, conversations: 3 });
+      .toEqual({ forms: 0, site: 0, conversations: 3, total: 3 });
+  });
+
+  it("resolve site sem misturar com formulário ou lead auxiliar", () => {
+    expect(resolveMetaLeadActions({ lead: 9, offsite_registration: 4 }, "offsite_registration"))
+      .toEqual({ forms: 0, site: 4, conversations: 0, total: 4 });
   });
 });

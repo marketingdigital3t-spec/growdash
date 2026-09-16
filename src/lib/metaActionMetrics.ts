@@ -36,12 +36,20 @@ export function resolveMetaActionMetrics(
   };
 }
 
-export function resolveMetaLeadActions(actionTotals?: Record<string, number>) {
+export function resolveMetaLeadActions(actionTotals?: Record<string, number>, siteAction?: string | null) {
   const nativeAliases = META_ACTION_TYPES.forms;
   const hasNativeAlias = nativeAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
   const hasConversationAlias = META_ACTION_TYPES.conversations.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
+  const hasSiteAlias = !!siteAction && Object.prototype.hasOwnProperty.call(actionTotals || {}, siteAction);
+  const site = siteAction && !nativeAliases.includes(siteAction as any) && siteAction !== "lead"
+    ? preferredValue(actionTotals, [siteAction])
+    : 0;
+  const forms = hasNativeAlias ? preferredValue(actionTotals, nativeAliases) : hasConversationAlias || hasSiteAlias ? 0 : preferredValue(actionTotals, ["lead"]);
+  const conversations = preferredValue(actionTotals, META_ACTION_TYPES.conversations);
   return {
-    forms: hasNativeAlias ? preferredValue(actionTotals, nativeAliases) : hasConversationAlias ? 0 : preferredValue(actionTotals, ["lead"]),
-    conversations: preferredValue(actionTotals, META_ACTION_TYPES.conversations),
+    forms,
+    site,
+    conversations,
+    total: forms + site + conversations,
   };
 }

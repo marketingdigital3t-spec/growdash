@@ -566,7 +566,7 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-            <FunnelAudienceProfile deals={operationalPeriodDeals} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} />
+            <FunnelAudienceProfile deals={operationalPeriodDeals} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} />
           </MotionItem>
 
           <MotionItem>

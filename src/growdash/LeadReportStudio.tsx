@@ -42,7 +42,7 @@ export type ReportSnapshot = {
 const METRICS: Array<{ id: MetricId; label: string; description: string }> = [
   { id: "spend", label: "Investimento", description: "Valor gasto pela Meta no período selecionado." },
   { id: "leads", label: "Leads Meta", description: "Forms, site e conversas iniciadas atribuídos pela Meta Ads." },
-  { id: "conversations", label: "Conversas iniciadas", description: "Evento onsite_conversion.messaging_conversation_started_7d da Meta Ads." },
+  { id: "conversations", label: "Conversas iniciadas", description: "Eventos oficiais de conversa iniciada da Meta Ads, com aliases reconciliados." },
   { id: "cpl", label: "CPL", description: "Investimento dividido pelos leads Meta." },
   { id: "impressions", label: "Impressões", description: "Total de vezes que os anúncios foram exibidos." },
   { id: "reach", label: "Alcance", description: "Quantidade estimada de pessoas únicas alcançadas." },
@@ -88,7 +88,9 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const filteredSales = useMemo(() => sales.filter((row) => row.sale_date >= reportFrom && row.sale_date <= reportTo), [sales, reportFrom, reportTo]);
   const adIds = useMemo(() => Array.from(new Set(filteredInsights.map((row) => row.ad_id).filter(Boolean))), [filteredInsights]);
   const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
-  const { data: actionData } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId);
+  const { data: actionData } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId, {
+    adAccountIds: accountId === "all" ? accounts.map((account) => account.id) : [accountId],
+  });
   const metaLeadActions = actionData?.metaLeadActions;
   const conversations = metaLeadActions?.conversations || 0;
   const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, metaLeadActions), [filteredDeals, filteredInsights, filteredSales, metaLeadActions]);
@@ -101,7 +103,7 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const { data: analysisSales = [], isLoading: loadingAnalysisSales } = useSales({ startDate: analysisFromDate, endDate, adAccountId: analysisEnabled ? accountId : undefined, enabled: analysisEnabled });
   const analysisAdIds = useMemo(() => Array.from(new Set(analysisInsights.map((row) => row.ad_id).filter(Boolean))), [analysisInsights]);
   const analysisAdAccountByAdId = useMemo(() => Object.fromEntries(analysisInsights.map((row) => [row.ad_id, row.ad_account_id])), [analysisInsights]);
-  const { data: analysisActionData, isLoading: loadingAnalysisActions } = useActionTotalsByAds(analysisAdIds, analysisFromDate, endDate, analysisAdAccountByAdId);
+  const { data: analysisActionData, isLoading: loadingAnalysisActions } = useActionTotalsByAds(analysisAdIds, analysisFromDate, endDate, analysisAdAccountByAdId, { adAccountIds: [accountId] });
   const analysisConversationsByDate = useMemo(() => {
     const scoped = analysisActionData?.dailyByAccount?.[accountId];
     if (!scoped) return {};

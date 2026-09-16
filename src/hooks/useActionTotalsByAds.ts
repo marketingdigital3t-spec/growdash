@@ -19,6 +19,7 @@ export interface ActionTotalsResult {
   /** Number of ad_ids excluded because their campaign was DELETED/ARCHIVED. */
   excludedAdCount: number;
   metaLeadActions: { forms: number; site: number; conversations: number; total: number };
+  dailyMetaLeadByAccount: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }> >;
 }
 
 export interface ActionScope {
@@ -70,6 +71,7 @@ export function useActionTotalsByAds(
       const totalsByAd: Record<string, Record<string, number>> = {};
       const valueTotalsByAd: Record<string, Record<string, number>> = {};
       const metaLeadActions = { forms: 0, site: 0, conversations: 0, total: 0 };
+      const dailyMetaLeadByAccount: ActionTotalsResult["dailyMetaLeadByAccount"] = {};
       const start = startDate ? format(startDate, "yyyy-MM-dd") : null;
       const end = endDate ? format(endDate, "yyyy-MM-dd") : null;
 
@@ -192,9 +194,20 @@ export function useActionTotalsByAds(
         metaLeadActions.forms += resolved.forms;
         metaLeadActions.site += site;
         metaLeadActions.conversations += resolved.conversations;
+        if (accountId) {
+          for (const [date, actions] of Object.entries(dailyByAd[adId] || {})) {
+            const dailyResolved = resolveMetaLeadActions(actions, lpAction);
+            const current = dailyMetaLeadByAccount[accountId]?.[date] || { forms: 0, site: 0, conversations: 0, total: 0 };
+            current.forms += dailyResolved.forms;
+            current.site += dailyResolved.site;
+            current.conversations += dailyResolved.conversations;
+            current.total = current.forms + current.site + current.conversations;
+            dailyMetaLeadByAccount[accountId] = { ...(dailyMetaLeadByAccount[accountId] || {}), [date]: current };
+          }
+        }
       }
       metaLeadActions.total = metaLeadActions.forms + metaLeadActions.site + metaLeadActions.conversations;
-      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions };
+      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, dailyMetaLeadByAccount };
     },
     staleTime: 120_000,
     gcTime: 15 * 60_000,

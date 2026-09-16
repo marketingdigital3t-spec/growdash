@@ -80,13 +80,15 @@ export function useAvailableActions() {
   return useQuery({
     queryKey: ["available_actions"],
     queryFn: async (): Promise<ActionEntry[]> => {
-      const { data, error } = await supabase
-        .from("insight_actions" as any)
-        .select("action_type, value")
-        .limit(50000);
-      if (error) throw error;
+      const rows: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase.from("insight_actions" as any).select("action_type, value").range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
       const map = new Map<string, { count: number; total: number }>();
-      for (const r of (data || []) as any[]) {
+      for (const r of rows) {
         const ex = map.get(r.action_type) || { count: 0, total: 0 };
         ex.count += 1;
         ex.total += Number(r.value || 0);
@@ -104,16 +106,21 @@ export function useActionsByAccount() {
   return useQuery({
     queryKey: ["actions_by_account"],
     queryFn: async (): Promise<Record<string, ActionEntry[]>> => {
-      const [campaignsRes, adsetsRes, adsRes, actionsRes] = await Promise.all([
+      const [campaignsRes, adsetsRes, adsRes] = await Promise.all([
         supabase.from("campaigns").select("id, ad_account_id"),
         supabase.from("adsets").select("id, campaign_id"),
         supabase.from("ads").select("id, adset_id"),
-        supabase.from("insight_actions" as any).select("ad_id, action_type, value").limit(100000),
       ]);
       if (campaignsRes.error) throw campaignsRes.error;
       if (adsetsRes.error) throw adsetsRes.error;
       if (adsRes.error) throw adsRes.error;
-      if (actionsRes.error) throw actionsRes.error;
+      const actionRows: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase.from("insight_actions" as any).select("ad_id, action_type, value").range(from, from + 999);
+        if (error) throw error;
+        actionRows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
 
       const campaignToAccount = new Map<string, string>();
       for (const c of (campaignsRes.data || []) as any[]) campaignToAccount.set(c.id, c.ad_account_id);
@@ -129,7 +136,7 @@ export function useActionsByAccount() {
       }
 
       const perAccount = new Map<string, Map<string, { count: number; total: number }>>();
-      for (const r of (actionsRes.data || []) as any[]) {
+      for (const r of actionRows) {
         const acc = adToAccount.get(r.ad_id);
         if (!acc) continue;
         let m = perAccount.get(acc);

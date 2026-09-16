@@ -3,15 +3,14 @@ import { resolveCampaignPrimaryResult, resolveCampaignResults } from "./campaign
 
 describe("resolveCampaignResults", () => {
   it("mantém leads Meta e conversas iniciadas separados", () => {
-    expect(resolveCampaignResults(12, {
+    expect(resolveCampaignResults(0, {
       link_click: 900,
       "onsite_conversion.messaging_conversation_started_7d": 4,
     })).toEqual({
-      total: 16,
-      leadCount: 12,
+      total: 4,
+      leadCount: 0,
       conversations: 4,
       breakdown: [
-        { label: "Leads Meta", value: 12 },
         { label: "Conversas iniciadas", value: 4 },
       ],
     });
@@ -34,13 +33,13 @@ describe("resolveCampaignResults", () => {
   });
 
   it("mostra o maior evento mesmo em campanha de geração de leads", () => {
-    const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 4 });
-    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Leads", value: 12 });
+    const results = resolveCampaignResults(0, { "onsite_conversion.messaging_conversation_started_7d": 4 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Conversas iniciadas", value: 4 });
   });
 
   it("mostra apenas conversas iniciadas para campanha que não é de leads", () => {
-    const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 4 });
-    expect(resolveCampaignPrimaryResult("OUTCOME_ENGAGEMENT", results)).toEqual({ label: "Leads", value: 12 });
+    const results = resolveCampaignResults(0, { "onsite_conversion.messaging_conversation_started_7d": 4 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_ENGAGEMENT", results)).toEqual({ label: "Conversas iniciadas", value: 4 });
   });
 
   it("mantém o único evento disponível como resultado exibido", () => {
@@ -60,5 +59,15 @@ describe("resolveCampaignResults", () => {
       "onsite_conversion.messaging_conversation_started_7d": 7,
       "onsite_conversion.messaging_conversation_started": 11,
     })).toMatchObject({ total: 14, leadCount: 3, conversations: 11 });
+  });
+
+  it("usa o evento configurado de site e não o lead auxiliar", () => {
+    expect(resolveCampaignResults(99, { lead: 9, landing_page_view: 10, offsite_registration: 4 }, "offsite_registration"))
+      .toMatchObject({ total: 4, leadCount: 4, conversations: 0 });
+  });
+
+  it("não usa insights antigos quando há ações auditáveis sem formulário", () => {
+    expect(resolveCampaignResults(38, { "onsite_conversion.messaging_conversation_started_7d": 11 }))
+      .toMatchObject({ total: 11, leadCount: 0, conversations: 11 });
   });
 });

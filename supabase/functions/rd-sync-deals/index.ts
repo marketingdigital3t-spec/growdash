@@ -754,6 +754,7 @@ Deno.serve(async (req) => {
     let reconciledDeleted = 0;
     let analyticsRangeComplete = false;
     let fullHistoryRequested = false;
+    let pagesProcessed = 0;
     const seenAnalyticsDealIds = new Set<string>();
     let debugLogged = false;
 
@@ -1364,6 +1365,7 @@ Deno.serve(async (req) => {
         let segmentComplete = false;
 
         while (page <= maxPages) {
+          pagesProcessed++;
           const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc${periodParams}${segment.params}`;
           const r = await fetchWithRetry(url);
           if (!r.ok) {
@@ -1498,7 +1500,9 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        ok: true,
+        ok: status === "success",
+        success: status === "success",
+        partial: status === "partial",
         created: totalCreated,
         updated: totalUpdated,
         skipped: totalSkipped,
@@ -1512,6 +1516,8 @@ Deno.serve(async (req) => {
         fields_created: fieldCatalog.created,
         fields_updated: fieldCatalog.updated,
         complete: analytics_mode ? analyticsRangeComplete : undefined,
+        pages_processed: pagesProcessed,
+        next_action: status === "partial" ? "Reexecutar a sincronização histórica para processar as páginas restantes." : undefined,
         full_history: fullHistoryRequested,
       }),
       {

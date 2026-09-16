@@ -36,7 +36,7 @@ function aggregate(rows: any[]): AudienceSegment[] {
   return [...map.values()].sort((a, b) => b.leads - a.leads || b.spend - a.spend || b.impressions - a.impressions);
 }
 
-export function useAudienceProfileData({ deals, campaignIds, startDate, endDate }: { deals: DealLocation[]; campaignIds: string[]; startDate: Date; endDate: Date }) {
+export function useAudienceProfileData({ deals, campaignIds, accountIds = [], startDate, endDate }: { deals: DealLocation[]; campaignIds: string[]; accountIds?: string[]; startDate: Date; endDate: Date }) {
   const locations = useMemo(() => {
     const map = new Map<string, number>();
     for (const deal of deals) {
@@ -49,9 +49,16 @@ export function useAudienceProfileData({ deals, campaignIds, startDate, endDate 
   }, [deals]);
   const locatedRegistrations = locations.filter((row) => row.key !== "Não informado").reduce((sum, row) => sum + row.leads, 0);
   const breakdownQuery = useQuery({
-    queryKey: ["funnel-audience-breakdowns", campaignIds.slice().sort().join(","), format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
-    enabled: campaignIds.length > 0,
+    queryKey: ["funnel-audience-breakdowns", campaignIds.slice().sort().join(","), accountIds.slice().sort().join(","), format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    enabled: campaignIds.length > 0 || accountIds.length > 0,
     queryFn: async () => {
+      let scopedCampaignIds = [...campaignIds];
+      if (!scopedCampaignIds.length && accountIds.length) {
+        const { data, error } = await supabase.from("campaigns").select("id").in("ad_account_id", accountIds);
+        if (error) throw error;
+        scopedCampaignIds = (data || []).map((row: any) => String(row.id));
+      }
+      if (!scopedCampaignIds.length) return Object.fromEntries(audienceBreakdowns.map((item) => [item.type, []])) as Record<BreakdownType, AudienceSegment[]>;
       // Supabase/PostgREST caps responses at 1,000 rows by default. A broad
       // account/date selection can exceed that cap (6 breakdowns x days x
       // campaigns), silently dropping segments from the audience profile.
@@ -61,7 +68,7 @@ export function useAudienceProfileData({ deals, campaignIds, startDate, endDate 
         const { data, error } = await (supabase as any)
           .from("insights_breakdowns")
           .select("breakdown_type, segment_key, leads, spend, impressions, clicks, date")
-          .in("campaign_id", campaignIds)
+          .in("campaign_id", scopedCampaignIds)
           .in("breakdown_type", audienceBreakdowns.map((item) => item.type))
           .gte("date", format(startDate, "yyyy-MM-dd"))
           .lte("date", format(endDate, "yyyy-MM-dd"))
@@ -97,8 +104,8 @@ function downloadAudienceReport(data: AudienceProfileData, startDate: Date, endD
   const link = document.createElement("a"); link.href = URL.createObjectURL(file); link.download = `perfil-publico-${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`; link.click(); URL.revokeObjectURL(link.href);
 }
 
-export function FunnelAudienceProfile({ deals, campaignIds, startDate, endDate, data: providedData, loading: providedLoading = false }: { deals: DealLocation[]; campaignIds: string[]; startDate: Date; endDate: Date; data?: AudienceProfileData; loading?: boolean }) {
-  const query = useAudienceProfileData({ deals, campaignIds, startDate, endDate });
+export function FunnelAudienceProfile({ deals, campaignIds, accountIds = [], startDate, endDate, data: providedData, loading: providedLoading = false }: { deals: DealLocation[]; campaignIds: string[]; accountIds?: string[]; startDate: Date; endDate: Date; data?: AudienceProfileData; loading?: boolean }) {
+  const query = useAudienceProfileData({ deals, campaignIds, accountIds, startDate, endDate });
   const data = providedData || query.data;
   const loading = providedLoading || query.isLoading;
   const errorMessage = query.error instanceof Error ? query.error.message : query.error ? "Não foi possível carregar os detalhamentos da Meta." : null;
