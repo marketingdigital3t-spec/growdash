@@ -7525,6 +7525,8 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   box-shadow: none !important;
 }
 .rdp .rdp-day_outside:not([aria-selected="true"]) {
+  border-radius: 0 !important;
+  background: transparent !important;
   color: hsl(var(--muted-foreground)) !important;
   opacity: .58 !important;
 }
