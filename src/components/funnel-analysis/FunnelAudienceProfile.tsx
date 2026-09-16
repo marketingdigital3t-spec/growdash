@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ChevronDown, Download, Minimize2 } from "lucide-react";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,15 +94,47 @@ function MetaBreakdown({ title, description, rows, loading, collapsed, onToggle 
 }
 
 function downloadAudienceReport(data: AudienceProfileData, startDate: Date, endDate: Date) {
-  const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-  const rows = ["Categoria;Segmento;Leads;Participação;Investimento;CPL;CTR"];
-  for (const item of audienceBreakdowns) {
-    const segments = data.segments[item.type]; const totalLeads = segments.reduce((sum, row) => sum + row.leads, 0);
-    for (const row of segments) rows.push([item.title, row.key, row.leads, totalLeads ? `${(row.leads / totalLeads * 100).toFixed(1)}%` : "", row.spend.toFixed(2), row.leads ? (row.spend / row.leads).toFixed(2) : "", row.impressions ? `${(row.clicks / row.impressions * 100).toFixed(2)}%` : ""].map(quote).join(";"));
+  void downloadAudiencePdf(data, startDate, endDate);
+}
+
+async function downloadAudiencePdf(data: AudienceProfileData, startDate: Date, endDate: Date) {
+  const pdf = await PDFDocument.create();
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const width = 595; const height = 842; const margin = 36;
+  const white = rgb(0.96, 0.97, 0.98); const muted = rgb(0.68, 0.71, 0.75); const accent = rgb(0.38, 0.82, 0.96);
+  let page = pdf.addPage([width, height]); let y = height - margin;
+  const paint = () => page.drawRectangle({ x: 0, y: 0, width, height, color: rgb(0.025, 0.027, 0.03) });
+  const nextPage = () => { page = pdf.addPage([width, height]); paint(); y = height - margin; };
+  const ensure = (needed: number) => { if (y - needed < margin) nextPage(); };
+  const draw = (value: string, x: number, size: number, font = regular, color = white) => page.drawText(value, { x, y, size, font, color });
+  const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const wrap = (value: string) => value.match(/.{1,42}(?:\s|$)|.{1,42}/g) || [value];
+  paint();
+  try {
+    const response = await fetch("/assets/growdash-logo-transparent.png");
+    if (response.ok) { const logo = await pdf.embedPng(await response.arrayBuffer()); const scale = Math.min(118 / logo.width, 34 / logo.height); page.drawImage(logo, { x: margin, y: y - logo.height * scale, width: logo.width * scale, height: logo.height * scale }); }
+  } catch { /* logo opcional: o relatório continua sendo gerado. */ }
+  y -= 52; draw("Perfil do público e entrega", margin, 20, bold); y -= 20; draw(`Período: ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}`, margin, 9, regular, muted); y -= 24;
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: rgb(0.18, 0.2, 0.23) }); y -= 24;
+  draw("Resumo", margin, 12, bold, accent); y -= 18; draw(`Cadastros RD analisados: ${data.registrations.toLocaleString("pt-BR")}`, margin, 10); y -= 15; draw(`Cadastros com cidade/estado: ${data.locatedRegistrations.toLocaleString("pt-BR")}`, margin, 10); y -= 24;
+  const sections: Array<{ title: string; rows: AudienceSegment[]; location?: boolean }> = [
+    { title: "Localização dos cadastros · RD", rows: data.locations.map((row) => ({ key: row.key, leads: row.leads, spend: 0, impressions: 0, clicks: 0 })), location: true },
+    ...audienceBreakdowns.map((item) => ({ title: `${item.title} · Meta`, rows: data.segments[item.type] })),
+  ];
+  for (const section of sections) {
+    ensure(50); draw(section.title, margin, 12, bold, accent); y -= 17;
+    if (!section.rows.length) { draw("Sem detalhamento sincronizado neste período.", margin, 9, regular, muted); y -= 25; continue; }
+    draw("Segmento", margin, 8, bold, muted); draw("Leads", 330, 8, bold, muted); draw(section.location ? "Participação" : "Investimento / CPL / CTR", 390, 8, bold, muted); y -= 12;
+    const total = section.location ? data.registrations : section.rows.reduce((sum, row) => sum + row.leads, 0);
+    for (const row of section.rows) {
+      const parts = wrap(row.key); const details = section.location ? `${total ? (row.leads / total * 100).toFixed(1) : "0.0"}%` : `${money(row.spend)} · CPL ${row.leads ? money(row.spend / row.leads) : "—"} · CTR ${row.impressions ? (row.clicks / row.impressions * 100).toFixed(2) : "0.00"}%`;
+      ensure(17 * parts.length + 8); parts.forEach((part, index) => { draw(part.trim(), margin, 8.5); if (index < parts.length - 1) y -= 11; });
+      const rowY = y; draw(row.leads.toLocaleString("pt-BR"), 330, 8.5); page.drawText(details, { x: 390, y: rowY, size: 7.5, font: regular, color: muted, maxWidth: 168 }); y -= 17;
+    }
+    y -= 10;
   }
-  for (const row of data.locations) rows.push(["Localização dos cadastros · RD", row.key, row.leads, data.registrations ? `${(row.leads / data.registrations * 100).toFixed(1)}%` : "", "", "", ""].map(quote).join(";"));
-  const file = new Blob([`\uFEFF${rows.join("\n")}`], { type: "text/csv;charset=utf-8" });
-  const link = document.createElement("a"); link.href = URL.createObjectURL(file); link.download = `perfil-publico-${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`; link.click(); URL.revokeObjectURL(link.href);
+  const bytes = await pdf.save(); const file = new Blob([bytes], { type: "application/pdf" }); const link = document.createElement("a"); link.href = URL.createObjectURL(file); link.download = `perfil-publico-${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`; link.click(); URL.revokeObjectURL(link.href);
 }
 
 export function FunnelAudienceProfile({ deals, campaignIds, accountIds = [], startDate, endDate, data: providedData, loading: providedLoading = false }: { deals: DealLocation[]; campaignIds: string[]; accountIds?: string[]; startDate: Date; endDate: Date; data?: AudienceProfileData; loading?: boolean }) {
