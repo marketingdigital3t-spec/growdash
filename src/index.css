@@ -7573,6 +7573,19 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
 .rdp .rdp-day[aria-selected="true"]:hover {
   color: #111827 !important;
 }
+/* Date-range presets use native buttons outside the DayPicker table. Keep the
+   active and hover states readable when the accent token resolves to white. */
+.gd-date-range-popover button[aria-pressed="true"],
+.gd-date-range-popover button[aria-pressed="true"]:hover,
+.gd-date-range-popover button:not([aria-pressed="true"]):hover {
+  background: #e5e7eb !important;
+  color: #111827 !important;
+}
+.gd-date-range-popover button[aria-pressed="true"] span,
+.gd-date-range-popover button[aria-pressed="true"]:hover span,
+.gd-date-range-popover button:not([aria-pressed="true"]):hover span {
+  color: #111827 !important;
+}
 
 /* Expert KPI cards use the same compact footprint as the standard executive
    metric strip: six cards across on desktop, with the remaining four below. */
