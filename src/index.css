@@ -6937,8 +6937,8 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
     flex-direction: column !important;
     /* This frame, rather than the document, owns the campaign-list scroll.
        Keeping a finite height reserves the final 64px for the totals row. */
-    height: clamp(300px, calc(100dvh - 26rem), 640px) !important;
-    max-height: clamp(300px, calc(100dvh - 26rem), 640px) !important;
+    height: clamp(300px, calc(100dvh - 30rem), 640px) !important;
+    max-height: clamp(300px, calc(100dvh - 30rem), 640px) !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] {
     min-height: 0 !important;
