@@ -1,7 +1,7 @@
 export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
   // native form events and only use it as a fallback when none is present.
-  forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"],
+  forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"],
   conversations: ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started"],
   linkClick: ["link_click"],
   landingPageView: ["landing_page_view"],
@@ -39,8 +39,9 @@ export function resolveMetaActionMetrics(
 export function resolveMetaLeadActions(actionTotals?: Record<string, number>) {
   const nativeAliases = META_ACTION_TYPES.forms;
   const hasNativeAlias = nativeAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
+  const hasConversationAlias = META_ACTION_TYPES.conversations.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
   return {
-    forms: hasNativeAlias ? preferredValue(actionTotals, nativeAliases) : preferredValue(actionTotals, ["lead"]),
+    forms: hasNativeAlias ? preferredValue(actionTotals, nativeAliases) : hasConversationAlias ? 0 : preferredValue(actionTotals, ["lead"]),
     conversations: preferredValue(actionTotals, META_ACTION_TYPES.conversations),
   };
 }

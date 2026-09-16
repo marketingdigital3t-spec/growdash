@@ -5,10 +5,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { useAccountAdsets } from "@/hooks/useAccountAdsets";
+import { META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 const NATIVE_LEAD_GROUPED = "onsite_conversion.lead_grouped";
+const NATIVE_FORM_EVENTS = META_ACTION_TYPES.forms;
 const LP_VIEW_EVENT = "landing_page_view";
-const MESSAGE_EVENT = "onsite_conversion.messaging_conversation_started_7d";
+const MESSAGE_EVENTS = META_ACTION_TYPES.conversations;
 
 const DEST_NATIVE = new Set(["ON_AD"]);
 const DEST_LANDING = new Set(["WEBSITE"]);
@@ -146,19 +148,27 @@ export function useCanonicalLeadsByAccountDate() {
       const hasLandingDest = Array.from(ds).some((d) => DEST_LANDING.has(d));
       const hasMessagesDest = Array.from(ds).some((d) => DEST_MESSAGES.has(d));
 
-      if ((t[NATIVE_LEAD_GROUPED] || 0) > 0 || hasNativeDest) nativeCampaigns.add(campId);
+      if (NATIVE_FORM_EVENTS.some((event) => (t[event] || 0) > 0) || hasNativeDest) nativeCampaigns.add(campId);
       if (
         lpAction &&
         (hasLandingDest || ((t[LP_VIEW_EVENT] || 0) > 0 && !hasNativeDest))
       ) {
         landingCampaigns.add(campId);
       }
-      if ((t[MESSAGE_EVENT] || 0) > 0 || hasMessagesDest) messagesCampaigns.add(campId);
+      if (MESSAGE_EVENTS.some((event) => (t[event] || 0) > 0) || hasMessagesDest) messagesCampaigns.add(campId);
     }
 
-    // 4) Walk all action rows, summing only the canonical event per ad's mechanic, per day.
-    for (const r of actions) {
-      const meta = adMeta[r.ad_id];
+    // 4) Resolve aliases per ad/day before adding them to the daily series.
+    const byAdDate = new Map<string, Record<string, number>>();
+    for (const row of actions) {
+      const key = `${row.ad_id}|${row.date}`;
+      const values = byAdDate.get(key) || {};
+      values[row.action_type] = (values[row.action_type] || 0) + Number(row.value || 0);
+      byAdDate.set(key, values);
+    }
+    for (const [adDate, values] of byAdDate) {
+      const [adId, date] = adDate.split("|");
+      const meta = adMeta[adId];
       if (!meta?.ad_account_id || !meta.campaign_id) continue;
       const campId = meta.campaign_id;
       const acc = meta.ad_account_id;
@@ -167,17 +177,17 @@ export function useCanonicalLeadsByAccountDate() {
       const isMessages = messagesCampaigns.has(campId);
       if (!isNative && !isLanding && !isMessages) continue;
 
-      let counts = false;
-      if (isNative && r.action_type === NATIVE_LEAD_GROUPED) counts = true;
-      if (!counts && isLanding) {
+      const resolved = resolveMetaLeadActions(values);
+      let value = isNative ? resolved.forms : 0;
+      if (isLanding) {
         const lpAction = (lpConfigs as any)[acc]?.action_type;
-        if (lpAction && r.action_type === lpAction) counts = true;
+        if (lpAction && !NATIVE_FORM_EVENTS.includes(lpAction as any) && lpAction !== "lead") value += Number(values[lpAction] || 0);
       }
-      if (!counts && isMessages && r.action_type === MESSAGE_EVENT) counts = true;
-      if (!counts) continue;
+      if (isMessages) value += resolved.conversations;
+      if (value <= 0) continue;
 
-      const key = `${acc}|${r.date}`;
-      targetByAccountDate.set(key, (targetByAccountDate.get(key) || 0) + Number(r.value || 0));
+      const key = `${acc}|${date}`;
+      targetByAccountDate.set(key, (targetByAccountDate.get(key) || 0) + value);
     }
 
     return { targetByAccountDate, isLoading: false };
@@ -193,5 +203,5 @@ export function useCanonicalLeadsByAccountDate() {
 export const CANONICAL_EVENTS = {
   NATIVE_LEAD_GROUPED,
   LP_VIEW_EVENT,
-  MESSAGE_EVENT,
+  MESSAGE_EVENT: MESSAGE_EVENTS[0],
 };

@@ -20,6 +20,7 @@ import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useSales } from "@/hooks/useSales";
 import { buildTwoMonthAnalysis, type TwoMonthAnalysis } from "@/lib/paidTrafficReport";
 import { audienceBreakdowns, type AudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
+import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
 export type ReportTotals = Record<MetricId, number>;
@@ -88,8 +89,9 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const adIds = useMemo(() => Array.from(new Set(filteredInsights.map((row) => row.ad_id).filter(Boolean))), [filteredInsights]);
   const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
   const { data: actionData } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId);
-  const conversations = actionData?.totals?.["onsite_conversion.messaging_conversation_started_7d"] || 0;
-  const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, conversations), [conversations, filteredDeals, filteredInsights, filteredSales]);
+  const metaLeadActions = actionData?.metaLeadActions;
+  const conversations = metaLeadActions?.conversations || 0;
+  const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, metaLeadActions), [filteredDeals, filteredInsights, filteredSales, metaLeadActions]);
   const daily = useMemo(() => dailyRows(filteredInsights), [filteredInsights]);
   const weekly = useMemo(() => weeklyRows(daily), [daily]);
   const analysisFromDate = useMemo(() => startOfMonth(subMonths(endDate, 1)), [endDate]);
@@ -103,7 +105,7 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const analysisConversationsByDate = useMemo(() => {
     const scoped = analysisActionData?.dailyByAccount?.[accountId];
     if (!scoped) return {};
-    return Object.fromEntries(Object.entries(scoped).map(([date, actions]) => [date, Number(actions["onsite_conversion.messaging_conversation_started_7d"] || 0)]));
+    return Object.fromEntries(Object.entries(scoped).map(([date, actions]) => [date, resolveMetaLeadActions(actions).conversations]));
   }, [accountId, analysisActionData?.dailyByAccount]);
   const analysis = useMemo(() => analysisEnabled ? buildTwoMonthAnalysis({ analysisFrom: analysisFromDate, analysisTo: endDate, insights: analysisInsights, deals: analysisDeals, sales: analysisSales, conversationsByDate: analysisConversationsByDate }) : undefined, [analysisConversationsByDate, analysisDeals, analysisEnabled, analysisFromDate, analysisInsights, analysisSales, endDate]);
   const analysisLoading = analysisEnabled && (loadingAnalysisInsights || loadingAnalysisDeals || loadingAnalysisSales || (analysisAdIds.length > 0 && loadingAnalysisActions));
@@ -312,9 +314,10 @@ function formatAnalysisMetric(id: TwoMonthAnalysis["metricComparisons"][number][
   return integer.format(value);
 }
 
-function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[], conversations = 0): ReportTotals {
+function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[], metaLeadActions?: { forms: number; site: number; conversations: number; total: number }): ReportTotals {
   const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-  const leads = insights.reduce((sum, row) => sum + Number(row.leads || 0), 0) + conversations;
+  const conversations = metaLeadActions?.conversations || 0;
+  const leads = metaLeadActions ? metaLeadActions.total : insights.reduce((sum, row) => sum + Number(row.leads || 0), 0) + conversations;
   const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
   const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);

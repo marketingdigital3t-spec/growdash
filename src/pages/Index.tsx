@@ -31,7 +31,6 @@ import { useToast } from "@/hooks/use-toast";
 import { DashboardReferenceDeck } from "@/components/dashboard/DashboardReferenceDeck";
 import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
 import { useEventClasses } from "@/hooks/useEventClasses";
-import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 
 const Index = () => {
@@ -149,7 +148,7 @@ const Index = () => {
       .filter((funnel) => funnel.is_active && visibleAccountIds.has(funnel.ad_account_id)
         && (selectedAccountIds.length === 0 || selectedAccountIds.includes(funnel.ad_account_id)))
       .map((funnel) => funnel.id),
-  ), [rdFunnels, selectedAccount, visibleAccountIds]);
+  ), [rdFunnels, selectedAccountIds, visibleAccountIds]);
   // `sales` é a fonte canônica de vendas, receita, reembolso e chargeback.
   // Uma venda RD histórica pode não ter `ad_account_id`, mas ainda pertence à
   // conta pelo funil. Incluí-la por esse vínculo evita que Dashboard e Análise
@@ -159,7 +158,7 @@ const Index = () => {
     if (sale.ad_account_id) return visibleAccountIds.has(sale.ad_account_id)
       && (selectedAccountIds.length === 0 || selectedAccountIds.includes(sale.ad_account_id));
     return !!sale.rd_funnel_id && activeScopedFunnelIds.has(sale.rd_funnel_id);
-  })), [activeScopedFunnelIds, excludedRDDealIds, sales, selectedAccount, visibleAccountIds]);
+  })), [activeScopedFunnelIds, excludedRDDealIds, sales, selectedAccountIds, visibleAccountIds]);
   const selectedCampaigns = useMemo(
     () => visibleCampaigns.filter((campaign: any) => selectedCampaignIds.includes(campaign.id)),
     [selectedCampaignIds, visibleCampaigns],
@@ -183,14 +182,19 @@ const Index = () => {
   // ainda não ter atualizado a etapa.
   const glassSales = aggregateRevenueSources(dashboardSales, dashboardRevenueDeals);
   const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-  const glassLeadsFromInsights = dashboardInsights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
   const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
   const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
-  const { data: dashboardActionData } = useActionTotalsByAds(dashboardActionAdIds, startDate, endDate, dashboardActionAccountMap);
-  const dashboardActions = resolveMetaLeadActions(dashboardActionData?.totals);
+  const { data: dashboardActionData } = useActionTotalsByAds(
+    dashboardActionAdIds,
+    startDate,
+    endDate,
+    dashboardActionAccountMap,
+    { adAccountIds: selectedAccountIds.length ? selectedAccountIds : visibleAccountIdList, campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined },
+  );
+  const dashboardActions = useMemo(() => dashboardActionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [dashboardActionData?.metaLeadActions]);
   const glassConversations = dashboardActions.conversations;
-  const glassForms = dashboardActionData ? dashboardActions.forms : glassLeadsFromInsights;
-  const leadBreakdown = useMemo(() => ({ forms: glassForms, site: Math.max(0, glassLeadsFromInsights - glassForms), conversations: glassConversations, total: glassLeadsFromInsights + glassConversations }), [glassConversations, glassForms, glassLeadsFromInsights]);
+  const glassForms = dashboardActions.forms;
+  const leadBreakdown = useMemo(() => ({ forms: glassForms, site: dashboardActions.site, conversations: glassConversations, total: dashboardActions.total }), [dashboardActions, glassConversations, glassForms]);
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;

@@ -15,7 +15,7 @@ type Insight = {
 };
 type ActionRow = { ad_id: string; date: string; action_type: string; value: number | null };
 type Totals = { spend: number; impressions: number; reach: number; clicks: number; leads: number };
-const FORM_ACTION_TYPES = ["onsite_conversion.lead_grouped", "lead", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"];
+const FORM_ACTION_TYPES = ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"];
 const CONVERSATION_ACTION_TYPES = ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started", "onsite_conversion.total_messaging_connection", "onsite_conversion.messaging_first_reply"];
 
 function responseError(error: string, status = 400) {
@@ -35,7 +35,7 @@ function totals(rows: Insight[]): Totals {
     reach: acc.reach + Number(row.reach || 0), clicks: acc.clicks + Number(row.clicks || 0), leads: acc.leads + Number(row.leads || 0),
   }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
 }
-function canonicalMetaLeads(rows: Insight[], actions: ActionRow[]) {
+function canonicalMetaLeads(rows: Insight[], actions: ActionRow[], lpAction?: string) {
   const byAdDate = new Map<string, Record<string, number>>();
   for (const row of actions) {
     const key = `${row.ad_id}|${row.date}`;
@@ -47,11 +47,13 @@ function canonicalMetaLeads(rows: Insight[], actions: ActionRow[]) {
   return rows.map((row) => {
     const values = byAdDate.get(`${row.ad_id}|${row.date}`);
     if (!values) return row;
-    const forms = maxAlias(values, FORM_ACTION_TYPES);
+    const hasNative = FORM_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
     const conversations = maxAlias(values, CONVERSATION_ACTION_TYPES);
+    const forms = hasNative ? maxAlias(values, FORM_ACTION_TYPES) : conversations > 0 ? 0 : maxAlias(values, ["lead"]);
+    const site = lpAction && !FORM_ACTION_TYPES.includes(lpAction) && lpAction !== "lead" ? maxAlias(values, [lpAction]) : 0;
     // A zero event set is a valid observation. Only use the old aggregate
     // column when action rows were not synced at all for that ad/day.
-    return { ...row, leads: forms + conversations };
+    return { ...row, leads: forms + site + conversations };
   });
 }
 function derived(metric: Totals, revenue = 0) {
@@ -161,6 +163,11 @@ Deno.serve(async (req) => {
       allInsights.push(...((page || []) as Insight[]));
       if (!page || page.length < 1000) break;
     }
+    let lpAction: string | undefined;
+    if (accountIds.length === 1) {
+      const { data: lpConfig } = await admin.from("account_lp_config").select("action_type").eq("ad_account_id", accountIds[0]).maybeSingle();
+      lpAction = lpConfig?.action_type || undefined;
+    }
     // The aggregate `insights.leads` field can lag an event reprocessing and
     // does not include messaging consistently. Build the same canonical lead
     // composition used by the Dashboard and Funnel: max(form aliases) +
@@ -180,7 +187,7 @@ Deno.serve(async (req) => {
       actionRows.push(...((page || []) as ActionRow[]));
       if (!page || page.length < 1000) break;
     }
-    const canonicalInsights = canonicalMetaLeads(allInsights, actionRows);
+    const canonicalInsights = canonicalMetaLeads(allInsights, actionRows, lpAction);
     const currentInsights = canonicalInsights.filter((row) => row.date >= startStr && row.date <= endStr);
     const previousInsights = canonicalInsights.filter((row) => row.date >= previousStartStr && row.date <= previousEndStr);
 

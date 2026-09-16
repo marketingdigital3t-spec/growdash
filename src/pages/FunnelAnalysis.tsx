@@ -43,7 +43,6 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
 import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
-import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -328,21 +327,28 @@ export default function FunnelAnalysis() {
     () => Object.fromEntries(scopedInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
     [scopedInsights],
   );
-  const { data: actionData, isLoading: loadingMetaActions } = useActionTotalsByAds(actionAdIds, startDate, endDate, actionAccountMap);
+  const actionScopeAccountIds = allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds;
+  const { data: actionData, isLoading: loadingMetaActions } = useActionTotalsByAds(
+    actionAdIds,
+    startDate,
+    endDate,
+    actionAccountMap,
+    { adAccountIds: actionScopeAccountIds },
+  );
 
   const mediaMetrics = useMemo(
     () => {
-      const actions = resolveMetaLeadActions(actionData?.totals);
+      const actions = actionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 };
       return computeFunnelMediaMetrics(
       scopedInsights,
       actions.conversations,
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,
-      actions.forms,
+      actions.forms + actions.site,
     );
     },
-    [actionData?.totals, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
+    [actionData?.metaLeadActions, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
   );
 
   async function handleSync() {

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toLocalDateString } from "@/lib/dateRange";
+import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 
 // Map Meta region name (Brazilian state full name) -> UF code
@@ -130,9 +131,16 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
 
         const allowedActions = Array.from(new Set<string>([
           "onsite_conversion.lead_grouped",
+          "omni_lead",
+          "leadgen_grouped",
+          "offsite_conversion.fb_pixel_lead",
+          "lead",
           "onsite_conversion.messaging_conversation_started_7d",
+          "onsite_conversion.messaging_conversation_started_28d",
+          "onsite_conversion.messaging_conversation_started",
           ...lpActions,
         ]));
+        const actionsByAd: Record<string, Record<string, number>> = {};
 
         // 3c. paginar insight_actions com join via ads->adsets->campaigns
         for (let from = 0; ; from += PAGE) {
@@ -146,9 +154,14 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
           const { data, error } = await q.range(from, from + PAGE - 1);
           if (error) break;
           const rows = (data || []) as any[];
-          for (const r of rows) totalMetaLeads += Number(r.value || 0);
+          for (const r of rows) {
+            const byType = actionsByAd[r.ad_id] || {};
+            byType[r.action_type] = (byType[r.action_type] || 0) + Number(r.value || 0);
+            actionsByAd[r.ad_id] = byType;
+          }
           if (rows.length < PAGE) break;
         }
+        totalMetaLeads = Object.values(actionsByAd).reduce((sum, actions) => sum + resolveMetaLeadActions(actions).forms + resolveMetaLeadActions(actions).conversations, 0);
       }
       const leadsWithRegion = Object.values(metaByUF).reduce((s, m) => s + m.leads, 0);
 

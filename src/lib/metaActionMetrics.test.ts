@@ -49,7 +49,12 @@ describe("Meta action metrics", () => {
   });
 
   it("usa lead somente quando não existe evento nativo de formulário", () => {
-    expect(resolveMetaLeadActions({ lead: 5, "onsite_conversion.messaging_conversation_started_7d": 2 }))
-      .toEqual({ forms: 5, conversations: 2 });
+    expect(resolveMetaLeadActions({ lead: 5 }))
+      .toEqual({ forms: 5, conversations: 0 });
+  });
+
+  it("não trata lead auxiliar de campanha de mensagem como formulário", () => {
+    expect(resolveMetaLeadActions({ lead: 9, "onsite_conversion.messaging_conversation_started_7d": 3 }))
+      .toEqual({ forms: 0, conversations: 3 });
   });
 });

@@ -36,6 +36,7 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { useAccountAdsets } from "@/hooks/useAccountAdsets";
 import { GeoOriginWidget } from "@/components/dashboard/widgets/GeoOriginWidget";
+import { META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 // Mapeamento destination_type (Meta) -> aba
 const DEST_NATIVE = new Set(["ON_AD"]);
@@ -49,7 +50,12 @@ const DEST_MESSAGES = new Set([
 // Não usamos `campaign.objective` porque o ODAX colapsou tudo em OUTCOME_LEADS.
 const NATIVE_LEAD_GROUPED = "onsite_conversion.lead_grouped";
 const LP_VIEW_EVENT = "landing_page_view";
-const MESSAGE_EVENT = "onsite_conversion.messaging_conversation_started_7d";
+const MESSAGE_EVENTS = META_ACTION_TYPES.conversations;
+const hasMessageAction = (totals: Record<string, number>) => MESSAGE_EVENTS.some((event) => Number(totals[event] || 0) > 0);
+const messageCount = (totals: Record<string, number>) => {
+  const values = MESSAGE_EVENTS.map((event) => Number(totals[event] || 0));
+  return values.length ? Math.max(...values) : 0;
+};
 
 interface Props {
   onEditSale: (s: Sale) => void;
@@ -96,6 +102,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     startDate,
     endDate,
     adAccountByAdId,
+    { adAccountIds: Array.from(new Set(insights.map((row) => row.ad_account_id).filter(Boolean) as string[])) },
   );
 
   // === STEP 2: classify each campaign by its real conversion mechanism ===
@@ -180,7 +187,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         landing.add(campId);
       }
       // Mensagens: destino estrutural sempre conta; eventos contam mesmo sem destino
-      if ((t[MESSAGE_EVENT] || 0) > 0 || hasMsgDest) messages.add(campId);
+      if (hasMessageAction(t) || hasMsgDest) messages.add(campId);
     }
     return { native, landing, messages, totalsByCampaign, accountByCampaign };
   }, [insights, actionData.totalsByAd, lpConfigs, accountAdsets, campaigns]);
@@ -293,7 +300,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
   const linkClicks = actionTotals["link_click"] || 0;
   const lpViews = actionTotals["landing_page_view"] || 0;
 
-  const messages = actionTotals[MESSAGE_EVENT] || 0;
+  const messages = messageCount(actionTotals);
 
   // Per-account event sets, fully driven by user-configured per-scope mapping.
   const allAccountIds = Array.from(new Set(Object.keys(scopedTotalsByAccount)));
@@ -316,10 +323,10 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
 
   // Returns the action_types used by the active tab for daily-series accumulation.
   const tabEventsForAccount = (acc: string): string[] => {
-    if (objective === "messages") return [MESSAGE_EVENT];
+    if (objective === "messages") return [...MESSAGE_EVENTS];
     if (objective === "native_form") return nativeEventsForAccount(acc);
     if (objective === "landing_page") return lpEventsForAccount(acc);
-    return Array.from(new Set([...nativeEventsForAccount(acc), ...lpEventsForAccount(acc), MESSAGE_EVENT]));
+    return Array.from(new Set([...nativeEventsForAccount(acc), ...lpEventsForAccount(acc), ...MESSAGE_EVENTS]));
   };
 
   // Compute totals — separa contagem por classificação para evitar dupla contagem
@@ -341,11 +348,14 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       lpLeads += accLandingTotals[e] || 0;
       if (!lpLeadActionsUsed.includes(e)) lpLeadActionsUsed.push(e);
     }
-    if (objective === "messages") tabLeads += accTotals[MESSAGE_EVENT] || 0;
+    if (objective === "messages") tabLeads += messageCount(accTotals);
     else if (objective === "native_form") tabLeads += accNative;
     else if (objective === "landing_page") for (const e of lpEvts) tabLeads += accLandingTotals[e] || 0;
-    else tabLeads += accNative + lpEvts.reduce((s, e) => s + (accLandingTotals[e] || 0), 0) + (accTotals[MESSAGE_EVENT] || 0);
+    else tabLeads += accNative + lpEvts.reduce((s, e) => s + (accLandingTotals[e] || 0), 0) + messageCount(accTotals);
   }
+  // The consolidated Leads tab must use the account-wide canonical contract,
+  // including ads whose insights row is missing from the local period query.
+  if (objective === "leads" && actionData.metaLeadActions) tabLeads = actionData.metaLeadActions.total;
 
   const clickRef = linkClicks > 0 ? linkClicks : totalClicks;
 
