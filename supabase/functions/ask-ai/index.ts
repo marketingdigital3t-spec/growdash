@@ -16,7 +16,9 @@ type Insight = {
 type ActionRow = { ad_id: string; date: string; action_type: string; value: number | null };
 type Totals = { spend: number; impressions: number; reach: number; clicks: number; leads: number };
 const FORM_ACTION_TYPES = ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"];
-const CONVERSATION_ACTION_TYPES = ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started", "onsite_conversion.total_messaging_connection", "onsite_conversion.messaging_first_reply"];
+// Only explicit conversation-start events are leads. Replies/connections are
+// downstream activity and must never inflate the started-conversation KPI.
+const CONVERSATION_ACTION_TYPES = ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started"];
 
 function responseError(error: string, status = 400) {
   return new Response(JSON.stringify({ error }), { status, headers: jsonHeaders });
