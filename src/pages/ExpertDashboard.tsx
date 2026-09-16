@@ -16,8 +16,6 @@ import { getExpertDashboardMetrics } from "@/lib/expertDashboardMetrics";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 
-const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
-const NATIVE_FORM_LEAD_EVENT = "onsite_conversion.lead_grouped";
 
 function expertGreeting(name: string) {
   if (!name) return "Painel do Expert";
@@ -75,21 +73,29 @@ export default function ExpertDashboard() {
       && accountIds.has(sale.ad_account_id)
       && (adAccountIds.length === 0 || adAccountIds.includes(sale.ad_account_id)));
   }, [accounts, sales, adAccountIds]);
-  const actionAdIds = useMemo(
-    () => Array.from(new Set(permittedInsights.map((insight) => insight.ad_id).filter(Boolean))),
-    [permittedInsights],
-  );
+  // Resolve the same complete account universe used by Dashboard/Funnel. The
+  // action resolver must not depend on local insights rows: a valid historical
+  // action can exist for an ad whose insight row failed to persist.
   const actionAccountMap = useMemo(
     () => Object.fromEntries(permittedInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
     [permittedInsights],
   );
-  const { data: actionData } = useActionTotalsByAds(actionAdIds, startDate, endDate, actionAccountMap);
+  const { data: actionData } = useActionTotalsByAds(
+    undefined,
+    startDate,
+    endDate,
+    actionAccountMap,
+    { adAccountIds: selectedAccountIds },
+  );
+  const expertLeadActions = useMemo(() => actionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [actionData?.metaLeadActions]);
   const expertMetrics = useMemo(
     () => getExpertDashboardMetrics(permittedInsights, rdDeals, permittedSales, {
-      nativeFormLeads: actionData?.totals?.[NATIVE_FORM_LEAD_EVENT],
-      conversations: actionData?.totals?.[MESSAGING_CONVERSATION_EVENT],
+      nativeFormLeads: expertLeadActions.forms,
+      siteLeads: expertLeadActions.site,
+      conversations: expertLeadActions.conversations,
+      total: expertLeadActions.total,
     }),
-    [actionData?.totals, permittedInsights, permittedSales, rdDeals],
+    [expertLeadActions, permittedInsights, permittedSales, rdDeals],
   );
   const leadBreakdown = useMemo(() => ({
     forms: expertMetrics.forms,

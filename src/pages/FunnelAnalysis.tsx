@@ -328,12 +328,21 @@ export default function FunnelAnalysis() {
     [scopedInsights],
   );
   const actionScopeAccountIds = allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds;
+  const actionScopeCampaignIds = useMemo(() => {
+    if (selectedCampaign === "all") return undefined;
+    const selectedName = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
+    const ids = visibleCampaignRows
+      .filter((campaign: any) => String(campaign.name || "").trim().toLocaleLowerCase("pt-BR") === selectedName)
+      .map((campaign: any) => String(campaign.id))
+      .filter(Boolean);
+    return ids.length ? Array.from(new Set(ids)) : undefined;
+  }, [selectedCampaign, visibleCampaignRows]);
   const { data: actionData, isLoading: loadingMetaActions } = useActionTotalsByAds(
     actionAdIds,
     startDate,
     endDate,
     actionAccountMap,
-    { adAccountIds: actionScopeAccountIds },
+    { adAccountIds: actionScopeAccountIds, campaignIds: actionScopeCampaignIds },
   );
 
   const mediaMetrics = useMemo(

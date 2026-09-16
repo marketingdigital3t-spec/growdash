@@ -23,4 +23,17 @@ describe("expert dashboard metrics", () => {
     const rows = getExpertAttribution([{ status: "confirmed", quantity: 1, net_revenue: 15000, utm_campaign: "Campanha A", utm_content: "Vídeo 1", payment_method: "credit_card" } as any]);
     expect(rows).toEqual([{ campaign: "Campanha A", creative: "Vídeo 1", sales: 1, revenue: 15000, payments: ["cartao"] }]);
   });
+
+  it("uses the canonical Meta action total instead of stale insights.leads", () => {
+    const result = getExpertDashboardMetrics(
+      [{ leads: 623, spend: 100 } as any],
+      [],
+      [],
+      { nativeFormLeads: 500, siteLeads: 0, conversations: 121, total: 621 },
+    );
+    expect(result.forms).toBe(500);
+    expect(result.conversations).toBe(121);
+    expect(result.metaLeads).toBe(621);
+    expect(result.leads).toBe(621);
+  });
 });

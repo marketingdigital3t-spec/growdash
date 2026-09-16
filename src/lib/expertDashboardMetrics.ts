@@ -13,7 +13,10 @@ export type ExpertAttribution = {
 
 export type ExpertLeadActions = {
   nativeFormLeads?: number;
+  siteLeads?: number;
   conversations?: number;
+  /** Canonical total resolved from Meta insight_actions. */
+  total?: number;
 };
 
 /**
@@ -27,13 +30,24 @@ export function getExpertDashboardMetrics(
   sales: Sale[],
   actions: ExpertLeadActions = {},
 ) {
+  const hasCanonicalActions = Object.prototype.hasOwnProperty.call(actions, "total")
+    || Object.prototype.hasOwnProperty.call(actions, "siteLeads");
   const leadsReportedByMeta = insights.reduce((total, insight) => total + Number(insight.leads ?? 0), 0);
-  const forms = Math.min(leadsReportedByMeta, Math.max(0, Number(actions.nativeFormLeads ?? 0)));
-  const siteLeads = Math.max(0, leadsReportedByMeta - forms);
+  // When the canonical action resolver is available, never reconstruct forms
+  // or site leads from insights.leads. That column is a legacy aggregate and
+  // can differ from insight_actions after a partial or delayed sync.
+  const forms = hasCanonicalActions
+    ? Math.max(0, Number(actions.nativeFormLeads ?? 0))
+    : actions.nativeFormLeads == null
+      ? Math.max(0, leadsReportedByMeta)
+      : Math.min(leadsReportedByMeta, Math.max(0, Number(actions.nativeFormLeads)));
+  const siteLeads = hasCanonicalActions
+    ? Math.max(0, Number(actions.siteLeads ?? 0))
+    : Math.max(0, leadsReportedByMeta - forms);
   const conversations = Math.max(0, Number(actions.conversations ?? 0));
-  // Same business rule used by the operational Dashboard: each started Meta
-  // conversation is an acquisition and must be included in total Meta leads.
-  const metaLeads = forms + siteLeads + conversations;
+  const metaLeads = hasCanonicalActions
+    ? Math.max(0, Number(actions.total ?? forms + siteLeads + conversations))
+    : forms + siteLeads + conversations;
   const rdLeads = rdDeals.length;
   const confirmedSales = sales.filter((sale) => sale.status === "confirmed");
   const salesCount = confirmedSales.reduce((total, sale) => total + Math.max(1, Number(sale.quantity ?? 1)), 0);
