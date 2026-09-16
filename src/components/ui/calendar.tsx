@@ -29,14 +29,14 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         head_cell: "w-9 rounded-md text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
         row: "mt-1.5 flex w-full",
         cell: "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20",
-        day: cn(buttonVariants({ variant: "ghost" }), "h-8 w-8 rounded-full p-0 font-medium text-foreground aria-selected:opacity-100 hover:bg-muted"),
-        day_range_start: "rounded-l-full bg-muted",
-        day_range_end: "rounded-r-full bg-muted",
+        day: cn(buttonVariants({ variant: "ghost" }), "h-8 w-8 rounded-none bg-transparent p-0 font-medium text-foreground aria-selected:opacity-100 hover:bg-muted"),
+        day_range_start: "rounded-full",
+        day_range_end: "rounded-full",
         day_selected:
           "rounded-full bg-white text-black hover:bg-white hover:text-black focus:bg-white focus:text-black dark:bg-white dark:text-black",
         day_today: "font-bold underline decoration-white/60 underline-offset-4",
         day_outside:
-          "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
+          "day-outside text-muted-foreground opacity-100 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
         day_disabled: "text-muted-foreground opacity-50",
         day_range_middle: "rounded-none bg-white/10 text-foreground aria-selected:bg-white/10 aria-selected:text-foreground",
         day_hidden: "invisible",
