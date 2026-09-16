@@ -7218,8 +7218,8 @@ html[data-accent] { --brand-gold: #fff !important; --brand-gold-light: #fff !imp
 .brand-shell .brand-sidebar, .brand-shell .brand-topbar, .brand-shell .brand-topbar.growdash-global-header { background: #080808 !important; color: #fff !important; border-color: #292929 !important; }
 .brand-shell .brand-sidebar :is(a,button,span,svg), .brand-shell .brand-topbar :is(a,button,span,svg) { color: #fff !important; }
 .brand-shell .brand-sidebar nav a[aria-current="page"], .brand-shell .brand-sidebar nav a[data-state="active"] { background: #2b2b2b !important; border-color: #555 !important; color: #fff !important; }
-.brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page) { background: var(--gd-content-bg) !important; color: var(--gd-content-text) !important; }
-.brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page) :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { background: var(--gd-content-surface) !important; color: var(--gd-content-text) !important; border-color: var(--gd-content-border) !important; box-shadow: 0 8px 24px rgba(0,0,0,.06) !important; }
+.brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page,.integrations-page) { background: var(--gd-content-bg) !important; color: var(--gd-content-text) !important; }
+.brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page,.integrations-page) :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { background: var(--gd-content-surface) !important; color: var(--gd-content-text) !important; border-color: var(--gd-content-border) !important; box-shadow: 0 8px 24px rgba(0,0,0,.06) !important; }
 .dark .brand-shell :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { box-shadow: 0 12px 28px rgba(0,0,0,.24) !important; }
 .brand-shell :is(.gd-kpi-grid,.dashboard-primary-kpis,.dashboard-glass-metrics,.dashboard-daily-charts,.gd-aligned-grid) { gap: var(--gd-space-card) !important; }
 .brand-shell .gd-metric-card { min-height: 0 !important; height: auto !important; border-radius: var(--gd-card-radius) !important; }
@@ -7285,6 +7285,25 @@ html[data-accent] .brand-shell .growdash-main::before {
   border-color: var(--gd-content-border) !important;
   color: var(--gd-content-text) !important;
   box-shadow: none !important;
+}
+
+/* Form controls must always read as part of the active content surface.
+   Legacy modules use both the shared Input and raw form tags, so this rule
+   keeps searches, filters and text areas from inheriting an obsolete dark
+   background after a palette or light/dark transition. */
+.brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], [cmdk-input])::placeholder {
+  color: var(--gd-content-muted) !important;
+  opacity: 1;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account) {
+  background: #ffffff !important;
+  border-color: #dededb !important;
+  color: #111111 !important;
+}
+
+html:not(.dark) .brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], [cmdk-input])::placeholder {
+  color: #666666 !important;
 }
 
 .brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account):hover,
@@ -7541,4 +7560,21 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   background: hsl(var(--primary) / .16) !important;
   color: hsl(var(--foreground)) !important;
 }
+/* Meta Ads interaction state: hovering an unselected date uses a neutral
+   light surface with dark text. This explicit pair prevents the dark theme's
+   muted token from producing a white-on-white date in any calendar portal. */
+.rdp .rdp-day:not([aria-selected="true"]):hover,
+.rdp .rdp-day_outside:not([aria-selected="true"]):hover {
+  background: #e5e7eb !important;
+  color: #111827 !important;
+  opacity: 1 !important;
+}
+.rdp .rdp-day_range_middle[aria-selected="true"]:hover,
+.rdp .rdp-day[aria-selected="true"]:hover {
+  color: #111827 !important;
+}
 
+/* Expert KPI cards use the same compact footprint as the standard executive
+   metric strip: six cards across on desktop, with the remaining four below. */
+.expert-dashboard .expert-kpi-grid .gd-metric-card { min-height: 96px !important; }
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content { min-height: 96px !important; padding: 16px !important; }
