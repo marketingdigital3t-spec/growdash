@@ -1,13 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
-import { parseISO, format } from "date-fns";
+import { parseISO, format, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
   const data = a.evolution.map((d) => ({
     date: d.date,
-    label: format(parseISO(d.date), "dd/MM", { locale: ptBR }),
+    label: isValid(parseISO(d.date)) ? format(parseISO(d.date), "dd/MM", { locale: ptBR }) : "Sem data",
     Leads: d.leads,
     Oportunidades: d.opportunities,
     Vendas: d.conversions,

@@ -73,6 +73,21 @@ export interface FunnelStage {
   is_lost: boolean;
 }
 
+/**
+ * Returns the first trustworthy timestamp available for a RD negotiation.
+ * Older imports may not have `lead_created_at`; using the stage update (and
+ * finally the closing timestamp) keeps a real lead visible in daily reports
+ * without fabricating a date.
+ */
+export function rdDealEventDate(deal: Pick<RDDeal, "lead_created_at" | "stage_updated_at" | "closed_at">): string | null {
+  for (const value of [deal.lead_created_at, deal.stage_updated_at, deal.closed_at]) {
+    if (!value) continue;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return value;
+  }
+  return null;
+}
+
 type CanonicalFunnelStage = Omit<FunnelStage, "rd_stage_id"> & { rd_stage_id: string };
 
 /**
@@ -583,12 +598,15 @@ export function computeFunnelAnalytics(
   const oppIdxThreshold = Math.max(1, Math.floor(sequence.length * 0.6));
   const evoMap = new Map<string, { leads: number; opportunities: number; conversions: number }>();
   for (const d of deals) {
-    if (d.lead_created_at) {
-      const day = dayKey(d.lead_created_at);
+    const leadEventDate = rdDealEventDate(d);
+    if (leadEventDate) {
+      const day = dayKey(leadEventDate);
       const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
       cur.leads += 1;
       const idx = indexInSeq.get(canonicalDealStageId(d)) ?? -1;
-      if (idx >= oppIdxThreshold) cur.opportunities += 1;
+      // A semantic RD stage is sufficient evidence for an opportunity even
+      // when the stage catalog was not synchronized for this funnel.
+      if (idx >= oppIdxThreshold || ["mql", "sql", "opportunity", "client"].includes(d.stage_bucket)) cur.opportunities += 1;
       evoMap.set(day, cur);
     }
   }
@@ -701,8 +719,9 @@ export function computeFunnelAnalytics(
   const wdMap = new Map<number, { leads: number; conversions: number; revenue: number }>();
   for (let i = 0; i < 7; i++) wdMap.set(i, { leads: 0, conversions: 0, revenue: 0 });
   for (const d of deals) {
-    if (d.lead_created_at) {
-      const wd = new Date(d.lead_created_at).getDay();
+    const leadEventDate = rdDealEventDate(d);
+    if (leadEventDate) {
+      const wd = new Date(leadEventDate).getDay();
       const cur = wdMap.get(wd)!;
       cur.leads += 1;
     }
@@ -733,8 +752,9 @@ export function computeFunnelAnalytics(
   const hourMap = new Map<number, { leads: number; conversions: number; revenue: number }>();
   for (let h = 0; h < 24; h++) hourMap.set(h, { leads: 0, conversions: 0, revenue: 0 });
   for (const d of deals) {
-    if (d.lead_created_at) {
-      const h = new Date(d.lead_created_at).getHours();
+    const leadEventDate = rdDealEventDate(d);
+    if (leadEventDate) {
+      const h = new Date(leadEventDate).getHours();
       const p = periodOfHour(h);
       periodMap.get(p)!.leads += 1;
       hourMap.get(h)!.leads += 1;
