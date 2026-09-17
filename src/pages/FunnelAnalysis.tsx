@@ -43,6 +43,7 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
 import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
+import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpportunityProfile";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -575,13 +576,17 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-            <FunnelAudienceProfile deals={operationalPeriodDeals} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={mediaMetrics.metaLeads} />
+              <FunnelAudienceProfile deals={operationalPeriodDeals} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={mediaMetrics.metaLeads} />
+            </MotionItem>
+
+          <MotionItem>
+            <FunnelOpportunityProfile deals={operationalPeriodDeals} insights={scopedInsights} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} />
           </MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
               <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock>
-              <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} insights={scopedInsights} /></HelpBlock>
+              <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} deals={operationalPeriodDeals} insights={scopedInsights} /></HelpBlock>
             </div>
           </MotionItem>
 

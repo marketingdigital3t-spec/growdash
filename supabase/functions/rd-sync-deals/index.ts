@@ -1166,13 +1166,25 @@ Deno.serve(async (req) => {
       // canonical sales, which is what Comercial displays.
       const hydratedItems: any[] = [];
       if (analytics_mode) {
-        // RD list responses omit contact/custom-field data. Hydrate analytics
-        // items through the authoritative detail + contacts endpoints so the
-        // RD remains the canonical source for names, city, state and fields.
+        // Reuse complete local profiles in incremental cycles. Only new or
+        // incomplete deals call the RD detail/contact endpoints.
+        const existingProfiles = new Map<string, any>();
+        const ids = items.map((item) => String(item?.id || item?._id || "")).filter(Boolean);
+        if (ids.length) {
+          const { data: profiles } = await admin.from("rd_deals")
+            .select("rd_deal_id,contact_name,contact_email,lead_city,lead_state,custom_fields,raw")
+            .eq("rd_funnel_id", funnel!.id).in("rd_deal_id", ids);
+          for (const profile of profiles || []) existingProfiles.set(String(profile.rd_deal_id), profile);
+        }
         const HYDRATION_BATCH_SIZE = 4;
         for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
           const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
-          const resolved = await Promise.all(batch.map((item) => processDeal(item)));
+          const resolved = await Promise.all(batch.map((item) => {
+            const id = String(item?.id || item?._id || "");
+            const profile = existingProfiles.get(id);
+            const complete = Boolean(profile?.raw) && Boolean(profile.contact_name || profile.contact_email || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
+            return complete ? { ...item, _storedProfile: profile } : processDeal(item);
+          }));
           hydratedItems.push(...resolved);
           if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
         }
@@ -1231,15 +1243,18 @@ Deno.serve(async (req) => {
         const inline = inlineContacts[0]?.contact || inlineContacts[0] || {};
         const firstContact = Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
         const baseContact = d.contact || d.deal_contact || {};
+        const storedProfile = d._storedProfile || {};
         const contact = { ...inline, ...firstContact, ...baseContact };
         const contactFields = firstContact.contact_custom_fields || contact.contact_custom_fields || baseContact.contact_custom_fields || [];
-        const dealFields = d.deal_custom_fields || d.custom_fields || [];
+        const dealFields = Array.isArray(d.deal_custom_fields || d.custom_fields) ? (d.deal_custom_fields || d.custom_fields) : [];
         observeCustomFields(observedFields, "deal", dealFields);
         observeCustomFields(observedFields, "contact", contactFields);
-        const customFields = {
-          ...extractAllCustomFields(dealFields, contactFields),
-          ...extractConfiguredFields(fieldConfigs, dealFields, contactFields),
-        };
+        const customFields = Object.keys(storedProfile.custom_fields || {}).length && !dealFields.length
+          ? storedProfile.custom_fields
+          : {
+            ...extractAllCustomFields(dealFields, contactFields),
+            ...extractConfiguredFields(fieldConfigs, dealFields, contactFields),
+          };
         const allCfSources = [dealFields, contactFields];
         const contactState =
           contact.state ||
@@ -1247,16 +1262,14 @@ Deno.serve(async (req) => {
           findCustomField(
             [dealFields, contactFields],
             ["state", "estado", "uf", "lead_state", "estadouf"],
-          ) ||
-          null;
+          ) || storedProfile.lead_state || null;
         const contactCity =
           contact.city ||
           contact.address_city ||
           findCustomField(
             [dealFields, contactFields],
             ["city", "cidade", "lead_city", "cidadelead"],
-          ) ||
-          null;
+          ) || storedProfile.lead_city || null;
         const utms = d.utms || d.utm || contact.utms || d.deal_source || d.lead_origin || {};
         const pickUtm = (name: string, aliases: string[]) =>
           d[`utm_${name}`] ||
@@ -1289,8 +1302,8 @@ Deno.serve(async (req) => {
         };
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;
-        if (contact.name || d.contact_name) row.contact_name = cleanContactName(contact.name || d.contact_name);
-        if (contact.email) row.contact_email = contact.email;
+        if (contact.name || d.contact_name || storedProfile.contact_name) row.contact_name = cleanContactName(contact.name || d.contact_name || storedProfile.contact_name);
+        if (contact.email || storedProfile.contact_email) row.contact_email = contact.email || storedProfile.contact_email;
         if (d.deal_lost_reason?.name || d.deal_lost_reason)
           row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
         if (d.user?.name || d.deal_user?.name || d.owner?.name)

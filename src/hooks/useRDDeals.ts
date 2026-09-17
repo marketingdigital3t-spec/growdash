@@ -39,6 +39,7 @@ export type StageBucket = "lead" | "mql" | "sql" | "opportunity" | "client" | "l
 
 export interface RDDeal {
   id: string;
+  ad_account_id: string;
   rd_funnel_id: string;
   rd_deal_id: string;
   rd_stage_id: string | null;
@@ -58,6 +59,8 @@ export interface RDDeal {
   utm_id: string | null;
   lead_state: string | null;
   lead_city: string | null;
+  contact_name?: string | null;
+  custom_fields?: Record<string, unknown> | null;
   lead_created_at: string | null;
   stage_updated_at: string | null;
   closed_at: string | null;
@@ -151,7 +154,7 @@ export function shouldApplyRDDateRange(includeHistory = false) {
 }
 
 const DEAL_FIELDS =
-  "id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, updated_at";
+  "id, ad_account_id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, lead_state, lead_city, contact_name, custom_fields, lead_created_at, stage_updated_at, closed_at, updated_at";
 
 /** Keeps the newest snapshot of a single RD deal when an integration retry
  * left more than one local row. The RD deal ID is global and is the canonical
