@@ -6990,6 +6990,7 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
     border-bottom-right-radius: 14px !important;
     border-bottom-left-radius: 14px !important;
     background: var(--gd-content-surface) !important;
+    margin-bottom: 16px !important;
   }
   .campaigns-workspace [data-campaign-totals-bar] {
     height: 76px !important;
