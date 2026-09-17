@@ -7550,15 +7550,15 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   opacity: .58 !important;
 }
 .rdp .rdp-day[aria-selected="true"]:not(.rdp-day_range_middle) {
-  border-radius: 9999px !important;
-  background: #f8fafc !important;
-  color: #111827 !important;
+  border-radius: 6px !important;
+  background: #0b83c9 !important;
+  color: #ffffff !important;
   opacity: 1 !important;
 }
 .rdp .rdp-day_range_middle[aria-selected="true"] {
   border-radius: 0 !important;
-  background: hsl(var(--primary) / .16) !important;
-  color: hsl(var(--foreground)) !important;
+  background: #bfdbf7 !important;
+  color: #1f2937 !important;
 }
 /* Meta Ads interaction state: hovering an unselected date uses a neutral
    light surface with dark text. This explicit pair prevents the dark theme's
@@ -7571,20 +7571,26 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
 }
 .rdp .rdp-day_range_middle[aria-selected="true"]:hover,
 .rdp .rdp-day[aria-selected="true"]:hover {
-  color: #111827 !important;
+  color: #1f2937 !important;
 }
 /* Date-range presets use native buttons outside the DayPicker table. Keep the
-   active and hover states readable when the accent token resolves to white. */
-.gd-date-range-popover button[aria-pressed="true"],
+   active and hover states readable without painting the entire active row. */
+.gd-date-range-popover button[aria-pressed="true"] {
+  background: transparent !important;
+  color: hsl(var(--foreground)) !important;
+}
 .gd-date-range-popover button[aria-pressed="true"]:hover,
 .gd-date-range-popover button:not([aria-pressed="true"]):hover {
-  background: #e5e7eb !important;
+  background: #e8f2fc !important;
   color: #111827 !important;
 }
-.gd-date-range-popover button[aria-pressed="true"] span,
 .gd-date-range-popover button[aria-pressed="true"]:hover span,
-.gd-date-range-popover button:not([aria-pressed="true"]):hover span {
-  color: #111827 !important;
+.gd-date-range-popover button:not([aria-pressed="true"]):hover span { color: #111827 !important; }
+.gd-date-range-popover button[aria-pressed="true"] > span:first-child {
+  border-color: #0b83c9 !important;
+}
+.gd-date-range-popover button[aria-pressed="true"] > span:first-child > span {
+  background: #0b83c9 !important;
 }
 
 /* Expert KPI cards use the same compact footprint as the standard executive
