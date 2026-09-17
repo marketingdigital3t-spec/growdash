@@ -29,12 +29,19 @@ export function FunnelOpportunityProfile({ deals, insights = [], campaignIds = [
   const opportunities = useMemo(() => deals.filter((deal) => deal.stage_bucket === "opportunity"), [deals]);
   const accountIds = useMemo(() => Array.from(new Set(opportunities.map((deal) => deal.ad_account_id).filter(Boolean))), [opportunities]);
   const campaignAccount = useMemo(() => new Map(insights.filter((row) => row.campaign_id && row.ad_account_id).map((row) => [String(row.campaign_id), String(row.ad_account_id)])), [insights]);
+  const opportunityKey = useMemo(() => opportunities.map((deal) => `${deal.rd_deal_id}:${deal.updated_at || deal.stage_updated_at || ""}`).sort().join(","), [opportunities]);
   const breakdownQuery = useQuery({
-    queryKey: ["funnel-opportunity-profile", campaignIds.slice().sort().join(","), accountIds.slice().sort().join(","), format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    queryKey: ["funnel-opportunity-profile", campaignIds.slice().sort().join(","), accountIds.slice().sort().join(","), opportunityKey, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
     enabled: campaignIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.from("insights_breakdowns").select("campaign_id,breakdown_type,segment_key,leads").in("campaign_id", campaignIds).in("breakdown_type", ["age", "gender", "publisher_platform"]).gte("date", format(startDate, "yyyy-MM-dd")).lte("date", format(endDate, "yyyy-MM-dd"));
-      if (error) throw error;
+      const data: Array<{ campaign_id: string; breakdown_type: string; segment_key: string | null; leads: number | null }> = [];
+      const PAGE = 1000;
+      for (let page = 0; ; page += 1) {
+        const { data: batch, error } = await supabase.from("insights_breakdowns").select("campaign_id,breakdown_type,segment_key,leads").in("campaign_id", campaignIds).in("breakdown_type", ["age", "gender", "publisher_platform"]).gte("date", format(startDate, "yyyy-MM-dd")).lte("date", format(endDate, "yyyy-MM-dd")).range(page * PAGE, page * PAGE + PAGE - 1);
+        if (error) throw error;
+        data.push(...((batch || []) as typeof data));
+        if (!batch || batch.length < PAGE) break;
+      }
       const map = new Map<string, Map<Dimension, Map<string, number>>>();
       for (const row of data || []) {
         const accountId = campaignAccount.get(String(row.campaign_id));
