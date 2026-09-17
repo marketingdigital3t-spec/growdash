@@ -19,22 +19,44 @@ type RdTarget = {
   name: string;
 };
 
-function previousSaoPauloDate(now = new Date()): string {
+function saoPauloDate(value: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(now);
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value]),
-  );
-  const localMidnightUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-  );
-  return new Date(localMidnightUtc - 86400000).toISOString().slice(0, 10);
+  }).formatToParts(value);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+type SyncWindow = {
+  start: Date;
+  end: Date;
+  startDate: string;
+  endDate: string;
+  mode: "incremental" | "historical" | "manual";
+};
+
+function dateWindow(targetDate: string): SyncWindow {
+  const start = new Date(`${targetDate}T00:00:00-03:00`);
+  const end = new Date(`${targetDate}T23:59:59.999-03:00`);
+  return { start, end, startDate: targetDate, endDate: targetDate, mode: "historical" };
+}
+
+function incrementalWindow(now: Date, previousEnd?: string | null): SyncWindow {
+  const end = now;
+  // Re-read a small overlap so a provider that updates a record at the edge of
+  // a window cannot leave a gap. The upserts/deduplication make this safe.
+  const watermark = previousEnd ? new Date(previousEnd) : new Date(end.getTime() - 15 * 60_000);
+  const start = new Date(watermark.getTime() - 5 * 60_000);
+  return {
+    start,
+    end,
+    startDate: saoPauloDate(start),
+    endDate: saoPauloDate(end),
+    mode: "incremental",
+  };
 }
 
 function isIsoDate(value: unknown): value is string {
@@ -138,9 +160,23 @@ Deno.serve(async (req) => {
 
   const requestBody = await req.json().catch(() => ({}));
   const requestedDate = requestBody?.targetDate ?? requestBody?.target_date;
-  const targetDate = isService && isIsoDate(requestedDate)
-    ? requestedDate
-    : previousSaoPauloDate();
+  const now = new Date();
+  let syncWindow: SyncWindow;
+  if (isService && isIsoDate(requestedDate)) {
+    syncWindow = dateWindow(requestedDate);
+    syncWindow.mode = "manual";
+  } else {
+    const { data: previousRun } = await admin
+      .from("daily_incremental_sync_runs")
+      .select("window_end,finished_at")
+      .eq("status", "success")
+      .not("window_end", "is", null)
+      .order("window_end", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    syncWindow = incrementalWindow(now, previousRun?.window_end);
+  }
+  const targetDate = syncWindow.startDate;
   const triggerSource = isService ? "service_role" : "pg_cron";
   const startedAt = new Date().toISOString();
 
@@ -148,6 +184,9 @@ Deno.serve(async (req) => {
     .from("daily_incremental_sync_runs")
     .insert({
       target_date: targetDate,
+      window_start: syncWindow.start.toISOString(),
+      window_end: syncWindow.end.toISOString(),
+      sync_mode: syncWindow.mode,
       trigger_source: triggerSource,
       status: "running",
       started_at: startedAt,
@@ -167,16 +206,16 @@ Deno.serve(async (req) => {
     // parallel because they persist to independent fact tables.
     const [metaInsights, metaLeads] = await Promise.all([
       callFunction(supabaseUrl, serviceKey, "sync-meta-insights", {
-        startDate: targetDate,
-        endDate: targetDate,
+        startDate: syncWindow.startDate,
+        endDate: syncWindow.endDate,
         incremental: true,
         includeBreakdowns: false,
-        triggerSource: "daily_previous_day",
+        triggerSource: "quarter_hour_incremental",
       }),
       callFunction(supabaseUrl, serviceKey, "sync-meta-leads", {
-        startDate: targetDate,
-        endDate: targetDate,
-        triggerSource: "daily_previous_day",
+        startDate: syncWindow.startDate,
+        endDate: syncWindow.endDate,
+        triggerSource: "quarter_hour_incremental",
       }),
     ]);
 
@@ -214,11 +253,11 @@ Deno.serve(async (req) => {
           service_user_id: funnel.user_id,
           cron_trigger: true,
           analytics_mode: true,
-          start_date: targetDate,
-          end_date: targetDate,
+          start_date: syncWindow.startDate,
+          end_date: syncWindow.endDate,
           max_deals: 10000,
           max_pages: 50,
-          trigger_source: "daily_previous_day",
+          trigger_source: "quarter_hour_incremental",
         },
       );
       return {
@@ -229,8 +268,16 @@ Deno.serve(async (req) => {
       };
     });
 
+    // Stage changes can happen on an existing RD deal without a new
+    // created_at timestamp. Refresh recent/open deals after the narrow pull.
+    const rdResync = await callFunction(
+      supabaseUrl,
+      serviceKey,
+      "rd-resync-cron",
+      { trigger: "quarter_hour_incremental" },
+    );
     const rdFailed = rdResults.filter((result) => !result.ok);
-    const allOk = metaInsights.ok && metaLeads.ok && rdFailed.length === 0;
+    const allOk = metaInsights.ok && metaLeads.ok && rdResync.ok && rdFailed.length === 0;
     const status = allOk ? "success" : "partial";
     const finishedAt = new Date().toISOString();
 
@@ -248,6 +295,7 @@ Deno.serve(async (req) => {
         meta_insights: metaInsights,
         meta_leads: metaLeads,
         rd: rdSummary,
+        rd_resync: rdResync,
         error_message: allOk
           ? null
           : "Uma ou mais fontes concluíram com erro; consulte os detalhes da execução.",
@@ -259,10 +307,14 @@ Deno.serve(async (req) => {
         success: allOk,
         status,
         targetDate,
+        windowStart: syncWindow.start.toISOString(),
+        windowEnd: syncWindow.end.toISOString(),
+        syncMode: syncWindow.mode,
         timezone: "America/Sao_Paulo",
         historicalDataPreserved: true,
         meta: { insights: metaInsights, leads: metaLeads },
         rd: rdSummary,
+        rdResync,
       }),
       {
         status: allOk ? 200 : 207,
@@ -280,7 +332,12 @@ Deno.serve(async (req) => {
       })
       .eq("id", run.id);
 
-    return new Response(JSON.stringify({ error: message, targetDate }), {
+    return new Response(JSON.stringify({
+      error: message,
+      targetDate,
+      windowStart: syncWindow.start.toISOString(),
+      windowEnd: syncWindow.end.toISOString(),
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

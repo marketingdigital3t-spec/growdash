@@ -1289,6 +1289,9 @@ export type Database = {
           status: string
           target_date: string
           trigger_source: string
+          window_end: string | null
+          window_start: string | null
+          sync_mode: string
         }
         Insert: {
           created_at?: string
@@ -1302,6 +1305,9 @@ export type Database = {
           status?: string
           target_date: string
           trigger_source?: string
+          window_end?: string | null
+          window_start?: string | null
+          sync_mode?: string
         }
         Update: {
           created_at?: string
@@ -1315,6 +1321,9 @@ export type Database = {
           status?: string
           target_date?: string
           trigger_source?: string
+          window_end?: string | null
+          window_start?: string | null
+          sync_mode?: string
         }
         Relationships: []
       }
