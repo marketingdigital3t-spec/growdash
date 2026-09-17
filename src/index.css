@@ -6986,6 +6986,11 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
    scrolling campaign body. Only the lower corners are rounded, matching the
    table frame without clipping the first line of content. */
 @media (min-width: 768px) {
+  .campaigns-workspace .campaign-table-frame {
+    border-bottom-right-radius: 14px !important;
+    border-bottom-left-radius: 14px !important;
+    background: var(--gd-content-surface) !important;
+  }
   .campaigns-workspace [data-campaign-totals-bar] {
     height: 76px !important;
     min-height: 76px !important;
