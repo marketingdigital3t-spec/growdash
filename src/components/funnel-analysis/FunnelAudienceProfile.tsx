@@ -12,7 +12,7 @@ type BreakdownType = "age" | "gender" | "publisher_platform" | "platform_positio
 export type AudienceSegment = { key: string; leads: number; spend: number; impressions: number; clicks: number };
 export type AudienceLocation = { key: string; leads: number };
 export type AudienceProfileData = { segments: Record<BreakdownType, AudienceSegment[]>; locations: AudienceLocation[]; registrations: number; locatedRegistrations: number };
-type DealLocation = { lead_city?: string | null; lead_state?: string | null };
+type DealLocation = { lead_city?: string | null; lead_state?: string | null; contact_name?: string | null; utm_source?: string | null; custom_fields?: Record<string, unknown> | null };
 
 export const audienceBreakdowns: ReadonlyArray<{ type: BreakdownType; title: string; description: string }> = [
   { type: "age", title: "Faixa etária", description: "Distribuição por idade estimada pela Meta." },
@@ -35,6 +35,21 @@ function aggregate(rows: any[]): AudienceSegment[] {
     map.set(key, current);
   }
   return [...map.values()].sort((a, b) => b.leads - a.leads || b.spend - a.spend || b.impressions - a.impressions);
+}
+
+function rdField(deal: DealLocation, aliases: string[]): string | null {
+  const fields = deal.custom_fields && typeof deal.custom_fields === "object" ? deal.custom_fields : {};
+  const normalized = aliases.map((alias) => alias.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, ""));
+  for (const [key, value] of Object.entries(fields)) {
+    const normalizedKey = key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    if (normalized.includes(normalizedKey) && value != null && String(value).trim()) return String(value).trim();
+  }
+  return null;
+}
+
+function rdSegments(deals: DealLocation[], aliases: string[]): AudienceSegment[] {
+  const rows = deals.map((deal) => rdField(deal, aliases)).filter(Boolean).map((key) => ({ segment_key: key, leads: 1, spend: 0, impressions: 0, clicks: 0 }));
+  return aggregate(rows);
 }
 
 export function useAudienceProfileData({ deals, campaignIds, accountIds = [], startDate, endDate }: { deals: DealLocation[]; campaignIds: string[]; accountIds?: string[]; startDate: Date; endDate: Date }) {
@@ -79,7 +94,16 @@ export function useAudienceProfileData({ deals, campaignIds, accountIds = [], st
         rows.push(...(data || []));
         if (!data || data.length < PAGE) break;
       }
-      return Object.fromEntries(audienceBreakdowns.map((item) => [item.type, aggregate(rows.filter((row: any) => row.breakdown_type === item.type))])) as Record<BreakdownType, AudienceSegment[]>;
+      const meta = Object.fromEntries(audienceBreakdowns.map((item) => [item.type, aggregate(rows.filter((row: any) => row.breakdown_type === item.type))])) as Record<BreakdownType, AudienceSegment[]>;
+      // RD is canonical for lead attributes. Meta is only a fallback for a
+      // dimension that RD did not provide for any synchronized lead.
+      const rdByType: Partial<Record<BreakdownType, AudienceSegment[]>> = {
+        age: rdSegments(deals, ["idade", "age", "faixa_etaria", "faixa etaria"]),
+        gender: rdSegments(deals, ["sexo", "genero", "gênero", "gender"]),
+        publisher_platform: rdSegments(deals, ["plataforma", "platform", "origem plataforma"]),
+      };
+      for (const item of audienceBreakdowns) if (rdByType[item.type]?.length) meta[item.type] = rdByType[item.type]!;
+      return meta;
     },
     staleTime: 15 * 60 * 1000,
   });

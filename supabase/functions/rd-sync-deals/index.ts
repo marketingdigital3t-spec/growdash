@@ -1165,7 +1165,18 @@ Deno.serve(async (req) => {
       // CRM record. The rd_deals trigger then propagates the same amount to
       // canonical sales, which is what Comercial displays.
       const hydratedItems: any[] = [];
-      if (refresh_amounts) {
+      if (analytics_mode) {
+        // RD list responses omit contact/custom-field data. Hydrate analytics
+        // items through the authoritative detail + contacts endpoints so the
+        // RD remains the canonical source for names, city, state and fields.
+        const HYDRATION_BATCH_SIZE = 4;
+        for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
+          const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
+          const resolved = await Promise.all(batch.map((item) => processDeal(item)));
+          hydratedItems.push(...resolved);
+          if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
+        }
+      } else if (refresh_amounts) {
         const HYDRATION_BATCH_SIZE = 4;
         for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
           const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
@@ -1216,11 +1227,12 @@ Deno.serve(async (req) => {
         const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
         const lost =
           !won && (Boolean(stageId && stageLostMap.get(stageId)) || Boolean(d.deal_lost_reason));
-        const baseContact = d.contact || d.deal_contact || {};
         const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
         const inline = inlineContacts[0]?.contact || inlineContacts[0] || {};
-        const contact = { ...inline, ...baseContact };
-        const contactFields = contact.contact_custom_fields || [];
+        const firstContact = Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
+        const baseContact = d.contact || d.deal_contact || {};
+        const contact = { ...inline, ...firstContact, ...baseContact };
+        const contactFields = firstContact.contact_custom_fields || contact.contact_custom_fields || baseContact.contact_custom_fields || [];
         const dealFields = d.deal_custom_fields || d.custom_fields || [];
         observeCustomFields(observedFields, "deal", dealFields);
         observeCustomFields(observedFields, "contact", contactFields);
@@ -1277,7 +1289,7 @@ Deno.serve(async (req) => {
         };
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;
-        if (contact.name || d.contact_name) row.contact_name = contact.name || d.contact_name;
+        if (contact.name || d.contact_name) row.contact_name = cleanContactName(contact.name || d.contact_name);
         if (contact.email) row.contact_email = contact.email;
         if (d.deal_lost_reason?.name || d.deal_lost_reason)
           row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
