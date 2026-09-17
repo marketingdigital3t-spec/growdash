@@ -1086,7 +1086,7 @@ export default function Campaigns() {
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : (
               <Card className={cn(
-                "campaign-table-frame relative min-h-0 overflow-hidden rounded-none border-0 pb-4 shadow-none md:flex md:flex-col md:pb-4",
+                "campaign-table-frame relative min-h-0 overflow-hidden rounded-none border-0 shadow-none md:flex md:flex-col",
                 analysisMode
                   ? "md:h-[clamp(560px,68vh,720px)] md:min-h-[560px]"
                   : "md:h-[clamp(300px,calc(100dvh-30rem),640px)] md:min-h-0",

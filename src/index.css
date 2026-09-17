@@ -6947,6 +6947,7 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
     box-sizing: border-box !important;
     background: var(--gd-content-bg) !important;
     padding-bottom: 24px !important;
+    min-height: 0 !important;
   }
   .campaigns-workspace .campaign-table-frame {
     display: flex !important;
@@ -6958,6 +6959,7 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
     border-bottom-left-radius: 14px !important;
     background: var(--gd-content-surface) !important;
     margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
   }
   .campaigns-workspace [data-campaign-table-scroll] { min-height: 0 !important; flex: 1 1 0 !important; overflow: auto !important; }
   .campaigns-workspace [data-campaign-totals-bar] {
@@ -6971,9 +6973,14 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
     border-radius: 0 0 14px 14px !important;
     border-bottom: 1px solid var(--gd-content-border) !important;
     background: var(--gd-content-surface) !important;
+    margin: 0 !important;
   }
-  .campaigns-workspace [data-campaign-totals-bar] [data-campaign-totals] { height: 76px !important; }
+  .campaigns-workspace [data-campaign-totals-bar] [data-campaign-totals] {
+    position: static !important;
+    height: 76px !important;
+  }
   .campaigns-workspace [data-campaign-totals-bar] [data-campaign-totals] > td {
+    position: static !important;
     height: 76px !important;
     padding-top: 8px !important;
     padding-bottom: 8px !important;
@@ -6982,9 +6989,24 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
 }
 
 @media (max-width: 767px) {
-  .campaigns-workspace { box-sizing: border-box !important; background: var(--gd-content-bg) !important; padding-bottom: 24px !important; }
-  .campaigns-workspace .campaign-table-frame { margin-bottom: 0 !important; border-bottom-right-radius: 14px !important; border-bottom-left-radius: 14px !important; }
-  .campaigns-workspace .campaign-total-bar { margin-bottom: 0 !important; border-radius: 0 0 14px 14px !important; }
+  .campaigns-workspace {
+    box-sizing: border-box !important;
+    background: var(--gd-content-bg) !important;
+    padding-bottom: 24px !important;
+  }
+  .campaigns-workspace .campaign-table-frame {
+    margin: 0 !important;
+    padding-bottom: 0 !important;
+    border-bottom-right-radius: 14px !important;
+    border-bottom-left-radius: 14px !important;
+    background: var(--gd-content-surface) !important;
+    overflow: hidden !important;
+  }
+  .campaigns-workspace [data-campaign-totals-bar] {
+    position: relative !important;
+    margin: 0 !important;
+    border-radius: 0 0 14px 14px !important;
+  }
 }
 
 /* The header is part of the permanent application chrome, exactly like the
