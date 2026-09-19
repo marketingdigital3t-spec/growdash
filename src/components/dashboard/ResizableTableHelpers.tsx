@@ -72,11 +72,12 @@ interface ResizableHeadProps<T extends string, S extends string> {
   align?: "left" | "right";
   className?: string;
   style?: CSSProperties;
+  title?: string;
 }
 
 export function ResizableHead<T extends string, S extends string>({
   colKey, width, onResize, children, sortable, sortableKey,
-  sortKey, sortAsc, onSort, align = "left", className, style,
+  sortKey, sortAsc, onSort, align = "left", className, style, title,
 }: ResizableHeadProps<T, S>) {
   const isActive = sortable && sortableKey && sortableKey === sortKey;
   return (
@@ -89,6 +90,7 @@ export function ResizableHead<T extends string, S extends string>({
         sortable && "cursor-pointer",
         className,
       )}
+      title={title}
       onClick={sortable && sortableKey && onSort ? () => onSort(sortableKey) : undefined}
     >
       <div className={cn("flex items-center gap-1 pr-2 truncate", align === "right" && "justify-end")}>

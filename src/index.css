@@ -5873,6 +5873,41 @@ html[data-accent]:not(.dark) .campaigns-workspace :is(.campaign-account-select, 
 .campaigns-workspace tbody tr:hover :is(td, span, b, strong) { color: hsl(var(--foreground)); }
 .campaigns-workspace tbody tr:hover .text-muted-foreground,
 .campaigns-workspace tbody tr:hover [class*="text-muted-foreground"] { color: hsl(var(--muted-foreground)) !important; }
+
+/* Meta Ads-style frozen identity columns. The scrollable metrics must stay
+   behind the checkbox/status/campaign columns on every theme and viewport. */
+.campaigns-workspace [data-campaign-table-scroll] {
+  isolation: isolate;
+  overscroll-behavior-x: contain;
+}
+.campaigns-workspace [data-campaign-table-scroll] > table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.campaigns-workspace [data-campaign-table-scroll] :is(th.sticky, td.sticky) {
+  background-clip: padding-box;
+  isolation: isolate;
+}
+.campaigns-workspace [data-campaign-table-scroll] th.sticky {
+  z-index: 60 !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] td.sticky {
+  z-index: 30 !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] :is(th.sticky, td.sticky)::after {
+  position: absolute;
+  inset: 0 -1px 0 auto;
+  width: 1px;
+  background: hsl(var(--border) / .8);
+  content: "";
+  pointer-events: none;
+}
+
+/* The content shell owns the 14px safe area; do not let the campaign frame
+   stretch into the viewport edge when the page uses the compact manager. */
+.gd-module-shell {
+  box-sizing: border-box;
+}
 html:not(.dark) .campaigns-workspace tbody tr:hover { background: #edf0f3 !important; }
 html:not(.dark) .campaign-result-tooltip {
   color: #17202a !important;

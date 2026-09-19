@@ -4,8 +4,8 @@ export type MetaColumnPresetKey = "performance" | "vtsd" | "performance_clicks" 
 export const campaignColumnLabels: Record<CampaignColumnKey, string> = {
   check: "Selecionar", name: "Campanha", delivery: "Status", deliveryStatus: "Veiculação", objective: "Objetivo", budget: "Orçamento",
   spend: "Valor usado", impressions: "Impressões", reach: "Alcance", frequency: "Frequência", cpm: "CPM",
-  clicks: "Cliques no link", ctr: "CTR", cpc: "CPC", leads: "Resultados / Leads", cpl: "Custo por resultado",
-  conversion: "Taxa de conversão", sales: "Compras / Vendas", cpa: "Custo por compra", revenue: "Valor de conversão",
+  clicks: "Cliques no link", ctr: "CTR", cpc: "CPC", leads: "Leads atribuídos", cpl: "Custo por lead",
+  conversion: "Taxa de conversão", sales: "Vendas atribuídas", cpa: "Custo por venda", revenue: "Valor de conversão",
   linkClicks: "Cliques no link", linkCpc: "CPC (clique no link)", uniqueLinkCtr: "CTR único (clique no link)",
   landingPageViews: "Visualizações da página de destino", costPerLandingPageView: "Custo por visualização da página de destino",
   checkouts: "Finalizações de compra iniciadas", costPerCheckout: "Custo por finalização de compra iniciada",

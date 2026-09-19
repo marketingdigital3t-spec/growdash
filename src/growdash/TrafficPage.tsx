@@ -70,7 +70,7 @@ export default function TrafficPage() {
 
   return (
     <div className={cn(
-      "gd-module-shell mx-auto w-full max-w-[1920px]",
+      "gd-module-shell mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px]",
       activeTab === "campaigns"
         ? campaignAnalysisMode
           ? "space-y-3"
