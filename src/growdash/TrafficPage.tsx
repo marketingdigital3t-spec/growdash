@@ -70,15 +70,15 @@ export default function TrafficPage() {
 
   return (
     <div className={cn(
-      "gd-module-shell mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px]",
+      "gd-module-shell mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px] md:pr-[68px]",
       activeTab === "campaigns"
         ? campaignAnalysisMode
           ? "space-y-3"
           : "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
         : "space-y-3",
     )}>
-      <nav className="growdash-scrollbar grid shrink-0 grid-cols-2 gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 sm:grid-cols-3 lg:max-w-[1500px] lg:grid-cols-6" aria-label="Áreas de Tráfego Pago">
-        {tabs.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => setParams({ aba: id })} className={cn("traffic-area-tab flex min-h-10 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4" />{label}</button>)}
+      <nav data-traffic-rail className="group/traffic-rail fixed right-3 top-1/2 z-50 flex w-11 -translate-y-1/2 flex-col gap-1 overflow-hidden rounded-xl border border-border bg-card/95 p-1 shadow-2xl backdrop-blur transition-[width] duration-200 hover:w-56" aria-label="Áreas de Tráfego Pago">
+        {tabs.map(({ id, label, icon: Icon }) => <button key={id} title={label} onClick={() => setParams({ aba: id })} className={cn("traffic-area-tab flex min-h-10 w-full items-center justify-start gap-3 rounded-lg px-2.5 text-left text-[11px] font-black transition", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4 shrink-0" /><span className="hidden truncate group-hover/traffic-rail:inline">{label}</span></button>)}
       </nav>
 
       {activeTab !== "campaigns" && activeTab !== "ai" && activeTab !== "presentation" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
