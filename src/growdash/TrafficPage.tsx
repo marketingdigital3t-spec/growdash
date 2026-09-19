@@ -70,15 +70,15 @@ export default function TrafficPage() {
 
   return (
     <div className={cn(
-      "gd-module-shell mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px] md:pr-[108px]",
+      "gd-module-shell relative mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px] md:pr-[84px]",
       activeTab === "campaigns"
         ? campaignAnalysisMode
           ? "space-y-3"
           : "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
         : "space-y-3",
     )}>
-      <nav data-traffic-rail className="group/traffic-rail fixed right-3 top-1/2 z-50 flex w-20 max-h-[calc(100dvh-24px)] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-2xl border border-border bg-card/95 p-2 shadow-2xl backdrop-blur" aria-label="Áreas de Tráfego Pago">
-        {tabs.map(({ id, label, icon: Icon }) => <button key={id} title={label} aria-label={label} onClick={() => setParams({ aba: id })} className={cn("group/traffic-item relative flex h-12 w-full shrink-0 items-center justify-center rounded-xl text-left text-[11px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-6 w-6 shrink-0" /><span className="pointer-events-none absolute right-full mr-2 hidden whitespace-nowrap rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground shadow-lg group-hover/traffic-item:block group-focus-within/traffic-item:block">{label}</span></button>)}
+      <nav data-traffic-rail className="group/traffic-rail absolute right-3 top-1/2 z-50 flex w-16 max-h-[calc(100%-28px)] -translate-y-1/2 flex-col gap-1.5 overflow-visible rounded-2xl border border-border bg-card/95 p-1.5 shadow-2xl backdrop-blur" aria-label="Áreas de Tráfego Pago">
+        {tabs.map(({ id, label, icon: Icon }) => <button key={id} title={label} aria-label={label} onClick={() => setParams({ aba: id })} className={cn("group/traffic-item relative flex h-11 w-full shrink-0 items-center justify-center rounded-xl text-left text-[11px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-5 w-5 shrink-0" /><span className="pointer-events-none absolute right-full mr-2 hidden whitespace-nowrap rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground shadow-lg group-hover/traffic-item:block group-focus-within/traffic-item:block">{label}</span></button>)}
       </nav>
 
       {activeTab !== "campaigns" && activeTab !== "ai" && activeTab !== "presentation" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
