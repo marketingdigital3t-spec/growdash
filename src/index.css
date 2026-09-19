@@ -6982,6 +6982,7 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
     box-sizing: border-box !important;
     background: var(--gd-content-bg) !important;
     padding-bottom: 24px !important;
+    margin-bottom: 14px !important;
     min-height: 0 !important;
   }
   .campaigns-workspace .campaign-table-frame {
@@ -7028,6 +7029,7 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
     box-sizing: border-box !important;
     background: var(--gd-content-bg) !important;
     padding-bottom: 24px !important;
+    margin-bottom: 14px !important;
   }
   .campaigns-workspace .campaign-table-frame {
     margin: 0 !important;
