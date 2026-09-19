@@ -72,6 +72,8 @@ async function callFunction(
   body: Record<string, unknown>,
 ): Promise<FunctionResult> {
   const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
     const response = await fetch(`${baseUrl}/functions/v1/${functionName}`, {
       method: "POST",
@@ -81,6 +83,7 @@ async function callFunction(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
     const raw = await response.text();
     let parsed: Record<string, unknown>;
@@ -102,6 +105,8 @@ async function callFunction(
       durationMs: Date.now() - startedAt,
       body: { error: error instanceof Error ? error.message : String(error) },
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -159,6 +164,27 @@ Deno.serve(async (req) => {
   }
 
   const requestBody = await req.json().catch(() => ({}));
+  // Do not let a slow provider create an unbounded pile of overlapping runs.
+  // Mark only genuinely stale rows as failed; a recent running row owns the
+  // current watermark and must finish before another window starts.
+  await admin
+    .from("daily_incremental_sync_runs")
+    .update({ status: "failed", finished_at: new Date().toISOString(), error_message: "Execução excedeu o tempo máximo e foi encerrada pelo próximo ciclo." })
+    .eq("status", "running")
+    .lt("started_at", new Date(Date.now() - 30 * 60_000).toISOString());
+  const { data: activeRun } = await admin
+    .from("daily_incremental_sync_runs")
+    .select("id,started_at")
+    .eq("status", "running")
+    .gte("started_at", new Date(Date.now() - 30 * 60_000).toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (activeRun) {
+    return new Response(JSON.stringify({ success: false, status: "skipped", reason: "Já existe uma sincronização incremental em andamento.", runId: activeRun.id }), {
+      status: 202,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const requestedDate = requestBody?.targetDate ?? requestBody?.target_date;
   const now = new Date();
   let syncWindow: SyncWindow;
