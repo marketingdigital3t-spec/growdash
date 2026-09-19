@@ -6980,7 +6980,9 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
 @media (min-width: 768px) {
   .campaigns-workspace {
     box-sizing: border-box !important;
-    background: var(--gd-content-bg) !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
     padding-bottom: 24px !important;
     margin-bottom: 14px !important;
     min-height: 0 !important;
@@ -7027,7 +7029,9 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
 @media (max-width: 767px) {
   .campaigns-workspace {
     box-sizing: border-box !important;
-    background: var(--gd-content-bg) !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
     padding-bottom: 24px !important;
     margin-bottom: 14px !important;
   }
