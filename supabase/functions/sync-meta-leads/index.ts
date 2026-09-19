@@ -179,26 +179,28 @@ function pickField(fd: any[], wants: string[]): string | null {
 async function fetchAll(
   url: string,
   maxPages = Number.POSITIVE_INFINITY,
-): Promise<{ data: any[]; error?: string }> {
+): Promise<{ data: any[]; pages: number; lastCursor?: string; repeatedCursor?: boolean; error?: string }> {
   const all: any[] = [];
   let next: string | undefined = url;
   let pages = 0;
   const seen = new Set<string>();
+  let lastCursor: string | undefined;
   while (next && pages < maxPages) {
     if (seen.has(next)) {
-      return { data: all, error: "A Meta repetiu o cursor de paginação; sincronização interrompida para evitar duplicação." };
+      return { data: all, pages, lastCursor, repeatedCursor: true, error: "A Meta repetiu o cursor de paginação; sincronização interrompida para evitar duplicação." };
     }
     seen.add(next);
     const r: Response = await fetch(next);
     const json: any = await r.json();
     if (json.error) {
-      return { data: all, error: json.error.message || String(json.error) };
+      return { data: all, pages, lastCursor, error: json.error.message || String(json.error) };
     }
     if (Array.isArray(json.data)) all.push(...json.data);
     next = json.paging?.next;
+    lastCursor = next;
     pages++;
   }
-  return { data: all };
+  return { data: all, pages, lastCursor };
 }
 
 function parseExactDateRange(body: Record<string, unknown>): {
@@ -288,6 +290,8 @@ Deno.serve(async (req) => {
 
     const accountResults: any[] = [];
     let totalUpserted = 0;
+    let totalPages = 0;
+    let lastCursor: string | null = null;
 
     for (const acc of accounts ?? []) {
       try {
@@ -334,6 +338,8 @@ Deno.serve(async (req) => {
           const leadsUrl =
             `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
           const r = await fetchAll(leadsUrl);
+          totalPages += r.pages;
+          if (r.lastCursor) lastCursor = r.lastCursor;
           if (r.error) {
             formErrors.push(`form ${formId}: ${r.error}`);
             continue;
@@ -445,6 +451,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         upserted: totalUpserted,
+        pagination: { pages: totalPages, last_cursor: lastCursor },
         accounts: accountResults,
         range: exactRange
           ? { startDate: exactRange.startDate, endDate: exactRange.endDate }

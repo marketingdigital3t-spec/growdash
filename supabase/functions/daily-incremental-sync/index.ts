@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
   try {
     // Both Meta jobs are exact-date and use idempotent upserts. They may run in
     // parallel because they persist to independent fact tables.
-    const [metaInsights, metaLeads] = await Promise.all([
+    const [metaInsights, metaLeads, metaHourly] = await Promise.all([
       callFunction(supabaseUrl, serviceKey, "sync-meta-insights", {
         startDate: syncWindow.startDate,
         endDate: syncWindow.endDate,
@@ -213,6 +213,11 @@ Deno.serve(async (req) => {
         triggerSource: "quarter_hour_incremental",
       }),
       callFunction(supabaseUrl, serviceKey, "sync-meta-leads", {
+        startDate: syncWindow.startDate,
+        endDate: syncWindow.endDate,
+        triggerSource: "quarter_hour_incremental",
+      }),
+      callFunction(supabaseUrl, serviceKey, "sync-meta-hourly", {
         startDate: syncWindow.startDate,
         endDate: syncWindow.endDate,
         triggerSource: "quarter_hour_incremental",
@@ -277,7 +282,7 @@ Deno.serve(async (req) => {
       { trigger: "quarter_hour_incremental" },
     );
     const rdFailed = rdResults.filter((result) => !result.ok);
-    const allOk = metaInsights.ok && metaLeads.ok && rdResync.ok && rdFailed.length === 0;
+    const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdFailed.length === 0;
     const status = allOk ? "success" : "partial";
     const finishedAt = new Date().toISOString();
 
@@ -294,6 +299,7 @@ Deno.serve(async (req) => {
         finished_at: finishedAt,
         meta_insights: metaInsights,
         meta_leads: metaLeads,
+        meta_hourly: metaHourly,
         rd: rdSummary,
         rd_resync: rdResync,
         error_message: allOk
@@ -313,6 +319,7 @@ Deno.serve(async (req) => {
         timezone: "America/Sao_Paulo",
         historicalDataPreserved: true,
         meta: { insights: metaInsights, leads: metaLeads },
+        hourly: metaHourly,
         rd: rdSummary,
         rdResync,
       }),

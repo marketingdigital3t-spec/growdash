@@ -74,12 +74,18 @@ Deno.serve(async (req) => {
     }
 
     let totalSynced = 0;
+    let totalPages = 0;
+    let lastCursor: string | null = null;
     const errors: string[] = [];
     let needsReauth = false;
     let failedAccounts = 0;
 
     for (const account of accounts) {
       const attemptedAt = new Date().toISOString();
+      const recordPagination = (result: { pages?: number; lastCursor?: string }) => {
+        totalPages += Number(result.pages || 0);
+        if (result.lastCursor) lastCursor = result.lastCursor;
+      };
       try {
         const accountToday = new Intl.DateTimeFormat("en-CA", {
           timeZone: account.timezone_name || "America/Sao_Paulo",
@@ -120,6 +126,7 @@ Deno.serve(async (req) => {
         const campaignsRes = await fetchMetaPaginated(
           `${graphBase}/${metaAccountId}/campaigns?fields=id,name,objective,effective_status,daily_budget,lifetime_budget&filtering=${campaignStatusFilter}&access_token=${accessToken}&limit=200`
         );
+        recordPagination(campaignsRes);
         if (campaignsRes.error) {
           failedAccounts++;
           errors.push(`Conta ${account.name}: ${campaignsRes.error}`);
@@ -187,6 +194,7 @@ Deno.serve(async (req) => {
         const adsetsRes = await fetchMetaPaginated(
           `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`
         );
+        recordPagination(adsetsRes);
         if (adsetsRes.error) errors.push(`Conta ${account.name} conjuntos: ${adsetsRes.error}`);
         const adsetsList = adsetsRes.data;
         if (adsetsList.length > 0) {
@@ -222,6 +230,7 @@ Deno.serve(async (req) => {
         const adsRes = await fetchMetaPaginated(
           `${graphBase}/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${adStatusFilter}&access_token=${accessToken}&limit=200`
         );
+        recordPagination(adsRes);
         if (adsRes.error) errors.push(`Conta ${account.name} anúncios: ${adsRes.error}`);
         const adsList = adsRes.data;
         if (adsList.length > 0) {
@@ -349,6 +358,7 @@ Deno.serve(async (req) => {
         const insightsRes = await fetchMetaPaginated(
           `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
         );
+        recordPagination(insightsRes);
         if (insightsRes.error) {
           errors.push(`Conta ${account.name} insights: ${insightsRes.error}`);
           failedAccounts++;
@@ -550,6 +560,7 @@ Deno.serve(async (req) => {
             const bRes = await fetchMetaPaginated(
               `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
+            recordPagination(bRes);
             if (bRes.error) {
               console.warn(`Breakdown ${breakdown.type} error: ${bRes.error}`);
               continue;
@@ -645,6 +656,7 @@ Deno.serve(async (req) => {
         error: failedAccounts >= accounts.length ? errors[0] : undefined,
         needs_reauth: needsReauth || undefined,
         graph_version: graphVersion,
+        pagination: { pages: totalPages, last_cursor: lastCursor },
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -706,6 +718,9 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
 // Segue paging.next até o fim, retornando erro estruturado sem expor token.
 async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY): Promise<{
   data: any[];
+  pages: number;
+  lastCursor?: string;
+  repeatedCursor?: boolean;
   error?: string;
   errorCode?: number;
   errorSubcode?: number;
@@ -716,18 +731,21 @@ async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINI
   let next: string | undefined = url;
   let pages = 0;
   const seen = new Set<string>();
+  let lastCursor: string | undefined;
   while (next && pages < maxPages) {
     // Protect against a malformed Graph paging cursor repeating forever while
     // still allowing arbitrarily large account/date ranges to fully drain.
     if (seen.has(next)) {
       console.warn("fetchMetaPaginated detected a repeated paging cursor");
-      break;
+      return { data: all, pages, lastCursor, repeatedCursor: true };
     }
     seen.add(next);
     const res = await fetchMeta(next);
     if (res.error) {
       return {
         data: all,
+        pages,
+        lastCursor,
         error: res.error.message || String(res.error),
         errorCode: typeof res.error.code === "number" ? res.error.code : undefined,
         errorSubcode: typeof res.error.error_subcode === "number" ? res.error.error_subcode : undefined,
@@ -737,10 +755,11 @@ async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINI
     }
     if (Array.isArray(res.data)) all.push(...res.data);
     next = res.paging?.next;
+    lastCursor = next;
     pages++;
   }
   if (next && Number.isFinite(maxPages)) console.warn(`fetchMetaPaginated hit maxPages=${maxPages}`);
-  return { data: all };
+  return { data: all, pages, lastCursor };
 }
 
 function sleep(ms: number) {

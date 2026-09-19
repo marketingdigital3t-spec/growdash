@@ -14,6 +14,7 @@ import { SpendNoLeadsCard } from "@/components/data-health/SpendNoLeadsCard";
 import { JobRunsCard } from "@/components/data-health/JobRunsCard";
 import { MetaValidationCard } from "@/components/data-health/MetaValidationCard";
 import { MetaLeadsReconciliationCard } from "@/components/data-health/MetaLeadsReconciliationCard";
+import { SyncAuditCard } from "@/components/data-health/SyncAuditCard";
 import { Inbox } from "lucide-react";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 
@@ -333,6 +334,8 @@ export default function DataHealth() {
       )}
 
       <MetaLeadsReconciliationCard />
+
+      <SyncAuditCard />
 
       <JobRunsCard />
 
