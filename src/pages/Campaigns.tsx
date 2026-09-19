@@ -897,7 +897,7 @@ export default function Campaigns() {
   return (
     <MotionPage
       className={cn(
-        "campaigns-workspace rounded-lg border border-border bg-card p-3 text-card-foreground shadow-sm md:p-4 dark:border-[#2a271f] dark:bg-[#070706]",
+        "campaigns-workspace rounded-lg border-0 bg-transparent p-3 text-card-foreground shadow-none md:p-4",
         analysisMode ? "overflow-visible" : "overflow-hidden md:flex md:min-h-0 md:flex-1 md:flex-col",
       )}
     >
