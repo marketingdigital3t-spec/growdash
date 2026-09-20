@@ -75,8 +75,6 @@ Deno.serve(async (req) => {
           rd_won_count: wonIds.size,
           linked_sale_count: [...wonIds].filter((id) => linkedIds.has(id)).length,
           missing_sale_count: missing.length,
-          financial_gap_count: financialGapIds.length,
-          financial_gap_rd_ids: financialGapIds.slice(0, 100),
           duplicate_rd_count: duplicateCount,
           missing_sale_rd_ids: missing.slice(0, 100),
           details: {
@@ -84,6 +82,8 @@ Deno.serve(async (req) => {
             canonical_source: "rd_deals",
             checked_at: new Date().toISOString(),
             financial_gap_is_not_fabricated: true,
+            financial_gap_count: financialGapIds.length,
+            financial_gap_rd_ids: financialGapIds.slice(0, 100),
             reprocess,
           },
         };
