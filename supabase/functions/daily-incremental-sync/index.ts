@@ -17,6 +17,7 @@ type RdTarget = {
   id: string;
   user_id: string;
   name: string;
+  rd_funnel_id: string;
 };
 
 function saoPauloDate(value: Date): string {
@@ -279,15 +280,35 @@ Deno.serve(async (req) => {
       new Set((integrations ?? []).map((row) => String(row.user_id))),
     );
     let rdTargets: RdTarget[] = [];
+    let duplicateMappingCount = 0;
     if (ownerIds.length) {
       const { data: funnels, error: funnelsError } = await admin
         .from("rd_funnels")
-        .select("id,user_id,name")
+        .select("id,user_id,name,rd_funnel_id")
         .in("user_id", ownerIds)
         .eq("is_active", true)
         .not("rd_funnel_id", "is", null);
       if (funnelsError) throw funnelsError;
-      rdTargets = (funnels ?? []) as RdTarget[];
+      const candidates = (funnels ?? []) as RdTarget[];
+      const { data: existingDealRows } = await admin
+        .from("rd_deals")
+        .select("rd_funnel_id")
+        .in("rd_funnel_id", candidates.map((funnel) => funnel.id));
+      const dealCounts = new Map<string, number>();
+      for (const row of existingDealRows ?? []) dealCounts.set(row.rd_funnel_id, (dealCounts.get(row.rd_funnel_id) || 0) + 1);
+      const grouped = new Map<string, RdTarget[]>();
+      for (const funnel of candidates) {
+        const key = `${funnel.user_id}:${funnel.rd_funnel_id}`;
+        const group = grouped.get(key) || [];
+        group.push(funnel);
+        grouped.set(key, group);
+      }
+      rdTargets = Array.from(grouped.values()).map((group) => group.sort((a, b) => (dealCounts.get(b.id) || 0) - (dealCounts.get(a.id) || 0) || a.id.localeCompare(b.id))[0]);
+      const duplicateTargets = candidates.filter((funnel) => !rdTargets.some((selected) => selected.id === funnel.id));
+      duplicateMappingCount = duplicateTargets.length;
+      if (duplicateTargets.length > 0) {
+        console.warn("Duplicate local RD funnel mappings detected", duplicateTargets.map((funnel) => ({ id: funnel.id, rd_funnel_id: funnel.rd_funnel_id, name: funnel.name })));
+      }
     }
 
     // Keep a low concurrency to respect RD API rate limits while avoiding one
@@ -342,7 +363,7 @@ Deno.serve(async (req) => {
       "rd-reconcile-metrics",
       { run_id: run.id, trigger_source: "quarter_hour_incremental" },
     );
-    const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0;
+    const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
     const status = allOk ? "success" : "partial";
     const finishedAt = new Date().toISOString();
 
@@ -350,6 +371,7 @@ Deno.serve(async (req) => {
       requested: rdResults.length,
       succeeded: rdResults.length - rdFailed.length,
       failed: rdFailed.length,
+      duplicate_mappings: duplicateMappingCount,
       results: rdResults,
     };
     const { error: runUpdateError } = await admin
