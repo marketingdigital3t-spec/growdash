@@ -321,7 +321,13 @@ Deno.serve(async (req) => {
         body: { skipped: "heavy_resync_requires_explicit_service_request" },
       };
     const rdFailed = rdResults.filter((result) => !result.ok);
-    const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdFailed.length === 0;
+    const rdMetricReconciliation = await callFunction(
+      supabaseUrl,
+      serviceKey,
+      "rd-reconcile-metrics",
+      { run_id: run.id, trigger_source: "quarter_hour_incremental" },
+    );
+    const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0;
     const status = allOk ? "success" : "partial";
     const finishedAt = new Date().toISOString();
 
@@ -340,6 +346,7 @@ Deno.serve(async (req) => {
         meta_leads: metaLeads,
         meta_hourly: metaHourly,
         rd: rdSummary,
+        rd_metric_reconciliation: rdMetricReconciliation,
         rd_resync: rdResync,
         error_message: allOk
           ? null
@@ -361,6 +368,7 @@ Deno.serve(async (req) => {
         meta: { insights: metaInsights, leads: metaLeads },
         hourly: metaHourly,
         rd: rdSummary,
+        rdMetricReconciliation: rdMetricReconciliation,
         rdResync,
       }),
       {

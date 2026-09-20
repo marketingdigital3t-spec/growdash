@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, endOfDay, format, startOfDay } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { canonicalWonDeals } from "@/lib/canonicalMetrics";
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 
 const NAME_TO_UF: Record<string, string> = {
@@ -423,10 +424,10 @@ export function computeFunnelAnalytics(
   // Sequência (sem perdido) para taxas de avanço
   const sequence = sortedStages.filter((s) => !s.is_lost);
   const wonStageIds = new Set(sortedStages.filter((stage) => stage.is_won).map((stage) => stage.rd_stage_id));
-  const confirmedClosedDeals = Array.from(new Map(
-    [...closedDeals, ...deals.filter((deal) => deal.win || wonStageIds.has(canonicalDealStageId(deal)) || isWonRDStageName(deal.rd_stage_name))]
-      .map((deal) => [deal.rd_deal_id, deal]),
-  ).values());
+  const confirmedClosedDeals = canonicalWonDeals([
+    ...closedDeals,
+    ...deals.filter((deal) => deal.win || wonStageIds.has(canonicalDealStageId(deal)) || isWonRDStageName(deal.rd_stage_name)),
+  ].map((deal) => wonStageIds.has(canonicalDealStageId(deal)) ? { ...deal, win: true } : deal));
 
   // Mapa: stage_id -> índice na sequência
   const indexInSeq = new Map<string, number>();

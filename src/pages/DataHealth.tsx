@@ -26,6 +26,7 @@ interface HealthData {
   accountsMissingLpConfig: { id: string; name: string }[];
   lastSyncs: { id: string; name: string; last_sync_success_at: string | null; connection_status: string }[];
   oauthIntegrations: { id: string; provider: string; is_active: boolean | null; token_expires_at: string | null; permission_health: string | null; last_permission_check_at: string | null; last_health_error: string | null }[];
+  rdMetricAudits: { id: string; funnel_id: string | null; status: string; rd_won_count: number; linked_sale_count: number; missing_sale_count: number; checked_at: string }[];
 }
 
 function formatSafeDate(value: string | Date | null | undefined, pattern: string) {
@@ -90,6 +91,11 @@ function useHealth() {
         .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
         .order("updated_at", { ascending: false });
       const { data: lpRows } = await supabase.from("account_lp_config").select("ad_account_id, action_type");
+      const { data: rdMetricAudits } = await (supabase as any)
+        .from("rd_metric_reconciliation_audits")
+        .select("id, funnel_id, status, rd_won_count, linked_sale_count, missing_sale_count, checked_at")
+        .order("checked_at", { ascending: false })
+        .limit(100);
       const lpMap = new Map((lpRows || []).map((r: any) => [r.ad_account_id, r.action_type]));
       const accountsMissingLpConfig = (accounts || [])
         .filter((a: any) => !lpMap.get(a.id))
@@ -103,6 +109,7 @@ function useHealth() {
         accountsMissingLpConfig,
         lastSyncs: (accounts || []) as any,
         oauthIntegrations: (oauthIntegrations || []) as any,
+        rdMetricAudits: (rdMetricAudits || []) as any,
       };
     },
   });
@@ -202,6 +209,19 @@ export default function DataHealth() {
         <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div><span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Diagnóstico por conta e período</span><p className="mt-1 text-sm font-bold">{adAccountId === "all" ? "Todas as contas" : data.lastSyncs.find((item) => item.id === adAccountId)?.name || "Conta selecionada"}</p></div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarRange className="h-4 w-4 text-primary" />{formatSafeDate(startDate, "dd/MM/yyyy")} — {formatSafeDate(endDate, "dd/MM/yyyy")}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Reconciliação canônica RD a cada 15 minutos</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {data.rdMetricAudits.length ? data.rdMetricAudits.slice(0, 20).map((audit) => (
+            <div key={audit.id} className="flex flex-col gap-1 border-b border-border/40 py-2 text-sm last:border-0 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2"><Badge variant={audit.status === "failed" ? "destructive" : "outline"}>{audit.status}</Badge><span>{audit.rd_won_count} vendas RD</span></div>
+              <span className="text-xs text-muted-foreground">{audit.linked_sale_count} vinculadas · {audit.missing_sale_count} sem linha financeira · {formatSafeDate(audit.checked_at, "dd/MM HH:mm")}</span>
+            </div>
+          )) : <p className="py-2 text-sm text-muted-foreground">Nenhuma auditoria canônica registrada ainda.</p>}
+          <p className="pt-2 text-xs text-muted-foreground">A contagem operacional usa os negócios ganhos no RD. Lacunas financeiras são exibidas para correção sem fabricar vendas.</p>
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
-import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
+import { canonicalWonDealIds, canonicalWonDeals } from "@/lib/canonicalMetrics";
 
 export interface RevenueSale {
   status: string;
@@ -27,7 +27,8 @@ export interface RDRevenueDeal {
  * impostos, estornos e chargebacks seguem vindo exclusivamente de `sales`.
  */
 export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenueDeal[] = []) {
-  const confirmed = sales.filter((sale) => sale.status === "confirmed");
+  const wonDealIds = canonicalWonDealIds(rdDeals);
+  const confirmed = sales.filter((sale) => sale.status === "confirmed" && (!sale.rd_deal_id || wonDealIds.has(sale.rd_deal_id)));
   const salesTotals = {
     totalGross: confirmed.reduce((sum, sale) => sum + Number(sale.gross_revenue || 0), 0),
     totalNet: confirmed.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0),
@@ -51,12 +52,13 @@ export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenue
       .filter((sale) => sale.status === "confirmed" && sale.rd_deal_id)
       .map((sale) => sale.rd_deal_id as string),
   );
+  const realizedWonDealIds = new Set([...realizedSaleDealIds].filter((id) => wonDealIds.has(id)));
+  const confirmedWithoutRD = confirmed.filter((sale) => !sale.rd_deal_id);
   const includedDealIds = new Set<string>();
-  const rdOnlyWonDeals = rdDeals.filter((deal) => {
+  const rdOnlyWonDeals = canonicalWonDeals(rdDeals).filter((deal) => {
     const dealId = deal.rd_deal_id?.trim();
     const amount = getRDDealAmount(deal);
-    if (!dealId || !Number.isFinite(amount) || amount <= 0) return false;
-    if (!deal.win && !isWonRDStageName(deal.rd_stage_name)) return false;
+    if (!dealId || !Number.isFinite(amount)) return false;
     if (realizedSaleDealIds.has(dealId) || includedDealIds.has(dealId)) return false;
     includedDealIds.add(dealId);
     return true;
@@ -67,10 +69,10 @@ export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenue
     ...salesTotals,
     totalGross: salesTotals.totalGross + rdOnlyRevenue,
     totalNet: salesTotals.totalNet + rdOnlyRevenue,
-    totalQuantity: salesTotals.totalQuantity + rdOnlyCount,
+    totalQuantity: confirmedWithoutRD.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0) + realizedWonDealIds.size + rdOnlyCount,
     rdOnlyRevenue,
     rdOnlyCount,
-    confirmedSalesCount: salesTotals.totalQuantity + rdOnlyCount,
+    confirmedSalesCount: confirmedWithoutRD.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0) + realizedWonDealIds.size + rdOnlyCount,
     refundRate,
     chargebackRate,
     arpu: salesTotals.totalQuantity > 0 ? salesTotals.totalNet / salesTotals.totalQuantity : 0,

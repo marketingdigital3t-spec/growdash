@@ -19,9 +19,16 @@ describe("aggregateRevenueSources", () => {
     expect(result.totalTax).toBe(10);
     expect(result.confirmedSalesCount).toBe(2);
   });
-  it("ignora negócios perdidos, abertos, sem valor e repetidos no RD", () => {
+  it("conta negócios ganhos mesmo sem valor, mas ignora perdidos, abertos e duplicados", () => {
     const result = aggregateRevenueSources([], [deal({ win: false, rd_stage_name: "Perdido" }), deal({ win: false, rd_stage_name: "Em negociação" }), deal({ rd_deal_id: "zero", amount_total: 0 }), deal({ rd_deal_id: "rd-1", amount_total: 1500 })]);
     expect(result.totalNet).toBe(1500);
-    expect(result.confirmedSalesCount).toBe(1);
+    expect(result.confirmedSalesCount).toBe(2);
+  });
+  it("mantém 14 vendas do RD quando apenas 13 possuem linha financeira", () => {
+    const deals = Array.from({ length: 14 }, (_, index) => deal({ rd_deal_id: `patient-${index}`, amount_total: index === 13 ? 0 : 1500 }));
+    const sales = deals.slice(0, 13).map((row) => sale({ id: `sale-${row.rd_deal_id}`, rd_deal_id: row.rd_deal_id, net_revenue: 1500, gross_revenue: 1500, tax_amount: 0 }));
+    const result = aggregateRevenueSources(sales, deals);
+    expect(result.confirmedSalesCount).toBe(14);
+    expect(result.rdOnlyCount).toBe(1);
   });
 });

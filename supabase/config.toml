@@ -72,6 +72,9 @@ verify_jwt = false
 [functions.rd-resync-cron]
 verify_jwt = false
 
+[functions.rd-reconcile-metrics]
+verify_jwt = false
+
 [functions.rd-discover-fields]
 verify_jwt = true
 [functions.historical-backfill]
