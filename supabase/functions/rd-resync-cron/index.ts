@@ -35,11 +35,12 @@ Deno.serve(async (req) => {
   const summary: Array<Record<string, unknown>> = [];
   try {
     // Active RD integrations
-    const { data: integrations } = await admin
+    const { data: integrations, error: integrationsError } = await admin
       .from("integrations")
       .select("user_id")
       .eq("provider", "rd_station_crm")
       .eq("is_active", true);
+    if (integrationsError) throw integrationsError;
 
     const userIds = Array.from(new Set((integrations || []).map((r: any) => r.user_id)));
     if (userIds.length === 0) {
@@ -48,11 +49,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: funnels } = await admin
+    const { data: funnels, error: funnelsError } = await admin
       .from("rd_funnels")
       .select("id, user_id, rd_funnel_id, name")
       .in("user_id", userIds)
       .not("rd_funnel_id", "is", null);
+    if (funnelsError) throw funnelsError;
 
     const cutoff = new Date(Date.now() - RECENT_DAYS * 86400000).toISOString();
 
@@ -90,13 +92,28 @@ Deno.serve(async (req) => {
           }),
         });
         const json = await resp.json().catch(() => ({}));
-        summary.push({ funnel_id: f.id, name: f.name, dispatched: ids.length, result: json });
+        summary.push({
+          funnel_id: f.id,
+          name: f.name,
+          dispatched: ids.length,
+          ok: resp.ok,
+          status: resp.status,
+          result: json,
+        });
       } catch (e) {
         summary.push({ funnel_id: f.id, name: f.name, error: (e as Error).message });
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, summary }), {
+    const failed = summary.filter((entry) => entry.ok === false || entry.error).length;
+    return new Response(JSON.stringify({
+      ok: failed === 0,
+      status: failed === 0 ? "success" : "partial",
+      requested: summary.length,
+      failed,
+      summary,
+    }), {
+      status: failed === 0 ? 200 : 207,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
