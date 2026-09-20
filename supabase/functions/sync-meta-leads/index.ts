@@ -293,6 +293,32 @@ Deno.serve(async (req) => {
     let totalPages = 0;
     let lastCursor: string | null = null;
     const pageFormsByToken = new Map<string, Map<string, string[]>>();
+    const permissionsByToken = new Map<string, Set<string> | null>();
+
+    async function inspectPermissions(token: string): Promise<Set<string> | null> {
+      if (permissionsByToken.has(token)) return permissionsByToken.get(token) || null;
+      try {
+        const response = await fetch(
+          `${GRAPH}/me/permissions?access_token=${encodeURIComponent(token)}`,
+        );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.error || !Array.isArray(payload?.data)) {
+          permissionsByToken.set(token, null);
+          return null;
+        }
+        const granted = new Set<string>(
+          payload.data
+            .filter((item: any) => String(item?.status).toLowerCase() === "granted")
+            .map((item: any) => String(item?.permission || ""))
+            .filter(Boolean),
+        );
+        permissionsByToken.set(token, granted);
+        return granted;
+      } catch {
+        permissionsByToken.set(token, null);
+        return null;
+      }
+    }
 
     async function discoverPageForms(token: string): Promise<Map<string, string[]>> {
       const cached = pageFormsByToken.get(token);
@@ -322,6 +348,7 @@ Deno.serve(async (req) => {
         const token = acc.access_token as string;
         const raw = acc.account_id as string;
         const actId = raw.startsWith("act_") ? raw : `act_${raw}`;
+        const grantedPermissions = await inspectPermissions(token);
 
         // Discover form_ids primarily via /leadgen_forms. The ads creative field is
         // unreliable across Meta API versions and was aborting the whole account.
@@ -343,6 +370,11 @@ Deno.serve(async (req) => {
         }
         const formIds = new Set<string>();
         const discoveryWarnings: string[] = [];
+        if (grantedPermissions && !grantedPermissions.has("leads_retrieval")) {
+          discoveryWarnings.push(
+            "Meta token sem a permissão leads_retrieval; reconecte a conta após aprovar essa permissão e o acesso às Páginas.",
+          );
+        }
         if (adsRes.error) discoveryWarnings.push(`ads: ${adsRes.error}`);
         // Lead forms are owned by Pages, not by the ad account. When Meta
         // exposes the form id in an ad creative, use that authoritative link
@@ -366,8 +398,11 @@ Deno.serve(async (req) => {
         // Also discover via /leadgen_forms on the account (covers forms not bound to specific ads)
         const formsUrl =
           `${GRAPH}/${actId}/leadgen_forms?fields=id&limit=200&access_token=${token}`;
-        const formsRes = await fetchAll(formsUrl);
-        if (formsRes.error) {
+        const canReadLeadForms = !grantedPermissions || grantedPermissions.has("leads_retrieval");
+        const formsRes = canReadLeadForms
+          ? await fetchAll(formsUrl)
+          : { data: [], pages: 0, error: "leads_retrieval ausente" };
+        if (formsRes.error && canReadLeadForms) {
           const pageForms = await discoverPageForms(token);
           for (const id of pageForms.get(raw.replace(/^act_/, "")) || []) formIds.add(id);
         }
