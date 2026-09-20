@@ -59,6 +59,15 @@ Deno.serve(async (req) => {
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
+    let disconnectedQuery = supabaseAdmin
+      .from("ad_accounts")
+      .select("id,name,account_id")
+      .eq("connection_status", "disconnected");
+    if (adAccountId) disconnectedQuery = disconnectedQuery.eq("id", adAccountId);
+    else if (adAccountIds.length > 0) disconnectedQuery = disconnectedQuery.in("id", adAccountIds);
+    if (userId) disconnectedQuery = disconnectedQuery.eq("user_id", userId);
+    const { data: disconnectedAccounts, error: disconnectedError } = await disconnectedQuery;
+    if (disconnectedError) throw disconnectedError;
     let accountsQuery = supabaseAdmin.from("ad_accounts").select("*").neq("connection_status", "disconnected");
     if (adAccountId) accountsQuery = accountsQuery.eq("id", adAccountId);
     else if (adAccountIds.length > 0) accountsQuery = accountsQuery.in("id", adAccountIds);
@@ -68,7 +77,13 @@ Deno.serve(async (req) => {
 
     if (!accounts || accounts.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: "Nenhuma conta de anúncio encontrada", synced: 0, accounts: 0 }),
+        JSON.stringify({
+          success: true,
+          message: "Nenhuma conta de anúncio ativa encontrada",
+          synced: 0,
+          accounts: 0,
+          skipped_disconnected: disconnectedAccounts?.length || 0,
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -655,6 +670,12 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: failedAccounts < accounts.length, synced: totalSynced,
         accounts: accounts.length,
+        skipped_disconnected: disconnectedAccounts?.length || 0,
+        disconnected_accounts: (disconnectedAccounts || []).map((account: any) => ({
+          id: account.id,
+          account_id: account.account_id,
+          name: account.name,
+        })),
         errors: errors.length > 0 ? errors : undefined,
         error: failedAccounts >= accounts.length ? errors[0] : undefined,
         needs_reauth: needsReauth || undefined,
