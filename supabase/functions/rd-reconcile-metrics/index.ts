@@ -58,11 +58,15 @@ Deno.serve(async (req) => {
           if (wonIds.has(id)) duplicateCount += 1;
           wonIds.add(id);
         }
-        const sales = await readAll("sales", "rd_deal_id,status", funnel.id);
+        const sales = await readAll("sales", "rd_deal_id,status,gross_revenue,net_revenue", funnel.id);
         const linkedIds = new Set<string>(sales.filter((sale) => sale.status === "confirmed" && sale.rd_deal_id).map((sale) => String(sale.rd_deal_id).trim()));
         const missing = [...wonIds].filter((id) => !linkedIds.has(id));
+        const financialGapIds = sales
+          .filter((sale) => sale.status === "confirmed" && sale.rd_deal_id && Number(sale.gross_revenue || 0) <= 0 && Number(sale.net_revenue || 0) <= 0)
+          .map((sale) => String(sale.rd_deal_id).trim())
+          .filter((id) => wonIds.has(id));
         const reprocess = await reprocessMissingDeals(funnel, missing);
-        const hasDivergence = missing.length > 0 || duplicateCount > 0;
+        const hasDivergence = missing.length > 0 || duplicateCount > 0 || financialGapIds.length > 0;
         const row = {
           funnel_id: funnel.id,
           user_id: funnel.user_id,
@@ -71,6 +75,8 @@ Deno.serve(async (req) => {
           rd_won_count: wonIds.size,
           linked_sale_count: [...wonIds].filter((id) => linkedIds.has(id)).length,
           missing_sale_count: missing.length,
+          financial_gap_count: financialGapIds.length,
+          financial_gap_rd_ids: financialGapIds.slice(0, 100),
           duplicate_rd_count: duplicateCount,
           missing_sale_rd_ids: missing.slice(0, 100),
           details: {
