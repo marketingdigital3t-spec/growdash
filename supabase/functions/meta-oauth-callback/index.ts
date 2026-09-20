@@ -210,11 +210,14 @@ Deno.serve(async (req) => {
         timezone_name: account.timezone_name ? String(account.timezone_name).slice(0, 100) : null,
         timezone_offset_hours_utc: Number.isFinite(Number(account.timezone_offset_hours_utc)) ? Number(account.timezone_offset_hours_utc) : null,
         metadata: { connection_method: "oauth", connected_at: new Date().toISOString() },
-        // Preserve an explicit Growdash deactivation when refreshing OAuth.
-        connection_status: existing?.connection_status === "disconnected" ? "disconnected" : "connected",
+        // OAuth only imports/refreshes profiles. Every profile starts disabled;
+        // the operator must explicitly activate each account in Growdash.
+        connection_status: "disconnected",
         last_sync_error: null,
         last_sync_error_code: null,
-        last_sync_success_at: new Date().toISOString(),
+        // OAuth only imports credentials and account metadata; the first
+        // successful insights/leads sync must establish freshness.
+        last_sync_success_at: null,
         updated_at: new Date().toISOString(),
       };
 

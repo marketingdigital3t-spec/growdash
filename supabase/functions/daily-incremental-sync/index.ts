@@ -113,6 +113,18 @@ async function callFunction(
   }
 }
 
+function applyReportedFailure(result: FunctionResult): FunctionResult {
+  const body = result.body || {};
+  const errors = Array.isArray(body.errors) ? body.errors : [];
+  const failedAccounts = Number(body.failedAccounts ?? body.failed_accounts ?? 0);
+  const skippedDisconnected = Number(body.skipped_disconnected ?? body.skippedDisconnected ?? 0);
+  const accountErrors = Array.isArray(body.accounts)
+    ? body.accounts.some((account: any) => Boolean(account?.error) || (Array.isArray(account?.errors) && account.errors.length > 0))
+    : false;
+  const hasReportedFailure = errors.length > 0 || failedAccounts > 0 || skippedDisconnected > 0 || accountErrors;
+  return hasReportedFailure ? { ...result, ok: false } : result;
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -233,7 +245,7 @@ Deno.serve(async (req) => {
   try {
     // Both Meta jobs are exact-date and use idempotent upserts. They may run in
     // parallel because they persist to independent fact tables.
-    const [metaInsights, metaLeads, metaHourly] = await Promise.all([
+    const [metaInsightsRaw, metaLeadsRaw, metaHourlyRaw] = await Promise.all([
       callFunction(supabaseUrl, serviceKey, "sync-meta-insights", {
         startDate: syncWindow.startDate,
         endDate: syncWindow.endDate,
@@ -252,6 +264,9 @@ Deno.serve(async (req) => {
         triggerSource: "quarter_hour_incremental",
       }),
     ]);
+    const metaInsights = applyReportedFailure(metaInsightsRaw);
+    const metaLeads = applyReportedFailure(metaLeadsRaw);
+    const metaHourly = applyReportedFailure(metaHourlyRaw);
 
     const { data: integrations, error: integrationsError } = await admin
       .from("integrations")

@@ -280,14 +280,23 @@ Deno.serve(async (req) => {
     const since = exactRange?.startEpoch ??
       Math.floor((Date.now() - days * 86400000) / 1000);
 
+    // Explicitly disabled accounts must never be queried or treated as a
+    // successful lead sync. They require an authorized reconnection first.
     let q = admin.from("ad_accounts").select(
-      "id,name,account_id,access_token,user_id",
-    );
+      "id,name,account_id,access_token,user_id,connection_status",
+    ).neq("connection_status", "disconnected");
     if (adAccountIds.length) q = q.in("id", adAccountIds);
     else if (adAccountId) q = q.eq("id", adAccountId);
     if (userId) q = q.eq("user_id", userId);
     const { data: accounts, error: accErr } = await q;
     if (accErr) throw accErr;
+
+    let disconnectedQuery = admin.from("ad_accounts").select("id,name,account_id").eq("connection_status", "disconnected");
+    if (adAccountIds.length) disconnectedQuery = disconnectedQuery.in("id", adAccountIds);
+    else if (adAccountId) disconnectedQuery = disconnectedQuery.eq("id", adAccountId);
+    if (userId) disconnectedQuery = disconnectedQuery.eq("user_id", userId);
+    const { data: disconnectedAccounts, error: disconnectedError } = await disconnectedQuery;
+    if (disconnectedError) throw disconnectedError;
 
     const accountResults: any[] = [];
     let totalUpserted = 0;
@@ -546,9 +555,12 @@ Deno.serve(async (req) => {
     }
 
     const hasErrors = accountResults.some((result: any) => Boolean(result.error) || (Array.isArray(result.errors) && result.errors.length > 0));
+    const skippedDisconnected = disconnectedAccounts?.length || 0;
     return new Response(
       JSON.stringify({
-        success: !hasErrors,
+        success: !hasErrors && skippedDisconnected === 0,
+        skipped_disconnected: skippedDisconnected,
+        disconnected_accounts: (disconnectedAccounts || []).map((account: any) => ({ id: account.id, account_id: account.account_id, name: account.name })),
         upserted: totalUpserted,
         pagination: { pages: totalPages, last_cursor: lastCursor },
         accounts: accountResults,
@@ -556,7 +568,7 @@ Deno.serve(async (req) => {
           ? { startDate: exactRange.startDate, endDate: exactRange.endDate }
           : { days },
       }),
-      { status: hasErrors ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: hasErrors || skippedDisconnected > 0 ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {

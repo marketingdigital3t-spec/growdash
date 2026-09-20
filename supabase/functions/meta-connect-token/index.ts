@@ -100,11 +100,15 @@ Deno.serve(async (req) => {
       timezone_offset_hours_utc: Number.isFinite(Number(meta.timezone_offset_hours_utc))
         ? Number(meta.timezone_offset_hours_utc)
         : null,
-      connection_status: "connected",
+      // Connecting the Meta profile must never silently enable every account.
+      // Activation is an explicit per-account action in the Integrations UI.
+      connection_status: "disconnected",
       last_sync_error: null,
       last_sync_error_code: null,
       last_sync_attempt_at: now,
-      last_sync_success_at: now,
+      // OAuth/token storage is not a data sync. Do not make health checks
+      // believe this account has already produced a successful snapshot.
+      last_sync_success_at: null,
       updated_at: now,
       metadata: { connection_method: "manual_token", validated_at: now },
     };

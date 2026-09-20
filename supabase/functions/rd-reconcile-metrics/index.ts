@@ -5,6 +5,23 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(url, serviceKey);
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type" };
 
+async function reprocessMissingDeals(funnel: { id: string; user_id: string }, dealIds: string[]) {
+  if (dealIds.length === 0) return { attempted: 0, ok: true, response: null };
+  const response = await fetch(`${url}/functions/v1/rd-sync-deals`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      funnel_id: funnel.id,
+      deal_ids: dealIds,
+      service_user_id: funnel.user_id,
+      cron_trigger: true,
+      trigger_source: "rd_metric_reconciliation",
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  return { attempted: dealIds.length, ok: response.ok && payload?.success !== false && payload?.ok !== false, response: { status: response.status, payload } };
+}
+
 function isWon(stage: unknown, win: unknown) {
   if (win === true) return true;
   const name = String(stage || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_-]+/g, " ").trim();
@@ -44,17 +61,25 @@ Deno.serve(async (req) => {
         const sales = await readAll("sales", "rd_deal_id,status", funnel.id);
         const linkedIds = new Set<string>(sales.filter((sale) => sale.status === "confirmed" && sale.rd_deal_id).map((sale) => String(sale.rd_deal_id).trim()));
         const missing = [...wonIds].filter((id) => !linkedIds.has(id));
+        const reprocess = await reprocessMissingDeals(funnel, missing);
+        const hasDivergence = missing.length > 0 || duplicateCount > 0;
         const row = {
           funnel_id: funnel.id,
           user_id: funnel.user_id,
           account_id: funnel.ad_account_id,
-          status: "success",
+          status: reprocess.ok && !hasDivergence ? "success" : "partial",
           rd_won_count: wonIds.size,
           linked_sale_count: [...wonIds].filter((id) => linkedIds.has(id)).length,
           missing_sale_count: missing.length,
           duplicate_rd_count: duplicateCount,
           missing_sale_rd_ids: missing.slice(0, 100),
-          details: { funnel_name: funnel.name, canonical_source: "rd_deals", checked_at: new Date().toISOString() },
+          details: {
+            funnel_name: funnel.name,
+            canonical_source: "rd_deals",
+            checked_at: new Date().toISOString(),
+            financial_gap_is_not_fabricated: true,
+            reprocess,
+          },
         };
         const { error } = await admin.from("rd_metric_reconciliation_audits").insert(row);
         if (error) throw error;
