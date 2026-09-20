@@ -292,6 +292,30 @@ Deno.serve(async (req) => {
     let totalUpserted = 0;
     let totalPages = 0;
     let lastCursor: string | null = null;
+    const pageFormsByToken = new Map<string, Map<string, string[]>>();
+
+    async function discoverPageForms(token: string): Promise<Map<string, string[]>> {
+      const cached = pageFormsByToken.get(token);
+      if (cached) return cached;
+      const result = new Map<string, string[]>();
+      const pagesRes = await fetchAll(
+        `${GRAPH}/me/accounts?fields=id,leadgen_forms.limit(200){id,account_id}&limit=100&access_token=${token}`,
+        1,
+      );
+      if (!pagesRes.error) {
+        for (const page of pagesRes.data || []) {
+          for (const form of page?.leadgen_forms?.data || []) {
+            const accountKey = String(form?.account_id || "");
+            if (!accountKey) continue;
+            const list = result.get(accountKey) || [];
+            if (form?.id) list.push(String(form.id));
+            result.set(accountKey, list);
+          }
+        }
+      }
+      pageFormsByToken.set(token, result);
+      return result;
+    }
 
     for (const acc of accounts ?? []) {
       try {
@@ -343,6 +367,10 @@ Deno.serve(async (req) => {
         const formsUrl =
           `${GRAPH}/${actId}/leadgen_forms?fields=id&limit=200&access_token=${token}`;
         const formsRes = await fetchAll(formsUrl);
+        if (formsRes.error) {
+          const pageForms = await discoverPageForms(token);
+          for (const id of pageForms.get(raw.replace(/^act_/, "")) || []) formIds.add(id);
+        }
         // An account-level endpoint error is non-fatal when creatives already
         // supplied form ids; the latter is the supported source for those ads.
         if (formsRes.error && formIds.size === 0) discoveryWarnings.push(`forms: ${formsRes.error}`);
