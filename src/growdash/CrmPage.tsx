@@ -52,7 +52,7 @@ import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
-import { excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
+import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
 import { isRDDealInCrmPeriod } from "@/lib/crmDateScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { PageHeading } from "./shared";
@@ -62,7 +62,6 @@ const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" 
 const number = new Intl.NumberFormat("pt-BR");
 const PAGE_SIZE = 50;
 const BOARD_STEP = 50;
-const MESSAGING_CONVERSATION_EVENT = "onsite_conversion.messaging_conversation_started_7d";
 
 type CRMView = "board" | "list" | "ai";
 type StatusFilter = "all" | "open" | "won" | "lost";
@@ -77,11 +76,19 @@ type PipelineStage = {
   rdStageId?: string | null;
 };
 
-// RD stage IDs are only unique within a pipeline. Keeping the funnel ID in
-// the board key prevents stages from separate funnels being merged or moved
-// by a local name-based heuristic when the user views more than one account.
+// RD stage IDs are only unique within a pipeline. This key is retained for
+// single-account views and as the source key for the consolidated mapping.
 function rdPipelineStageKey(rdFunnelId: string | null | undefined, rdStageId: string | null | undefined) {
   return `${rdFunnelId || "unassigned-funnel"}:${rdStageId || "no-stage"}`;
+}
+
+function canonicalStageForDeal(deal: Pick<RDDealLite, "rd_stage_name" | "rd_stage_order" | "win" | "stage_bucket">) {
+  return consolidatedCRMStage({
+    name: deal.rd_stage_name,
+    order: deal.rd_stage_order,
+    won: deal.win || deal.stage_bucket === "client",
+    lost: deal.stage_bucket === "lost" || deal.stage_bucket === "disqualified",
+  });
 }
 
 type CrmMetricCardProps = {
@@ -232,8 +239,10 @@ export default function CrmPage() {
     () => metaInsights.filter((insight) => !!insight.ad_account_id && availableAccountIds.has(insight.ad_account_id)),
     [availableAccountIds, metaInsights],
   );
-  const metaLeads = useMemo(() => scopedMetaInsights
-    .reduce((sum, insight) => sum + Number(insight.leads ?? 0), 0), [scopedMetaInsights]);
+  const metaLeads = useMemo(
+    () => scopedMetaInsights.reduce((sum, insight) => sum + Number(insight.leads ?? 0), 0),
+    [scopedMetaInsights],
+  );
   const metaActionAdIds = useMemo(
     () => Array.from(new Set(scopedMetaInsights.map((insight) => insight.ad_id).filter(Boolean))),
     [scopedMetaInsights],
@@ -248,8 +257,9 @@ export default function CrmPage() {
     endDate,
     metaActionAccountMap,
   );
-  const metaConversations = Number(metaActionData?.totals?.[MESSAGING_CONVERSATION_EVENT] ?? 0);
-  const totalMetaLeads = metaLeads + metaConversations;
+  const metaLeadActions = metaActionData?.metaLeadActions;
+  const metaConversations = metaLeadActions?.conversations || 0;
+  const totalMetaLeads = metaLeadActions?.total || 0;
   const productPriceByName = useMemo(() => new Map(
     products
       .filter((product) => Number(product.price) > 0)
@@ -335,8 +345,54 @@ export default function CrmPage() {
     };
   }, [dealsInPipeline, getOpportunityAmount, scopedSales]);
 
-  const stages = useMemo<PipelineStage[]>(() => {
+  const boardStageModel = useMemo(() => {
     const map = new Map<string, PipelineStage>();
+    const sourceToCanonicalId = new Map<string, string>();
+
+    if (isConsolidatedView) {
+      const addCanonicalStage = (source: {
+        rd_funnel_id: string | null;
+        rd_stage_id?: string | null;
+        name: string | null;
+        order: number | null;
+        is_won?: boolean;
+        is_lost?: boolean;
+      }) => {
+        const canonical = consolidatedCRMStage({
+          name: source.name,
+          order: source.order,
+          won: source.is_won,
+          lost: source.is_lost,
+        });
+        if (source.rd_stage_id) sourceToCanonicalId.set(rdPipelineStageKey(source.rd_funnel_id, source.rd_stage_id), canonical.id);
+        const current = map.get(canonical.id);
+        if (!current || canonical.order < current.order) {
+          map.set(canonical.id, {
+            id: canonical.id,
+            name: canonical.name,
+            order: canonical.order,
+            won: canonical.won,
+            lost: canonical.lost,
+          });
+        }
+      };
+
+      for (const stage of visibleStoredStages) addCanonicalStage(stage);
+      for (const deal of dealsInPipeline) addCanonicalStage({
+        rd_funnel_id: deal.rd_funnel_id,
+        rd_stage_id: deal.rd_stage_id,
+        name: deal.rd_stage_name,
+        order: deal.rd_stage_order,
+        is_won: deal.win || deal.stage_bucket === "client",
+        is_lost: deal.stage_bucket === "lost" || deal.stage_bucket === "disqualified",
+      });
+
+      return {
+        stages: Array.from(map.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR")),
+        sourceToCanonicalId,
+      };
+    }
+
     for (const stage of visibleStoredStages) {
       const id = rdPipelineStageKey(stage.rd_funnel_id, stage.rd_stage_id);
       map.set(id, {
@@ -361,20 +417,27 @@ export default function CrmPage() {
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR"));
+    return {
+      stages: Array.from(map.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR")),
+      sourceToCanonicalId,
+    };
   }, [dealsInPipeline, isConsolidatedView, visibleStoredStages]);
+  const stages = boardStageModel.stages;
 
   const stageDeals = useMemo(() => {
     const map = new Map<string, RDDealLite[]>();
     for (const stage of stages) map.set(stage.id, []);
     for (const deal of deals) {
-      const stageId = rdPipelineStageKey(deal.rd_funnel_id, deal.rd_stage_id);
+      const sourceKey = rdPipelineStageKey(deal.rd_funnel_id, deal.rd_stage_id);
+      const stageId = isConsolidatedView
+        ? boardStageModel.sourceToCanonicalId.get(sourceKey) || canonicalStageForDeal(deal).id
+        : sourceKey;
       const current = map.get(stageId) || [];
       current.push(deal);
       map.set(stageId, current);
     }
     return map;
-  }, [deals, stages]);
+  }, [boardStageModel.sourceToCanonicalId, deals, isConsolidatedView, stages]);
 
   const lastUpdatedAt = useMemo(() => {
     const timestamps = scopedDeals.map((deal) => deal.updated_at || deal.stage_updated_at).filter(Boolean) as string[];
