@@ -374,7 +374,7 @@ export default function GrowdashLayout() {
                   return collapsed && !showSidebarLabels ? (
                     <Tooltip key={item.path}>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" sideOffset={12} className="z-[120] border-primary/35 bg-[#080808] px-3 py-2 text-xs font-semibold text-primary shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
+                      <TooltipContent side="right" sideOffset={12} className="growdash-sidebar-tooltip z-[120] px-3 py-2 text-xs font-semibold shadow-[0_18px_55px_-18px_rgba(0,0,0,.95)]">
                         {item.label}
                       </TooltipContent>
                     </Tooltip>

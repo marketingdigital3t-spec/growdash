@@ -6695,6 +6695,16 @@ html[data-accent="metallic-gold"],
   color: var(--gd-sidebar-ink) !important;
   background-color: rgba(255,255,255,.07) !important;
 }
+.growdash-sidebar-tooltip {
+  border: 1px solid rgba(255,255,255,.2) !important;
+  background: #080808 !important;
+  color: #fff !important;
+}
+html:not(.dark) .growdash-sidebar-tooltip {
+  border-color: #d6d6d6 !important;
+  background: #fff !important;
+  color: #0b0b0b !important;
+}
 .brand-shell :is(.bg-background, .bg-card, .bg-popover) {
   background-color: hsl(var(--background)) !important;
 }
