@@ -1089,7 +1089,7 @@ Deno.serve(async (req) => {
       if (existingSalesError) throw existingSalesError;
 
       const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
-      const hasFinancialData = amountTotal > 0 || netRevenue > 0 || taxAmount > 0 || Boolean(rdPayment);
+      const hasFinancialData = amountTotal > 0 || netRevenue > 0 || taxAmount > 0;
 
       // A won RD deal is canonical for counting conversions, but it is not
       // proof of a payment. Do not create a zero-value financial sale when RD
