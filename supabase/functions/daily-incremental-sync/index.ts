@@ -92,8 +92,11 @@ async function callFunction(
     } catch {
       parsed = { response: raw.slice(0, 4000) };
     }
+    const semanticFailure = parsed.success === false || parsed.ok === false;
     return {
-      ok: response.ok,
+      // Some gateways normalize non-2xx function responses. Respect the
+      // function's explicit success/ok contract as well as HTTP status.
+      ok: response.ok && !semanticFailure,
       status: response.status,
       durationMs: Date.now() - startedAt,
       body: parsed,
