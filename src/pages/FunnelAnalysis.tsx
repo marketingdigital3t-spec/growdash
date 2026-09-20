@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format, subDays } from "date-fns";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, computeFunnelAnalytics } from "@/hooks/useRDDeals";
+import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics } from "@/hooks/useRDDeals";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { computeFunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 import { useSales } from "@/hooks/useSales";
@@ -184,6 +184,12 @@ export default function FunnelAnalysis() {
     product: selectedProduct,
     enabled: funnelScopeIds.length > 0,
   });
+  const { data: stageHistory = [], isLoading: loadingStageHistory } = useRDDealStageHistory({
+    funnelIds: funnelScopeIds,
+    startDate,
+    endDate,
+    enabled: funnelScopeIds.length > 0,
+  });
   const { data: periodSales = [], isLoading: loadingPeriodSales } = useSales({
     startDate,
     endDate,
@@ -219,8 +225,8 @@ export default function FunnelAnalysis() {
 
   const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
-    () => computeFunnelAnalytics(operationalPeriodDeals, operationalStages, operationalPeriodClosedDeals, { startDate, endDate }),
-    [endDate, operationalPeriodClosedDeals, operationalPeriodDeals, operationalStages, startDate],
+    () => computeFunnelAnalytics(operationalPeriodDeals, operationalStages, operationalPeriodClosedDeals, { startDate, endDate }, stageHistory),
+    [endDate, operationalPeriodClosedDeals, operationalPeriodDeals, operationalStages, stageHistory, startDate],
   );
   // RD é a fonte canônica do funil: vendas, receita, etapas e evolução usam
   // o mesmo snapshot de negócios ganhos. A tabela `sales` fica restrita à
@@ -272,6 +278,43 @@ export default function FunnelAnalysis() {
     enabled: visibleAccounts.length > 0,
   });
   const { data: campaignRows = [] } = useCampaigns(effectiveAdAccountId, effectiveAdAccountIds);
+  const { data: hierarchyRows = [] } = useQuery({
+    queryKey: ["funnel-attribution-hierarchy", effectiveAdAccountId, effectiveAdAccountIds?.slice().sort().join(",")],
+    enabled: visibleAccounts.length > 0,
+    staleTime: 15 * 60 * 1000,
+    queryFn: async () => {
+      let query = (supabase as any)
+        .from("ads")
+        .select("id,name,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,ad_account_id))")
+        .limit(10000);
+      if (effectiveAdAccountIds?.length) query = query.in("adsets.campaigns.ad_account_id", effectiveAdAccountIds);
+      else if (effectiveAdAccountId) query = query.eq("adsets.campaigns.ad_account_id", effectiveAdAccountId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map((row: any) => ({
+        ad_id: String(row.id),
+        ad_name: row.name || "",
+        adset_name: row.adsets?.name || "",
+        campaign_name: row.adsets?.campaigns?.name || "",
+        campaign_id: row.adsets?.campaigns?.id || null,
+        ad_account_id: row.adsets?.campaigns?.ad_account_id || null,
+        adset_id: row.adset_id || row.adsets?.id || null,
+        date: "",
+        spend: 0,
+        impressions: 0,
+        reach: 0,
+        clicks: 0,
+        ctr: 0,
+        cpm: 0,
+        frequency: 0,
+        leads: 0,
+        cpl: 0,
+        conversion_rate: 0,
+        efficiency_rate: 0,
+        health_score: 0,
+      }));
+    },
+  });
   const visibleCampaignRows = useMemo(
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
@@ -505,7 +548,7 @@ export default function FunnelAnalysis() {
         </div>
       </MotionItem>
 
-      {loadingFunnels || isLoading || loadingMetaActions || loadingPeriodDeals || loadingClosedDeals || loadingPeriodClosedDeals || loadingStages || loadingPeriodSales ? (
+      {loadingFunnels || isLoading || loadingMetaActions || loadingPeriodDeals || loadingClosedDeals || loadingPeriodClosedDeals || loadingStages || loadingPeriodSales || loadingStageHistory ? (
         <MotionItem>
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>
@@ -580,14 +623,14 @@ export default function FunnelAnalysis() {
             </MotionItem>
 
           <MotionItem>
-            <FunnelOpportunityProfile deals={operationalPeriodDeals} insights={scopedInsights} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} />
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+              <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock>
+              <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} deals={operationalPeriodDeals} insights={[...scopedInsights, ...hierarchyRows]} /></HelpBlock>
+            </div>
           </MotionItem>
 
           <MotionItem>
-            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-              <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock>
-              <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} deals={operationalPeriodDeals} insights={scopedInsights} /></HelpBlock>
-            </div>
+            <FunnelOpportunityProfile deals={operationalPeriodDeals} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} />
           </MotionItem>
 
           <MotionItem>

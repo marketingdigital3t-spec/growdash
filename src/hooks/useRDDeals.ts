@@ -77,6 +77,19 @@ export interface FunnelStage {
   is_lost: boolean;
 }
 
+export interface RDDealStageHistory {
+  id: string;
+  rd_deal_id: string;
+  rd_funnel_id: string;
+  from_stage_id: string | null;
+  from_stage_name: string | null;
+  from_stage_bucket: string | null;
+  to_stage_id: string | null;
+  to_stage_name: string | null;
+  to_stage_bucket: string | null;
+  changed_at: string;
+}
+
 /**
  * Returns the first trustworthy timestamp available for a RD negotiation.
  * Older imports may not have `lead_created_at`; using the stage update (and
@@ -101,6 +114,14 @@ type CanonicalFunnelStage = Omit<FunnelStage, "rd_stage_id"> & { rd_stage_id: st
  * mapping each deal to that canonical stage.
  */
 export function consolidateFunnelStages(stages: FunnelStage[]) {
+  const funnelIds = new Set(stages.map((stage) => stage.rd_funnel_id));
+  if (funnelIds.size === 1) {
+    const sourceToCanonicalId = new Map(stages.map((stage) => [stage.rd_stage_id, stage.rd_stage_id]));
+    return {
+      stages: [...stages].sort((a, b) => a.order - b.order || a.rd_stage_id.localeCompare(b.rd_stage_id)),
+      sourceToCanonicalId,
+    };
+  }
   const sourceToCanonicalId = new Map<string, string>();
   const canonicalById = new Map<string, CanonicalFunnelStage>();
 
@@ -129,6 +150,26 @@ export function consolidateFunnelStages(stages: FunnelStage[]) {
     stages: Array.from(canonicalById.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR")),
     sourceToCanonicalId,
   };
+}
+
+export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled = true }: { funnelIds: string[]; startDate: Date; endDate: Date; enabled?: boolean }) {
+  const scopeIds = Array.from(new Set(funnelIds)).sort();
+  return useQuery({
+    queryKey: ["rd_deal_stage_history", scopeIds.join(","), startDate.toISOString(), endDate.toISOString()],
+    enabled: enabled && scopeIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("rd_deal_stage_history")
+        .select("id, rd_deal_id, rd_funnel_id, from_stage_id, from_stage_name, from_stage_bucket, to_stage_id, to_stage_name, to_stage_bucket, changed_at")
+        .in("rd_funnel_id", scopeIds)
+        .gte("changed_at", startOfDay(startDate).toISOString())
+        .lte("changed_at", endOfDay(endDate).toISOString())
+        .order("changed_at", { ascending: true });
+      if (error) throw error;
+      return (data || []) as RDDealStageHistory[];
+    },
+    staleTime: 15 * 60 * 1000,
+  });
 }
 
 interface Params {
@@ -203,7 +244,7 @@ export function useRDDeals(params: Params) {
         // in Perfil do público e entrega.
         const rangeStart = startOfDay(startDate ?? endDate!).toISOString();
         const rangeEnd = endOfDay(endDate ?? startDate!).toISOString();
-        query = query.or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`);
+        query = query.or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`);
       }
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
@@ -396,14 +437,17 @@ export function computeFunnelAnalytics(
   stages: FunnelStage[],
   closedDeals: RDDeal[] = deals.filter((deal) => deal.win),
   dateRange?: { startDate: Date; endDate: Date },
+  stageHistory: RDDealStageHistory[] = [],
 ): FunnelAnalytics {
   const totalLeads = deals.length;
 
   const { stages: sortedStages } = consolidateFunnelStages(stages);
+  const preserveNativeStages = new Set(stages.map((stage) => stage.rd_funnel_id)).size === 1;
   const canonicalDealStageId = (deal: RDDeal) => {
     // Stage IDs are scoped to an RD funnel. Resolving by ID alone mixed
     // identical stage IDs from different accounts in consolidated views.
     const nativeStage = stages.find((stage) => stage.rd_funnel_id === deal.rd_funnel_id && stage.rd_stage_id === deal.rd_stage_id);
+    if (nativeStage && preserveNativeStages) return nativeStage.rd_stage_id;
     if (nativeStage) {
       return consolidatedCRMStage({
         id: nativeStage.rd_stage_id,
@@ -557,7 +601,27 @@ export function computeFunnelAnalytics(
   // Taxa de avanço: cada par é agregado apenas entre funis que contêm as
   // duas etapas adjacentes, sem criar uma sequência global entre contas.
   const stageConversion: FunnelAnalytics["stageConversion"] = [];
-  for (const pair of Array.from(pairCounts.values()).sort((a, b) => a.order - b.order || a.from.localeCompare(b.from, "pt-BR") || a.to.localeCompare(b.to, "pt-BR"))) {
+  const historyPairs = new Map<string, { from: string; to: string; fromCount: Set<string>; toCount: Set<string>; order: number }>();
+  const nativeStageByKey = new Map(stages.map((stage) => [`${stage.rd_funnel_id}:${stage.rd_stage_id}`, stage]));
+  for (const event of stageHistory) {
+    if (!event.from_stage_id || !event.to_stage_id) continue;
+    const fromId = preserveNativeStages ? event.from_stage_id : (consolidateFunnelStages(stages.filter((stage) => stage.rd_funnel_id === event.rd_funnel_id)).sourceToCanonicalId.get(event.from_stage_id) || event.from_stage_id);
+    const toId = preserveNativeStages ? event.to_stage_id : (consolidateFunnelStages(stages.filter((stage) => stage.rd_funnel_id === event.rd_funnel_id)).sourceToCanonicalId.get(event.to_stage_id) || event.to_stage_id);
+    const fromStage = nativeStageByKey.get(`${event.rd_funnel_id}:${event.from_stage_id}`);
+    const toStage = nativeStageByKey.get(`${event.rd_funnel_id}:${event.to_stage_id}`);
+    const order = toStage?.order ?? 9999;
+    const key = `${fromId}:${toId}`;
+    const pair = historyPairs.get(key) || { from: fromStage?.name || event.from_stage_name || fromId, to: toStage?.name || event.to_stage_name || toId, fromCount: new Set<string>(), toCount: new Set<string>(), order };
+    pair.fromCount.add(event.rd_deal_id);
+    pair.toCount.add(event.rd_deal_id);
+    pair.order = Math.min(pair.order, order);
+    historyPairs.set(key, pair);
+  }
+  const conversionPairs = stageHistory.length > 0
+    ? Array.from(historyPairs.values()).map((pair) => ({ from: pair.from, to: pair.to, fromCount: pair.fromCount.size, toCount: pair.toCount.size, order: pair.order }))
+    : Array.from(pairCounts.values());
+  // Sem histórico real, não estimamos avanço pela etapa atual.
+  for (const pair of (stageHistory.length > 0 ? conversionPairs : [] ).sort((a, b) => a.order - b.order || a.from.localeCompare(b.from, "pt-BR") || a.to.localeCompare(b.to, "pt-BR"))) {
     const rate = pair.fromCount > 0 ? (pair.toCount / pair.fromCount) * 100 : 0;
     const lost = Math.max(0, pair.fromCount - pair.toCount);
     const lossPct = pair.fromCount > 0 ? (lost / pair.fromCount) * 100 : 0;
@@ -608,9 +672,10 @@ export function computeFunnelAnalytics(
       const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
       cur.leads += 1;
       const idx = indexInSeq.get(canonicalDealStageId(d)) ?? -1;
-      // A semantic RD stage is sufficient evidence for an opportunity even
-      // when the stage catalog was not synchronized for this funnel.
-      if (idx >= oppIdxThreshold || ["mql", "sql", "opportunity", "client"].includes(d.stage_bucket)) cur.opportunities += 1;
+      // When stage history exists, opportunity dates come exclusively from
+      // the real stage-entry event below. The current stage is only a safe
+      // fallback for older snapshots without history.
+      if (stageHistory.length === 0 && (idx >= oppIdxThreshold || ["mql", "sql", "opportunity", "client"].includes(d.stage_bucket))) cur.opportunities += 1;
       evoMap.set(day, cur);
     }
   }
@@ -625,6 +690,22 @@ export function computeFunnelAnalytics(
     for (const day of eachDayOfInterval({ start: dateRange.startDate, end: dateRange.endDate })) {
       const key = format(day, "yyyy-MM-dd");
       if (!evoMap.has(key)) evoMap.set(key, { leads: 0, opportunities: 0, conversions: 0 });
+    }
+  }
+  if (stageHistory.length > 0) {
+    const seenOpportunityEvents = new Set<string>();
+    for (const event of stageHistory) {
+      const target = stages.find((stage) => stage.rd_funnel_id === event.rd_funnel_id && stage.rd_stage_id === event.to_stage_id);
+      if (!target || target.is_lost) continue;
+      const key = `${event.rd_deal_id}:${event.changed_at.slice(0, 10)}`;
+      if (target.is_won) continue;
+      if (target.order >= Math.max(1, Math.floor(sequence.length * 0.6)) && !seenOpportunityEvents.has(key)) {
+        const day = dayKey(event.changed_at);
+        const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
+        cur.opportunities += 1;
+        seenOpportunityEvents.add(key);
+        evoMap.set(day, cur);
+      }
     }
   }
   const evolution = Array.from(evoMap.entries())
@@ -813,13 +894,10 @@ export function computeFunnelAnalytics(
     avgTicket,
     revenue,
     stages: stagesOut,
-    // O RD sincronizado contém somente a etapa atual, não o histórico de
-    // movimentações. Portanto não há base para afirmar uma taxa de avanço ou
-    // uma perda entre etapas; exibir essa estimativa criaria um falso funil.
-    stageConversion: [],
+    stageConversion,
     evolution,
     agingBuckets,
-    bottleneck: null,
+    bottleneck: stageConversion.find((item) => item.isBottleneck)?.from || null,
     sourceBreakdown,
     lostReasons,
     standbyReasons,

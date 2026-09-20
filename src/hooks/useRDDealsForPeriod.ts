@@ -108,7 +108,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
           // Some older RD imports do not have lead_created_at. They are still
           // leads and must be included using the timestamp available for the
           // deal, rather than disappearing from expert and funnel totals.
-          .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`)
+          .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`)
           .order("lead_created_at", { ascending: false });
         if (adAccountId) q = q.eq("ad_account_id", adAccountId);
         // An empty selection means "all accounts". Passing [] to PostgREST

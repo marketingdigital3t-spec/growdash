@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeFunnelAnalytics, dedupeRDDeals, shouldApplyRDDateRange, type RDDeal, type FunnelStage } from "./useRDDeals";
+import { computeFunnelAnalytics, consolidateFunnelStages, dedupeRDDeals, shouldApplyRDDateRange, type RDDeal, type FunnelStage, type RDDealStageHistory } from "./useRDDeals";
 
 describe("RD deals date scope", () => {
   it("keeps a selected period scoped to its creation or closing dates", () => {
@@ -50,6 +50,42 @@ describe("RD deals date scope", () => {
       ["Vendas ganhas", 2],
     ]);
     expect(analytics.stageConversion).toEqual([]);
+
+    const consolidated = consolidateFunnelStages(stages);
+    expect(consolidated.sourceToCanonicalId.get("a-lead")).toBe("new-leads");
+    expect(consolidated.sourceToCanonicalId.get("m-lead")).toBe("new-leads");
+    expect(consolidated.sourceToCanonicalId.get("a-sale")).toBe("won");
+    expect(consolidated.sourceToCanonicalId.get("m-sale")).toBe("won");
+  });
+
+  it("preserves native stage order and labels for a single RD funnel", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "patient-model", rd_stage_id: "won", name: "Vendas realizadas", order: 9, is_won: true, is_lost: false },
+      { rd_funnel_id: "patient-model", rd_stage_id: "lead", name: "Novo lead", order: 1, is_won: false, is_lost: false },
+      { rd_funnel_id: "patient-model", rd_stage_id: "contact", name: "Em contato", order: 2, is_won: false, is_lost: false },
+    ];
+    expect(consolidateFunnelStages(stages).stages.map((stage) => stage.name)).toEqual(["Novo lead", "Em contato", "Vendas realizadas"]);
+  });
+
+  it("uses real RD stage history for transitions and daily opportunities", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "patient-model", rd_stage_id: "lead", name: "Novo lead", order: 1, is_won: false, is_lost: false },
+      { rd_funnel_id: "patient-model", rd_stage_id: "contact", name: "Em contato", order: 2, is_won: false, is_lost: false },
+      { rd_funnel_id: "patient-model", rd_stage_id: "won", name: "Vendas realizadas", order: 3, is_won: true, is_lost: false },
+    ];
+    const deal = (id: string, stageId: string, win = false): RDDeal => ({
+      id, rd_deal_id: id, rd_funnel_id: "patient-model", rd_stage_id: stageId, rd_stage_name: stages.find((stage) => stage.rd_stage_id === stageId)!.name, rd_stage_order: stages.find((stage) => stage.rd_stage_id === stageId)!.order,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: win ? "client" : "lead", win, lost_reason: null, amount_total: win ? 15000 : 0,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null, lead_state: null, lead_city: null,
+      lead_created_at: "2026-09-01T12:00:00Z", stage_updated_at: "2026-09-02T12:00:00Z", closed_at: win ? "2026-09-03T12:00:00Z" : null,
+    });
+    const history: RDDealStageHistory[] = [{
+      id: "history-1", rd_deal_id: "deal-1", rd_funnel_id: "patient-model", from_stage_id: "lead", from_stage_name: "Novo lead", from_stage_bucket: "lead",
+      to_stage_id: "contact", to_stage_name: "Em contato", to_stage_bucket: "lead", changed_at: "2026-09-02T12:00:00Z",
+    }];
+    const analytics = computeFunnelAnalytics([deal("deal-1", "won", true)], stages, [deal("deal-1", "won", true)], { startDate: new Date("2026-09-01T00:00:00Z"), endDate: new Date("2026-09-03T23:59:59Z") }, history);
+    expect(analytics.stageConversion[0]).toMatchObject({ from: "Novo lead", to: "Em contato", rate: 100 });
+    expect(analytics.evolution.some((day) => day.opportunities > 0)).toBe(true);
   });
 
   it("does not create an advancement pair from stages that belong to different funnels", () => {
