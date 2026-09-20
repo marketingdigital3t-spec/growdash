@@ -194,8 +194,8 @@ Deno.serve(async (req) => {
     console.log(`Balance sync complete: ${updated}/${accounts.length} updated`);
 
     return new Response(
-      JSON.stringify({ success: true, updated, total: accounts.length, errors: errors.length > 0 ? errors : undefined }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: errors.length === 0, updated, total: accounts.length, errors: errors.length > 0 ? errors : undefined }),
+      { status: errors.length ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("Balance sync error:", e);

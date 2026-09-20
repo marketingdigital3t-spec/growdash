@@ -447,9 +447,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    const hasErrors = accountResults.some((result: any) => Boolean(result.error) || (Array.isArray(result.errors) && result.errors.length > 0));
     return new Response(
       JSON.stringify({
-        success: true,
+        success: !hasErrors,
         upserted: totalUpserted,
         pagination: { pages: totalPages, last_cursor: lastCursor },
         accounts: accountResults,
@@ -457,7 +458,7 @@ Deno.serve(async (req) => {
           ? { startDate: exactRange.startDate, endDate: exactRange.endDate }
           : { days },
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: hasErrors ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {

@@ -207,8 +207,8 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, upserted: totalUpserted, perAccount, errors: errors.length ? errors : undefined }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: errors.length === 0, upserted: totalUpserted, perAccount, errors: errors.length ? errors : undefined }),
+      { status: errors.length ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("sync-meta-transactions error:", e);

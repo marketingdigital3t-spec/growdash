@@ -1058,16 +1058,18 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.log(`[rd_deals upsert] ${rdDealId} failed: ${(e as Error).message}`);
         metrics.errors++;
+        throw e;
       }
 
       // Se o negócio foi reaberto/perdido, a receita anteriormente realizada
       // deve sair de todos os painéis sem apagar o vínculo de auditoria.
       if (!won) {
-        await admin
+        const { error: cancelError } = await admin
           .from("sales")
           .update({ status: "cancelled", attribution_reason: "rd_deal_not_won" })
           .eq("user_id", userId!)
           .eq("rd_deal_id", rdDealId);
+        if (cancelError) throw cancelError;
         return;
       }
 
@@ -1132,10 +1134,11 @@ Deno.serve(async (req) => {
           update.payment_method = rdPayment;
           update.payment_method_source = "rd";
         }
-        await admin.from("sales").update(update).eq("rd_deal_id", rdDealId);
+        const { error: salesUpdateError } = await admin.from("sales").update(update).eq("rd_deal_id", rdDealId);
+        if (salesUpdateError) throw salesUpdateError;
         totalUpdated++;
       } else {
-        await admin.from("sales").insert({
+        const { error: salesInsertError } = await admin.from("sales").insert({
           ...baseData,
           lead_entry_date: leadEntryDate,
           lead_state: contactState,
@@ -1153,6 +1156,7 @@ Deno.serve(async (req) => {
           payment_method_source: rdPayment ? "rd" : "default",
           notes: null,
         });
+        if (salesInsertError) throw salesInsertError;
         totalCreated++;
       }
     }

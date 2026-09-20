@@ -184,9 +184,9 @@ Deno.serve(async (req) => {
               previous_status: prevStatus, last_activated_at,
             };
           });
-          await supabaseAdmin.from("campaigns").upsert(upsertRows, { onConflict: "id" });
+          throwIfError(await supabaseAdmin.from("campaigns").upsert(upsertRows, { onConflict: "id" }), `campanhas da conta ${account.name}`);
           if (campaignChanges.length > 0) {
-            await supabaseAdmin.from("campaign_changes").insert(campaignChanges);
+            throwIfError(await supabaseAdmin.from("campaign_changes").insert(campaignChanges), `histórico de campanhas da conta ${account.name}`);
           }
         }
 
@@ -222,8 +222,8 @@ Deno.serve(async (req) => {
               destination_type: a.destination_type ?? null,
             };
           });
-          await supabaseAdmin.from("adsets").upsert(rows, { onConflict: "id" });
-          if (changes.length > 0) await supabaseAdmin.from("campaign_changes").insert(changes);
+          throwIfError(await supabaseAdmin.from("adsets").upsert(rows, { onConflict: "id" }), `conjuntos da conta ${account.name}`);
+          if (changes.length > 0) throwIfError(await supabaseAdmin.from("campaign_changes").insert(changes), `histórico de conjuntos da conta ${account.name}`);
         }
 
         // 3. Fetch ads (incluindo arquivados)
@@ -264,8 +264,8 @@ Deno.serve(async (req) => {
               status: newStatus, previous_status: prevStatus, last_activated_at,
             };
           });
-          await supabaseAdmin.from("ads").upsert(rows, { onConflict: "id" });
-          if (changes.length > 0) await supabaseAdmin.from("campaign_changes").insert(changes);
+          throwIfError(await supabaseAdmin.from("ads").upsert(rows, { onConflict: "id" }), `anúncios da conta ${account.name}`);
+          if (changes.length > 0) throwIfError(await supabaseAdmin.from("campaign_changes").insert(changes), `histórico de anúncios da conta ${account.name}`);
         }
 
         // 3.5 O histórico de atividades dos últimos 60 dias é pesado. Ele roda
@@ -344,7 +344,7 @@ Deno.serve(async (req) => {
             );
             if (fresh.length > 0) {
               for (let i = 0; i < fresh.length; i += 200) {
-                await supabaseAdmin.from("campaign_changes").insert(fresh.slice(i, i + 200));
+                throwIfError(await supabaseAdmin.from("campaign_changes").insert(fresh.slice(i, i + 200)), `atividades da conta ${account.name}`);
               }
               console.log(`Inserted ${fresh.length} activity rows for ${account.name}`);
             }
@@ -423,12 +423,9 @@ Deno.serve(async (req) => {
                 console.warn(`Hydration failed for ad ${adId}: ${(e as Error).message}`);
               }
             }
-            if (newCampaigns.size > 0)
-              await supabaseAdmin.from("campaigns").upsert([...newCampaigns.values()], { onConflict: "id" });
-            if (newAdsets.size > 0)
-              await supabaseAdmin.from("adsets").upsert([...newAdsets.values()], { onConflict: "id" });
-            if (newAds.size > 0)
-              await supabaseAdmin.from("ads").upsert([...newAds.values()], { onConflict: "id" });
+            if (newCampaigns.size > 0) throwIfError(await supabaseAdmin.from("campaigns").upsert([...newCampaigns.values()], { onConflict: "id" }), `campanhas hidratadas da conta ${account.name}`);
+            if (newAdsets.size > 0) throwIfError(await supabaseAdmin.from("adsets").upsert([...newAdsets.values()], { onConflict: "id" }), `conjuntos hidratados da conta ${account.name}`);
+            if (newAds.size > 0) throwIfError(await supabaseAdmin.from("ads").upsert([...newAds.values()], { onConflict: "id" }), `anúncios hidratados da conta ${account.name}`);
           }
         }
 
@@ -485,7 +482,7 @@ Deno.serve(async (req) => {
           const { error: aErr } = await supabaseAdmin
             .from("insight_actions")
             .upsert(chunk, { onConflict: "ad_id,date,action_type", ignoreDuplicates: false });
-          if (aErr) console.error("insight_actions upsert error:", aErr.message);
+          if (aErr) throw new Error(`ações da conta ${account.name}: ${aErr.message}`);
         }
         if (actionRows.length > 0) console.log(`insight_actions: ${actionRows.length} rows`);
 
@@ -536,8 +533,8 @@ Deno.serve(async (req) => {
           const { error: upsertError } = await supabaseAdmin
             .from("insights")
             .upsert(chunk, { onConflict: "ad_id,date", ignoreDuplicates: false });
-          if (!upsertError) totalSynced += chunk.length;
-          else console.error("Upsert error:", upsertError.message);
+          if (upsertError) throw new Error(`insights da conta ${account.name}: ${upsertError.message}`);
+          totalSynced += chunk.length;
         }
 
         // 5. Buscar breakdowns somente quando explicitamente solicitado. Eles
@@ -607,7 +604,7 @@ Deno.serve(async (req) => {
               const { error: bErr } = await supabaseAdmin
                 .from("insights_breakdowns")
                 .upsert(chunk, { onConflict: "campaign_id,date,breakdown_type,segment_key", ignoreDuplicates: false });
-              if (bErr) console.error(`Breakdown ${breakdown.type} upsert error:`, bErr.message);
+              if (bErr) throw new Error(`breakdown ${breakdown.type} da conta ${account.name}: ${bErr.message}`);
             }
             console.log(`Breakdown ${breakdown.type}: ${bRows.length} rows`);
           }
@@ -768,4 +765,8 @@ function sleep(ms: number) {
 
 function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
+}
+
+function throwIfError(result: { error?: { message?: string } | null }, context: string) {
+  if (result.error) throw new Error(`Falha ao persistir ${context}: ${result.error.message || "erro desconhecido"}`);
 }
