@@ -366,7 +366,11 @@ Deno.serve(async (req) => {
       },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error
+      ? error.message
+      : (typeof error === "object" && error !== null
+        ? JSON.stringify(error)
+        : String(error));
     await admin
       .from("daily_incremental_sync_runs")
       .update({
