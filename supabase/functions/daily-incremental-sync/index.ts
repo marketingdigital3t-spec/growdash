@@ -299,14 +299,24 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Stage changes can happen on an existing RD deal without a new
-    // created_at timestamp. Refresh recent/open deals after the narrow pull.
-    const rdResync = await callFunction(
-      supabaseUrl,
-      serviceKey,
-      "rd-resync-cron",
-      { trigger: "quarter_hour_incremental" },
-    );
+    // Stage changes on existing deals arrive through the RD webhook. The
+    // heavyweight open-deal reconciliation is intentionally opt-in so it
+    // cannot block the 15-minute watermark window or create overlapping runs.
+    // It can still be requested explicitly by an authenticated service call.
+    const runHeavyResync = requestBody?.include_resync === true && isService;
+    const rdResync = runHeavyResync
+      ? await callFunction(
+        supabaseUrl,
+        serviceKey,
+        "rd-resync-cron",
+        { trigger: "explicit_incremental_resync" },
+      )
+      : {
+        ok: true,
+        status: 204,
+        durationMs: 0,
+        body: { skipped: "heavy_resync_requires_explicit_service_request" },
+      };
     const rdFailed = rdResults.filter((result) => !result.ok);
     const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdFailed.length === 0;
     const status = allOk ? "success" : "partial";
@@ -318,7 +328,7 @@ Deno.serve(async (req) => {
       failed: rdFailed.length,
       results: rdResults,
     };
-    await admin
+    const { error: runUpdateError } = await admin
       .from("daily_incremental_sync_runs")
       .update({
         status,
@@ -333,6 +343,7 @@ Deno.serve(async (req) => {
           : "Uma ou mais fontes concluíram com erro; consulte os detalhes da execução.",
       })
       .eq("id", run.id);
+    if (runUpdateError) throw runUpdateError;
 
     return new Response(
       JSON.stringify({
