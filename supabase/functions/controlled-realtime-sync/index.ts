@@ -139,8 +139,13 @@ Deno.serve(async (req) => {
               analytics_mode: realtime,
               start_date: realtime ? today : undefined,
               end_date: realtime ? today : undefined,
-              max_pages: realtime ? 1 : 50,
-              max_deals: realtime ? 200 : 3_000,
+              // Analytics mode walks every RD status segment and up to the
+              // complete bounded page budget instead of only the first 200
+              // records. This keeps all connected funnels represented in the
+              // near-realtime snapshot; manual full_history remains the
+              // authoritative unbounded reconciliation.
+              max_pages: realtime ? 50 : 50,
+              max_deals: realtime ? 10_000 : 3_000,
               trigger_source: realtime ? "auto_realtime" : "manual",
             }),
           }));
@@ -270,11 +275,26 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
 }
 
 async function listAccessibleFunnels(admin: ReturnType<typeof createClient>, userId: string, adAccountId?: string) {
+  // A CRM reader may use a funnel owned by another account through
+  // user_rd_funnel_access. The previous owner-only query silently skipped
+  // those funnels during automatic sync, while the CRM itself could display
+  // their already-stored deals.
+  const { data: grants, error: grantsError } = await admin
+    .from("user_rd_funnel_access")
+    .select("rd_funnel_id")
+    .eq("user_id", userId);
+  if (grantsError) throw grantsError;
+  const grantedIds = (grants || []).map((row: any) => String(row.rd_funnel_id)).filter(Boolean);
+
   let query = admin.from("rd_funnels")
     .select("id,ad_account_id,rd_funnel_id,name,user_id")
-    .eq("user_id", userId)
     .eq("is_active", true)
     .not("rd_funnel_id", "is", null);
+  if (grantedIds.length) {
+    query = query.or(`user_id.eq.${userId},id.in.(${grantedIds.join(",")})`);
+  } else {
+    query = query.eq("user_id", userId);
+  }
   if (adAccountId) query = query.eq("ad_account_id", adAccountId);
   const { data, error } = await query;
   if (error) throw error;
