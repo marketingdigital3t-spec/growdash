@@ -302,14 +302,17 @@ Deno.serve(async (req) => {
         // Discover form_ids primarily via /leadgen_forms. The ads creative field is
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
-          `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id,creative{object_story_spec,asset_feed_spec}&limit=200&access_token=${token}`;
-        let adsRes = await fetchAll(adsUrl);
+          `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id,creative{object_story_spec}&limit=50&access_token=${token}`;
+        // Lead forms are discovered from the first creative page; this keeps
+        // the 15-minute all-account job bounded even for very large accounts.
+        let adsRes = await fetchAll(adsUrl, 1);
         if (adsRes.error) {
           // Older tokens/API versions may reject nested creative fields. Keep
           // lead synchronization alive with the minimal ad listing, while
           // retaining the error only if the fallback also fails.
           const fallbackAds = await fetchAll(
             `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id&limit=200&access_token=${token}`,
+            1,
           );
           if (!fallbackAds.error) adsRes = fallbackAds;
           else adsRes = { ...adsRes, error: `ads: ${adsRes.error}; fallback: ${fallbackAds.error}` };
