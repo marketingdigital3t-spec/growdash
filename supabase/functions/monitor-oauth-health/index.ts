@@ -137,11 +137,13 @@ Deno.serve(async (req) => {
         ? await checkMetaToken(String(account.access_token), appId, appSecret)
         : { status: baseStatus === "error" ? "error" : "unchecked" as HealthStatus, permissions: [], details: { reason: "Token ausente" } };
       const checkedAt = new Date().toISOString();
-      await admin.from("ad_accounts").update({
+      let accountUpdate = admin.from("ad_accounts").update({
         oauth_health_status: check.status,
         oauth_checked_at: checkedAt,
         oauth_permissions: check.permissions,
-      }).eq("id", account.id).eq("user_id", user.id);
+      }).eq("id", account.id);
+      if (requestedUserId) accountUpdate = accountUpdate.eq("user_id", requestedUserId);
+      await accountUpdate;
       const workspaceId = String(account.workspace_id || workspaceByUser.get(String(account.user_id)) || membership || "");
       if (workspaceId) await admin.from("oauth_health_events").insert({
         workspace_id: workspaceId,
@@ -170,11 +172,13 @@ Deno.serve(async (req) => {
         if (check.status === "healthy" && baseStatus === "expiring") check.status = "expiring";
       }
       const checkedAt = new Date().toISOString();
-      await admin.from("integrations").update({
+      let integrationUpdate = admin.from("integrations").update({
         permission_health: check.status,
         last_permission_check_at: checkedAt,
         last_health_error: check.status === "error" ? "Falha ao validar o token" : null,
-      }).eq("id", integration.id).eq("user_id", user.id);
+      }).eq("id", integration.id);
+      if (requestedUserId) integrationUpdate = integrationUpdate.eq("user_id", requestedUserId);
+      await integrationUpdate;
       const workspaceId = String(workspaceByUser.get(String(integration.user_id)) || membership || "");
       if (workspaceId) await admin.from("oauth_health_events").insert({
         workspace_id: workspaceId,
