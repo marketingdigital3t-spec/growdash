@@ -49,18 +49,21 @@ Deno.serve(async (req) => {
   const base = Deno.env.get("SUPABASE_URL")!;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const admin = createClient(base, key);
+  const body = await req.json().catch(() => ({}));
   const auth = req.headers.get("Authorization") || "";
   const isService = auth === `Bearer ${key}`;
+  const cronSecret = req.headers.get("x-cron-secret");
+  const { data: validCronSecret } = await admin.rpc("verify_daily_incremental_sync_secret", { candidate: cronSecret });
+  const isCron = !isService && validCronSecret === true;
   let userId: string | null = null;
-  if (!isService) {
+  if (!isService && !isCron) {
     const caller = createClient(base, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
     const { data } = await caller.auth.getUser();
     if (!data.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     userId = data.user.id;
   }
 
-  const body = await req.json().catch(() => ({}));
-  if (isService && typeof body.user_id === "string") userId = body.user_id;
+  if ((isService || isCron) && typeof body.user_id === "string") userId = body.user_id;
   if (!userId) return new Response(JSON.stringify({ error: "user_id obrigatório para execução de serviço" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   const started = new Date().toISOString();
@@ -73,9 +76,11 @@ Deno.serve(async (req) => {
   const historicalStart = String(body.start_date || body.startDate || "2000-01-01");
 
   try {
-    const { data: accounts, error: accountsError } = await admin.from("ad_accounts").select("id,name").eq("user_id", userId).neq("connection_status", "disconnected");
-    if (accountsError) throw accountsError;
-    for (const account of accounts || []) {
+    const rdOnly = body.rd_only === true;
+    if (!rdOnly) {
+      const { data: accounts, error: accountsError } = await admin.from("ad_accounts").select("id,name").eq("user_id", userId).neq("connection_status", "disconnected");
+      if (accountsError) throw accountsError;
+      for (const account of accounts || []) {
       let windowStart = historicalStart;
       while (windowStart <= today) {
         const windowEnd = addDays(windowStart, 89) < today ? addDays(windowStart, 89) : today;
@@ -94,9 +99,12 @@ Deno.serve(async (req) => {
         if (windowEnd === today) break;
         windowStart = addDays(windowEnd, 1);
       }
+      }
     }
 
-    const { data: funnels, error: funnelsError } = await admin.from("rd_funnels").select("id,user_id,name").eq("user_id", userId).eq("is_active", true).not("rd_funnel_id", "is", null);
+    let funnelsQuery = admin.from("rd_funnels").select("id,user_id,name").eq("user_id", userId).eq("is_active", true).not("rd_funnel_id", "is", null);
+    if (typeof body.funnel_id === "string") funnelsQuery = funnelsQuery.eq("id", body.funnel_id);
+    const { data: funnels, error: funnelsError } = await funnelsQuery;
     if (funnelsError) throw funnelsError;
     for (const funnel of funnels || []) {
       const result = await invoke(base, key, "rd-sync-deals", { funnel_id: funnel.id, service_user_id: userId, cron_trigger: true, analytics_mode: true, full_history: true, trigger_source: "historical_backfill" });

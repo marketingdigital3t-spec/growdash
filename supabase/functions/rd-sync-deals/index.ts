@@ -1089,6 +1089,14 @@ Deno.serve(async (req) => {
       if (existingSalesError) throw existingSalesError;
 
       const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
+      const hasFinancialData = amountTotal > 0 || netRevenue > 0 || taxAmount > 0 || Boolean(rdPayment);
+
+      // A won RD deal is canonical for counting conversions, but it is not
+      // proof of a payment. Do not create a zero-value financial sale when RD
+      // provides neither an amount nor a payment method. The rd_deals row
+      // above remains available for CRM/KPI counts and reconciliation.
+      if (!existing && !hasFinancialData) return;
+      if (existing && !hasFinancialData) return;
 
       // Constrói payload preservando valores manuais já preenchidos.
       // Regra: campos vindos do RD só são gravados quando o registro existente
