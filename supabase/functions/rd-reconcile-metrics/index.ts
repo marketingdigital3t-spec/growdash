@@ -91,7 +91,9 @@ Deno.serve(async (req) => {
       }
     }
     const failed = results.filter((row) => row.status === "failed").length;
-    return new Response(JSON.stringify({ ok: failed === 0, status: failed ? "partial" : "success", requested: results.length, failed, results }), { status: failed ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const divergent = results.filter((row) => row.status === "partial").length;
+    const unhealthy = failed + divergent;
+    return new Response(JSON.stringify({ ok: unhealthy === 0, status: unhealthy ? "partial" : "success", requested: results.length, failed, divergent, results }), { status: unhealthy ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
