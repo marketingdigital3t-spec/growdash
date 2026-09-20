@@ -5,13 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
 // browser whenever someone changes tabs or returns to the application.
-const REFRESH_INTERVAL_MS = 5 * 60_000;
-const LOCAL_DEDUP_WINDOW_MS = 4 * 60_000;
+// The sync function fetches deltas, so a short watermark window keeps the CRM
+// close to RD without re-running a full historical reconciliation.
+const REFRESH_INTERVAL_MS = 60_000;
+const LOCAL_DEDUP_WINDOW_MS = 45_000;
 const STORAGE_PREFIX = "growdash:last-background-sync";
 // A Meta/RD sync can write several related rows in rapid succession. Waiting
 // for a quiet window prevents each write from reloading the same heavy traffic
 // queries and making every tab appear to refresh continuously.
-const REALTIME_UI_BATCH_MS = 15_000;
+const REALTIME_UI_BATCH_MS = 1_000;
 
 const LIVE_TABLES = [
   "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",
@@ -110,7 +112,7 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
     if (!enabled) return;
     // A primeira pintura deve mostrar o cache local. A sincronização com Meta/RD
     // só entra depois que a tela já ficou utilizável.
-    const initial = window.setTimeout(() => void refresh(false), 4_000);
+    const initial = window.setTimeout(() => void refresh(false), 1_500);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => void refresh(false);
     const onVisibility = () => {
