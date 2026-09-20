@@ -294,7 +294,9 @@ Deno.serve(async (req) => {
             seenActivityPages.add(activitiesUrl);
             const actData = await fetchMeta(activitiesUrl);
             if (actData.error) {
-              console.warn(`Activities error: ${actData.error.message}`);
+              const message = `Conta ${account.name} atividades: ${actData.error.message}`;
+              errors.push(message);
+              console.warn(message);
               break;
             }
             for (const ev of (actData.data || [])) {
@@ -559,7 +561,9 @@ Deno.serve(async (req) => {
             );
             recordPagination(bRes);
             if (bRes.error) {
-              console.warn(`Breakdown ${breakdown.type} error: ${bRes.error}`);
+              const message = `Conta ${account.name} breakdown ${breakdown.type}: ${bRes.error}`;
+              errors.push(message);
+              console.warn(message);
               continue;
             }
             const bRows = (bRes.data || [])
@@ -609,7 +613,9 @@ Deno.serve(async (req) => {
             console.log(`Breakdown ${breakdown.type}: ${bRows.length} rows`);
           }
         } catch (bErr) {
-          console.warn(`Breakdowns failed for ${account.name}: ${(bErr as Error).message}`);
+          const message = `Conta ${account.name} breakdowns: ${(bErr as Error).message}`;
+          errors.push(message);
+          console.warn(message);
         }
 
         // Mark account as connected after a successful sync
