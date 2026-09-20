@@ -275,6 +275,7 @@ Deno.serve(async (req) => {
       ? (body.ad_account_ids || body.adAccountIds).filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
     const exactRange = parseExactDateRange(body);
+    const permissionAudit = body?.permission_audit === true;
     const days: number = Math.max(1, Math.min(90, Number(body.days ?? 7)));
     const since = exactRange?.startEpoch ??
       Math.floor((Date.now() - days * 86400000) / 1000);
@@ -348,7 +349,7 @@ Deno.serve(async (req) => {
         const token = acc.access_token as string;
         const raw = acc.account_id as string;
         const actId = raw.startsWith("act_") ? raw : `act_${raw}`;
-        const grantedPermissions = await inspectPermissions(token);
+        const grantedPermissions = permissionAudit ? await inspectPermissions(token) : null;
 
         // Discover form_ids primarily via /leadgen_forms. The ads creative field is
         // unreliable across Meta API versions and was aborting the whole account.
