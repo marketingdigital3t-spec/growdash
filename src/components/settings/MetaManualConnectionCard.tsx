@@ -85,7 +85,7 @@ export function MetaManualConnectionCard({ onConnected }: { onConnected?: () => 
       <div className="flex items-start gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
         <span>
-          O token é validado na API da Meta e armazenado somente no servidor. Para uso contínuo, prefira um token de usuário do sistema da BM com permissões <code>ads_read</code>, <code>ads_management</code> e <code>business_management</code>.
+          O token é validado na API da Meta e armazenado somente no servidor. Para sincronizar campanhas e Lead Ads, prefira um token de usuário do sistema da BM com permissões <code>ads_read</code>, <code>ads_management</code>, <code>business_management</code> e <code>leads_retrieval</code>, além do acesso às Páginas vinculadas aos formulários.
         </span>
       </div>
 
