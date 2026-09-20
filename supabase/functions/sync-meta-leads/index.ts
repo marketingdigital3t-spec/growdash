@@ -302,16 +302,47 @@ Deno.serve(async (req) => {
         // Discover form_ids primarily via /leadgen_forms. The ads creative field is
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
-          `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id&limit=200&access_token=${token}`;
-        const adsRes = await fetchAll(adsUrl);
+          `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id,creative{object_story_spec,asset_feed_spec}&limit=200&access_token=${token}`;
+        let adsRes = await fetchAll(adsUrl);
+        if (adsRes.error) {
+          // Older tokens/API versions may reject nested creative fields. Keep
+          // lead synchronization alive with the minimal ad listing, while
+          // retaining the error only if the fallback also fails.
+          const fallbackAds = await fetchAll(
+            `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id&limit=200&access_token=${token}`,
+          );
+          if (!fallbackAds.error) adsRes = fallbackAds;
+          else adsRes = { ...adsRes, error: `ads: ${adsRes.error}; fallback: ${fallbackAds.error}` };
+        }
         const formIds = new Set<string>();
         const discoveryWarnings: string[] = [];
         if (adsRes.error) discoveryWarnings.push(`ads: ${adsRes.error}`);
+        // Lead forms are owned by Pages, not by the ad account. When Meta
+        // exposes the form id in an ad creative, use that authoritative link
+        // and avoid the unsupported /act_<id>/leadgen_forms request entirely.
+        const collectFormIds = (value: any) => {
+          if (!value || typeof value !== "object") return;
+          if (Array.isArray(value)) {
+            for (const item of value) collectFormIds(item);
+            return;
+          }
+          for (const [key, nested] of Object.entries(value)) {
+            const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+            if ((normalizedKey === "leadgenformid" || normalizedKey === "formid" || normalizedKey === "leadformid") && nested) {
+              formIds.add(String(nested));
+            } else if (nested && typeof nested === "object") {
+              collectFormIds(nested);
+            }
+          }
+        };
+        for (const ad of adsRes.data || []) collectFormIds(ad?.creative);
         // Also discover via /leadgen_forms on the account (covers forms not bound to specific ads)
         const formsUrl =
           `${GRAPH}/${actId}/leadgen_forms?fields=id&limit=200&access_token=${token}`;
         const formsRes = await fetchAll(formsUrl);
-        if (formsRes.error) discoveryWarnings.push(`forms: ${formsRes.error}`);
+        // An account-level endpoint error is non-fatal when creatives already
+        // supplied form ids; the latter is the supported source for those ads.
+        if (formsRes.error && formIds.size === 0) discoveryWarnings.push(`forms: ${formsRes.error}`);
         for (const f of formsRes.data || []) {
           if (f?.id) formIds.add(String(f.id));
         }
