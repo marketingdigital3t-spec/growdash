@@ -91,29 +91,44 @@ Deno.serve(async (req) => {
     const url = Deno.env.get("SUPABASE_URL")!;
     const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const authHeader = req.headers.get("Authorization") || "";
-    const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) return json({ error: "Não autorizado" }, 401);
-
     const admin = createClient(url, service);
-    const { data: membership, error: membershipError } = await admin
+    const authHeader = req.headers.get("Authorization") || "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const isService = Boolean(bearer && bearer === service);
+    let user: { id: string } | null = null;
+    let isCron = false;
+    if (!isService) {
+      const cronSecret = req.headers.get("x-cron-secret");
+      const { data: validSecret } = await admin.rpc("verify_daily_incremental_sync_secret", { candidate: cronSecret });
+      isCron = validSecret === true;
+      if (!isCron) {
+        const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
+        const { data: userRes, error: authError } = await userClient.auth.getUser();
+        if (authError || !userRes.user) return json({ error: "Não autorizado" }, 401);
+        user = { id: userRes.user.id };
+      }
+    }
+
+    const requestedUserId = user?.id || null;
+    const { data: memberships, error: membershipError } = await admin
       .from("workspace_members")
-      .select("workspace_id")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    if (membershipError || !membership?.workspace_id) return json({ error: "Workspace não encontrado" }, 409);
+      .select("user_id,workspace_id")
+      .eq(isService || isCron ? "status" : "user_id", isService || isCron ? "active" : requestedUserId);
+    if (membershipError) throw membershipError;
+    const workspaceByUser = new Map((memberships || []).map((row: any) => [String(row.user_id), String(row.workspace_id)]));
+    const membership = requestedUserId ? workspaceByUser.get(requestedUserId) : null;
+    if (!isService && !isCron && !membership) return json({ error: "Workspace não encontrado" }, 409);
 
     const appId = Deno.env.get("META_APP_ID");
     const appSecret = Deno.env.get("META_APP_SECRET");
     const graphVersion = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
     const results: Array<Record<string, unknown>> = [];
 
-    const { data: accounts, error: accountsError } = await admin
+    let accountsQuery = admin
       .from("ad_accounts")
-      .select("id, account_id, access_token, connection_status, oauth_health_status, oauth_checked_at")
-      .eq("user_id", user.id);
+      .select("id, user_id, workspace_id, account_id, access_token, connection_status, oauth_health_status, oauth_checked_at");
+    if (requestedUserId) accountsQuery = accountsQuery.eq("user_id", requestedUserId);
+    const { data: accounts, error: accountsError } = await accountsQuery;
     if (accountsError) throw accountsError;
 
     for (const account of accounts ?? []) {
@@ -127,8 +142,9 @@ Deno.serve(async (req) => {
         oauth_checked_at: checkedAt,
         oauth_permissions: check.permissions,
       }).eq("id", account.id).eq("user_id", user.id);
-      await admin.from("oauth_health_events").insert({
-        workspace_id: membership.workspace_id,
+      const workspaceId = String(account.workspace_id || workspaceByUser.get(String(account.user_id)) || membership || "");
+      if (workspaceId) await admin.from("oauth_health_events").insert({
+        workspace_id: workspaceId,
         ad_account_id: account.id,
         provider: "meta_ads",
         status: check.status,
@@ -138,10 +154,11 @@ Deno.serve(async (req) => {
       results.push({ id: account.id, provider: "meta_ads", status: check.status, missing_permissions: check.details.missing_permissions ?? [] });
     }
 
-    const { data: integrations, error: integrationsError } = await admin
+    let integrationsQuery = admin
       .from("integrations")
-      .select("id, provider, api_token, provider_account_id, token_expires_at, is_active")
-      .eq("user_id", user.id);
+      .select("id, user_id, provider, api_token, provider_account_id, token_expires_at, is_active");
+    if (requestedUserId) integrationsQuery = integrationsQuery.eq("user_id", requestedUserId);
+    const { data: integrations, error: integrationsError } = await integrationsQuery;
     if (integrationsError) throw integrationsError;
 
     for (const integration of integrations ?? []) {
@@ -158,8 +175,9 @@ Deno.serve(async (req) => {
         last_permission_check_at: checkedAt,
         last_health_error: check.status === "error" ? "Falha ao validar o token" : null,
       }).eq("id", integration.id).eq("user_id", user.id);
-      await admin.from("oauth_health_events").insert({
-        workspace_id: membership.workspace_id,
+      const workspaceId = String(workspaceByUser.get(String(integration.user_id)) || membership || "");
+      if (workspaceId) await admin.from("oauth_health_events").insert({
+        workspace_id: workspaceId,
         integration_id: integration.id,
         provider,
         status: check.status,
@@ -169,7 +187,7 @@ Deno.serve(async (req) => {
       results.push({ id: integration.id, provider, status: check.status, missing_permissions: check.details.missing_permissions ?? [] });
     }
 
-    return json({ checked: results.length, results });
+    return json({ checked: results.length, results, scope: requestedUserId ? "user" : "all" });
   } catch (error) {
     console.error("monitor-oauth-health", error);
     return json({ error: error instanceof Error ? error.message : "Falha interna ao verificar OAuth" }, 500);
