@@ -534,13 +534,14 @@ Deno.serve(async (req) => {
     // original do vínculo, mesmo quando um master executa a manutenção.
     userId = String(funnel.user_id);
 
-    const { data: integration } = await admin
+    const { data: integration, error: integrationError } = await admin
       .from("integrations")
       .select("api_token")
       .eq("user_id", userId)
       .eq("provider", "rd_station_crm")
       .eq("is_active", true)
       .maybeSingle();
+    if (integrationError) throw integrationError;
 
     if (!integration?.api_token) {
       return new Response(
@@ -569,7 +570,7 @@ Deno.serve(async (req) => {
 
     // Cria sync_run (status=running)
     const isReprocess = Array.isArray(deal_ids) && deal_ids.length > 0;
-    const { data: runRow } = await admin
+    const { data: runRow, error: runError } = await admin
       .from("sync_runs")
       .insert({
         user_id: userId,
@@ -582,18 +583,21 @@ Deno.serve(async (req) => {
       })
       .select("id")
       .single();
+    if (runError) throw runError;
     runId = runRow?.id || null;
 
-    const { data: products } = await admin
+    const { data: products, error: productsError } = await admin
       .from("products")
       .select("id, name, tax_rate")
       .eq("user_id", userId);
+    if (productsError) throw productsError;
     const productList = products || [];
 
-    const { data: fieldConfigsRows } = await admin
+    const { data: fieldConfigsRows, error: fieldConfigsError } = await admin
       .from("rd_field_configs")
       .select("key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
       .eq("ad_account_id", funnel.ad_account_id);
+    if (fieldConfigsError) throw fieldConfigsError;
     const fieldConfigs: FieldConfig[] = (fieldConfigsRows as any[]) || [];
     // The RD API has no reliable per-pipeline custom-field catalogue. Observe
     // fields while reading every deal and upsert the account catalogue once at
@@ -707,9 +711,10 @@ Deno.serve(async (req) => {
           };
         });
         if (rows.length > 0) {
-          await admin
+          const { error: stagesUpsertError } = await admin
             .from("rd_funnel_stages")
             .upsert(rows, { onConflict: "rd_funnel_id,rd_stage_id" });
+          if (stagesUpsertError) throw stagesUpsertError;
           // A pipeline can be edited directly in RD Station. Retaining a
           // deleted or renamed stage locally makes the CRM render columns that
           // no longer exist in RD, so remove only stages absent from a
@@ -1020,7 +1025,7 @@ Deno.serve(async (req) => {
 
       // Upsert rd_deals (todos os deals, não apenas ganhos)
       try {
-        await admin.from("rd_deals").upsert(
+        const { error: dealUpsertError } = await admin.from("rd_deals").upsert(
           {
             user_id: userId!,
             ad_account_id: funnel!.ad_account_id,
@@ -1055,6 +1060,7 @@ Deno.serve(async (req) => {
           },
           { onConflict: "user_id,rd_deal_id" },
         );
+        if (dealUpsertError) throw dealUpsertError;
       } catch (e) {
         console.log(`[rd_deals upsert] ${rdDealId} failed: ${(e as Error).message}`);
         metrics.errors++;
@@ -1073,13 +1079,14 @@ Deno.serve(async (req) => {
         return;
       }
 
-      const { data: existing } = await admin
+      const { data: existing, error: existingSalesError } = await admin
         .from("sales")
         .select(
           "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
         )
         .eq("rd_deal_id", rdDealId)
         .maybeSingle();
+      if (existingSalesError) throw existingSalesError;
 
       const rdPayment = extractPaymentMethod([dealCustomFields, contactCustomFields]);
 
