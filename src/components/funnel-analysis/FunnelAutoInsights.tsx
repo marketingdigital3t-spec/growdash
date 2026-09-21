@@ -32,7 +32,7 @@ export function FunnelAutoInsights({ a, compact = false }: { a: FunnelAnalytics;
     insights.push({
       icon: AlertTriangle,
       color: "text-red-400",
-      text: `Maior gargalo: ${a.bottleneck.from} → ${a.bottleneck.to} (perda de ${a.bottleneck.lossPct.toFixed(1)}%).`,
+      text: `Maior gargalo: ${a.bottleneck.from} → ${a.bottleneck.to} (perda de ${(Number(a.bottleneck.lossPct) || 0).toFixed(1)}%).`,
     });
   }
 

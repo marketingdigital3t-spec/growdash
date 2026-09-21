@@ -18,7 +18,7 @@ export function FunnelBottlenecks({ a }: { a: FunnelAnalytics }) {
             <div className="text-sm">
               <div className="font-medium">Maior queda: {b.from} → {b.to}</div>
               <div className="text-muted-foreground mt-0.5">
-                Perda de {b.lossPct.toFixed(1)}% dos leads nessa transição.
+                Perda de {(Number(b.lossPct) || 0).toFixed(1)}% dos leads nessa transição.
               </div>
             </div>
           </div>

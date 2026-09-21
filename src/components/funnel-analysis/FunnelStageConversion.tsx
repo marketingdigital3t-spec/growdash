@@ -9,7 +9,9 @@ export function FunnelStageConversion({ a }: Props) {
     label: s.label,
     shortLabel: shortenLabel(s.label),
     rate: Math.min(100, Math.max(0, Number(s.rate.toFixed(1)))),
-    lossPct: Number(s.lossPct.toFixed(1)),
+    // Older stage-history rows may not contain lossPct. Keep the transition
+    // visible instead of crashing the entire analysis screen.
+    lossPct: Number((Number(s.lossPct) || 0).toFixed(1)),
     lost: Math.max(0, Math.round(s.lost || 0)),
     isBottleneck: s.isBottleneck && s.lost > 0,
   }));

@@ -900,7 +900,10 @@ export function computeFunnelAnalytics(
     stageConversion,
     evolution,
     agingBuckets,
-    bottleneck: stageConversion.find((item) => item.isBottleneck)?.from || null,
+    bottleneck: (() => {
+      const item = stageConversion.find((entry) => entry.isBottleneck);
+      return item ? { from: item.from, to: item.to, lossPct: Number(item.lossPct) || 0 } : null;
+    })(),
     sourceBreakdown,
     lostReasons,
     standbyReasons,

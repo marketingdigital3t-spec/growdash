@@ -21,7 +21,7 @@ export function FunnelGrowthRecommendations({ analytics, media }: { analytics: F
       items.push({ tone: "warning", title: "Cobertura RD abaixo do esperado", detail: `A Meta reporta ${media.metaLeads} aquisição(ões), e o RD contém ${analytics.totalLeads} lead(s) no mesmo recorte (${media.rdCoverage.toFixed(0)}% de cobertura). Corrija UTMs e a entrada no RD antes de usar CPL/CAC para escala.` });
     }
     if (analytics.bottleneck && analytics.bottleneck.lossPct > 0) {
-      items.push({ tone: "tip", title: "Ataque o gargalo antes de comprar mais tráfego", detail: `${analytics.bottleneck.from} → ${analytics.bottleneck.to} tem a maior perda estimada (${analytics.bottleneck.lossPct.toFixed(1)}%). Defina responsável, SLA de resposta e cadência de follow-up para essa passagem.` });
+      items.push({ tone: "tip", title: "Ataque o gargalo antes de comprar mais tráfego", detail: `${analytics.bottleneck.from} → ${analytics.bottleneck.to} tem a maior perda estimada (${(Number(analytics.bottleneck.lossPct) || 0).toFixed(1)}%). Defina responsável, SLA de resposta e cadência de follow-up para essa passagem.` });
     }
     if (analytics.agingBuckets.gt7 > 0) {
       items.push({ tone: "tip", title: "Recupere leads antes de gerar novos custos", detail: `${analytics.agingBuckets.gt7} lead(s) estão parados há mais de 7 dias. Faça uma lista de reativação e meça resposta, oportunidade e venda antes de abrir nova campanha.` });
