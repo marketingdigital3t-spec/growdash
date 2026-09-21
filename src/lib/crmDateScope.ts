@@ -25,10 +25,22 @@ function isWithinRange(value: string | null | undefined, startDate: Date, endDat
  */
 export function isRDDealInCrmPeriod(deal: PeriodScopedDeal, startDate: Date, endDate: Date, includeHistory = false) {
   if (includeHistory) return true;
+  // Won negotiations belong to the interval by their won date, not by the
+  // original lead date. This keeps historical sales out of a monthly board.
+  if (deal.win || isWonRDStageName(deal.rd_stage_name)) return isRDDealWonInCrmPeriod(deal, startDate, endDate, false);
   if (isWithinRange(deal.lead_created_at, startDate, endDate)) return true;
   if (isWithinRange(deal.closed_at, startDate, endDate)) return true;
   // RD integrations may not backfill closed_at for an already-won deal. Its
   // stage movement is the authoritative period fallback in that case.
   if ((deal.win || isWonRDStageName(deal.rd_stage_name)) && isWithinRange(deal.stage_updated_at, startDate, endDate)) return true;
   return !deal.lead_created_at && !deal.closed_at && isWithinRange(deal.stage_updated_at, startDate, endDate);
+}
+
+/** A won KPI is scoped by the effective won date, never by lead creation. */
+export function isRDDealWonInCrmPeriod(deal: PeriodScopedDeal, startDate: Date, endDate: Date, includeHistory = false) {
+  const won = Boolean(deal.win || isWonRDStageName(deal.rd_stage_name));
+  if (!won) return false;
+  if (includeHistory) return true;
+  if (isWithinRange(deal.closed_at, startDate, endDate)) return true;
+  return !deal.closed_at && isWithinRange(deal.stage_updated_at, startDate, endDate);
 }

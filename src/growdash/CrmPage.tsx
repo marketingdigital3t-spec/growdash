@@ -53,7 +53,7 @@ import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
 import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
-import { isRDDealInCrmPeriod } from "@/lib/crmDateScope";
+import { isRDDealInCrmPeriod, isRDDealWonInCrmPeriod } from "@/lib/crmDateScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
@@ -329,7 +329,7 @@ export default function CrmPage() {
     // KPIs describe the selected account/date scope, never a transient board
     // search or status filter. In "Todas as contas" this is the union of all
     // connected Meta accounts and RD funnels.
-    const won = dealsInPipeline.filter((deal) => classifyLead(deal) === "won");
+    const won = dealsInPipeline.filter((deal) => isRDDealWonInCrmPeriod(deal, startDate, endDate, preset === "max"));
     const lost = dealsInPipeline.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
     const active = dealsInPipeline.filter((deal) => !deal.win && !lost.includes(deal));
     const wonIds = new Set(won.map((deal) => deal.rd_deal_id));
@@ -343,7 +343,7 @@ export default function CrmPage() {
       lost: lost.length,
       conversion: dealsInPipeline.length ? (won.length / dealsInPipeline.length) * 100 : 0,
     };
-  }, [dealsInPipeline, getOpportunityAmount, scopedSales]);
+  }, [dealsInPipeline, endDate, getOpportunityAmount, preset, scopedSales, startDate]);
 
   const boardStageModel = useMemo(() => {
     const map = new Map<string, PipelineStage>();
