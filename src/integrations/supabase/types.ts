@@ -1048,7 +1048,6 @@ export type Database = {
         Row: {
           business_unit_id: string | null
           created_at: string
-          expert_name: string | null
           id: string
           legal_name: string | null
           metadata: Json
@@ -1061,7 +1060,6 @@ export type Database = {
         Insert: {
           business_unit_id?: string | null
           created_at?: string
-          expert_name?: string | null
           id?: string
           legal_name?: string | null
           metadata?: Json
@@ -1074,7 +1072,6 @@ export type Database = {
         Update: {
           business_unit_id?: string | null
           created_at?: string
-          expert_name?: string | null
           id?: string
           legal_name?: string | null
           metadata?: Json
@@ -1641,6 +1638,39 @@ export type Database = {
           },
         ]
       }
+      event_class_participants: {
+        Row: {
+          id: string
+          event_class_id: string
+          participant_type: string
+          name: string
+          investment_cents: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          event_class_id: string
+          participant_type: string
+          name: string
+          investment_cents?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          event_class_id?: string
+          participant_type?: string
+          name?: string
+          investment_cents?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       event_classes: {
         Row: {
           ad_account_id: string | null
@@ -1649,6 +1679,7 @@ export type Database = {
           created_at: string
           date_end: string | null
           date_start: string
+          expert_name: string | null
           has_model_patients: boolean
           id: string
           location: string | null
@@ -1672,6 +1703,7 @@ export type Database = {
           created_at?: string
           date_end?: string | null
           date_start: string
+          expert_name?: string | null
           has_model_patients?: boolean
           id?: string
           location?: string | null
@@ -1695,6 +1727,7 @@ export type Database = {
           created_at?: string
           date_end?: string | null
           date_start?: string
+          expert_name?: string | null
           has_model_patients?: boolean
           id?: string
           location?: string | null

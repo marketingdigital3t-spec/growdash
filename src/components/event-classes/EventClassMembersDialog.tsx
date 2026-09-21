@@ -1,147 +1,31 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { UserPlus, Trash2, ExternalLink, RefreshCw } from "lucide-react";
-import {
-  useEventClassMembers,
-  useAddEventClassMember,
-  useRemoveEventClassMember,
-  type EventClass,
-  type MemberType,
-} from "@/hooks/useEventClasses";
-import { RDMemberPickerDialog } from "./RDMemberPickerDialog";
+import { Pencil, Trash2, UserPlus } from "lucide-react";
+import { useCreateEventClassParticipant, useDeleteEventClassParticipant, useEventClassParticipants, useUpdateEventClassParticipant, type EventClass, type EventClassParticipant, type MemberType } from "@/hooks/useEventClasses";
 import { toast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 
-function dealField(fields: unknown, aliases: string[]) {
-  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return "";
-  const normalize = (value: string) => value.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "");
-  const wanted = aliases.map(normalize);
-  const entry = Object.entries(fields as Record<string, unknown>).find(([key]) => wanted.includes(normalize(key)));
-  return entry?.[1] == null ? "" : String(entry[1]);
-}
-
-interface Props {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  eventClass: EventClass;
-  memberType: MemberType;
-}
+interface Props { open: boolean; onOpenChange: (v: boolean) => void; eventClass: EventClass; memberType: MemberType; }
+const empty = { name: "", investment: "0", notes: "" };
+function cents(value: string) { const normalized = value.replace(/\./g, "").replace(",", "."); const amount = Number(normalized); return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100)) : 0; }
+function money(value: number) { return (value / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
 
 export function EventClassMembersDialog({ open, onOpenChange, eventClass, memberType }: Props) {
-  const { data: members, isLoading } = useEventClassMembers(eventClass.id, memberType);
-  const remove = useRemoveEventClassMember();
-  const addManual = useAddEventClassMember();
-  const qc = useQueryClient();
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [manualOpen, setManualOpen] = useState(false);
-  const [manualNames, setManualNames] = useState("");
-
-  const max = memberType === "student" ? (eventClass.max_people || eventClass.max_students) : eventClass.max_model_patients;
+  const { data: participants = [], isLoading } = useEventClassParticipants(eventClass.id, memberType);
+  const create = useCreateEventClassParticipant(); const update = useUpdateEventClassParticipant(); const remove = useDeleteEventClassParticipant();
+  const [form, setForm] = useState(empty); const [editing, setEditing] = useState<EventClassParticipant | null>(null);
   const label = memberType === "student" ? "Alunas" : "Pacientes-modelo";
-  const linkedCount = members?.length ?? 0;
-  const manualCount = memberType === "student"
-    ? Number(eventClass.manual_student_count || 0)
-    : Number(eventClass.manual_model_patient_count || 0);
-  const totalCount = linkedCount + manualCount;
-
-  const handleRemove = async (id: string) => {
-    if (!confirm("Remover este vínculo? O registro no RD não será afetado.")) return;
-    try {
-      await remove.mutateAsync({ id, eventClassId: eventClass.id, memberType });
-      toast({ title: "Vínculo removido" });
-    } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
-    }
+  const save = async () => {
+    if (!form.name.trim()) { toast({ title: "Informe o nome.", variant: "destructive" }); return; }
+    try { if (editing) await update.mutateAsync({ id: editing.id, event_class_id: eventClass.id, name: form.name, investment_cents: cents(form.investment), notes: form.notes }); else await create.mutateAsync({ event_class_id: eventClass.id, participant_type: memberType, name: form.name, investment_cents: cents(form.investment), notes: form.notes }); setForm(empty); setEditing(null); toast({ title: editing ? "Cadastro atualizado" : "Cadastro adicionado" }); } catch (error: any) { toast({ title: "Não foi possível salvar", description: error?.message?.includes("unique") ? "Esse nome já está cadastrado nesta turma." : error?.message, variant: "destructive" }); }
   };
-
-  const addManualNames = async () => {
-    const names = manualNames.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
-    for (const name of names) {
-      const key = `manual:${name}:${Date.now()}`;
-      await addManual.mutateAsync({ eventClassId: eventClass.id, rdDealId: key, memberType, dealName: name });
-    }
-    setManualNames(""); setManualOpen(false); toast({ title: `${names.length} nome(s) adicionado(s)` });
-  };
-
-  return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{label} — {eventClass.title}</DialogTitle>
-            <p className="text-sm text-muted-foreground">{totalCount}/{max} vagas preenchidas · RD: {linkedCount} · Manual: {manualCount}</p>
-          </DialogHeader>
-
-          <div className="flex gap-2">
-            <Button onClick={() => setPickerOpen(true)} className="flex-1 sm:flex-none">
-              <UserPlus className="h-4 w-4 mr-2" /> Adicionar via RD
-            </Button>
-            <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: ["event_class_members", eventClass.id, memberType] })}>
-              <RefreshCw className="h-4 w-4 mr-2" /> Sincronizar
-            </Button>
-            <Button variant="outline" onClick={() => setManualOpen((value) => !value)}>Adicionar nomes</Button>
-          </div>
-          {manualOpen && <div className="space-y-2 rounded-lg border border-dashed border-primary/40 bg-primary/[.04] p-3"><p className="text-xs text-muted-foreground">Cole um nome por linha. Esses nomes ficam registrados na turma e não serão removidos pela sincronização do RD.</p><Textarea value={manualNames} onChange={(event) => setManualNames(event.target.value)} placeholder="Eunice Rosa\nJeane Magalhães" rows={4} /><Button size="sm" onClick={() => void addManualNames()} disabled={!manualNames.trim() || addManual.isPending}>Salvar nomes</Button></div>}
-
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-            {isLoading && <div className="text-sm text-muted-foreground text-center py-8">Carregando...</div>}
-            {!isLoading && linkedCount === 0 && (
-              <div className="text-center py-10 text-sm text-muted-foreground">
-                Nenhum{memberType === "student" ? "a pessoa" : " paciente-modelo"} vinculad{memberType === "student" ? "a" : "o"} via RD ainda.{manualCount > 0 && " As vagas manuais podem ser editadas na turma."}
-              </div>
-            )}
-            {(members || []).map((m: any) => {
-              const d = m.deal || {};
-              const s = m.sale || {};
-              const totalValue = d.amount_total || dealField(d.custom_fields, ["valor total", "valor da venda", "valor"]);
-              return (
-                <div key={m.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{s.contact_name || (m.rd_deal_id.startsWith("manual:") ? m.rd_deal_id.split(":")[1] : `Deal ${m.rd_deal_id.slice(0, 8)}`)}</span>
-                      {d.rd_stage_name && <Badge variant="secondary" className="text-xs">{d.rd_stage_name}</Badge>}
-                      {d.win && <Badge className="text-xs bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15">Ganho</Badge>}
-                    </div>
-                    <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
-                      {s.contact_email && <span>{s.contact_email}</span>}
-                      {s.contact_phone && <span>{s.contact_phone}</span>}
-                      {(d.lead_city || d.lead_state) && <span>{[d.lead_city, d.lead_state].filter(Boolean).join("/")}</span>}
-                      {totalValue && <span>Valor total: {Number(String(totalValue).replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", ".") || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>}
-                      {d.deal_owner_name && <span>Resp: {d.deal_owner_name}</span>}
-                      {d.utm_campaign && <span>Camp: {d.utm_campaign}</span>}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {(dealField(d.custom_fields, ["data da turma", "data turma", "turma"])) && <Badge variant="outline" className="text-[10px]">Turma: {dealField(d.custom_fields, ["data da turma", "data turma", "turma"])}</Badge>}
-                      {(dealField(d.custom_fields, ["profissão", "profissao", "profissão / área de atuação", "area de atuacao"])) && <Badge variant="outline" className="text-[10px]">Profissão: {dealField(d.custom_fields, ["profissão", "profissao", "profissão / área de atuação", "area de atuacao"])}</Badge>}
-                      {(dealField(d.custom_fields, ["tipo de público", "tipo de publico", "publico"])) && <Badge variant="outline" className="text-[10px]">Público: {dealField(d.custom_fields, ["tipo de público", "tipo de publico", "publico"])}</Badge>}
-                    </div>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" asChild title="Ver no RD">
-                      <a href={`https://crm.rdstation.com/deals/${m.rd_deal_id}`} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => handleRemove(m.id)} title="Remover">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <RDMemberPickerDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        eventClass={eventClass}
-        memberType={memberType}
-      />
-    </>
-  );
+  const edit = (participant: EventClassParticipant) => { setEditing(participant); setForm({ name: participant.name, investment: (participant.investment_cents / 100).toFixed(2).replace(".", ","), notes: participant.notes || "" }); };
+  const del = async (participant: EventClassParticipant) => { if (!confirm(`Remover ${participant.name}?`)) return; try { await remove.mutateAsync({ id: participant.id, eventClassId: eventClass.id }); } catch (error: any) { toast({ title: "Não foi possível remover", description: error?.message, variant: "destructive" }); } };
+  const pending = create.isPending || update.isPending;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{label} — {eventClass.title}</DialogTitle><p className="text-sm text-muted-foreground">{participants.length} cadastro(s) manual(is). Nenhum dado é importado do RD ou Meta.</p></DialogHeader>
+    <div className="space-y-3 rounded-lg border border-dashed border-primary/40 bg-primary/[.03] p-3"><div className="flex items-center gap-2 font-semibold"><UserPlus className="h-4 w-4" />{editing ? "Editar cadastro" : `Adicionar ${memberType === "student" ? "aluna" : "paciente-modelo"}`}</div><div className="grid gap-3 sm:grid-cols-2"><div><Label>Nome *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div><div><Label>Investimento (R$)</Label><Input inputMode="decimal" value={form.investment} onChange={(e) => setForm({ ...form, investment: e.target.value })} placeholder="0,00" /></div><div className="sm:col-span-2"><Label>Observações</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} /></div></div><div className="flex gap-2"><Button onClick={() => void save()} disabled={pending}>{pending ? "Salvando…" : editing ? "Salvar alterações" : "Adicionar"}</Button>{editing && <Button variant="outline" onClick={() => { setEditing(null); setForm(empty); }}>Cancelar edição</Button>}</div></div>
+    <div className="max-h-[45vh] space-y-2 overflow-y-auto">{isLoading && <p className="py-6 text-center text-sm text-muted-foreground">Carregando…</p>}{!isLoading && participants.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum cadastro manual ainda.</p>}{participants.map((participant) => <div key={participant.id} className="flex items-start justify-between gap-3 rounded-lg border border-border p-3"><div><p className="font-medium">{participant.name}</p><p className="text-xs text-muted-foreground">{money(participant.investment_cents)}{participant.notes ? ` · ${participant.notes}` : ""}</p></div><div className="flex gap-1"><Button size="icon" variant="ghost" onClick={() => edit(participant)} aria-label="Editar participante"><Pencil className="h-4 w-4" /></Button><Button size="icon" variant="ghost" onClick={() => void del(participant)} aria-label="Remover participante"><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div>)}</div><DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button></DialogFooter></DialogContent></Dialog>;
 }

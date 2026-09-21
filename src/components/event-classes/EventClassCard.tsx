@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, MapPin, Users, Stethoscope, MoreVertical, RefreshCw, Edit, Trash2 } from "lucide-react";
+import { Calendar, MapPin, Users, Stethoscope, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -12,7 +12,6 @@ import { useDeleteEventClass } from "@/hooks/useEventClasses";
 import { EventClassMembersDialog } from "./EventClassMembersDialog";
 import { EventClassFormDialog } from "./EventClassFormDialog";
 import { toast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 
 const STATUS_LABELS: Record<EventClassStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   open: { label: "Aberta", variant: "default" },
@@ -27,7 +26,6 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
   const [patientsOpen, setPatientsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const remove = useDeleteEventClass();
-  const qc = useQueryClient();
 
   const peopleCap = ec.max_people || ec.max_students || 0;
   const studentPct = peopleCap > 0 ? (ec.studentCount / peopleCap) * 100 : 0;
@@ -60,16 +58,12 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant={status.variant}>{status.label}</Badge>
-                {ec.sources.map((source, index) => (
-                  <Badge key={source.id || `${source.rd_funnel_id}-${index}`} variant="outline" className="text-xs">
-                    {source.member_type === "student" ? "Alunas" : "PM"}: {source.funnel_name || "Funil RD"}
-                  </Badge>
-                ))}
               </div>
               <h3 className="font-semibold text-base leading-tight">{ec.title}</h3>
               <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
                 <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {dateLabel}</span>
                 {ec.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {ec.location}</span>}
+                {ec.expert_name && <span>Expert: {ec.expert_name}</span>}
               </div>
             </div>
             <DropdownMenu>
@@ -77,9 +71,6 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                 <Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => qc.invalidateQueries({ queryKey: ["event_classes"] })}>
-                  <RefreshCw className="h-3.5 w-3.5 mr-2" /> Sincronizar
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setEditOpen(true)}>
                   <Edit className="h-3.5 w-3.5 mr-2" /> Editar
                 </DropdownMenuItem>
@@ -97,7 +88,6 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                 <span className="font-medium">{ec.studentCount}/{peopleCap}</span>
               </div>
               <Progress value={Math.min(studentPct, 100)} className="h-1.5" />
-              {ec.manual_student_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedStudentCount} · Manual: {ec.manual_student_count}</p>}
             </div>
             {ec.has_model_patients && (
               <div className="space-y-1">
@@ -106,7 +96,6 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                   <span className="font-medium">{ec.modelPatientCount}/{ec.max_model_patients}</span>
                 </div>
                 <Progress value={Math.min(patientPct, 100)} className="h-1.5" />
-                {ec.manual_model_patient_count > 0 && <p className="text-[11px] text-muted-foreground">RD: {ec.linkedModelPatientCount} · Manual: {ec.manual_model_patient_count}</p>}
               </div>
             )}
           </div>

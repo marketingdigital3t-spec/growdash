@@ -4,30 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, CalendarDays, Users, Stethoscope, AlertTriangle, CheckCircle2, Clock3, MapPin } from "lucide-react";
-import { useCreateEventClass, useEventClasses, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
-import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useEventClasses, type EventClassStatus, type EventClassWithCounts } from "@/hooks/useEventClasses";
 import { EventClassCard } from "@/components/event-classes/EventClassCard";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
 import { motion } from "framer-motion";
 import { parseISO, isAfter, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
-import { toast } from "sonner";
-
-const STRUCTURE_TEMPLATES = [
-  ["Ranniely — 12/09 — Araguaína", "2026-09-12", "Araguaína - TO"],
-  ["Ranniely — 02/10 — Alpha", "2026-10-02", "Alpha - SP"],
-  ["Ranniely — 09/11 — Alpha", "2026-11-09", "Alpha - SP"],
-  ["José — 17 a 19/10 — CTA Brasília", "2026-10-17", "CTA Brasília"],
-  ["Natália — 17/10 — Alpha", "2026-10-17", "Alpha - SP"],
-  ["Natália — 07/11 — Alpha", "2026-11-07", "Alpha - SP"],
-  ["Natália — 28/11 — Adamantina", "2026-11-28", "Adamantina - SP"],
-  ["Ste — 17/10 — São José do Rio Preto", "2026-10-17", "São José do Rio Preto - SP"],
-  ["Ste — 24/10 — São José do Rio Preto", "2026-10-24", "São José do Rio Preto - SP"],
-  ["Ste — 21/11 — Alpha", "2026-11-21", "Alpha - SP"],
-  ["Ste — 28/11 — Alpha", "2026-11-28", "Alpha - SP"],
-  ["J.App — 21/10 — CENESP", "2026-10-21", "CENESP - SP"],
-] as const;
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Todos os status" },
@@ -60,23 +42,15 @@ export default function EventClasses() {
   const { data: classes, isLoading } = useEventClasses();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [funnelFilter, setFunnelFilter] = useState<string>("all");
-  const [expertFilters, setExpertFilters] = useState<string[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [activeView, setActiveView] = useState<"classes" | "agenda">("classes");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const create = useCreateEventClass();
-  const { data: funnels } = useRDFunnels(undefined, activeView === "classes");
-  const expertOptions = useMemo(() => Array.from(new Set((funnels || []).map((funnel) => funnel.expert_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")).map((name) => ({ id: name, name })), [funnels]);
-  const expertByFunnel = useMemo(() => new Map((funnels || []).map((funnel) => [funnel.id, funnel.expert_name || funnel.name])), [funnels]);
 
   const filtered = useMemo(() => {
     const list = classes || [];
     return list
       .filter((c) => statusFilter === "all" || c.status === statusFilter)
-      .filter((c) => funnelFilter === "all" || c.sources.some((source) => source.rd_funnel_id === funnelFilter))
-      .filter((c) => expertFilters.length === 0 || c.sources.some((source) => expertFilters.includes(expertByFunnel.get(source.rd_funnel_id) || "")))
       .filter((c) => !dateFrom || c.date_start >= dateFrom)
       .filter((c) => !dateTo || c.date_start <= dateTo)
       .filter((c) => {
@@ -84,8 +58,7 @@ export default function EventClasses() {
         const ql = query.toLowerCase();
         return c.title.toLowerCase().includes(ql)
           || (c.location || "").toLowerCase().includes(ql)
-          || (c.rd_funnel_name || "").toLowerCase().includes(ql)
-          || c.sources.some((source) => (source.funnel_name || "").toLowerCase().includes(ql));
+          || (c.expert_name || "").toLowerCase().includes(ql);
       })
       .sort((a, b) => {
         // priorização operacional
@@ -105,7 +78,7 @@ export default function EventClasses() {
         if (sa !== sb) return sa - sb;
         return a.date_start.localeCompare(b.date_start);
       });
-  }, [classes, query, statusFilter, funnelFilter, expertFilters, expertByFunnel, dateFrom, dateTo]);
+  }, [classes, query, statusFilter, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
     const list = filtered;
@@ -132,43 +105,6 @@ export default function EventClasses() {
     };
   }, [filtered]);
 
-  const importOperationalClasses = async () => {
-    const existingTitles = new Set((classes || []).map((eventClass) => eventClass.title.trim().toLocaleLowerCase("pt-BR")));
-    const missing = STRUCTURE_TEMPLATES.filter(([title]) => !existingTitles.has(title.toLocaleLowerCase("pt-BR")));
-    if (missing.length === 0) {
-      toast.info("As turmas com data definida dessa grade já estão cadastradas.");
-      return;
-    }
-
-    try {
-      for (const [title, date_start, location] of missing) {
-        await create.mutateAsync({
-          title,
-          date_start,
-          date_end: null,
-          location,
-          max_people: 0,
-          max_students: 0,
-          max_model_patients: 0,
-          manual_student_count: 0,
-          manual_model_patient_count: 0,
-          has_model_patients: false,
-          ad_account_id: null,
-          rd_funnel_id: null,
-          rd_model_patient_funnel_id: null,
-          allowed_student_stage_ids: [],
-          allowed_model_patient_stage_ids: [],
-          status: "upcoming",
-          notes: "Importada da grade operacional. Vincule conta e funil do RD para contabilização automática; use os controles manuais enquanto o vínculo não estiver definido.",
-          sources: [],
-        });
-      }
-      toast.success(`${missing.length} turma(s) criada(s). Configure o funil RD em cada turma quando quiser automatizar a ocupação.`);
-    } catch (error: any) {
-      toast.error(error?.message || "Não foi possível importar todas as turmas.");
-    }
-  };
-
   return (
     <div className="event-classes-page mx-auto w-full max-w-[1600px] space-y-6">
       <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
@@ -184,13 +120,10 @@ export default function EventClasses() {
               <CalendarDays className="h-6 w-6 text-primary" /> Datas & Turmas
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Gerencie turmas, vagas, alunos e pacientes-modelo vinculados aos funis comerciais do RD Station.
+              Gerencie turmas, experts, alunas e pacientes-modelo com cadastros 100% manuais.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={importOperationalClasses} disabled={create.isPending}>
-              Importar grade de turmas
-            </Button>
             <Button onClick={() => setFormOpen(true)}>
               <Plus className="h-4 w-4 mr-2" /> Nova turma
             </Button>
@@ -214,7 +147,7 @@ export default function EventClasses() {
           <Input
             aria-label="Buscar turma"
             value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar turma por nome, local ou funil..."
+          placeholder="Buscar turma por nome, expert ou local..."
             className="pl-9"
           />
         </div>
@@ -226,14 +159,6 @@ export default function EventClasses() {
             {STATUS_OPTIONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={funnelFilter} onValueChange={setFunnelFilter}>
-          <SelectTrigger aria-label="Filtrar turmas por funil RD" className="w-full sm:w-56"><SelectValue placeholder="Funil RD" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os funis</SelectItem>
-            {(funnels || []).map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {expertOptions.length > 0 && <AccountMultiSelect accounts={expertOptions} selectedIds={expertFilters} onChange={setExpertFilters} className="w-full sm:w-[230px]" emptyLabel="Todos os experts" singularLabel="expert" pluralLabel="experts" ariaLabel="Filtrar por experts" searchPlaceholder="Pesquisar expert…" />}
       </div>
 
       {isLoading && (
@@ -245,7 +170,7 @@ export default function EventClasses() {
           <CardContent className="py-16 text-center space-y-2">
             <CalendarDays className="h-10 w-10 text-muted-foreground/40 mx-auto" />
             <h3 className="font-medium">Nenhuma turma cadastrada ainda</h3>
-            <p className="text-sm text-muted-foreground">Crie a primeira turma e vincule a um funil do RD Station.</p>
+            <p className="text-sm text-muted-foreground">Crie a primeira turma com nome, expert, datas e capacidades.</p>
             <Button onClick={() => setFormOpen(true)} className="mt-4">
               <Plus className="h-4 w-4 mr-2" /> Nova turma
             </Button>
@@ -278,7 +203,7 @@ function AgendaPanel({ classes, isLoading, onCreate }: { classes: EventClassWith
       const vacancies = Math.max(peopleCap - eventClass.studentCount, 0);
       return <article key={eventClass.id} className="grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-[140px_minmax(0,1fr)_auto]">
         <div className="flex flex-row items-center gap-3 border-b border-border bg-primary/[0.04] p-4 sm:flex-col sm:items-start sm:justify-center sm:border-b-0 sm:border-r"><span className="text-2xl font-black text-primary">{format(parseISO(eventClass.date_start), "dd")}</span><span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{format(parseISO(eventClass.date_start), "MMM yyyy", { locale: ptBR })}</span></div>
-        <div className="p-4"><div className="flex flex-wrap items-center gap-2"><h2 className="font-black">{eventClass.title}</h2><span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">{eventClass.status === "sold_out" ? "Esgotada" : eventClass.status === "upcoming" ? "Em breve" : "Aberta"}</span></div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span><Clock3 className="mr-1 inline h-3.5 w-3.5" />{format(parseISO(eventClass.date_start), "HH:mm")}{eventClass.date_end ? `–${format(parseISO(eventClass.date_end), "HH:mm")}` : ""}</span>{eventClass.location && <span><MapPin className="mr-1 inline h-3.5 w-3.5" />{eventClass.location}</span>}{eventClass.rd_funnel_name && <span>Funil: {eventClass.rd_funnel_name}</span>}</div></div>
+        <div className="p-4"><div className="flex flex-wrap items-center gap-2"><h2 className="font-black">{eventClass.title}</h2><span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">{eventClass.status === "sold_out" ? "Esgotada" : eventClass.status === "upcoming" ? "Em breve" : "Aberta"}</span></div><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span><Clock3 className="mr-1 inline h-3.5 w-3.5" />{eventClass.expert_name || "Expert não informado"}</span>{eventClass.location && <span><MapPin className="mr-1 inline h-3.5 w-3.5" />{eventClass.location}</span>}</div></div>
         <div className="flex items-center gap-5 border-t border-border px-4 py-3 sm:border-l sm:border-t-0"><div className="text-right"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Ocupação</span><strong className="text-sm">{eventClass.studentCount}/{peopleCap}</strong></div><div className="text-right"><span className="block text-[9px] font-black uppercase tracking-wider text-muted-foreground">Vagas</span><strong className="text-sm text-primary">{vacancies}</strong></div></div>
       </article>;
     })}</div>}
