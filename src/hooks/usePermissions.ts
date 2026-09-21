@@ -45,7 +45,11 @@ export function usePermissions() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["permissions", user?.id, workspace?.id],
     enabled: !!user && !!workspace,
-    retry: false,
+    // Permission reads can briefly fail while the Supabase session is being
+    // refreshed. Retry boundedly before showing the global access error;
+    // authorization is still fail-closed after all attempts are exhausted.
+    retry: 2,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2_000),
     queryFn: async () => withRequestTimeout((async () => {
       const scopedPerm =
         workspace?.id && !workspace.id.startsWith("legacy-")
@@ -131,7 +135,11 @@ export function usePermissions() {
     // A workspace bootstrap error used to be ignored here. A protected route
     // then redirected to the first "allowed" route with no permissions,
     // which looked like a perpetual loading/reload to the user.
-    error: isError || workspaceError,
+    // Workspace owners/admins derive authority from the membership row and do
+    // not depend on the secondary permission catalog. A transient failure in
+    // that catalog must not blank the entire CRM/Funnel application for them.
+    // Non-admin members remain fail-closed when their permission read fails.
+    error: workspaceError || (!canAdmin && isError),
     retry: async () => {
       await refetchWorkspace();
       return refetch();
