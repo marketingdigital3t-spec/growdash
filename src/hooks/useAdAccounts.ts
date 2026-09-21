@@ -10,6 +10,10 @@ export function useAdAccounts(includeDisconnected = true) {
   return useQuery({
     queryKey: ["ad_accounts", user?.id ?? "anonymous", includeDisconnected],
     enabled: !!user,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 5_000),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await withRequestTimeout(supabase
         .from("ad_accounts")

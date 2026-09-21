@@ -22,6 +22,10 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     // Do not retain a previous user's funnels while the session changes.
     queryKey: ["rd_funnels", user?.id ?? "anonymous", adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
     enabled: enabled && !!user,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 5_000),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
@@ -30,8 +34,7 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
       if (error) throw error;
       return data as RDFunnel[];
     },
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
   });
 }
 
