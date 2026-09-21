@@ -100,7 +100,8 @@ export default function FunnelAnalysis() {
   // somar esses registros: somente funis ligados a contas Meta que ainda
   // existem na Growdash entram no escopo de “Todas as contas”.
   const activeFunnels = useMemo(
-    () => funnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id && integratedAccountIds.has(funnel.ad_account_id)),
+    () => funnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id
+      && (!funnel.ad_account_id || integratedAccountIds.has(funnel.ad_account_id))),
     [funnels, integratedAccountIds],
   );
   // Uma conta selecionada só pode consultar os funis vinculados ao seu UUID.

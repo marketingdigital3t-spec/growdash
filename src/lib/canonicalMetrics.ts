@@ -3,6 +3,8 @@ import { format } from "date-fns";
 
 export type CanonicalWonDeal = {
   rd_deal_id: string;
+  rd_connection_id?: string | null;
+  ad_account_id?: string | null;
   win?: boolean | null;
   rd_stage_name?: string | null;
   closed_at?: string | null;
@@ -50,8 +52,12 @@ export function isCanonicalWonDeal(deal: Pick<CanonicalWonDeal, "win" | "rd_stag
 export function canonicalWonDealIds<T extends CanonicalWonDeal>(deals: T[]) {
   const ids = new Set<string>();
   for (const deal of deals) {
-    const id = String(deal.rd_deal_id || "").trim();
-    if (id && isCanonicalWonDeal(deal)) ids.add(id);
+    const rawId = String(deal.rd_deal_id || "").trim();
+    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${rawId}`;
+    if (rawId && isCanonicalWonDeal(deal)) {
+      ids.add(rawId);
+      ids.add(id);
+    }
   }
   return ids;
 }
@@ -59,7 +65,7 @@ export function canonicalWonDealIds<T extends CanonicalWonDeal>(deals: T[]) {
 export function canonicalWonDeals<T extends CanonicalWonDeal>(deals: T[]) {
   const seen = new Set<string>();
   return deals.filter((deal) => {
-    const id = String(deal.rd_deal_id || "").trim();
+    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${String(deal.rd_deal_id || "").trim()}`;
     if (!id || !isCanonicalWonDeal(deal) || seen.has(id)) return false;
     seen.add(id);
     return true;

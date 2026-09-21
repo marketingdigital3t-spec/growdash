@@ -27,4 +27,16 @@ describe("RD query scope", () => {
   it("deduplicates the same RD identity once", () => {
     expect(dedupeRDDealsById([{ rd_deal_id: "deal-1" }, { rd_deal_id: "deal-1" }, { rd_deal_id: "deal-2" }])).toHaveLength(2);
   });
+
+  it("keeps the same external deal separate when it belongs to different RD connections", () => {
+    expect(dedupeRDDealsById([
+      { rd_deal_id: "deal-1", rd_connection_id: "connection-a" },
+      { rd_deal_id: "deal-1", rd_connection_id: "connection-b" },
+    ])).toHaveLength(2);
+  });
+
+  it("allows an RD-only funnel without weakening an explicit account scope", () => {
+    expect(isDealInRDQueryScope({ ad_account_id: null, rd_funnel_id: "funnel-a" }, scope)).toBe(false);
+    expect(isDealInRDQueryScope({ ad_account_id: "account-a", rd_funnel_id: "funnel-a" }, scope)).toBe(true);
+  });
 });

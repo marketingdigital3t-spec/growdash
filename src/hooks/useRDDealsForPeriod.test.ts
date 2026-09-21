@@ -42,13 +42,12 @@ const base = (overrides: Partial<RDDealLite> = {}): RDDealLite => ({
 });
 
 describe("dedupeRDDeals", () => {
-  it("keeps one deal across a consolidated account selection", () => {
+  it("keeps separate account identities when a legacy snapshot reuses an RD id", () => {
     const rows = dedupeRDDeals([
       base({ id: "old", ad_account_id: "account-a" }),
       base({ id: "new", ad_account_id: "account-b", updated_at: "2026-08-02T12:00:00.000Z", amount_total: 15_000 }),
     ]);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: "new", amount_total: 15_000 });
+    expect(rows).toHaveLength(2);
   });
 
   it("does not merge separate RD deals", () => {

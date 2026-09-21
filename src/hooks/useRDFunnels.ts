@@ -7,6 +7,7 @@ export interface RDFunnel {
   id: string;
   user_id: string;
   ad_account_id: string;
+  rd_connection_id?: string | null;
   name: string;
   expert_name: string | null;
   rd_funnel_id: string | null;

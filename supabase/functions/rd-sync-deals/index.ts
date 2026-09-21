@@ -512,7 +512,7 @@ Deno.serve(async (req) => {
     // clientes. O cron continua limitado ao owner informado pelo service role.
     const funnelQuery = (isServiceCall ? admin : caller!)
       .from("rd_funnels")
-      .select("id, user_id, ad_account_id, rd_funnel_id, name")
+      .select("id, user_id, ad_account_id, rd_connection_id, rd_funnel_id, name")
       .eq("id", funnel_id);
     if (isServiceCall) funnelQuery.eq("user_id", userId);
     const { data: funnel } = await funnelQuery.maybeSingle();
@@ -1028,6 +1028,7 @@ Deno.serve(async (req) => {
         const { error: dealUpsertError } = await admin.from("rd_deals").upsert(
           {
             user_id: userId!,
+            rd_connection_id: funnel!.rd_connection_id || null,
             ad_account_id: funnel!.ad_account_id,
             rd_funnel_id: funnel!.id,
             rd_deal_id: rdDealId,
@@ -1058,7 +1059,7 @@ Deno.serve(async (req) => {
             raw: d,
             custom_fields: customFields,
           },
-          { onConflict: "user_id,rd_deal_id" },
+          { onConflict: "rd_connection_id,rd_deal_id" },
         );
         if (dealUpsertError) throw dealUpsertError;
       } catch (e) {
@@ -1298,6 +1299,7 @@ Deno.serve(async (req) => {
           null;
         const row: Record<string, unknown> = {
           user_id: userId!,
+          rd_connection_id: funnel!.rd_connection_id || null,
           ad_account_id: funnel!.ad_account_id,
           rd_funnel_id: funnel!.id,
           rd_deal_id: rdDealId,
@@ -1340,7 +1342,7 @@ Deno.serve(async (req) => {
         const batch = rows.slice(offset, offset + PERSIST_BATCH_SIZE);
         const { error } = await admin
           .from("rd_deals")
-          .upsert(batch, { onConflict: "user_id,rd_deal_id" });
+          .upsert(batch, { onConflict: "rd_connection_id,rd_deal_id" });
         if (error) throw error;
         totalUpdated += batch.length;
         if (offset + PERSIST_BATCH_SIZE < rows.length) await sleep(20);

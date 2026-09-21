@@ -139,7 +139,7 @@ export default function CrmPage() {
   } = useGlobalFilters();
   const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
   const isConsolidatedView = adAccountIds.length !== 1;
-  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: adAccounts = [], isLoading: loadingAdAccounts, isError: adAccountsError, error: adAccountsQueryError, refetch: refetchAdAccounts } = useAdAccounts();
   const availableAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
@@ -156,11 +156,16 @@ export default function CrmPage() {
   // uma cópia pessoal do token. A consulta usa RLS e continua retornando
   // somente os funis atribuídos ao usuário atual.
   const canReadCrm = crmPipelineEnabled(!!user);
-  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(accountFilter, canReadCrm && availableAccounts.length > 0, accountFilter ? undefined : accountScopeIds);
+  // RD is an independent source. When no Meta account is selected, load all
+  // funnels visible through RLS, including RD-only funnels with no Meta link.
+  // A selected Meta account remains a strict boundary and only shows funnels
+  // explicitly linked to that account.
+  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(accountFilter, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length), accountFilter ? undefined : undefined);
   const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
   const availableFunnels = useMemo(
-    () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id && accountScopeSet.has(funnel.ad_account_id)),
-    [accountScopeSet, funnelData],
+    () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id
+      && (!adAccountIds.length || accountScopeSet.has(funnel.ad_account_id))),
+    [accountScopeSet, adAccountIds.length, funnelData],
   );
   const availableFunnelIds = useMemo(() => new Set(availableFunnels.map((funnel) => funnel.id)), [availableFunnels]);
   const scopedSelectedFunnelIds = useMemo(
@@ -178,9 +183,9 @@ export default function CrmPage() {
     refetch: refetchDeals,
   } = useRDCRMDeals({
     adAccountId: accountFilter,
-    adAccountIds: accountFilter ? undefined : accountScopeIds,
+    adAccountIds: accountFilter ? undefined : (adAccountIds.length ? accountScopeIds : undefined),
     funnelIds: requestedFunnelIds,
-    enabled: canReadCrm && accountScopeIds.length > 0 && requestedFunnelIds.length > 0,
+    enabled: canReadCrm && (accountScopeIds.length > 0 || !adAccountIds.length) && requestedFunnelIds.length > 0,
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
   const { data: insightData = [], isLoading: loadingMetaInsights, isPlaceholderData: isPreviousInsightScope } = useInsights({ adAccountId: accountFilter, adAccountIds: accountScopeIds, startDate, endDate });
@@ -243,8 +248,7 @@ export default function CrmPage() {
   );
   const scopedDeals = useMemo(
     () => dedupeRDDeals(allDeals.filter((deal) =>
-      !!deal.ad_account_id
-      && accountScopeSet.has(deal.ad_account_id)
+      (!deal.ad_account_id || accountScopeSet.has(deal.ad_account_id))
       && !!deal.rd_funnel_id
       && connectedFunnelIdSet.has(deal.rd_funnel_id)
       && !isExcludedLegacyRannielyStage(connectedFunnelNameById.get(deal.rd_funnel_id), deal.rd_stage_name),
@@ -578,7 +582,7 @@ export default function CrmPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
-          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name }))} selectedIds={adAccountIds} onChange={setAdAccountIds} className="h-11" popoverClassName="crm-filter-popover" />
+          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name }))} selectedIds={adAccountIds} onChange={setAdAccountIds} loading={loadingAdAccounts} errorMessage={adAccountsError ? `Falha ao carregar contas: ${adAccountsQueryError instanceof Error ? adAccountsQueryError.message : "verifique a conexão"}` : undefined} onRetry={() => void refetchAdAccounts()} className="h-11" popoverClassName="crm-filter-popover" />
           <AccountMultiSelect
             accounts={availableFunnels.map((funnel) => ({ id: funnel.id, name: funnel.name }))}
             selectedIds={scopedSelectedFunnelIds}
