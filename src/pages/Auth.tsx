@@ -6,11 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
+import { withRequestTimeout } from "@/lib/resilience";
 
 type Mode = "login" | "register";
 
 function isTransientAuthError(error: { status?: number; message?: string } | null | undefined) {
-  return !!error && ([500, 502, 503, 504].includes(Number(error.status)) || /HTTP\s*50[234]|upstream|temporar/i.test(error.message || ""));
+  return !!error && ([0, 408, 429, 500, 502, 503, 504].includes(Number(error.status)) || /HTTP\s*50[234]|upstream|temporar|tempo de carregamento|timed out|timeout|network|fetch failed/i.test(error.message || ""));
 }
 
 function authErrorMessage(error: { status?: number; message?: string } | null | undefined) {
@@ -43,11 +44,15 @@ export default function Auth() {
     setLoading(true);
     if (mode === "login") {
       let error: { status?: number; message?: string } | null = null;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const result = await supabase.auth.signInWithPassword({ email, password });
-        error = result.error;
-        if (!error || !isTransientAuthError(error) || attempt === 1) break;
-        await new Promise((resolve) => window.setTimeout(resolve, 700));
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const result = await withRequestTimeout(supabase.auth.signInWithPassword({ email, password }), 12_000);
+          error = result.error;
+        } catch (requestError) {
+          error = { status: 0, message: requestError instanceof Error ? requestError.message : "Falha de rede no serviço de autenticação." };
+        }
+        if (!error || !isTransientAuthError(error) || attempt === 2) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
       }
       setLoading(false);
       if (error) { toast({ title: "Não foi possível entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos. Se necessário, use a recuperação de acesso." : authErrorMessage(error), variant: "destructive" }); return; }
