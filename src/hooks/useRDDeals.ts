@@ -182,6 +182,7 @@ interface Params {
   source?: string;
   state?: string;
   campaign?: string;
+  campaigns?: string[];
   owner?: string;
   product?: string;
   /**
@@ -216,7 +217,7 @@ export function dedupeRDDeals(rows: RDDeal[]) {
 }
 
 export function useRDDeals(params: Params) {
-  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, owner, product, includeHistory = false, enabled = true } = params;
+  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
   const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
   return useQuery({
     queryKey: [
@@ -226,7 +227,7 @@ export function useRDDeals(params: Params) {
       endDate?.toISOString(),
       source ?? "all",
       state ?? "all",
-      campaign ?? "all",
+      campaigns?.slice().sort().join(",") || campaign || "all",
       owner ?? "all",
       product ?? "all",
       includeHistory ? "history" : "period",
@@ -250,7 +251,7 @@ export function useRDDeals(params: Params) {
       }
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
-      if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
+      if (campaigns?.length) query = query.in("utm_campaign", campaigns); else if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
       if (owner && owner !== "all") query = query.eq("deal_owner_name", owner);
       if (product && product !== "all") query = query.eq("rd_product_name", product);
 
@@ -280,7 +281,7 @@ export function useRDDeals(params: Params) {
  * datas foi a principal causa de divergência com os relatórios do RD.
  */
 export function useRDClosedDeals(params: Params) {
-  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, owner, product, includeHistory = false, enabled = true } = params;
+  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
   const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
   return useQuery({
     queryKey: [
@@ -290,7 +291,7 @@ export function useRDClosedDeals(params: Params) {
       endDate?.toISOString(),
       source ?? "all",
       state ?? "all",
-      campaign ?? "all",
+      campaigns?.slice().sort().join(",") || campaign || "all",
       owner ?? "all",
       product ?? "all",
       includeHistory ? "history" : "period",
@@ -308,7 +309,7 @@ export function useRDClosedDeals(params: Params) {
       if (shouldApplyRDDateRange(includeHistory) && endDate) query = query.lte("closed_at", endOfDay(endDate).toISOString());
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
-      if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
+      if (campaigns?.length) query = query.in("utm_campaign", campaigns); else if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
       if (owner && owner !== "all") query = query.eq("deal_owner_name", owner);
       if (product && product !== "all") query = query.eq("rd_product_name", product);
 

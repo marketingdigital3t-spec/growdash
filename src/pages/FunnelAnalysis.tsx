@@ -41,6 +41,7 @@ import { FunnelGrowthRecommendations } from "@/components/funnel-analysis/Funnel
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
+import { CampaignMultiSelect } from "@/components/dashboard/CampaignMultiSelect";
 import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpportunityProfile";
@@ -86,7 +87,8 @@ export default function FunnelAnalysis() {
   const allAccountsSelected = selectedAccountIds.length === 0;
   const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels();
   const [selectedSource, setSelectedSource] = useState<string>("all");
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const selectedCampaign = selectedCampaigns.length === 1 ? selectedCampaigns[0] : "all";
   const [selectedState, setSelectedState] = useState<string>("all");
   const [selectedOwner, setSelectedOwner] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<string>("all");
@@ -130,7 +132,7 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     source: selectedSource,
-    campaign: selectedCampaign,
+    campaigns: selectedCampaigns,
     state: selectedState,
     owner: selectedOwner,
     product: selectedProduct,
@@ -144,7 +146,7 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     source: selectedSource,
-    campaign: selectedCampaign,
+    campaigns: selectedCampaigns,
     state: selectedState,
     owner: selectedOwner,
     product: selectedProduct,
@@ -166,7 +168,7 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     source: selectedSource,
-    campaign: selectedCampaign,
+    campaigns: selectedCampaigns,
     state: selectedState,
     owner: selectedOwner,
     product: selectedProduct,
@@ -178,7 +180,7 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     source: selectedSource,
-    campaign: selectedCampaign,
+    campaigns: selectedCampaigns,
     state: selectedState,
     owner: selectedOwner,
     product: selectedProduct,
@@ -247,13 +249,13 @@ export default function FunnelAnalysis() {
     funnelIds: funnelScopeIds,
     scopedDealIds: periodScopedDealIds,
     source: selectedSource,
-    campaign: selectedCampaign,
+    campaigns: selectedCampaigns,
     state: selectedState,
     product: selectedProduct,
     allowedDealIds: periodAllowedDealIds,
     stateByDealId: periodStateByDealId,
     excludedDealIds,
-  }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaign, selectedProduct, selectedSource, selectedState]);
+  }), [excludedDealIds, funnelScopeIds, periodAllowedDealIds, periodSales, periodScopedDealIds, periodStateByDealId, selectedCampaigns, selectedProduct, selectedSource, selectedState]);
   const periodAnalytics = periodBaseAnalytics;
   const previousAvgDaysToConvert = useMemo(() => {
     const span = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
@@ -327,19 +329,19 @@ export default function FunnelAnalysis() {
     // Mesmo que a política do banco permita consultar histórico legado, a
     // mídia exibida aqui deve pertencer exclusivamente às contas integradas.
     const accountScopedInsights = insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
-    if (selectedCampaign === "all") return { scopedInsights: accountScopedInsights, campaignWithoutMediaMatch: false };
-    const campaign = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
+    if (!selectedCampaigns.length) return { scopedInsights: accountScopedInsights, campaignWithoutMediaMatch: false };
+    const campaigns = selectedCampaigns.map((value) => value.trim().toLocaleLowerCase("pt-BR"));
     const matches = accountScopedInsights.filter((row) => {
       // Older Meta insight rows may have no campaign name. They must not
       // crash the whole analysis while a campaign filter is active.
       const metaName = String(row.campaign_name ?? "").trim().toLocaleLowerCase("pt-BR");
       if (!metaName) return false;
-      return metaName === campaign || metaName.includes(campaign) || campaign.includes(metaName);
+      return campaigns.some((campaign) => metaName === campaign || metaName.includes(campaign) || campaign.includes(metaName));
     });
     // UTMs e campanhas Meta podem ter nomes diferentes. Exibir todas as
     // campanhas neste caso distorce investimento, CPL e ROAS do funil.
     return { scopedInsights: matches, campaignWithoutMediaMatch: matches.length === 0 };
-  }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet, selectedCampaign]);
+  }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet, selectedCampaigns]);
 
   // O filtro de campanha do RD usa UTM e nem sempre tem o mesmo nome da
   // campanha na Meta. Use os IDs reais das campanhas visíveis e, como
@@ -347,21 +349,21 @@ export default function FunnelAnalysis() {
   // público continua carregando para campanhas de formulário, mensagem e
   // outros objetivos mesmo quando os nomes divergem.
   const audienceCampaignIds = useMemo(() => {
-    const filter = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
+    const filters = selectedCampaigns.map((value) => value.trim().toLocaleLowerCase("pt-BR"));
     const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     const candidates = visibleCampaignRows.filter((campaign: any) => accountIds.has(campaign.ad_account_id));
-    const matching = selectedCampaign === "all"
+    const matching = !selectedCampaigns.length
       ? candidates
       : candidates.filter((campaign: any) => {
         const name = String(campaign.name || "").toLocaleLowerCase("pt-BR");
-        return name.includes(filter) || filter.includes(name);
+        return filters.some((filter) => name.includes(filter) || filter.includes(name));
       });
     const insightIds = scopedInsights
       .filter((row) => !!row.campaign_id && !!row.ad_account_id && accountIds.has(row.ad_account_id))
       .map((row) => String(row.campaign_id));
     const ids = (matching.length ? matching.map((campaign: any) => String(campaign.id)) : candidates.map((campaign: any) => String(campaign.id))).concat(insightIds).filter(Boolean);
     return Array.from(new Set(ids));
-  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, selectedCampaign, visibleCampaignRows]);
+  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, selectedCampaigns, visibleCampaignRows]);
 
   // O total de aquisição da Análise de Funis é uma métrica da Meta: cada
   // conversa iniciada por anúncio é um lead a ser trabalhado. Buscamos os
@@ -376,14 +378,14 @@ export default function FunnelAnalysis() {
   );
   const actionScopeAccountIds = allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds;
   const actionScopeCampaignIds = useMemo(() => {
-    if (selectedCampaign === "all") return undefined;
-    const selectedName = selectedCampaign.trim().toLocaleLowerCase("pt-BR");
+    if (!selectedCampaigns.length) return undefined;
+    const selectedNames = new Set(selectedCampaigns.map((name) => name.trim().toLocaleLowerCase("pt-BR")));
     const ids = visibleCampaignRows
-      .filter((campaign: any) => String(campaign.name || "").trim().toLocaleLowerCase("pt-BR") === selectedName)
+      .filter((campaign: any) => selectedNames.has(String(campaign.name || "").trim().toLocaleLowerCase("pt-BR")))
       .map((campaign: any) => String(campaign.id))
       .filter(Boolean);
     return ids.length ? Array.from(new Set(ids)) : undefined;
-  }, [selectedCampaign, visibleCampaignRows]);
+  }, [selectedCampaigns, visibleCampaignRows]);
   const { data: actionData, isLoading: loadingMetaActions } = useActionTotalsByAds(
     actionAdIds,
     startDate,
@@ -544,7 +546,7 @@ export default function FunnelAnalysis() {
           />
 
           <FilterSelect label="Origem" value={selectedSource} onChange={setSelectedSource} options={sources} />
-          <FilterSelect label="Campanha" value={selectedCampaign} onChange={setSelectedCampaign} options={campaigns} />
+          <CampaignMultiSelect campaigns={campaigns.map((name) => ({ id: name, name }))} selectedIds={selectedCampaigns} onChange={setSelectedCampaigns} placeholder="Todas as campanhas" className="gd-filter-control w-full bg-background/60 sm:w-[180px]" />
           <FilterSelect label="Estado" value={selectedState} onChange={setSelectedState} options={states} />
           <FilterSelect label="Responsável" value={selectedOwner} onChange={setSelectedOwner} options={owners} />
           <FilterSelect label="Produto" value={selectedProduct} onChange={setSelectedProduct} options={products} />
