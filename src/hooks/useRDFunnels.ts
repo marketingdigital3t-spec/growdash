@@ -18,6 +18,14 @@ export interface RDFunnel {
 
 export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?: string[]) {
   const { user } = useAuth();
+  const cacheKey = user?.id ? `growdash:rd-funnels:${user.id}:${adAccountId ?? "all"}:${adAccountIds?.slice().sort().join(",") ?? ""}` : "";
+  const readCache = () => {
+    if (!cacheKey) return undefined;
+    try {
+      const value = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      return Array.isArray(value) ? value as RDFunnel[] : undefined;
+    } catch { return undefined; }
+  };
   return useQuery({
     // Do not retain a previous user's funnels while the session changes.
     queryKey: ["rd_funnels", user?.id ?? "anonymous", adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
@@ -25,14 +33,18 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     retry: 3,
     retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 5_000),
     refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
+    staleTime: 2 * 60 * 1000,
+    placeholderData: readCache,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
       else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
       const { data, error } = await withRequestTimeout(q, 15_000);
       if (error) throw error;
-      return data as RDFunnel[];
+      const result = data as RDFunnel[];
+      try { if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* cache is optional */ }
+      return result;
     },
     staleTime: 60 * 1000,
   });
