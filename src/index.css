@@ -7389,20 +7389,20 @@ html:not(.dark) .brand-shell .growdash-main :is(input, select, textarea, [role="
   border-color: #d4d4d4 !important;
   color: #111111 !important;
 }
-.dark .brand-shell .crm-page .crm-filter-strip :is(h2, p, span, label, svg) {
+.dark .brand-shell .crm-page .crm-filter-strip :is(h2, p, span, label) {
   color: #111111 !important;
 }
 .dark .brand-shell .crm-page .crm-filter-strip .text-muted-foreground {
   color: #666666 !important;
 }
-.dark .brand-shell .crm-page .crm-filter-strip :is(input, select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date) {
+.dark .brand-shell .crm-page .crm-filter-strip :is(select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date) {
   background: #ffffff !important;
   border-color: #c9c9c9 !important;
   color: #111111 !important;
   box-shadow: none !important;
 }
-.dark .brand-shell .crm-page .crm-filter-strip :is(input, select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date):hover,
-.dark .brand-shell .crm-page .crm-filter-strip :is(input, select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date):focus-visible {
+.dark .brand-shell .crm-page .crm-filter-strip :is(select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date):hover,
+.dark .brand-shell .crm-page .crm-filter-strip :is(select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date):focus-visible {
   background: #ffffff !important;
   border-color: #111111 !important;
   color: #111111 !important;
@@ -7741,3 +7741,22 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
    metric strip: six cards across on desktop, with the remaining four below. */
 .expert-dashboard .expert-kpi-grid .gd-metric-card { min-height: 96px !important; }
 .expert-dashboard .expert-kpi-grid .gd-metric-card-content { min-height: 96px !important; padding: 16px !important; }
+
+/* Keep every search input on the same graphite/white contract in black mode,
+   including modules whose legacy selectors are loaded later in this file. */
+.dark .brand-shell .growdash-main :is(input[placeholder*="Buscar"], input[placeholder*="Pesquisar"], input[placeholder*="Pesquise"], input[aria-label*="Buscar"], input[aria-label*="Pesquisar"], .campaign-search-input),
+.dark .brand-shell .growdash-main :is(input[placeholder*="Buscar"], input[placeholder*="Pesquisar"], input[placeholder*="Pesquise"], input[aria-label*="Buscar"], input[aria-label*="Pesquisar"], .campaign-search-input):hover,
+.dark .brand-shell .growdash-main :is(input[placeholder*="Buscar"], input[placeholder*="Pesquisar"], input[placeholder*="Pesquise"], input[aria-label*="Buscar"], input[aria-label*="Pesquisar"], .campaign-search-input):focus-visible {
+  background: #2b2b2b !important;
+  border-color: #555555 !important;
+  color: #ffffff !important;
+  caret-color: #ffffff !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.08) !important;
+}
+.dark .brand-shell .growdash-main :is(input[placeholder*="Buscar"], input[placeholder*="Pesquisar"], input[placeholder*="Pesquise"], input[aria-label*="Buscar"], input[aria-label*="Pesquisar"], .campaign-search-input)::placeholder {
+  color: #c2c2c2 !important;
+  opacity: 1 !important;
+}
+.dark .brand-shell .growdash-main label:has(> input[placeholder*="Buscar"], > input[placeholder*="Pesquisar"], > input[placeholder*="Pesquise"]) > svg {
+  color: #ffffff !important;
+}
