@@ -61,9 +61,13 @@ export class RouteErrorBoundary extends Component<Props, State> {
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{this.state.retryBlocked ? "As tentativas foram interrompidas para impedir um loop. Escolha outra tela ou volte ao início." : refreshRequired ? "Uma atualização substituiu os arquivos desta tela. Atualize uma única vez para abrir a versão atual." : "A navegação e seus dados continuam seguros. Tente este módulo novamente."}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
           {!this.state.retryBlocked && <button type="button" onClick={this.retry} className="gd-button"><RefreshCw className="h-4 w-4" /> Tentar módulo</button>}
-          {refreshRequired && !this.state.retryBlocked && <button type="button" onClick={this.reloadLatest} className="gd-button">Atualizar versão</button>}
+          {!this.state.retryBlocked && <button type="button" onClick={this.reloadLatest} className="gd-button">Recarregar módulo</button>}
           <button type="button" onClick={this.goHome} className="gd-button">Ir para o início</button>
         </div>
+        <details className="mx-auto mt-4 max-w-lg text-left text-[11px] text-muted-foreground">
+          <summary className="cursor-pointer text-center">Detalhes técnicos</summary>
+          <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-2">{this.state.error.message}</pre>
+        </details>
       </div>
     </section>;
   }
