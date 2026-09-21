@@ -7432,6 +7432,12 @@ html:not(.dark) .brand-shell .growdash-main :is(input, select, textarea, [role="
   background: #ffffff !important;
   color: #111111 !important;
 }
+.dark .crm-filter-popover :is(.bg-popover, .bg-background, .bg-card, .bg-muted) {
+  background: #ffffff !important;
+}
+.dark .crm-filter-popover :is(.bg-accent, .bg-accent\/50) {
+  background: #eeeeee !important;
+}
 .dark .crm-filter-popover :is(input, button, [role="option"], [role="dialog"], span, svg, label) {
   color: #111111 !important;
 }

@@ -198,7 +198,7 @@ export function MetaDateRangePicker({
                     <SelectTrigger aria-label="Selecionar período de comparação" className="w-[160px] h-9">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="crm-filter-popover">
                       {PRESET_ORDER.filter((p) => p !== "custom").map((p) => (
                         <SelectItem key={p} value={p}>
                           {PRESET_LABELS[p]}
