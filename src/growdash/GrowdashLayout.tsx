@@ -131,6 +131,7 @@ export default function GrowdashLayout() {
   const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const {
     adAccountId,
+    adAccountIds,
     setAdAccountId,
     segment,
     setSegment,
@@ -154,6 +155,7 @@ export default function GrowdashLayout() {
     startDate: monthlyRange.startDate,
     endDate: monthlyRange.endDate,
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
+    adAccountIds: adAccountIds.length > 1 ? adAccountIds : undefined,
     enabled: loadBackgroundData,
   });
   const { data: goalData, isLoading: loadingGoals } = useSalesGoals(currentMonth, { enabled: loadBackgroundData });

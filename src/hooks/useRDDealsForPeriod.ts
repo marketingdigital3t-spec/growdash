@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
+import { isRDDealInScopePeriod } from "@/lib/rdQueryScope";
 import { withRequestTimeout } from "@/lib/resilience";
 
 export interface RDDealLite {
@@ -115,10 +116,12 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         let q = supabase
           .from("rd_deals")
           .select(FIELDS)
-          // Some older RD imports do not have lead_created_at. They are still
-          // leads and must be included using the timestamp available for the
-          // deal, rather than disappearing from expert and funnel totals.
-          .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`)
+          // Fetch every timestamp that can establish the canonical period.
+          // The final client-side selector below applies the business rule:
+          // creation for open/lost, closing (or a real won-stage transition)
+          // for won. In particular, a deal created months ago but closed in
+          // the selected interval must not be lost by a lead_created filter.
+          .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
           .order("lead_created_at", { ascending: false });
         if (adAccountId) q = q.eq("ad_account_id", adAccountId);
         // An empty selection means "all accounts". Passing [] to PostgREST
@@ -138,7 +141,14 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         all = all.concat(batch);
         if (batch.length < PAGE) break;
       }
-      return dedupeRDDeals(all);
+      const scoped = all.filter((deal) => isRDDealInScopePeriod(deal, {
+        accountIds: adAccountId ? [adAccountId] : (adAccountIds ?? []),
+        funnelIds: [],
+        startDate,
+        endDate,
+        dateRule: "created_at_for_open_closed_at_for_won",
+      }));
+      return dedupeRDDeals(scoped);
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,

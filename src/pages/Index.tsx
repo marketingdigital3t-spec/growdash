@@ -68,6 +68,12 @@ const Index = () => {
     : adAccounts, [adAccounts, businessUnitId, segment]);
   const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
   const visibleAccountIdList = useMemo(() => visibleAccounts.map((account) => account.id), [visibleAccounts]);
+  // A seleção explícita é uma fronteira de dados. Só usamos todas as contas
+  // visíveis quando o usuário realmente deixou o seletor em "Todas".
+  const scopedAccountIds = useMemo(
+    () => selectedAccountIds.length ? selectedAccountIds : visibleAccountIdList,
+    [selectedAccountIds, visibleAccountIdList],
+  );
   const isRDAccountScopeReady = selectedAccount !== "all" || (!loadingAdAccounts && visibleAccountIdList.length > 0);
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
@@ -96,14 +102,14 @@ const Index = () => {
     startDate,
     endDate,
     adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : visibleAccountIdList,
+    adAccountIds: selectedAccountIds.length > 1 || selectedAccountIds.length === 0 ? scopedAccountIds : undefined,
     enabled: isRDAccountScopeReady,
   });
   const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
     startDate,
     endDate,
     adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : visibleAccountIdList,
+    adAccountIds: selectedAccountIds.length > 1 || selectedAccountIds.length === 0 ? scopedAccountIds : undefined,
     enabled: isRDAccountScopeReady,
   });
   const { data: rdFunnels = [] } = useRDFunnels();
@@ -211,7 +217,7 @@ const Index = () => {
     const syncEnd = format(endDate, "yyyy-MM-dd");
     syncMeta.mutate({
       adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-      adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : visibleAccountIdList,
+      adAccountIds: selectedAccountIds.length > 1 || selectedAccountIds.length === 0 ? scopedAccountIds : undefined,
       startDate: syncStart,
       endDate: syncEnd,
       includeBreakdowns: true,
