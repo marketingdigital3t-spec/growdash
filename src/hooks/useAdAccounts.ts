@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
 
-export function useAdAccounts(includeDisconnected = false) {
+// Disconnected accounts remain visible so operators can reconnect them. Hiding
+// them made a permissions outage look like destructive data loss.
+export function useAdAccounts(includeDisconnected = true) {
   const { user } = useAuth();
   return useQuery({
     queryKey: ["ad_accounts", user?.id ?? "anonymous", includeDisconnected],

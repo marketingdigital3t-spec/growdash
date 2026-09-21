@@ -112,7 +112,9 @@ function IntegrationsContent() {
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
   const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
   const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
-  const { data: rdFunnelsData } = useRDFunnels(undefined, !!rdIntegration?.is_active);
+  // Keep funnel inventory visible while RD authorization is blocked. The UI
+  // must show what needs reconnection instead of rendering an empty state.
+  const { data: rdFunnelsData } = useRDFunnels(undefined, !!user);
   const connectMeta = useMetaOAuth();
   const connectInstagram = useInstagramOAuth();
   const connectGoogle = useGoogleWorkspaceOAuth();
@@ -185,7 +187,17 @@ function IntegrationsContent() {
 
       if (metaConnected) {
         try {
-          await syncMeta.mutateAsync({ adAccountIds: adAccounts.filter((account) => account.connection_status !== "disconnected").map((account) => account.id), startDate: format(subDays(new Date(), 30), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd") });
+          const syncStart = format(subDays(new Date(), 30), "yyyy-MM-dd");
+          const syncEnd = format(new Date(), "yyyy-MM-dd");
+          await syncMeta.mutateAsync({
+            adAccountIds: adAccounts.filter((account) => account.connection_status !== "disconnected").map((account) => account.id),
+            startDate: syncStart,
+            endDate: syncEnd,
+            // Keep audience delivery data available for every campaign type.
+            includeBreakdowns: true,
+            breakdownStartDate: syncStart,
+            breakdownEndDate: syncEnd,
+          });
           completed.push("Meta Ads");
         } catch (error) {
           failures.push(`Meta Ads: ${error instanceof Error ? error.message : "falha na sincronização"}`);
