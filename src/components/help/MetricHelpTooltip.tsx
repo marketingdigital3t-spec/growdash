@@ -27,20 +27,20 @@ export function MetricHelpTooltip({
   return (
     <TooltipProvider delayDuration={280} skipDelayDuration={100}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            tabIndex={0}
-            className={cn("group/help relative min-w-0 cursor-default outline-none", className)}
-            aria-label={`${title}. ${description}${detail ? ` ${detail}` : ""}`}
-          >
-            {children}
-            {showHint && (
-              <span className="pointer-events-none absolute right-2 top-2 z-10 grid h-5 w-5 place-items-center rounded-full border border-primary/35 bg-background/80 text-primary opacity-70 shadow-sm transition-opacity group-hover/help:opacity-100 group-focus-visible/help:opacity-100">
+        <div className={cn("group/help relative min-w-0", className)}>
+          {children}
+          {showHint ? (
+            <TooltipTrigger asChild>
+              <button type="button" aria-label={`${title}. ${description}${detail ? ` ${detail}` : ""}`} className="absolute right-2 top-2 z-10 grid h-5 w-5 place-items-center rounded-full border border-primary/35 bg-background/80 text-primary opacity-70 shadow-sm transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <Info className="h-3 w-3" aria-hidden="true" />
-              </span>
-            )}
-          </div>
-        </TooltipTrigger>
+              </button>
+            </TooltipTrigger>
+          ) : (
+            <TooltipTrigger asChild>
+              <span tabIndex={0} aria-label={`${title}. ${description}${detail ? ` ${detail}` : ""}`} className="pointer-events-none absolute inset-0 outline-none" />
+            </TooltipTrigger>
+          )}
+        </div>
         <TooltipContent
           side="top"
           align="center"

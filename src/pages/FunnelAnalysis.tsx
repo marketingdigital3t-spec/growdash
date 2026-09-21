@@ -209,7 +209,7 @@ export default function FunnelAnalysis() {
   const excludedDealIds = useMemo(() => excludedOperationalRDDealIds(deals, activeFunnels), [activeFunnels, deals]);
 
   const sources = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_source).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
-  const campaigns = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_campaign).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
+  const rdCampaigns = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_campaign).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
   const states = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.lead_state).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
   const owners = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.deal_owner_name).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
   const products = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.rd_product_name).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
@@ -217,11 +217,10 @@ export default function FunnelAnalysis() {
   useEffect(() => {
     if (loadingFilterDeals) return;
     if (selectedSource !== "all" && !sources.includes(selectedSource)) setSelectedSource("all");
-    if (selectedCampaign !== "all" && !campaigns.includes(selectedCampaign)) setSelectedCampaign("all");
     if (selectedState !== "all" && !states.includes(selectedState)) setSelectedState("all");
     if (selectedOwner !== "all" && !owners.includes(selectedOwner)) setSelectedOwner("all");
     if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
-  }, [campaigns, loadingFilterDeals, owners, products, selectedCampaign, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
+  }, [loadingFilterDeals, owners, products, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
 
   const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
@@ -319,6 +318,10 @@ export default function FunnelAnalysis() {
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
   );
+  const campaigns = useMemo(() => Array.from(new Set([
+    ...rdCampaigns,
+    ...visibleCampaignRows.map((campaign) => campaign.name).filter(Boolean),
+  ])).sort((a, b) => a.localeCompare(b, "pt-BR")), [rdCampaigns, visibleCampaignRows]);
   const { scopedInsights, campaignWithoutMediaMatch } = useMemo(() => {
     const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     // Mesmo que a política do banco permita consultar histórico legado, a
