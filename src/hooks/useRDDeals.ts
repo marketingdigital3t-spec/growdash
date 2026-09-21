@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { eachDayOfInterval, endOfDay, format, startOfDay } from "date-fns";
+import { eachDayOfInterval, format } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
-import { canonicalWonDeals } from "@/lib/canonicalMetrics";
+import { canonicalWonDeals, canonicalWonDate, isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 import { withRequestTimeout } from "@/lib/resilience";
 
@@ -109,7 +109,7 @@ export function rdDealEventDate(deal: Pick<RDDeal, "lead_created_at" | "stage_up
 /** Canonical timestamp for a won RD deal. Older imports often omit closed_at;
  * the last real stage movement is the only trustworthy period fallback. */
 export function rdDealWonDate(deal: Pick<RDDeal, "closed_at" | "stage_updated_at">): string | null {
-  return deal.closed_at || deal.stage_updated_at || null;
+  return canonicalWonDate(deal);
 }
 
 type CanonicalFunnelStage = Omit<FunnelStage, "rd_stage_id"> & { rd_stage_id: string };
@@ -165,12 +165,13 @@ export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled =
     queryKey: ["rd_deal_stage_history", scopeIds.join(","), startDate.toISOString(), endDate.toISOString()],
     enabled: enabled && scopeIds.length > 0,
     queryFn: async () => {
+      const bounds = saoPauloDayBounds(startDate, endDate);
       const { data, error } = await withRequestTimeout(supabase
         .from("rd_deal_stage_history")
         .select("id, rd_deal_id, rd_funnel_id, from_stage_id, from_stage_name, from_stage_bucket, to_stage_id, to_stage_name, to_stage_bucket, changed_at")
         .in("rd_funnel_id", scopeIds)
-        .gte("changed_at", startOfDay(startDate).toISOString())
-        .lte("changed_at", endOfDay(endDate).toISOString())
+        .gte("changed_at", bounds.start.toISOString())
+        .lte("changed_at", bounds.end.toISOString())
         .order("changed_at", { ascending: true }), 15_000);
       if (error) throw error;
       return (data || []) as RDDealStageHistory[];
@@ -183,6 +184,8 @@ export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled =
 interface Params {
   funnelId?: string;
   funnelIds?: string[];
+  adAccountId?: string;
+  adAccountIds?: string[];
   startDate?: Date;
   endDate?: Date;
   source?: string;
@@ -223,12 +226,14 @@ export function dedupeRDDeals(rows: RDDeal[]) {
 }
 
 export function useRDDeals(params: Params) {
-  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
+  const { funnelId, funnelIds, adAccountId, adAccountIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
   const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
   return useQuery({
     queryKey: [
       "rd_deals",
       scopeIds.join(","),
+      adAccountId ?? "all",
+      adAccountIds?.slice().sort().join(",") ?? "",
       startDate?.toISOString(),
       endDate?.toISOString(),
       source ?? "all",
@@ -245,14 +250,17 @@ export function useRDDeals(params: Params) {
         .select(DEAL_FIELDS)
         .order("lead_created_at", { ascending: false });
       query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
+      if (adAccountId) query = query.eq("ad_account_id", adAccountId);
+      else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
 
       if (shouldApplyRDDateRange(includeHistory) && (startDate || endDate)) {
         // Older RD imports may not have lead_created_at. Keep those leads in
         // the selected period using the next trustworthy event timestamp,
         // matching useRDDealsForPeriod and preventing silent under-counting
         // in Perfil do público e entrega.
-        const rangeStart = startOfDay(startDate ?? endDate!).toISOString();
-        const rangeEnd = endOfDay(endDate ?? startDate!).toISOString();
+        const bounds = saoPauloDayBounds(startDate ?? endDate!, endDate ?? startDate!);
+        const rangeStart = bounds.start.toISOString();
+        const rangeEnd = bounds.end.toISOString();
         query = query.or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`);
       }
       if (source && source !== "all") query = query.eq("utm_source", source);
@@ -287,12 +295,14 @@ export function useRDDeals(params: Params) {
  * datas foi a principal causa de divergência com os relatórios do RD.
  */
 export function useRDClosedDeals(params: Params) {
-  const { funnelId, funnelIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
+  const { funnelId, funnelIds, adAccountId, adAccountIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
   const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
   return useQuery({
     queryKey: [
       "rd_closed_deals",
       scopeIds.join(","),
+      adAccountId ?? "all",
+      adAccountIds?.slice().sort().join(",") ?? "",
       startDate?.toISOString(),
       endDate?.toISOString(),
       source ?? "all",
@@ -309,6 +319,8 @@ export function useRDClosedDeals(params: Params) {
         .select(DEAL_FIELDS)
         .order("closed_at", { ascending: false, nullsFirst: false });
       query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
+      if (adAccountId) query = query.eq("ad_account_id", adAccountId);
+      else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
 
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
@@ -330,14 +342,7 @@ export function useRDClosedDeals(params: Params) {
       // vendas reais por causa da ordem de sincronização.
       const won = dedupeRDDeals(all).filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
       if (includeHistory || (!startDate && !endDate)) return won;
-      const from = startOfDay(startDate ?? endDate!).getTime();
-      const to = endOfDay(endDate ?? startDate!).getTime();
-      return won.filter((deal) => {
-        const value = rdDealWonDate(deal);
-        if (!value) return false;
-        const timestamp = new Date(value).getTime();
-        return Number.isFinite(timestamp) && timestamp >= from && timestamp <= to;
-      });
+      return won.filter((deal) => isCanonicalWonDealInPeriod(deal, startDate ?? endDate!, endDate ?? startDate!));
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
@@ -484,10 +489,15 @@ export function computeFunnelAnalytics(
   // Sequência (sem perdido) para taxas de avanço
   const sequence = sortedStages.filter((s) => !s.is_lost);
   const wonStageIds = new Set(sortedStages.filter((stage) => stage.is_won).map((stage) => stage.rd_stage_id));
-  const confirmedClosedDeals = canonicalWonDeals([
+  const wonCandidates = [
     ...closedDeals,
     ...deals.filter((deal) => deal.win || wonStageIds.has(canonicalDealStageId(deal)) || isWonRDStageName(deal.rd_stage_name)),
-  ].map((deal) => wonStageIds.has(canonicalDealStageId(deal)) ? { ...deal, win: true } : deal));
+  ].map((deal) => wonStageIds.has(canonicalDealStageId(deal)) ? { ...deal, win: true } : deal);
+  const confirmedClosedDeals = canonicalWonDeals(
+    dateRange
+      ? dedupeRDDeals(wonCandidates).filter((deal) => isCanonicalWonDealInPeriod(deal, dateRange.startDate, dateRange.endDate))
+      : dedupeRDDeals(wonCandidates),
+  );
 
   // Mapa: stage_id -> índice na sequência
   const indexInSeq = new Map<string, number>();

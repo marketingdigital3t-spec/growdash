@@ -1,5 +1,5 @@
-import { endOfDay, startOfDay } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 
 type PeriodScopedDeal = {
   win?: boolean | null;
@@ -12,9 +12,10 @@ type PeriodScopedDeal = {
 function isWithinRange(value: string | null | undefined, startDate: Date, endDate: Date) {
   if (!value) return false;
   const timestamp = new Date(value).getTime();
+  const bounds = saoPauloDayBounds(startDate, endDate);
   return Number.isFinite(timestamp)
-    && timestamp >= startOfDay(startDate).getTime()
-    && timestamp <= endOfDay(endDate).getTime();
+    && timestamp >= bounds.start.getTime()
+    && timestamp <= bounds.end.getTime();
 }
 
 /**
@@ -38,9 +39,6 @@ export function isRDDealInCrmPeriod(deal: PeriodScopedDeal, startDate: Date, end
 
 /** A won KPI is scoped by the effective won date, never by lead creation. */
 export function isRDDealWonInCrmPeriod(deal: PeriodScopedDeal, startDate: Date, endDate: Date, includeHistory = false) {
-  const won = Boolean(deal.win || isWonRDStageName(deal.rd_stage_name));
-  if (!won) return false;
   if (includeHistory) return true;
-  if (isWithinRange(deal.closed_at, startDate, endDate)) return true;
-  return !deal.closed_at && isWithinRange(deal.stage_updated_at, startDate, endDate);
+  return isCanonicalWonDealInPeriod(deal, startDate, endDate);
 }

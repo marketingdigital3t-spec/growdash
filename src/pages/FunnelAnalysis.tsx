@@ -129,6 +129,8 @@ export default function FunnelAnalysis() {
   const { data: stages = [], isLoading: loadingStages } = useFunnelStagesForIds(funnelScopeIds);
   const { data: deals = [], isLoading, refetch } = useRDDeals({
     funnelIds: funnelScopeIds,
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -143,6 +145,8 @@ export default function FunnelAnalysis() {
   // pipeline e os KPIs abaixo usam `deals`, que contém o histórico completo.
   const { data: periodDeals = [], isLoading: loadingPeriodDeals } = useRDDeals({
     funnelIds: funnelScopeIds,
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -158,6 +162,8 @@ export default function FunnelAnalysis() {
   // mesma consulta e não há uma segunda requisição.
   const { data: filterDeals = [], isLoading: loadingFilterDeals } = useRDDeals({
     funnelIds: funnelScopeIds,
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     // Filtros devem listar todos os valores que existem no pipeline, não só
     // os valores de leads recém-criados.
     includeHistory: true,
@@ -165,6 +171,8 @@ export default function FunnelAnalysis() {
   });
   const { data: closedDeals = [], isLoading: loadingClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -177,6 +185,8 @@ export default function FunnelAnalysis() {
   });
   const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,

@@ -156,4 +156,43 @@ describe("RD deals date scope", () => {
     expect(analytics.standbyReasons).toEqual([{ reason: "Aguardando retorno", count: 1, pct: 100 }]);
     expect(analytics.lostReasons).toEqual([{ reason: "Sem orçamento", count: 1, pct: 100 }]);
   });
+
+  it("does not reintroduce a sale closed outside the selected period", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "one", rd_stage_id: "won", name: "Vendas realizadas", order: 1, is_won: true, is_lost: false },
+    ];
+    const deal: RDDeal = {
+      id: "snapshot-1", rd_deal_id: "rd-sale-1", rd_funnel_id: "one", rd_stage_id: "won", rd_stage_name: "Vendas realizadas", rd_stage_order: 1,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "client", win: true, lost_reason: null, amount_total: 1200,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: null, lead_city: null, lead_created_at: "2026-09-02T12:00:00Z", stage_updated_at: "2026-09-10T12:00:00Z", closed_at: "2026-08-20T12:00:00Z",
+    };
+    const analytics = computeFunnelAnalytics(
+      [deal],
+      stages,
+      [],
+      { startDate: new Date("2026-09-01T00:00:00-03:00"), endDate: new Date("2026-09-30T00:00:00-03:00") },
+    );
+    expect(analytics.conversions).toBe(0);
+    expect(analytics.revenue).toBe(0);
+  });
+
+  it("uses stage movement as the period fallback only without closed_at", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "one", rd_stage_id: "won", name: "Venda realizada", order: 1, is_won: true, is_lost: false },
+    ];
+    const deal: RDDeal = {
+      id: "snapshot-2", rd_deal_id: "rd-sale-2", rd_funnel_id: "one", rd_stage_id: "won", rd_stage_name: "Venda realizada", rd_stage_order: 1,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "client", win: true, lost_reason: null, amount_total: 900,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: null, lead_city: null, lead_created_at: "2026-08-01T12:00:00Z", stage_updated_at: "2026-09-10T12:00:00Z", closed_at: null,
+    };
+    const analytics = computeFunnelAnalytics(
+      [deal],
+      stages,
+      [],
+      { startDate: new Date("2026-09-01T00:00:00-03:00"), endDate: new Date("2026-09-30T00:00:00-03:00") },
+    );
+    expect(analytics.conversions).toBe(1);
+  });
 });

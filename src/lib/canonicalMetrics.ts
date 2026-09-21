@@ -1,12 +1,46 @@
 import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { format } from "date-fns";
 
 export type CanonicalWonDeal = {
   rd_deal_id: string;
   win?: boolean | null;
   rd_stage_name?: string | null;
+  closed_at?: string | null;
+  stage_updated_at?: string | null;
+  updated_at?: string | null;
   amount_total?: number | null;
   amount_total_effective?: number | null;
 };
+
+/** The only timestamp used for a won RD deal. A stage update is a legacy
+ * fallback, never an override for a real closing timestamp. */
+export function canonicalWonDate(deal: Pick<CanonicalWonDeal, "closed_at" | "stage_updated_at">) {
+  return deal.closed_at || deal.stage_updated_at || null;
+}
+
+/** Calendar boundaries for the business timezone used by the RD operation. */
+export function saoPauloDayBounds(startDate: Date, endDate: Date) {
+  const start = format(startDate, "yyyy-MM-dd");
+  const end = format(endDate, "yyyy-MM-dd");
+  return {
+    start: new Date(`${start}T00:00:00-03:00`),
+    end: new Date(`${end}T23:59:59.999-03:00`),
+  };
+}
+
+export function isCanonicalWonDealInPeriod(
+  deal: Pick<CanonicalWonDeal, "win" | "rd_stage_name" | "closed_at" | "stage_updated_at">,
+  startDate: Date,
+  endDate: Date,
+) {
+  if (!isCanonicalWonDeal(deal)) return false;
+  const value = canonicalWonDate(deal);
+  if (!value) return false;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return false;
+  const bounds = saoPauloDayBounds(startDate, endDate);
+  return timestamp >= bounds.start.getTime() && timestamp <= bounds.end.getTime();
+}
 
 /** A single, shared definition of a won RD deal used by every KPI surface. */
 export function isCanonicalWonDeal(deal: Pick<CanonicalWonDeal, "win" | "rd_stage_name">) {

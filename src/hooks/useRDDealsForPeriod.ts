@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { endOfDay, format, startOfDay } from "date-fns";
+import { format } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { withRequestTimeout } from "@/lib/resilience";
 
 export interface RDDealLite {
@@ -96,8 +97,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
       // Calendar selections are local-midnight dates. Expand the bounds to the
       // complete local days before comparing timestamptz columns; otherwise a
       // custom interval silently drops every deal created later on its end date.
-      const rangeStart = startOfDay(startDate).toISOString();
-      const rangeEnd = endOfDay(endDate).toISOString();
+      const bounds = saoPauloDayBounds(startDate, endDate);
+      const rangeStart = bounds.start.toISOString();
+      const rangeEnd = bounds.end.toISOString();
       const PAGE = 1000;
       let all: RDDealLite[] = [];
       // The date interval is already constrained by the user. Stop only when
@@ -147,8 +149,9 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
     queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
     enabled,
     queryFn: async () => {
-      const rangeStart = startOfDay(startDate).toISOString();
-      const rangeEnd = endOfDay(endDate).toISOString();
+      const bounds = saoPauloDayBounds(startDate, endDate);
+      const rangeStart = bounds.start.toISOString();
+      const rangeEnd = bounds.end.toISOString();
       const PAGE = 1000;
       const fetchAll = async (fallbackToStageUpdate: boolean) => {
         let rows: RDDealLite[] = [];
@@ -177,7 +180,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
       // timestamp filters in production. Fetch the two disjoint ranges
       // explicitly: closed deals first, then the historical fallback.
       const all = (await fetchAll(false)).concat(await fetchAll(true));
-      return dedupeRDDeals(all).filter((deal) => classifyLead(deal) === "won");
+      return dedupeRDDeals(all).filter((deal) => isCanonicalWonDealInPeriod(deal, startDate, endDate));
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
