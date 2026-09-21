@@ -94,10 +94,11 @@ export function recoverLatestBuildOnce(scope: string, error: unknown) {
   // and manifest. The marker deliberately survives the application boot: if
   // the new build is also broken, it must fail visibly rather than loop.
   try {
-    const key = `growdash:chunk-reload:${scope}`;
-    const previous = Number(sessionStorage.getItem(key) || 0);
-    if (previous && Date.now() - previous < 60_000) return false;
-    sessionStorage.setItem(key, String(Date.now()));
+    // Use one global, short-lived recovery budget. A route-specific marker
+    // could remain in an old tab and prevent a later route from refreshing
+    // after the same deployment changed its chunk graph.
+    const recovery = consumeRecoveryAttempt("chunk-reload", 60_000, 1);
+    if (recovery.blocked) return false;
     // reload() can reuse a cached HTML document which still points to the
     // deleted chunk. A harmless cache-busting parameter forces Pages/CDN and
     // the browser to request the current application shell instead.
