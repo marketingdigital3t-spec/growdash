@@ -16,15 +16,16 @@ export interface RDFunnel {
   updated_at: string;
 }
 
-export function useRDFunnels(adAccountId?: string, enabled = true) {
+export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?: string[]) {
   const { user } = useAuth();
   return useQuery({
     // Do not retain a previous user's funnels while the session changes.
-    queryKey: ["rd_funnels", user?.id ?? "anonymous", adAccountId ?? "all"],
+    queryKey: ["rd_funnels", user?.id ?? "anonymous", adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
     enabled: enabled && !!user,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
+      else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
       const { data, error } = await withRequestTimeout(q, 15_000);
       if (error) throw error;
       return data as RDFunnel[];

@@ -80,6 +80,13 @@ interface Params {
   enabled?: boolean;
 }
 
+export interface RDCRMQueryScope {
+  adAccountId?: string;
+  adAccountIds?: string[];
+  funnelIds?: string[];
+  enabled?: boolean;
+}
+
 const FIELDS =
   "id, rd_deal_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_attribution_method, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, updated_at";
 
@@ -193,9 +200,11 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
  * pela data de criação: um lead antigo que continua aberto precisa permanecer
  * visível no pipeline, exatamente como no RD Station.
  */
-export function useRDCRMDeals(adAccountId?: string, enabled = true, adAccountIds?: string[]) {
+export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, enabled = true }: RDCRMQueryScope) {
+  const accountScope = adAccountIds?.slice().sort().join(",") ?? "";
+  const funnelScope = funnelIds?.slice().sort().join(",") ?? "";
   return useQuery({
-    queryKey: ["rd_crm_deals", adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
+    queryKey: ["rd_crm_deals", adAccountId ?? "all", accountScope, funnelScope],
     enabled,
     queryFn: async () => {
       const pageSize = 1_000;
@@ -210,7 +219,8 @@ export function useRDCRMDeals(adAccountId?: string, enabled = true, adAccountIds
           .order("stage_updated_at", { ascending: false, nullsFirst: false })
           .order("lead_created_at", { ascending: false, nullsFirst: false });
         if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-        else if (adAccountIds) query = query.in("ad_account_id", adAccountIds);
+        else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
+        if (funnelIds?.length) query = query.in("rd_funnel_id", funnelIds);
 
         const from = page * pageSize;
         const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), 15_000);

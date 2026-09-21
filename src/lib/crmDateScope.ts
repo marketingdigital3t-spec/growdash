@@ -29,12 +29,9 @@ export function isRDDealInCrmPeriod(deal: PeriodScopedDeal, startDate: Date, end
   // Won negotiations belong to the interval by their won date, not by the
   // original lead date. This keeps historical sales out of a monthly board.
   if (deal.win || isWonRDStageName(deal.rd_stage_name)) return isRDDealWonInCrmPeriod(deal, startDate, endDate, false);
-  if (isWithinRange(deal.lead_created_at, startDate, endDate)) return true;
-  if (isWithinRange(deal.closed_at, startDate, endDate)) return true;
-  // RD integrations may not backfill closed_at for an already-won deal. Its
-  // stage movement is the authoritative period fallback in that case.
-  if ((deal.win || isWonRDStageName(deal.rd_stage_name)) && isWithinRange(deal.stage_updated_at, startDate, endDate)) return true;
-  return !deal.lead_created_at && !deal.closed_at && isWithinRange(deal.stage_updated_at, startDate, endDate);
+  // Open and lost negotiations are scoped only by their creation date. A
+  // later update or closing must not pull them into a different calendar.
+  return isWithinRange(deal.lead_created_at, startDate, endDate);
 }
 
 /** A won KPI is scoped by the effective won date, never by lead creation. */

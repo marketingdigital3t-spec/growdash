@@ -53,8 +53,9 @@ import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
 import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
-import { isRDDealInCrmPeriod, isRDDealWonInCrmPeriod } from "@/lib/crmDateScope";
+import { isRDDealWonInCrmPeriod } from "@/lib/crmDateScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
+import { isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 
@@ -143,7 +144,11 @@ export default function CrmPage() {
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
   const availableAccountIds = useMemo(() => new Set(availableAccounts.map((account) => account.id)), [availableAccounts]);
-  const availableAccountIdList = useMemo(() => availableAccounts.map((account) => account.id), [availableAccounts]);
+  const accountScopeIds = useMemo(
+    () => adAccountIds.length ? adAccountIds.filter((id) => availableAccountIds.has(id)) : Array.from(availableAccountIds),
+    [adAccountIds, availableAccountIds],
+  );
+  const accountScopeSet = useMemo(() => new Set(accountScopeIds), [accountScopeIds]);
   const { data: rdIntegration, isLoading: loadingRDIntegration } = useRDIntegration();
   const rdEnabled = rdIntegration?.is_active === true;
   // A conexão do RD pertence ao dono da conta/funil. Um gestor ou membro com
@@ -151,7 +156,18 @@ export default function CrmPage() {
   // uma cópia pessoal do token. A consulta usa RLS e continua retornando
   // somente os funis atribuídos ao usuário atual.
   const canReadCrm = crmPipelineEnabled(!!user);
-  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(accountFilter, canReadCrm);
+  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(accountFilter, canReadCrm && availableAccounts.length > 0, accountFilter ? undefined : accountScopeIds);
+  const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
+  const availableFunnels = useMemo(
+    () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id && accountScopeSet.has(funnel.ad_account_id)),
+    [accountScopeSet, funnelData],
+  );
+  const availableFunnelIds = useMemo(() => new Set(availableFunnels.map((funnel) => funnel.id)), [availableFunnels]);
+  const scopedSelectedFunnelIds = useMemo(
+    () => selectedFunnelIds.filter((id) => availableFunnelIds.has(id)),
+    [availableFunnelIds, selectedFunnelIds],
+  );
+  const requestedFunnelIds = scopedSelectedFunnelIds.length ? scopedSelectedFunnelIds : availableFunnels.map((funnel) => funnel.id);
   const {
     data: dealData = [],
     isLoading: loadingDeals,
@@ -160,13 +176,14 @@ export default function CrmPage() {
     isError: dealsError,
     error: dealsQueryError,
     refetch: refetchDeals,
-  } = useRDCRMDeals(
-    accountFilter,
-    canReadCrm && (!isConsolidatedView || availableAccountIdList.length > 0),
-    isConsolidatedView ? availableAccountIdList : undefined,
-  );
-  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds });
-  const { data: insightData = [], isLoading: loadingMetaInsights, isPlaceholderData: isPreviousInsightScope } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate, endDate });
+  } = useRDCRMDeals({
+    adAccountId: accountFilter,
+    adAccountIds: accountFilter ? undefined : accountScopeIds,
+    funnelIds: requestedFunnelIds,
+    enabled: canReadCrm && accountScopeIds.length > 0 && requestedFunnelIds.length > 0,
+  });
+  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
+  const { data: insightData = [], isLoading: loadingMetaInsights, isPlaceholderData: isPreviousInsightScope } = useInsights({ adAccountId: accountFilter, adAccountIds: accountScopeIds, startDate, endDate });
   const { data: products = [], isLoading: loadingProducts } = useProducts();
   const [view, setView] = useState<CRMView>(() => {
     if (searchParams.get("tab") === "ai") return "ai";
@@ -179,6 +196,10 @@ export default function CrmPage() {
   const [syncing, setSyncing] = useState(false);
   const [page, setPage] = useState(1);
   const [stageLimits, setStageLimits] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    setSelectedFunnelIds((current) => current.filter((id) => availableFunnelIds.has(id)));
+  }, [availableFunnelIds]);
 
   // Query cache keeps the previous screen visible globally, which is useful
   // for a silent refresh of the same scope. A different account is a hard
@@ -201,8 +222,8 @@ export default function CrmPage() {
   // in the operational CRM. The board has exactly the active RD funnels that
   // are still linked in Integrations.
   const connectedFunnels = useMemo(
-    () => funnels.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id && availableAccountIds.has(funnel.ad_account_id)),
-    [availableAccountIds, funnels],
+    () => funnels.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id && accountScopeSet.has(funnel.ad_account_id) && requestedFunnelIds.includes(funnel.id)),
+    [accountScopeSet, funnels, requestedFunnelIds],
   );
   // CRM is driven by the Meta account selector. Each active RD funnel linked
   // to that account becomes its pipeline scope automatically; users should
@@ -223,21 +244,21 @@ export default function CrmPage() {
   const scopedDeals = useMemo(
     () => dedupeRDDeals(allDeals.filter((deal) =>
       !!deal.ad_account_id
-      && availableAccountIds.has(deal.ad_account_id)
+      && accountScopeSet.has(deal.ad_account_id)
       && !!deal.rd_funnel_id
       && connectedFunnelIdSet.has(deal.rd_funnel_id)
       && !isExcludedLegacyRannielyStage(connectedFunnelNameById.get(deal.rd_funnel_id), deal.rd_stage_name),
     )),
-    [allDeals, availableAccountIds, connectedFunnelIdSet, connectedFunnelNameById],
+    [allDeals, accountScopeSet, connectedFunnelIdSet, connectedFunnelNameById],
   );
   const scopedSales = useMemo(() => canonicalSales.filter((sale) =>
     !!sale.ad_account_id
-    && availableAccountIds.has(sale.ad_account_id)
+    && accountScopeSet.has(sale.ad_account_id)
     && (!sale.rd_deal_id || !excludedDealIds.has(sale.rd_deal_id)),
-  ), [availableAccountIds, canonicalSales, excludedDealIds]);
+  ), [accountScopeSet, canonicalSales, excludedDealIds]);
   const scopedMetaInsights = useMemo(
-    () => metaInsights.filter((insight) => !!insight.ad_account_id && availableAccountIds.has(insight.ad_account_id)),
-    [availableAccountIds, metaInsights],
+    () => metaInsights.filter((insight) => !!insight.ad_account_id && accountScopeSet.has(insight.ad_account_id)),
+    [accountScopeSet, metaInsights],
   );
   const metaLeads = useMemo(
     () => scopedMetaInsights.reduce((sum, insight) => sum + Number(insight.leads ?? 0), 0),
@@ -292,12 +313,19 @@ export default function CrmPage() {
   useEffect(() => {
     setPage(1);
     setStageLimits({});
-  }, [adAccountId, endDate, owner, preset, query, startDate, status]);
+  }, [adAccountId, endDate, owner, preset, query, selectedFunnelIds, startDate, status]);
 
   const funnelNames = useMemo(() => new Map(connectedFunnels.map((funnel) => [funnel.id, funnel.name])), [connectedFunnels]);
+  const rdScope = useMemo<RDQueryScope>(() => ({
+    accountIds: accountScopeIds,
+    funnelIds: funnelScopeIds,
+    startDate,
+    endDate,
+    dateRule: "created_at_for_open_closed_at_for_won",
+  }), [accountScopeIds, endDate, funnelScopeIds, startDate]);
   const dealsInPipeline = useMemo(
-    () => scopedDeals.filter((deal) => isRDDealInCrmPeriod(deal, startDate, endDate, preset === "max")),
-    [endDate, preset, scopedDeals, startDate],
+    () => scopedDeals.filter((deal) => preset === "max" ? true : isRDDealInScopePeriod(deal, rdScope)),
+    [preset, rdScope, scopedDeals],
   );
   const owners = useMemo(
     () => Array.from(new Set(dealsInPipeline.map((deal) => deal.deal_owner_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
@@ -551,6 +579,18 @@ export default function CrmPage() {
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
           <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name }))} selectedIds={adAccountIds} onChange={setAdAccountIds} className="h-11" popoverClassName="crm-filter-popover" />
+          <AccountMultiSelect
+            accounts={availableFunnels.map((funnel) => ({ id: funnel.id, name: funnel.name }))}
+            selectedIds={scopedSelectedFunnelIds}
+            onChange={setSelectedFunnelIds}
+            className="h-11"
+            popoverClassName="crm-filter-popover"
+            emptyLabel="Todos os funis da conta"
+            singularLabel="funil"
+            pluralLabel="funis"
+            ariaLabel="Selecionar funis RD"
+            searchPlaceholder="Pesquisar funil…"
+          />
           <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -572,7 +612,7 @@ export default function CrmPage() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
-          <span>{number.format(deals.length)} negociação(ões) encontrada(s) · {isConsolidatedView ? "pipeline único consolidado de todas as contas" : funnelScopeIds.length === 1 ? `funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? `${funnelScopeIds.length} funis vinculados à conta selecionada` : "nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
+          <span>{number.format(deals.length)} negociação(ões) encontrada(s) · {isConsolidatedView ? "pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? `funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? `${funnelScopeIds.length} funis selecionados` : "nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
         </div>
       </section>
