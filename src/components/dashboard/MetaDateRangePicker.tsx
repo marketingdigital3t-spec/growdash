@@ -21,6 +21,7 @@ interface Props {
   startDate: Date;
   endDate: Date;
   className?: string;
+  popoverClassName?: string;
   /** Aplica atalhos como Hoje/Ontem/7 dias no primeiro clique. */
   applyPresetOnClick?: boolean;
 }
@@ -58,6 +59,7 @@ export function MetaDateRangePicker({
   startDate,
   endDate,
   className,
+  popoverClassName,
   applyPresetOnClick = false,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -125,7 +127,7 @@ export function MetaDateRangePicker({
           type="button"
           aria-label={`Selecionar período: ${formatTrigger(preset, startDate, endDate)}`}
           className={cn(
-            "min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto",
+            "gd-filter-date min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto",
             className,
           )}
         >
@@ -133,7 +135,7 @@ export function MetaDateRangePicker({
           <span className="truncate">{formatTrigger(preset, startDate, endDate)}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 max-w-[95vw]" align="start">
+      <PopoverContent className={cn("gd-date-range-popover w-auto max-w-[95vw] p-0", popoverClassName)} align="start">
         <div className="flex flex-col md:flex-row">
           {/* Presets */}
           <ScrollArea className="md:w-56 border-b md:border-b-0 md:border-r max-h-[50vh] md:max-h-[480px]">
@@ -175,7 +177,7 @@ export function MetaDateRangePicker({
               onSelect={handleCalendarSelect}
               locale={ptBR}
               weekStartsOn={1}
-              className="p-3 pointer-events-auto"
+              className="gd-date-range-calendar pointer-events-auto p-3"
             />
 
             <div className="px-4 pb-3 space-y-3">

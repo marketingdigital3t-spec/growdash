@@ -540,7 +540,7 @@ export default function CrmPage() {
         )}
       />
 
-      <section className="gd-panel mb-4 p-3 sm:p-4">
+      <section className="crm-filter-strip gd-panel mb-4 p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
           <Search className="h-4 w-4 text-primary" />
           <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">Defina a conta, o período e as negociações exibidas abaixo.</p></div>
@@ -550,7 +550,7 @@ export default function CrmPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
-          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name }))} selectedIds={adAccountIds} onChange={setAdAccountIds} className="h-11" />
+          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name }))} selectedIds={adAccountIds} onChange={setAdAccountIds} className="h-11" popoverClassName="crm-filter-popover" />
           <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -563,8 +563,9 @@ export default function CrmPage() {
             startDate={startDate}
             endDate={endDate}
             className="h-11"
+            popoverClassName="crm-filter-popover"
           />
-          <div className="flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
+          <div className="crm-filter-status flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
             {([ ["all", "Todos"], ["open", "Abertos"], ["won", "Ganhos"], ["lost", "Perdidos"] ] as [StatusFilter, string][]).map(([id, label]) => (
               <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>
             ))}

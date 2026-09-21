@@ -7381,6 +7381,69 @@ html:not(.dark) .brand-shell .growdash-main :is(input, select, textarea, [role="
   color: #666666 !important;
 }
 
+/* CRM filter contract: even in black mode the filter surface is a single
+   white/black control group. This is intentionally scoped to the CRM filter
+   strip so the rest of the dark CRM workspace keeps its graphite surfaces. */
+.dark .brand-shell .crm-page .crm-filter-strip {
+  background: #ffffff !important;
+  border-color: #d4d4d4 !important;
+  color: #111111 !important;
+}
+.dark .brand-shell .crm-page .crm-filter-strip :is(h2, p, span, label, svg) {
+  color: #111111 !important;
+}
+.dark .brand-shell .crm-page .crm-filter-strip .text-muted-foreground {
+  color: #666666 !important;
+}
+.dark .brand-shell .crm-page .crm-filter-strip :is(input, select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date) {
+  background: #ffffff !important;
+  border-color: #c9c9c9 !important;
+  color: #111111 !important;
+  box-shadow: none !important;
+}
+.dark .brand-shell .crm-page .crm-filter-strip :is(input, select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date):hover,
+.dark .brand-shell .crm-page .crm-filter-strip :is(input, select, .gd-button, .gd-filter-control, .gd-filter-account, .gd-filter-date):focus-visible {
+  background: #ffffff !important;
+  border-color: #111111 !important;
+  color: #111111 !important;
+}
+.dark .brand-shell .crm-page .crm-filter-strip .gd-account-count {
+  background: #eeeeee !important;
+  border-color: #c9c9c9 !important;
+  color: #111111 !important;
+}
+.dark .brand-shell .crm-page .crm-filter-status {
+  background: #ffffff !important;
+  border-color: #c9c9c9 !important;
+}
+.dark .brand-shell .crm-page .crm-filter-status button,
+.dark .brand-shell .crm-page .crm-filter-status button:hover,
+.dark .brand-shell .crm-page .crm-filter-status button[aria-pressed="true"] {
+  background: #ffffff !important;
+  color: #111111 !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+.dark .brand-shell .crm-page .crm-filter-status button[aria-pressed="true"] {
+  border-color: #111111 !important;
+}
+.dark .crm-filter-popover {
+  border-color: #c9c9c9 !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+.dark .crm-filter-popover :is(input, button, [role="option"], [role="dialog"], span, svg, label) {
+  color: #111111 !important;
+}
+.dark .crm-filter-popover :is(input, button, [role="option"]):hover,
+.dark .crm-filter-popover [aria-pressed="true"] {
+  background: #eeeeee !important;
+  color: #111111 !important;
+}
+.dark .crm-filter-popover .text-muted-foreground {
+  color: #666666 !important;
+}
+
 .brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account):hover,
 .brand-shell .growdash-main :is(input, select, textarea, [role="combobox"], .gd-filter-control, .gd-filter-account):focus-visible {
   background: var(--gd-content-surface) !important;
