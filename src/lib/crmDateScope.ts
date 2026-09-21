@@ -1,10 +1,12 @@
 import { endOfDay, startOfDay } from "date-fns";
+import { isWonRDStageName } from "@/lib/rdDealStatus";
 
 type PeriodScopedDeal = {
   win?: boolean | null;
   lead_created_at?: string | null;
   stage_updated_at?: string | null;
   closed_at?: string | null;
+  rd_stage_name?: string | null;
 };
 
 function isWithinRange(value: string | null | undefined, startDate: Date, endDate: Date) {
@@ -27,6 +29,6 @@ export function isRDDealInCrmPeriod(deal: PeriodScopedDeal, startDate: Date, end
   if (isWithinRange(deal.closed_at, startDate, endDate)) return true;
   // RD integrations may not backfill closed_at for an already-won deal. Its
   // stage movement is the authoritative period fallback in that case.
-  if (deal.win && isWithinRange(deal.stage_updated_at, startDate, endDate)) return true;
+  if ((deal.win || isWonRDStageName(deal.rd_stage_name)) && isWithinRange(deal.stage_updated_at, startDate, endDate)) return true;
   return !deal.lead_created_at && !deal.closed_at && isWithinRange(deal.stage_updated_at, startDate, endDate);
 }

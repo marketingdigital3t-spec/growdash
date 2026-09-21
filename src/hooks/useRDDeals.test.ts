@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { computeFunnelAnalytics, consolidateFunnelStages, dedupeRDDeals, shouldApplyRDDateRange, type RDDeal, type FunnelStage, type RDDealStageHistory } from "./useRDDeals";
+import { computeFunnelAnalytics, consolidateFunnelStages, dedupeRDDeals, rdDealWonDate, shouldApplyRDDateRange, type RDDeal, type FunnelStage, type RDDealStageHistory } from "./useRDDeals";
 
 describe("RD deals date scope", () => {
+  it("uses stage movement as the won-date fallback when closed_at is absent", () => {
+    expect(rdDealWonDate({ closed_at: null, stage_updated_at: "2026-09-12T12:00:00Z" })).toBe("2026-09-12T12:00:00Z");
+    expect(rdDealWonDate({ closed_at: "2026-09-13T12:00:00Z", stage_updated_at: "2026-09-12T12:00:00Z" })).toBe("2026-09-13T12:00:00Z");
+  });
+
   it("keeps a selected period scoped to its creation or closing dates", () => {
     expect(shouldApplyRDDateRange(false)).toBe(true);
   });

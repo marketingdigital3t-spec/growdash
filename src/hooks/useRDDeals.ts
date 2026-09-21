@@ -106,6 +106,12 @@ export function rdDealEventDate(deal: Pick<RDDeal, "lead_created_at" | "stage_up
   return null;
 }
 
+/** Canonical timestamp for a won RD deal. Older imports often omit closed_at;
+ * the last real stage movement is the only trustworthy period fallback. */
+export function rdDealWonDate(deal: Pick<RDDeal, "closed_at" | "stage_updated_at">): string | null {
+  return deal.closed_at || deal.stage_updated_at || null;
+}
+
 type CanonicalFunnelStage = Omit<FunnelStage, "rd_stage_id"> & { rd_stage_id: string };
 
 /**
@@ -301,12 +307,9 @@ export function useRDClosedDeals(params: Params) {
       let query = supabase
         .from("rd_deals")
         .select(DEAL_FIELDS)
-        .not("closed_at", "is", null)
-        .order("closed_at", { ascending: false });
+        .order("closed_at", { ascending: false, nullsFirst: false });
       query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
 
-      if (shouldApplyRDDateRange(includeHistory) && startDate) query = query.gte("closed_at", startDate.toISOString());
-      if (shouldApplyRDDateRange(includeHistory) && endDate) query = query.lte("closed_at", endOfDay(endDate).toISOString());
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
       if (campaigns?.length) query = query.in("utm_campaign", campaigns); else if (campaign && campaign !== "all") query = query.eq("utm_campaign", campaign);
@@ -325,7 +328,16 @@ export function useRDClosedDeals(params: Params) {
       // Alguns pipelines do RD mantêm a etapa final como “Vendas realizadas”
       // antes de preencher o booleano técnico `win`. Não descartamos essas
       // vendas reais por causa da ordem de sincronização.
-      return dedupeRDDeals(all).filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
+      const won = dedupeRDDeals(all).filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
+      if (includeHistory || (!startDate && !endDate)) return won;
+      const from = startOfDay(startDate ?? endDate!).getTime();
+      const to = endOfDay(endDate ?? startDate!).getTime();
+      return won.filter((deal) => {
+        const value = rdDealWonDate(deal);
+        if (!value) return false;
+        const timestamp = new Date(value).getTime();
+        return Number.isFinite(timestamp) && timestamp >= from && timestamp <= to;
+      });
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
@@ -684,8 +696,9 @@ export function computeFunnelAnalytics(
     }
   }
   for (const d of confirmedClosedDeals) {
-    if (!d.closed_at) continue;
-    const day = dayKey(d.closed_at);
+    const wonDate = rdDealWonDate(d);
+    if (!wonDate) continue;
+    const day = dayKey(wonDate);
     const cur = evoMap.get(day) || { leads: 0, opportunities: 0, conversions: 0 };
     cur.conversions += 1;
     evoMap.set(day, cur);
@@ -816,8 +829,9 @@ export function computeFunnelAnalytics(
     }
   }
   for (const d of confirmedClosedDeals) {
-    if (!d.closed_at) continue;
-    const wd = new Date(d.closed_at).getDay();
+    const wonDate = rdDealWonDate(d);
+    if (!wonDate) continue;
+    const wd = new Date(wonDate).getDay();
     const cur = wdMap.get(wd)!;
     cur.conversions += 1;
     cur.revenue += d.amount_total || 0;
@@ -850,8 +864,9 @@ export function computeFunnelAnalytics(
     }
   }
   for (const d of confirmedClosedDeals) {
-    if (!d.closed_at) continue;
-    const h = new Date(d.closed_at).getHours();
+    const wonDate = rdDealWonDate(d);
+    if (!wonDate) continue;
+    const h = new Date(wonDate).getHours();
     const p = periodOfHour(h);
     periodMap.get(p)!.conversions += 1;
     const hv = hourMap.get(h)!;

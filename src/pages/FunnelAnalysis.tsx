@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format, subDays } from "date-fns";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics } from "@/hooks/useRDDeals";
+import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics, rdDealWonDate } from "@/hooks/useRDDeals";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -262,10 +262,11 @@ export default function FunnelAnalysis() {
     const previousStart = subDays(startDate, span);
     const previousEnd = subDays(startDate, 1);
     const values = operationalClosedDeals.filter((deal) => {
-      if (!deal.closed_at || !deal.lead_created_at) return false;
-      const closed = new Date(deal.closed_at);
+      const wonDate = rdDealWonDate(deal);
+      if (!wonDate || !deal.lead_created_at) return false;
+      const closed = new Date(wonDate);
       return closed >= previousStart && closed <= new Date(previousEnd.getFullYear(), previousEnd.getMonth(), previousEnd.getDate(), 23, 59, 59, 999);
-    }).map((deal) => Math.max(0, (new Date(deal.closed_at!).getTime() - new Date(deal.lead_created_at!).getTime()) / 86400000));
+    }).map((deal) => Math.max(0, (new Date(rdDealWonDate(deal)!).getTime() - new Date(deal.lead_created_at!).getTime()) / 86400000));
     return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
   }, [endDate, operationalClosedDeals, startDate]);
 
