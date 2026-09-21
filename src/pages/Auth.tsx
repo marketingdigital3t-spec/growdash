@@ -9,6 +9,15 @@ import { BrandMark } from "@/components/BrandLogo";
 
 type Mode = "login" | "register";
 
+function isTransientAuthError(error: { status?: number; message?: string } | null | undefined) {
+  return !!error && ([500, 502, 503, 504].includes(Number(error.status)) || /HTTP\s*50[234]|upstream|temporar/i.test(error.message || ""));
+}
+
+function authErrorMessage(error: { status?: number; message?: string } | null | undefined) {
+  if (isTransientAuthError(error)) return "O serviço de autenticação está temporariamente indisponível. Tente novamente em alguns instantes; sua conta e senha não foram alteradas.";
+  return error?.message || "Não foi possível concluir o acesso.";
+}
+
 export default function Auth() {
   const [mode, setMode] = useState<Mode>("login");
   const [name, setName] = useState("");
@@ -33,15 +42,21 @@ export default function Auth() {
     if (mode === "register" && password !== confirmPassword) { toast({ title: "As senhas não coincidem", variant: "destructive" }); return; }
     setLoading(true);
     if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      let error: { status?: number; message?: string } | null = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const result = await supabase.auth.signInWithPassword({ email, password });
+        error = result.error;
+        if (!error || !isTransientAuthError(error) || attempt === 1) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 700));
+      }
       setLoading(false);
-      if (error) { toast({ title: "Não foi possível entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos. Se necessário, use a recuperação de acesso." : error.message, variant: "destructive" }); return; }
+      if (error) { toast({ title: "Não foi possível entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos. Se necessário, use a recuperação de acesso." : authErrorMessage(error), variant: "destructive" }); return; }
       navigate("/", { replace: true });
       return;
     }
     const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim() } } });
     setLoading(false);
-    if (error) { toast({ title: "Não foi possível criar a conta", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: "Não foi possível criar a conta", description: authErrorMessage(error), variant: "destructive" }); return; }
     if (data.session) navigate("/", { replace: true });
     else toast({ title: "Cadastro realizado", description: "Confirme seu email para acessar a Growdash." });
   }
@@ -54,7 +69,7 @@ export default function Auth() {
     // prevents the password recovery screen from receiving the Supabase token.
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
     setLoading(false);
-    if (error) toast({ title: "Recuperação não enviada", description: error.message, variant: "destructive" });
+    if (error) toast({ title: "Recuperação não enviada", description: authErrorMessage(error), variant: "destructive" });
     else { toast({ title: "Link de recuperação enviado" }); setForgotOpen(false); }
   }
 
