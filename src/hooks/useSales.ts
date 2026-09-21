@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tansta
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toLocalDateString } from "@/lib/dateRange";
+import { withRequestTimeout } from "@/lib/resilience";
 
 
 export interface Sale {
@@ -132,7 +133,7 @@ export function useSales(params?: UseSalesParams) {
       for (let page = 0; ; page++) {
         const from = page * PAGE;
         const to = from + PAGE - 1;
-        const { data, error } = await query.range(from, to);
+        const { data, error } = await withRequestTimeout(query.range(from, to), 15_000);
         if (error) throw error;
         const batch = (data || []).map((row) => ({ ...row, campaign_ids: row.campaign_ids || [] })) as Sale[];
         all = all.concat(batch);
@@ -140,6 +141,7 @@ export function useSales(params?: UseSalesParams) {
       }
       return dedupeCanonicalSales(all);
     },
+    refetchOnWindowFocus: false,
   });
 }
 

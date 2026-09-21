@@ -4,6 +4,7 @@ import { eachDayOfInterval, endOfDay, format, startOfDay } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { canonicalWonDeals } from "@/lib/canonicalMetrics";
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
+import { withRequestTimeout } from "@/lib/resilience";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -158,17 +159,18 @@ export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled =
     queryKey: ["rd_deal_stage_history", scopeIds.join(","), startDate.toISOString(), endDate.toISOString()],
     enabled: enabled && scopeIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await withRequestTimeout(supabase
         .from("rd_deal_stage_history")
         .select("id, rd_deal_id, rd_funnel_id, from_stage_id, from_stage_name, from_stage_bucket, to_stage_id, to_stage_name, to_stage_bucket, changed_at")
         .in("rd_funnel_id", scopeIds)
         .gte("changed_at", startOfDay(startDate).toISOString())
         .lte("changed_at", endOfDay(endDate).toISOString())
-        .order("changed_at", { ascending: true });
+        .order("changed_at", { ascending: true }), 15_000);
       if (error) throw error;
       return (data || []) as RDDealStageHistory[];
     },
     staleTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -257,7 +259,7 @@ export function useRDDeals(params: Params) {
       for (let p = 0; ; p++) {
         const from = p * PAGE;
         const to = from + PAGE - 1;
-        const { data, error } = await query.range(from, to);
+        const { data, error } = await withRequestTimeout(query.range(from, to), 15_000);
         if (error) throw error;
         const batch = (data || []) as unknown as RDDeal[];
         all = all.concat(batch);
@@ -267,7 +269,7 @@ export function useRDDeals(params: Params) {
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -313,7 +315,7 @@ export function useRDClosedDeals(params: Params) {
       const PAGE = 1000;
       let all: RDDeal[] = [];
       for (let p = 0; ; p++) {
-        const { data, error } = await query.range(p * PAGE, p * PAGE + PAGE - 1);
+        const { data, error } = await withRequestTimeout(query.range(p * PAGE, p * PAGE + PAGE - 1), 15_000);
         if (error) throw error;
         const batch = (data || []) as unknown as RDDeal[];
         all = all.concat(batch);
@@ -326,7 +328,7 @@ export function useRDClosedDeals(params: Params) {
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -345,10 +347,11 @@ export function useFunnelStagesForIds(funnelIds: string[]) {
         .select("rd_funnel_id, rd_stage_id, name, order, is_won, is_lost")
         .order("order", { ascending: true });
       query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
-      const { data, error } = await query;
+      const { data, error } = await withRequestTimeout(query, 15_000);
       if (error) throw error;
       return (data || []) as unknown as FunnelStage[];
     },
+    refetchOnWindowFocus: false,
   });
 }
 

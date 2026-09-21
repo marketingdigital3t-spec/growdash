@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { withRequestTimeout } from "@/lib/resilience";
 
 export interface RDFunnel {
   id: string;
@@ -24,10 +25,12 @@ export function useRDFunnels(adAccountId?: string, enabled = true) {
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
-      const { data, error } = await q;
+      const { data, error } = await withRequestTimeout(q, 15_000);
       if (error) throw error;
       return data as RDFunnel[];
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 

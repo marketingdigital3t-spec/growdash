@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { endOfDay, format, startOfDay } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { withRequestTimeout } from "@/lib/resilience";
 
 export interface RDDealLite {
   id: string;
@@ -117,7 +118,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
         const from = p * PAGE;
         const to = from + PAGE - 1;
-        const { data, error } = await q.range(from, to);
+        const { data, error } = await withRequestTimeout(q.range(from, to), 15_000);
         // Nunca transforme uma página ausente em um resultado aparentemente
         // completo: isso era a causa de contagens parciais no funil.
         if (error) throw error;
@@ -132,7 +133,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -161,7 +162,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
             : query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd);
           if (adAccountId) query = query.eq("ad_account_id", adAccountId);
           else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
-          const { data, error } = await query.range(page * PAGE, (page + 1) * PAGE - 1);
+          const { data, error } = await withRequestTimeout(query.range(page * PAGE, (page + 1) * PAGE - 1), 15_000);
           if (error) throw error;
           const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
             ...deal,
@@ -180,7 +181,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -209,7 +210,7 @@ export function useRDCRMDeals(adAccountId?: string, enabled = true, adAccountIds
         else if (adAccountIds) query = query.in("ad_account_id", adAccountIds);
 
         const from = page * pageSize;
-        const { data, error } = await query.range(from, from + pageSize - 1);
+        const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), 15_000);
         if (error) throw error;
         const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
           ...deal,
@@ -226,7 +227,7 @@ export function useRDCRMDeals(adAccountId?: string, enabled = true, adAccountIds
     },
     staleTime: 15 * 60 * 1_000,
     gcTime: 24 * 60 * 60 * 1_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });

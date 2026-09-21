@@ -631,7 +631,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      {isLoadingSelectedScope || loadingMetaActions || loadingProducts ? <CRMLoading /> : dealsError ? (
+      {isLoadingSelectedScope ? <CRMLoading /> : dealsError ? (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
           <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar as negociações</h2><p className="mt-2 text-sm text-muted-foreground">{dealsQueryError instanceof Error ? dealsQueryError.message : "A consulta do CRM falhou. Verifique seu acesso ao funil e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchDeals()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
         </section>
