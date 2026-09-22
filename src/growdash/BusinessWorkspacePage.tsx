@@ -73,7 +73,9 @@ function MetaLink({ item, accountId, collapsed }: { item: BusinessMenuItem; acco
 }
 
 export default function BusinessWorkspacePage() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("growdash:business-sidebar-collapsed") === "true"; } catch { return false; }
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const { adAccountId } = useGlobalFilters();
   const accountsQuery = useAdAccounts(false);
@@ -82,13 +84,16 @@ export default function BusinessWorkspacePage() {
   const location = useLocation();
   const activeLabel = useMemo(() => [...PRIMARY_ITEMS, ...SECONDARY_ITEMS, ...FOOTER_ITEMS].find((item) => item.path === location.pathname)?.label, [location.pathname]);
   useEffect(() => setMobileOpen(false), [location.pathname]);
+  useEffect(() => {
+    try { localStorage.setItem("growdash:business-sidebar-collapsed", String(collapsed)); } catch { /* storage is optional */ }
+  }, [collapsed]);
 
   return <div className="relative flex min-h-0 w-full min-w-0 flex-1 overflow-hidden bg-background">
     {mobileOpen && <button type="button" aria-label="Fechar menu Business" className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setMobileOpen(false)} />}
     <aside className={`business-secondary-sidebar ${mobileOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 shrink-0 border-r border-slate-200 bg-white text-slate-900 shadow-xl transition-[width] duration-200 lg:static lg:z-auto lg:flex lg:shadow-none ${collapsed ? "w-16" : "w-64"}`} aria-label="Menu Business">
       <div className="flex h-16 items-center justify-between border-b border-slate-200 px-3"><div className={collapsed ? "sr-only" : "flex items-center gap-2"}><div className="grid h-8 w-8 place-items-center rounded-lg bg-slate-800 text-white"><Menu className="h-4 w-4" /></div><div><p className="text-sm font-bold leading-none">Meta</p><p className="text-xs leading-none text-slate-500">Business</p></div></div><Button variant="ghost" size="icon" aria-label={collapsed ? "Expandir menu Business" : "Recolher menu Business"} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</Button></div>
       <div className="border-b border-slate-200 p-3">{account ? <div className={`rounded-lg bg-slate-100 px-3 py-2 text-xs ${collapsed ? "text-center" : ""}`} title={account.name}>{collapsed ? "●" : <><span className="block font-semibold">{account.name}</span><span className="text-slate-500">Conta Meta selecionada</span></>}</div> : <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{collapsed ? "!" : "Selecione uma conta Meta"}</div>}</div>
-      <nav className="min-h-0 flex-1 overflow-y-auto p-2"><div className="space-y-1">{PRIMARY_ITEMS.map((item) => <MetaLink key={item.path} item={item} accountId={accountId} collapsed={collapsed} />)}</div><div className={`my-3 border-t border-slate-200 pt-3 ${collapsed ? "sr-only" : ""}`}><p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Usadas com frequência</p>{SECONDARY_ITEMS.map((item) => <MetaLink key={item.path} item={item} accountId={accountId} collapsed={collapsed} />)}</div><div className="mt-3 border-t border-slate-200 pt-3">{FOOTER_ITEMS.map((item) => <MetaLink key={item.path} item={item} accountId={accountId} collapsed={collapsed} />)}</div></nav>
+      <nav className="min-h-0 flex-1 overflow-y-auto p-2"><div className="space-y-1">{PRIMARY_ITEMS.map((item) => <MetaLink key={item.path} item={item} accountId={accountId} collapsed={collapsed} />)}</div><div className="my-3 border-t border-slate-200 pt-3"><p className={`px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 ${collapsed ? "sr-only" : ""}`}>Usadas com frequência</p>{SECONDARY_ITEMS.map((item) => <MetaLink key={item.path} item={item} accountId={accountId} collapsed={collapsed} />)}</div><div className="mt-3 border-t border-slate-200 pt-3">{FOOTER_ITEMS.map((item) => <MetaLink key={item.path} item={item} accountId={accountId} collapsed={collapsed} />)}</div></nav>
     </aside>
     <main className="min-w-0 flex-1 overflow-y-auto"><div className="border-b border-border/70 bg-background/95 px-4 py-3 lg:hidden"><Button variant="outline" size="sm" onClick={() => setMobileOpen((value) => !value)}><SlidersHorizontal className="mr-2 h-4 w-4" />Menu Business</Button></div><div className="mx-auto max-w-[1600px] p-4 sm:p-6"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-primary">Meta Business Suite</p><p className="text-xs text-muted-foreground">{activeLabel || "Workspace"} · dados oficiais da conta selecionada</p></div>{account && <span className="rounded-full border border-border px-3 py-1 text-[10px] font-bold text-muted-foreground">{account.name}</span>}</div><Outlet /></div></main>
   </div>;
