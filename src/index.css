@@ -7294,6 +7294,24 @@ html:not(.dark) .brand-shell .brand-sidebar :is(a, button, span, svg) { color: #
 html:not(.dark) .brand-shell .brand-sidebar nav a:hover,
 html:not(.dark) .brand-shell .brand-sidebar nav > section > button:hover { color: #ffffff !important; background: #202020 !important; }
 html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"] { background: #2b2b2b !important; color: #ffffff !important; }
+
+/* Business uses the same permanent dark chrome as the primary Growdash sidebar.
+   The content canvas may change theme, but this navigation never becomes white. */
+.business-secondary-sidebar {
+  background: #080808 !important;
+  border-color: #292929 !important;
+  color: #ffffff !important;
+}
+.business-secondary-sidebar :is(a, button, span, p, svg) { color: #ffffff !important; }
+.business-secondary-sidebar :is(a, button):hover { background: #202020 !important; color: #ffffff !important; }
+.business-secondary-sidebar a[aria-current="page"] { background: #2b2b2b !important; color: #ffffff !important; }
+.business-secondary-sidebar .bg-slate-800 { background: #1f1f1f !important; }
+.business-secondary-sidebar .bg-slate-100 { background: #171717 !important; }
+.business-secondary-sidebar .bg-amber-50 { background: #2a2110 !important; }
+.business-secondary-sidebar .text-slate-500,
+.business-secondary-sidebar .text-slate-400 { color: rgba(255,255,255,.62) !important; }
+.business-secondary-sidebar .text-amber-800 { color: #f4c76b !important; }
+.business-secondary-sidebar .border-slate-200 { border-color: #292929 !important; }
 .brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page,.integrations-page) :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { background: var(--gd-content-surface) !important; color: var(--gd-content-text) !important; border-color: var(--gd-content-border) !important; box-shadow: 0 8px 24px rgba(0,0,0,.06) !important; }
 .dark .brand-shell :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { box-shadow: 0 12px 28px rgba(0,0,0,.24) !important; }
 .brand-shell :is(.gd-kpi-grid,.dashboard-primary-kpis,.dashboard-glass-metrics,.dashboard-daily-charts,.gd-aligned-grid) { gap: var(--gd-space-card) !important; }
