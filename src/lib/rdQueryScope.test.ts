@@ -24,6 +24,24 @@ describe("RD query scope", () => {
     expect(isRDDealInScopePeriod({ ad_account_id: "account-a", rd_funnel_id: "funnel-a", win: true, closed_at: "2026-09-05T12:00:00-03:00" }, scope)).toBe(true);
   });
 
+  it("mirrors the RD creation-date filter for every current stage", () => {
+    const creationScope = normalizeRDQueryScope({ ...scope, dateRule: "lead_created_at" });
+    expect(isRDDealInScopePeriod({
+      ad_account_id: "account-a",
+      rd_funnel_id: "funnel-a",
+      win: true,
+      lead_created_at: "2026-09-10T12:00:00-03:00",
+      closed_at: "2026-10-01T12:00:00-03:00",
+    }, creationScope)).toBe(true);
+    expect(isRDDealInScopePeriod({
+      ad_account_id: "account-a",
+      rd_funnel_id: "funnel-a",
+      win: true,
+      lead_created_at: "2026-08-10T12:00:00-03:00",
+      closed_at: "2026-09-10T12:00:00-03:00",
+    }, creationScope)).toBe(false);
+  });
+
   it("deduplicates the same RD identity once", () => {
     expect(dedupeRDDealsById([{ rd_deal_id: "deal-1" }, { rd_deal_id: "deal-1" }, { rd_deal_id: "deal-2" }])).toHaveLength(2);
   });

@@ -7,7 +7,7 @@ export type RDQueryScope = {
   funnelIds: string[];
   startDate: Date;
   endDate: Date;
-  dateRule: "created_at_for_open_closed_at_for_won";
+  dateRule: "lead_created_at" | "created_at_for_open_closed_at_for_won";
 };
 
 export function normalizeRDQueryScope(scope: RDQueryScope): RDQueryScope {
@@ -48,6 +48,7 @@ function inPeriod(value: string | null | undefined, scope: RDQueryScope) {
 
 export function isRDDealInScopePeriod(deal: ScopedDeal, scope: RDQueryScope) {
   if (!isDealInRDQueryScope(deal, scope)) return false;
+  if (scope.dateRule === "lead_created_at") return inPeriod(deal.lead_created_at, scope);
   if (isCanonicalWonDeal(deal)) return inPeriod(canonicalWonDate(deal), scope);
   return inPeriod(deal.lead_created_at, scope);
 }

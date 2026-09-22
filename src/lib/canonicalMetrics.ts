@@ -17,6 +17,8 @@ export type CanonicalWonDeal = {
 /** The only timestamp used for a won RD deal. A stage update is a legacy
  * fallback, never an override for a real closing timestamp. */
 export function canonicalWonDate(deal: Pick<CanonicalWonDeal, "closed_at" | "stage_updated_at">) {
+  // A missing close and missing transition is unknown, not a sale dated by
+  // lead creation. Never invent a financial/conversion date.
   return deal.closed_at || deal.stage_updated_at || null;
 }
 

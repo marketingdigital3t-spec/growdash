@@ -53,9 +53,9 @@ import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
 import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
-import { isRDDealWonInCrmPeriod } from "@/lib/crmDateScope";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
+import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 
@@ -185,6 +185,8 @@ export default function CrmPage() {
     adAccountId: accountFilter,
     adAccountIds: accountFilter ? undefined : (adAccountIds.length ? accountScopeIds : undefined),
     funnelIds: requestedFunnelIds,
+    startDate: preset === "max" ? undefined : startDate,
+    endDate: preset === "max" ? undefined : endDate,
     enabled: canReadCrm && (accountScopeIds.length > 0 || !adAccountIds.length) && requestedFunnelIds.length > 0,
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
@@ -199,6 +201,7 @@ export default function CrmPage() {
   const [owner, setOwner] = useState("all");
   const [selectedDeal, setSelectedDeal] = useState<RDDealLite | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [stageLimits, setStageLimits] = useState<Record<string, number>>({});
 
@@ -325,7 +328,7 @@ export default function CrmPage() {
     funnelIds: funnelScopeIds,
     startDate,
     endDate,
-    dateRule: "created_at_for_open_closed_at_for_won",
+    dateRule: "lead_created_at",
   }), [accountScopeIds, endDate, funnelScopeIds, startDate]);
   const dealsInPipeline = useMemo(
     () => scopedDeals.filter((deal) => preset === "max" ? true : isRDDealInScopePeriod(deal, rdScope)),
@@ -361,9 +364,16 @@ export default function CrmPage() {
     // KPIs describe the selected account/date scope, never a transient board
     // search or status filter. In "Todas as contas" this is the union of all
     // connected Meta accounts and RD funnels.
-    const won = dealsInPipeline.filter((deal) => isRDDealWonInCrmPeriod(deal, startDate, endDate, preset === "max"));
+    // The CRM is a replica of the RD board filtered by "Data de criação".
+    // dealsInPipeline has already applied that canonical scope, so the won KPI
+    // must count the won records in the same snapshot instead of re-filtering
+    // them by closed_at (which belongs to sales analytics, not this board).
+    const won = dealsInPipeline.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
     const lost = dealsInPipeline.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
-    const active = dealsInPipeline.filter((deal) => !deal.win && !lost.includes(deal));
+    const active = dealsInPipeline.filter((deal) => {
+      const bucket = classifyLead(deal);
+      return bucket === "open" || bucket === "qualified";
+    });
     const wonIds = new Set(won.map((deal) => deal.rd_deal_id));
     const realized = aggregateRevenueSources(scopedSales.filter((sale) => sale.rd_deal_id && wonIds.has(sale.rd_deal_id)), won);
     return {
@@ -489,7 +499,9 @@ export default function CrmPage() {
       return;
     }
     setSyncing(true);
+    setSyncWarning(null);
     try {
+      const syncResults: Array<{ deals?: number; pages_processed?: number }> = [];
       for (const funnel of connectedFunnels) {
         const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
           body: {
@@ -516,7 +528,13 @@ export default function CrmPage() {
             trigger_source: "crm_history_refresh",
           },
         });
-        if (error || data?.error || data?.success === false) throw error || new Error(data?.error || "Falha na sincronização.");
+        if (error || data?.error || data?.success === false || data?.partial) {
+          const details = data?.snapshot_missing_ids?.length
+            ? ` IDs ausentes: ${data.snapshot_missing_ids.slice(0, 5).join(", ")}`
+            : "";
+          throw error || new Error(`${data?.error || "Snapshot RD incompleto."}${details}`);
+        }
+        syncResults.push(data);
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),
@@ -525,9 +543,13 @@ export default function CrmPage() {
         queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] }),
         queryClient.invalidateQueries({ queryKey: ["sales"] }),
       ]);
-      toast.success("Negociações atualizadas com o RD Station.");
+      const deals = syncResults.reduce((sum, result) => sum + Number(result?.deals || 0), 0);
+      const pages = syncResults.reduce((sum, result) => sum + Number(result?.pages_processed || 0), 0);
+      toast.success(`RD reconciliado: ${deals} negócios em ${pages} páginas.`);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível sincronizar o RD Station.");
+      const message = error instanceof Error ? error.message : "Não foi possível sincronizar o RD Station.";
+      setSyncWarning(`Último snapshot mantido; sincronização pendente: ${message}`);
+      toast.error(message);
     } finally {
       setSyncing(false);
     }
@@ -620,6 +642,12 @@ export default function CrmPage() {
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
         </div>
       </section>
+
+      {syncWarning && (
+        <div role="status" className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          {syncWarning}
+        </div>
+      )}
 
       {view !== "ai" && (
         <section className="mb-4" aria-labelledby="crm-metrics-title">

@@ -756,6 +756,8 @@ Deno.serve(async (req) => {
     let fullHistoryRequested = false;
     let pagesProcessed = 0;
     const seenAnalyticsDealIds = new Set<string>();
+    let snapshotMissingIds: string[] = [];
+    let snapshotDuplicateCount = 0;
     let debugLogged = false;
 
     async function processDeal(d: any) {
@@ -1361,7 +1363,11 @@ Deno.serve(async (req) => {
       // Full-history reconciliation is explicitly initiated by the user in
       // CRM. Do not silently reduce it to the daily/interactive limits. The
       // regular realtime and date-range paths intentionally stay bounded.
-      fullHistoryRequested = analytics_mode && full_history === true;
+      // A CRM refresh always carries the visible calendar interval. Honour
+      // that scope even if an older frontend also sends full_history=true;
+      // otherwise every account refresh unnecessarily drains the entire RD
+      // archive and frequently times out before persisting the final stages.
+      fullHistoryRequested = analytics_mode && full_history === true && !(start_date && end_date);
       const maxPages = fullHistoryRequested
         ? Number.POSITIVE_INFINITY
         // Analytics mode is the exact multi-status path. Respect its page
@@ -1397,12 +1403,30 @@ Deno.serve(async (req) => {
       // https://developers.rdstation.com/reference/crm-v1-list-deals
       const analyticsSegments = analytics_mode
         ? [
-            { name: "ongoing", params: "", won: false },
-            { name: "won", params: "&win=true", won: true },
-            { name: "lost", params: "&win=false", won: false },
-            { name: "paused", params: "&hold=true", won: false },
+            // The unfiltered list is authoritative for open/lost records and
+            // already carries each deal's native stage. Some RD accounts
+            // silently ignore `deal_stage_id`, so walking every stage would
+            // repeat the entire pipeline and can exceed the Edge timeout.
+            { name: "ongoing", stageId: null, params: "", won: false },
+            // Terminal stages get a targeted pass as a complement to the
+            // status endpoint. This catches old deals whose `win` flag was
+            // not backfilled while keeping the request count bounded.
+            ...Array.from(stageWonMap.entries())
+              .filter(([, won]) => won)
+              .map(([stageId]) => ({
+              name: `stage:${stageId}`,
+              stageId,
+              params: `&deal_stage_id=${encodeURIComponent(stageId)}`,
+              won: true,
+            })),
+            // Keep status segments as a safety net for terminal deals whose
+            // stage is not returned by the list endpoint or whose legacy
+            // `win` flag was not backfilled.
+            { name: "won", stageId: null, params: "&win=true", won: true },
+            { name: "lost", stageId: null, params: "&win=false", won: false },
+            { name: "paused", stageId: null, params: "&hold=true", won: false },
           ]
-        : [{ name: "ongoing", params: "", won: false }];
+        : [{ name: "ongoing", stageId: null, params: "", won: false }];
       analyticsRangeComplete = analytics_mode;
 
       segmentLoop: for (const segment of analyticsSegments) {
@@ -1453,9 +1477,24 @@ Deno.serve(async (req) => {
               .filter((deal: any) => {
                 const rdDealId = String(deal.id || deal._id || "");
                 if (!rdDealId || seenAnalyticsDealIds.has(rdDealId)) return false;
-                const rawDate = segment.won
-                  ? (deal.closed_at || deal.updated_at || deal.created_at)
-                  : (deal.created_at || deal.updated_at);
+                // The RD API may return the same unfiltered page even when a
+                // deal_stage_id query parameter is supplied. Never attribute
+                // that page to the first stage: enforce the stage locally so
+                // each native RD column gets its own records and later
+                // terminal-stage segments can still contribute their deals.
+                if (segment.stageId) {
+                  const returnedStageId = deal.deal_stage?.id ? String(deal.deal_stage.id) : "";
+                  if (returnedStageId !== String(segment.stageId)) return false;
+                }
+                // The RD `win=true` segment is not exhaustive: older deals
+                // can remain flagged as open in the API even while their
+                // current stage is terminal (for example "Venda Realizada").
+                // Classify the stage before applying the calendar so those
+                // deals use the won date and are not dropped by an old
+                // creation date.
+                // CRM replica scope follows the RD "Data de criação" filter
+                // for every current stage, including won/lost columns.
+                const rawDate = deal.created_at || deal.updated_at;
                 if (!rawDate) return true;
                 const timestamp = new Date(rawDate).getTime();
                 return (!startMs || timestamp >= startMs) && (!endMs || timestamp <= endMs);
@@ -1465,12 +1504,18 @@ Deno.serve(async (req) => {
             totalDeals += rangedDeals.length;
 
             const timestamps = deals
-              .map((deal: any) => new Date((segment.won ? (deal.closed_at || deal.updated_at || deal.created_at) : (deal.created_at || deal.updated_at)) || 0).getTime())
+              .filter((deal: any) => !segment.stageId || String(deal.deal_stage?.id || "") === String(segment.stageId))
+              .map((deal: any) => {
+                return new Date((deal.created_at || deal.updated_at) || 0).getTime();
+              })
               .filter((value: number) => Number.isFinite(value) && value > 0);
-            const reachedOlderBoundary = !segment.won && Boolean(
-              startMs && timestamps.some((value: number) => value < startMs),
-            );
-            if (deals.length < 200 || reachedOlderBoundary) {
+            // Do not stop at the creation-date boundary. A deal created
+            // before the selected interval may have entered a won stage in
+            // the interval, and the RD list endpoint can return it through
+            // the non-won segment. Drain the segment to its real API end;
+            // full-history runs remain unbounded and bounded runs still use
+            // their explicit page budget.
+            if (deals.length < 200) {
               segmentComplete = true;
               break;
             }
@@ -1539,6 +1584,31 @@ Deno.serve(async (req) => {
       }
     }
 
+    // A successful API walk is not enough: verify that every RD ID selected
+    // for this snapshot exists in the local table before reporting success.
+    // This is the guard that prevents a partial page/status segment from
+    // masquerading as a complete CRM mirror.
+    if (analytics_mode && analyticsRangeComplete) {
+      let localQuery = admin
+        .from("rd_deals")
+        .select("rd_deal_id")
+        .eq("rd_funnel_id", funnel.id);
+      if (start_date && end_date) {
+        localQuery = localQuery
+          .gte("lead_created_at", `${start_date}T00:00:00-03:00`)
+          .lte("lead_created_at", `${end_date}T23:59:59.999-03:00`);
+      }
+      const { data: localSnapshot, error: localSnapshotError } = await localQuery;
+      if (localSnapshotError) throw localSnapshotError;
+      const localIds = (localSnapshot || []).map((row: any) => String(row.rd_deal_id || "")).filter(Boolean);
+      const localIdSet = new Set(localIds);
+      snapshotMissingIds = Array.from(seenAnalyticsDealIds).filter((id) => !localIdSet.has(id));
+      snapshotDuplicateCount = localIds.length - localIdSet.size;
+      if (snapshotMissingIds.length || snapshotDuplicateCount > 0) {
+        analyticsRangeComplete = false;
+      }
+    }
+
     const fieldCatalog = await syncObservedFieldCatalog();
     const status = metrics.errors > 0 || (analytics_mode && !analyticsRangeComplete) ? "partial" : "success";
     await finishRun({
@@ -1548,6 +1618,9 @@ Deno.serve(async (req) => {
       updated: totalUpdated,
       skipped: totalSkipped,
       funnelName: funnel.name,
+      errorMessage: snapshotMissingIds.length || snapshotDuplicateCount > 0
+        ? `Snapshot RD incompleto: ${snapshotMissingIds.length} ID(s) ausente(s), ${snapshotDuplicateCount} duplicidade(s)`
+        : undefined,
     });
 
     return new Response(
@@ -1569,6 +1642,8 @@ Deno.serve(async (req) => {
         fields_updated: fieldCatalog.updated,
         complete: analytics_mode ? analyticsRangeComplete : undefined,
         pages_processed: pagesProcessed,
+        snapshot_missing_ids: snapshotMissingIds,
+        snapshot_duplicate_count: snapshotDuplicateCount,
         next_action: status === "partial" ? "Reexecutar a sincronização histórica para processar as páginas restantes." : undefined,
         full_history: fullHistoryRequested,
       }),

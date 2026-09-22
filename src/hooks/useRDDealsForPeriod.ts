@@ -86,6 +86,8 @@ export interface RDCRMQueryScope {
   adAccountId?: string;
   adAccountIds?: string[];
   funnelIds?: string[];
+  startDate?: Date;
+  endDate?: Date;
   enabled?: boolean;
 }
 
@@ -198,6 +200,8 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
       // timestamp filters in production. Fetch the two disjoint ranges
       // explicitly: closed deals first, then the historical fallback.
       const all = (await fetchAll(false)).concat(await fetchAll(true));
+      // A won deal without both a close timestamp and a real stage transition
+      // has no trustworthy sales date and must remain out of period KPIs.
       return dedupeRDDeals(all).filter((deal) => isCanonicalWonDealInPeriod(deal, startDate, endDate));
     },
     staleTime: 15 * 60 * 1000,
@@ -211,11 +215,11 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
  * pela data de criação: um lead antigo que continua aberto precisa permanecer
  * visível no pipeline, exatamente como no RD Station.
  */
-export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, enabled = true }: RDCRMQueryScope) {
+export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, enabled = true }: RDCRMQueryScope) {
   const accountScope = adAccountIds?.slice().sort().join(",") ?? "";
   const funnelScope = funnelIds?.slice().sort().join(",") ?? "";
   return useQuery({
-    queryKey: ["rd_crm_deals", adAccountId ?? "all", accountScope, funnelScope],
+    queryKey: ["rd_crm_deals", adAccountId ?? "all", accountScope, funnelScope, startDate ? format(startDate, "yyyy-MM-dd") : "all", endDate ? format(endDate, "yyyy-MM-dd") : "all"],
     enabled,
     queryFn: async () => {
       const pageSize = 1_000;
@@ -232,6 +236,10 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, enabled = 
         if (adAccountId) query = query.eq("ad_account_id", adAccountId);
         else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
         if (funnelIds?.length) query = query.in("rd_funnel_id", funnelIds);
+        if (startDate && endDate) {
+          const bounds = saoPauloDayBounds(startDate, endDate);
+          query = query.gte("lead_created_at", bounds.start.toISOString()).lte("lead_created_at", bounds.end.toISOString());
+        }
 
         const from = page * pageSize;
         const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), 15_000);
