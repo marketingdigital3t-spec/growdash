@@ -90,7 +90,7 @@ export default function BusinessWorkspacePage() {
     try { localStorage.setItem("growdash:business-sidebar-collapsed:v2", String(collapsed)); } catch { /* storage is optional */ }
   }, [collapsed]);
 
-  return <div className="relative -mx-[var(--gd-page-gutter)] -my-[var(--gd-page-gutter)] flex min-h-[calc(100vh-48px)] min-w-0 flex-1 overflow-hidden bg-background">
+  return <div className="relative -my-[var(--gd-page-gutter)] flex min-h-[calc(100vh-48px)] min-w-0 flex-1 overflow-hidden bg-background">
     {mobileOpen && <button type="button" aria-label="Fechar menu Business" className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setMobileOpen(false)} />}
     <aside className={`business-secondary-sidebar ${mobileOpen ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 shrink-0 flex-col border-r border-slate-200 bg-white text-slate-900 shadow-xl transition-[width] duration-200 lg:static lg:z-auto lg:flex lg:flex-col lg:shadow-none ${collapsed ? "w-16" : "w-64"}`} aria-label="Menu Business">
       <div className="flex h-16 items-center justify-between border-b border-slate-200 px-3"><div className={collapsed ? "sr-only" : "flex items-center gap-2"}><div className="grid h-8 w-8 place-items-center rounded-lg bg-slate-800 text-white"><Menu className="h-4 w-4" /></div><div><p className="text-sm font-bold leading-none">Meta</p><p className="text-xs leading-none text-slate-500">Business</p></div></div><Button variant="ghost" size="icon" aria-label={collapsed ? "Expandir menu Business" : "Recolher menu Business"} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}</Button></div>

@@ -486,6 +486,7 @@ export default function GrowdashLayout() {
         <main
           className={cn(
             "growdash-main min-w-0 max-w-full overflow-x-clip px-[var(--gd-page-gutter)] py-[var(--gd-page-gutter)] pb-[calc(var(--gd-page-gutter)+env(safe-area-inset-bottom))]",
+            pathname.startsWith("/business") && "business-main",
             isCampaignsWorkspace
               ? "md:h-[calc(100dvh-48px)] md:min-h-0 md:overflow-hidden"
               : "min-h-[calc(100vh-48px)]",

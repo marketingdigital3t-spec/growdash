@@ -7312,6 +7312,7 @@ html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"] { backgro
 .business-secondary-sidebar .text-slate-400 { color: rgba(255,255,255,.62) !important; }
 .business-secondary-sidebar .text-amber-800 { color: #f4c76b !important; }
 .business-secondary-sidebar .border-slate-200 { border-color: #292929 !important; }
+.brand-shell .growdash-main.business-main { padding-left: 0 !important; padding-right: 0 !important; }
 .brand-shell :is(.dashboard-page,.gd-funnel-analysis,.event-classes-page,.expert-dashboard,.crm-page,.commercial-page,.paid-traffic-page,.agenda-page,.kanban-page,.finance-page,.integrations-page) :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { background: var(--gd-content-surface) !important; color: var(--gd-content-text) !important; border-color: var(--gd-content-border) !important; box-shadow: 0 8px 24px rgba(0,0,0,.06) !important; }
 .dark .brand-shell :is(.gd-panel,.dashboard-glass-card,.dashboard-terra-card,.gd-metric-card,.dashboard-video-glass) { box-shadow: 0 12px 28px rgba(0,0,0,.24) !important; }
 .brand-shell :is(.gd-kpi-grid,.dashboard-primary-kpis,.dashboard-glass-metrics,.dashboard-daily-charts,.gd-aligned-grid) { gap: var(--gd-space-card) !important; }
