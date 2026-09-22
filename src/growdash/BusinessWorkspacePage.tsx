@@ -38,7 +38,7 @@ const META_BASE = "https://business.facebook.com";
 const PRIMARY_ITEMS: BusinessMenuItem[] = [
   { label: "Página inicial", path: "/business", icon: LayoutDashboard },
   { label: "Notificações", path: "/business/notifications", icon: Bell },
-  { label: "Gerenciador de anúncios", path: "/business/ads-manager", icon: MonitorPlay, external: (id) => `${META_BASE}/adsmanager/manage/campaigns?act=${encodeURIComponent(id)}` },
+  { label: "Gerenciador de anúncios", path: "/business/ads-manager", icon: MonitorPlay },
   { label: "Caixa de entrada", path: "/business/inbox", icon: Inbox, external: () => `${META_BASE}/latest/inbox/all` },
   { label: "Central de Leads", path: "/business/leads", icon: Users, external: (id) => `${META_BASE}/latest/leads_center?asset_id=${encodeURIComponent(id)}` },
   { label: "Conteúdo", path: "/business/content", icon: Newspaper, external: () => `${META_BASE}/latest/content` },

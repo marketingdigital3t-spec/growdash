@@ -262,7 +262,7 @@ export default function App() {
                     <Route path="business" element={<ResilientRoute><RequirePage page="campaigns">{analytics(<BusinessWorkspacePage />)}</RequirePage></ResilientRoute>}>
                       <Route index element={<BusinessPage />} />
                       <Route path="insights" element={<BusinessPage />} />
-                      <Route path="ads-manager" element={<BusinessUnavailablePage title="Gerenciador de anúncios" description="A gestão completa de campanhas permanece na ferramenta oficial da Meta para preservar todos os controles e permissões." externalUrl="https://business.facebook.com/adsmanager" />} />
+                      <Route path="ads-manager" element={<TrafficPage />} />
                       <Route path="notifications" element={<BusinessUnavailablePage title="Notificações" description="As notificações serão exibidas quando a Meta disponibilizar os eventos deste ativo para a conexão autorizada." />} />
                       <Route path="inbox" element={<BusinessUnavailablePage title="Caixa de entrada" description="A Caixa de entrada exige permissões de mensagens e ativos vinculados. Nenhuma conversa é simulada enquanto a conexão não estiver autorizada." externalUrl="https://business.facebook.com/latest/inbox/all" />} />
                       <Route path="leads" element={<BusinessUnavailablePage title="Central de Leads" description="Leads recebidos por webhook aparecerão aqui após a validação de formulário e permissão leads_retrieval." externalUrl="https://business.facebook.com/latest/leads_center" />} />
