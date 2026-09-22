@@ -5,6 +5,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -34,25 +35,27 @@ Deno.serve(async (req) => {
 
   const summary: Array<Record<string, unknown>> = [];
   try {
-    // Active RD integrations
-    const { data: integrations, error: integrationsError } = await admin
-      .from("integrations")
-      .select("user_id")
-      .eq("provider", "rd_station_crm")
-      .eq("is_active", true);
-    if (integrationsError) throw integrationsError;
-
-    const userIds = Array.from(new Set((integrations || []).map((r: any) => r.user_id)));
-    if (userIds.length === 0) {
-      return new Response(JSON.stringify({ ok: true, message: "no active integrations", summary }), {
+    const connections = await listAuthorizedRDConnections(admin);
+    const { data: blockedConnections } = await admin
+      .from("rd_account_connections")
+      .select("id,user_id,account_name,status,last_error")
+      .neq("status", "connected");
+    for (const connection of blockedConnections || []) {
+      summary.push({ connection_id: connection.id, user_id: connection.user_id, account_name: connection.account_name, status: connection.status, blocked: true, error: connection.last_error || "Conexão não autorizada" });
+    }
+    if (connections.length === 0) {
+      const blocked = summary.filter((entry) => entry.blocked).length;
+      return new Response(JSON.stringify({ ok: blocked === 0, status: blocked === 0 ? "success" : "partial", message: blocked === 0 ? "no RD connections" : "RD connections blocked", blocked, summary }), {
+        status: blocked === 0 ? 200 : 207,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { data: funnels, error: funnelsError } = await admin
       .from("rd_funnels")
-      .select("id, user_id, rd_funnel_id, name")
-      .in("user_id", userIds)
+      .select("id, user_id, rd_connection_id, rd_funnel_id, name")
+      .in("rd_connection_id", connections.map((connection) => connection.id))
+      .eq("is_active", true)
       .not("rd_funnel_id", "is", null);
     if (funnelsError) throw funnelsError;
 
@@ -88,6 +91,7 @@ Deno.serve(async (req) => {
             funnel_id: f.id,
             deal_ids: ids,
             service_user_id: f.user_id,
+            rd_connection_id: f.rd_connection_id,
             cron_trigger: true,
           }),
         });

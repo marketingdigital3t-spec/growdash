@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { resolveRDConnection } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,20 +35,31 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: existing } = await admin
-      .from("integrations")
-      .select("id, api_token, is_active, webhook_secret")
-      .eq("user_id", userId)
-      .eq("provider", "rd_station_crm")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const connectionId = typeof body?.rd_connection_id === "string" ? body.rd_connection_id : null;
+    const accountName = typeof body?.account_name === "string" && body.account_name.trim()
+      ? body.account_name.trim()
+      : "RD Station";
+    const externalAccountId = typeof body?.external_account_id === "string" && body.external_account_id.trim()
+      ? body.external_account_id.trim()
+      : `rd:${userId}:${accountName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}`;
+    let existingQuery = admin
+      .from("rd_account_connections")
+      .select("id, api_token, status, permissions, webhook_secret")
+      .eq("user_id", userId);
+    if (connectionId) existingQuery = existingQuery.eq("id", connectionId);
+    else existingQuery = existingQuery.eq("external_account_id", externalAccountId);
+    const { data: existing } = await existingQuery.maybeSingle();
 
     if (body?.disconnect === true) {
       if (existing?.id) {
+        if (body?.delete === true) {
+          const { error } = await admin.from("rd_account_connections").delete().eq("id", existing.id).eq("user_id", userId);
+          if (error) throw error;
+          return json({ ok: true, connected: false, deleted: true });
+        }
         const { error } = await admin
-          .from("integrations")
-          .update({ api_token: null, is_active: false, updated_at: new Date().toISOString() })
+          .from("rd_account_connections")
+          .update({ api_token: null, status: "blocked", last_error: "Desconectado manualmente", updated_at: new Date().toISOString() })
           .eq("id", existing.id);
         if (error) throw error;
       }
@@ -55,7 +67,7 @@ Deno.serve(async (req) => {
     }
 
     const suppliedToken = typeof body?.api_token === "string" ? body.api_token.trim() : "";
-    const token = suppliedToken || (existing?.is_active ? String(existing.api_token ?? "") : "");
+    const token = suppliedToken || (existing?.status === "connected" ? String(existing.api_token ?? "") : "");
     if (!token) return json({ error: "RD Station CRM não conectado. Informe um token válido." }, 400);
 
     let response: Response | null = null;
@@ -72,8 +84,8 @@ Deno.serve(async (req) => {
     const rateLimited = response?.status === 429;
     if (!response || (!response.ok && !rateLimited)) {
       const status = response?.status ?? 502;
-      if (!suppliedToken && existing?.id && (status === 401 || status === 403)) {
-        await admin.from("integrations").update({ is_active: false }).eq("id", existing.id);
+      if (existing?.id && (status === 401 || status === 403)) {
+        await admin.from("rd_account_connections").update({ status: "blocked", last_error: `RD API HTTP ${status}`, last_attempt_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", existing.id);
       }
       return json({
         error: `Token inválido ou sem permissão no RD Station (HTTP ${status}).`,
@@ -86,22 +98,24 @@ Deno.serve(async (req) => {
     if (suppliedToken) {
       const values = {
         api_token: suppliedToken,
-        is_active: true,
+        status: "connected",
+        account_name: accountName,
+        external_account_id: externalAccountId,
+        last_attempt_at: new Date().toISOString(),
+        last_success_at: new Date().toISOString(),
+        last_error: null,
+        permissions: ["deal_pipelines", "deals"],
         webhook_secret: webhookSecret,
         updated_at: new Date().toISOString(),
       };
       const operation = existing?.id
-        ? admin.from("integrations").update(values).eq("id", existing.id)
-        : admin.from("integrations").insert({
+        ? admin.from("rd_account_connections").update(values).eq("id", existing.id)
+        : admin.from("rd_account_connections").insert({
             user_id: userId,
-            provider: "rd_station_crm",
             ...values,
           });
       const { error } = await operation;
       if (error) throw error;
-
-    } else if (existing?.id && !existing.webhook_secret) {
-      await admin.from("integrations").update({ webhook_secret: webhookSecret }).eq("id", existing.id);
     }
 
     try {

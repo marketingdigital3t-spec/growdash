@@ -50,13 +50,12 @@ export function useRDHealthCheck() {
       const since7 = new Date(Date.now() - 7 * 86400000).toISOString();
 
       // 1) Token RD CRM
-      const { data: integration } = await supabase
-        .from("integrations")
-        .select("id, is_active")
-        .eq("provider", "rd_station_crm")
-        .maybeSingle();
+      const { data: connections, error: connectionError } = await (supabase as any)
+        .from("rd_account_connections")
+        .select("id, status, last_error")
+        .order("updated_at", { ascending: false });
 
-      const isConnected = !!integration?.is_active;
+      const isConnected = !connectionError && (connections ?? []).some((connection: any) => connection.status === "connected");
       if (!isConnected) {
         checks.push({
           id: "token",
@@ -87,7 +86,7 @@ export function useRDHealthCheck() {
       // 2) Funis vinculados
       const { data: funnels = [] } = await supabase
         .from("rd_funnels")
-        .select("id, name, rd_funnel_id, is_active, ad_account_id");
+        .select("id, name, rd_funnel_id, is_active, ad_account_id, rd_connection_id");
 
       const activeLinked = (funnels ?? []).filter((f) => f.is_active && f.rd_funnel_id);
       if (activeLinked.length === 0) {

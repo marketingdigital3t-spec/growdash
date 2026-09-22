@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { resolveRDConnection } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,22 +30,20 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: integration } = await admin
-      .from("integrations")
-      .select("api_token")
-      .eq("user_id", userId)
-      .eq("provider", "rd_station_crm")
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (!integration?.api_token) {
+    const body = await req.json().catch(() => ({}));
+    let connection;
+    try {
+      connection = await resolveRDConnection(admin, { connectionId: body?.rd_connection_id, userId });
+    } catch (error) {
       return new Response(JSON.stringify({
-        error: "RD Station CRM não conectado. Configure o token nas Configurações.",
+        error: error instanceof Error && error.message === "RD_CONNECTION_NOT_AUTHORIZED"
+          ? "Conexão RD sem autorização válida. Reconecte esta conta."
+          : "Nenhuma conexão RD autorizada para esta conta.",
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const r = await fetch(
-      `https://crm.rdstation.com/api/v1/deal_pipelines/?token=${encodeURIComponent(integration.api_token)}&limit=200`,
+      `https://crm.rdstation.com/api/v1/deal_pipelines/?token=${encodeURIComponent(connection.api_token!)}&limit=200`,
     );
     if (!r.ok) {
       const txt = await r.text();

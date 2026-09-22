@@ -8,15 +8,15 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link2, CheckCircle2, AlertCircle, Trash2, Unplug } from "lucide-react";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
-import { useAuth } from "@/contexts/AuthContext";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 
 export function RDIntegrationCard() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [token, setToken] = useState("");
+  const [accountName, setAccountName] = useState("RD Station");
+  const [externalAccountId, setExternalAccountId] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const { user } = useAuth();
 
   const { data: integration, isError: integrationLoadFailed, error: integrationLoadError, refetch: refetchIntegration } = useRDIntegration();
   const isConnected = !!integration?.is_active;
@@ -24,7 +24,7 @@ export function RDIntegrationCard() {
   const save = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("rd-test-connection", {
-        body: { api_token: token.trim() },
+        body: { api_token: token.trim(), account_name: accountName.trim(), external_account_id: externalAccountId.trim() || undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -37,6 +37,7 @@ export function RDIntegrationCard() {
         description: data?.warning || "Token validado e salvo com segurança.",
       });
       qc.invalidateQueries({ queryKey: ["integration"] });
+      qc.invalidateQueries({ queryKey: ["rd_account_connections"] });
       qc.invalidateQueries({ queryKey: ["rd_health_check"] });
     },
     onError: (e: any) =>
@@ -56,6 +57,7 @@ export function RDIntegrationCard() {
       setToken("");
       toast({ title: "RD Station desconectado", description: "O token salvo foi removido da Growdash." });
       qc.invalidateQueries({ queryKey: ["integration"] });
+      qc.invalidateQueries({ queryKey: ["rd_account_connections"] });
       qc.invalidateQueries({ queryKey: ["rd_health_check"] });
     },
     onError: (e: Error) =>
@@ -64,12 +66,8 @@ export function RDIntegrationCard() {
 
   const remove = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("delete-integration-account", {
-        body: {
-          provider: "rd_station_crm",
-          account_id: user?.id,
-          confirmation: "EXCLUIR RD",
-        },
+      const { data, error } = await supabase.functions.invoke("rd-test-connection", {
+        body: { disconnect: true, delete: true, account_name: accountName.trim(), external_account_id: externalAccountId.trim() || undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -121,6 +119,17 @@ export function RDIntegrationCard() {
           <p>2. Clique no ícone de engrenagem (<strong>Admin</strong>)</p>
           <p>3. Vá em <strong>Integrações → API do CRM</strong></p>
           <p>4. Clique em <strong>Gerar token</strong> e copie o valor</p>
+        </div>
+
+        <div className="space-y-1">
+          <Label>Nome da conta RD</Label>
+          <input className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Ex.: Paciente Modelo" />
+          <p className="text-xs text-muted-foreground">Use um nome diferente para cada conta RD que for conectada.</p>
+        </div>
+
+        <div className="space-y-1">
+          <Label>ID externo da conta (opcional)</Label>
+          <input className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={externalAccountId} onChange={(event) => setExternalAccountId(event.target.value)} placeholder="Identificador fornecido pelo RD" />
         </div>
 
         <div className="space-y-1">

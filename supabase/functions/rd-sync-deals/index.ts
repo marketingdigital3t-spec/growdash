@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { resolveRDConnection } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -534,19 +535,13 @@ Deno.serve(async (req) => {
     // original do vínculo, mesmo quando um master executa a manutenção.
     userId = String(funnel.user_id);
 
-    const { data: integration, error: integrationError } = await admin
-      .from("integrations")
-      .select("api_token")
-      .eq("user_id", userId)
-      .eq("provider", "rd_station_crm")
-      .eq("is_active", true)
-      .maybeSingle();
-    if (integrationError) throw integrationError;
-
-    if (!integration?.api_token) {
+    let connection;
+    try {
+      connection = await resolveRDConnection(admin, { connectionId: funnel.rd_connection_id, funnelId: funnel.id, userId });
+    } catch (error) {
       return new Response(
         JSON.stringify({
-          error: "RD Station CRM não conectado. Configure o token nas Configurações.",
+          error: error instanceof Error ? error.message : "RD connection unavailable",
         }),
         {
           status: 400,
@@ -554,7 +549,7 @@ Deno.serve(async (req) => {
         },
       );
     }
-    const token = integration.api_token;
+    const token = connection.api_token!;
 
     if (only_missing_names) {
       const { data: missingRows, error: missingError } = await admin

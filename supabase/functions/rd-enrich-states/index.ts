@@ -1,5 +1,6 @@
 // Enrich rd_deals.lead_state for deals missing state by re-fetching contacts from RD CRM.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,16 +106,14 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
     const admin = createClient(url, serviceKey);
 
-    const { data: integ } = await admin
-      .from("integrations").select("api_token")
-      .eq("user_id", userId).eq("provider", "rd_station_crm").eq("is_active", true).maybeSingle();
-    if (!integ?.api_token) return new Response(JSON.stringify({ error: "RD CRM token not configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    const token = integ.api_token;
+    const connections = await listAuthorizedRDConnections(admin, [userId]);
+    const tokenByConnection = new Map<string, string>();
+    for (const connection of connections) if (connection.api_token) tokenByConnection.set(connection.id, connection.api_token);
 
     // Fetch up to 800 deals missing state (multiple runs if needed for larger backlogs)
     const { data: deals, error } = await admin
       .from("rd_deals")
-      .select("id, rd_deal_id, raw")
+      .select("id, rd_deal_id, rd_connection_id, raw")
       .eq("user_id", userId)
       .is("lead_state", null)
       .limit(800);
@@ -126,6 +125,8 @@ Deno.serve(async (req) => {
     let viaApi = 0;
 
     for (const d of (deals || []) as any[]) {
+      const token = tokenByConnection.get(String(d.rd_connection_id || ""));
+      if (!token) { skipped++; continue; }
       let raw = d.raw || null;
 
       // ---------- Fast path: infer UF from any phone already present in raw ----------

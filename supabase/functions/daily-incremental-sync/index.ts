@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +17,7 @@ type FunctionResult = {
 type RdTarget = {
   id: string;
   user_id: string;
+  rd_connection_id: string;
   name: string;
   rd_funnel_id: string;
 };
@@ -269,23 +271,15 @@ Deno.serve(async (req) => {
     const metaLeads = applyReportedFailure(metaLeadsRaw);
     const metaHourly = applyReportedFailure(metaHourlyRaw);
 
-    const { data: integrations, error: integrationsError } = await admin
-      .from("integrations")
-      .select("user_id")
-      .eq("provider", "rd_station_crm")
-      .eq("is_active", true);
-    if (integrationsError) throw integrationsError;
-
-    const ownerIds = Array.from(
-      new Set((integrations ?? []).map((row) => String(row.user_id))),
-    );
+    const rdConnections = await listAuthorizedRDConnections(admin);
+    const ownerIds = Array.from(new Set(rdConnections.map((row) => String(row.user_id))));
     let rdTargets: RdTarget[] = [];
     let duplicateMappingCount = 0;
     if (ownerIds.length) {
       const { data: funnels, error: funnelsError } = await admin
         .from("rd_funnels")
-        .select("id,user_id,name,rd_funnel_id")
-        .in("user_id", ownerIds)
+        .select("id,user_id,rd_connection_id,name,rd_funnel_id")
+        .in("rd_connection_id", rdConnections.map((connection) => connection.id))
         .eq("is_active", true)
         .not("rd_funnel_id", "is", null);
       if (funnelsError) throw funnelsError;
@@ -298,7 +292,7 @@ Deno.serve(async (req) => {
       for (const row of existingDealRows ?? []) dealCounts.set(row.rd_funnel_id, (dealCounts.get(row.rd_funnel_id) || 0) + 1);
       const grouped = new Map<string, RdTarget[]>();
       for (const funnel of candidates) {
-        const key = `${funnel.user_id}:${funnel.rd_funnel_id}`;
+        const key = `${funnel.rd_connection_id}:${funnel.rd_funnel_id}`;
         const group = grouped.get(key) || [];
         group.push(funnel);
         grouped.set(key, group);
@@ -328,6 +322,7 @@ Deno.serve(async (req) => {
           max_deals: 10000,
           max_pages: 50,
           trigger_source: "quarter_hour_incremental",
+          rd_connection_id: funnel.rd_connection_id,
         },
       );
       return {

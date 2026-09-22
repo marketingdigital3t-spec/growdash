@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { buildRDDealNote, isNoteAutomationFunnel } from "../_shared/rdDealNote.ts";
+import { resolveRDConnection } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,13 +19,12 @@ Deno.serve(async (req) => {
     if (!webhookSecret) return json({ error: "Unauthorized" }, 401);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    const { data: integration } = await admin.from("integrations")
-      .select("id,user_id,webhook_secret,api_token")
-      .eq("provider", "rd_station_crm")
-      .eq("is_active", true)
+    const { data: connection } = await admin.from("rd_account_connections")
+      .select("id,user_id,webhook_secret,api_token,status")
       .eq("webhook_secret", webhookSecret)
+      .eq("status", "connected")
       .maybeSingle();
-    if (!integration) return json({ error: "Unauthorized" }, 401);
+    if (!connection) return json({ error: "Unauthorized" }, 401);
 
     const payload = await req.json().catch(() => null);
     const document = payload?.document || payload?.deal || payload;
@@ -37,7 +37,8 @@ Deno.serve(async (req) => {
     if (eventName === "crm_deal_deleted") {
       await admin.from("rd_deals")
         .delete()
-        .eq("user_id", integration.user_id)
+        .eq("user_id", connection.user_id)
+        .eq("rd_connection_id", connection.id)
         .eq("rd_deal_id", String(dealId));
       return json({ ok: true, deleted: true });
     }
@@ -47,7 +48,8 @@ Deno.serve(async (req) => {
     const pipelineName = String(pipeline?.name || "");
     let query = admin.from("rd_funnels")
       .select("id,user_id,rd_funnel_id,name")
-      .eq("user_id", integration.user_id)
+      .eq("user_id", connection.user_id)
+      .eq("rd_connection_id", connection.id)
       .eq("is_active", true);
     if (pipelineId) query = query.eq("rd_funnel_id", pipelineId);
     const { data: exactFunnels } = await query;
@@ -56,7 +58,8 @@ Deno.serve(async (req) => {
     if (!funnel && pipelineName) {
       const { data: candidates } = await admin.from("rd_funnels")
         .select("id,user_id,rd_funnel_id,name")
-        .eq("user_id", integration.user_id)
+        .eq("user_id", connection.user_id)
+        .eq("rd_connection_id", connection.id)
         .eq("is_active", true);
       const wanted = normalize(pipelineName);
       funnel = (candidates || []).find((item: any) => normalize(item.name) === wanted);
@@ -76,7 +79,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         funnel_id: funnel.id,
         deal_ids: [String(dealId)],
-        service_user_id: integration.user_id,
+        service_user_id: connection.user_id,
+        rd_connection_id: connection.id,
         cron_trigger: true,
         trigger_source: "webhook",
       }),
@@ -88,7 +92,7 @@ Deno.serve(async (req) => {
     }
     let note: { status: string; error?: string } | undefined;
     if (eventName === "crm_deal_created" && isNoteAutomationFunnel(funnel.name)) {
-      note = await publishCreationNote(admin, integration, funnel, String(dealId));
+      note = await publishCreationNote(admin, connection, funnel, String(dealId));
     }
     return json({ ok: true, event: eventName, funnel_id: funnel.id, result, note });
   } catch (error) {
@@ -97,7 +101,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function publishCreationNote(admin: any, integration: any, funnel: any, rdDealId: string) {
+async function publishCreationNote(admin: any, connection: any, funnel: any, rdDealId: string) {
   const { data: deal, error: dealError } = await admin
     .from("rd_deals")
     .select("id,rd_deal_id,ad_account_id,contact_name,contact_email,contact_phone,lead_city,lead_state,lead_created_at,custom_fields,raw,meta_lead_id")
@@ -109,7 +113,7 @@ async function publishCreationNote(admin: any, integration: any, funnel: any, rd
   const { data: existing } = await admin
     .from("rd_deal_note_sync")
     .select("id,status,attempts")
-    .eq("integration_id", integration.id)
+    .eq("rd_connection_id", connection.id)
     .eq("rd_deal_id", rdDealId)
     .maybeSingle();
   if (existing?.status === "sent" || existing?.status === "sending") return { status: "skipped", error: "Anotação já enviada ou em processamento" };
@@ -117,7 +121,7 @@ async function publishCreationNote(admin: any, integration: any, funnel: any, rd
   const meta = await findMetaLead(admin, deal);
   const noteBody = buildRDDealNote({ deal, meta, timezone: "America/Sao_Paulo" });
   const { error: insertError } = await admin.from("rd_deal_note_sync").insert({
-    integration_id: integration.id,
+    rd_connection_id: connection.id,
     rd_deal_id: rdDealId,
     rd_funnel_id: funnel.id,
     note_body: noteBody,
@@ -128,7 +132,7 @@ async function publishCreationNote(admin: any, integration: any, funnel: any, rd
   const { data: claimed, error: claimError } = await admin
     .from("rd_deal_note_sync")
     .update({ note_body: noteBody, status: "sending", attempts: (existing?.attempts || 0) + 1, updated_at: new Date().toISOString(), last_error: null })
-    .eq("integration_id", integration.id)
+    .eq("rd_connection_id", connection.id)
     .eq("rd_deal_id", rdDealId)
     .in("status", ["pending", "failed"])
     .select("id")
@@ -136,7 +140,7 @@ async function publishCreationNote(admin: any, integration: any, funnel: any, rd
   if (claimError || !claimed) return { status: "skipped", error: "Outra entrega já assumiu esta anotação" };
 
   try {
-    const providerNoteId = await createRDNote(String(integration.api_token || ""), rdDealId, noteBody);
+    const providerNoteId = await createRDNote(String(connection.api_token || ""), rdDealId, noteBody);
     await admin.from("rd_deal_note_sync").update({ status: "sent", provider_note_id: providerNoteId, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", claimed.id);
     return { status: "sent" };
   } catch (error) {

@@ -1048,6 +1048,7 @@ export type Database = {
         Row: {
           business_unit_id: string | null
           created_at: string
+          expert_name: string | null
           id: string
           legal_name: string | null
           metadata: Json
@@ -1060,6 +1061,7 @@ export type Database = {
         Insert: {
           business_unit_id?: string | null
           created_at?: string
+          expert_name?: string | null
           id?: string
           legal_name?: string | null
           metadata?: Json
@@ -1072,6 +1074,7 @@ export type Database = {
         Update: {
           business_unit_id?: string | null
           created_at?: string
+          expert_name?: string | null
           id?: string
           legal_name?: string | null
           metadata?: Json
@@ -1279,48 +1282,57 @@ export type Database = {
           error_message: string | null
           finished_at: string | null
           id: string
+          meta_hourly: Json | null
           meta_insights: Json | null
           meta_leads: Json | null
           rd: Json | null
+          rd_metric_reconciliation: Json | null
+          rd_resync: Json | null
           started_at: string
           status: string
+          sync_mode: string
           target_date: string
           trigger_source: string
           window_end: string | null
           window_start: string | null
-          sync_mode: string
         }
         Insert: {
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
           id?: string
+          meta_hourly?: Json | null
           meta_insights?: Json | null
           meta_leads?: Json | null
           rd?: Json | null
+          rd_metric_reconciliation?: Json | null
+          rd_resync?: Json | null
           started_at?: string
           status?: string
+          sync_mode?: string
           target_date: string
           trigger_source?: string
           window_end?: string | null
           window_start?: string | null
-          sync_mode?: string
         }
         Update: {
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
           id?: string
+          meta_hourly?: Json | null
           meta_insights?: Json | null
           meta_leads?: Json | null
           rd?: Json | null
+          rd_metric_reconciliation?: Json | null
+          rd_resync?: Json | null
           started_at?: string
           status?: string
+          sync_mode?: string
           target_date?: string
           trigger_source?: string
           window_end?: string | null
           window_start?: string | null
-          sync_mode?: string
         }
         Relationships: []
       }
@@ -1580,6 +1592,47 @@ export type Database = {
           },
         ]
       }
+      event_class_participants: {
+        Row: {
+          created_at: string
+          event_class_id: string
+          id: string
+          investment_cents: number
+          name: string
+          notes: string | null
+          participant_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_class_id: string
+          id?: string
+          investment_cents?: number
+          name: string
+          notes?: string | null
+          participant_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_class_id?: string
+          id?: string
+          investment_cents?: number
+          name?: string
+          notes?: string | null
+          participant_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_class_participants_event_class_id_fkey"
+            columns: ["event_class_id"]
+            isOneToOne: false
+            referencedRelation: "event_classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_class_sources: {
         Row: {
           ad_account_id: string | null
@@ -1637,39 +1690,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      event_class_participants: {
-        Row: {
-          id: string
-          event_class_id: string
-          participant_type: string
-          name: string
-          investment_cents: number
-          notes: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          event_class_id: string
-          participant_type: string
-          name: string
-          investment_cents?: number
-          notes?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          event_class_id?: string
-          participant_type?: string
-          name?: string
-          investment_cents?: number
-          notes?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       event_classes: {
         Row: {
@@ -3971,6 +3991,135 @@ export type Database = {
           },
         ]
       }
+      rd_account_connections: {
+        Row: {
+          account_name: string
+          api_token: string | null
+          created_at: string
+          external_account_id: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          last_success_at: string | null
+          permissions: Json
+          status: string
+          updated_at: string
+          user_id: string
+          webhook_secret: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          account_name: string
+          api_token?: string | null
+          created_at?: string
+          external_account_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_success_at?: string | null
+          permissions?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+          webhook_secret?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          account_name?: string
+          api_token?: string | null
+          created_at?: string
+          external_account_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_success_at?: string | null
+          permissions?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+          webhook_secret?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rd_account_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rd_deal_note_sync: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          integration_id: string | null
+          last_error: string | null
+          note_body: string
+          provider_note_id: string | null
+          rd_connection_id: string | null
+          rd_deal_id: string
+          rd_funnel_id: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          last_error?: string | null
+          note_body: string
+          provider_note_id?: string | null
+          rd_connection_id?: string | null
+          rd_deal_id: string
+          rd_funnel_id?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          integration_id?: string | null
+          last_error?: string | null
+          note_body?: string
+          provider_note_id?: string | null
+          rd_connection_id?: string | null
+          rd_deal_id?: string
+          rd_funnel_id?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rd_deal_note_sync_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rd_deal_note_sync_rd_connection_id_fkey"
+            columns: ["rd_connection_id"]
+            isOneToOne: false
+            referencedRelation: "rd_account_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rd_deal_note_sync_rd_funnel_id_fkey"
+            columns: ["rd_funnel_id"]
+            isOneToOne: false
+            referencedRelation: "rd_funnels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rd_deal_notes: {
         Row: {
           author_id: string
@@ -4124,7 +4273,7 @@ export type Database = {
       }
       rd_deals: {
         Row: {
-          ad_account_id: string
+          ad_account_id: string | null
           amount_monthly: number | null
           amount_total: number | null
           amount_total_effective: number | null
@@ -4172,6 +4321,7 @@ export type Database = {
           owner_name: string | null
           raw: Json | null
           raw_payload: Json | null
+          rd_connection_id: string | null
           rd_deal_id: string
           rd_funnel_id: string
           rd_product_name: string | null
@@ -4194,7 +4344,7 @@ export type Database = {
           win: boolean
         }
         Insert: {
-          ad_account_id: string
+          ad_account_id?: string | null
           amount_monthly?: number | null
           amount_total?: number | null
           amount_total_effective?: number | null
@@ -4242,6 +4392,7 @@ export type Database = {
           owner_name?: string | null
           raw?: Json | null
           raw_payload?: Json | null
+          rd_connection_id?: string | null
           rd_deal_id: string
           rd_funnel_id: string
           rd_product_name?: string | null
@@ -4264,7 +4415,7 @@ export type Database = {
           win?: boolean
         }
         Update: {
-          ad_account_id?: string
+          ad_account_id?: string | null
           amount_monthly?: number | null
           amount_total?: number | null
           amount_total_effective?: number | null
@@ -4312,6 +4463,7 @@ export type Database = {
           owner_name?: string | null
           raw?: Json | null
           raw_payload?: Json | null
+          rd_connection_id?: string | null
           rd_deal_id?: string
           rd_funnel_id?: string
           rd_product_name?: string | null
@@ -4333,7 +4485,15 @@ export type Database = {
           utm_term?: string | null
           win?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rd_deals_rd_connection_id_fkey"
+            columns: ["rd_connection_id"]
+            isOneToOne: false
+            referencedRelation: "rd_account_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rd_field_configs: {
         Row: {
@@ -4430,42 +4590,123 @@ export type Database = {
       }
       rd_funnels: {
         Row: {
-          ad_account_id: string
+          ad_account_id: string | null
           created_at: string
           expert_name: string | null
           id: string
           is_active: boolean
           name: string
+          rd_connection_id: string | null
           rd_funnel_id: string | null
           updated_at: string
           user_id: string
           utm_campaign_pattern: string | null
         }
         Insert: {
-          ad_account_id: string
+          ad_account_id?: string | null
           created_at?: string
           expert_name?: string | null
           id?: string
           is_active?: boolean
           name: string
+          rd_connection_id?: string | null
           rd_funnel_id?: string | null
           updated_at?: string
           user_id: string
           utm_campaign_pattern?: string | null
         }
         Update: {
-          ad_account_id?: string
+          ad_account_id?: string | null
           created_at?: string
           expert_name?: string | null
           id?: string
           is_active?: boolean
           name?: string
+          rd_connection_id?: string | null
           rd_funnel_id?: string | null
           updated_at?: string
           user_id?: string
           utm_campaign_pattern?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rd_funnels_rd_connection_id_fkey"
+            columns: ["rd_connection_id"]
+            isOneToOne: false
+            referencedRelation: "rd_account_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rd_metric_reconciliation_audits: {
+        Row: {
+          account_id: string | null
+          checked_at: string
+          details: Json
+          duplicate_rd_count: number
+          funnel_id: string | null
+          id: string
+          linked_sale_count: number
+          missing_sale_count: number
+          missing_sale_rd_ids: Json
+          rd_won_count: number
+          run_id: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          checked_at?: string
+          details?: Json
+          duplicate_rd_count?: number
+          funnel_id?: string | null
+          id?: string
+          linked_sale_count?: number
+          missing_sale_count?: number
+          missing_sale_rd_ids?: Json
+          rd_won_count?: number
+          run_id?: string | null
+          status: string
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          checked_at?: string
+          details?: Json
+          duplicate_rd_count?: number
+          funnel_id?: string | null
+          id?: string
+          linked_sale_count?: number
+          missing_sale_count?: number
+          missing_sale_rd_ids?: Json
+          rd_won_count?: number
+          run_id?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rd_metric_reconciliation_audits_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rd_metric_reconciliation_audits_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "rd_funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rd_metric_reconciliation_audits_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "daily_incremental_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rd_metrics: {
         Row: {
@@ -5280,6 +5521,133 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sync_backfill_items: {
+        Row: {
+          account_id: string | null
+          created_at: string
+          details: Json
+          duplicates: number
+          error_message: string | null
+          finished_at: string | null
+          funnel_id: string | null
+          gaps: Json
+          id: string
+          last_cursor: string | null
+          pages_read: number
+          provider: string
+          records_read: number
+          records_upserted: number
+          run_id: string
+          started_at: string
+          status: string
+          user_id: string
+          window_end: string | null
+          window_start: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string
+          details?: Json
+          duplicates?: number
+          error_message?: string | null
+          finished_at?: string | null
+          funnel_id?: string | null
+          gaps?: Json
+          id?: string
+          last_cursor?: string | null
+          pages_read?: number
+          provider: string
+          records_read?: number
+          records_upserted?: number
+          run_id: string
+          started_at?: string
+          status?: string
+          user_id: string
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string
+          details?: Json
+          duplicates?: number
+          error_message?: string | null
+          finished_at?: string | null
+          funnel_id?: string | null
+          gaps?: Json
+          id?: string
+          last_cursor?: string | null
+          pages_read?: number
+          provider?: string
+          records_read?: number
+          records_upserted?: number
+          run_id?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_backfill_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_backfill_items_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "rd_funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_backfill_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sync_backfill_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_backfill_runs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          mode: string
+          started_at: string
+          status: string
+          summary: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          mode?: string
+          started_at?: string
+          status?: string
+          summary?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          mode?: string
+          started_at?: string
+          status?: string
+          summary?: Json
+          user_id?: string
+        }
+        Relationships: []
       }
       sync_logs: {
         Row: {

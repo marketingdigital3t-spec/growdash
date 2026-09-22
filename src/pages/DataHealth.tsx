@@ -17,6 +17,7 @@ import { MetaLeadsReconciliationCard } from "@/components/data-health/MetaLeadsR
 import { SyncAuditCard } from "@/components/data-health/SyncAuditCard";
 import { Inbox } from "lucide-react";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
 
 interface HealthData {
   orphanSales: number;
@@ -115,9 +116,36 @@ function useHealth() {
   });
 }
 
+function useOperationalAudit(adAccountId: string, startDate: Date, endDate: Date) {
+  return useQuery({
+    queryKey: ["rd-operational-audit", adAccountId, startDate.toISOString(), endDate.toISOString()],
+    queryFn: async () => {
+      let query = supabase.from("rd_deals").select("rd_deal_id,rd_connection_id,rd_funnel_id,ad_account_id,win,rd_stage_name,lead_created_at,closed_at,stage_updated_at").limit(10000);
+      if (adAccountId !== "all") query = query.eq("ad_account_id", adAccountId);
+      const { data, error } = await query;
+      if (error) throw error;
+      const rows = (data ?? []) as any[];
+      const ids = new Set<string>();
+      const sales = rows.filter((deal) => {
+        if (!isCanonicalWonDeal(deal)) return false;
+        const effective = canonicalWonDate(deal);
+        if (!effective) return false;
+        const timestamp = new Date(effective).getTime();
+        const inRange = timestamp >= startDate.getTime() && timestamp <= endDate.getTime();
+        if (inRange && deal.rd_deal_id) ids.add(String(deal.rd_deal_id));
+        return inRange;
+      });
+      const duplicateIds = rows.map((deal) => String(deal.rd_deal_id || "")).filter(Boolean).filter((id, index, all) => all.indexOf(id) !== index);
+      return { rows, ids: Array.from(ids), salesCount: sales.length, duplicateIds: Array.from(new Set(duplicateIds)) };
+    },
+    staleTime: 30_000,
+  });
+}
+
 export default function DataHealth() {
   const { adAccountId, startDate, endDate } = useGlobalFilters();
   const { data, isLoading, refetch } = useHealth();
+  const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, startDate, endDate);
   const [enriching, setEnriching] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [syncingLeads, setSyncingLeads] = useState(false);
@@ -209,6 +237,16 @@ export default function DataHealth() {
         <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div><span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Diagnóstico por conta e período</span><p className="mt-1 text-sm font-bold">{adAccountId === "all" ? "Todas as contas" : data.lastSyncs.find((item) => item.id === adAccountId)?.name || "Conta selecionada"}</p></div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarRange className="h-4 w-4 text-primary" />{formatSafeDate(startDate, "dd/MM/yyyy")} — {formatSafeDate(endDate, "dd/MM/yyyy")}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Auditoria operacional por conta e período</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {auditLoading ? <p className="text-sm text-muted-foreground">Consultando IDs RD do escopo selecionado…</p> : auditError ? <p className="text-sm text-destructive">Falha ao consultar o escopo: {(auditError as Error).message}</p> : operationalAudit ? <>
+            <div className="grid gap-3 text-sm sm:grid-cols-3"><div><span className="text-muted-foreground">Negócios carregados</span><p className="text-xl font-black">{operationalAudit.rows.length}</p></div><div><span className="text-muted-foreground">Vendas no período</span><p className="text-xl font-black">{operationalAudit.salesCount}</p></div><div><span className="text-muted-foreground">Duplicidades</span><p className="text-xl font-black">{operationalAudit.duplicateIds.length}</p></div></div>
+            <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">IDs RD usados no escopo ({operationalAudit.ids.length})</summary><p className="mt-2 break-all text-xs text-muted-foreground">{operationalAudit.ids.join(", ") || "Nenhum ID encontrado"}</p></details>
+          </> : null}
         </CardContent>
       </Card>
 

@@ -9,19 +9,15 @@ export function useRDIntegration() {
     queryKey: ["integration", "rd_station_crm", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("integrations")
-        .select("id, provider, is_active, created_at, updated_at")
+      const { data, error } = await (supabase as any)
+        .from("rd_account_connections")
+        .select("id, status, created_at, updated_at, last_success_at, last_error")
         .eq("user_id", user!.id)
-        .eq("provider", "rd_station_crm")
-        // Older installations may contain more than one historical RD row.
-        // The backend always uses the newest credential, so the UI must use
-        // the same deterministic rule rather than failing on maybeSingle().
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data ? { ...data, provider: "rd_station_crm", is_active: data.status === "connected" } : null;
     },
   });
 }

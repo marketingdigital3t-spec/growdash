@@ -14,6 +14,7 @@ export default defineConfig({
     timezoneId: "America/Sao_Paulo",
     reducedMotion: "reduce",
     screenshot: "only-on-failure",
+    ...(process.env.GROWDASH_AUTH_STATE ? { storageState: process.env.GROWDASH_AUTH_STATE } : {}),
   },
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 4174",

@@ -4,6 +4,7 @@
 //
 // Roda no contexto do usuário autenticado (usa o token de integração dele).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,26 +101,13 @@ Deno.serve(async (req) => {
     const dryRun = body?.dry_run === true;
     const limit = Math.min(Number(body?.limit) || 200, 500);
 
-    // Token RD
-    const { data: integration } = await admin
-      .from("integrations")
-      .select("api_token")
-      .eq("user_id", userId)
-      .eq("provider", "rd_station_crm")
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (!integration?.api_token) {
-      return new Response(JSON.stringify({ error: "RD Station CRM não conectado." }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const token = integration.api_token;
+    const connections = await listAuthorizedRDConnections(admin, [userId]);
+    const tokenByConnection = new Map(connections.map((connection) => [connection.id, connection.api_token]).filter((entry): entry is [string, string] => Boolean(entry[1])));
 
     // Funis do usuário (para resolver rd_funnel_id quando faltar)
     const { data: funnelsData } = await admin
       .from("rd_funnels")
-      .select("id, ad_account_id, rd_funnel_id, name")
+      .select("id, ad_account_id, rd_connection_id, rd_funnel_id, name")
       .eq("user_id", userId);
     const funnelById = new Map<string, any>();
     const funnelByAdAccount = new Map<string, any>();
@@ -159,9 +147,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    let dealsFetched = 0, dealsCreated = 0, salesUpdated = 0, notFound = 0, errors = 0;
+    let dealsFetched = 0, dealsCreated = 0, salesUpdated = 0, notFound = 0, errors = 0, skipped = 0;
 
     for (const sale of orphans) {
+      const funnelHint = sale.rd_funnel_id ? funnelById.get(sale.rd_funnel_id) : funnelByAdAccount.get(sale.ad_account_id);
+      const token = tokenByConnection.get(String(funnelHint?.rd_connection_id || ""));
+      if (!token) { skipped++; continue; }
       const rdId = String(sale.rd_deal_id);
       const deal = await fetchJson(`https://crm.rdstation.com/api/v1/deals/${rdId}?token=${encodeURIComponent(token)}`);
       if (!deal || !deal.id) { notFound++; continue; }
@@ -218,10 +209,6 @@ Deno.serve(async (req) => {
       // Resolve ad_account/funnel
       let funnel = sale.rd_funnel_id ? funnelById.get(sale.rd_funnel_id) : null;
       if (!funnel) funnel = funnelByAdAccount.get(sale.ad_account_id);
-      if (!funnel) {
-        // último recurso: qualquer funil do usuário
-        funnel = (funnelsData || [])[0];
-      }
       if (!funnel) { errors++; continue; }
 
       const amountTotal = parseFloat(deal.amount_total || deal.amount || "0") || 0;
@@ -230,6 +217,7 @@ Deno.serve(async (req) => {
       const { error: upErr } = await admin.from("rd_deals").upsert({
         user_id: userId,
         ad_account_id: funnel.ad_account_id,
+        rd_connection_id: funnel.rd_connection_id,
         rd_funnel_id: funnel.id,
         rd_deal_id: rdId,
         rd_stage_id: stageId,
