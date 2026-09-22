@@ -74,7 +74,9 @@ function MetaLink({ item, accountId, collapsed }: { item: BusinessMenuItem; acco
 
 export default function BusinessWorkspacePage() {
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem("growdash:business-sidebar-collapsed") === "true"; } catch { return false; }
+    // v2 intentionally ignores the old compact-menu preference. The first
+    // Business release could leave users with icons only and no visible labels.
+    try { return localStorage.getItem("growdash:business-sidebar-collapsed:v2") === "true"; } catch { return false; }
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const { adAccountId } = useGlobalFilters();
@@ -85,7 +87,7 @@ export default function BusinessWorkspacePage() {
   const activeLabel = useMemo(() => [...PRIMARY_ITEMS, ...SECONDARY_ITEMS, ...FOOTER_ITEMS].find((item) => item.path === location.pathname)?.label, [location.pathname]);
   useEffect(() => setMobileOpen(false), [location.pathname]);
   useEffect(() => {
-    try { localStorage.setItem("growdash:business-sidebar-collapsed", String(collapsed)); } catch { /* storage is optional */ }
+    try { localStorage.setItem("growdash:business-sidebar-collapsed:v2", String(collapsed)); } catch { /* storage is optional */ }
   }, [collapsed]);
 
   return <div className="relative flex min-h-0 w-full min-w-0 flex-1 overflow-hidden bg-background">
