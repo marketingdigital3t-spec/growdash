@@ -21,6 +21,7 @@ import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
 const FullDashboard = lazyWithRetry(() => import("@/pages/Index"), "dashboard");
 const TrafficPage = lazyWithRetry(() => import("@/growdash/TrafficPage"), "campaigns");
 const FunnelAnalysis = lazyWithRetry(() => import("@/pages/FunnelAnalysis"), "funnel-analysis");
+const BusinessPage = lazyWithRetry(() => import("@/growdash/BusinessPage"), "business");
 const FullAlerts = lazyWithRetry(() => import("@/pages/Alerts"), "alerts");
 const EventClasses = lazyWithRetry(() => import("@/pages/EventClasses"), "event-classes");
 const IncompleteLeads = lazyWithRetry(() => import("@/pages/LeadsIncompletos"), "incomplete-leads");
@@ -257,6 +258,7 @@ export default function App() {
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />
                     <Route path="analise-de-funis" element={<ResilientRoute><RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage></ResilientRoute>} />
+                    <Route path="business" element={<ResilientRoute><RequirePage page="campaigns">{analytics(<BusinessPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="analise-funis" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="funnels" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="alertas" element={<RequirePage page="alerts">{analytics(<FullAlerts />)}</RequirePage>} />

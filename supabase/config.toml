@@ -39,6 +39,9 @@ verify_jwt = true
 [functions.sync-meta-insights]
 verify_jwt = true
 
+[functions.meta-webhook]
+verify_jwt = false
+
 [functions.sync-meta-hourly]
 verify_jwt = true
 

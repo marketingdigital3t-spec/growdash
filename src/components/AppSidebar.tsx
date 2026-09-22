@@ -1,4 +1,4 @@
-import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, Moon, Sun, AlertCircle, GitBranch, CalendarDays, Users as UsersIcon, HeartPulse, Sparkles } from "lucide-react";
+import { BarChart3, LayoutDashboard, Megaphone, Bell, Settings, Moon, Sun, AlertCircle, GitBranch, CalendarDays, Users as UsersIcon, HeartPulse, Sparkles, BriefcaseBusiness } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -29,6 +29,7 @@ export function AppSidebar() {
     { title: "Painel do Expert", url: "/painel-expert", icon: Sparkles, show: perms.canExpertDashboard },
     { title: "Campanhas", url: "/campanhas", icon: Megaphone, show: perms.canCampaigns },
     { title: "Análise de Funis", url: "/analise-de-funis", icon: GitBranch, show: perms.canFunnels },
+    { title: "Business", url: "/business", icon: BriefcaseBusiness, show: perms.canCampaigns },
     { title: "Datas & Turmas", url: "/agenda-turmas", icon: CalendarDays, show: perms.canClasses },
     { title: "Leads incompletos", url: "/leads-incompletos", icon: AlertCircle, show: perms.isMaster },
     { title: "Alertas", url: "/alerts", icon: Bell, show: perms.isMaster },
