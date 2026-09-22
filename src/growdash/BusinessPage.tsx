@@ -77,6 +77,7 @@ export default function BusinessPage() {
   if (accountsQuery.isLoading) return <StateCard title="Carregando contas Meta…" description="A Growdash está consultando somente contas autorizadas." />;
   if (accountsQuery.isError) return <StateCard title="Não foi possível carregar as contas Meta" description={(accountsQuery.error as Error).message} action={<Button variant="outline" onClick={() => void accountsQuery.refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button>} />;
   if (!accounts.length) return <StateCard title="Nenhuma conta Meta autorizada" description="Conecte uma conta em Integrações para carregar dados oficiais." />;
+  if (adAccountId !== "all" && !accounts.some((account) => account.id === adAccountId)) return <StateCard title="Conta Meta bloqueada ou sem permissão" description="A conta selecionada não está autorizada para este workspace. Nenhum dado de outra conta foi usado." />;
   if (!selectedId && adAccountIds.length === 0) return <StateCard title="Selecione uma conta Meta" description="A aba Business não consulta todas as contas automaticamente. Escolha uma conta nos filtros globais." />;
   if (insightsQuery.isError) return <StateCard title="Insights indisponíveis pela Meta" description={(insightsQuery.error as Error).message} action={<Button variant="outline" onClick={() => void insightsQuery.refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button>} />;
 
