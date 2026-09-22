@@ -40,7 +40,7 @@ const PRIMARY_ITEMS: BusinessMenuItem[] = [
   { label: "Notificações", path: "/business/notifications", icon: Bell },
   { label: "Gerenciador de anúncios", path: "/business/ads-manager", icon: MonitorPlay },
   { label: "Caixa de entrada", path: "/business/inbox", icon: Inbox, external: () => `${META_BASE}/latest/inbox/all` },
-  { label: "Central de Leads", path: "/business/leads", icon: Users, external: (id) => `${META_BASE}/latest/leads_center?asset_id=${encodeURIComponent(id)}` },
+  { label: "Central de Leads", path: "/business/leads", icon: Users },
   { label: "Conteúdo", path: "/business/content", icon: Newspaper, external: () => `${META_BASE}/latest/content` },
   { label: "Creator Marketing", path: "/business/creator-marketing", icon: Workflow, external: () => `${META_BASE}/latest/creator-marketplace` },
   { label: "Planner", path: "/business/planner", icon: CalendarDays, external: () => `${META_BASE}/latest/planner` },
