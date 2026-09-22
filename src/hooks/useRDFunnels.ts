@@ -6,7 +6,7 @@ import { withRequestTimeout } from "@/lib/resilience";
 export interface RDFunnel {
   id: string;
   user_id: string;
-  ad_account_id: string;
+  ad_account_id: string | null;
   rd_connection_id?: string | null;
   name: string;
   expert_name: string | null;

@@ -14,15 +14,16 @@ import { Filter as Funnel, Plus, Trash2, RefreshCw, CheckCircle2, AlertCircle } 
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
+import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 
 interface RDPipeline { id: string; name: string }
 
-function useRDApiFunnels(enabled: boolean) {
+function useRDApiFunnels(enabled: boolean, rdConnectionId?: string) {
   return useQuery({
-    queryKey: ["rd_api_funnels"],
-    enabled,
+    queryKey: ["rd_api_funnels", rdConnectionId ?? "none"],
+    enabled: enabled && !!rdConnectionId,
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("rd-list-funnels", { body: {} });
+      const { data, error } = await supabase.functions.invoke("rd-list-funnels", { body: { rd_connection_id: rdConnectionId } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return (data?.pipelines || []) as RDPipeline[];
@@ -31,11 +32,13 @@ function useRDApiFunnels(enabled: boolean) {
 }
 
 function LinkFunnelDialog({
-  accountId, open, onOpenChange,
-}: { accountId: string; open: boolean; onOpenChange: (o: boolean) => void }) {
+  accountId, open, onOpenChange, rdConnectionId,
+}: { accountId: string | null; open: boolean; onOpenChange: (o: boolean) => void; rdConnectionId?: string }) {
   const { toast } = useToast();
   const create = useCreateRDFunnel();
-  const { data: pipelines = [], isLoading, error } = useRDApiFunnels(open);
+  const { data: connections = [] } = useRDAccountConnections();
+  const [selectedConnectionId, setSelectedConnectionId] = useState(rdConnectionId || "");
+  const { data: pipelines = [], isLoading, error } = useRDApiFunnels(open, selectedConnectionId);
   const [pipelineId, setPipelineId] = useState("");
 
   const selected = pipelines.find((p) => p.id === pipelineId);
@@ -46,6 +49,10 @@ function LinkFunnelDialog({
         <DialogHeader>
           <DialogTitle>Vincular funil do RD Station</DialogTitle>
         </DialogHeader>
+        <Select value={selectedConnectionId} onValueChange={setSelectedConnectionId}>
+          <SelectTrigger><SelectValue placeholder="Escolha a conexão RD" /></SelectTrigger>
+          <SelectContent>{connections.map((connection) => <SelectItem key={connection.id} value={connection.id}>{connection.account_name} · {connection.status}</SelectItem>)}</SelectContent>
+        </Select>
         {error ? (
           <div className="text-sm text-destructive">
             {(error as Error).message}. Configure o token no card acima.
@@ -65,11 +72,12 @@ function LinkFunnelDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
-            disabled={!selected || create.isPending}
+            disabled={!selected || !selectedConnectionId || create.isPending}
             onClick={async () => {
               if (!selected) return;
               await create.mutateAsync({
                 ad_account_id: accountId,
+                rd_connection_id: selectedConnectionId,
                 name: selected.name,
                 expert_name: null,
                 rd_funnel_id: selected.id,
@@ -205,8 +213,15 @@ function AccountFunnelsBlock({ accountId, accountName }: { accountId: string; ac
   );
 }
 
+function RDOnlyFunnelsBlock({ connectionId, accountName, funnels }: { connectionId: string; accountName: string; funnels: RDFunnel[] }) {
+  const [openLink, setOpenLink] = useState(false);
+  return <div className="rounded-lg border border-dashed p-3 space-y-3"><div className="flex items-center justify-between gap-2"><div><p className="font-medium text-sm">{accountName}</p><p className="text-xs text-muted-foreground">Funis RD sem vínculo Meta · {funnels.length}</p></div><Button size="sm" variant="outline" onClick={() => setOpenLink(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Vincular funil</Button></div>{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} />)}<LinkFunnelDialog accountId={null} rdConnectionId={connectionId} open={openLink} onOpenChange={setOpenLink} /></div>;
+}
+
 export function RDFunnelsSection() {
   const { data: accounts = [] } = useAdAccounts();
+  const { data: allFunnels = [] } = useRDFunnels(undefined, true);
+  const { data: connections = [] } = useRDAccountConnections();
 
   return (
     <Card>
@@ -220,12 +235,16 @@ export function RDFunnelsSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {accounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Adicione uma conta Meta acima primeiro.</p>
-        ) : (
-          accounts.map((acc) => (
+        {accounts.length === 0 && connections.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma conta ou conexão RD autorizada.</p> : (
+          <>
+          {accounts.map((acc) => (
             <AccountFunnelsBlock key={acc.id} accountId={acc.id} accountName={acc.name} />
-          ))
+          ))}
+          {connections.map((connection) => {
+            const rdOnlyFunnels = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id && !funnel.ad_account_id);
+            return <RDOnlyFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={rdOnlyFunnels} />;
+          })}
+          </>
         )}
       </CardContent>
     </Card>
