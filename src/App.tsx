@@ -13,6 +13,7 @@ import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
 import GrowdashLayout from "@/growdash/GrowdashLayout";
+import BusinessWorkspacePage, { BusinessUnavailablePage } from "@/growdash/BusinessWorkspacePage";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
 
 // Route modules must remain lazy here as well as in the layout preloader.
@@ -258,7 +259,25 @@ export default function App() {
                     <Route path="trafego-pago/gerenciador" element={<Navigate to="/campanhas" replace />} />
                     <Route path="campaigns" element={<Navigate to="/campanhas" replace />} />
                     <Route path="analise-de-funis" element={<ResilientRoute><RequirePage page="funnels">{analytics(<FunnelAnalysis />)}</RequirePage></ResilientRoute>} />
-                    <Route path="business" element={<ResilientRoute><RequirePage page="campaigns">{analytics(<BusinessPage />)}</RequirePage></ResilientRoute>} />
+                    <Route path="business" element={<ResilientRoute><RequirePage page="campaigns">{analytics(<BusinessWorkspacePage />)}</RequirePage></ResilientRoute>}>
+                      <Route index element={<BusinessPage />} />
+                      <Route path="insights" element={<BusinessPage />} />
+                      <Route path="ads-manager" element={<BusinessUnavailablePage title="Gerenciador de anúncios" description="A gestão completa de campanhas permanece na ferramenta oficial da Meta para preservar todos os controles e permissões." externalUrl="https://business.facebook.com/adsmanager" />} />
+                      <Route path="notifications" element={<BusinessUnavailablePage title="Notificações" description="As notificações serão exibidas quando a Meta disponibilizar os eventos deste ativo para a conexão autorizada." />} />
+                      <Route path="inbox" element={<BusinessUnavailablePage title="Caixa de entrada" description="A Caixa de entrada exige permissões de mensagens e ativos vinculados. Nenhuma conversa é simulada enquanto a conexão não estiver autorizada." externalUrl="https://business.facebook.com/latest/inbox/all" />} />
+                      <Route path="leads" element={<BusinessUnavailablePage title="Central de Leads" description="Leads recebidos por webhook aparecerão aqui após a validação de formulário e permissão leads_retrieval." externalUrl="https://business.facebook.com/latest/leads_center" />} />
+                      <Route path="content" element={<BusinessUnavailablePage title="Conteúdo" description="O conteúdo orgânico será exibido quando houver um Instagram ou Página vinculados e dados oficiais persistidos." externalUrl="https://business.facebook.com/latest/content" />} />
+                      <Route path="creator-marketing" element={<BusinessUnavailablePage title="Creator Marketing" description="Esta ferramenta depende de disponibilidade do produto Meta para o portfólio conectado." externalUrl="https://business.facebook.com/latest/creator-marketplace" />} />
+                      <Route path="planner" element={<BusinessUnavailablePage title="Planner" description="O Planner abre a ferramenta oficial da Meta para manter recursos de publicação e calendário completos." externalUrl="https://business.facebook.com/latest/planner" />} />
+                      <Route path="ads" element={<BusinessUnavailablePage title="Anúncios" description="A lista interna será ampliada com os anúncios persistidos pela sincronização Meta. Use a ferramenta oficial para edição completa." externalUrl="https://business.facebook.com/adsmanager/manage/ads" />} />
+                      <Route path="monetization" element={<BusinessUnavailablePage title="Monetização" description="A Meta só disponibiliza os dados de monetização para ativos e permissões elegíveis." externalUrl="https://business.facebook.com/latest/monetization" />} />
+                      <Route path="tools" element={<BusinessUnavailablePage title="Todas as ferramentas" description="A central oficial reúne ferramentas que não possuem endpoint público equivalente na Graph API." externalUrl="https://business.facebook.com/latest/home" />} />
+                      <Route path="billing" element={<BusinessUnavailablePage title="Cobrança e pagamentos" description="Dados de cobrança são consultados diretamente na central oficial da Meta e não são misturados às métricas de campanha." externalUrl="https://business.facebook.com/billing_hub" />} />
+                      <Route path="events" element={<BusinessUnavailablePage title="Gerenciador de eventos" description="O Gerenciador de Eventos exige permissões administrativas específicas e permanece separado dos Insights." externalUrl="https://business.facebook.com/events_manager2" />} />
+                      <Route path="search" element={<BusinessUnavailablePage title="Pesquisar" description="Use a busca oficial para localizar ativos e ferramentas do portfólio Meta conectado." externalUrl="https://business.facebook.com/latest/home" />} />
+                      <Route path="settings" element={<BusinessUnavailablePage title="Configurações" description="As configurações administrativas serão abertas na Meta para evitar alterações parciais ou não auditadas dentro da Growdash." externalUrl="https://business.facebook.com/settings" />} />
+                      <Route path="help" element={<BusinessUnavailablePage title="Ajuda" description="Consulte a documentação oficial da Meta para permissões, ativos e disponibilidade de endpoints." externalUrl="https://www.facebook.com/business/help" />} />
+                    </Route>
                     <Route path="analise-funis" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="funnels" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="alertas" element={<RequirePage page="alerts">{analytics(<FullAlerts />)}</RequirePage>} />
