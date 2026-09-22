@@ -1397,12 +1397,12 @@ Deno.serve(async (req) => {
       // https://developers.rdstation.com/reference/crm-v1-list-deals
       const analyticsSegments = analytics_mode
         ? [
-            { name: "ongoing", params: "" },
-            { name: "won", params: "&win=true" },
-            { name: "lost", params: "&win=false" },
-            { name: "paused", params: "&hold=true" },
+            { name: "ongoing", params: "", won: false },
+            { name: "won", params: "&win=true", won: true },
+            { name: "lost", params: "&win=false", won: false },
+            { name: "paused", params: "&hold=true", won: false },
           ]
-        : [{ name: "ongoing", params: "" }];
+        : [{ name: "ongoing", params: "", won: false }];
       analyticsRangeComplete = analytics_mode;
 
       segmentLoop: for (const segment of analyticsSegments) {
@@ -1411,7 +1411,12 @@ Deno.serve(async (req) => {
 
         while (page <= maxPages) {
           pagesProcessed++;
-          const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc${periodParams}${segment.params}`;
+          // Ganhos podem ter sido criados meses antes e fechados no período
+          // selecionado. O RD não oferece um filtro confiável por closed_at
+          // nesta rota; por isso o segmento ganho percorre o histórico e é
+          // filtrado localmente pela data efetiva de fechamento.
+          const segmentPeriodParams = segment.won ? "" : periodParams;
+          const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc${segmentPeriodParams}${segment.params}`;
           const r = await fetchWithRetry(url);
           if (!r.ok) {
             const txt = await r.text();
@@ -1448,7 +1453,9 @@ Deno.serve(async (req) => {
               .filter((deal: any) => {
                 const rdDealId = String(deal.id || deal._id || "");
                 if (!rdDealId || seenAnalyticsDealIds.has(rdDealId)) return false;
-                const rawDate = deal.created_at || deal.updated_at;
+                const rawDate = segment.won
+                  ? (deal.closed_at || deal.updated_at || deal.created_at)
+                  : (deal.created_at || deal.updated_at);
                 if (!rawDate) return true;
                 const timestamp = new Date(rawDate).getTime();
                 return (!startMs || timestamp >= startMs) && (!endMs || timestamp <= endMs);
@@ -1458,9 +1465,9 @@ Deno.serve(async (req) => {
             totalDeals += rangedDeals.length;
 
             const timestamps = deals
-              .map((deal: any) => new Date(deal.created_at || deal.updated_at || 0).getTime())
+              .map((deal: any) => new Date((segment.won ? (deal.closed_at || deal.updated_at || deal.created_at) : (deal.created_at || deal.updated_at)) || 0).getTime())
               .filter((value: number) => Number.isFinite(value) && value > 0);
-            const reachedOlderBoundary = Boolean(
+            const reachedOlderBoundary = !segment.won && Boolean(
               startMs && timestamps.some((value: number) => value < startMs),
             );
             if (deals.length < 200 || reachedOlderBoundary) {
