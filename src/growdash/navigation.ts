@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   BadgeDollarSign,
+  BriefcaseBusiness,
   Building2,
   Cable,
   CalendarDays,
@@ -106,6 +107,14 @@ export const NAV_SECTIONS: NavSection[] = [
         // Navigation metadata must not masquerade as live analytics.
         metrics: [],
         highlights: ["Conversão por etapa", "Principais pontos de abandono", "Canais que mais convertem"],
+      },
+      {
+        label: "Business",
+        path: "/business",
+        icon: BriefcaseBusiness,
+        description: "Acompanhe anúncios pagos e ativos sociais oficiais do Meta Business.",
+        metrics: [],
+        highlights: ["Insights pagos", "Instagram e Página", "Saúde da conexão"],
       },
       {
         label: "Automações",
