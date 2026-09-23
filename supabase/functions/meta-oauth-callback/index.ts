@@ -1,37 +1,20 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const escapeHtml = (value: string) => value
-  .replaceAll("&", "&amp;")
-  .replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;")
-  .replaceAll('"', "&quot;")
-  .replaceAll("'", "&#039;");
-
 const resultPage = (status: "success" | "error", message: string, accounts = 0) => {
-  const safeMessage = escapeHtml(message);
-  const payload = JSON.stringify({
-    type: "growdash-meta-oauth",
-    status,
-    message,
-    accounts,
-  }).replaceAll("<", "\\u003c");
+  const appUrl = (Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").replace(/\/$/, "");
+  const callbackUrl = new URL(`${appUrl}/meta-oauth-callback.html`);
+  callbackUrl.searchParams.set("status", status);
+  callbackUrl.searchParams.set("message", message);
+  callbackUrl.searchParams.set("accounts", String(accounts));
 
-  return new Response(`<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Growdash · Meta Ads</title><style>
-body{margin:0;background:#090909;color:#f5f5f5;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}
-main{max-width:520px;border:1px solid #5c4816;border-radius:18px;background:#15130e;padding:32px;text-align:center;box-shadow:0 20px 60px #0008}
-h1{color:${status === "success" ? "#f5f5f5" : "#ff6b6b"};font-size:24px}p{color:#c8c8c8;line-height:1.55}button{border:1px solid #f5f5f5;border-radius:10px;background:#f5f5f5;color:#101010;padding:12px 18px;font-weight:700;cursor:pointer}
-</style></head><body><main><h1>${status === "success" ? "Meta Ads conectado" : "Não foi possível conectar"}</h1><p>${safeMessage}</p><button onclick="window.close()">Voltar para a Growdash</button></main>
-<script>try{if(window.opener)window.opener.postMessage(${payload},'*')}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1800)" : ""}</script>
-</body></html>`, {
-    status: status === "success" ? 200 : 400,
+  // Supabase's gateway may normalize Edge Function bodies to text/plain.
+  // Redirect the OAuth popup to a same-origin static page so the browser
+  // renders the result and can safely notify the opener via postMessage.
+  return new Response(null, {
+    status: 303,
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
+      Location: callbackUrl.toString(),
       "Cache-Control": "no-store",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
-      "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "no-referrer",
     },
   });
 };
@@ -59,7 +42,8 @@ type MetaPage<T> = {
 async function fetchPagedAccounts(graphVersion: string, path: string, accessToken: string) {
   const accounts: MetaAccount[] = [];
   let after: string | null = null;
-  for (let page = 0; page < 50; page += 1) {
+  const seenCursors = new Set<string>();
+  while (true) {
     const accountsUrl = new URL(`https://graph.facebook.com/${graphVersion}/${path}`);
     accountsUrl.searchParams.set("fields", "id,account_id,name,currency,timezone_name,timezone_offset_hours_utc");
     accountsUrl.searchParams.set("limit", "100");
@@ -74,6 +58,10 @@ async function fetchPagedAccounts(graphVersion: string, path: string, accessToke
     accounts.push(...(Array.isArray(result.data) ? result.data : []));
     after = result.paging?.cursors?.after ?? null;
     if (!after || !result.paging?.next) break;
+    if (seenCursors.has(after)) {
+      return { accounts, error: "A Meta devolveu uma paginação circular; a lista não pôde ser reconciliada com segurança." };
+    }
+    seenCursors.add(after);
   }
   return { accounts, error: null as string | null };
 }
@@ -145,10 +133,7 @@ Deno.serve(async (req) => {
     // Business, some users only expose assets through their Business Manager;
     // use the business-owned and client-owned collections as a safe fallback.
     const direct = await fetchPagedAccounts(graphVersion, "me/adaccounts", accessToken);
-    if (direct.error) {
-      console.error("Meta ad accounts lookup failed", direct.error);
-      return resultPage("error", "A autorização funcionou, mas a Meta não liberou a lista de contas de anúncio. Verifique ads_read, business_management e o acesso do usuário à conta.");
-    }
+    if (direct.error) console.warn("Meta direct ad accounts lookup failed; trying Business Manager assets", direct.error);
 
     const accountsById = new Map<string, MetaAccount>();
     for (const account of direct.accounts) {
@@ -185,7 +170,9 @@ Deno.serve(async (req) => {
     const accounts = Array.from(accountsById.values());
 
     if (accounts.length === 0) {
-      return resultPage("error", "Nenhuma conta de anúncio acessível foi encontrada nesse perfil da Meta.");
+      return resultPage("error", direct.error
+        ? "A autorização foi concluída, mas a Meta não liberou nenhuma conta de anúncio. Verifique ads_read, business_management e o acesso do usuário às contas."
+        : "Nenhuma conta de anúncio acessível foi encontrada nesse perfil da Meta.");
     }
 
     let saved = 0;
