@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
           success: blocked === 0,
           status: blocked === 0 ? "success" : "blocked",
           message: blocked === 0 ? "Nenhuma conta de anúncio ativa encontrada" : "Todas as contas de anúncio selecionadas estão bloqueadas",
+          error: blocked === 0 ? undefined : "Todas as contas Meta selecionadas estão bloqueadas ou sem permissão válida.",
           synced: 0,
           accounts: 0,
           skipped_disconnected: blocked,
