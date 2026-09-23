@@ -59,21 +59,19 @@ Deno.serve(async (req) => {
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
-    let disconnectedQuery = supabaseAdmin
-      .from("ad_accounts")
-      .select("id,name,account_id")
-      .eq("connection_status", "disconnected");
-    if (adAccountId) disconnectedQuery = disconnectedQuery.eq("id", adAccountId);
-    else if (adAccountIds.length > 0) disconnectedQuery = disconnectedQuery.in("id", adAccountIds);
-    if (userId) disconnectedQuery = disconnectedQuery.eq("user_id", userId);
-    const { data: disconnectedAccounts, error: disconnectedError } = await disconnectedQuery;
-    if (disconnectedError) throw disconnectedError;
-    let accountsQuery = supabaseAdmin.from("ad_accounts").select("*").neq("connection_status", "disconnected");
+    let accountsQuery = supabaseAdmin.from("ad_accounts").select("*");
     if (adAccountId) accountsQuery = accountsQuery.eq("id", adAccountId);
     else if (adAccountIds.length > 0) accountsQuery = accountsQuery.in("id", adAccountIds);
     if (userId) accountsQuery = accountsQuery.eq("user_id", userId);
-    const { data: accounts, error: accError } = await accountsQuery;
+    const { data: allAccounts, error: accError } = await accountsQuery;
     if (accError) throw accError;
+
+    const blockedStatuses = new Set(["disconnected", "blocked"]);
+    const blockedOAuthStatuses = new Set(["permission_removed", "expired", "invalid"]);
+    const disconnectedAccounts = (allAccounts || []).filter((account: any) =>
+      blockedStatuses.has(String(account.connection_status || "")) || blockedOAuthStatuses.has(String(account.oauth_health_status || ""))
+    );
+    const accounts = (allAccounts || []).filter((account: any) => !disconnectedAccounts.some((blocked: any) => blocked.id === account.id));
 
     if (!accounts || accounts.length === 0) {
       const blocked = disconnectedAccounts?.length || 0;

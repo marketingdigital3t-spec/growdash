@@ -141,6 +141,11 @@ Deno.serve(async (req) => {
         oauth_health_status: check.status,
         oauth_checked_at: checkedAt,
         oauth_permissions: check.permissions,
+        ...(check.status === "permission_removed" ? {
+          connection_status: "blocked",
+          last_sync_error: "Permissões Meta insuficientes para leitura de anúncios/leads",
+          last_sync_error_code: "META_PERMISSION_REMOVED",
+        } : {}),
       }).eq("id", account.id);
       if (requestedUserId) accountUpdate = accountUpdate.eq("user_id", requestedUserId);
       await accountUpdate;
