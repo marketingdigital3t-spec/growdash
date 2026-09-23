@@ -176,7 +176,11 @@ function IntegrationsContent() {
     () => (Array.isArray(socialAccountsData) ? socialAccountsData.filter((account) => isPresent(account) && account.connection_status !== "disconnected") : []),
     [socialAccountsData],
   );
-  const metaConnected = adAccounts.length > 0;
+  const syncableMetaAccounts = useMemo(
+    () => adAccounts.filter((account) => account.connection_status === "connected" && !["permission_removed", "expired", "invalid"].includes(String(account.oauth_health_status || ""))),
+    [adAccounts],
+  );
+  const metaConnected = syncableMetaAccounts.length > 0;
   const rdConnected = !!rdIntegration?.is_active;
   const activeRDFunnels = rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id);
   const latestMetaSync = useMemo(() => adAccounts.map((account) => account.last_sync_success_at).filter(Boolean).sort().at(-1) ?? null, [adAccounts]);
@@ -192,7 +196,7 @@ function IntegrationsContent() {
           const syncStart = format(subDays(new Date(), 30), "yyyy-MM-dd");
           const syncEnd = format(new Date(), "yyyy-MM-dd");
           await syncMeta.mutateAsync({
-            adAccountIds: adAccounts.filter((account) => account.connection_status !== "disconnected").map((account) => account.id),
+            adAccountIds: syncableMetaAccounts.map((account) => account.id),
             startDate: syncStart,
             endDate: syncEnd,
             // Keep audience delivery data available for every campaign type.
@@ -213,9 +217,17 @@ function IntegrationsContent() {
           let syncedFunnels = 0;
           for (const funnel of activeRDFunnels) {
             try {
-              const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: { funnel_id: funnel.id } });
+              const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
+                body: {
+                  funnel_id: funnel.id,
+                  analytics_mode: true,
+                  full_history: true,
+                  refresh_amounts: true,
+                  trigger_source: "integrations_full_history",
+                },
+              });
               if (error) throw new Error(await getEdgeFunctionErrorMessage(error, `Não foi possível sincronizar o funil ${funnel.name}.`));
-              if (data?.error) throw new Error(data.error);
+              if (data?.error || data?.success === false || data?.partial || data?.status === "partial") throw new Error(data?.error || `Snapshot incompleto (${data?.pages_processed ?? 0} páginas processadas).`);
               syncedFunnels += 1;
             } catch (error) {
               failures.push(`RD Station (${funnel.name}): ${error instanceof Error ? error.message : "falha na sincronização"}`);
