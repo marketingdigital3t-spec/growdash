@@ -1375,13 +1375,7 @@ Deno.serve(async (req) => {
         // limiting it to one page silently dropped older deals in every
         // funnel as soon as a pipeline exceeded 200 records.
         : analytics_mode
-          ? Math.max(
-              1,
-              Math.min(
-                Number.isFinite(requestedPages) ? requestedPages : 50,
-                50,
-              ),
-            )
+          ? (Number.isFinite(requestedPages) && requestedPages > 0 ? requestedPages : Number.POSITIVE_INFINITY)
           : realtime
             ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
             : 50;
@@ -1389,7 +1383,7 @@ Deno.serve(async (req) => {
       const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
       // A full-history reconciliation must drain every RD page. The API itself
       // is the boundary; an arbitrary page/deal ceiling silently loses leads.
-      const maxAnalyticsDeals = fullHistoryRequested
+      const maxAnalyticsDeals = analytics_mode
         ? Number.POSITIVE_INFINITY
         : Math.max(1, Math.min(Number(max_deals) || 10_000, 10_000));
       const periodParams =

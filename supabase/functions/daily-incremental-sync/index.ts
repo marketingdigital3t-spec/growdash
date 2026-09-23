@@ -284,21 +284,11 @@ Deno.serve(async (req) => {
         .not("rd_funnel_id", "is", null);
       if (funnelsError) throw funnelsError;
       const candidates = (funnels ?? []) as RdTarget[];
-      const { data: existingDealRows } = await admin
-        .from("rd_deals")
-        .select("rd_funnel_id")
-        .in("rd_funnel_id", candidates.map((funnel) => funnel.id));
-      const dealCounts = new Map<string, number>();
-      for (const row of existingDealRows ?? []) dealCounts.set(row.rd_funnel_id, (dealCounts.get(row.rd_funnel_id) || 0) + 1);
-      const grouped = new Map<string, RdTarget[]>();
-      for (const funnel of candidates) {
-        const key = `${funnel.rd_connection_id}:${funnel.rd_funnel_id}`;
-        const group = grouped.get(key) || [];
-        group.push(funnel);
-        grouped.set(key, group);
-      }
-      rdTargets = Array.from(grouped.values()).map((group) => group.sort((a, b) => (dealCounts.get(b.id) || 0) - (dealCounts.get(a.id) || 0) || a.id.localeCompare(b.id))[0]);
-      const duplicateTargets = candidates.filter((funnel) => !rdTargets.some((selected) => selected.id === funnel.id));
+      // Process every active local mapping. A duplicate external funnel ID is
+      // an audit problem, but selecting one mapping based on local row counts
+      // silently discarded an entire account/funnel from reconciliation.
+      rdTargets = candidates;
+      const duplicateTargets = candidates.filter((funnel, index) => candidates.some((other, otherIndex) => otherIndex < index && other.rd_connection_id === funnel.rd_connection_id && other.rd_funnel_id === funnel.rd_funnel_id));
       duplicateMappingCount = duplicateTargets.length;
       if (duplicateTargets.length > 0) {
         console.warn("Duplicate local RD funnel mappings detected", duplicateTargets.map((funnel) => ({ id: funnel.id, rd_funnel_id: funnel.rd_funnel_id, name: funnel.name })));
@@ -319,8 +309,6 @@ Deno.serve(async (req) => {
           analytics_mode: true,
           start_date: syncWindow.startDate,
           end_date: syncWindow.endDate,
-          max_deals: 10000,
-          max_pages: 50,
           trigger_source: "quarter_hour_incremental",
           rd_connection_id: funnel.rd_connection_id,
         },

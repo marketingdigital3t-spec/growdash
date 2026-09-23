@@ -96,13 +96,11 @@ export default function FunnelAnalysis() {
   const queryClient = useQueryClient();
   const syncMeta = useSyncMeta();
 
-  // A tabela do RD pode preservar vínculos antigos. A análise nunca pode
-  // somar esses registros: somente funis ligados a contas Meta que ainda
-  // existem na Growdash entram no escopo de “Todas as contas”.
+  // RD é uma fonte independente de Meta. Funis ativos continuam disponíveis
+  // mesmo quando ainda não possuem uma conta de anúncios vinculada.
   const activeFunnels = useMemo(
-    () => funnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id
-      && (!funnel.ad_account_id || integratedAccountIds.has(funnel.ad_account_id))),
-    [funnels, integratedAccountIds],
+    () => funnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id),
+    [funnels],
   );
   // Uma conta selecionada só pode consultar os funis vinculados ao seu UUID.
   // Fallback por nome/"primeiro funil" misturava a análise quando o vínculo de

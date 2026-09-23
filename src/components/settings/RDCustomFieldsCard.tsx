@@ -81,7 +81,7 @@ export function RDCustomFieldsCard() {
         const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
           // Reads open, won, lost and paused deals so the initial catalogue is
           // complete. Subsequent daily/webhook syncs keep it current.
-          body: { funnel_id: funnel.id, analytics_mode: true, max_deals: 10000, max_pages: 50 },
+          body: { funnel_id: funnel.id, analytics_mode: true },
         });
         if (error || data?.error) {
           failed++;

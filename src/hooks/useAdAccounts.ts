@@ -8,13 +8,6 @@ import { withRequestTimeout } from "@/lib/resilience";
 export function useAdAccounts(includeDisconnected = true) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:ad-accounts:${user.id}:${includeDisconnected ? "all" : "connected"}` : "";
-  const readCache = () => {
-    if (!cacheKey) return undefined;
-    try {
-      const value = JSON.parse(localStorage.getItem(cacheKey) || "null");
-      return Array.isArray(value) ? value : undefined;
-    } catch { return undefined; }
-  };
   return useQuery({
     queryKey: ["ad_accounts", user?.id ?? "anonymous", includeDisconnected],
     enabled: !!user,
@@ -23,7 +16,6 @@ export function useAdAccounts(includeDisconnected = true) {
     refetchOnReconnect: true,
     refetchOnWindowFocus: false,
     staleTime: 2 * 60_000,
-    placeholderData: readCache,
     queryFn: async () => {
       const { data, error } = await withRequestTimeout(supabase
         .from("ad_accounts")

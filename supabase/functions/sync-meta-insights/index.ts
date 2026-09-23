@@ -76,15 +76,17 @@ Deno.serve(async (req) => {
     if (accError) throw accError;
 
     if (!accounts || accounts.length === 0) {
+      const blocked = disconnectedAccounts?.length || 0;
       return new Response(
         JSON.stringify({
-          success: true,
-          message: "Nenhuma conta de anúncio ativa encontrada",
+          success: blocked === 0,
+          status: blocked === 0 ? "success" : "blocked",
+          message: blocked === 0 ? "Nenhuma conta de anúncio ativa encontrada" : "Todas as contas de anúncio selecionadas estão bloqueadas",
           synced: 0,
           accounts: 0,
-          skipped_disconnected: disconnectedAccounts?.length || 0,
+          skipped_disconnected: blocked,
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: blocked === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -97,6 +99,7 @@ Deno.serve(async (req) => {
 
     for (const account of accounts) {
       const attemptedAt = new Date().toISOString();
+      let accountHadError = false;
       const recordPagination = (result: { pages?: number; lastCursor?: string }) => {
         totalPages += Number(result.pages || 0);
         if (result.lastCursor) lastCursor = result.lastCursor;
@@ -211,6 +214,7 @@ Deno.serve(async (req) => {
         );
         recordPagination(adsetsRes);
         if (adsetsRes.error) errors.push(`Conta ${account.name} conjuntos: ${adsetsRes.error}`);
+        if (adsetsRes.error) accountHadError = true;
         const adsetsList = adsetsRes.data;
         if (adsetsList.length > 0) {
           console.log(`Found ${adsetsList.length} adsets`);
@@ -247,6 +251,7 @@ Deno.serve(async (req) => {
         );
         recordPagination(adsRes);
         if (adsRes.error) errors.push(`Conta ${account.name} anúncios: ${adsRes.error}`);
+        if (adsRes.error) accountHadError = true;
         const adsList = adsRes.data;
         if (adsList.length > 0) {
           console.log(`Found ${adsList.length} ads`);
@@ -311,6 +316,7 @@ Deno.serve(async (req) => {
             if (actData.error) {
               const message = `Conta ${account.name} atividades: ${actData.error.message}`;
               errors.push(message);
+              accountHadError = true;
               console.warn(message);
               break;
             }
@@ -578,6 +584,7 @@ Deno.serve(async (req) => {
             if (bRes.error) {
               const message = `Conta ${account.name} breakdown ${breakdown.type}: ${bRes.error}`;
               errors.push(message);
+              accountHadError = true;
               console.warn(message);
               continue;
             }
@@ -630,18 +637,20 @@ Deno.serve(async (req) => {
         } catch (bErr) {
           const message = `Conta ${account.name} breakdowns: ${(bErr as Error).message}`;
           errors.push(message);
+          accountHadError = true;
           console.warn(message);
         }
 
-        // Mark account as connected after a successful sync
+        if (accountHadError) failedAccounts++;
+        // Mark account as connected only when every required block completed.
         await supabaseAdmin
           .from("ad_accounts")
           .update({
-            connection_status: "connected",
-            last_sync_error: null,
-            last_sync_error_code: null,
+            connection_status: accountHadError ? "error" : "connected",
+            last_sync_error: accountHadError ? errors.filter((message) => message.startsWith(`Conta ${account.name}`)).join("; ") : null,
+            last_sync_error_code: accountHadError ? "PARTIAL_SYNC" : null,
             last_sync_attempt_at: attemptedAt,
-            last_sync_success_at: attemptedAt,
+            ...(accountHadError ? {} : { last_sync_success_at: attemptedAt }),
           })
           // A completed sync is not authorization to reactivate an account.
           .eq("id", account.id)
@@ -668,7 +677,9 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success: failedAccounts < accounts.length, synced: totalSynced,
+        success: failedAccounts === 0 && (accounts.length > 0) && (disconnectedAccounts?.length || 0) === 0,
+        status: failedAccounts === 0 && (disconnectedAccounts?.length || 0) === 0 ? "success" : (failedAccounts === accounts.length ? "failed" : "partial"),
+        synced: totalSynced,
         accounts: accounts.length,
         skipped_disconnected: disconnectedAccounts?.length || 0,
         disconnected_accounts: (disconnectedAccounts || []).map((account: any) => ({
@@ -677,12 +688,12 @@ Deno.serve(async (req) => {
           name: account.name,
         })),
         errors: errors.length > 0 ? errors : undefined,
-        error: failedAccounts >= accounts.length ? errors[0] : undefined,
+        error: failedAccounts >= accounts.length || (accounts.length === 0 && (disconnectedAccounts?.length || 0) > 0) ? (errors[0] || "Todas as contas Meta selecionadas estão bloqueadas") : undefined,
         needs_reauth: needsReauth || undefined,
         graph_version: graphVersion,
         pagination: { pages: totalPages, last_cursor: lastCursor },
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: failedAccounts === 0 && (disconnectedAccounts?.length || 0) === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     return new Response(
