@@ -111,7 +111,10 @@ function IntegrationsContent() {
   const [search, setSearch] = useState("");
   const [accountOrder, setAccountOrder] = useState<"name-asc" | "name-desc" | "status">("name-asc");
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
-  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
+  // A profile-level Meta disconnect removes every ad account from this
+  // integration inventory. Historical facts remain in the database, but
+  // disconnected accounts must not remain visible as active integration rows.
+  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(false);
   const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
   const { data: rdConnections = [], isLoading: loadingRDConnections, isError: rdConnectionsFailed, refetch: refetchRDConnections } = useRDAccountConnections();
   // Keep funnel inventory visible while RD authorization is blocked. The UI
