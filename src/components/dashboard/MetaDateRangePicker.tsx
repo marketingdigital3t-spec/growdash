@@ -138,8 +138,9 @@ export function MetaDateRangePicker({
       <PopoverContent className={cn("gd-date-range-popover w-auto max-w-[95vw] p-0", popoverClassName)} align="start">
         <div className="flex flex-col md:flex-row">
           {/* Presets */}
-          <ScrollArea className="md:w-56 border-b md:border-b-0 md:border-r max-h-[50vh] md:max-h-[480px]">
+          <ScrollArea className="gd-date-range-presets md:w-56 border-b md:border-b-0 md:border-r max-h-[50vh] md:max-h-[480px]">
             <div className="p-3 space-y-1">
+              <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[.08em] text-muted-foreground">Usados recentemente</p>
               {PRESET_ORDER.map((p) => {
                 const active = pendingPreset === p;
                 return (
@@ -173,6 +174,9 @@ export function MetaDateRangePicker({
             <Calendar
               mode="range"
               numberOfMonths={typeof window !== "undefined" && window.innerWidth < 768 ? 1 : 2}
+              captionLayout="dropdown"
+              fromYear={2020}
+              toYear={new Date().getFullYear() + 1}
               selected={pendingRange}
               onSelect={handleCalendarSelect}
               locale={ptBR}

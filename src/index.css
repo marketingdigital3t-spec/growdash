@@ -7843,6 +7843,47 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
 .expert-dashboard .expert-kpi-grid .gd-metric-card { min-height: 96px !important; }
 .expert-dashboard .expert-kpi-grid .gd-metric-card-content { min-height: 96px !important; padding: 16px !important; }
 
+/* Meta Ads-style date picker surface. Interaction and date semantics stay in
+   MetaDateRangePicker; these rules only reproduce its visual hierarchy. */
+.gd-date-range-popover {
+  overflow: hidden !important;
+  border: 1px solid rgba(148,163,184,.32) !important;
+  border-radius: 14px !important;
+  background: #202020 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 24px 70px rgba(0,0,0,.38), 0 4px 16px rgba(0,0,0,.22) !important;
+}
+.gd-date-range-popover > div { min-height: 430px; }
+.gd-date-range-presets { width: 224px !important; border-color: rgba(255,255,255,.12) !important; background: #202020 !important; }
+.gd-date-range-presets p { color: rgba(255,255,255,.62) !important; }
+.gd-date-range-presets button { min-height: 34px; border: 1px solid transparent; border-radius: 9px !important; color: rgba(255,255,255,.88) !important; }
+.gd-date-range-presets button:hover { background: rgba(255,255,255,.08) !important; color: #fff !important; }
+.gd-date-range-presets button[aria-pressed="true"] { border-color: rgba(255,255,255,.55) !important; background: rgba(255,255,255,.04) !important; box-shadow: 0 0 0 2px rgba(255,255,255,.12); }
+.gd-date-range-presets button[aria-pressed="true"] > span:first-child { border-color: #2396ff !important; }
+.gd-date-range-presets button[aria-pressed="true"] > span:first-child > span { background: #2396ff !important; }
+.gd-date-range-popover .rdp { padding: 18px 16px 12px !important; }
+.gd-date-range-popover .rdp-months { gap: 18px !important; }
+.gd-date-range-popover .rdp-month { width: 252px; }
+.gd-date-range-popover .rdp-caption { height: 32px; border-bottom-color: rgba(255,255,255,.12) !important; }
+.gd-date-range-popover .rdp-caption_dropdowns { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.gd-date-range-popover .rdp-caption_dropdowns select { appearance: none; border: 0; border-radius: 6px; background: transparent; color: #f8fafc; font-size: 13px; font-weight: 800; padding: 3px 19px 3px 5px; }
+.gd-date-range-popover .rdp-caption_dropdowns select:hover { background: rgba(255,255,255,.08); }
+.gd-date-range-popover .rdp-caption_dropdowns select:focus-visible { outline: 2px solid #2396ff; outline-offset: 1px; }
+.gd-date-range-popover .rdp-head_cell { color: rgba(255,255,255,.62) !important; font-size: 10px; }
+.gd-date-range-popover .rdp-day { color: #f8fafc !important; }
+.gd-date-range-popover .rdp-day_outside { color: rgba(255,255,255,.42) !important; }
+.gd-date-range-popover .rdp-day_range_middle[aria-selected="true"] { background: rgba(35,150,255,.24) !important; color: #eaf5ff !important; }
+.gd-date-range-popover .rdp-day[aria-selected="true"]:not(.rdp-day_range_middle) { background: #1687d8 !important; color: #fff !important; border-radius: 6px !important; box-shadow: 0 3px 9px rgba(22,135,216,.38); }
+.gd-date-range-popover .rdp-day:not([aria-selected="true"]):hover { background: rgba(255,255,255,.11) !important; color: #fff !important; }
+.gd-date-range-popover > div > div:last-child { border-top: 1px solid rgba(255,255,255,.12) !important; }
+.gd-date-range-popover > div > div:last-child > div { color: rgba(255,255,255,.64); }
+.gd-date-range-popover > div > div:last-child button { min-width: 90px; border-radius: 8px; }
+.gd-date-range-popover > div > div:last-child button:last-child { border-color: #1687d8 !important; background: #1687d8 !important; color: #fff !important; box-shadow: 0 6px 14px rgba(22,135,216,.28); }
+@media (max-width: 767px) {
+  .gd-date-range-presets { width: 100% !important; max-height: 220px !important; }
+  .gd-date-range-popover .rdp-month { width: 286px; }
+}
+
 /* Keep every search input on the same graphite/white contract in black mode,
    including modules whose legacy selectors are loaded later in this file. */
 .dark .brand-shell .growdash-main :is(input[placeholder*="Buscar"], input[placeholder*="Pesquisar"], input[placeholder*="Pesquise"], input[aria-label*="Buscar"], input[aria-label*="Pesquisar"], .campaign-search-input),
