@@ -105,6 +105,9 @@ Deno.serve(async (req) => {
       connection_status: "disconnected",
       last_sync_error: null,
       last_sync_error_code: null,
+      oauth_health_status: "unchecked",
+      oauth_checked_at: null,
+      oauth_permissions: [],
       last_sync_attempt_at: now,
       // OAuth/token storage is not a data sync. Do not make health checks
       // believe this account has already produced a successful snapshot.

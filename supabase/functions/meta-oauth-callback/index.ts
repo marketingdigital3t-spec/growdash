@@ -202,6 +202,9 @@ Deno.serve(async (req) => {
         connection_status: "disconnected",
         last_sync_error: null,
         last_sync_error_code: null,
+        oauth_health_status: "unchecked",
+        oauth_checked_at: null,
+        oauth_permissions: [],
         // OAuth only imports credentials and account metadata; the first
         // successful insights/leads sync must establish freshness.
         last_sync_success_at: null,

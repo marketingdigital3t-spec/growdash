@@ -259,7 +259,9 @@ function IntegrationsContent() {
 
   const toggleMetaAccount = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      const { error } = await supabase.from("ad_accounts").update({ connection_status: active ? "connected" : "disconnected" }).eq("id", id);
+      const { error } = await supabase.from("ad_accounts").update(active
+        ? { connection_status: "connected", oauth_health_status: "unchecked", oauth_checked_at: null, oauth_permissions: [] }
+        : { connection_status: "disconnected" }).eq("id", id);
       if (error) throw error;
       return { id, active };
     },
