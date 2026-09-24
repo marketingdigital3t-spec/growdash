@@ -251,7 +251,7 @@ export default function DataHealth() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Reconciliação canônica RD a cada 15 minutos</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Reconciliação canônica Meta/RD a cada 5 minutos</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {data.rdMetricAudits.length ? data.rdMetricAudits.slice(0, 20).map((audit) => (
             <div key={audit.id} className="flex flex-col gap-1 border-b border-border/40 py-2 text-sm last:border-0 sm:flex-row sm:items-center sm:justify-between">

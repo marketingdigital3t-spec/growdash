@@ -51,7 +51,9 @@ function incrementalWindow(now: Date, previousEnd?: string | null): SyncWindow {
   const end = now;
   // Re-read a small overlap so a provider that updates a record at the edge of
   // a window cannot leave a gap. The upserts/deduplication make this safe.
-  const watermark = previousEnd ? new Date(previousEnd) : new Date(end.getTime() - 15 * 60_000);
+  const watermark = previousEnd ? new Date(previousEnd) : new Date(end.getTime() - 5 * 60_000);
+  // Keep a small overlap around the five-minute cadence. Upserts make the
+  // overlap idempotent and prevent edge events from being lost.
   const start = new Date(watermark.getTime() - 5 * 60_000);
   return {
     start,
@@ -254,17 +256,17 @@ Deno.serve(async (req) => {
         endDate: syncWindow.endDate,
         incremental: true,
         includeBreakdowns: false,
-        triggerSource: "quarter_hour_incremental",
+        triggerSource: "five_minute_incremental",
       }),
       callFunction(supabaseUrl, serviceKey, "sync-meta-leads", {
         startDate: syncWindow.startDate,
         endDate: syncWindow.endDate,
-        triggerSource: "quarter_hour_incremental",
+        triggerSource: "five_minute_incremental",
       }),
       callFunction(supabaseUrl, serviceKey, "sync-meta-hourly", {
         startDate: syncWindow.startDate,
         endDate: syncWindow.endDate,
-        triggerSource: "quarter_hour_incremental",
+        triggerSource: "five_minute_incremental",
       }),
     ]);
     const metaInsights = applyReportedFailure(metaInsightsRaw);
@@ -309,7 +311,7 @@ Deno.serve(async (req) => {
           analytics_mode: true,
           start_date: syncWindow.startDate,
           end_date: syncWindow.endDate,
-          trigger_source: "quarter_hour_incremental",
+          trigger_source: "five_minute_incremental",
           rd_connection_id: funnel.rd_connection_id,
         },
       );
@@ -323,7 +325,7 @@ Deno.serve(async (req) => {
 
     // Stage changes on existing deals arrive through the RD webhook. The
     // heavyweight open-deal reconciliation is intentionally opt-in so it
-    // cannot block the 15-minute watermark window or create overlapping runs.
+    // cannot block the five-minute watermark window or create overlapping runs.
     // It can still be requested explicitly by an authenticated service call.
     const runHeavyResync = requestBody?.include_resync === true && isService;
     const rdResync = runHeavyResync
@@ -344,7 +346,7 @@ Deno.serve(async (req) => {
       supabaseUrl,
       serviceKey,
       "rd-reconcile-metrics",
-      { run_id: run.id, trigger_source: "quarter_hour_incremental" },
+      { run_id: run.id, trigger_source: "five_minute_incremental" },
     );
     const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
     const status = allOk ? "success" : "partial";
