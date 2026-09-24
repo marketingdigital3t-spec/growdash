@@ -51,6 +51,21 @@ export function useSyncMeta() {
 
   return useMutation({
     mutationFn: async (params: SyncParams) => {
+      // Revalidate stored tokens before running the metrics sync. This clears
+      // stale OAuth/connection flags after a successful Meta reconnect while
+      // still allowing the sync endpoint to return the real Graph error when
+      // a token is genuinely revoked.
+      const accountIds = Array.from(new Set([
+        ...(params.adAccountIds ?? []),
+        ...(params.adAccountId ? [params.adAccountId] : []),
+      ].filter(Boolean)));
+      for (const accountId of accountIds) {
+        try {
+          await supabase.functions.invoke("meta-reconnect-stored-token", { body: { account_id: accountId } });
+        } catch {
+          // The main sync reports the authoritative Meta error below.
+        }
+      }
       const body = {
         adAccountId: params.adAccountId,
         adAccountIds: params.adAccountIds,
