@@ -1,7 +1,11 @@
 export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
   // native form events and only use it as a fallback when none is present.
-  forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"],
+  // Lead Ads, older Lead Ads aliases and website lead conversions are all
+  // exposed by Meta as result actions depending on campaign destination.
+  // Resolve them as aliases (max, never additive) so one submission is not
+  // counted twice when Meta returns more than one representation.
+  forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"],
   // Older Meta accounts expose the same result as total_messaging_connection.
   // It is a fallback alias only; preferredValue() prevents additive counting
   // when a started-conversation alias is present in the same ad.

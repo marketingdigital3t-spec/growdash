@@ -470,6 +470,7 @@ Deno.serve(async (req) => {
             valueOf("onsite_conversion.lead_grouped"),
             valueOf("omni_lead"),
             valueOf("leadgen_grouped"),
+            valueOf("offsite_conversion.fb_pixel_lead"),
           ];
           // Meta sometimes exposes only `lead` for older form accounts. It is
           // a fallback, never an additive alias: on messaging campaigns it can
@@ -530,7 +531,7 @@ Deno.serve(async (req) => {
           // antigas retornam apenas `lead` (sem `lead_grouped`); nesse caso ele
           // é o único resultado de formulário disponível e não pode ser perdido.
           const nativeLeads = nativeFormValue(actions);
-          const lpLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
+          const lpLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
           const leads = nativeLeads + lpLeads;
           const cpl = leads > 0 ? spend / leads : 0;
           const conversionRate = clicks > 0 ? (leads / clicks) * 100 : 0;
@@ -601,7 +602,7 @@ Deno.serve(async (req) => {
                 // message campaigns. Do not drop message campaigns from the
                 // audience report simply because they have no form action.
                 const nLeads = nativeFormValue(actions);
-                const lLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
+                const lLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
                 // Meta varies the messaging action name by objective/API
                 // version. Count every known conversation-start action so
                 // click-to-message campaigns also populate the audience

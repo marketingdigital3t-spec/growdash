@@ -139,6 +139,7 @@ Deno.serve(async (req) => {
             "onsite_conversion.lead_grouped",
             "omni_lead",
             "leadgen_grouped",
+            "offsite_conversion.fb_pixel_lead",
           ];
           const canonicalForms = formAliases.map(findVal);
           const hasConversation = [
