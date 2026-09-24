@@ -1549,7 +1549,10 @@ Deno.serve(async (req) => {
       if (analytics_mode && start_date && end_date && analyticsRangeComplete && !fullHistoryRequested) {
         const localIds: string[] = [];
         const pageSize = 1000;
-        for (let localPage = 0; localPage < 50; localPage++) {
+        // Paginate until PostgREST returns a short page. A fixed page count
+        // silently left stale records above 50k deals and made reconciliation
+        // report a false snapshot for large funnels.
+        for (let localPage = 0; ; localPage++) {
           const { data: localRows, error: localError } = await admin
             .from("rd_deals")
             .select("rd_deal_id")
@@ -1592,9 +1595,16 @@ Deno.serve(async (req) => {
           .gte("lead_created_at", `${start_date}T00:00:00-03:00`)
           .lte("lead_created_at", `${end_date}T23:59:59.999-03:00`);
       }
-      const { data: localSnapshot, error: localSnapshotError } = await localQuery;
-      if (localSnapshotError) throw localSnapshotError;
-      const localIds = (localSnapshot || []).map((row: any) => String(row.rd_deal_id || "")).filter(Boolean);
+      const localIds: string[] = [];
+      const pageSize = 1000;
+      for (let localPage = 0; ; localPage++) {
+        const { data: localSnapshot, error: localSnapshotError } = await localQuery
+          .range(localPage * pageSize, localPage * pageSize + pageSize - 1);
+        if (localSnapshotError) throw localSnapshotError;
+        const batch = (localSnapshot || []).map((row: any) => String(row.rd_deal_id || "")).filter(Boolean);
+        localIds.push(...batch);
+        if (batch.length < pageSize) break;
+      }
       const localIdSet = new Set(localIds);
       snapshotMissingIds = Array.from(seenAnalyticsDealIds).filter((id) => !localIdSet.has(id));
       snapshotDuplicateCount = localIds.length - localIdSet.size;
