@@ -47,7 +47,10 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
           {metrics.map((metric) => {
             const isLeads = metric.label === "Leads" && leadsBreakdown;
             const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[10px] [&_svg]:h-3.5 [&_svg]:w-3.5", metric.tone === "good" && "is-good")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="whitespace-nowrap text-[6.5px] font-black uppercase leading-tight tracking-[.035em] text-muted-foreground" title={metric.label}>{metric.label}</p><p className="mt-1 whitespace-nowrap text-[12px] font-black leading-none tabular-nums" title={metric.value}>{metric.value}</p></div></>;
-            const className = "gd-glass-metric group flex min-h-[66px] min-w-0 items-center gap-1.5 rounded-xl px-2 py-2.5 text-left";
+            const className = cn(
+              "gd-glass-metric group flex min-h-[66px] min-w-0 items-center gap-1.5 rounded-xl px-2 py-2.5 text-left",
+              isLeads && "gd-glass-metric-leads",
+            );
             return isLeads ? <button key={metric.label} type="button" className={className} title="Forms/site e conversas iniciadas. Clique para detalhar." aria-expanded={showLeadBreakdown} onClick={() => setShowLeadBreakdown((value) => !value)}>{content}</button> : <article key={metric.label} className={className} title={metricDescription(metric.label)}>{content}</article>;
           })}
         </div>

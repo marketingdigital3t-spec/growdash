@@ -7602,6 +7602,32 @@ html:not(.dark) .brand-shell .growdash-main :is(input, select, textarea, [role="
   border-color: var(--gd-content-text) !important;
 }
 
+/* Leads is the only interactive KPI in this strip. Normalize the native
+   button surface so hover/focus cannot turn it gray, then add a restrained
+   lower accent to separate its detail affordance from the other metrics. */
+.brand-shell .dashboard-summary-strip button.gd-glass-metric {
+  appearance: none;
+  -webkit-appearance: none;
+  color: inherit !important;
+  font: inherit;
+}
+.brand-shell .dashboard-summary-strip .gd-glass-metric-leads {
+  position: relative;
+  overflow: hidden;
+  background: var(--gd-content-surface) !important;
+}
+.brand-shell .dashboard-summary-strip .gd-glass-metric-leads::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  left: 10px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: color-mix(in srgb, var(--gd-content-text) 34%, transparent);
+  pointer-events: none;
+}
+
 .brand-shell .dashboard-grid-container .react-grid-item:not(.dashboard-default-static) > .dashboard-widget-shell {
   height: 100% !important;
   min-height: 0 !important;
