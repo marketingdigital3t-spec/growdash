@@ -68,9 +68,18 @@ Deno.serve(async (req) => {
 
     const blockedStatuses = new Set(["disconnected", "blocked"]);
     const blockedOAuthStatuses = new Set(["permission_removed", "expired", "invalid"]);
-    const disconnectedAccounts = (allAccounts || []).filter((account: any) =>
-      blockedStatuses.has(String(account.connection_status || "")) || blockedOAuthStatuses.has(String(account.oauth_health_status || ""))
-    );
+    // An OAuth health flag can be stale after a successful reconnect (the
+    // token is replaced before the monitoring cycle clears the old flag).
+    // Do not discard an account that still has a token: let the Graph API be
+    // the authority. A real 190/permission response below will mark it
+    // invalid and block it; this prevents valid accounts from returning the
+    // misleading "all accounts blocked" result and leaving today's metrics at
+    // zero.
+    const disconnectedAccounts = (allAccounts || []).filter((account: any) => {
+      const hasToken = typeof account.access_token === "string" && account.access_token.trim().length > 0;
+      return blockedStatuses.has(String(account.connection_status || "")) ||
+        (blockedOAuthStatuses.has(String(account.oauth_health_status || "")) && !hasToken);
+    });
     const accounts = (allAccounts || []).filter((account: any) => !disconnectedAccounts.some((blocked: any) => blocked.id === account.id));
 
     if (!accounts || accounts.length === 0) {
