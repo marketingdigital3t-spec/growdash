@@ -2,7 +2,10 @@ export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
   // native form events and only use it as a fallback when none is present.
   forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"],
-  conversations: ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started"],
+  // Older Meta accounts expose the same result as total_messaging_connection.
+  // It is a fallback alias only; preferredValue() prevents additive counting
+  // when a started-conversation alias is present in the same ad.
+  conversations: ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started", "onsite_conversion.total_messaging_connection"],
   linkClick: ["link_click"],
   landingPageView: ["landing_page_view"],
   checkout: [

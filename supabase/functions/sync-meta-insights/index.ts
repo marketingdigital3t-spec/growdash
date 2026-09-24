@@ -478,6 +478,7 @@ Deno.serve(async (req) => {
             "onsite_conversion.messaging_conversation_started_7d",
             "onsite_conversion.messaging_conversation_started_28d",
             "onsite_conversion.messaging_conversation_started",
+            "onsite_conversion.total_messaging_connection",
           ].some((type) => actions.some((item: any) => item.action_type === type));
           return canonical.some((value) => value > 0) ? Math.max(...canonical) : hasConversation ? 0 : valueOf("lead");
         };
@@ -609,6 +610,7 @@ Deno.serve(async (req) => {
                   "onsite_conversion.messaging_conversation_started_7d",
                   "onsite_conversion.messaging_conversation_started",
                   "onsite_conversion.messaging_conversation_started_28d",
+                  "onsite_conversion.total_messaging_connection",
                 ];
                 const conversations = Math.max(...messagingActions.map(findVal));
                 return {

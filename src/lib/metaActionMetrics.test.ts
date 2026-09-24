@@ -58,6 +58,11 @@ describe("Meta action metrics", () => {
       .toEqual({ forms: 0, site: 0, conversations: 3, total: 3 });
   });
 
+  it("usa o evento legado de conexão como fallback de conversa", () => {
+    expect(resolveMetaLeadActions({ "onsite_conversion.total_messaging_connection": 16 }))
+      .toEqual({ forms: 0, site: 0, conversations: 16, total: 16 });
+  });
+
   it("resolve site sem misturar com formulário ou lead auxiliar", () => {
     expect(resolveMetaLeadActions({ lead: 9, offsite_registration: 4 }, "offsite_registration"))
       .toEqual({ forms: 0, site: 4, conversations: 0, total: 4 });
