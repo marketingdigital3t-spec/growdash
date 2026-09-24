@@ -79,14 +79,14 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: existing, error: existingError } = await admin
+    const { data: existingRows, error: existingError } = await admin
       .from("ad_accounts")
       .select("id")
       .eq("user_id", user.id)
-      .eq("account_id", accountId)
-      .limit(1)
-      .maybeSingle();
+      .in("account_id", [accountId, numericAccountId])
+      .order("updated_at", { ascending: false });
     if (existingError) throw existingError;
+    const existing = existingRows?.[0] ?? null;
 
     const now = new Date().toISOString();
     const values = {

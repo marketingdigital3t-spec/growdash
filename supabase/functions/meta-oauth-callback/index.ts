@@ -180,13 +180,16 @@ Deno.serve(async (req) => {
       const rawId = String(account.account_id ?? account.id ?? "").replace(/^act_/, "").trim();
       if (!/^\d+$/.test(rawId)) continue;
       const accountId = `act_${rawId}`;
-      const { data: existing } = await admin
+      const { data: existingRows } = await admin
         .from("ad_accounts")
         .select("id,connection_status,last_sync_success_at")
         .eq("user_id", oauthState.user_id)
-        .eq("account_id", accountId)
-        .limit(1)
-        .maybeSingle();
+        .in("account_id", [accountId, rawId])
+        .order("connection_status", { ascending: true })
+        .order("updated_at", { ascending: false });
+      // Prefer an already active canonical row; otherwise reuse the newest
+      // legacy row instead of inserting another copy on every OAuth refresh.
+      const existing = (existingRows || []).sort((a, b) => Number(b.connection_status !== "disconnected") - Number(a.connection_status !== "disconnected"))[0];
       const values = {
         user_id: oauthState.user_id,
         account_id: accountId,
