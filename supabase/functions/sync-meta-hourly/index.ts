@@ -132,8 +132,25 @@ Deno.serve(async (req) => {
             const a = actions.find((x: any) => x.action_type === type);
             return a ? Number(a.value || 0) : 0;
           };
-          const nativeLeads = findVal("onsite_conversion.lead_grouped");
-          const lpLeads = lpAction ? findVal(lpAction) : 0;
+          // Keep hourly form leads aligned with the daily sync. Meta account
+          // versions expose different aliases; use the strongest canonical
+          // value and never add aliases that represent the same submission.
+          const formAliases = [
+            "onsite_conversion.lead_grouped",
+            "omni_lead",
+            "leadgen_grouped",
+          ];
+          const canonicalForms = formAliases.map(findVal);
+          const hasConversation = [
+            "onsite_conversion.messaging_conversation_started_7d",
+            "onsite_conversion.messaging_conversation_started_28d",
+            "onsite_conversion.messaging_conversation_started",
+            "onsite_conversion.total_messaging_connection",
+          ].some((type) => actions.some((item) => item.action_type === type));
+          const nativeLeads = canonicalForms.some((value) => value > 0)
+            ? Math.max(...canonicalForms)
+            : hasConversation ? 0 : findVal("lead");
+          const lpLeads = lpAction && ![...formAliases, "lead"].includes(lpAction) ? findVal(lpAction) : 0;
           const leads = nativeLeads + lpLeads;
 
           const key = `${r.ad_id}|${r.date_start}|${hour}`;

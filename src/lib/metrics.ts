@@ -7,8 +7,11 @@ export function aggregateMetrics(rows: InsightRow[]) {
   const totalImpressions = rows.reduce((s, r) => s + r.impressions, 0);
 
   const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
-  const avgCTR = rows.length > 0 ? rows.reduce((s, r) => s + r.ctr, 0) / rows.length : 0;
-  const avgCPM = rows.length > 0 ? rows.reduce((s, r) => s + r.cpm, 0) / rows.length : 0;
+  // Totals must match Meta's account-level calculation. Averaging row-level
+  // rates gives disproportionate weight to small ads and diverges from Ads
+  // Manager whenever rows have different delivery volumes.
+  const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
   const conversionRate = totalClicks > 0 ? (totalLeads / totalClicks) * 100 : 0;
   const efficiencyRate = totalImpressions > 0 ? (totalLeads / totalImpressions) * 100 : 0;
 

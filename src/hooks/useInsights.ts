@@ -153,7 +153,10 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       })) as InsightRow[]);
     },
     enabled,
-    staleTime: 15 * 60 * 1000,
+    // The backend reconciles Meta every five minutes. Keep the UI cache on
+    // that same cadence so account totals do not remain stale for 15 minutes.
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: true,
   });
