@@ -14,12 +14,13 @@ interface Props {
   forecast30: number;
   sales: number;
   leadsBreakdown?: { forms: number; site: number; conversations: number; total: number };
+  loading?: boolean;
 }
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 
-export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast30, sales, leadsBreakdown }: Props) {
+export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast30, sales, leadsBreakdown, loading = false }: Props) {
   const isMobile = useIsMobile();
   const [showLeadBreakdown, setShowLeadBreakdown] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
@@ -27,14 +28,15 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
   });
   useEffect(() => { try { localStorage.setItem("growdash:glass-strip-collapsed", collapsed ? "1" : "0"); } catch {} }, [collapsed]);
   const compact = isMobile && collapsed;
+  const display = (value: string) => loading ? "Carregando…" : value;
   const metrics: GlassMetric[] = [
-    { label: "Faturamento bruto", value: brl.format(revenue), icon: <DollarSign /> },
-    { label: "Investimento", value: brl.format(spend), icon: <Coins /> },
-    { label: "Leads", value: integer.format(leads), icon: <Users /> },
-    { label: "CPL", value: brl.format(cpl), icon: <BarChart3 /> },
-    { label: "ROAS", value: `${roas.toFixed(2)}x`, icon: <TrendingUp />, tone: roas >= 1 ? "good" : undefined },
-    { label: "Previsão 30d", value: brl.format(forecast30), icon: <TrendingUp /> },
-    { label: "Vendas", value: integer.format(sales), icon: <ShoppingCart /> },
+    { label: "Faturamento bruto", value: display(brl.format(revenue)), icon: <DollarSign /> },
+    { label: "Investimento", value: display(brl.format(spend)), icon: <Coins /> },
+    { label: "Leads", value: display(integer.format(leads)), icon: <Users /> },
+    { label: "CPL", value: display(brl.format(cpl)), icon: <BarChart3 /> },
+    { label: "ROAS", value: display(`${roas.toFixed(2)}x`), icon: <TrendingUp />, tone: roas >= 1 ? "good" : undefined },
+    { label: "Previsão 30d", value: display(brl.format(forecast30)), icon: <TrendingUp /> },
+    { label: "Vendas", value: display(integer.format(sales)), icon: <ShoppingCart /> },
   ];
 
   return <section className="dashboard-summary-strip sticky top-[calc(88px+env(safe-area-inset-top))] z-20 min-w-0 lg:top-[49px]" aria-label="Resumo fixo do Dashboard">

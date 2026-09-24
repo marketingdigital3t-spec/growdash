@@ -209,7 +209,7 @@ const Index = () => {
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
 
-  const handleSync = () => {
+  const handleSync = useCallback(() => {
     // A mutation já invalida as consultas de insights ao terminar. Refazer a
     // consulta antes e depois da sincronização só competia por rede e fazia o
     // dashboard trocar desnecessariamente para estado de carregamento.
@@ -224,7 +224,19 @@ const Index = () => {
       breakdownStartDate: syncStart,
       breakdownEndDate: syncEnd,
     });
-  };
+  }, [endDate, scopedAccountIds, selectedAccountIds, startDate, syncMeta]);
+
+  // A newly connected account can legitimately have no local rows until its
+  // first reconciliation. Force one scoped sync once per account/period so the
+  // dashboard never settles permanently on a misleading all-zero snapshot.
+  const autoSyncKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (loadingAdAccounts || isLoading || syncMeta.isPending || allInsights.length > 0 || selectedAccountIds.length === 0) return;
+    const key = `${selectedAccountIds.slice().sort().join(",")}|${format(startDate, "yyyy-MM-dd")}|${format(endDate, "yyyy-MM-dd")}`;
+    if (autoSyncKeyRef.current === key) return;
+    autoSyncKeyRef.current = key;
+    handleSync();
+  }, [allInsights.length, endDate, handleSync, isLoading, loadingAdAccounts, selectedAccountIds, startDate, syncMeta.isPending]);
 
   const cloneView = useCallback((view: DashboardView): DashboardView => ({
     ...view,
@@ -401,11 +413,11 @@ const Index = () => {
       </MotionItem>
 
       <div className="mx-3">
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || syncMeta.isPending} />
       </div>
 
       <div className="mx-3">
-        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} />
+        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || syncMeta.isPending} />
       </div>
 
       <div className="mx-3">
