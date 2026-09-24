@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
       const accountId = `act_${rawId}`;
       const { data: existing } = await admin
         .from("ad_accounts")
-        .select("id,connection_status")
+        .select("id,connection_status,last_sync_success_at")
         .eq("user_id", oauthState.user_id)
         .eq("account_id", accountId)
         .limit(1)
@@ -197,9 +197,10 @@ Deno.serve(async (req) => {
         timezone_name: account.timezone_name ? String(account.timezone_name).slice(0, 100) : null,
         timezone_offset_hours_utc: Number.isFinite(Number(account.timezone_offset_hours_utc)) ? Number(account.timezone_offset_hours_utc) : null,
         metadata: { connection_method: "oauth", connected_at: new Date().toISOString() },
-        // OAuth only imports/refreshes profiles. Every profile starts disabled;
-        // the operator must explicitly activate each account in Growdash.
-        connection_status: "disconnected",
+        // A profile refresh must not silently deactivate accounts that the
+        // operator already enabled. New accounts remain disabled until the
+        // operator explicitly activates them in Growdash.
+        connection_status: existing?.connection_status || "disconnected",
         last_sync_error: null,
         last_sync_error_code: null,
         oauth_health_status: "unchecked",
@@ -207,7 +208,7 @@ Deno.serve(async (req) => {
         oauth_permissions: [],
         // OAuth only imports credentials and account metadata; the first
         // successful insights/leads sync must establish freshness.
-        last_sync_success_at: null,
+        last_sync_success_at: existing?.last_sync_success_at || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -220,7 +221,7 @@ Deno.serve(async (req) => {
     }
 
     if (saved === 0) return resultPage("error", "As contas foram encontradas, mas não puderam ser salvas na Growdash.");
-    return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio conectada${saved === 1 ? "" : "s"} com segurança.`, saved);
+    return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio importada${saved === 1 ? "" : "s"}. Contas já ativadas foram preservadas; contas novas aguardam ativação na Growdash.`, saved);
   } catch (error) {
     console.error("meta-oauth-callback", error);
     return resultPage("error", "Ocorreu uma falha interna ao concluir a conexão.");
