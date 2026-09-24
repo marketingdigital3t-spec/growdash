@@ -77,7 +77,12 @@ Deno.serve(async (req) => {
     // zero.
     const disconnectedAccounts = (allAccounts || []).filter((account: any) => {
       const hasToken = typeof account.access_token === "string" && account.access_token.trim().length > 0;
-      return blockedStatuses.has(String(account.connection_status || "")) ||
+      const hasRecordedSyncFailure = Boolean(account.last_sync_error || account.last_sync_error_code);
+      // A manually disabled account has no current sync failure. If a token
+      // exists together with a recorded failure, it is recoverable: retry the
+      // real Graph request instead of returning the generic all-blocked error.
+      const manuallyDisabled = blockedStatuses.has(String(account.connection_status || "")) && !hasRecordedSyncFailure;
+      return manuallyDisabled ||
         (blockedOAuthStatuses.has(String(account.oauth_health_status || "")) && !hasToken);
     });
     const accounts = (allAccounts || []).filter((account: any) => !disconnectedAccounts.some((blocked: any) => blocked.id === account.id));
