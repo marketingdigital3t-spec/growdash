@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 function statusIcon(s: CheckStatus, className = "h-4 w-4") {
   if (s === "ok") return <CheckCircle2 className={`${className} text-emerald-500`} />;
@@ -34,10 +35,18 @@ export function RDHealthCheckCard() {
   const syncFunnel = useMutation({
     mutationFn: async (funnelId?: string) => {
       const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
-        body: funnelId ? { funnel_id: funnelId } : {},
+        body: funnelId ? {
+          funnel_id: funnelId,
+          analytics_mode: true,
+          full_history: true,
+          refresh_amounts: true,
+          trigger_source: "rd_health_manual",
+        } : {},
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error) throw new Error(await getEdgeFunctionErrorMessage(error, "Não foi possível sincronizar o funil RD."));
+      if (data?.error || data?.success === false || data?.partial || data?.status === "partial") {
+        throw new Error(data?.error || `Sincronização incompleta: ${data?.pages_processed ?? 0} páginas processadas.`);
+      }
       return data;
     },
     onSuccess: () => {
@@ -45,7 +54,7 @@ export function RDHealthCheckCard() {
       qc.invalidateQueries({ queryKey: ["rd_health_check"] });
       qc.invalidateQueries({ queryKey: ["rd_deals"] });
     },
-    onError: (e: any) => toast.error(e.message || "Erro ao sincronizar"),
+    onError: (e: Error) => toast.error(e.message || "Erro ao sincronizar"),
   });
 
   const summary = useMemo(() => (data ? overallBadge(data.overall) : null), [data]);

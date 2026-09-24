@@ -3,7 +3,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import {
   useRDFunnels, useCreateRDFunnel, useUpdateRDFunnel, useDeleteRDFunnel, type RDFunnel,
 } from "@/hooks/useRDFunnels";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
+import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 
 interface RDPipeline { id: string; name: string }
 
@@ -98,6 +99,7 @@ function LinkFunnelDialog({
 
 function FunnelRow({ funnel }: { funnel: RDFunnel }) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const update = useUpdateRDFunnel();
   const remove = useDeleteRDFunnel();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -106,19 +108,34 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
   const sync = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
-        body: { funnel_id: funnel.id },
+        body: {
+          funnel_id: funnel.id,
+          // A manual action must mirror the complete RD pipeline, including
+          // open, won, lost and paused deals. The incremental path only
+          // refreshes a small recent window and made this screen look empty
+          // or incomplete compared with RD.
+          analytics_mode: true,
+          full_history: true,
+          refresh_amounts: true,
+          trigger_source: "funnel_settings_manual",
+        },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error) throw new Error(await getEdgeFunctionErrorMessage(error, `Não foi possível sincronizar o funil ${funnel.name}.`));
+      if (data?.error || data?.success === false || data?.partial || data?.status === "partial") {
+        throw new Error(data?.error || `Sincronização incompleta: ${data?.pages_processed ?? 0} páginas processadas, ${data?.snapshot_missing_ids?.length ?? 0} IDs ausentes.`);
+      }
       return data;
     },
     onSuccess: (d) => {
+      void queryClient.invalidateQueries({ queryKey: ["rd_deals"] });
+      void queryClient.invalidateQueries({ queryKey: ["rd_latest_sync"] });
+      void queryClient.invalidateQueries({ queryKey: ["rd_health_check"] });
       toast({
-        title: "Sincronizado!",
-        description: `${d.created} novas, ${d.updated} atualizadas, ${d.skipped} ignoradas`,
+        title: "Funil sincronizado com o RD",
+        description: `${d.deals ?? 0} negócios verificados · ${d.pages_processed ?? 0} páginas · ${d.created ?? 0} novos · ${d.updated ?? 0} atualizados`,
       });
     },
-    onError: (e: any) => toast({ title: "Erro ao sincronizar", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Erro ao sincronizar", description: e.message || "A sincronização falhou.", variant: "destructive" }),
   });
 
   return (
