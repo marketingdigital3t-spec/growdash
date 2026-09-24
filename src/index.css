@@ -3503,6 +3503,86 @@ html:not(.dark) {
   transform: none !important;
 }
 .gd-funnel-kpi-label { display: block; font-size: .82rem !important; font-weight: 600; line-height: 1.2; }
+
+/* Dashboard visual refresh: a clearer product surface with restrained color,
+   depth and hierarchy. This block is presentation-only; it does not change
+   any data, query or synchronization behavior. */
+.brand-shell .dashboard-page {
+  --dash-accent: #2563eb;
+  --dash-accent-soft: rgba(37, 99, 235, .10);
+  --dash-surface: rgba(255, 255, 255, .94);
+  --dash-surface-muted: #f4f7fb;
+  --dash-border: rgba(15, 23, 42, .10);
+  background: radial-gradient(circle at 92% -8%, rgba(37,99,235,.10), transparent 28%), #f6f8fb !important;
+  padding-bottom: 2rem;
+}
+.dark .brand-shell .dashboard-page {
+  --dash-accent: #60a5fa;
+  --dash-accent-soft: rgba(96, 165, 250, .14);
+  --dash-surface: rgba(20, 25, 34, .94);
+  --dash-surface-muted: #151b25;
+  --dash-border: rgba(148, 163, 184, .18);
+  background: radial-gradient(circle at 92% -8%, rgba(37,99,235,.18), transparent 28%), #0b0f15 !important;
+}
+.brand-shell .dashboard-page > .mx-3:first-child h1 { letter-spacing: -.035em; font-size: clamp(1.7rem, 2.2vw, 2.15rem); }
+.brand-shell .dashboard-page > .mx-3:first-child p { color: var(--gd-content-muted) !important; }
+.brand-shell .dashboard-page > .mx-3:nth-child(2) > div {
+  border: 1px solid var(--dash-border) !important;
+  border-radius: 14px;
+  background: var(--dash-surface);
+  box-shadow: 0 10px 28px rgba(15,23,42,.06);
+  padding: 10px 12px 12px;
+}
+.dark .brand-shell .dashboard-page > .mx-3:nth-child(2) > div { box-shadow: 0 14px 34px rgba(0,0,0,.22); }
+.brand-shell .dashboard-page .dashboard-summary-strip { position: relative; top: auto !important; z-index: 3; }
+.brand-shell .dashboard-page .dashboard-summary-strip-surface {
+  border: 1px solid var(--dash-border) !important;
+  border-radius: 16px !important;
+  background: var(--dash-surface) !important;
+  box-shadow: 0 14px 32px rgba(15,23,42,.08) !important;
+  overflow: hidden;
+}
+.brand-shell .dashboard-page .dashboard-glass-metrics { padding: 9px !important; gap: 9px !important; }
+.brand-shell .dashboard-page .gd-glass-metric {
+  min-height: 72px !important;
+  border: 1px solid var(--dash-border) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(145deg, var(--dash-surface), var(--dash-surface-muted)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.8), 0 5px 14px rgba(15,23,42,.05);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.brand-shell .dashboard-page .gd-glass-metric:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--dash-accent) 35%, var(--dash-border)) !important; box-shadow: 0 9px 20px rgba(37,99,235,.12); }
+.brand-shell .dashboard-page .gd-glass-metric-icon { background: var(--dash-accent-soft) !important; color: var(--dash-accent) !important; border: 1px solid color-mix(in srgb, var(--dash-accent) 22%, transparent); }
+.brand-shell .dashboard-page .dashboard-primary-kpis,
+.brand-shell .dashboard-page .dashboard-financial-overview { gap: 14px !important; }
+.brand-shell .dashboard-page .gd-metric-card,
+.brand-shell .dashboard-page .dashboard-financial-overview > *,
+.brand-shell .dashboard-page .dashboard-primary-kpis > * {
+  border: 1px solid var(--dash-border) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, var(--dash-surface), var(--dash-surface-muted)) !important;
+  box-shadow: 0 12px 26px rgba(15,23,42,.07), inset 0 1px rgba(255,255,255,.78) !important;
+}
+.dark .brand-shell .dashboard-page .gd-metric-card,
+.dark .brand-shell .dashboard-page .dashboard-financial-overview > *,
+.dark .brand-shell .dashboard-page .dashboard-primary-kpis > * { box-shadow: 0 14px 30px rgba(0,0,0,.24), inset 0 1px rgba(255,255,255,.06) !important; }
+.brand-shell .dashboard-page .dashboard-reference-kpi,
+.brand-shell .dashboard-page .dashboard-reference-funnel,
+.brand-shell .dashboard-page .dashboard-reference-radar {
+  border-color: color-mix(in srgb, var(--dash-accent) 22%, var(--dash-border));
+  background: linear-gradient(145deg, var(--dash-surface), var(--dash-surface-muted));
+  box-shadow: 0 14px 30px rgba(15,23,42,.07), inset 0 1px rgba(255,255,255,.76);
+}
+.brand-shell .dashboard-page .dashboard-reference-kpi strong,
+.brand-shell .dashboard-page .dashboard-reference-funnel header span,
+.brand-shell .dashboard-page .dashboard-reference-radar header span { color: var(--gd-content-text); }
+.brand-shell .dashboard-page .dashboard-reference-kpi p,
+.brand-shell .dashboard-page .dashboard-reference-funnel header small,
+.brand-shell .dashboard-page .dashboard-reference-radar header small { color: var(--gd-content-muted); }
+.brand-shell .dashboard-page .dashboard-reference-icon { color: var(--dash-accent); border-color: color-mix(in srgb, var(--dash-accent) 38%, transparent); background: var(--dash-accent-soft); }
+.brand-shell .dashboard-page .dashboard-reference-panels { gap: 14px; }
+.brand-shell .dashboard-page .dashboard-section-heading { margin-bottom: 10px; }
+.brand-shell .dashboard-page .dashboard-section-heading h2 { letter-spacing: -.02em; }
 .gd-funnel-kpi-icon { width: 1.35rem !important; height: 1.35rem !important; }
 .gd-funnel-kpi-value { margin-top: .6rem; font-size: clamp(1.55rem, 1.75vw, 2.05rem) !important; font-weight: 650; line-height: 1.05 !important; letter-spacing: -.025em; }
 .gd-funnel-kpi-detail { margin-top: .5rem; font-size: .7rem !important; line-height: 1.2; }
