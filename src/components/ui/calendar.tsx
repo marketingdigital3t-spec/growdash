@@ -11,6 +11,9 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      captionLayout="dropdown"
+      fromYear={2020}
+      toYear={new Date().getFullYear() + 1}
       className={cn("p-3", className)}
       classNames={{
         months: "flex flex-col gap-6 sm:flex-row sm:gap-5",

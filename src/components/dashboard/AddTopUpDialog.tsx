@@ -92,7 +92,7 @@ export function AddTopUpDialog({ open, onOpenChange, accountId, accountName }: P
                   {date ? format(date, "dd 'de' MMM yyyy", { locale: ptBR }) : "Selecionar"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="gd-calendar-popover w-auto p-0" align="start">
                 <Calendar
                   mode="single"
                   selected={date}

@@ -7879,6 +7879,51 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
 .gd-date-range-popover > div > div:last-child > div { color: rgba(255,255,255,.64); }
 .gd-date-range-popover > div > div:last-child button { min-width: 90px; border-radius: 8px; }
 .gd-date-range-popover > div > div:last-child button:last-child { border-color: #1687d8 !important; background: #1687d8 !important; color: #fff !important; box-shadow: 0 6px 14px rgba(22,135,216,.28); }
+
+/* The same Meta Ads surface is used by the smaller date controls (monthly
+   goals and manual top-ups). They use the shared Calendar primitive, so this
+   keeps their month controls, selected day and hover states identical without
+   changing their single-date behavior. */
+.gd-calendar-popover {
+  overflow: hidden !important;
+  border: 1px solid rgba(148,163,184,.32) !important;
+  border-radius: 14px !important;
+  background: #202020 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 24px 70px rgba(0,0,0,.38), 0 4px 16px rgba(0,0,0,.22) !important;
+}
+.gd-calendar-popover .rdp { padding: 18px 16px 14px !important; }
+.gd-calendar-popover .rdp-caption { height: 32px; border-bottom: 1px solid rgba(255,255,255,.12) !important; }
+.gd-calendar-popover .rdp-caption_dropdowns { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.gd-calendar-popover .rdp-caption_dropdowns select {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 3px 19px 3px 5px;
+}
+.gd-calendar-popover .rdp-caption_dropdowns select:hover { background: rgba(255,255,255,.08); }
+.gd-calendar-popover .rdp-caption_dropdowns select:focus-visible { outline: 2px solid #2396ff; outline-offset: 1px; }
+.gd-calendar-popover .rdp-caption_label,
+.gd-calendar-popover .rdp-head_cell,
+.gd-calendar-popover .rdp-day,
+.gd-calendar-popover .rdp-nav_button { color: #f8fafc !important; }
+.gd-calendar-popover .rdp-head_cell { color: rgba(255,255,255,.62) !important; font-size: 10px; }
+.gd-calendar-popover .rdp-day { height: 36px; width: 36px; }
+.gd-calendar-popover .rdp-day:not([aria-selected="true"]) { background: transparent !important; color: #f8fafc !important; }
+.gd-calendar-popover .rdp-day_outside:not([aria-selected="true"]) { color: rgba(255,255,255,.42) !important; }
+.gd-calendar-popover .rdp-day:not([aria-selected="true"]):hover,
+.gd-calendar-popover .rdp-day_outside:not([aria-selected="true"]):hover { background: rgba(255,255,255,.11) !important; color: #fff !important; }
+.gd-calendar-popover .rdp-day[aria-selected="true"] {
+  border-radius: 6px !important;
+  background: #1687d8 !important;
+  color: #fff !important;
+  box-shadow: 0 3px 9px rgba(22,135,216,.38);
+}
+.gd-calendar-popover .rdp-day_today { font-weight: 800; text-decoration: underline; text-decoration-color: rgba(255,255,255,.6); text-underline-offset: 4px; }
 @media (max-width: 767px) {
   .gd-date-range-presets { width: 100% !important; max-height: 220px !important; }
   .gd-date-range-popover .rdp-month { width: 286px; }
