@@ -280,16 +280,15 @@ function IntegrationsContent() {
       const response = await supabase.functions.invoke("delete-integration-account", {
         body: { provider: "meta", confirmation: "DESCONECTAR META" },
       });
-      // Older Supabase deployments do not yet understand the profile-level
-      // operation. Fall back to the owner-scoped update so disconnecting is
-      // still available while the Edge Function rolls out.
+      // Older deployments use the same non-destructive profile marker so
+      // every account disappears from the integration inventory immediately.
       if (response.error || response.data?.error) {
         const { error: fallbackError } = await supabase
           .from("ad_accounts")
-          .update({ access_token: "", connection_status: "disconnected", last_sync_error: null, last_sync_error_code: null })
+          .update({ access_token: "", connection_status: "disconnected", last_sync_error: null, last_sync_error_code: null, metadata: { connection_method: "disconnected", profile_disconnected: true, disconnected_at: new Date().toISOString() } })
           .eq("user_id", user?.id ?? "");
         if (fallbackError) throw response.error || new Error(response.data.error);
-        return { ok: true, message: "Perfil Meta desconectado. Os dados históricos foram preservados; você já pode conectar outro perfil." };
+        return { ok: true, message: "Perfil Meta desconectado. Todas as contas foram removidas da integração; os dados históricos foram preservados." };
       }
       return response.data;
     },
