@@ -5,9 +5,10 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 async function validSignature(rawBody: string, header: string | null, secret: string) {
   if (!header || !secret) return false;
+  if (!/^sha256=[a-f0-9]{64}$/i.test(header)) return false;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
   const expected = header.replace(/^sha256=/, "");
-  const bytes = new Uint8Array(expected.match(/.{1,2}/g)?.map((pair) => parseInt(pair, 16)) ?? []);
+  const bytes = new Uint8Array(expected.match(/.{2}/g)!.map((pair) => Number.parseInt(pair, 16)));
   return bytes.length === 32 && await crypto.subtle.verify("HMAC", key, bytes, new TextEncoder().encode(rawBody));
 }
 

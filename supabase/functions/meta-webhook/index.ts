@@ -7,10 +7,6 @@ const corsHeaders = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-function bytesToHex(bytes: ArrayBuffer) {
-  return Array.from(new Uint8Array(bytes)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 async function sha256(value: string) {
   return bytesToHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
 }
@@ -19,9 +15,11 @@ async function validSignature(raw: string, signature: string | null) {
   const secret = Deno.env.get("META_APP_SECRET");
   if (!secret) return false;
   if (!signature?.startsWith("sha256=")) return false;
+  const encoded = signature.slice(7);
+  if (!/^[a-f0-9]{64}$/i.test(encoded)) return false;
+  const expected = new Uint8Array(encoded.match(/.{2}/g)!.map((pair) => Number.parseInt(pair, 16)));
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const digest = bytesToHex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw)));
-  return digest === signature.slice(7);
+  return crypto.subtle.verify("HMAC", key, expected, new TextEncoder().encode(raw));
 }
 
 Deno.serve(async (req) => {
