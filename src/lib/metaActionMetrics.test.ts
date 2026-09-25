@@ -63,9 +63,9 @@ describe("Meta action metrics", () => {
       .toEqual({ forms: 0, site: 0, conversations: 16, total: 16 });
   });
 
-  it("reconhece lead de site retornado pelo pixel sem duplicar aliases", () => {
+  it("classifica lead de site retornado pelo pixel separadamente sem duplicar aliases", () => {
     expect(resolveMetaLeadActions({ "offsite_conversion.fb_pixel_lead": 50, lead: 50 }))
-      .toEqual({ forms: 50, site: 0, conversations: 0, total: 50 });
+      .toEqual({ forms: 0, site: 50, conversations: 0, total: 50 });
   });
 
   it("resolve site sem misturar com formulário ou lead auxiliar", () => {

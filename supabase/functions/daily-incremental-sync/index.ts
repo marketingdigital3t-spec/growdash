@@ -97,7 +97,7 @@ async function callFunction(
     } catch {
       parsed = { response: raw.slice(0, 4000) };
     }
-    const semanticFailure = parsed.success === false || parsed.ok === false;
+    const semanticFailure = parsed.success === false || parsed.ok === false || parsed.status === "partial" || parsed.status === "failed" || parsed.status === "blocked";
     return {
       // Some gateways normalize non-2xx function responses. Respect the
       // function's explicit success/ok contract as well as HTTP status.
@@ -127,7 +127,8 @@ function applyReportedFailure(result: FunctionResult): FunctionResult {
     ? body.accounts.some((account: any) => Boolean(account?.error) || (Array.isArray(account?.errors) && account.errors.length > 0))
     : false;
   const hasReportedFailure = errors.length > 0 || failedAccounts > 0 || skippedDisconnected > 0 || accountErrors;
-  return hasReportedFailure ? { ...result, ok: false } : result;
+  const nonSuccessStatus = ["partial", "failed", "blocked", "stale_snapshot"].includes(String(body.status || ""));
+  return hasReportedFailure || nonSuccessStatus ? { ...result, ok: false } : result;
 }
 
 async function mapWithConcurrency<T, R>(

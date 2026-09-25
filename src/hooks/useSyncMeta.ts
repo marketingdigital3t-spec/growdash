@@ -15,6 +15,7 @@ interface SyncParams {
 
 type SyncResponse = {
   success?: boolean;
+  status?: "success" | "partial" | "failed" | "blocked" | "stale_snapshot";
   synced?: number;
   accounts?: number;
   errors?: string[];
@@ -37,7 +38,7 @@ async function invokeSyncFunction(name: string, body: Record<string, unknown>): 
     throw Object.assign(new Error(formatEdgeFunctionError(details)), { details });
   }
   const data = (result.data ?? {}) as SyncResponse;
-  if (data.error || data.success === false) {
+  if (data.error || data.success === false || data.status === "failed" || data.status === "blocked") {
     throw Object.assign(new Error(data.error || data.errors?.join(" · ") || "A Meta recusou a sincronização."), {
       details: { needsReauth: Boolean(data.needs_reauth) },
     });
@@ -102,6 +103,8 @@ export function useSyncMeta() {
       }
       return {
         ...insights,
+        status: insights.status === "partial" || leads.status === "partial" || hourly.status === "partial" || leadsWarning || hourlyWarning ? "partial" : "success",
+        success: !insights.errors?.length && !leads.errors?.length && !hourly.errors?.length && !leadsWarning && !hourlyWarning,
         synced: Number(insights.synced ?? 0),
         accounts: Number(insights.accounts ?? 0),
         hourly_synced: Number(hourly.synced ?? 0),
@@ -122,8 +125,9 @@ export function useSyncMeta() {
       void queryClient.invalidateQueries({ queryKey: ["meta_leads"] });
       void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
       toast({
-        title: "Sincronização concluída!",
-        description: `${data.synced} registros diários e ${data.hourly_synced} horários em ${data.accounts} conta(s).${data.errors?.length ? ` ⚠️ ${data.errors.length} aviso(s).` : ""}`,
+        title: data.status === "partial" ? "Sincronização parcial" : "Sincronização concluída",
+        description: `${data.synced} registros diários e ${data.hourly_synced} horários em ${data.accounts} conta(s).${data.errors?.length ? ` ⚠️ ${data.errors.length} erro(s)/aviso(s).` : ""}`,
+        variant: data.status === "partial" ? "destructive" : undefined,
       });
     },
     onError: (e: Error & { details?: { needsReauth?: boolean } }) => {

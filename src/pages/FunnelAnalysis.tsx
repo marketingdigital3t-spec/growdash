@@ -413,7 +413,8 @@ export default function FunnelAnalysis() {
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,
-      actions.forms + actions.site,
+      actions.forms,
+      actions.site,
     );
     },
     [actionData?.metaLeadActions, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
@@ -463,7 +464,10 @@ export default function FunnelAnalysis() {
             const details = await edgeFunctionErrorDetails(error);
             throw new Error(formatEdgeFunctionError(details));
           }
-          if (data?.error) throw new Error(data.error);
+          if (data?.error || data?.success === false || data?.partial === true || (data?.status && data.status !== "success")) {
+            const details = Array.isArray(data?.errors) && data.errors.length ? `: ${data.errors.join(" · ")}` : "";
+            throw new Error(`${data?.error || data?.message || "Snapshot RD incompleto."}${details}`);
+          }
           rdResults.push({ status: "fulfilled", value: data });
         } catch (reason) {
           rdResults.push({ status: "rejected", reason });
@@ -483,10 +487,13 @@ export default function FunnelAnalysis() {
       await queryClient.invalidateQueries({ queryKey: ["sales"] });
       await refetch();
 
-      if (metaResult.status === "rejected" || rdFailures.length > 0) {
+      const metaPartial = metaResult.status === "fulfilled" && Boolean((metaResult.value as any)?.status && (metaResult.value as any).status !== "success");
+      if (metaResult.status === "rejected" || metaPartial || rdFailures.length > 0) {
         const metaMessage = metaResult.status === "rejected"
           ? (metaResult.reason instanceof Error ? metaResult.reason.message : String(metaResult.reason))
-          : "";
+          : metaPartial
+            ? ((metaResult.value as any)?.errors?.join(" · ") || "A Meta concluiu apenas parte da sincronização.")
+            : "";
         const rdMessage = rdFailures
           .map((result) => result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "")
           .filter(Boolean)
@@ -517,7 +524,8 @@ export default function FunnelAnalysis() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <HealthBadge />
+            <MetaHealthBadge accounts={visibleAccounts} selectedIds={selectedAccountIds} />
+            <RDHealthBadge />
             <Button onClick={handleSync} disabled={syncing || syncMeta.isPending || (!funnelId && visibleAccounts.length === 0)} variant="default" size="sm">
               <RefreshCw className={`h-4 w-4 mr-2 ${syncing || syncMeta.isPending ? "animate-spin" : ""}`} />
               Sincronizar Meta + RD
@@ -694,7 +702,7 @@ function FilterSelect({
   );
 }
 
-function HealthBadge() {
+function RDHealthBadge() {
   const navigate = useNavigate();
   const { data, isLoading } = useRDHealthCheck();
   if (isLoading || !data) return null;
@@ -710,6 +718,30 @@ function HealthBadge() {
       className={`${cls} cursor-pointer gap-1.5 px-2.5 py-1`}
       onClick={() => navigate("/configuracoes#rd-health")}
     >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </Badge>
+  );
+}
+
+type MetaHealthAccount = { id: string; name?: string | null; connection_status?: string | null; last_sync_error?: string | null; last_sync_success_at?: string | null };
+
+function MetaHealthBadge({ accounts, selectedIds }: { accounts: MetaHealthAccount[]; selectedIds: string[] }) {
+  const navigate = useNavigate();
+  const scoped = selectedIds.length ? accounts.filter((account) => selectedIds.includes(account.id)) : accounts;
+  if (!scoped.length) return null;
+  const hasBlocked = scoped.some((account) => ["disconnected", "blocked", "expired", "invalid"].includes(String(account.connection_status)));
+  const hasError = scoped.some((account) => ["error", "unknown"].includes(String(account.connection_status)) || Boolean(account.last_sync_error));
+  const allConnected = scoped.every((account) => account.connection_status === "connected" && !account.last_sync_error);
+  const state = allConnected ? "ok" : hasBlocked && !hasError ? "error" : "warning";
+  const map = {
+    ok: { Icon: CheckCircle2, cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30", label: "Meta OK" },
+    warning: { Icon: AlertTriangle, cls: "bg-amber-500/10 text-amber-600 border-amber-500/30", label: "Meta parcial" },
+    error: { Icon: XCircle, cls: "bg-red-500/10 text-red-600 border-red-500/30", label: "Meta bloqueada" },
+  } as const;
+  const { Icon, cls, label } = map[state];
+  return (
+    <Badge variant="outline" className={`${cls} cursor-pointer gap-1.5 px-2.5 py-1`} onClick={() => navigate("/integracoes")}>
       <Icon className="h-3.5 w-3.5" />
       {label}
     </Badge>

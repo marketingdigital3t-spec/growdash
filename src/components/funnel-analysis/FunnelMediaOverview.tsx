@@ -1,5 +1,5 @@
 import type { FunnelMediaMetrics } from "@/lib/funnelMediaMetrics";
-import { BadgeDollarSign, Eye, Gauge, MousePointerClick, Users } from "lucide-react";
+import { BadgeDollarSign, Eye, Gauge, MessageCircle, MousePointerClick, Users, Waypoints } from "lucide-react";
 import { metricDescription } from "@/lib/metricPresentation";
 import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 
@@ -14,7 +14,10 @@ export function FunnelMediaOverview({ metrics }: { metrics: FunnelMediaMetrics }
     { label: "Investimento Meta", value: fmtBRL(metrics.spend), detail: "Meta Ads", icon: BadgeDollarSign },
     { label: "Impressões", value: fmtInt(metrics.impressions), detail: `Alcance ${fmtInt(metrics.reach)}`, icon: Eye },
     { label: "Cliques no link", value: fmtInt(metrics.clicks), detail: `CTR ${fmtPct(metrics.ctr)}`, icon: MousePointerClick },
-    { label: "Leads totais Meta", value: fmtInt(metrics.metaLeads), detail: `${fmtInt(metrics.formLeads)} forms/site + ${fmtInt(metrics.conversations)} conversas · CPL ${fmtBRL(metrics.metaCpl)}`, icon: Users },
+    { label: "Leads totais Meta", value: fmtInt(metrics.metaLeads), detail: `${fmtInt(metrics.formLeads)} formulário + ${fmtInt(metrics.siteLeads)} site + ${fmtInt(metrics.conversations)} conversa · CPL ${fmtBRL(metrics.metaCpl)}`, icon: Users },
+    { label: "Formulários", value: fmtInt(metrics.formLeads), detail: `CPL ${fmtBRL(metrics.formLeads > 0 ? metrics.spend / metrics.formLeads : null)} · Meta`, icon: Waypoints },
+    { label: "Leads de site", value: fmtInt(metrics.siteLeads), detail: `CPL ${fmtBRL(metrics.siteLeads > 0 ? metrics.spend / metrics.siteLeads : null)} · Meta`, icon: MousePointerClick },
+    { label: "Conversas iniciadas", value: fmtInt(metrics.conversations), detail: `CPL ${fmtBRL(metrics.conversations > 0 ? metrics.spend / metrics.conversations : null)} · Meta`, icon: MessageCircle },
     { label: "CAC / ROAS", value: `${fmtBRL(metrics.cac)} / ${metrics.roas == null ? "—" : `${metrics.roas.toFixed(2)}x`}`, detail: `${metrics.sales} venda(s)`, icon: Gauge },
   ];
 

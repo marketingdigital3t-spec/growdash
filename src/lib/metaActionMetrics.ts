@@ -1,11 +1,12 @@
 export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
   // native form events and only use it as a fallback when none is present.
-  // Lead Ads, older Lead Ads aliases and website lead conversions are all
-  // exposed by Meta as result actions depending on campaign destination.
+  // Lead Ads and older Lead Ads aliases are exposed by Meta as result actions.
+  // Website conversions stay in the separate `site` group below.
   // Resolve them as aliases (max, never additive) so one submission is not
   // counted twice when Meta returns more than one representation.
-  forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead"],
+  forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"],
+  site: ["offsite_conversion.fb_pixel_lead", "offsite_conversion.lead"],
   // Older Meta accounts expose the same result as total_messaging_connection.
   // It is a fallback alias only; preferredValue() prevents additive counting
   // when a started-conversation alias is present in the same ad.
@@ -47,10 +48,10 @@ export function resolveMetaLeadActions(actionTotals?: Record<string, number>, si
   const nativeAliases = META_ACTION_TYPES.forms;
   const hasNativeAlias = nativeAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
   const hasConversationAlias = META_ACTION_TYPES.conversations.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
-  const hasSiteAlias = !!siteAction && Object.prototype.hasOwnProperty.call(actionTotals || {}, siteAction);
-  const site = siteAction && !nativeAliases.includes(siteAction as any) && siteAction !== "lead"
-    ? preferredValue(actionTotals, [siteAction])
-    : 0;
+  const configuredSiteAliases = siteAction && !nativeAliases.includes(siteAction as any) && siteAction !== "lead" ? [siteAction] : [];
+  const siteAliases = configuredSiteAliases.length ? configuredSiteAliases : META_ACTION_TYPES.site;
+  const hasSiteAlias = siteAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
+  const site = preferredValue(actionTotals, siteAliases);
   const forms = hasNativeAlias ? preferredValue(actionTotals, nativeAliases) : hasConversationAlias || hasSiteAlias ? 0 : preferredValue(actionTotals, ["lead"]);
   const conversations = preferredValue(actionTotals, META_ACTION_TYPES.conversations);
   return {

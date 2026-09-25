@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -182,17 +182,13 @@ export function useActionTotalsByAds(
           if (config.action_type) lpByAccount[config.ad_account_id] = config.action_type;
         }
       }
-      const nativeAliases = new Set<string>(META_ACTION_TYPES.forms);
       for (const adId of allowedIds) {
         const actions = totalsByAd[adId] || {};
-        const resolved = resolveMetaLeadActions(actions);
         const accountId = resolvedAccountByAd[adId] || "";
         const lpAction = lpByAccount[accountId];
-        const site = lpAction && !nativeAliases.has(lpAction) && lpAction !== "lead"
-          ? Math.max(0, Number(actions[lpAction] || 0))
-          : 0;
+        const resolved = resolveMetaLeadActions(actions, lpAction);
         metaLeadActions.forms += resolved.forms;
-        metaLeadActions.site += site;
+        metaLeadActions.site += resolved.site;
         metaLeadActions.conversations += resolved.conversations;
         if (accountId) {
           for (const [date, actions] of Object.entries(dailyByAd[adId] || {})) {

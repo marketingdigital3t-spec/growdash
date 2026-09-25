@@ -5,11 +5,13 @@ export interface FunnelMediaMetrics {
   impressions: number;
   reach: number;
   clicks: number;
-  /** Leads de formulário/site reportados nos insights da Meta. */
+  /** Leads nativos de formulário da Meta. */
   formLeads: number;
+  /** Conversões de lead no site atribuídas pela Meta. */
+  siteLeads: number;
   /** Conversas iniciadas por anúncios Meta no período selecionado. */
   conversations: number;
-  /** Aquisições Meta: leads de formulário/site + conversas iniciadas. */
+  /** Aquisições Meta: formulário + site + conversas iniciadas. */
   metaLeads: number;
   rdLeads: number;
   sales: number;
@@ -34,6 +36,7 @@ export function computeFunnelMediaMetrics(
   sales: number,
   revenue: number,
   formLeadsOverride?: number,
+  siteLeadsOverride?: number,
 ): FunnelMediaMetrics {
   const totals = insights.reduce(
     (acc, row) => {
@@ -51,11 +54,13 @@ export function computeFunnelMediaMetrics(
   // `insights.leads` column can be stale after an account is resynced and was
   // the source of under-counts (e.g. 7 shown vs 13 forms in Ads Manager).
   const formLeads = formLeadsOverride == null ? totals.metaLeads : Math.max(0, Number(formLeadsOverride) || 0);
-  const metaLeads = formLeads + safeConversations;
+  const siteLeads = siteLeadsOverride == null ? 0 : Math.max(0, Number(siteLeadsOverride) || 0);
+  const metaLeads = formLeads + siteLeads + safeConversations;
 
   return {
     ...totals,
     formLeads,
+    siteLeads,
     conversations: safeConversations,
     metaLeads,
     rdLeads,
