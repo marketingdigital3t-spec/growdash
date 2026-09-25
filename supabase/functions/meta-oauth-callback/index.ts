@@ -200,10 +200,13 @@ Deno.serve(async (req) => {
         timezone_name: account.timezone_name ? String(account.timezone_name).slice(0, 100) : null,
         timezone_offset_hours_utc: Number.isFinite(Number(account.timezone_offset_hours_utc)) ? Number(account.timezone_offset_hours_utc) : null,
         metadata: { connection_method: "oauth", connected_at: new Date().toISOString() },
-        // A profile refresh must not silently deactivate accounts that the
-        // operator already enabled. New accounts remain disabled until the
-        // operator explicitly activates them in Growdash.
-        connection_status: existing?.connection_status || "disconnected",
+        // A successful OAuth authorization is authoritative for accounts that
+        // were expired/error. Keep an account explicitly disabled by the
+        // operator disabled, but do not leave a freshly authorized account
+        // stuck showing "reconnection required" because of its old status.
+        connection_status: existing?.connection_status === "disconnected"
+          ? "disconnected"
+          : "connected",
         last_sync_error: null,
         last_sync_error_code: null,
         oauth_health_status: "unchecked",
