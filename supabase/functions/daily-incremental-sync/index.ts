@@ -51,7 +51,17 @@ function incrementalWindow(now: Date, previousEnd?: string | null): SyncWindow {
   const end = now;
   // Re-read a small overlap so a provider that updates a record at the edge of
   // a window cannot leave a gap. The upserts/deduplication make this safe.
-  const watermark = previousEnd ? new Date(previousEnd) : new Date(end.getTime() - 5 * 60_000);
+  const parsedPrevious = previousEnd ? new Date(previousEnd) : null;
+  // A stale successful run must never make the next five-minute cycle scan
+  // days of history. Partial runs still advance the watermark for the
+  // sources that completed; their explicit status remains visible to the UI
+  // and unresolved records are retried by webhook/manual reconciliation.
+  const previousIsRecent = parsedPrevious && Number.isFinite(parsedPrevious.getTime())
+    ? end.getTime() - parsedPrevious.getTime() <= 15 * 60_000
+    : false;
+  const watermark = previousIsRecent && parsedPrevious
+    ? parsedPrevious
+    : new Date(end.getTime() - 5 * 60_000);
   // Keep a small overlap around the five-minute cadence. Upserts make the
   // overlap idempotent and prevent edge events from being lost.
   const start = new Date(watermark.getTime() - 5 * 60_000);
@@ -217,8 +227,9 @@ Deno.serve(async (req) => {
     const { data: previousRun } = await admin
       .from("daily_incremental_sync_runs")
       .select("window_end,finished_at")
-      .eq("status", "success")
+      .in("status", ["success", "partial"])
       .not("window_end", "is", null)
+      .not("finished_at", "is", null)
       .order("window_end", { ascending: false })
       .limit(1)
       .maybeSingle();
