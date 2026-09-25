@@ -1429,11 +1429,12 @@ Deno.serve(async (req) => {
 
         while (page <= maxPages) {
           pagesProcessed++;
-          // Ganhos podem ter sido criados meses antes e fechados no período
-          // selecionado. O RD não oferece um filtro confiável por closed_at
-          // nesta rota; por isso o segmento ganho percorre o histórico e é
-          // filtrado localmente pela data efetiva de fechamento.
-          const segmentPeriodParams = segment.won ? "" : periodParams;
+          // O CRM replica o filtro "Data de criação" do RD. Todos os status
+          // usam o mesmo intervalo; varrer o histórico inteiro para o
+          // segmento ganho a cada ciclo de cinco minutos causava 429 e ainda
+          // podia deixar o snapshot incompleto. Vendas por closed_at são
+          // calculadas separadamente pela reconciliação de métricas.
+          const segmentPeriodParams = periodParams;
           const url = `https://crm.rdstation.com/api/v1/deals?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&page=${page}&limit=200&order=created_at&direction=desc${segmentPeriodParams}${segment.params}`;
           const r = await fetchWithRetry(url);
           if (!r.ok) {
@@ -1503,13 +1504,19 @@ Deno.serve(async (req) => {
                 return new Date((deal.created_at || deal.updated_at) || 0).getTime();
               })
               .filter((value: number) => Number.isFinite(value) && value > 0);
-            // Do not stop at the creation-date boundary. A deal created
-            // before the selected interval may have entered a won stage in
-            // the interval, and the RD list endpoint can return it through
-            // the non-won segment. Drain the segment to its real API end;
-            // full-history runs remain unbounded and bounded runs still use
-            // their explicit page budget.
+            // The RD endpoint is ordered by created_at desc. Once a complete
+            // page is older than the requested start, later pages cannot
+            // contain records in this CRM snapshot. Stopping here is what
+            // makes the five-minute incremental cycle bounded and prevents
+            // rate-limit storms while preserving every in-range deal.
+            const pageBeforeRange = Boolean(
+              startMs && timestamps.length > 0 && timestamps.every((value) => value < startMs),
+            );
             if (deals.length < 200) {
+              segmentComplete = true;
+              break;
+            }
+            if (pageBeforeRange) {
               segmentComplete = true;
               break;
             }

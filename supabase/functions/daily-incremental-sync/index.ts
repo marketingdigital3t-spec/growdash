@@ -75,10 +75,11 @@ async function callFunction(
   serviceKey: string,
   functionName: string,
   body: Record<string, unknown>,
+  timeoutMs = 45_000,
 ): Promise<FunctionResult> {
   const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${baseUrl}/functions/v1/${functionName}`, {
       method: "POST",
@@ -298,9 +299,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Keep a low concurrency to respect RD API rate limits while avoiding one
-    // slow funnel blocking all other connected accounts.
-    const rdResults = await mapWithConcurrency(rdTargets, 2, async (funnel) => {
+    // RD applies a shared rate limit per connection. Serialize funnels within
+    // one connection, while allowing independent connections to progress in
+    // parallel so the five-minute cycle does not get stuck behind one account.
+    const targetsByConnection = Array.from(rdTargets.reduce((groups, target) => {
+      const key = target.rd_connection_id || `legacy:${target.user_id}`;
+      const group = groups.get(key) || [];
+      group.push(target);
+      groups.set(key, group);
+      return groups;
+    }, new Map<string, RdTarget[]>()).values());
+    const syncTarget = async (funnel: RdTarget) => {
       const result = await callFunction(
         supabaseUrl,
         serviceKey,
@@ -315,6 +324,7 @@ Deno.serve(async (req) => {
           trigger_source: "five_minute_incremental",
           rd_connection_id: funnel.rd_connection_id,
         },
+        120_000,
       );
       return {
         funnelId: funnel.id,
@@ -322,7 +332,17 @@ Deno.serve(async (req) => {
         userId: funnel.user_id,
         ...result,
       };
-    });
+    };
+    const groupedResults = await mapWithConcurrency(
+      targetsByConnection,
+      Math.min(4, Math.max(1, targetsByConnection.length)),
+      async (group) => {
+        const results = [];
+        for (const funnel of group) results.push(await syncTarget(funnel));
+        return results;
+      },
+    );
+    const rdResults = groupedResults.flat();
 
     // Stage changes on existing deals arrive through the RD webhook. The
     // heavyweight open-deal reconciliation is intentionally opt-in so it
