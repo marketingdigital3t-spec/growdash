@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Bot, CheckCircle2, Clock3, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useToast } from "@/hooks/use-toast";
 import { PageHeading } from "@/growdash/shared";
 
 type AgentRow = { id: string; role: string; name: string; status: string; permissions: Record<string, unknown> };
@@ -12,6 +13,7 @@ const roleLabels: Record<string, string> = { ceo: "CEO Orquestrador", backend_se
 
 export default function AgentOfficeControlPage() {
   const { data: workspace, isLoading: loadingWorkspace, error: workspaceError } = useWorkspace();
+  const { toast } = useToast();
   const owner = workspace?.role === "owner";
   const query = useQuery({
     queryKey: ["agent-office-control", workspace?.id],
@@ -33,7 +35,12 @@ export default function AgentOfficeControlPage() {
   });
 
   const runNow = async () => {
-    await supabase.functions.invoke("agent-office-orchestrator", { body: { trigger: "manual" } });
+    const { data, error } = await supabase.functions.invoke("agent-office-orchestrator", { body: { trigger: "manual" } });
+    if (error || data?.status === "failed") {
+      toast({ title: "Falha ao executar ciclo", description: error?.message || "O Agent Office registrou uma falha interna.", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Ciclo executado", description: data?.status === "partial" ? "O ciclo terminou com achados ou falhas parciais." : "As verificações determinísticas foram concluídas." });
     await query.refetch();
   };
 
