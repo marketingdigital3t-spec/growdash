@@ -109,7 +109,11 @@ Deno.serve(async (req) => {
         .neq("id", run.id)
         .order("started_at", { ascending: false })
         .limit(2);
-      const consecutiveFailures = (previousRuns || []).length === 2 && (previousRuns || []).every((item: { status: string }) => ["failed", "partial", "blocked"].includes(item.status));
+      // A partial run is an expected outcome when deterministic checks find
+      // a real Meta/RD issue; counting it as an infrastructure failure would
+      // make this alert self-perpetuate forever. Only consecutive technical
+      // failures should create the reliability finding.
+      const consecutiveFailures = (previousRuns || []).length === 2 && (previousRuns || []).every((item: { status: string }) => item.status === "failed");
       if (consecutiveFailures) findings.push({ fingerprint: `three-failures:${workspace.id}:${bucket()}`, severity: "critical", category: "reliability", source: "agent_office_runs", description: "Três ciclos consecutivos do Agent Office falharam ou ficaram parciais.", evidence: { previous_statuses: (previousRuns || []).map((item: { status: string }) => item.status), alert: true } });
       for (const finding of findings) {
         const role = finding.category === "meta" || finding.category === "rd" || finding.category === "sync" ? "backend_meta_rd" : "backend_security";
