@@ -30,13 +30,13 @@ describe("CRM consolidated pipeline", () => {
     ]);
   });
 
-  it("excludes only the legacy Dr Junior stage from the Ranniely Aluna funnel", () => {
-    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Leads Antigos do Junior")).toBe(true);
+  it("does not exclude historical stages from the canonical CRM history", () => {
+    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Leads Antigos do Junior")).toBe(false);
     expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Paciente modelo", "Leads antigos do Dr Junior")).toBe(false);
     expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Novos leads")).toBe(false);
   });
 
-  it("applies the legacy exclusion to every dashboard data source", () => {
+  it("retains historical stages in every dashboard data source", () => {
     const rows = filterOperationalRDDeals([
       { rd_funnel_id: "aluna", rd_stage_name: "Leads Antigos do Junior", id: "legacy" },
       { rd_funnel_id: "aluna", rd_stage_name: "Venda Realizada", id: "sale" },
@@ -46,10 +46,10 @@ describe("CRM consolidated pipeline", () => {
       { id: "model", name: "Dra. Ranniely Silva – Paciente Modelo" },
     ]);
 
-    expect(rows.map((row) => row.id)).toEqual(["sale", "model"]);
+    expect(rows.map((row) => row.id)).toEqual(["legacy", "sale", "model"]);
   });
 
-  it("removes matching canonical revenue IDs and the empty legacy column", () => {
+  it("does not remove historical revenue IDs or stages", () => {
     const funnels = [
       { id: "aluna", name: "Dra. Ranniely Silva – Aluna" },
       { id: "model", name: "Dra. Ranniely Silva – Paciente Modelo" },
@@ -58,10 +58,10 @@ describe("CRM consolidated pipeline", () => {
       { rd_funnel_id: "aluna", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "legacy" },
       { rd_funnel_id: "model", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "valid" },
     ];
-    expect(excludedOperationalRDDealIds(deals, funnels)).toEqual(new Set(["legacy"]));
+    expect(excludedOperationalRDDealIds(deals, funnels)).toEqual(new Set());
     expect(filterOperationalRDFunnelStages([
       { rd_funnel_id: "aluna", name: "Leads Antigos do Junior" },
       { rd_funnel_id: "aluna", name: "Novos Leads" },
-    ], funnels).map((stage) => stage.name)).toEqual(["Novos Leads"]);
+    ], funnels).map((stage) => stage.name)).toEqual(["Leads Antigos do Junior", "Novos Leads"]);
   });
 });

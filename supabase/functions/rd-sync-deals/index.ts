@@ -5,6 +5,17 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function bearerRole(authHeader: string) {
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  try {
+    const payload = token.split(".")[1];
+    return payload ? JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))).role : null;
+  } catch {
+    return null;
+  }
+}
 
 function normalize(s: string) {
   return s
@@ -15,19 +26,6 @@ function normalize(s: string) {
     .replace(/[-_]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-// Imported records in this legacy RD stage belong to a previous operation.
-// They must never enter the operational Aluna funnel or create a sale in
-// Growdash. The scope is deliberately strict: same stage names in other
-// Ranniely funnels remain valid.
-function isExcludedLegacyRannielyStage(funnelName: string | null | undefined, stageName: string | null | undefined) {
-  const funnel = normalize(String(funnelName || ""));
-  const stage = normalize(String(stageName || ""));
-  return funnel.includes("ranniely")
-    && funnel.includes("aluna")
-    && stage.includes("leads antigos")
-    && stage.includes("junior");
 }
 
 function keyNorm(s: string) {
@@ -493,17 +491,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Service-role path (cron/orchestrator): trust supplied user_id when bearer matches SERVICE_ROLE_KEY
+    // Internal path (cron/orchestrator): trust supplied user_id only when the
+    // caller proves either the service role or the configured cron secret.
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const cronSecret = Deno.env.get("CRON_SECRET") || "";
+    const suppliedCronSecret = req.headers.get("x-cron-secret") ||
+      (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "");
+    const bearerIsServiceRole = bearerRole(authHeader) === "service_role";
     const isServiceCall = !!(
       cron_trigger &&
       service_user_id &&
-      serviceKey &&
-      authHeader === `Bearer ${serviceKey}`
+      ((serviceKey && authHeader === `Bearer ${serviceKey}`) || bearerIsServiceRole ||
+        (cronSecret && suppliedCronSecret === cronSecret))
     );
 
     if (isServiceCall) {
       userId = String(service_user_id);
+      if (!UUID_RE.test(userId)) {
+        return new Response(JSON.stringify({ error: "service_user_id inválido" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     } else {
       caller = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
         global: { headers: { Authorization: authHeader } },
@@ -853,26 +862,6 @@ Deno.serve(async (req) => {
       return { ...detail, _contacts: dealContacts };
     }
 
-    async function removeExcludedLegacyDeal(rdDealId: string) {
-      // Marking a possibly existing sale as cancelled preserves its external
-      // audit trail but removes it from every realized-sales aggregation.
-      const { error: saleError } = await admin
-        .from("sales")
-        .update({ status: "cancelled", attribution_reason: "excluded_legacy_ranniely_aluna_stage" })
-        .eq("user_id", userId!)
-        .eq("rd_funnel_id", funnel!.id)
-        .eq("rd_deal_id", rdDealId);
-      if (saleError) throw saleError;
-
-      const { error: dealError } = await admin
-        .from("rd_deals")
-        .delete()
-        .eq("user_id", userId!)
-        .eq("rd_funnel_id", funnel!.id)
-        .eq("rd_deal_id", rdDealId);
-      if (dealError) throw dealError;
-    }
-
     async function persistDeal(d: any) {
       const rdDealId = String(d.id || d._id);
       const amountTotal = parseFloat(d.amount_total || d.amount || "0") || 0;
@@ -886,12 +875,6 @@ Deno.serve(async (req) => {
         !won && (Boolean(stageId && stageLostMap.get(stageId)) || d.deal_lost_reason != null);
       const bucket = bucketFromStage(stageName, won, lost);
       const lostReason = d.deal_lost_reason?.name || d.deal_lost_reason || null;
-
-      if (isExcludedLegacyRannielyStage(funnel!.name, stageName)) {
-        await removeExcludedLegacyDeal(rdDealId);
-        totalSkipped++;
-        return;
-      }
 
       const baseContact = d.contact || d.deal_contact || {};
       const inlineContacts = asArray(d.contacts ?? d.set_contacts ?? d.deal_contacts);
@@ -1244,20 +1227,9 @@ Deno.serve(async (req) => {
         hydratedItems.push(...items);
       }
 
-      // Analytics refreshes use the paginated endpoint rather than
-      // `persistDeal`. Apply the same exclusion here so this alternative path
-      // cannot recreate the imported legacy records.
-      const excludedLegacyIds = hydratedItems
-        .filter((deal) => isExcludedLegacyRannielyStage(funnel!.name, deal.deal_stage?.name || null))
-        .map((deal) => String(deal.id || deal._id || ""))
-        .filter(Boolean);
-      for (const rdDealId of excludedLegacyIds) {
-        await removeExcludedLegacyDeal(rdDealId);
-        totalSkipped++;
-      }
-      const operationalItems = hydratedItems.filter(
-        (deal) => !isExcludedLegacyRannielyStage(funnel!.name, deal.deal_stage?.name || null),
-      );
+      // Analytics refreshes use the paginated endpoint and retain the complete
+      // RD history, including stages imported from previous operations.
+      const operationalItems = hydratedItems;
 
       const rows = operationalItems.map((d) => {
         const rdDealId = String(d.id || d._id);

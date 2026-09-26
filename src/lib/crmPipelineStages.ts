@@ -34,27 +34,15 @@ function normalized(value: string | null | undefined) {
     .trim();
 }
 
-/**
- * This imported legacy list belongs to a previous operation and must not be
- * presented as a live stage of Dra. Ranniely's Aluna pipeline. It is hidden in
- * Growdash only; the RD record remains intact for audit and recovery.
- */
+/** Historical RD stages remain visible in the canonical CRM history. */
 export function isExcludedLegacyRannielyStage(funnelName: string | null | undefined, stageName: string | null | undefined) {
-  const funnel = normalized(funnelName);
-  const stage = normalized(stageName);
-  return funnel.includes("ranniely")
-    && funnel.includes("aluna")
-    && stage.includes("leads antigos")
-    // RD names the legacy stage "Leads Antigos do Junior" (without "Dr").
-    // Match the stable identifier, not the honorific, so all 82 imported
-    // records stay outside Growdash operational totals.
-    && stage.includes("junior");
+  void funnelName;
+  void stageName;
+  return false;
 }
 
 /**
- * Applies the operational funnel policy consistently outside the CRM board.
- * The RD record itself is retained; only the imported legacy stage is omitted
- * from business metrics, dashboards and reports.
+ * Keeps every RD deal in operational metrics, including historical stages.
  */
 export function filterOperationalRDDeals<T extends RDDealStageSource>(deals: T[], funnels: RDFunnelStageSource[]) {
   const funnelNameById = new Map(funnels.map((funnel) => [funnel.id, funnel.name]));
@@ -64,10 +52,7 @@ export function filterOperationalRDDeals<T extends RDDealStageSource>(deals: T[]
   ));
 }
 
-/**
- * Revenue is persisted separately from the RD pipeline. Keep the corresponding
- * sale rows out of KPIs when their current deal belongs to an excluded stage.
- */
+/** Kept for API compatibility; no historical RD deal is excluded. */
 export function excludedOperationalRDDealIds(deals: RDDealStageSource[], funnels: RDFunnelStageSource[]) {
   const funnelNameById = new Map(funnels.map((funnel) => [funnel.id, funnel.name]));
   return new Set(deals.flatMap((deal) => {
@@ -81,7 +66,7 @@ export function excludedOperationalRDDealIds(deals: RDDealStageSource[], funnels
 
 type RDFunnelStageRecord = { rd_funnel_id: string | null; name: string | null };
 
-/** The excluded legacy stage must not remain as an empty pipeline column. */
+/** Retains all stages returned by RD, including historical stages. */
 export function filterOperationalRDFunnelStages<T extends RDFunnelStageRecord>(stages: T[], funnels: RDFunnelStageSource[]) {
   const funnelNameById = new Map(funnels.map((funnel) => [funnel.id, funnel.name]));
   return stages.filter((stage) => !isExcludedLegacyRannielyStage(
