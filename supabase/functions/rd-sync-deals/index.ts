@@ -1478,6 +1478,14 @@ Deno.serve(async (req) => {
                 return (!startMs || timestamp >= startMs) && (!endMs || timestamp <= endMs);
               })
               .slice(0, Math.max(0, maxAnalyticsDeals - totalDeals));
+            // Some RD accounts ignore one or more pagination/status query
+            // parameters and repeat a page already consumed by the previous
+            // segment. Stop that segment when it contributes no new IDs;
+            // otherwise a full-history run can loop forever at page 2+.
+            if (rangedDeals.length === 0) {
+              segmentComplete = true;
+              break;
+            }
             await persistAnalyticsBatch(rangedDeals);
             totalDeals += rangedDeals.length;
 
