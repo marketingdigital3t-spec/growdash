@@ -14,8 +14,16 @@ type Finding = {
 
 async function resolveCaller(req: Request) {
   const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const cronHeader = req.headers.get("x-cron-secret");
   const secret = Deno.env.get("AGENT_OFFICE_CRON_SECRET") || Deno.env.get("CRON_SECRET");
-  if (bearer === serviceKey || (!!secret && req.headers.get("x-cron-secret") === secret)) return { kind: "system" as const, userId: null };
+  let validCron = Boolean(secret && cronHeader === secret);
+  // The scheduled job currently sources its secret from the private sync
+  // ledger. Keep that contract valid without exposing the value to clients.
+  if (!validCron && cronHeader) {
+    const { data: config } = await admin.schema("private").from("daily_incremental_sync_config").select("cron_secret").eq("singleton", true).maybeSingle();
+    validCron = Boolean(config?.cron_secret && cronHeader === config.cron_secret);
+  }
+  if (bearer === serviceKey || validCron) return { kind: "system" as const, userId: null };
   if (!bearer) return null;
   const caller = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") || serviceKey, { global: { headers: { Authorization: `Bearer ${bearer}` } } });
   const { data: { user } } = await caller.auth.getUser();
