@@ -238,6 +238,9 @@ function IntegrationsContent() {
             } catch (error) {
               failures.push(`RD Station (${funnel.name}): ${error instanceof Error ? error.message : "falha na sincronização"}`);
             }
+            // Keep a short gap between full-history requests that share the
+            // same RD token; this avoids turning one click into a burst.
+            if (funnel !== activeRDFunnels.at(-1)) await new Promise((resolve) => setTimeout(resolve, 1_000));
           }
           if (syncedFunnels) completed.push(`RD Station (${syncedFunnels} funil${syncedFunnels > 1 ? "is" : ""})`);
         }

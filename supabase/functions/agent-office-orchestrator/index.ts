@@ -56,12 +56,12 @@ async function ensureAgents(workspace: { id: string; owner_id: string }) {
 async function collectFindings(workspaceId: string): Promise<Finding[]> {
   const findings: Finding[] = [];
   const { data: accounts, error: accountsError } = await admin.from("ad_accounts")
-    .select("id,name,connection_status,last_sync_at,last_error,metadata").eq("workspace_id", workspaceId);
+    .select("id,name,connection_status,last_sync_success_at,last_sync_error,metadata").eq("workspace_id", workspaceId);
   if (accountsError) findings.push({ fingerprint: `meta-query:${workspaceId}`, severity: "high", category: "meta", source: "ad_accounts", description: "Não foi possível consultar as contas Meta.", evidence: { code: accountsError.code || "QUERY_ERROR" } });
   for (const account of accounts || []) {
     if (account.connection_status === "disconnected") continue;
     if (account.connection_status !== "connected") findings.push({ fingerprint: `meta-status:${account.id}`, severity: "high", category: "meta", source: "ad_accounts", account_id: account.id, description: `Conta Meta ${account.name || account.id} está ${account.connection_status || "sem estado"}.`, evidence: { status: account.connection_status || null, last_error: account.last_error || null } });
-    if (account.last_error) findings.push({ fingerprint: `meta-error:${account.id}:${String(account.last_error).slice(0, 80)}`, severity: "medium", category: "meta", source: "ad_accounts", account_id: account.id, description: `A última sincronização da conta Meta registrou erro.`, evidence: { last_error: String(account.last_error).slice(0, 500) } });
+    if (account.last_sync_error) findings.push({ fingerprint: `meta-error:${account.id}:${String(account.last_sync_error).slice(0, 80)}`, severity: "medium", category: "meta", source: "ad_accounts", account_id: account.id, description: `A última sincronização da conta Meta registrou erro.`, evidence: { last_error: String(account.last_sync_error).slice(0, 500) } });
   }
 
   const { data: connections, error: connectionError } = await admin.from("rd_account_connections")

@@ -337,6 +337,9 @@ function bucketFromStage(
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let rdRequestTail: Promise<void> = Promise.resolve();
+let rdNextRequestAt = 0;
+const RD_MIN_REQUEST_INTERVAL_MS = 300;
 
 /** Converte ISO timestamp para YYYY-MM-DD no fuso America/Sao_Paulo (BRT, UTC-3).
  *  Evita que vendas fechadas após 21h BRT sejam contadas no dia seguinte. */
@@ -351,15 +354,23 @@ function toBrtDateString(iso: string): string {
 const metrics = { retries: 0, errors: 0, details: 0, contacts: 0 };
 
 async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
-  const backoffs = [500, 1500, 4000];
+  const backoffs = [5_000, 15_000, 30_000, 60_000];
   let lastErr: any = null;
   for (let i = 0; i < attempts; i++) {
     try {
+      let release!: () => void;
+      const turn = rdRequestTail;
+      rdRequestTail = new Promise<void>((resolve) => { release = resolve; });
+      await turn;
+      const spacing = Math.max(0, rdNextRequestAt - Date.now());
+      if (spacing > 0) await sleep(spacing);
+      rdNextRequestAt = Date.now() + RD_MIN_REQUEST_INTERVAL_MS;
+      release();
       const r = await fetch(url);
       if (r.ok) return r;
       if ([429, 500, 502, 503, 504].includes(r.status) && i < attempts - 1) {
-        const ra = parseInt(r.headers.get("Retry-After") || "0", 10);
-        const wait = ra > 0 ? ra * 1000 : backoffs[i];
+        const retryAfter = Number(r.headers.get("Retry-After") || "0");
+        const wait = retryAfter > 0 ? retryAfter * 1000 : backoffs[i];
         metrics.retries++;
         console.log(
           `[retry] ${r.status} on ${url.split("?")[0]} — waiting ${wait}ms (attempt ${i + 1}/${attempts})`,
@@ -1455,7 +1466,7 @@ Deno.serve(async (req) => {
                 segment: segment.name,
               }),
               {
-                status: 502,
+                status: r.status === 429 ? 429 : 502,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
               },
             );
