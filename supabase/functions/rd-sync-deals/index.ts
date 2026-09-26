@@ -1552,19 +1552,23 @@ Deno.serve(async (req) => {
       // intervalo com sucesso reconciliamos esses registros locais antigos.
       // Assim, a contagem por etapa representa o snapshot atual exibido pelo
       // RD para a mesma conta e o mesmo filtro de data.
-      if (analytics_mode && start_date && end_date && analyticsRangeComplete && !fullHistoryRequested) {
+      if (analytics_mode && analyticsRangeComplete && (fullHistoryRequested || (start_date && end_date && !fullHistoryRequested))) {
         const localIds: string[] = [];
         const pageSize = 1000;
         // Paginate until PostgREST returns a short page. A fixed page count
         // silently left stale records above 50k deals and made reconciliation
         // report a false snapshot for large funnels.
         for (let localPage = 0; ; localPage++) {
-          const { data: localRows, error: localError } = await admin
+          let localQuery = admin
             .from("rd_deals")
             .select("rd_deal_id")
-            .eq("rd_funnel_id", funnel.id)
-            .gte("lead_created_at", `${start_date}T00:00:00-03:00`)
-            .lte("lead_created_at", `${end_date}T23:59:59.999-03:00`)
+            .eq("rd_funnel_id", funnel.id);
+          if (!fullHistoryRequested && start_date && end_date) {
+            localQuery = localQuery
+              .gte("lead_created_at", `${start_date}T00:00:00-03:00`)
+              .lte("lead_created_at", `${end_date}T23:59:59.999-03:00`);
+          }
+          const { data: localRows, error: localError } = await localQuery
             .order("rd_deal_id", { ascending: true })
             .range(localPage * pageSize, localPage * pageSize + pageSize - 1);
           if (localError) throw localError;
