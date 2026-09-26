@@ -23,11 +23,12 @@ async function invokeFn(name: string, body: Record<string, unknown> = {}) {
 }
 
 async function runJob(jobName: string, fn: () => Promise<{ processed: number; metadata?: Record<string, unknown> }>) {
-  const { data: run } = await admin
+  const { data: run, error: runInsertError } = await admin
     .from("job_runs")
     .insert({ job_name: jobName, status: "running", trigger_source: "cron" })
     .select("id")
     .single();
+  if (runInsertError || !run) throw runInsertError || new Error(`Não foi possível registrar o job ${jobName}`);
   const runId = run?.id;
   try {
     const { processed, metadata } = await fn();
@@ -65,24 +66,38 @@ Deno.serve(async (req) => {
   }
 
   const results: unknown[] = [];
+  const { data: rdUsers, error: rdUsersError } = await admin
+    .from("rd_account_connections")
+    .select("user_id")
+    .eq("status", "connected")
+    .not("api_token", "is", null);
+  if (rdUsersError) return new Response(JSON.stringify({ ok: false, error: "Não foi possível listar conexões RD", details: rdUsersError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const serviceUserIds = Array.from(new Set((rdUsers || []).map((row) => row.user_id).filter(Boolean)));
 
   // 1) Reconcile sales <-> RD deals (full backfill window)
   results.push(await runJob("reconcile-sales-rd", async () => {
-    const r = await invokeFn("reconcile-sales-rd", { days: 90 });
-    if (!r.ok) throw new Error(`reconcile failed: ${r.status} ${JSON.stringify(r.data)}`);
-    const created = (r.data as any)?.created ?? 0;
-    return { processed: created, metadata: r.data as any };
+    let processed = 0;
+    const metadata: Record<string, unknown> = { users: serviceUserIds.length, results: [] };
+    for (const service_user_id of serviceUserIds) {
+      const r = await invokeFn("reconcile-sales-rd", { days: 90, service_user_id });
+      if (!r.ok) throw new Error(`reconcile failed for ${service_user_id}: ${r.status} ${JSON.stringify(r.data)}`);
+      processed += Number((r.data as any)?.created ?? 0);
+      (metadata.results as unknown[]).push({ service_user_id, result: r.data });
+    }
+    return { processed, metadata };
   }));
 
   // 2) Enrich states from RD — loop up to 10 batches (≈2000 deals)
   results.push(await runJob("rd-enrich-states", async () => {
     let total = 0;
-    for (let i = 0; i < 10; i++) {
-      const r = await invokeFn("rd-enrich-states", { limit: 200 });
-      if (!r.ok) throw new Error(`enrich failed: ${r.status}`);
-      const updated = (r.data as any)?.updated ?? 0;
-      total += updated;
-      if (updated < 50) break; // nothing significant left
+    for (const service_user_id of serviceUserIds) {
+      for (let i = 0; i < 10; i++) {
+        const r = await invokeFn("rd-enrich-states", { limit: 200, service_user_id });
+        if (!r.ok) throw new Error(`enrich failed for ${service_user_id}: ${r.status}`);
+        const updated = (r.data as any)?.updated ?? 0;
+        total += updated;
+        if (updated < 50) break; // nothing significant left
+      }
     }
     return { processed: total };
   }));
@@ -114,7 +129,9 @@ Deno.serve(async (req) => {
     return { processed: retried, metadata: { candidates: accounts?.length ?? 0, errors } };
   }));
 
-  return new Response(JSON.stringify({ ok: true, results }), {
+  const failed = results.filter((result) => (result as { ok?: boolean })?.ok === false).length;
+  return new Response(JSON.stringify({ ok: failed === 0, status: failed === 0 ? "success" : "partial", results }), {
+    status: failed === 0 ? 200 : 207,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

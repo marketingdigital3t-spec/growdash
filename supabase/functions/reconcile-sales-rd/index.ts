@@ -82,22 +82,23 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: auth } } },
-    );
-    const { data: userRes } = await supabase.auth.getUser();
-    const userId = userRes.user?.id;
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "Usuário inválido" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
     const body = await req.json().catch(() => ({}));
+    const url = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const bearer = auth.replace(/^Bearer\s+/i, "").trim();
+    const cronSecret = Deno.env.get("DAILY_RECONCILIATION_CRON_SECRET") || Deno.env.get("CRON_SECRET");
+    const isInternal = bearer === serviceKey || (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+    let userId: string;
+    if (isInternal) {
+      userId = typeof body?.service_user_id === "string" ? body.service_user_id.trim() : "";
+      if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) return new Response(JSON.stringify({ error: "service_user_id obrigatório para execução interna" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } else {
+      const supabase = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
+      const { data: userRes } = await supabase.auth.getUser();
+      userId = userRes.user?.id || "";
+      if (!userId) return new Response(JSON.stringify({ error: "Usuário inválido" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const admin = createClient(url, serviceKey);
     const dryRun = body?.dry_run === true;
     const limit = Math.min(Number(body?.limit) || 200, 500);
 

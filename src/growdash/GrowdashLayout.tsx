@@ -66,7 +66,7 @@ const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
   "/configuracoes": () => import("@/pages/Settings"),
   "/usuarios": () => import("@/pages/Users"),
   "/agenda-turmas": () => import("@/pages/EventClasses"),
-  "/agentes": () => import("@/growdash/ModulePage"),
+  "/agentes": () => import("@/growdash/AgentOfficeControlPage"),
   "/chamados": () => import("@/growdash/ModulePage"),
   "/automacoes": () => import("@/growdash/ModulePage"),
   "/marcas": () => import("@/growdash/ModulePage"),

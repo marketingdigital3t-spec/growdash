@@ -100,10 +100,20 @@ Deno.serve(async (req) => {
     if (!authHeader) return new Response(JSON.stringify({ error: "Missing auth" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anon = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-    const { data: userData, error: ue } = await anon.auth.getUser();
-    if (ue || !userData?.user) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    const userId = userData.user.id;
+    const body = await req.json().catch(() => ({}));
+    const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const cronSecret = Deno.env.get("DAILY_RECONCILIATION_CRON_SECRET") || Deno.env.get("CRON_SECRET");
+    const isInternal = bearer === serviceKey || (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret);
+    let userId: string;
+    if (isInternal) {
+      userId = typeof body?.service_user_id === "string" ? body.service_user_id.trim() : "";
+      if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) return new Response(JSON.stringify({ error: "service_user_id obrigatório para execução interna" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } else {
+      const anon = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+      const { data: userData, error: ue } = await anon.auth.getUser();
+      if (ue || !userData?.user) return new Response(JSON.stringify({ error: "Invalid token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      userId = userData.user.id;
+    }
     const admin = createClient(url, serviceKey);
 
     const connections = await listAuthorizedRDConnections(admin, [userId]);

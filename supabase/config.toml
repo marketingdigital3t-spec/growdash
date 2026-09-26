@@ -80,6 +80,8 @@ verify_jwt = false
 
 [functions.rd-discover-fields]
 verify_jwt = true
+[functions.agent-office-orchestrator]
+verify_jwt = false
 [functions.historical-backfill]
 verify_jwt = false
 [functions.admin-create-user]
