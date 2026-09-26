@@ -338,6 +338,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let rdRequestTail: Promise<void> = Promise.resolve();
 let rdNextRequestAt = 0;
 const RD_MIN_REQUEST_INTERVAL_MS = 300;
+const RD_REQUEST_TIMEOUT_MS = 30_000;
 
 /** Converte ISO timestamp para YYYY-MM-DD no fuso America/Sao_Paulo (BRT, UTC-3).
  *  Evita que vendas fechadas após 21h BRT sejam contadas no dia seguinte. */
@@ -364,7 +365,14 @@ async function fetchWithRetry(url: string, attempts = 3): Promise<Response> {
       if (spacing > 0) await sleep(spacing);
       rdNextRequestAt = Date.now() + RD_MIN_REQUEST_INTERVAL_MS;
       release();
-      const r = await fetch(url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), RD_REQUEST_TIMEOUT_MS);
+      let r: Response;
+      try {
+        r = await fetch(url, { signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (r.ok) return r;
       if ([429, 500, 502, 503, 504].includes(r.status) && i < attempts - 1) {
         const retryAfter = Number(r.headers.get("Retry-After") || "0");
