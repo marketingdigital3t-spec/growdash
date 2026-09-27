@@ -18,6 +18,7 @@ interface Props {
   onChange: (ids: string[]) => void;
   placeholder?: string;
   className?: string;
+  entityLabel?: string;
 }
 
 export function CampaignMultiSelect({
@@ -26,6 +27,7 @@ export function CampaignMultiSelect({
   onChange,
   placeholder = "Todas campanhas",
   className,
+  entityLabel = "campanha",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -41,7 +43,7 @@ export function CampaignMultiSelect({
     ? placeholder
     : selectedIds.length === 1
     ? campaigns.find((c) => c.id === selectedIds[0])?.name ?? "1 campanha"
-    : `${selectedIds.length} campanhas`;
+    : `${selectedIds.length} ${entityLabel}${selectedIds.length === 1 ? "" : "s"}`;
 
   const toggle = (id: string) => {
     if (selectedIds.includes(id)) onChange(selectedIds.filter((x) => x !== id));
@@ -84,7 +86,7 @@ export function CampaignMultiSelect({
                 autoFocus
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Pesquisar campanha..."
+                placeholder={`Pesquisar ${entityLabel}...`}
                 className="h-9 pl-7 pr-7"
               />
               {search && (
@@ -123,7 +125,7 @@ export function CampaignMultiSelect({
           <div className="p-1 pr-2">
             {filtered.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                Nenhuma campanha encontrada
+                Nenhum(a) {entityLabel} encontrado(a)
               </div>
             ) : (
               filtered.map((c) => {

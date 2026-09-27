@@ -538,6 +538,7 @@ export default function FunnelAnalysis() {
             selectedIds={selectedFunnelIds}
             onChange={setSelectedFunnelIds}
             placeholder="Todos os funis RD"
+            entityLabel="funil"
             className="gd-filter-control w-full bg-background/60 sm:w-[220px]"
           />
           <MetaDateRangePicker
