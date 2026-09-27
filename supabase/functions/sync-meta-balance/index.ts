@@ -6,6 +6,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function statusForMetaError(code: number | null): "expired" | "error" | "unknown" {
+  if (code === 190) return "expired";
+  if (code === 10 || code === 100 || code === 200) return "error";
+  return "unknown";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -80,7 +86,11 @@ Deno.serve(async (req) => {
           await supabaseAdmin
             .from("ad_accounts")
             .update({
-              connection_status: "disconnected",
+              // A failed balance request is not proof that the operator
+              // disconnected the account. Preserve a diagnosable status so
+              // configuration/permission errors such as Meta #200 are not
+              // presented as a manual disconnect.
+              connection_status: statusForMetaError(code),
               last_sync_error: msg,
               last_sync_error_code: code,
               last_sync_attempt_at: attemptedAt,

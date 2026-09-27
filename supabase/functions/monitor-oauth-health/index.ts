@@ -137,18 +137,26 @@ Deno.serve(async (req) => {
         ? await checkMetaToken(String(account.access_token), appId, appSecret)
         : { status: baseStatus === "error" ? "error" : "unchecked" as HealthStatus, permissions: [], details: { reason: "Token ausente" } };
       const checkedAt = new Date().toISOString();
-      let accountUpdate = admin.from("ad_accounts").update({
+      // Health checks may refresh diagnostic columns for every account, but a
+      // manual disconnect is authoritative and must never be changed to
+      // `blocked` by an automated permission check.
+      const healthUpdate = {
         oauth_health_status: check.status,
         oauth_checked_at: checkedAt,
         oauth_permissions: check.permissions,
-        ...(check.status === "permission_removed" ? {
+      };
+      let accountUpdate = admin.from("ad_accounts").update(healthUpdate).eq("id", account.id);
+      if (requestedUserId) accountUpdate = accountUpdate.eq("user_id", requestedUserId);
+      await accountUpdate;
+      if (check.status === "permission_removed" && account.connection_status !== "disconnected") {
+        let permissionUpdate = admin.from("ad_accounts").update({
           connection_status: "blocked",
           last_sync_error: "Permissões Meta insuficientes para leitura de anúncios/leads",
           last_sync_error_code: "META_PERMISSION_REMOVED",
-        } : {}),
-      }).eq("id", account.id);
-      if (requestedUserId) accountUpdate = accountUpdate.eq("user_id", requestedUserId);
-      await accountUpdate;
+        }).eq("id", account.id).neq("connection_status", "disconnected");
+        if (requestedUserId) permissionUpdate = permissionUpdate.eq("user_id", requestedUserId);
+        await permissionUpdate;
+      }
       const workspaceId = String(account.workspace_id || workspaceByUser.get(String(account.user_id)) || membership || "");
       if (workspaceId) await admin.from("oauth_health_events").insert({
         workspace_id: workspaceId,
