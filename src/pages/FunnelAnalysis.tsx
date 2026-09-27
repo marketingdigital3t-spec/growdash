@@ -118,8 +118,10 @@ export default function FunnelAnalysis() {
     [activeFunnels, allFunnelsSelected, selectedFunnelIdSet],
   );
   useEffect(() => {
-    if (selectedFunnelIds.length && selectedFunnelIds.some((id) => !activeFunnels.some((funnel) => funnel.id === id))) setSelectedFunnelIds([]);
-  }, [activeFunnels, selectedFunnelIds]);
+    // During the first render the funnel query is still empty. Do not erase a
+    // persisted selection before the active funnel list has arrived.
+    if (!loadingFunnels && selectedFunnelIds.length && selectedFunnelIds.some((id) => !activeFunnels.some((funnel) => funnel.id === id))) setSelectedFunnelIds([]);
+  }, [activeFunnels, loadingFunnels, selectedFunnelIds]);
   useEffect(() => {
     try {
       localStorage.setItem("growdash:funnel-analysis-rd-scope", JSON.stringify(selectedFunnelIds));
