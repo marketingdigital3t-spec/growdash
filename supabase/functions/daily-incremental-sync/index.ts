@@ -344,9 +344,14 @@ Deno.serve(async (req) => {
         ...result,
       };
     };
+    // RD and PostgREST share the same account-level pressure during a cycle.
+    // Running independent connections in parallel looked faster but caused
+    // statement timeouts when a large funnel was reconciling at the same time.
+    // Keep one funnel at a time; the bounded five-minute window is safer than
+    // overlapping writers and produces a complete, observable run per funnel.
     const groupedResults = await mapWithConcurrency(
       targetsByConnection,
-      Math.min(4, Math.max(1, targetsByConnection.length)),
+      1,
       async (group) => {
         const results = [];
         for (const funnel of group) results.push(await syncTarget(funnel));
