@@ -32,8 +32,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useInsights } from "@/hooks/useInsights";
-import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
@@ -190,7 +188,6 @@ export default function CrmPage() {
     enabled: canReadCrm && (accountScopeIds.length > 0 || !adAccountIds.length) && requestedFunnelIds.length > 0,
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
-  const { data: insightData = [], isLoading: loadingMetaInsights, isPlaceholderData: isPreviousInsightScope } = useInsights({ adAccountId: accountFilter, adAccountIds: accountScopeIds, startDate, endDate });
   const { data: products = [], isLoading: loadingProducts } = useProducts();
   const [view, setView] = useState<CRMView>(() => {
     if (searchParams.get("tab") === "ai") return "ai";
@@ -214,12 +211,11 @@ export default function CrmPage() {
   // boundary: displaying that previous account while the new query runs is
   // materially misleading in CRM. Fail closed until every account-scoped
   // source belongs to the selection.
-  const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope || isPreviousInsightScope;
-  const isLoadingSelectedScope = isChangingAccountScope || loadingDeals || loadingSales || loadingMetaInsights;
+  const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
+  const isLoadingSelectedScope = isChangingAccountScope || loadingDeals || loadingSales;
   const funnels = useMemo(() => isChangingAccountScope ? [] : funnelData, [funnelData, isChangingAccountScope]);
   const allDeals = useMemo(() => isChangingAccountScope ? [] : dealData, [dealData, isChangingAccountScope]);
   const canonicalSales = useMemo(() => isChangingAccountScope ? [] : salesData, [isChangingAccountScope, salesData]);
-  const metaInsights = useMemo(() => isChangingAccountScope ? [] : insightData, [insightData, isChangingAccountScope]);
 
   useEffect(() => {
     if (adAccountId !== "all" && availableAccounts.length && !availableAccountIds.has(adAccountId)) setAdAccountId("all");
@@ -263,31 +259,6 @@ export default function CrmPage() {
     && accountScopeSet.has(sale.ad_account_id)
     && (!sale.rd_deal_id || !excludedDealIds.has(sale.rd_deal_id)),
   ), [accountScopeSet, canonicalSales, excludedDealIds]);
-  const scopedMetaInsights = useMemo(
-    () => metaInsights.filter((insight) => !!insight.ad_account_id && accountScopeSet.has(insight.ad_account_id)),
-    [accountScopeSet, metaInsights],
-  );
-  const metaLeads = useMemo(
-    () => scopedMetaInsights.reduce((sum, insight) => sum + Number(insight.leads ?? 0), 0),
-    [scopedMetaInsights],
-  );
-  const metaActionAdIds = useMemo(
-    () => Array.from(new Set(scopedMetaInsights.map((insight) => insight.ad_id).filter(Boolean))),
-    [scopedMetaInsights],
-  );
-  const metaActionAccountMap = useMemo(
-    () => Object.fromEntries(scopedMetaInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
-    [scopedMetaInsights],
-  );
-  const { data: metaActionData, isLoading: loadingMetaActions } = useActionTotalsByAds(
-    metaActionAdIds,
-    startDate,
-    endDate,
-    metaActionAccountMap,
-  );
-  const metaLeadActions = metaActionData?.metaLeadActions;
-  const metaConversations = metaLeadActions?.conversations || 0;
-  const totalMetaLeads = metaLeadActions?.total || 0;
   const productPriceByName = useMemo(() => new Map(
     products
       .filter((product) => Number(product.price) > 0)
@@ -658,15 +629,7 @@ export default function CrmPage() {
             </div>
             <p className="text-xs text-muted-foreground">Cada card informa a fonte e o critério do dado.</p>
           </div>
-          <div className="gd-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <CrmMetricCard
-              source="Meta Ads"
-              label="Leads Meta"
-              value={number.format(totalMetaLeads)}
-              description={`${number.format(metaLeads)} leads + ${number.format(metaConversations)} conversas iniciadas`}
-              icon={<UsersRound className="h-4 w-4" />}
-              tone="meta"
-            />
+          <div className="gd-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <CrmMetricCard
               source="RD Station CRM"
               label="Negociações no funil"
