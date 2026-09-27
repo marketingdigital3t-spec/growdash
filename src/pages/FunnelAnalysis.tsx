@@ -36,7 +36,6 @@ import { filterCanonicalFunnelSales } from "@/lib/funnelRevenue";
 import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
-import { FunnelGrowthRecommendations } from "@/components/funnel-analysis/FunnelGrowthRecommendations";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
@@ -602,10 +601,6 @@ export default function FunnelAnalysis() {
               salesConversionRate={mediaMetrics.salesConversionRate}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
             />
-          </MotionItem>
-
-          <MotionItem>
-            <FunnelGrowthRecommendations analytics={periodAnalytics} media={mediaMetrics} />
           </MotionItem>
 
           <MotionItem>
