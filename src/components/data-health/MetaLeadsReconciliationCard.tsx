@@ -33,7 +33,8 @@ function useReconciliation(days: number) {
 
       const { data: accounts } = await supabase
         .from("ad_accounts")
-        .select("id, name");
+        .select("id, name, connection_status")
+        .eq("connection_status", "connected");
 
       const rows: AccountRow[] = [];
       for (const acc of (accounts || []) as any[]) {

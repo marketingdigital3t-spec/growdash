@@ -86,7 +86,8 @@ function useHealth() {
       // Accounts and LP config status
       const { data: accounts } = await supabase
         .from("ad_accounts")
-        .select("id, name, last_sync_success_at, connection_status");
+        .select("id, name, last_sync_success_at, connection_status")
+        .eq("connection_status", "connected");
       const { data: oauthIntegrations } = await supabase
         .from("integrations")
         .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")

@@ -29,9 +29,14 @@ function isProfileDisconnected(account: { metadata?: unknown }) {
   return Boolean(account.metadata && typeof account.metadata === "object" && (account.metadata as Record<string, unknown>).profile_disconnected === true);
 }
 
-// Disconnected accounts remain visible so operators can reconnect them. Hiding
-// them made a permissions outage look like destructive data loss.
-export function useAdAccounts(includeDisconnected = true) {
+export function isActiveMetaAccount(account: { connection_status?: string | null; metadata?: unknown }) {
+  return account.connection_status === "connected" && !isProfileDisconnected(account);
+}
+
+// Product screens use only accounts with an active Meta integration. The
+// optional flag is retained for the connection-management flow, which may
+// explicitly request the full inventory.
+export function useAdAccounts(includeDisconnected = false) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:ad-accounts:${user.id}:${includeDisconnected ? "all" : "connected"}` : "";
   return useQuery({
@@ -49,7 +54,7 @@ export function useAdAccounts(includeDisconnected = true) {
         .order("created_at", { ascending: false }), 12_000);
       if (!error) {
         const normalized = dedupeMetaAccounts((data ?? []).filter((account) => !isProfileDisconnected(account)));
-        const result = includeDisconnected ? normalized : normalized.filter((account) => account.connection_status !== "disconnected");
+        const result = includeDisconnected ? normalized : normalized.filter(isActiveMetaAccount);
         try { if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result ?? [])); } catch { /* cache is optional */ }
         return result;
       }
@@ -60,7 +65,7 @@ export function useAdAccounts(includeDisconnected = true) {
         .order("created_at", { ascending: false }), 12_000);
       if (legacy.error) throw legacy.error;
       const normalized = dedupeMetaAccounts((legacy.data ?? []).filter((account) => !isProfileDisconnected(account)).map((account) => ({ ...account, workspace_id: null, business_unit_id: "legacy-infoproduto", timezone_name: "America/Sao_Paulo", timezone_offset_hours_utc: -3, attribution_window: "account_default", oauth_health_status: "unchecked", oauth_checked_at: null, oauth_permissions: [] })));
-      const result = includeDisconnected ? normalized : normalized.filter((account) => account.connection_status !== "disconnected");
+      const result = includeDisconnected ? normalized : normalized.filter(isActiveMetaAccount);
       try { if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* cache is optional */ }
       return result;
     },
