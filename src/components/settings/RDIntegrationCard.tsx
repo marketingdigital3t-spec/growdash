@@ -14,8 +14,6 @@ export function RDIntegrationCard() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [token, setToken] = useState("");
-  const [accountName, setAccountName] = useState("RD Station");
-  const [externalAccountId, setExternalAccountId] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: integration, isError: integrationLoadFailed, error: integrationLoadError, refetch: refetchIntegration } = useRDIntegration();
@@ -24,7 +22,7 @@ export function RDIntegrationCard() {
   const save = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("rd-test-connection", {
-        body: { api_token: token.trim(), account_name: accountName.trim(), external_account_id: externalAccountId.trim() || undefined },
+        body: { api_token: token.trim() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -67,7 +65,7 @@ export function RDIntegrationCard() {
   const remove = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("rd-test-connection", {
-        body: { disconnect: true, delete: true, account_name: accountName.trim(), external_account_id: externalAccountId.trim() || undefined },
+        body: { disconnect: true, delete: true },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -119,17 +117,6 @@ export function RDIntegrationCard() {
           <p>2. Clique no ícone de engrenagem (<strong>Admin</strong>)</p>
           <p>3. Vá em <strong>Integrações → API do CRM</strong></p>
           <p>4. Clique em <strong>Gerar token</strong> e copie o valor</p>
-        </div>
-
-        <div className="space-y-1">
-          <Label>Nome da conta RD</Label>
-          <input className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Ex.: Paciente Modelo" />
-          <p className="text-xs text-muted-foreground">Use um nome diferente para cada conta RD que for conectada.</p>
-        </div>
-
-        <div className="space-y-1">
-          <Label>ID externo da conta (opcional)</Label>
-          <input className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={externalAccountId} onChange={(event) => setExternalAccountId(event.target.value)} placeholder="Identificador fornecido pelo RD" />
         </div>
 
         <div className="space-y-1">
