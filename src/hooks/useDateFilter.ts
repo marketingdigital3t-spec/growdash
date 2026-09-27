@@ -1,7 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import {
-  startOfDay,
-  endOfDay,
   subDays,
   startOfMonth,
   endOfMonth,
@@ -47,6 +45,28 @@ export type CustomDateRange = { from: Date; to: Date };
 const isValidDate = (value: unknown): value is Date =>
   value instanceof Date && !Number.isNaN(value.getTime());
 
+const BUSINESS_TIMEZONE = "America/Sao_Paulo";
+
+/** Return a calendar date in the business timezone, independent of the
+ * browser/Edge machine timezone. Date filters are calendar dates, not UTC
+ * instants; using the host timezone made the current day shift at midnight
+ * and produced empty Meta/RD results. */
+export function businessDateKey(value: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function businessBoundary(value: Date, endOfDay = false): Date {
+  const key = businessDateKey(value);
+  return new Date(`${key}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}-03:00`);
+}
+
 /**
  * Browser storage is an optimization, never a source of truth. A malformed
  * value must not propagate to a query key (`toISOString`) and take down the
@@ -60,8 +80,8 @@ export function normalizeCustomDateRange(value: Partial<CustomDateRange> | null 
 }
 
 export function resolvePreset(preset: DatePreset, customRange: { from: Date; to: Date }) {
-  const today = startOfDay(new Date());
-  const endToday = endOfDay(today);
+  const today = businessBoundary(new Date());
+  const endToday = businessBoundary(today, true);
   const safeRange = normalizeCustomDateRange(customRange);
   switch (preset) {
     case "today_yesterday":
@@ -100,7 +120,7 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
       // older RD/Meta data on its own.
       return { startDate: new Date(2000, 0, 1), endDate: endToday };
     case "custom":
-      return { startDate: startOfDay(safeRange.from), endDate: endOfDay(safeRange.to) };
+      return { startDate: businessBoundary(safeRange.from), endDate: businessBoundary(safeRange.to, true) };
     default:
       return { startDate: subDays(today, 29), endDate: new Date() };
   }
