@@ -3480,6 +3480,20 @@ html:not(.dark) {
   grid-auto-rows: auto !important;
 }
 
+/* Shared desktop canvas: the Expert panel is the reference for all modules.
+   Keep every authenticated screen on the same readable width and gutters;
+   the campaign workspace remains full-height through its existing layout. */
+.brand-shell .gd-page-transition > :where(:not(.campaigns-workspace):not(.life-sim-page)) {
+  width: 100% !important;
+  max-width: 1680px !important;
+  margin-inline: auto !important;
+}
+@media (max-width: 767px) {
+  .brand-shell .gd-page-transition > :where(:not(.campaigns-workspace):not(.life-sim-page)) {
+    max-width: none !important;
+  }
+}
+
 /* Neutral structural controls; semantic colors remain available to results. */
 .brand-shell :is(button, [role="tab"], .gd-filter-control, .gd-filter-account):not(.text-emerald-500):not(.text-red-500) {
   border-color: var(--gd-content-border) !important;
