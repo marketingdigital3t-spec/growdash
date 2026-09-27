@@ -63,6 +63,14 @@ export interface RDDeal {
   lead_state: string | null;
   lead_city: string | null;
   contact_name?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  meta_lead_id?: string | null;
+  meta_form_id?: string | null;
+  meta_campaign_id?: string | null;
+  meta_adset_id?: string | null;
+  meta_ad_id?: string | null;
+  meta_attribution_method?: string | null;
   custom_fields?: Record<string, unknown> | null;
   lead_created_at: string | null;
   stage_updated_at: string | null;
@@ -209,7 +217,7 @@ export function shouldApplyRDDateRange(includeHistory = false) {
 }
 
 const DEAL_FIELDS =
-  "id, rd_connection_id, ad_account_id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, lead_state, lead_city, contact_name, custom_fields, lead_created_at, stage_updated_at, closed_at, updated_at";
+  "id, rd_connection_id, ad_account_id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_attribution_method, lead_state, lead_city, contact_name, contact_email, contact_phone, custom_fields, lead_created_at, stage_updated_at, closed_at, updated_at";
 
 /** Keeps the newest snapshot of a single RD deal when an integration retry
  * left more than one local row. The RD deal ID is global and is the canonical
@@ -262,7 +270,10 @@ export function useRDDeals(params: Params) {
         const bounds = saoPauloDayBounds(startDate ?? endDate!, endDate ?? startDate!);
         const rangeStart = bounds.start.toISOString();
         const rangeEnd = bounds.end.toISOString();
-        query = query.or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`);
+        // Lead volume is based on entry date. A stage movement is only a
+        // fallback for legacy rows that have no entry timestamp; otherwise an
+        // old lead moved today would be counted as a new lead in the period.
+        query = query.or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd}),and(lead_created_at.is.null,stage_updated_at.is.null,closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd})`);
       }
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
