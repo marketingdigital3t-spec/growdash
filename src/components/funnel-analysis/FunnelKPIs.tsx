@@ -11,6 +11,7 @@ interface Props {
   trafficSpend: number;
   cpl?: number | null;
   cac?: number | null;
+  roas?: number | null;
   salesConversionRate?: number | null;
   previousAvgDaysToConvert?: number | null;
 }
@@ -18,7 +19,7 @@ interface Props {
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversionRate, previousAvgDaysToConvert }: Props) {
+export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, roas, salesConversionRate, previousAvgDaysToConvert }: Props) {
   const timeChange = previousAvgDaysToConvert && previousAvgDaysToConvert > 0 ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100 : null;
   const cards = [
     { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-foreground", format: "brl" as const },
@@ -29,12 +30,12 @@ export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, salesConversi
     { label: "Ticket médio", value: a.avgTicket, icon: Target, color: "text-foreground", format: "brl" as const },
     { label: "Receita gerada", value: a.revenue, icon: DollarSign, color: "text-foreground", format: "brl" as const },
     {
-      label: "CPL / CAC",
+      label: "CPL / CAC / ROAS",
       value: 0,
       icon: TrendingUp,
       color: "text-foreground",
       format: "custom" as const,
-      custom: `${fmtBRL(cpl ?? 0)} / ${fmtBRL(cac ?? 0)}`,
+      custom: `${fmtBRL(cpl ?? 0)} / ${fmtBRL(cac ?? 0)} / ${roas == null ? "—" : `${roas.toFixed(2)}x`}`,
     },
   ];
 

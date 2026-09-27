@@ -598,6 +598,7 @@ export default function FunnelAnalysis() {
               trafficSpend={mediaMetrics.spend}
               cpl={mediaMetrics.metaCpl}
               cac={mediaMetrics.cac}
+              roas={mediaMetrics.roas}
               salesConversionRate={mediaMetrics.salesConversionRate}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
             />
