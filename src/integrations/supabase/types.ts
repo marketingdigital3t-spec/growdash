@@ -291,6 +291,10 @@ export type Database = {
           rd_fields_last_discovered_at: string | null
           remaining_balance: number | null
           target_cpl: number | null
+          token_expires_at: string | null
+          token_issued_at: string | null
+          token_refreshed_at: string | null
+          token_refresh_source: string | null
           timezone_name: string | null
           timezone_offset_hours_utc: number | null
           updated_at: string
@@ -324,6 +328,10 @@ export type Database = {
           rd_fields_last_discovered_at?: string | null
           remaining_balance?: number | null
           target_cpl?: number | null
+          token_expires_at?: string | null
+          token_issued_at?: string | null
+          token_refreshed_at?: string | null
+          token_refresh_source?: string | null
           timezone_name?: string | null
           timezone_offset_hours_utc?: number | null
           updated_at?: string
@@ -357,6 +365,10 @@ export type Database = {
           rd_fields_last_discovered_at?: string | null
           remaining_balance?: number | null
           target_cpl?: number | null
+          token_expires_at?: string | null
+          token_issued_at?: string | null
+          token_refreshed_at?: string | null
+          token_refresh_source?: string | null
           timezone_name?: string | null
           timezone_offset_hours_utc?: number | null
           updated_at?: string

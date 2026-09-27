@@ -64,39 +64,44 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
 
-      // Resolve the media scope in a separate query. The previous nested
-      // `insights -> ads -> adsets -> campaigns` inner join silently dropped
-      // valid insight rows whenever one historical Meta entity was missing or
-      // had an incomplete relationship. That made a healthy account display
-      // R$ 0 / 0 leads even though the daily facts were already stored.
+      // Build the media catalog with separate queries. The previous nested
+      // inner join discarded valid daily facts when a historical adset or
+      // campaign relationship was missing, rendering accounts as zeroed out.
       const adCatalog: Record<string, any> = {};
-      let adsQuery = supabase
-        .from("ads")
-        .select("id, name, status, thumbnail_url, adsets!inner(name, status, campaigns!inner(id, name, status, objective, ad_account_id))")
-        .order("id", { ascending: true });
-      if (adAccountIds && adAccountIds.length > 0) {
-        adsQuery = adsQuery.in("adsets.campaigns.ad_account_id", adAccountIds);
-      } else if (adAccountId) {
-        adsQuery = adsQuery.eq("adsets.campaigns.ad_account_id", adAccountId);
-      }
-      if (campaignId) adsQuery = adsQuery.eq("adsets.campaigns.id", campaignId);
-      if (campaignIds && campaignIds.length > 0) adsQuery = adsQuery.in("adsets.campaigns.id", campaignIds);
-      if (objectives && objectives.length > 0) adsQuery = adsQuery.in("adsets.campaigns.objective", objectives);
+      const accountIds = adAccountIds?.length ? adAccountIds : adAccountId ? [adAccountId] : [];
+      let campaignsQuery = supabase.from("campaigns").select("id,name,status,objective,ad_account_id").order("id", { ascending: true });
+      if (accountIds.length) campaignsQuery = campaignsQuery.in("ad_account_id", accountIds);
+      if (campaignId) campaignsQuery = campaignsQuery.eq("id", campaignId);
+      if (campaignIds?.length) campaignsQuery = campaignsQuery.in("id", campaignIds);
+      if (objectives?.length) campaignsQuery = campaignsQuery.in("objective", objectives);
+      const { data: campaignRows, error: campaignsError } = await withRequestTimeout(campaignsQuery, 15_000);
+      if (campaignsError) throw campaignsError;
+      const campaigns = (campaignRows || []) as any[];
+      const campaignIdSet = new Set(campaigns.map((row) => String(row.id)));
+      if (campaignIdSet.size === 0) return [];
 
-      const ADS_PAGE = 1000;
-      let adIds: string[] = [];
-      for (let page = 0; ; page++) {
-        const { data, error } = await withRequestTimeout(adsQuery.range(page * ADS_PAGE, page * ADS_PAGE + ADS_PAGE - 1), 15_000);
-        if (error) throw error;
-        const batch = data || [];
-        for (const row of batch as any[]) {
-          if (!row?.id) continue;
-          adCatalog[String(row.id)] = row;
-          adIds.push(String(row.id));
-        }
-        if (batch.length < ADS_PAGE) break;
-      }
-      adIds = Array.from(new Set(adIds));
+      const { data: adsetRows, error: adsetsError } = await withRequestTimeout(
+        supabase.from("adsets").select("id,name,status,campaign_id").in("campaign_id", Array.from(campaignIdSet)),
+        15_000,
+      );
+      if (adsetsError) throw adsetsError;
+      const adsets = (adsetRows || []) as any[];
+      const adsetIdSet = new Set(adsets.map((row) => String(row.id)));
+      if (adsetIdSet.size === 0) return [];
+
+      const { data: adRows, error: adsError } = await withRequestTimeout(
+        supabase.from("ads").select("id,name,status,adset_id,thumbnail_url").in("adset_id", Array.from(adsetIdSet)).order("id", { ascending: true }),
+        15_000,
+      );
+      if (adsError) throw adsError;
+      const adsetCatalog = new Map(adsets.map((row) => [String(row.id), row]));
+      const campaignCatalog = new Map(campaigns.map((row) => [String(row.id), row]));
+      const adIds = (adRows || []).map((row: any) => {
+        const adset = adsetCatalog.get(String(row.adset_id));
+        const campaign = adset ? campaignCatalog.get(String(adset.campaign_id)) : null;
+        if (row?.id) adCatalog[String(row.id)] = { ...row, adsets: { ...adset, campaigns: campaign } };
+        return row?.id ? String(row.id) : null;
+      }).filter(Boolean) as string[];
       if (adIds.length === 0) return [];
 
       let query = supabase

@@ -12,6 +12,7 @@ interface Props {
   errorCode?: number | null;
   lastAttemptAt?: string | null;
   lastSuccessAt?: string | null;
+  tokenExpiresAt?: string | null;
   onReconnect?: () => void;
   onRetry?: () => void;
   retrying?: boolean;
@@ -45,6 +46,7 @@ export function AccountConnectionStatus({
   errorCode,
   lastAttemptAt,
   lastSuccessAt,
+  tokenExpiresAt,
   onReconnect,
   onRetry,
   retrying,
@@ -53,6 +55,8 @@ export function AccountConnectionStatus({
   const needsReconnect = !isConnected;
   const lastSuccess = fmtDate(lastSuccessAt);
   const lastAttempt = fmtDate(lastAttemptAt);
+  const tokenExpiry = fmtDate(tokenExpiresAt);
+  const tokenExpiring = tokenExpiresAt ? new Date(tokenExpiresAt).getTime() < Date.now() + 30 * 86_400_000 : false;
 
   const badge = (
     <span
@@ -73,6 +77,7 @@ export function AccountConnectionStatus({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {badge}
         {lastSuccess && <span>Última sync: {lastSuccess}</span>}
+        {tokenExpiry && <span className={cn(tokenExpiring && "text-amber-600 dark:text-amber-400")}>Token expira: {tokenExpiry}</span>}
       </div>
     );
   }
@@ -107,6 +112,7 @@ export function AccountConnectionStatus({
                 Última tentativa: {lastAttempt}
               </p>
             )}
+            {tokenExpiry && <p className="text-[11px] text-amber-700 dark:text-amber-400">Token expira: {tokenExpiry}</p>}
           </div>
         </div>
         <div className="flex flex-wrap gap-2 pt-1">

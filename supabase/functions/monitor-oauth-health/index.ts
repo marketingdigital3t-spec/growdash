@@ -46,10 +46,13 @@ async function checkMetaToken(token: string, appId?: string, appSecret?: string)
   // A healthy connection must be able to read both delivery metrics and the
   // lead/conversation events used by Growdash reports.
   const missing = ["ads_read", "leads_retrieval"].filter((permission) => !permissions.includes(permission));
+  const tokenExpiresAt = Number(data.expires_at) > 0 ? Number(data.expires_at) * 1000 : null;
   const status: HealthStatus = data.is_valid !== true
     ? "expired"
     : missing.length > 0
       ? "permission_removed"
+      : tokenExpiresAt && tokenExpiresAt < Date.now() + 30 * 86_400_000
+        ? "expiring"
       : "healthy";
   return {
     status,
@@ -57,7 +60,9 @@ async function checkMetaToken(token: string, appId?: string, appSecret?: string)
     details: {
       is_valid: data.is_valid === true,
       app_id: data.app_id ?? null,
-      data_access_expires_at: data.data_access_expires_at ?? null,
+      expires_at: data.expires_at ?? null,
+      data_access_expires_at: data.data_access_expiration_time ?? null,
+      issued_at: data.issued_at ?? null,
       missing_permissions: missing,
     },
   };
@@ -126,7 +131,7 @@ Deno.serve(async (req) => {
 
     let accountsQuery = admin
       .from("ad_accounts")
-      .select("id, user_id, workspace_id, account_id, access_token, connection_status, oauth_health_status, oauth_checked_at");
+      .select("id, user_id, workspace_id, account_id, access_token, connection_status, oauth_health_status, oauth_checked_at, token_expires_at, token_issued_at");
     if (requestedUserId) accountsQuery = accountsQuery.eq("user_id", requestedUserId);
     const { data: accounts, error: accountsError } = await accountsQuery;
     if (accountsError) throw accountsError;
@@ -144,6 +149,14 @@ Deno.serve(async (req) => {
         oauth_health_status: check.status,
         oauth_checked_at: checkedAt,
         oauth_permissions: check.permissions,
+        token_expires_at: typeof check.details.expires_at === "number"
+          ? new Date(Number(check.details.expires_at) * 1000).toISOString()
+          : (typeof check.details.expires_at === "string" ? check.details.expires_at : account.token_expires_at),
+        token_issued_at: typeof check.details.issued_at === "number"
+          ? new Date(Number(check.details.issued_at) * 1000).toISOString()
+          : (typeof check.details.issued_at === "string" ? check.details.issued_at : account.token_issued_at),
+        token_refreshed_at: checkedAt,
+        token_refresh_source: "health_check",
       };
       let accountUpdate = admin.from("ad_accounts").update(healthUpdate).eq("id", account.id);
       if (requestedUserId) accountUpdate = accountUpdate.eq("user_id", requestedUserId);
@@ -152,7 +165,7 @@ Deno.serve(async (req) => {
         let permissionUpdate = admin.from("ad_accounts").update({
           connection_status: "blocked",
           last_sync_error: "Permissões Meta insuficientes para leitura de anúncios/leads",
-          last_sync_error_code: "META_PERMISSION_REMOVED",
+          last_sync_error_code: 200,
         }).eq("id", account.id).neq("connection_status", "disconnected");
         if (requestedUserId) permissionUpdate = permissionUpdate.eq("user_id", requestedUserId);
         await permissionUpdate;

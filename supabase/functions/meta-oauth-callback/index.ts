@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { hasMinimumMetaTokenLifetime, inspectMetaToken } from "../_shared/metaToken.ts";
 
 const resultPage = (status: "success" | "error", message: string, accounts = 0) => {
   const appUrl = (Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").replace(/\/$/, "");
@@ -129,6 +130,14 @@ Deno.serve(async (req) => {
       ? String(longResult.access_token)
       : String(tokenResult.access_token);
 
+    const tokenInspection = await inspectMetaToken(accessToken, appId, appSecret);
+    if (!tokenInspection.isValid) {
+      return resultPage("error", tokenInspection.errorMessage || "A Meta não confirmou o novo token.");
+    }
+    if (!hasMinimumMetaTokenLifetime(tokenInspection.expiresAt)) {
+      return resultPage("error", "A Meta devolveu um token com validade inferior a 30 dias. Nenhuma conta foi alterada; autorize novamente com um usuário Meta que tenha acesso às contas de anúncio.");
+    }
+
     // `/me/adaccounts` is the canonical endpoint. For Meta Login for
     // Business, some users only expose assets through their Business Manager;
     // use the business-owned and client-owned collections as a safe fallback.
@@ -211,7 +220,11 @@ Deno.serve(async (req) => {
         last_sync_error_code: null,
         oauth_health_status: "unchecked",
         oauth_checked_at: null,
-        oauth_permissions: [],
+        oauth_permissions: tokenInspection.permissions,
+        token_issued_at: tokenInspection.issuedAt || new Date().toISOString(),
+        token_expires_at: tokenInspection.expiresAt,
+        token_refreshed_at: new Date().toISOString(),
+        token_refresh_source: "oauth",
         // OAuth only imports credentials and account metadata; the first
         // successful insights/leads sync must establish freshness.
         last_sync_success_at: existing?.last_sync_success_at || null,
@@ -227,7 +240,7 @@ Deno.serve(async (req) => {
     }
 
     if (saved === 0) return resultPage("error", "As contas foram encontradas, mas não puderam ser salvas na Growdash.");
-    return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio importada${saved === 1 ? "" : "s"}. Contas já ativadas foram preservadas; contas novas aguardam ativação na Growdash.`, saved);
+    return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio importada${saved === 1 ? "" : "s"}. Token válido até ${new Date(tokenInspection.expiresAt!).toLocaleDateString("pt-BR")}.`, saved);
   } catch (error) {
     console.error("meta-oauth-callback", error);
     return resultPage("error", "Ocorreu uma falha interna ao concluir a conexão.");

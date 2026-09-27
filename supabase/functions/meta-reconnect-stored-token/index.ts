@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { hasMinimumMetaTokenLifetime, inspectMetaToken } from "../_shared/metaToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
     const admin = createClient(url, service);
     const { data: account, error: accountError } = await admin
       .from("ad_accounts")
-      .select("id, account_id, name, access_token")
+      .select("id, account_id, name, access_token, token_expires_at")
       .eq("id", accountId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -77,6 +78,21 @@ Deno.serve(async (req) => {
       return json({ ok: false, account: { id: account.id, name: account.name }, code, error: safeMetaMessage(code) }, 409);
     }
 
+    const appId = Deno.env.get("META_APP_ID");
+    const appSecret = Deno.env.get("META_APP_SECRET");
+    const inspection = await inspectMetaToken(String(account.access_token), appId, appSecret);
+    if (!inspection.isValid || !hasMinimumMetaTokenLifetime(inspection.expiresAt)) {
+      await admin.from("ad_accounts").update({
+        connection_status: "expired",
+        oauth_health_status: "expiring",
+        last_sync_error: "O token Meta tem menos de 30 dias de validade restante. Reconecte pelo OAuth.",
+        last_sync_error_code: 190,
+        last_sync_attempt_at: now,
+        updated_at: now,
+      }).eq("id", account.id).eq("user_id", user.id);
+      return json({ ok: false, account: { id: account.id, name: account.name }, error: "O token salvo tem menos de 30 dias restantes. Clique em Conectar / atualizar perfil Meta para autorizar um novo token." }, 409);
+    }
+
     const returnedAccountId = `act_${String(meta.account_id ?? meta.id ?? "").replace(/^act_/i, "")}`;
     if (returnedAccountId !== account.account_id) return json({ error: "A Meta retornou uma conta diferente da conta salva." }, 409);
 
@@ -88,7 +104,11 @@ Deno.serve(async (req) => {
       connection_status: "connected",
       oauth_health_status: "healthy",
       oauth_checked_at: now,
-      oauth_permissions: [],
+      oauth_permissions: inspection.permissions,
+      token_issued_at: inspection.issuedAt || null,
+      token_expires_at: inspection.expiresAt,
+      token_refreshed_at: now,
+      token_refresh_source: "health_check",
       last_sync_error: null,
       last_sync_error_code: null,
       last_sync_attempt_at: now,
@@ -97,7 +117,7 @@ Deno.serve(async (req) => {
     }).eq("id", account.id).eq("user_id", user.id);
     if (updateError) throw updateError;
 
-    return json({ ok: true, account: { id: account.id, name: meta.name ?? account.name } });
+    return json({ ok: true, account: { id: account.id, name: meta.name ?? account.name }, token_expires_at: inspection.expiresAt });
   } catch (error) {
     console.error("meta-reconnect-stored-token", error);
     return json({ error: "Não foi possível validar o último token da Meta." }, 500);

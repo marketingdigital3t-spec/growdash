@@ -31,7 +31,7 @@ type RunResult = {
 // A UI pode chamar esta função ao abrir, ao recuperar foco e a cada minuto.
 // A trava persistida garante que várias abas/dispositivos nunca multipliquem o
 // consumo das APIs para a mesma conta/funil.
-const CONTROLLED_SYNC_INTERVAL_MS = 60 * 1_000;
+const CONTROLLED_SYNC_INTERVAL_MS = 5 * 60 * 1_000;
 const RETRY_AFTER_FAILURE_MS = 60 * 1_000;
 const LOCK_TTL_MS = 12 * 60 * 1_000;
 
@@ -61,8 +61,6 @@ Deno.serve(async (req) => {
     const today = dateInSaoPaulo(new Date());
     // Atualização automática toca somente o dia corrente. Intervalos históricos
     // continuam disponíveis nas rotas manuais/backfill, sem serem reprocessados.
-    const startDate = body.startDate || today;
-    const endDate = body.endDate || today;
     const scopeKey = body.adAccountId || "all";
     const includeMeta = body.includeMeta !== false;
     const includeRD = body.includeRD !== false;
@@ -96,8 +94,8 @@ Deno.serve(async (req) => {
           // corrida e discrepância entre cards e gráficos por hora.
           const insights = await invokeFunction(supabaseUrl, authHeader, "sync-meta-insights", {
             adAccountId: body.adAccountId,
-            startDate,
-            endDate,
+            // Omitting dates lets sync-meta-insights resolve "today" in each
+            // account's Meta timezone instead of forcing São Paulo midnight.
             incremental: true,
             includeBreakdowns: false,
           });
@@ -105,8 +103,6 @@ Deno.serve(async (req) => {
 
           const hourly = await invokeFunction(supabaseUrl, authHeader, "sync-meta-hourly", {
             adAccountId: body.adAccountId,
-            startDate,
-            endDate,
           });
           const errors = [insights.data?.errors, hourly.data?.errors, hourly.error].filter(Boolean);
           return {
@@ -137,8 +133,8 @@ Deno.serve(async (req) => {
               funnel_id: funnel.id,
               realtime,
               analytics_mode: realtime,
-              start_date: realtime ? today : undefined,
-              end_date: realtime ? today : undefined,
+              // No explicit dates: the current RD pipeline is a snapshot of
+              // all open/current deals, not a lead-entry report for São Paulo.
               // Analytics mode walks every RD status segment and up to the
               // complete bounded page budget instead of only the first 200
               // records. This keeps all connected funnels represented in the
@@ -155,7 +151,7 @@ Deno.serve(async (req) => {
 
     return json({
       success: results.every((result) => result.skipped || !result.errors),
-      freshness_seconds: 60,
+      freshness_seconds: 300,
       synchronized_date: today,
       duration_ms: Date.now() - startedAt,
       results,

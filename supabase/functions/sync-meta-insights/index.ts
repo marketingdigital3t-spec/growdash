@@ -671,7 +671,7 @@ Deno.serve(async (req) => {
           .update({
             connection_status: accountHadError ? "error" : "connected",
             last_sync_error: accountHadError ? errors.filter((message) => message.startsWith(`Conta ${account.name}`)).join("; ") : null,
-            last_sync_error_code: accountHadError ? "PARTIAL_SYNC" : null,
+            last_sync_error_code: null,
             last_sync_attempt_at: attemptedAt,
             ...(accountHadError ? {} : { last_sync_success_at: attemptedAt }),
           })
