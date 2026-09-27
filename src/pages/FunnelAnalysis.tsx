@@ -18,7 +18,6 @@ import { FunnelSourceTable } from "@/components/funnel-analysis/FunnelSourceTabl
 import { FunnelLostReasons } from "@/components/funnel-analysis/FunnelLostReasons";
 import { FunnelStateMap } from "@/components/funnel-analysis/FunnelStateMap";
 import { FunnelConversionHeatmap } from "@/components/funnel-analysis/FunnelConversionHeatmap";
-import { FunnelMediaOverview } from "@/components/funnel-analysis/FunnelMediaOverview";
 import { FunnelSalesAttribution } from "@/components/funnel-analysis/FunnelSalesAttribution";
 import { RefreshCw, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -334,12 +333,12 @@ export default function FunnelAnalysis() {
     ...rdCampaigns,
     ...visibleCampaignRows.map((campaign) => campaign.name).filter(Boolean),
   ])).sort((a, b) => a.localeCompare(b, "pt-BR")), [rdCampaigns, visibleCampaignRows]);
-  const { scopedInsights, campaignWithoutMediaMatch } = useMemo(() => {
+  const scopedInsights = useMemo(() => {
     const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     // Mesmo que a política do banco permita consultar histórico legado, a
     // mídia exibida aqui deve pertencer exclusivamente às contas integradas.
     const accountScopedInsights = insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
-    if (!selectedCampaigns.length) return { scopedInsights: accountScopedInsights, campaignWithoutMediaMatch: false };
+    if (!selectedCampaigns.length) return accountScopedInsights;
     const campaigns = selectedCampaigns.map((value) => value.trim().toLocaleLowerCase("pt-BR"));
     const matches = accountScopedInsights.filter((row) => {
       // Older Meta insight rows may have no campaign name. They must not
@@ -350,7 +349,7 @@ export default function FunnelAnalysis() {
     });
     // UTMs e campanhas Meta podem ter nomes diferentes. Exibir todas as
     // campanhas neste caso distorce investimento, CPL e ROAS do funil.
-    return { scopedInsights: matches, campaignWithoutMediaMatch: matches.length === 0 };
+    return matches;
   }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet, selectedCampaigns]);
 
   // O filtro de campanha do RD usa UTM e nem sempre tem o mesmo nome da
@@ -532,17 +531,6 @@ export default function FunnelAnalysis() {
             </Button>
           </div>
         </div>
-      </MotionItem>
-
-      <MotionItem>
-        {loadingInsights ? (
-          <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Carregando métricas da Meta…</div>
-        ) : (
-          <>
-            <HelpBlock help={blockHelp.media}><FunnelMediaOverview metrics={mediaMetrics} /></HelpBlock>
-            {campaignWithoutMediaMatch && <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-muted-foreground"><b className="text-amber-600 dark:text-amber-400">Campanha sem correspondência segura na Meta.</b><p className="mt-1">A mídia foi mantida em zero para não misturar campanhas. Ajuste o nome/UTM da campanha ou selecione “Todas as campanhas” para ver o total da conta.</p></div>}
-          </>
-        )}
       </MotionItem>
 
       <MotionItem>
