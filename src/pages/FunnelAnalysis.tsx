@@ -100,7 +100,15 @@ export default function FunnelAnalysis() {
     () => funnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id),
     [funnels],
   );
-  const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
+  const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("growdash:funnel-analysis-rd-scope");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  });
   const selectedFunnelIdSet = useMemo(() => new Set(selectedFunnelIds), [selectedFunnelIds]);
   const allFunnelsSelected = selectedFunnelIds.length === 0;
   // Meta e RD têm escopos independentes: a conta de anúncios nunca escolhe
@@ -112,6 +120,13 @@ export default function FunnelAnalysis() {
   useEffect(() => {
     if (selectedFunnelIds.length && selectedFunnelIds.some((id) => !activeFunnels.some((funnel) => funnel.id === id))) setSelectedFunnelIds([]);
   }, [activeFunnels, selectedFunnelIds]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("growdash:funnel-analysis-rd-scope", JSON.stringify(selectedFunnelIds));
+    } catch {
+      // A blocked browser storage must not change the selected data scope.
+    }
+  }, [selectedFunnelIds]);
   const funnelId = selectedFunnelIds.length === 1 ? selectedFunnelIds[0] : "";
   const funnelScopeIds = useMemo(
     () => scopedActiveFunnels.map((funnel) => funnel.id),
