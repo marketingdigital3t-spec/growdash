@@ -579,6 +579,43 @@ Deno.serve(async (req) => {
     }
     const token = connection.api_token!;
 
+    // A crashed Edge invocation can leave its audit row as `running`. Do not
+    // let those orphaned rows create concurrent writers and database timeouts.
+    // Runs older than 20 minutes cannot be a healthy interactive sync; close
+    // them explicitly, and reject a genuinely active duplicate invocation.
+    const staleBefore = new Date(Date.now() - 20 * 60_000).toISOString();
+    const { data: runningRows, error: runningError } = await admin
+      .from("sync_runs")
+      .select("id,started_at")
+      .eq("funnel_id", funnel.id)
+      .eq("status", "running")
+      .order("started_at", { ascending: false })
+      .limit(20);
+    if (runningError) throw runningError;
+    const staleIds = (runningRows || [])
+      .filter((row: any) => String(row.started_at || "") < staleBefore)
+      .map((row: any) => row.id)
+      .filter(Boolean);
+    if (staleIds.length > 0) {
+      await admin.from("sync_runs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_message: "run órfão encerrado antes de uma nova sincronização",
+      }).in("id", staleIds).eq("status", "running");
+    }
+    const activeRun = (runningRows || []).find((row: any) => !staleIds.includes(row.id));
+    if (activeRun) {
+      return new Response(JSON.stringify({
+        ok: false,
+        status: "already_running",
+        run_id: activeRun.id,
+        message: "Este funil já possui uma sincronização em andamento.",
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (only_missing_names) {
       const { data: missingRows, error: missingError } = await admin
         .from("rd_deals")
