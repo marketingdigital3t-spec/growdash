@@ -46,7 +46,7 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
         <div className="dashboard-glass-metrics grid min-w-0 grid-cols-2 gap-1.5 border-t border-border/40 bg-transparent p-1.5 md:grid-cols-7 md:gap-1.5 md:border-t-0 md:p-2">
           {metrics.map((metric) => {
             const isLeads = metric.label === "Leads" && leadsBreakdown;
-            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[10px] [&_svg]:h-3.5 [&_svg]:w-3.5", metric.tone === "good" && "is-good")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="whitespace-nowrap text-[6.5px] font-black uppercase leading-tight tracking-[.035em] text-muted-foreground" title={metric.label}>{metric.label}</p><p className="mt-1 whitespace-nowrap text-[12px] font-black leading-none tabular-nums" title={metric.value}>{metric.value}</p></div></>;
+            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[10px] [&_svg]:h-3.5 [&_svg]:w-3.5", metric.tone === "good" && "is-good")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="break-words text-[6.5px] font-black uppercase leading-tight tracking-[.035em] text-muted-foreground" title={metric.label}>{metric.label}</p><p className="mt-1 min-w-0 break-words text-[clamp(.68rem,1.25vw,.78rem)] font-black leading-tight tabular-nums" title={metric.value}>{metric.value}</p></div></>;
             const className = cn(
               "gd-glass-metric group flex min-h-[66px] min-w-0 items-center gap-1.5 rounded-xl px-2 py-2.5 text-left",
               isLeads && "gd-glass-metric-leads",

@@ -3414,8 +3414,11 @@ html:not(.dark) {
 /* Compact, proportional KPI contract. */
 .brand-shell .gd-metric-card { min-height: 0 !important; height: auto !important; border-radius: var(--gd-card-radius) !important; }
 .brand-shell .gd-metric-card-content { min-height: 126px !important; padding: var(--gd-card-padding) !important; justify-content: center !important; }
-.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-content-text) !important; font-size: clamp(1.45rem, 2.2vw, 2rem) !important; line-height: 1.1 !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-content-text) !important; line-height: 1.1 !important; }
 .brand-shell .gd-metric-card .gd-metric-icon { background: rgba(127,127,127,.14) !important; color: var(--gd-content-text) !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value[data-value-size="long"] { font-size: 1rem !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value[data-value-size="medium"] { font-size: 1.15rem !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value[data-value-size="regular"] { font-size: 1.35rem !important; }
 @media (max-width: 767px) { .brand-shell .gd-metric-card-content { min-height: 112px !important; padding: 16px !important; } }
 
 /* Selected-account count: compact neutral indicator, not a solid black badge. */
@@ -6511,7 +6514,7 @@ html[data-accent="sapphire"] .brand-shell,
   box-shadow: none !important;
 }
 .brand-shell .gd-metric-card :is(.text-muted-foreground, p:first-child) { color: var(--gd-ink-muted) !important; }
-.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-ink) !important; font-size: clamp(1.25rem, 1.8vw, 1.65rem) !important; line-height: 1.15 !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-ink) !important; line-height: 1.15 !important; }
 .brand-shell .gd-metric-card .text-emerald-500,
 .brand-shell .gd-metric-card .text-emerald-400,
 .brand-shell .gd-metric-card .text-emerald-600 { color: var(--gd-positive) !important; }
@@ -7400,7 +7403,7 @@ html:not(.dark) .brand-shell .brand-sidebar nav a[aria-current="page"] { backgro
 .brand-shell :is(.gd-kpi-grid,.dashboard-primary-kpis,.dashboard-glass-metrics,.dashboard-daily-charts,.gd-aligned-grid) { gap: var(--gd-space-card) !important; }
 .brand-shell .gd-metric-card { min-height: 0 !important; height: auto !important; border-radius: var(--gd-card-radius) !important; }
 .brand-shell .gd-metric-card-content { min-height: 126px !important; padding: var(--gd-card-padding) !important; justify-content: center !important; }
-.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-content-text) !important; font-size: clamp(1.45rem,2.2vw,2rem) !important; line-height: 1.1 !important; }
+.brand-shell .gd-metric-card .dashboard-terra-metric-value { color: var(--gd-content-text) !important; line-height: 1.1 !important; }
 .brand-shell .gd-metric-card .gd-metric-icon { background: rgba(127,127,127,.14) !important; color: var(--gd-content-text) !important; }
 .brand-shell :is(.gd-metric-card,.gd-panel,.dashboard-glass-card) :is(h1,h2,h3,h4,h5,p,span,strong,label,td,th) { color: var(--gd-content-text) !important; }
 .brand-shell :is(.gd-metric-card,.gd-panel,.dashboard-glass-card) .text-muted-foreground { color: var(--gd-content-muted) !important; }
