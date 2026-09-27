@@ -339,6 +339,11 @@ let rdRequestTail: Promise<void> = Promise.resolve();
 let rdNextRequestAt = 0;
 const RD_MIN_REQUEST_INTERVAL_MS = 300;
 const RD_REQUEST_TIMEOUT_MS = 30_000;
+// Leave enough margin for the Edge runtime to finish the current batch and
+// close sync_runs cleanly instead of being killed by the gateway (HTTP 520).
+// Historical runs are intentionally resumable: a later invocation reuses
+// stored profiles and continues walking the remaining RD pages.
+const RD_SYNC_RUNTIME_BUDGET_MS = 90_000;
 
 /** Converte ISO timestamp para YYYY-MM-DD no fuso America/Sao_Paulo (BRT, UTC-3).
  *  Evita que vendas fechadas após 21h BRT sejam contadas no dia seguinte. */
@@ -416,6 +421,7 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
   let caller: any = null;
+  const runtimeDeadline = startedAt + RD_SYNC_RUNTIME_BUDGET_MS;
 
   async function finishRun(opts: {
     status: "success" | "partial" | "failed";
@@ -1456,6 +1462,10 @@ Deno.serve(async (req) => {
         let segmentComplete = false;
 
         while (page <= maxPages) {
+          if (Date.now() >= runtimeDeadline) {
+            analyticsRangeComplete = false;
+            break segmentLoop;
+          }
           pagesProcessed++;
           // O CRM replica o filtro "Data de criação" do RD. Todos os status
           // usam o mesmo intervalo; varrer o histórico inteiro para o
@@ -1533,6 +1543,11 @@ Deno.serve(async (req) => {
             }
             await persistAnalyticsBatch(rangedDeals);
             totalDeals += rangedDeals.length;
+
+            if (Date.now() >= runtimeDeadline) {
+              analyticsRangeComplete = false;
+              break segmentLoop;
+            }
 
             const timestamps = deals
               .filter((deal: any) => !segment.stageId || String(deal.deal_stage?.id || "") === String(segment.stageId))
