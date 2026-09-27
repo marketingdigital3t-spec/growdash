@@ -415,10 +415,12 @@ export default function FunnelAnalysis() {
     if (!funnelId && visibleAccounts.length === 0) return;
     setSyncing(true);
     try {
-      // A Meta aceita no máximo 37 meses. A reconciliação é independente do
-      // filtro visual, mas fica nos 36 meses completos mais recentes para não
-      // ser recusada pela API nem inverter o intervalo em filtros antigos.
-      const metaSyncRange = getMetaSyncRange();
+      // A atualização manual deve ser rápida e previsível: reconcilia apenas
+      // o período atualmente selecionado. O backfill histórico é executado
+      // pelo job próprio e não deve bloquear o botão por dezenas de minutos.
+      // A função ainda limita o início a 36 meses, que é o máximo aceito pela
+      // Graph API da Meta.
+      const metaSyncRange = getMetaSyncRange(new Date(), startDate, endDate);
       const funnelsToSync = scopedActiveFunnels;
 
       let metaResult: PromiseSettledResult<unknown>;
