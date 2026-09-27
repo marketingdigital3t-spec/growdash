@@ -6,6 +6,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function connectionStatusForMetaError(errorCode: number | undefined, retryable: boolean) {
+  if (errorCode === 190) return "expired";
+  // App/configuration and request/permission errors must remain diagnosable as
+  // errors. They are not proof that the ad account was disconnected.
+  if ([10, 100, 200, 190].includes(Number(errorCode)) || retryable) return "error";
+  return "error";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -165,7 +173,7 @@ Deno.serve(async (req) => {
           await supabaseAdmin
             .from("ad_accounts")
             .update({
-              connection_status: tokenExpired ? "expired" : campaignsRes.retryable ? "error" : "disconnected",
+              connection_status: connectionStatusForMetaError(campaignsRes.errorCode, campaignsRes.retryable),
               last_sync_error: campaignsRes.error,
               last_sync_error_code: campaignsRes.errorCode ?? null,
               last_sync_attempt_at: attemptedAt,
@@ -402,7 +410,7 @@ Deno.serve(async (req) => {
           await supabaseAdmin
             .from("ad_accounts")
             .update({
-              connection_status: tokenExpired ? "expired" : insightsRes.retryable ? "error" : "disconnected",
+              connection_status: connectionStatusForMetaError(insightsRes.errorCode, insightsRes.retryable),
               last_sync_error: insightsRes.error,
               last_sync_error_code: insightsRes.errorCode ?? null,
               last_sync_attempt_at: attemptedAt,
