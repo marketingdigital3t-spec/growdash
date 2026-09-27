@@ -100,16 +100,19 @@ export default function FunnelAnalysis() {
     () => funnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id),
     [funnels],
   );
-  // Uma conta selecionada só pode consultar os funis vinculados ao seu UUID.
-  // Fallback por nome/"primeiro funil" misturava a análise quando o vínculo de
-  // uma conta estava ausente ou tinha nome parecido com outro.
+  const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
+  const selectedFunnelIdSet = useMemo(() => new Set(selectedFunnelIds), [selectedFunnelIds]);
+  const allFunnelsSelected = selectedFunnelIds.length === 0;
+  // Meta e RD têm escopos independentes: a conta de anúncios nunca escolhe
+  // ou limita automaticamente o funil CRM.
   const scopedActiveFunnels = useMemo(
-    () => allAccountsSelected ? activeFunnels : activeFunnels.filter((funnel) => selectedAccountIdSet.has(funnel.ad_account_id)),
-    [activeFunnels, allAccountsSelected, selectedAccountIdSet],
+    () => allFunnelsSelected ? activeFunnels : activeFunnels.filter((funnel) => selectedFunnelIdSet.has(funnel.id)),
+    [activeFunnels, allFunnelsSelected, selectedFunnelIdSet],
   );
-  const funnelId = selectedAccountIds.length === 1
-    ? scopedActiveFunnels.find((funnel) => funnel.ad_account_id === selectedAccountIds[0])?.id || ""
-    : "";
+  useEffect(() => {
+    if (selectedFunnelIds.length && selectedFunnelIds.some((id) => !activeFunnels.some((funnel) => funnel.id === id))) setSelectedFunnelIds([]);
+  }, [activeFunnels, selectedFunnelIds]);
+  const funnelId = selectedFunnelIds.length === 1 ? selectedFunnelIds[0] : "";
   const funnelScopeIds = useMemo(
     () => scopedActiveFunnels.map((funnel) => funnel.id),
     [scopedActiveFunnels],
@@ -126,8 +129,6 @@ export default function FunnelAnalysis() {
   const { data: stages = [], isLoading: loadingStages } = useFunnelStagesForIds(funnelScopeIds);
   const { data: deals = [], isLoading, refetch } = useRDDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -142,8 +143,6 @@ export default function FunnelAnalysis() {
   // pipeline e os KPIs abaixo usam `deals`, que contém o histórico completo.
   const { data: periodDeals = [], isLoading: loadingPeriodDeals } = useRDDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -159,8 +158,6 @@ export default function FunnelAnalysis() {
   // mesma consulta e não há uma segunda requisição.
   const { data: filterDeals = [], isLoading: loadingFilterDeals } = useRDDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     // Filtros devem listar todos os valores que existem no pipeline, não só
     // os valores de leads recém-criados.
     includeHistory: true,
@@ -168,8 +165,6 @@ export default function FunnelAnalysis() {
   });
   const { data: closedDeals = [], isLoading: loadingClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -182,8 +177,6 @@ export default function FunnelAnalysis() {
   });
   const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -540,6 +533,13 @@ export default function FunnelAnalysis() {
             onChange={setAdAccountIds}
             className="gd-filter-account bg-background/60"
           />
+          <CampaignMultiSelect
+            campaigns={activeFunnels.map((funnel) => ({ id: funnel.id, name: funnel.name }))}
+            selectedIds={selectedFunnelIds}
+            onChange={setSelectedFunnelIds}
+            placeholder="Todos os funis RD"
+            className="gd-filter-control w-full bg-background/60 sm:w-[220px]"
+          />
           <MetaDateRangePicker
             preset={preset}
             onPresetChange={setPreset}
@@ -570,7 +570,7 @@ export default function FunnelAnalysis() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     {activeFunnels.length === 0
-                      ? "Nenhum funil RD vinculado para esta conta."
+                      ? "Nenhum funil RD ativo disponível."
                       : noStages
                         ? "Os estágios reais do funil ainda não foram sincronizados."
                         : "Nenhuma negociação encontrada no histórico sincronizado."}
@@ -581,7 +581,7 @@ export default function FunnelAnalysis() {
                 </div>
                 <Button onClick={handleSync} disabled={syncing || (!funnelId && visibleAccounts.length === 0)} size="sm" variant="outline" className="shrink-0">
                   <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                  {activeFunnels.length === 0 ? "Configurar ou sincronizar" : "Sincronizar agora"}
+                    {activeFunnels.length === 0 ? "Configurar ou sincronizar" : "Sincronizar agora"}
                 </Button>
               </div>
             </MotionItem>
