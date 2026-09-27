@@ -45,7 +45,12 @@ export function useMetaOAuth() {
     // The OAuth callback is served by Supabase and then redirected to the
     // same-origin Growdash static page so browsers render it as HTML. Accept
     // both origins while still rejecting messages from every other window.
-    const expectedOrigins = new Set([new URL(SUPABASE_URL).origin, window.location.origin]);
+    const expectedOrigins = new Set([
+      new URL(SUPABASE_URL).origin,
+      window.location.origin,
+      "https://growdash.com.br",
+      "https://www.growdash.com.br",
+    ]);
     const receiveOAuthResult = (event: MessageEvent) => {
       if (!expectedOrigins.has(event.origin) || event.source !== oauthPopup.current) return;
       if (event.data?.type !== "growdash-meta-oauth") return;

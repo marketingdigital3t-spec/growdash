@@ -65,6 +65,8 @@ type SafeAdAccount = {
   last_sync_attempt_at: string | null;
   last_sync_success_at: string | null;
   token_expires_at: string | null;
+  oauth_health_status: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 function normalizeAdAccounts(value: unknown): SafeAdAccount[] {
@@ -84,6 +86,8 @@ function normalizeAdAccounts(value: unknown): SafeAdAccount[] {
       last_sync_attempt_at: safeText(source.last_sync_attempt_at) || null,
       last_sync_success_at: safeText(source.last_sync_success_at) || null,
       token_expires_at: safeText(source.token_expires_at) || null,
+      oauth_health_status: safeText(source.oauth_health_status) || null,
+      metadata: source.metadata && typeof source.metadata === "object" ? source.metadata as Record<string, unknown> : null,
     }];
   });
 }
@@ -113,7 +117,7 @@ function IntegrationsContent() {
   const [search, setSearch] = useState("");
   const [accountOrder, setAccountOrder] = useState<"name-asc" | "name-desc" | "status">("name-asc");
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
-  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts();
+  const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
   const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
   const { data: rdConnections = [], isLoading: loadingRDConnections, isError: rdConnectionsFailed, refetch: refetchRDConnections } = useRDAccountConnections();
   // Keep funnel inventory visible while RD authorization is blocked. The UI

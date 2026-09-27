@@ -25,8 +25,9 @@ export function dedupeMetaAccounts<T extends { account_id?: string | null; conne
   return Array.from(byAccount.values());
 }
 
-function isProfileDisconnected(account: { metadata?: unknown }) {
-  return Boolean(account.metadata && typeof account.metadata === "object" && (account.metadata as Record<string, unknown>).profile_disconnected === true);
+function isProfileDisconnected(account: { connection_status?: string | null; metadata?: unknown }) {
+  return account.connection_status === "disconnected"
+    && Boolean(account.metadata && typeof account.metadata === "object" && (account.metadata as Record<string, unknown>).profile_disconnected === true);
 }
 
 export function isActiveMetaAccount(account: { connection_status?: string | null; metadata?: unknown }) {

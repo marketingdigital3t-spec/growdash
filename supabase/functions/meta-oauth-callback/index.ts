@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     if (!tokenInspection.isValid) {
       return resultPage("error", tokenInspection.errorMessage || "A Meta não confirmou o novo token.");
     }
-    if (!hasMinimumMetaTokenLifetime(tokenInspection.expiresAt)) {
+    if (!hasMinimumMetaTokenLifetime(tokenInspection.expiresAt, 30, tokenInspection.dataAccessExpiresAt)) {
       return resultPage("error", "A Meta devolveu um token com validade inferior a 30 dias. Nenhuma conta foi alterada; autorize novamente com um usuário Meta que tenha acesso às contas de anúncio.");
     }
 

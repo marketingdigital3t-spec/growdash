@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     const appId = Deno.env.get("META_APP_ID");
     const appSecret = Deno.env.get("META_APP_SECRET");
     const inspection = await inspectMetaToken(String(account.access_token), appId, appSecret);
-    if (!inspection.isValid || !hasMinimumMetaTokenLifetime(inspection.expiresAt)) {
+    if (!inspection.isValid || !hasMinimumMetaTokenLifetime(inspection.expiresAt, 30, inspection.dataAccessExpiresAt)) {
       await admin.from("ad_accounts").update({
         connection_status: "expired",
         oauth_health_status: "expiring",

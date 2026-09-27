@@ -12,7 +12,9 @@
   if (text) text.textContent = message;
   try {
     if (window.opener && !window.opener.closed) {
-      window.opener.postMessage({ type: "growdash-meta-oauth", status, message, accounts }, "https://growdash.com.br");
+      ["https://growdash.com.br", "https://www.growdash.com.br"].forEach((origin) => {
+        window.opener.postMessage({ type: "growdash-meta-oauth", status, message, accounts }, origin);
+      });
     }
   } catch (_) { /* the visible page remains usable if the opener is gone */ }
   if (status === "success") window.setTimeout(() => window.close(), 1800);

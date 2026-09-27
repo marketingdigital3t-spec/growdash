@@ -8,7 +8,8 @@ describe("active Meta account visibility", () => {
     expect(isActiveMetaAccount({ connection_status: "blocked" })).toBe(false);
   });
 
-  it("rejects a profile-disconnected account even if its row is stale", () => {
-    expect(isActiveMetaAccount({ connection_status: "connected", metadata: { profile_disconnected: true } })).toBe(false);
+  it("keeps a manually reactivated account visible after its old marker remains", () => {
+    expect(isActiveMetaAccount({ connection_status: "connected", metadata: { profile_disconnected: true } })).toBe(true);
+    expect(isActiveMetaAccount({ connection_status: "disconnected", metadata: { profile_disconnected: true } })).toBe(false);
   });
 });
