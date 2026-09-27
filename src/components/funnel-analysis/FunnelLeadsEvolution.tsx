@@ -12,6 +12,12 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
     Oportunidades: d.opportunities,
     Vendas: d.conversions,
   }));
+  const firstActive = data.findIndex((row) => row.Leads > 0 || row.Oportunidades > 0 || row.Vendas > 0);
+  const lastActive = data.findLastIndex((row) => row.Leads > 0 || row.Oportunidades > 0 || row.Vendas > 0);
+  // O cálculo inclui dias vazios para preservar o intervalo selecionado. No
+  // gráfico, removemos apenas o vazio externo para que os eventos reais não
+  // fiquem comprimidos no canto direito do bloco.
+  const chartData = firstActive >= 0 ? data.slice(firstActive, lastActive + 1) : data;
 
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
@@ -21,9 +27,9 @@ export function FunnelLeadsEvolution({ a }: { a: FunnelAnalytics }) {
       <CardContent>
         <div className="h-72">
           <ResponsiveContainer>
-            <LineChart data={data} className="funnel-evolution-chart">
+            <LineChart data={chartData} className="funnel-evolution-chart" margin={{ left: 4, right: 12 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={24} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
               <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
               <Tooltip
                 contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} labelStyle={{ color: "hsl(var(--foreground))" }} itemStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted) / 0.25)", stroke: "hsl(var(--border))" }}
