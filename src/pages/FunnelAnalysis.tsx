@@ -590,7 +590,7 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {selectedAccountIds.length === 1 ? "neste funil" : `em ${funnelScopeIds.length} funil(is) conectado(s)`}. Os KPIs e gráficos abaixo usam somente o período selecionado.
+              <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {selectedFunnelIds.length === 1 ? "neste funil" : `em ${funnelScopeIds.length} funil(is) selecionado(s)`}. A conta Meta selecionada é usada somente para mídia. Os KPIs e gráficos abaixo usam somente o período selecionado.
             </div>
             <FunnelKPIs
               a={periodAnalytics}
