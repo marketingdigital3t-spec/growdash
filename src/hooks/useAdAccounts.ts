@@ -15,8 +15,8 @@ export function dedupeMetaAccounts<T extends { account_id?: string | null; conne
     const key = canonicalMetaAccountId(account.account_id);
     if (!key) continue;
     const current = byAccount.get(key);
-    const currentActive = current?.connection_status !== "disconnected";
-    const nextActive = account.connection_status !== "disconnected";
+    const currentActive = current ? isActiveMetaAccount(current) : false;
+    const nextActive = isActiveMetaAccount(account);
     const shouldReplace = !current
       || (nextActive && !currentActive)
       || (nextActive === currentActive && String(account.created_at || "") > String(current.created_at || ""));
@@ -37,7 +37,7 @@ export function isActiveMetaAccount(account: { connection_status?: string | null
 // Product screens use only accounts with an active Meta integration. The
 // optional flag is retained for the connection-management flow, which may
 // explicitly request the full inventory.
-export function useAdAccounts(includeDisconnected = true) {
+export function useAdAccounts(includeDisconnected = false) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:ad-accounts:${user.id}:${includeDisconnected ? "all" : "connected"}` : "";
   return useQuery({

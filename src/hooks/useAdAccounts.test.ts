@@ -12,4 +12,10 @@ describe("active Meta account visibility", () => {
     expect(isActiveMetaAccount({ connection_status: "connected", metadata: { profile_disconnected: true } })).toBe(true);
     expect(isActiveMetaAccount({ connection_status: "disconnected", metadata: { profile_disconnected: true } })).toBe(false);
   });
+
+  it("treats every non-connected integration status as inactive", () => {
+    for (const connection_status of ["paused", "error", "expired", "blocked", "unknown"]) {
+      expect(isActiveMetaAccount({ connection_status })).toBe(false);
+    }
+  });
 });

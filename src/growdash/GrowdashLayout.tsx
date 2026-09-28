@@ -268,7 +268,7 @@ export default function GrowdashLayout() {
     // Não trate esse estado transitório como remoção de acesso, pois isso faz o
     // seletor global e a meta mensal saltarem para "todas as contas".
     if (loadingAdAccounts || visibleAccounts.length === 0) return;
-    if (adAccountId !== "all" && businessUnitId && !visibleAccounts.some((account) => account.id === adAccountId)) {
+    if (adAccountId !== "all" && !visibleAccounts.some((account) => account.id === adAccountId)) {
       setAdAccountId("all");
     }
   }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);

@@ -5,7 +5,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { aggregateMetaTrafficMetrics, type MetaTrafficMetrics, type MetaTrafficScope } from "@/lib/metaTraffic";
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; isLoading: boolean; isError: boolean; error: unknown } {
-  const accounts = useAdAccounts(true);
+  const accounts = useAdAccounts();
   const accountIds = scope.adAccountIds.filter(Boolean);
   const insights = useInsights({
     adAccountId: accountIds.length === 1 ? accountIds[0] : undefined,
