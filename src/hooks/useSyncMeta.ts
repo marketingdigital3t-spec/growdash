@@ -33,12 +33,22 @@ async function invokeSyncFunction(name: string, body: Record<string, unknown>): 
   if (result.error) {
     const first = await edgeFunctionErrorDetails(result.error);
     if (first.status === 401) {
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (!refreshError) result = await supabase.functions.invoke(name, { body });
+      const { data: sessionData, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError && sessionData.session) result = await supabase.functions.invoke(name, { body });
+      if (refreshError || !sessionData.session) {
+        throw Object.assign(new Error("Sua sessão da Growdash expirou. Entre novamente para sincronizar a Meta."), {
+          details: { needsReauth: false, sessionExpired: true },
+        });
+      }
     }
   }
   if (result.error) {
     const details = await edgeFunctionErrorDetails(result.error);
+    if (details.status === 401) {
+      throw Object.assign(new Error("Sua sessão da Growdash expirou. Entre novamente para sincronizar a Meta."), {
+        details: { needsReauth: false, sessionExpired: true },
+      });
+    }
     throw Object.assign(new Error(formatEdgeFunctionError(details)), { details });
   }
   const data = (result.data ?? {}) as SyncResponse;

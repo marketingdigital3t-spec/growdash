@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { aggregateMetaLeadActionDays } from "@/lib/metaActionMetrics";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -182,27 +182,9 @@ export function useActionTotalsByAds(
           if (config.action_type) lpByAccount[config.ad_account_id] = config.action_type;
         }
       }
-      for (const adId of allowedIds) {
-        const actions = totalsByAd[adId] || {};
-        const accountId = resolvedAccountByAd[adId] || "";
-        const lpAction = lpByAccount[accountId];
-        const resolved = resolveMetaLeadActions(actions, lpAction);
-        metaLeadActions.forms += resolved.forms;
-        metaLeadActions.site += resolved.site;
-        metaLeadActions.conversations += resolved.conversations;
-        if (accountId) {
-          for (const [date, actions] of Object.entries(dailyByAd[adId] || {})) {
-            const dailyResolved = resolveMetaLeadActions(actions, lpAction);
-            const current = dailyMetaLeadByAccount[accountId]?.[date] || { forms: 0, site: 0, conversations: 0, total: 0 };
-            current.forms += dailyResolved.forms;
-            current.site += dailyResolved.site;
-            current.conversations += dailyResolved.conversations;
-            current.total = current.forms + current.site + current.conversations;
-            dailyMetaLeadByAccount[accountId] = { ...(dailyMetaLeadByAccount[accountId] || {}), [date]: current };
-          }
-        }
-      }
-      metaLeadActions.total = metaLeadActions.forms + metaLeadActions.site + metaLeadActions.conversations;
+      const canonicalDaily = aggregateMetaLeadActionDays(dailyByAd, resolvedAccountByAd, lpByAccount);
+      Object.assign(metaLeadActions, canonicalDaily.totals);
+      Object.assign(dailyMetaLeadByAccount, canonicalDaily.dailyByAccount);
       return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, dailyMetaLeadByAccount };
     },
     staleTime: 120_000,

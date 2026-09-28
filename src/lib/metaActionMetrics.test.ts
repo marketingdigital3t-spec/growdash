@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveMetaActionMetrics, resolveMetaLeadActions } from "./metaActionMetrics";
+import { aggregateMetaLeadActionDays, resolveMetaActionMetrics, resolveMetaLeadActions } from "./metaActionMetrics";
 
 describe("Meta action metrics", () => {
   it("prioriza a ação omni para não duplicar checkout e compra", () => {
@@ -71,5 +71,18 @@ describe("Meta action metrics", () => {
   it("resolve site sem misturar com formulário ou lead auxiliar", () => {
     expect(resolveMetaLeadActions({ lead: 9, offsite_registration: 4 }, "offsite_registration"))
       .toEqual({ forms: 0, site: 4, conversations: 0, total: 4 });
+  });
+
+  it("resolve aliases por dia antes de somar o período inteiro", () => {
+    const result = aggregateMetaLeadActionDays({
+      ad1: {
+        "2026-09-27": { "onsite_conversion.lead_grouped": 4, leadgen_grouped: 4 },
+        "2026-09-28": { omni_lead: 3, "onsite_conversion.lead_grouped": 2 },
+      },
+    }, { ad1: "account-1" });
+
+    expect(result.totals).toEqual({ forms: 7, site: 0, conversations: 0, total: 7 });
+    expect(result.dailyByAccount["account-1"]["2026-09-27"].total).toBe(4);
+    expect(result.dailyByAccount["account-1"]["2026-09-28"].total).toBe(3);
   });
 });

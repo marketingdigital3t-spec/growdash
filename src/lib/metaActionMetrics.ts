@@ -63,3 +63,30 @@ export function resolveMetaLeadActions(actionTotals?: Record<string, number>, si
     total: forms + site + conversations,
   };
 }
+
+export function aggregateMetaLeadActionDays(
+  dailyActionsByAd: Record<string, Record<string, Record<string, number>>>,
+  accountByAd: Record<string, string | null | undefined>,
+  siteActionByAccount: Record<string, string | undefined> = {},
+) {
+  const totals = { forms: 0, site: 0, conversations: 0, total: 0 };
+  const dailyByAccount: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }>> = {};
+  for (const [adId, dates] of Object.entries(dailyActionsByAd)) {
+    const accountId = accountByAd[adId];
+    for (const [date, actions] of Object.entries(dates)) {
+      const resolved = resolveMetaLeadActions(actions, accountId ? siteActionByAccount[accountId] : undefined);
+      totals.forms += resolved.forms;
+      totals.site += resolved.site;
+      totals.conversations += resolved.conversations;
+      if (!accountId) continue;
+      const current = dailyByAccount[accountId]?.[date] || { forms: 0, site: 0, conversations: 0, total: 0 };
+      current.forms += resolved.forms;
+      current.site += resolved.site;
+      current.conversations += resolved.conversations;
+      current.total = current.forms + current.site + current.conversations;
+      dailyByAccount[accountId] = { ...(dailyByAccount[accountId] || {}), [date]: current };
+    }
+  }
+  totals.total = totals.forms + totals.site + totals.conversations;
+  return { totals, dailyByAccount };
+}
