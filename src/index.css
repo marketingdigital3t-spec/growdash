@@ -8058,6 +8058,31 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   background: transparent !important;
   color: #fff !important;
 }
+
+/* Final hard reset for the range grid. Some DayPicker builds paint the
+   modifier on the table cell (and may add a pseudo-element), so resetting
+   only the button still leaves the long blue weekly bars visible. */
+.gd-date-range-popover .rdp,
+.gd-date-range-popover .rdp table,
+.gd-date-range-popover .rdp tbody,
+.gd-date-range-popover .rdp tr,
+.gd-date-range-popover .rdp td,
+.gd-date-range-popover .rdp td::before,
+.gd-date-range-popover .rdp td::after,
+.gd-date-range-popover .rdp button.rdp-day,
+.gd-date-range-popover .rdp button.rdp-day[aria-selected="true"] {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.gd-date-range-popover .rdp button.rdp-day,
+.gd-date-range-popover .rdp button.rdp-day[aria-selected="true"] {
+  color: #f8fafc !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+}
 @media (max-width: 767px) {
   .gd-date-range-presets { width: 100% !important; max-height: 220px !important; }
   .gd-date-range-popover .rdp-month { width: 286px; }
