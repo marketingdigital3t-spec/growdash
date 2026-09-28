@@ -37,7 +37,7 @@ export function isActiveMetaAccount(account: { connection_status?: string | null
 // Product screens use only accounts with an active Meta integration. The
 // optional flag is retained for the connection-management flow, which may
 // explicitly request the full inventory.
-export function useAdAccounts(includeDisconnected = false) {
+export function useAdAccounts(includeDisconnected = true) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:ad-accounts:${user.id}:${includeDisconnected ? "all" : "connected"}` : "";
   return useQuery({

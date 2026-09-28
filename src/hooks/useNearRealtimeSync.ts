@@ -54,6 +54,8 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
   const invalidateTimer = useRef<number | null>(null);
   const [state, setState] = useState<SyncState>("idle");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const scope = adAccountId || "all";
 
   const invalidateLiveQueries = useCallback(() => {
@@ -92,6 +94,8 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
       if (error || data?.error || data?.success === false) {
         throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
       }
+      setSyncError(null);
+      if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
       setLastUpdatedAt(new Date());
       setState("fresh");
       invalidateLiveQueries();
@@ -99,6 +103,7 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
       // Falha silenciosa: o histórico armazenado permanece visível e uma nova
       // tentativa ocorrerá ao recuperar foco ou no próximo ciclo.
       console.warn("[near-realtime-sync]", error);
+      setSyncError(error instanceof Error ? error.message : String(error));
       setState("error");
     }).finally(() => {
       inFlight.current = null;
@@ -143,5 +148,5 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
     };
   }, [enabled, invalidateLiveQueries, scope]);
 
-  return { state, lastUpdatedAt, refresh };
+  return { state, lastUpdatedAt, lastSyncAt, syncError, refresh };
 }

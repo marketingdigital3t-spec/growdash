@@ -575,7 +575,7 @@ export default function CrmPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
-          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name }))} selectedIds={adAccountIds} onChange={setAdAccountIds} loading={loadingAdAccounts} errorMessage={adAccountsError ? `Falha ao carregar contas: ${adAccountsQueryError instanceof Error ? adAccountsQueryError.message : "verifique a conexão"}` : undefined} onRetry={() => void refetchAdAccounts()} className="h-11" popoverClassName="crm-filter-popover" />
+          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))} selectedIds={adAccountIds} onChange={setAdAccountIds} loading={loadingAdAccounts} errorMessage={adAccountsError ? `Falha ao carregar contas: ${adAccountsQueryError instanceof Error ? adAccountsQueryError.message : "verifique a conexão"}` : undefined} onRetry={() => void refetchAdAccounts()} className="h-11" popoverClassName="crm-filter-popover" />
           <AccountMultiSelect
             accounts={availableFunnels.map((funnel) => ({ id: funnel.id, name: funnel.name }))}
             selectedIds={scopedSelectedFunnelIds}

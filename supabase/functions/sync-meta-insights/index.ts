@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
     // enviando startDate/endDate explicitamente e preservam todo o histórico.
     const requestedStartDate = body.startDate;
     const requestedEndDate = body.endDate;
+    const syncStartedAt = new Date().toISOString();
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
     const graphBase = `https://graph.facebook.com/${graphVersion}`;
 
@@ -105,6 +106,9 @@ Deno.serve(async (req) => {
           synced: 0,
           accounts: 0,
           skipped_disconnected: blocked,
+          synced_at: null,
+          freshness_seconds: null,
+          scope: { ad_account_ids: adAccountIds.length ? adAccountIds : adAccountId ? [adAccountId] : [], start_date: requestedStartDate || null, end_date: requestedEndDate || null },
         }),
         { status: blocked === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -714,6 +718,9 @@ Deno.serve(async (req) => {
         error: failedAccounts >= accounts.length || (accounts.length === 0 && (disconnectedAccounts?.length || 0) > 0) ? (errors[0] || "Todas as contas Meta selecionadas estão bloqueadas") : undefined,
         needs_reauth: needsReauth || undefined,
         graph_version: graphVersion,
+        synced_at: new Date().toISOString(),
+        freshness_seconds: Math.max(0, Math.floor((Date.now() - new Date(syncStartedAt).getTime()) / 1000)),
+        scope: { ad_account_ids: accounts.map((account: any) => account.id), start_date: requestedStartDate || null, end_date: requestedEndDate || null },
         pagination: { pages: totalPages, last_cursor: lastCursor },
       }),
       { status: failedAccounts === 0 && (disconnectedAccounts?.length || 0) === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }

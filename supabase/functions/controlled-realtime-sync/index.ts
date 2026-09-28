@@ -151,7 +151,9 @@ Deno.serve(async (req) => {
 
     return json({
       success: results.every((result) => result.skipped || !result.errors),
-      freshness_seconds: 300,
+      freshness_seconds: 0,
+      synced_at: new Date().toISOString(),
+      scope: { ad_account_ids: body.adAccountId ? [body.adAccountId] : [] },
       synchronized_date: today,
       duration_ms: Date.now() - startedAt,
       results,

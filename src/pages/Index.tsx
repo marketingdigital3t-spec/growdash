@@ -27,6 +27,7 @@ import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardReferenceDeck } from "@/components/dashboard/DashboardReferenceDeck";
 import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
@@ -88,6 +89,12 @@ const Index = () => {
     endDate,
     enabled: true,
   });
+  const dashboardMeta = useMetaTrafficMetrics({
+    adAccountIds: selectedAccountIds.length ? selectedAccountIds : scopedAccountIds,
+    campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined,
+    startDate: format(startDate, "yyyy-MM-dd"),
+    endDate: format(endDate, "yyyy-MM-dd"),
+  }, !loadingAdAccounts);
   const { data: sales = [] } = useSales({
     startDate,
     endDate,
@@ -187,7 +194,7 @@ const Index = () => {
   // chegaram a `sales`; uma venda de checkout nunca é descartada por o RD
   // ainda não ter atualizado a etapa.
   const glassSales = aggregateRevenueSources(dashboardSales, dashboardRevenueDeals);
-  const glassSpend = dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
+  const glassSpend = dashboardMeta.data.spend || dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
   const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
   const { data: dashboardActionData } = useActionTotalsByAds(
@@ -198,14 +205,14 @@ const Index = () => {
     { adAccountIds: selectedAccountIds.length ? selectedAccountIds : visibleAccountIdList, campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined },
   );
   const dashboardActions = useMemo(() => dashboardActionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [dashboardActionData?.metaLeadActions]);
-  const glassConversations = dashboardActions.conversations;
-  const glassForms = dashboardActions.forms;
+  const glassConversations = dashboardMeta.data.conversations || dashboardActions.conversations;
+  const glassForms = dashboardMeta.data.formLeads || dashboardActions.forms;
   const leadBreakdown = useMemo(() => ({ forms: glassForms, site: dashboardActions.site, conversations: glassConversations, total: dashboardActions.total }), [dashboardActions, glassConversations, glassForms]);
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
-  const glassImpressions = dashboardInsights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
-  const glassClicks = dashboardInsights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
+  const glassImpressions = dashboardMeta.data.impressions || dashboardInsights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
+  const glassClicks = dashboardMeta.data.clicks || dashboardInsights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
 

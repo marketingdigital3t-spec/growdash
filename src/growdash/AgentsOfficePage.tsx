@@ -26,6 +26,7 @@ import {
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -88,6 +89,7 @@ export default function AgentsOfficePage() {
   const activeAccountId = activeAgent ? assignments[activeAgent.id] : undefined;
   const account = visibleAccounts.find((item) => item.id === activeAccountId);
   const { data: insights = [], isFetching: loadingInsights } = useInsights({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: activeAccountId ? [activeAccountId] : [], startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, !!activeAccountId);
   const { data: deals = [], isFetching: loadingDeals } = useRDDealsForPeriod({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
   const { data: sales = [] } = useSales({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
 
@@ -122,13 +124,7 @@ export default function AgentsOfficePage() {
   }, []);
 
   const metrics = useMemo<AgentMetrics>(() => {
-    const media = insights.reduce((total, row) => ({
-      spend: total.spend + Number(row.spend || 0),
-      impressions: total.impressions + Number(row.impressions || 0),
-      reach: total.reach + Number(row.reach || 0),
-      clicks: total.clicks + Number(row.clicks || 0),
-      leads: total.leads + Number(row.leads || 0),
-    }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
+    const media = metaTraffic.data;
     const confirmed = aggregateSales(sales);
     return {
       ...media,
@@ -136,7 +132,7 @@ export default function AgentsOfficePage() {
       wonDeals: confirmed.totalQuantity,
       revenue: confirmed.totalNet,
     };
-  }, [deals, insights, sales]);
+  }, [deals, metaTraffic.data, sales]);
 
   const activeLifeState = activeAgent ? lifeStates[activeAgent.id] : null;
   const gameClock = formatAgentClock(gameMinutes);
@@ -274,7 +270,7 @@ export default function AgentsOfficePage() {
               </div>
               <div className="agent-chat-messages growdash-scrollbar">
                 {(messages[activeAgent.id] || []).map((message) => <div key={message.id} className={cn("agent-message", message.role === "user" ? "is-user" : "is-agent")}>{message.text}</div>)}
-                {(loadingInsights || loadingDeals) && activeAccountId && <div className="agent-message is-agent animate-pulse">Atualizando dados da conta em segundo plano…</div>}
+                {(loadingInsights || metaTraffic.isLoading || loadingDeals) && activeAccountId && <div className="agent-message is-agent animate-pulse">Atualizando dados da conta em segundo plano…</div>}
               </div>
               <div className="border-t border-white/10 p-3">
                 <div className="mb-2 flex gap-1 overflow-x-auto growdash-scrollbar-hidden">{["Leads e CPL", "CTR e criativos", "Vendas e ROAS"].map((suggestion) => <button key={suggestion} type="button" onClick={() => setInput(suggestion)} className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[9px] text-white/55 hover:border-primary/50 hover:text-primary">{suggestion}</button>)}</div>

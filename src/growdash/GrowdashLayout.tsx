@@ -16,6 +16,7 @@ import {
   UserRound,
   Palette,
   BadgeDollarSign,
+  RefreshCw,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { endOfMonth, startOfMonth } from "date-fns";
@@ -169,7 +170,7 @@ export default function GrowdashLayout() {
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
-  useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId, enabled: loadBackgroundData });
+  const liveSync = useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId, enabled: loadBackgroundData });
 
   const displayName = sidebarProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const avatarUrl = sidebarProfile?.avatar_url || user?.user_metadata?.avatar_url || "";
@@ -482,6 +483,10 @@ export default function GrowdashLayout() {
               SaaS
             </button>
           </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => void liveSync.refresh(true)} disabled={liveSync.state === "refreshing"} className="order-2 h-8 shrink-0 gap-1.5 border-white/15 bg-white/[.04] text-[10px] text-white/75 hover:bg-white/10 hover:text-white lg:order-none" title={liveSync.syncError || "Atualizar métricas Meta agora"}>
+            <RefreshCw className={cn("h-3.5 w-3.5", liveSync.state === "refreshing" && "animate-spin")} />
+            <span className="hidden sm:inline">{liveSync.state === "refreshing" ? "Sincronizando…" : "Atualizar Meta"}</span>
+          </Button>
         </header>
         <main
           className={cn(

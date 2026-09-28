@@ -35,6 +35,7 @@ import { useSales } from "@/hooks/useSales";
 import { filterCanonicalFunnelSales } from "@/lib/funnelRevenue";
 import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages } from "@/lib/crmPipelineStages";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
@@ -411,21 +412,35 @@ export default function FunnelAnalysis() {
     actionAccountMap,
     { adAccountIds: actionScopeAccountIds, campaignIds: actionScopeCampaignIds },
   );
+  const funnelMeta = useMetaTrafficMetrics({
+    adAccountIds: actionScopeAccountIds,
+    campaignIds: actionScopeCampaignIds,
+    startDate: format(startDate, "yyyy-MM-dd"),
+    endDate: format(endDate, "yyyy-MM-dd"),
+  }, visibleAccounts.length > 0);
 
   const mediaMetrics = useMemo(
     () => {
       const actions = actionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 };
-      return computeFunnelMediaMetrics(
-      scopedInsights,
-      actions.conversations,
+      const mediaRows = funnelMeta.data.rowCount > 0 ? [{
+        spend: funnelMeta.data.spend,
+        impressions: funnelMeta.data.impressions,
+        reach: funnelMeta.data.reach,
+        clicks: funnelMeta.data.clicks,
+        leads: funnelMeta.data.leads,
+      }] : scopedInsights;
+      const computed = computeFunnelMediaMetrics(
+      mediaRows as any,
+      funnelMeta.data.conversations || actions.conversations,
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,
-      actions.forms,
-      actions.site,
+      funnelMeta.data.formLeads || actions.forms,
+      funnelMeta.data.siteLeads || actions.site,
     );
+      return { ...computed, spend: funnelMeta.data.spend || computed.spend, metaLeads: funnelMeta.data.leads || computed.metaLeads };
     },
-    [actionData?.metaLeadActions, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
+    [actionData?.metaLeadActions, funnelMeta.data, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
   );
 
   async function handleSync() {
@@ -547,7 +562,7 @@ export default function FunnelAnalysis() {
       <MotionItem>
         <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
           <AccountMultiSelect
-            accounts={visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") }))}
+            accounts={visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome"), connection_status: account.connection_status }))}
             selectedIds={selectedAccountIds}
             onChange={setAdAccountIds}
             className="gd-filter-account bg-background/60"

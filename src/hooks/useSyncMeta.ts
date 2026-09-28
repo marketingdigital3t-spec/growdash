@@ -11,6 +11,7 @@ interface SyncParams {
   includeBreakdowns?: boolean;
   breakdownStartDate?: string;
   breakdownEndDate?: string;
+  force?: boolean;
 }
 
 type SyncResponse = {
@@ -22,6 +23,9 @@ type SyncResponse = {
   needs_reauth?: boolean;
   error?: string;
   leads?: number;
+  synced_at?: string;
+  freshness_seconds?: number;
+  scope?: { ad_account_ids?: string[]; start_date?: string | null; end_date?: string | null };
 };
 
 async function invokeSyncFunction(name: string, body: Record<string, unknown>): Promise<SyncResponse> {
@@ -75,6 +79,7 @@ export function useSyncMeta() {
         includeBreakdowns: params.includeBreakdowns === true,
         breakdownStartDate: params.breakdownStartDate,
         breakdownEndDate: params.breakdownEndDate,
+        force: params.force === true,
       };
       // Hourly reconciliation reads the daily rows. Running both in parallel
       // caused races, inflated API usage and occasional non-2xx responses.
@@ -90,6 +95,7 @@ export function useSyncMeta() {
           adAccountIds: params.adAccountIds,
           startDate: params.startDate,
           endDate: params.endDate,
+          force: params.force === true,
         });
       } catch (error) {
         leadsWarning = error instanceof Error ? error.message : "Leads Meta pendentes.";
@@ -110,6 +116,9 @@ export function useSyncMeta() {
         hourly_synced: Number(hourly.synced ?? 0),
         leads_synced: Number(leads.synced ?? leads.leads ?? 0),
         errors: [...(insights.errors ?? []), ...(leads.errors ?? []), ...(hourly.errors ?? []), ...(leadsWarning ? [leadsWarning] : []), ...(hourlyWarning ? [hourlyWarning] : [])],
+        synced_at: insights.synced_at || new Date().toISOString(),
+        freshness_seconds: insights.freshness_seconds,
+        scope: insights.scope,
       };
     },
     onSuccess: (data) => {
