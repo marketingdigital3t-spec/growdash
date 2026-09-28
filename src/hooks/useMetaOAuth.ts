@@ -19,20 +19,19 @@ export function useMetaOAuth() {
       // not access popup.document after opening: that cross-origin read throws
       // and prevents the OAuth URL from ever being assigned.
       const popup = window.open("about:blank", "_blank", "popup,width=620,height=760");
-      if (!popup) {
-        throw new Error("O navegador bloqueou a janela da Meta. Libere pop-ups para a Growdash e tente novamente.");
-      }
-
+      // In-app browsers frequently block popups. Keep the OAuth request
+      // usable by falling back to a same-tab redirect after the URL is ready.
       oauthPopup.current = popup;
       const { data, error } = await supabase.functions.invoke("meta-oauth-start", { body: {} });
       if (error || !data?.authUrl) {
-        popup.close();
+        popup?.close();
         oauthPopup.current = null;
         if (data?.error) throw new Error(`${data.error}${data.action ? ` ${data.action}` : ""}`);
         throw new Error(await getEdgeFunctionErrorMessage(error, "Não foi possível iniciar a conexão com a Meta."));
       }
 
-      popup.location.replace(data.authUrl);
+      if (popup) popup.location.replace(data.authUrl);
+      else window.location.assign(data.authUrl);
     },
     onError: (error: Error) => toast({
       title: "Não foi possível conectar",
