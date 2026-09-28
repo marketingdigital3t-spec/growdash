@@ -184,6 +184,15 @@ Deno.serve(async (req) => {
         : "Nenhuma conta de anúncio acessível foi encontrada nesse perfil da Meta.");
     }
 
+    const { data: workspaceMembership } = await admin
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", oauthState.user_id)
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     let saved = 0;
     for (const account of accounts) {
       const rawId = String(account.account_id ?? account.id ?? "").replace(/^act_/, "").trim();
@@ -201,6 +210,7 @@ Deno.serve(async (req) => {
       const existing = (existingRows || []).sort((a, b) => Number(b.connection_status !== "disconnected") - Number(a.connection_status !== "disconnected"))[0];
       const values = {
         user_id: oauthState.user_id,
+        workspace_id: workspaceMembership?.workspace_id ?? null,
         account_id: accountId,
         provider_account_id: rawId,
         name: String(account.name ?? accountId).slice(0, 255),
