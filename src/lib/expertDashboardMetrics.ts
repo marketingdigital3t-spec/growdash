@@ -20,9 +20,9 @@ export type ExpertLeadActions = {
 };
 
 /**
- * Keeps acquisition sources explicit. A native Meta lead and a messaging
- * conversation are distinct events. Both are Meta acquisitions and therefore
- * compose the Expert's total lead KPI, while RD remains a separate metric.
+ * Keeps acquisition sources explicit. The Expert's Meta total follows the Ads
+ * Manager Results column (forms/site leads plus initiated conversations),
+ * while the conversation component remains separately visible.
  */
 export function getExpertDashboardMetrics(
   insights: InsightRow[],

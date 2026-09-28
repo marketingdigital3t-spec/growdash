@@ -161,7 +161,10 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
           }
           if (rows.length < PAGE) break;
         }
-        totalMetaLeads = Object.values(actionsByAd).reduce((sum, actions) => sum + resolveMetaLeadActions(actions).forms + resolveMetaLeadActions(actions).conversations, 0);
+        totalMetaLeads = Object.values(actionsByAd).reduce((sum, actions) => {
+          const resolved = resolveMetaLeadActions(actions);
+          return sum + resolved.forms + resolved.site + resolved.conversations;
+        }, 0);
       }
       const leadsWithRegion = Object.values(metaByUF).reduce((s, m) => s + m.leads, 0);
 

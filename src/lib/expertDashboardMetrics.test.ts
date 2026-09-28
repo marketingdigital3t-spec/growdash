@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getExpertAttribution, getExpertDashboardMetrics } from "./expertDashboardMetrics";
 
 describe("expert dashboard metrics", () => {
-  it("includes Meta conversations in total leads while keeping RD separate", () => {
+  it("matches the Ads Manager results total while keeping RD separate", () => {
     const result = getExpertDashboardMetrics(
       [{ leads: 40, spend: 240 } as any, { leads: 20, spend: 60 } as any],
       [{ id: "1" }, { id: "2" }, { id: "3" }, { id: "4" }] as any,

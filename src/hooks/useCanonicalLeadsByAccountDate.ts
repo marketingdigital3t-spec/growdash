@@ -37,7 +37,8 @@ interface ActionRow {
  * as the dashboard KPI "Leads":
  *   - FORMS (ON_AD) campaigns: `onsite_conversion.lead_grouped`
  *   - LANDING (WEBSITE) campaigns: per-account configured action_type (`account_lp_config`)
- *   - MESSAGES campaigns: `onsite_conversion.messaging_conversation_started_7d`
+ * Messaging campaigns contribute their initiated conversations, matching the
+ * Ads Manager's overall Results total used by the dashboard.
  *
  * Returns `Map<"accountId|YYYY-MM-DD", number>`.
  *

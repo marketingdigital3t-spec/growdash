@@ -58,6 +58,8 @@ export function resolveMetaLeadActions(actionTotals?: Record<string, number>, si
     forms,
     site,
     conversations,
+    // The Ads Manager's overall Results column combines lead submissions and
+    // initiated conversations; the component fields keep both sources visible.
     total: forms + site + conversations,
   };
 }
