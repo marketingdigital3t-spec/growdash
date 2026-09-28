@@ -78,13 +78,42 @@ Deno.serve(async (req) => {
   try {
     const rdOnly = body.rd_only === true;
     if (!rdOnly) {
-      const { data: accounts, error: accountsError } = await admin.from("ad_accounts").select("id,name").eq("user_id", userId).neq("connection_status", "disconnected");
+      // Keep the historical run account-complete, but never sync a manually
+      // disconnected/blocked row. Legacy OAuth imports can leave duplicate
+      // rows for the same Meta account; choose the newest usable row so the
+      // same provider facts are not requested twice.
+      const { data: accountRows, error: accountsError } = await admin
+        .from("ad_accounts")
+        .select("id,name,account_id,connection_status,oauth_health_status,access_token,created_at")
+        .eq("user_id", userId)
+        .not("connection_status", "in", "(disconnected,blocked)");
       if (accountsError) throw accountsError;
-      for (const account of accounts || []) {
+      const accountMap = new Map<string, any>();
+      for (const account of accountRows || []) {
+        const providerId = String(account.account_id || account.id).replace(/^act_/i, "");
+        const hasToken = typeof account.access_token === "string" && account.access_token.trim().length > 0;
+        const oauthBlocked = new Set(["permission_removed", "expired", "invalid"]).has(String(account.oauth_health_status || ""));
+        if (oauthBlocked && !hasToken) continue;
+        const current = accountMap.get(providerId);
+        if (!current || String(account.created_at || "") > String(current.created_at || "")) accountMap.set(providerId, account);
+      }
+      const accounts = Array.from(accountMap.values());
+      for (const account of accounts) {
       let windowStart = historicalStart;
       while (windowStart <= today) {
         const windowEnd = addDays(windowStart, 89) < today ? addDays(windowStart, 89) : today;
-        const common = { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, incremental: false, includeBreakdowns: false, triggerSource: "historical_backfill" };
+        const common = {
+          adAccountId: account.id,
+          startDate: windowStart,
+          endDate: windowEnd,
+          incremental: false,
+          // Historical audience/placement/region data is part of the same
+          // provider truth and must not be omitted from a complete backfill.
+          includeBreakdowns: true,
+          breakdownStartDate: windowStart,
+          breakdownEndDate: windowEnd,
+          triggerSource: "historical_backfill",
+        };
         const insight = await invoke(base, key, "sync-meta-insights", common);
         const lead = await invoke(base, key, "sync-meta-leads", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" });
         const hourly = await invoke(base, key, "sync-meta-hourly", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" });
