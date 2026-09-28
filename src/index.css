@@ -7996,6 +7996,45 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   box-shadow: 0 3px 9px rgba(22,135,216,.38);
 }
 .gd-calendar-popover .rdp-day_today { font-weight: 800; text-decoration: underline; text-decoration-color: rgba(255,255,255,.6); text-underline-offset: 4px; }
+
+/* DayPicker's dropdown caption includes screen-reader-only labels such as
+   "Month:" and "Year:". The shared reset does not load DayPicker's own
+   stylesheet, so keep those labels accessible without letting them occupy
+   visual space beside the native month/year selects. */
+.gd-date-range-popover .rdp-vhidden,
+.gd-calendar-popover .rdp-vhidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Range modifiers are applied directly to each day button. Give middle days
+   their own compact tile instead of allowing the browser's default range
+   background to merge every selected week into a full-width blue bar. */
+.gd-date-range-popover .rdp-day_range_middle[aria-selected="true"] {
+  border-radius: 6px !important;
+  background: rgba(35,150,255,.22) !important;
+  color: #eaf5ff !important;
+}
+.gd-date-range-popover .rdp-day_range_start,
+.gd-date-range-popover .rdp-day_range_end {
+  border-radius: 7px !important;
+  background: #1687d8 !important;
+  color: #fff !important;
+  box-shadow: 0 3px 9px rgba(22,135,216,.3) !important;
+}
+.gd-date-range-popover .rdp-day_range_middle[aria-selected="true"]:hover,
+.gd-date-range-popover .rdp-day_range_start[aria-selected="true"]:hover,
+.gd-date-range-popover .rdp-day_range_end[aria-selected="true"]:hover {
+  background: #2396ff !important;
+  color: #fff !important;
+}
 @media (max-width: 767px) {
   .gd-date-range-presets { width: 100% !important; max-height: 220px !important; }
   .gd-date-range-popover .rdp-month { width: 286px; }
