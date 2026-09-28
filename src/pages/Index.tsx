@@ -230,6 +230,7 @@ const Index = () => {
       includeBreakdowns: true,
       breakdownStartDate: syncStart,
       breakdownEndDate: syncEnd,
+      force: true,
     });
   }, [endDate, scopedAccountIds, selectedAccountIds, startDate, syncMeta]);
 

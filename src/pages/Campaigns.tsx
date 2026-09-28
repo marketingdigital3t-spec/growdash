@@ -554,6 +554,7 @@ export default function Campaigns() {
         adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : undefined,
         startDate: formatApiDate(startDate),
         endDate: formatApiDate(endDate),
+        force: true,
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campaigns_full"] }),

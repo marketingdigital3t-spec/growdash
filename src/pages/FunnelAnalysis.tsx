@@ -467,6 +467,7 @@ export default function FunnelAnalysis() {
             includeBreakdowns: true,
             breakdownStartDate: format(startDate, "yyyy-MM-dd"),
             breakdownEndDate: format(endDate, "yyyy-MM-dd"),
+            force: true,
           }),
         };
       } catch (reason) {
