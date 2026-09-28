@@ -56,6 +56,10 @@ Deno.serve(async (req) => {
     const adAccountIds = Array.isArray(body.adAccountIds)
       ? body.adAccountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
+    const campaignIds = Array.isArray(body.campaignIds)
+      ? body.campaignIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+      : [];
+    const requestedAttributionWindow = typeof body.attributionWindow === "string" ? body.attributionWindow.trim() : "";
     const includeBreakdowns = body.includeBreakdowns === true;
     const requestedBreakdownStartDate = typeof body.breakdownStartDate === "string" ? body.breakdownStartDate : undefined;
     const requestedBreakdownEndDate = typeof body.breakdownEndDate === "string" ? body.breakdownEndDate : undefined;
@@ -139,7 +143,9 @@ Deno.serve(async (req) => {
         // to the visible dashboard period, independent from media backfills.
         const breakdownStartDate = requestedBreakdownStartDate || startDate;
         const breakdownEndDate = requestedBreakdownEndDate || endDate;
-        const attributionWindows = account.attribution_window && account.attribution_window !== "account_default"
+        const attributionWindows = requestedAttributionWindow && requestedAttributionWindow !== "account_default"
+          ? requestedAttributionWindow.split(",").map((value: string) => value.trim()).filter(Boolean)
+          : account.attribution_window && account.attribution_window !== "account_default"
           ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
           : ["7d_click", "1d_view"];
         const attributionParam = encodeURIComponent(JSON.stringify(attributionWindows));
@@ -402,8 +408,11 @@ Deno.serve(async (req) => {
 
         // 4. Buscar insights a nível de CONTA (não depende da listagem de campanhas)
         //    Captura inclusive ads de campanhas arquivadas/finalizadas
+        const campaignFilter = campaignIds.length
+          ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: campaignIds }]))}`
+          : "";
         const insightsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
         );
         recordPagination(insightsRes);
         if (insightsRes.error) {
@@ -720,7 +729,14 @@ Deno.serve(async (req) => {
         graph_version: graphVersion,
         synced_at: new Date().toISOString(),
         freshness_seconds: Math.max(0, Math.floor((Date.now() - new Date(syncStartedAt).getTime()) / 1000)),
-        scope: { ad_account_ids: accounts.map((account: any) => account.id), start_date: requestedStartDate || null, end_date: requestedEndDate || null },
+        scope: {
+          ad_account_ids: accounts.map((account: any) => account.id),
+          campaign_ids: campaignIds,
+          start_date: requestedStartDate || null,
+          end_date: requestedEndDate || null,
+          attribution_window: requestedAttributionWindow || "account_default",
+          timezone: typeof body.timezone === "string" ? body.timezone : "account",
+        },
         pagination: { pages: totalPages, last_cursor: lastCursor },
       }),
       { status: failedAccounts === 0 && (disconnectedAccounts?.length || 0) === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }

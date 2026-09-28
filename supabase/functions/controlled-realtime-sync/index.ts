@@ -10,8 +10,12 @@ type SyncProvider = "meta" | "rd" | "balance";
 
 type SyncBody = {
   adAccountId?: string;
+  adAccountIds?: string[];
+  campaignIds?: string[];
   startDate?: string;
   endDate?: string;
+  timezone?: string;
+  attributionWindow?: string;
   includeMeta?: boolean;
   includeRD?: boolean;
   includeBalance?: boolean;
@@ -26,6 +30,8 @@ type RunResult = {
   reason?: string;
   synced?: number;
   errors?: unknown;
+  synced_at?: string;
+  freshness_seconds?: number | null;
 };
 
 // A UI pode chamar esta função ao abrir, ao recuperar foco e a cada minuto.
@@ -59,9 +65,14 @@ Deno.serve(async (req) => {
     try { body = await req.json(); } catch { body = {}; }
 
     const today = dateInSaoPaulo(new Date());
-    // Atualização automática toca somente o dia corrente. Intervalos históricos
-    // continuam disponíveis nas rotas manuais/backfill, sem serem reprocessados.
-    const scopeKey = body.adAccountId || "all";
+    const startDate = body.startDate || today;
+    const endDate = body.endDate || today;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
+      return json({ error: "startDate/endDate inválidos; use YYYY-MM-DD e um intervalo crescente." }, 400);
+    }
+    const accountScope = (body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : []).sort().join(",") || "all";
+    const campaignScope = (body.campaignIds || []).slice().sort().join(",") || "all-campaigns";
+    const scopeKey = `${accountScope}:${campaignScope}:${startDate}:${endDate}:${body.attributionWindow || "account_default"}:${body.timezone || "account"}`;
     const includeMeta = body.includeMeta !== false;
     const includeRD = body.includeRD !== false;
     const includeBalance = body.includeBalance !== false;
@@ -94,8 +105,13 @@ Deno.serve(async (req) => {
           // corrida e discrepância entre cards e gráficos por hora.
           const insights = await invokeFunction(supabaseUrl, authHeader, "sync-meta-insights", {
             adAccountId: body.adAccountId,
+            adAccountIds: body.adAccountIds,
+            campaignIds: body.campaignIds,
+            startDate,
+            endDate,
+            timezone: body.timezone,
+            attributionWindow: body.attributionWindow,
             // Omitting dates lets sync-meta-insights resolve "today" in each
-            // account's Meta timezone instead of forcing São Paulo midnight.
             incremental: true,
             includeBreakdowns: false,
           });
@@ -103,6 +119,10 @@ Deno.serve(async (req) => {
 
           const hourly = await invokeFunction(supabaseUrl, authHeader, "sync-meta-hourly", {
             adAccountId: body.adAccountId,
+            adAccountIds: body.adAccountIds,
+            startDate,
+            endDate,
+            attributionWindow: body.attributionWindow,
           });
           const errors = [insights.data?.errors, hourly.data?.errors, hourly.error].filter(Boolean);
           return {
@@ -149,12 +169,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    const metaResult = results.find((result) => result.provider === "meta");
     return json({
       success: results.every((result) => result.skipped || !result.errors),
-      freshness_seconds: 0,
-      synced_at: new Date().toISOString(),
-      scope: { ad_account_ids: body.adAccountId ? [body.adAccountId] : [] },
-      synchronized_date: today,
+      freshness_seconds: metaResult?.freshness_seconds ?? null,
+      synced_at: metaResult?.synced_at || new Date().toISOString(),
+      scope: {
+        ad_account_ids: body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : [],
+        campaign_ids: body.campaignIds || [],
+        start_date: startDate,
+        end_date: endDate,
+        attribution_window: body.attributionWindow || "account_default",
+        timezone: body.timezone || "account",
+      },
+      synchronized_date: endDate,
       duration_ms: Date.now() - startedAt,
       results,
     });
@@ -233,6 +261,8 @@ async function runControlled(args: {
       scope: scopeKey,
       synced: Number(payload?.synced || payload?.deals || payload?.updated || 0),
       errors: hasError ? error : undefined,
+      synced_at: typeof payload?.synced_at === "string" ? payload.synced_at : finishedAt,
+      freshness_seconds: payload?.freshness_seconds == null ? null : Number(payload.freshness_seconds),
     };
   } catch (error) {
     const finishedAt = new Date().toISOString();

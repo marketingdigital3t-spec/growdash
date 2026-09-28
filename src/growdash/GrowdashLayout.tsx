@@ -138,6 +138,8 @@ export default function GrowdashLayout() {
     segment,
     setSegment,
     businessUnitId,
+    startDate,
+    endDate,
   } = useGlobalFilters();
   const visibleAccounts = useMemo(
     () => businessUnitId
@@ -170,7 +172,13 @@ export default function GrowdashLayout() {
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
-  const liveSync = useNearRealtimeSync({ adAccountId: adAccountId === "all" ? undefined : adAccountId, enabled: loadBackgroundData });
+  const liveSync = useNearRealtimeSync({
+    adAccountId: adAccountId === "all" ? undefined : adAccountId,
+    adAccountIds: adAccountId === "all" ? adAccountIds : undefined,
+    startDate,
+    endDate,
+    enabled: loadBackgroundData,
+  });
 
   const displayName = sidebarProfile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
   const avatarUrl = sidebarProfile?.avatar_url || user?.user_metadata?.avatar_url || "";

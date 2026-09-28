@@ -47,4 +47,17 @@ describe("Meta traffic metrics", () => {
     expect(result.roas).toBe(0);
     expect(result.rowCount).toBe(0);
   });
+
+  it("expõe resultados por objetivo sem repetir a mesma ação em cada dia", () => {
+    const result = aggregateMetaTrafficMetrics([
+      { ad_id: "ad-1", ad_account_id: "acc-1", campaign_id: "camp-1", campaign_name: "Leads", campaign_objective: "OUTCOME_LEADS", spend: 10, impressions: 100, reach: 80, clicks: 5 },
+      { ad_id: "ad-1", ad_account_id: "acc-1", campaign_id: "camp-1", campaign_name: "Leads", campaign_objective: "OUTCOME_LEADS", spend: 12, impressions: 120, reach: 90, clicks: 6 },
+    ], {
+      totalsByAd: { "ad-1": { onsite_conversion_lead_grouped: 3, "onsite_conversion.lead_grouped": 3 } },
+      metaLeadActions: { forms: 3, site: 0, conversations: 0, total: 3 },
+    }, "2026-09-28T12:00:00.000Z", [], Date.parse("2026-09-28T12:01:00.000Z"));
+
+    expect(result.resultBreakdown).toHaveLength(1);
+    expect(result.resultBreakdown[0]).toMatchObject({ campaignId: "camp-1", resultType: "leads", value: 3 });
+  });
 });

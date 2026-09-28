@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
     const adAccountIds = Array.isArray(body.adAccountIds)
       ? body.adAccountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
+    const requestedAttributionWindow = typeof body.attributionWindow === "string" ? body.attributionWindow.trim() : "";
     const requestedStartDate: string | undefined = body.startDate;
     const requestedEndDate: string | undefined = body.endDate;
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
@@ -85,7 +86,9 @@ Deno.serve(async (req) => {
         const accessToken = account.access_token as string;
         const raw = account.account_id as string;
         const metaAccountId = raw.startsWith("act_") ? raw : `act_${raw}`;
-        const attributionWindows = account.attribution_window && account.attribution_window !== "account_default"
+        const attributionWindows = requestedAttributionWindow && requestedAttributionWindow !== "account_default"
+          ? requestedAttributionWindow.split(",").map((value: string) => value.trim()).filter(Boolean)
+          : account.attribution_window && account.attribution_window !== "account_default"
           ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
           : ["7d_click", "1d_view"];
 

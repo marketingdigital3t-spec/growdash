@@ -36,6 +36,9 @@ type SyncState = "idle" | "refreshing" | "fresh" | "error";
 
 interface Params {
   adAccountId?: string;
+  adAccountIds?: string[];
+  startDate?: Date;
+  endDate?: Date;
   enabled?: boolean;
 }
 
@@ -43,12 +46,12 @@ interface Params {
  * Stale-while-revalidate para Meta Ads + RD Station.
  *
  * As telas leem primeiro o último snapshot local (histórico já sincronizado).
- * A rotina externa só consulta o delta do dia corrente em segundo plano; cada
+ * A rotina externa consulta o escopo do calendário atual em segundo plano; cada
  * gravação no banco é recebida em realtime e agrupada por no máximo um segundo.
  * Assim, os KPIs permanecem visíveis e mudam sem um loader central nem novo
  * backfill do histórico a cada navegação.
  */
-export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}) {
+export function useNearRealtimeSync({ adAccountId, adAccountIds, startDate, endDate, enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
   const inFlight = useRef<Promise<void> | null>(null);
   const invalidateTimer = useRef<number | null>(null);
@@ -56,7 +59,7 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const scope = adAccountId || "all";
+  const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${startDate?.toISOString().slice(0, 10) || "today"}:${endDate?.toISOString().slice(0, 10) || "today"}`;
 
   const invalidateLiveQueries = useCallback(() => {
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
@@ -84,6 +87,9 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
       const { data, error } = await supabase.functions.invoke("controlled-realtime-sync", {
         body: {
           adAccountId,
+          adAccountIds,
+          startDate: startDate?.toISOString().slice(0, 10),
+          endDate: endDate?.toISOString().slice(0, 10),
           includeMeta: true,
           includeRD: true,
           includeBalance: true,
@@ -111,7 +117,7 @@ export function useNearRealtimeSync({ adAccountId, enabled = true }: Params = {}
 
     inFlight.current = task;
     return task;
-  }, [adAccountId, enabled, invalidateLiveQueries, scope]);
+  }, [adAccountId, adAccountIds, endDate, enabled, invalidateLiveQueries, scope, startDate]);
 
   useEffect(() => {
     if (!enabled) return;
