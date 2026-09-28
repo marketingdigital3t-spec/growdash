@@ -147,8 +147,10 @@ Deno.serve(async (req) => {
           ? requestedAttributionWindow.split(",").map((value: string) => value.trim()).filter(Boolean)
           : account.attribution_window && account.attribution_window !== "account_default"
           ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
-          : ["7d_click", "1d_view"];
-        const attributionParam = encodeURIComponent(JSON.stringify(attributionWindows));
+          : [];
+        const attributionParam = attributionWindows.length
+          ? `&action_attribution_windows=${encodeURIComponent(JSON.stringify(attributionWindows))}`
+          : "";
         const accessToken = account.access_token;
         const rawAccountId = account.account_id;
         const metaAccountId = rawAccountId.startsWith("act_") ? rawAccountId : `act_${rawAccountId}`;
@@ -412,7 +414,7 @@ Deno.serve(async (req) => {
           ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: campaignIds }]))}`
           : "";
         const insightsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
+          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
         );
         recordPagination(insightsRes);
         if (insightsRes.error) {
@@ -613,7 +615,7 @@ Deno.serve(async (req) => {
           ];
           for (const breakdown of breakdownRequests) {
             const bRes = await fetchMetaPaginated(
-              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}&action_attribution_windows=${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
             recordPagination(bRes);
             if (bRes.error) {

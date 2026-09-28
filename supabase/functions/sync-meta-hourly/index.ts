@@ -90,7 +90,10 @@ Deno.serve(async (req) => {
           ? requestedAttributionWindow.split(",").map((value: string) => value.trim()).filter(Boolean)
           : account.attribution_window && account.attribution_window !== "account_default"
           ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
-          : ["7d_click", "1d_view"];
+          : [];
+        const attributionParam = attributionWindows.length
+          ? `&action_attribution_windows=${encodeURIComponent(JSON.stringify(attributionWindows))}`
+          : "";
 
         // Match daily sync: leads = onsite_conversion.lead_grouped + per-account configured LP event.
         const { data: lpCfg } = await supabaseAdmin
@@ -107,7 +110,7 @@ Deno.serve(async (req) => {
           `&breakdowns=hourly_stats_aggregated_by_audience_time_zone` +
           `&fields=ad_id,campaign_id,spend,clicks,actions` +
           `&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}` +
-          `&action_attribution_windows=${encodeURIComponent(JSON.stringify(attributionWindows))}` +
+          attributionParam +
           `&use_unified_attribution_setting=true` +
           `&access_token=${accessToken}` +
           `&limit=500`;
