@@ -8035,6 +8035,29 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   background: #2396ff !important;
   color: #fff !important;
 }
+
+/* The range picker is intentionally text-only: no blue fill, outline or
+   rounded border should remain on selected cells or their table wrappers. */
+.gd-date-range-popover .rdp-cell,
+.gd-date-range-popover .rdp-day,
+.gd-date-range-popover .rdp-day[aria-selected="true"],
+.gd-date-range-popover .rdp-day_selected,
+.gd-date-range-popover .rdp-day_range_start,
+.gd-date-range-popover .rdp-day_range_middle,
+.gd-date-range-popover .rdp-day_range_end {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #f8fafc !important;
+  text-decoration: none !important;
+}
+.gd-date-range-popover .rdp-cell:hover,
+.gd-date-range-popover .rdp-day:hover,
+.gd-date-range-popover .rdp-day_selected:hover {
+  background: transparent !important;
+  color: #fff !important;
+}
 @media (max-width: 767px) {
   .gd-date-range-presets { width: 100% !important; max-height: 220px !important; }
   .gd-date-range-popover .rdp-month { width: 286px; }
