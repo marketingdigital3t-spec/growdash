@@ -18,6 +18,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    let body: { adAccountId?: string; adAccountIds?: string[] } = {};
+    try { body = await req.json(); } catch { /* empty body means all authorized accounts */ }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
@@ -54,6 +56,8 @@ Deno.serve(async (req) => {
     if (userId) {
       accountsQuery = accountsQuery.eq("user_id", userId);
     }
+    if (body.adAccountId) accountsQuery = accountsQuery.eq("id", body.adAccountId);
+    else if (Array.isArray(body.adAccountIds) && body.adAccountIds.length > 0) accountsQuery = accountsQuery.in("id", body.adAccountIds);
     const { data: accounts, error: accError } = await accountsQuery;
     if (accError) throw accError;
 
