@@ -659,12 +659,18 @@ Deno.serve(async (req) => {
     if (productsError) throw productsError;
     const productList = products || [];
 
-    const { data: fieldConfigsRows, error: fieldConfigsError } = await admin
-      .from("rd_field_configs")
-      .select("key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
-      .eq("ad_account_id", funnel.ad_account_id);
-    if (fieldConfigsError) throw fieldConfigsError;
-    const fieldConfigs: FieldConfig[] = (fieldConfigsRows as any[]) || [];
+    // RD funnels can now exist independently of a Meta ad account. Never send
+    // a literal `null` through PostgREST's UUID equality filter (`eq(...,
+    // null)` becomes `eq.null` and aborts the whole RD sync).
+    let fieldConfigs: FieldConfig[] = [];
+    if (funnel.ad_account_id) {
+      const { data: fieldConfigsRows, error: fieldConfigsError } = await admin
+        .from("rd_field_configs")
+        .select("key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
+        .eq("ad_account_id", funnel.ad_account_id);
+      if (fieldConfigsError) throw fieldConfigsError;
+      fieldConfigs = (fieldConfigsRows as any[]) || [];
+    }
     // The RD API has no reliable per-pipeline custom-field catalogue. Observe
     // fields while reading every deal and upsert the account catalogue once at
     // the end of this run. This makes discovery automatic for every linked
@@ -672,6 +678,7 @@ Deno.serve(async (req) => {
     const observedFields = new Map<string, ObservedField>();
 
     async function syncObservedFieldCatalog() {
+      if (!funnel?.ad_account_id) return { created: 0, updated: 0 };
       if (observedFields.size === 0) return { created: 0, updated: 0 };
       const existingBySourceAndLabel = new Map<string, any>();
       const usedKeys = new Set<string>();
