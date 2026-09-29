@@ -154,16 +154,12 @@ export default function CrmPage() {
   // uma cópia pessoal do token. A consulta usa RLS e continua retornando
   // somente os funis atribuídos ao usuário atual.
   const canReadCrm = crmPipelineEnabled(!!user);
-  // RD is an independent source. When no Meta account is selected, load all
-  // funnels visible through RLS, including RD-only funnels with no Meta link.
-  // A selected Meta account remains a strict boundary and only shows funnels
-  // explicitly linked to that account.
-  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(accountFilter, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length), accountFilter ? undefined : undefined);
+  // RD funnels are an independent source and are never scoped by a Meta account.
+  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
   const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
   const availableFunnels = useMemo(
-    () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id
-      && (!adAccountIds.length || accountScopeSet.has(funnel.ad_account_id))),
-    [accountScopeSet, adAccountIds.length, funnelData],
+    () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id),
+    [funnelData],
   );
   const availableFunnelIds = useMemo(() => new Set(availableFunnels.map((funnel) => funnel.id)), [availableFunnels]);
   const scopedSelectedFunnelIds = useMemo(
@@ -180,12 +176,10 @@ export default function CrmPage() {
     error: dealsQueryError,
     refetch: refetchDeals,
   } = useRDCRMDeals({
-    adAccountId: accountFilter,
-    adAccountIds: accountFilter ? undefined : (adAccountIds.length ? accountScopeIds : undefined),
     funnelIds: requestedFunnelIds,
     startDate: preset === "max" ? undefined : startDate,
     endDate: preset === "max" ? undefined : endDate,
-    enabled: canReadCrm && (accountScopeIds.length > 0 || !adAccountIds.length) && requestedFunnelIds.length > 0,
+    enabled: canReadCrm && requestedFunnelIds.length > 0,
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
   const { data: products = [], isLoading: loadingProducts } = useProducts();
@@ -226,8 +220,8 @@ export default function CrmPage() {
   // in the operational CRM. The board has exactly the active RD funnels that
   // are still linked in Integrations.
   const connectedFunnels = useMemo(
-    () => funnels.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id && accountScopeSet.has(funnel.ad_account_id) && requestedFunnelIds.includes(funnel.id)),
-    [accountScopeSet, funnels, requestedFunnelIds],
+    () => funnels.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id && requestedFunnelIds.includes(funnel.id)),
+    [funnels, requestedFunnelIds],
   );
   // CRM is driven by the Meta account selector. Each active RD funnel linked
   // to that account becomes its pipeline scope automatically; users should

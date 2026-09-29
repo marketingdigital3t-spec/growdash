@@ -82,3 +82,43 @@ export function useDeleteRDFunnel() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rd_funnels"] }),
   });
 }
+
+export function useImportRDFunnels() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ connectionId, pipelines }: { connectionId: string; pipelines: Array<{ id: string; name: string }> }) => {
+      if (!user) throw new Error("Sessão não encontrada.");
+      const { data: existing, error: existingError } = await supabase
+        .from("rd_funnels")
+        .select("id,rd_funnel_id,rd_connection_id")
+        .eq("user_id", user.id);
+      if (existingError) throw existingError;
+      const known = new Set((existing ?? []).map((funnel) => funnel.rd_funnel_id).filter(Boolean));
+      for (const funnel of existing ?? []) {
+        if (funnel.rd_funnel_id && funnel.rd_connection_id === null && pipelines.some((pipeline) => pipeline.id === funnel.rd_funnel_id)) {
+          const { error } = await supabase.from("rd_funnels").update({ rd_connection_id: connectionId, ad_account_id: null }).eq("id", funnel.id);
+          if (error) throw error;
+        }
+      }
+      const rows = pipelines
+        .filter((pipeline) => pipeline.id && !known.has(pipeline.id))
+        .map((pipeline) => ({
+          user_id: user.id,
+          ad_account_id: null,
+          rd_connection_id: connectionId,
+          name: pipeline.name,
+          expert_name: null,
+          rd_funnel_id: pipeline.id,
+          utm_campaign_pattern: null,
+          is_active: true,
+        }));
+      if (rows.length) {
+        const { error } = await supabase.from("rd_funnels").insert(rows);
+        if (error) throw error;
+      }
+      return { imported: rows.length, total: pipelines.length };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rd_funnels"] }),
+  });
+}

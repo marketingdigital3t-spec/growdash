@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useAdAccounts } from "@/hooks/useAdAccounts";
 import {
-  useRDFunnels, useCreateRDFunnel, useUpdateRDFunnel, useDeleteRDFunnel, type RDFunnel,
+  useRDFunnels, useCreateRDFunnel, useUpdateRDFunnel, useDeleteRDFunnel, useImportRDFunnels, type RDFunnel,
 } from "@/hooks/useRDFunnels";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,8 +32,8 @@ function useRDApiFunnels(enabled: boolean, rdConnectionId?: string) {
 }
 
 function LinkFunnelDialog({
-  accountId, open, onOpenChange, rdConnectionId,
-}: { accountId: string | null; open: boolean; onOpenChange: (o: boolean) => void; rdConnectionId?: string }) {
+  open, onOpenChange, rdConnectionId,
+}: { open: boolean; onOpenChange: (o: boolean) => void; rdConnectionId?: string }) {
   const { toast } = useToast();
   const create = useCreateRDFunnel();
   const { data: connections = [] } = useRDAccountConnections();
@@ -77,7 +76,7 @@ function LinkFunnelDialog({
             onClick={async () => {
               if (!selected) return;
               await create.mutateAsync({
-                ad_account_id: accountId,
+                ad_account_id: null,
                 rd_connection_id: selectedConnectionId,
                 name: selected.name,
                 expert_name: null,
@@ -201,42 +200,30 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
   );
 }
 
-function AccountFunnelsBlock({ accountId, accountName }: { accountId: string; accountName: string }) {
-  const { data: funnels = [] } = useRDFunnels(accountId);
+function RDConnectionFunnelsBlock({ connectionId, accountName, funnels }: { connectionId: string; accountName: string; funnels: RDFunnel[] }) {
   const [openLink, setOpenLink] = useState(false);
-
-  return (
-    <div className="rounded-lg border p-3 space-y-3">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <p className="font-medium text-sm">{accountName}</p>
-          <p className="text-xs text-muted-foreground">
-            {funnels.length === 0
-              ? "Nenhum funil vinculado"
-              : `${funnels.length} funil${funnels.length > 1 ? "is" : ""} vinculado${funnels.length > 1 ? "s" : ""}`}
-          </p>
-        </div>
-        <Button size="sm" onClick={() => setOpenLink(true)}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> Vincular funil do RD
+  const { data: pipelines = [], isLoading, error } = useRDApiFunnels(true, connectionId);
+  const importFunnels = useImportRDFunnels();
+  const { toast } = useToast();
+  const importedCount = funnels.length;
+  return <div className="rounded-lg border p-3 space-y-3">
+    <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div><p className="font-medium text-sm">{accountName}</p><p className="text-xs text-muted-foreground">{importedCount} funil(is) carregado(s) · ativação independente da Meta</p></div>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" disabled={isLoading || !!error || importFunnels.isPending} onClick={() => importFunnels.mutate({ connectionId, pipelines }, { onSuccess: (result) => toast({ title: "Funis RD carregados", description: `${result.imported} novos funis importados de ${result.total} disponíveis.` }), onError: (importError: Error) => toast({ title: "Erro ao carregar funis", description: importError.message, variant: "destructive" }) })}>
+          <RefreshCw className={`h-3.5 w-3.5 mr-1 ${importFunnels.isPending ? "animate-spin" : ""}`} /> {importFunnels.isPending ? "Carregando…" : "Carregar todos os funis"}
         </Button>
+        <Button size="sm" onClick={() => setOpenLink(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Adicionar funil</Button>
       </div>
-
-      <AnimatePresence mode="popLayout">
-        {funnels.map((f) => <FunnelRow key={f.id} funnel={f} />)}
-      </AnimatePresence>
-
-      <LinkFunnelDialog accountId={accountId} open={openLink} onOpenChange={setOpenLink} />
     </div>
-  );
-}
-
-function RDOnlyFunnelsBlock({ connectionId, accountName, funnels }: { connectionId: string; accountName: string; funnels: RDFunnel[] }) {
-  const [openLink, setOpenLink] = useState(false);
-  return <div className="rounded-lg border border-dashed p-3 space-y-3"><div className="flex items-center justify-between gap-2"><div><p className="font-medium text-sm">{accountName}</p><p className="text-xs text-muted-foreground">Funis RD sem vínculo Meta · {funnels.length}</p></div><Button size="sm" variant="outline" onClick={() => setOpenLink(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Vincular funil</Button></div>{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} />)}<LinkFunnelDialog accountId={null} rdConnectionId={connectionId} open={openLink} onOpenChange={setOpenLink} /></div>;
+    {error && <p className="text-xs text-destructive">Não foi possível consultar os funis desta conexão RD.</p>}
+    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} />)}</AnimatePresence>
+    {!funnels.length && !isLoading && <p className="text-sm text-muted-foreground">Nenhum funil carregado. Use “Carregar todos os funis”.</p>}
+    <LinkFunnelDialog rdConnectionId={connectionId} open={openLink} onOpenChange={setOpenLink} />
+  </div>;
 }
 
 export function RDFunnelsSection() {
-  const { data: accounts = [] } = useAdAccounts();
   const { data: allFunnels = [] } = useRDFunnels(undefined, true);
   const { data: connections = [] } = useRDAccountConnections();
 
@@ -244,25 +231,17 @@ export function RDFunnelsSection() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Funnel className="h-5 w-5" /> Funis RD por conta
+          <Funnel className="h-5 w-5" /> Funis RD
         </CardTitle>
         <CardDescription>
-          Vincule funis reais do RD Station a cada conta Meta. Use "Sincronizar" para puxar as vendas
-          ganhas daquele funil para o painel.
+          Todos os funis do RD Station ficam disponíveis aqui. Ative ou desative cada funil sem vínculo com contas Meta.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {accounts.length === 0 && connections.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma conta ou conexão RD autorizada.</p> : (
-          <>
-          {accounts.map((acc) => (
-            <AccountFunnelsBlock key={acc.id} accountId={acc.id} accountName={acc.name} />
-          ))}
-          {connections.map((connection) => {
-            const rdOnlyFunnels = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id && !funnel.ad_account_id);
-            return <RDOnlyFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={rdOnlyFunnels} />;
-          })}
-          </>
-        )}
+        {connections.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p> : connections.map((connection) => {
+          const connectionFunnels = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id);
+          return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} />;
+        })}
       </CardContent>
     </Card>
   );
