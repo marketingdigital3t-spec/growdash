@@ -139,7 +139,9 @@ Deno.serve(async (req) => {
     }
 
     if (includeRD) {
-      const funnels = await listAccessibleFunnels(admin, user.id, body.adAccountId, body.adAccountIds);
+      // RD funnels are an independent source. A selected Meta account must
+      // never hide or suppress another active RD pipeline.
+      const funnels = await listAccessibleFunnels(admin, user.id);
       if (funnels.length === 0) {
         results.push({ provider: "rd", skipped: true, reason: "Nenhum funil RD vinculado para sincronizar." });
       } else {
@@ -303,7 +305,7 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
   return last || { error: `${name} failed` };
 }
 
-async function listAccessibleFunnels(admin: ReturnType<typeof createClient>, userId: string, adAccountId?: string, adAccountIds?: string[]) {
+async function listAccessibleFunnels(admin: ReturnType<typeof createClient>, userId: string) {
   // A CRM reader may use a funnel owned by another account through
   // user_rd_funnel_access. The previous owner-only query silently skipped
   // those funnels during automatic sync, while the CRM itself could display
@@ -324,8 +326,6 @@ async function listAccessibleFunnels(admin: ReturnType<typeof createClient>, use
   } else {
     query = query.eq("user_id", userId);
   }
-  if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-  else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
