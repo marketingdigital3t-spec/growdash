@@ -765,8 +765,12 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success: failedAccounts === 0 && (accounts.length > 0) && (disconnectedAccounts?.length || 0) === 0,
-        status: failedAccounts === 0 && (disconnectedAccounts?.length || 0) === 0 ? "success" : (failedAccounts === accounts.length ? "failed" : "partial"),
+        // Disconnected/manual-disabled accounts are intentionally outside the
+        // synchronization scope. Their presence must not downgrade a
+        // successful run for the active accounts that were actually queried.
+        // A real active-account failure still produces partial/failed.
+        success: failedAccounts === 0 && accounts.length > 0,
+        status: failedAccounts === 0 ? "success" : (failedAccounts === accounts.length ? "failed" : "partial"),
         synced: totalSynced,
         accounts: accounts.length,
         skipped_disconnected: disconnectedAccounts?.length || 0,
@@ -791,7 +795,7 @@ Deno.serve(async (req) => {
         },
         pagination: { pages: totalPages, last_cursor: lastCursor },
       }),
-      { status: failedAccounts === 0 && (disconnectedAccounts?.length || 0) === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: failedAccounts === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     return new Response(

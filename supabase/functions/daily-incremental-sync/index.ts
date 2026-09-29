@@ -137,7 +137,10 @@ function applyReportedFailure(result: FunctionResult): FunctionResult {
   const accountErrors = Array.isArray(body.accounts)
     ? body.accounts.some((account: any) => Boolean(account?.error) || (Array.isArray(account?.errors) && account.errors.length > 0))
     : false;
-  const hasReportedFailure = errors.length > 0 || failedAccounts > 0 || skippedDisconnected > 0 || accountErrors;
+  // skipped_disconnected is expected when the workspace retains historical
+  // rows for disabled accounts. It is not a failure of the active-account
+  // snapshot and must not make the five-minute run partial by itself.
+  const hasReportedFailure = errors.length > 0 || failedAccounts > 0 || accountErrors;
   const nonSuccessStatus = ["partial", "failed", "blocked", "stale_snapshot"].includes(String(body.status || ""));
   return hasReportedFailure || nonSuccessStatus ? { ...result, ok: false } : result;
 }
