@@ -55,7 +55,21 @@ export default function Auth() {
         await new Promise((resolve) => window.setTimeout(resolve, 700 * (attempt + 1)));
       }
       setLoading(false);
-      if (error) { toast({ title: "Não foi possível entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos. Se necessário, use a recuperação de acesso." : authErrorMessage(error), variant: "destructive" }); return; }
+      if (error) {
+        const invalidCredentials = error.message === "Invalid login credentials";
+        if (invalidCredentials) {
+          setForgotEmail(email);
+          setForgotOpen(true);
+        }
+        toast({
+          title: invalidCredentials ? "Acesso não reconhecido" : "Não foi possível entrar",
+          description: invalidCredentials
+            ? "A senha foi recusada. Use a recuperação ou envie um link de acesso abaixo; a conta e os dados não foram alterados."
+            : authErrorMessage(error),
+          variant: "destructive",
+        });
+        return;
+      }
       navigate("/", { replace: true });
       return;
     }
@@ -76,6 +90,19 @@ export default function Auth() {
     setLoading(false);
     if (error) toast({ title: "Recuperação não enviada", description: authErrorMessage(error), variant: "destructive" });
     else { toast({ title: "Link de recuperação enviado" }); setForgotOpen(false); }
+  }
+
+  async function sendAccessLink() {
+    const email = (forgotEmail || identifier).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast({ title: "Informe um email válido", variant: "destructive" }); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/` },
+    });
+    setLoading(false);
+    if (error) toast({ title: "Link de acesso não enviado", description: authErrorMessage(error), variant: "destructive" });
+    else toast({ title: "Link de acesso enviado", description: "Verifique a caixa de entrada e o spam para entrar sem a senha." });
   }
 
   async function social(provider: "google" | "apple") {
@@ -105,7 +132,7 @@ export default function Auth() {
         <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
         {mode === "register" && <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
         {mode === "login" && <div className="auth-forgot-row"><label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Lembrar de mim</label><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link">Esqueceu a senha?</button></div>}
-        {forgotOpen && <div className="auth-recovery-box"><p>Enviaremos um link seguro para criar uma nova senha.</p><div className="auth-recovery-row"><input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} placeholder="seu@email.com" /><button type="button" onClick={recover}>Enviar link</button></div></div>}
+        {forgotOpen && <div className="auth-recovery-box"><p>Recupere a senha ou entre sem senha por um link enviado ao seu email.</p><div className="auth-recovery-row"><input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} placeholder="seu@email.com" /><button type="button" onClick={recover} disabled={loading}>Redefinir senha</button></div><button type="button" onClick={sendAccessLink} disabled={loading} className="auth-link mt-3 w-full text-center">Enviar link de acesso sem senha</button></div>}
         <button type="submit" disabled={loading} className="auth-submit-button">{loading ? "Entrando…" : mode === "login" ? "Entrar" : "Criar conta"}</button>
       </form>
       <div className="auth-divider"><span />ou continue com<span /></div>
