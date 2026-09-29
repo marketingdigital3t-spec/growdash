@@ -2,6 +2,7 @@ export type MetricKind = "count" | "currency" | "percentage" | "ratio" | "durati
 
 const descriptions: Record<string, string> = {
   "leads totais": "Quantidade absoluta de leads no período e filtros selecionados.",
+  lead: "Quantidade de negociações criadas no RD Station no período, conta e filtros selecionados.",
   "leads qualificados": "Leads que avançaram para uma etapa considerada qualificada no CRM.",
   "conversões / vendas": "Quantidade de negócios marcados como ganhos ou vendas confirmadas.",
   "taxa de conversão": "Percentual de leads que se transformaram em conversão ou venda.",

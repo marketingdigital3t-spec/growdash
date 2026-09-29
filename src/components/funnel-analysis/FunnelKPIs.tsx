@@ -7,7 +7,9 @@ import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 
 interface Props {
   a: FunnelAnalytics;
-  metaLeads: number;
+  rdLeads: number;
+  rdLeadsLoading?: boolean;
+  rdLeadsError?: boolean;
   trafficSpend: number;
   cpl?: number | null;
   cac?: number | null;
@@ -19,11 +21,12 @@ interface Props {
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, roas, salesConversionRate, previousAvgDaysToConvert }: Props) {
+export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, cpl, cac, roas, salesConversionRate, previousAvgDaysToConvert }: Props) {
   const timeChange = previousAvgDaysToConvert && previousAvgDaysToConvert > 0 ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100 : null;
+  const rdLeadValue = rdLeadsError ? null : rdLeadsLoading ? null : rdLeads;
   const cards = [
     { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-foreground", format: "brl" as const },
-    { label: "Leads totais Meta", value: metaLeads, icon: Users, color: "text-foreground", format: "int" as const },
+    { label: "Lead", value: rdLeadValue, icon: Users, color: "text-foreground", format: "int" as const, detail: rdLeadsError ? "Falha ao carregar negociações RD" : "Negociações criadas no RD Station" },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-foreground", format: "int" as const },
     { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-foreground", format: "pct" as const, decimals: 2 },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: "text-foreground", format: "days" as const, detail: timeChange == null ? "Sem período anterior" : `${Math.abs(timeChange).toFixed(0)}% ${timeChange <= 0 ? "menor" : "maior"} que período anterior` },
@@ -52,7 +55,7 @@ export function FunnelKPIs({ a, metaLeads, trafficSpend, cpl, cac, roas, salesCo
                   <Icon className={`gd-funnel-kpi-icon shrink-0 ${c.color} dark:text-white`} />
                 </div>
                 <div className={`gd-funnel-kpi-value ${c.color} dark:text-white`}>
-                  {c.format === "int" && <AnimatedNumber value={Math.round(c.value)} decimals={0} />}
+                  {c.format === "int" && (rdLeadsLoading && c.label === "Lead" ? "Carregando…" : rdLeadsError && c.label === "Lead" ? "Indisponível" : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
                   {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={c.decimals ?? 1} />%</>}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
                   {c.format === "brl" && fmtBRL(c.value)}

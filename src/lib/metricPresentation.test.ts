@@ -15,4 +15,8 @@ describe("metricPresentation", () => {
     expect(metricDescription("CPL")).toContain("Custo por lead");
     expect(metricDescription("Métrica customizada")).toContain("Métrica customizada");
   });
+
+  it("describes Lead as RD-created negotiations", () => {
+    expect(metricDescription("Lead")).toContain("negociações criadas no RD Station");
+  });
 });

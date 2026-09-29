@@ -157,10 +157,12 @@ export default function FunnelAnalysis() {
     includeHistory: true,
     enabled: funnelScopeIds.length > 0,
   });
-  // Este recorte é usado somente para comparação temporal com Meta Ads. O
-  // pipeline e os KPIs abaixo usam `deals`, que contém o histórico completo.
-  const { data: periodDeals = [], isLoading: loadingPeriodDeals } = useRDDeals({
+  // Este recorte representa as negociações RD criadas no período selecionado,
+  // já limitado à conta Meta escolhida quando houver vínculo de conta.
+  const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError } = useRDDeals({
     funnelIds: funnelScopeIds,
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -195,6 +197,8 @@ export default function FunnelAnalysis() {
   });
   const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
+    adAccountId: effectiveAdAccountId,
+    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -629,9 +633,11 @@ export default function FunnelAnalysis() {
             </div>
             <FunnelKPIs
               a={periodAnalytics}
-              metaLeads={mediaMetrics.metaLeads}
+              rdLeads={periodAnalytics.totalLeads}
+              rdLeadsLoading={loadingPeriodDeals}
+              rdLeadsError={!!periodDealsError}
               trafficSpend={mediaMetrics.spend}
-              cpl={mediaMetrics.metaCpl}
+              cpl={mediaMetrics.rdCpl}
               cac={mediaMetrics.cac}
               roas={mediaMetrics.roas}
               salesConversionRate={mediaMetrics.salesConversionRate}
