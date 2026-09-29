@@ -438,6 +438,45 @@ Deno.serve(async (req) => {
         const allInsights = insightsRes.data;
         console.log(`Total ${allInsights.length} insight rows for account ${account.name}`);
 
+        // A successful Meta response is a snapshot for this account/date
+        // scope. Remove facts that disappeared from the response before
+        // writing the new snapshot; otherwise a lead/spend row deleted or
+        // re-attributed by Meta remains forever in Growdash.
+        const { data: storedCampaigns } = await supabaseAdmin
+          .from("campaigns")
+          .select("id")
+          .eq("ad_account_id", account.id);
+        const storedCampaignIds = (storedCampaigns || []).map((row: any) => String(row.id)).filter(Boolean);
+        const { data: storedAdsets } = storedCampaignIds.length
+          ? await supabaseAdmin.from("adsets").select("id").in("campaign_id", storedCampaignIds)
+          : { data: [] as any[] };
+        const storedAdsetIds = (storedAdsets || []).map((row: any) => String(row.id)).filter(Boolean);
+        const { data: storedAds } = storedAdsetIds.length
+          ? await supabaseAdmin.from("ads").select("id").in("adset_id", storedAdsetIds)
+          : { data: [] as any[] };
+        const factAdIds = [...new Set([
+          ...adsList.map((ad: any) => String(ad.id || "")).filter(Boolean),
+          ...allInsights.map((insight: any) => String(insight.ad_id || "")).filter(Boolean),
+          ...(storedAds || []).map((ad: any) => String(ad.id || "")).filter(Boolean),
+        ])];
+        for (let i = 0; i < factAdIds.length; i += 500) {
+          const adChunk = factAdIds.slice(i, i + 500);
+          const { error: actionDeleteError } = await supabaseAdmin
+            .from("insight_actions")
+            .delete()
+            .in("ad_id", adChunk)
+            .gte("date", startDate)
+            .lte("date", endDate);
+          if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
+          const { error: insightDeleteError } = await supabaseAdmin
+            .from("insights")
+            .delete()
+            .in("ad_id", adChunk)
+            .gte("date", startDate)
+            .lte("date", endDate);
+          if (insightDeleteError) throw new Error(`limpeza dos insights da conta ${account.name}: ${insightDeleteError.message}`);
+        }
+
         // 4.1 Hidratar ads/adsets/campaigns ausentes (necessário para o join do dashboard)
         const insightAdIds = [...new Set(allInsights.map((i: any) => i.ad_id).filter(Boolean))];
         if (insightAdIds.length > 0) {
@@ -613,6 +652,17 @@ Deno.serve(async (req) => {
             { type: "country", apiBreakdowns: "country" },
             { type: "region", apiBreakdowns: "region" },
           ];
+          const campaignIdsForCleanup = campaigns.map((campaign: any) => String(campaign.id || "")).filter(Boolean);
+          for (let i = 0; i < campaignIdsForCleanup.length; i += 500) {
+            const campaignChunk = campaignIdsForCleanup.slice(i, i + 500);
+            const { error: breakdownDeleteError } = await supabaseAdmin
+              .from("insights_breakdowns")
+              .delete()
+              .in("campaign_id", campaignChunk)
+              .gte("date", breakdownStartDate)
+              .lte("date", breakdownEndDate);
+            if (breakdownDeleteError) throw new Error(`limpeza dos breakdowns da conta ${account.name}: ${breakdownDeleteError.message}`);
+          }
           for (const breakdown of breakdownRequests) {
             const bRes = await fetchMetaPaginated(
               `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`

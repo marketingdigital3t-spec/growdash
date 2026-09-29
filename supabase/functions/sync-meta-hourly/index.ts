@@ -228,6 +228,16 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Replace the successful account/date hourly snapshot so hours that
+        // disappeared from Meta do not remain as stale spend or lead facts.
+        const { error: hourlyDeleteError } = await supabaseAdmin
+          .from("insights_hourly")
+          .delete()
+          .eq("ad_account_id", account.id)
+          .gte("date", startDate)
+          .lte("date", endDate);
+        if (hourlyDeleteError) throw new Error(`limpeza horária da conta ${account.name}: ${hourlyDeleteError.message}`);
+
         for (let i = 0; i < rows.length; i += 500) {
           const chunk = rows.slice(i, i + 500);
           const { error: upErr } = await supabaseAdmin
