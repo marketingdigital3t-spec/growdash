@@ -32,7 +32,10 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         head_cell: "w-9 rounded-md text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
         row: "mt-1.5 flex w-full",
         cell: "relative h-9 w-9 p-0 text-center text-sm focus-within:relative focus-within:z-20",
-        day: cn(buttonVariants({ variant: "ghost" }), "h-8 w-8 rounded-none bg-transparent p-0 font-medium text-foreground aria-selected:opacity-100 hover:bg-muted"),
+        // DayPicker cells are data controls, not action buttons. Do not use
+        // the shared `premium-button` variant here: its global metallic skin
+        // paints every day in the range and creates the large blue/white bars.
+        day: "inline-flex h-8 w-8 items-center justify-center rounded-none border-0 bg-transparent p-0 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-selected:opacity-100",
         day_range_start: "rounded-full",
         day_range_end: "rounded-full",
         day_selected:
