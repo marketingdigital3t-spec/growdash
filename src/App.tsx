@@ -65,7 +65,10 @@ const queryClient = new QueryClient({
       // Revalidate stale facts when a module is opened, including after a
       // background Meta or RD synchronization has completed.
       refetchOnMount: true,
-      refetchOnWindowFocus: false,
+      // Ao voltar para a Growdash, revalida o último snapshot persistido sem
+      // bloquear a pintura. Isso mantém os números visíveis e corrige a
+      // sensação de que a tela ficou presa em dados antigos.
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
     },
   },
