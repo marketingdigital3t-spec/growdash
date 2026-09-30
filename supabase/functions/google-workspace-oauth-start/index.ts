@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     url.searchParams.set("access_type", "offline");
     url.searchParams.set("prompt", "consent");
     url.searchParams.set("include_granted_scopes", "true");
-    url.searchParams.set("scope", "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/gmail.send");
+    url.searchParams.set("scope", "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/spreadsheets.readonly");
     url.searchParams.set("state", state);
     return json({ authUrl: url.toString(), redirectUri });
   } catch (error) { return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500); }

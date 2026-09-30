@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3, LockKeyhole, ShieldCheck, UsersRound } from "lucide-react";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -14,6 +14,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { getExpertDashboardMetrics } from "@/lib/expertDashboardMetrics";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { ExpertOperationsView } from "@/components/expert/ExpertOperationsView";
 
 
 function expertGreeting(name: string) {
@@ -60,6 +61,7 @@ export default function ExpertDashboard() {
   const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const [view, setView] = useState<"executive" | "operations">("executive");
   // useInsights keeps the previous query result while a filter changes. Always
   // reapply the permitted account scope so the all-accounts total can never
   // briefly include a prior account or an account outside this expert access.
@@ -120,7 +122,14 @@ export default function ExpertDashboard() {
         </div>
       </MotionItem>
 
-      <DashboardProvider value={{
+      <div className="flex w-fit items-center gap-1 rounded-xl border border-border bg-muted/50 p-1" role="tablist" aria-label="Visão do Painel do Expert">
+        <button type="button" role="tab" aria-selected={view === "executive"} onClick={() => setView("executive")} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${view === "executive" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Visão executiva</button>
+        <button type="button" role="tab" aria-selected={view === "operations"} onClick={() => setView("operations")} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${view === "operations" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Operação</button>
+      </div>
+
+      {view === "operations" && <MotionItem><ExpertOperationsView /></MotionItem>}
+
+      {view === "executive" && <DashboardProvider value={{
         startDate, endDate, adAccountId: selectedId, insights: permittedInsights, sales: permittedSales, rdDeals, revenueDeals,
         alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading,
         metricOverrides: { leads: expertMetrics.leads, conversion_rate: expertMetrics.conversionRate, cpl: expertMetrics.cpl },
@@ -152,7 +161,7 @@ export default function ExpertDashboard() {
           </section>
         </MotionItem>
 
-      </DashboardProvider>
+      </DashboardProvider>}
 
       {!isLoading && accounts.length === 0 && (
         <Card className="border-dashed"><CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground"><LockKeyhole className="h-5 w-5 text-primary" />Nenhuma conta foi autorizada para este acesso. Solicite ao administrador que vincule uma conta de anúncio.</CardContent></Card>

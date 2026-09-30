@@ -1,0 +1,85 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+
+const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+const norm = (value: unknown) => String(value ?? "").trim().toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+const cents = (value: unknown) => {
+  const raw = String(value ?? "").replace(/[^0-9,.-]/g, "").trim();
+  if (!raw) return 0;
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100)) : 0;
+};
+const dateValue = (value: unknown) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const br = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (br) return `${br[3]}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+};
+const hashRow = async (value: unknown) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+async function freshToken(admin: ReturnType<typeof createClient>, integration: any) {
+  const saved = JSON.parse(String(integration.api_token || "{}"));
+  if (integration.token_expires_at && new Date(integration.token_expires_at).getTime() > Date.now() + 60_000) return saved.access_token;
+  if (!saved.refresh_token) throw new Error("A autorização Google expirou. Conecte a conta novamente.");
+  const body = new URLSearchParams({ client_id: Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") ?? "", client_secret: Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") ?? "", refresh_token: saved.refresh_token, grant_type: "refresh_token" });
+  const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+  const next = await response.json().catch(() => ({}));
+  if (!response.ok || !next.access_token) throw new Error("O Google recusou a renovação da autorização.");
+  saved.access_token = next.access_token;
+  await admin.from("integrations").update({ api_token: JSON.stringify(saved), token_expires_at: new Date(Date.now() + Number(next.expires_in ?? 3600) * 1000).toISOString() }).eq("id", integration.id);
+  return saved.access_token;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  try {
+    const base = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(base, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) return json({ error: "Sessão inválida" }, 401);
+    const admin = createClient(base, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const input = await req.json().catch(() => ({}));
+    const connectionId = String(input.connection_id || "");
+    if (!connectionId) return json({ error: "Informe a conexão da planilha." }, 400);
+    const { data: connection, error: connectionError } = await admin.from("expert_sheet_connections").select("*").eq("id", connectionId).maybeSingle();
+    if (connectionError || !connection) return json({ error: "Conexão de planilha não encontrada." }, 404);
+    const { data: expert } = await admin.from("experts").select("id,workspace_id").eq("id", connection.expert_id).maybeSingle();
+    const { data: membership } = await admin.from("workspace_members").select("id").eq("workspace_id", expert?.workspace_id).eq("user_id", user.id).maybeSingle();
+    if (!membership && expert?.workspace_id) return json({ error: "Sem permissão para este expert." }, 403);
+    const { data: integration } = await admin.from("integrations").select("id,api_token,token_expires_at").eq("user_id", user.id).eq("provider", "google_workspace").eq("is_active", true).maybeSingle();
+    if (!integration) return json({ error: "Conecte uma conta Google antes de sincronizar a planilha." }, 409);
+    const token = await freshToken(admin, integration);
+    const run = await admin.from("expert_sales_sync_runs").insert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, status: "partial" }).select("id").single();
+    const runId = run.data?.id;
+    await admin.from("expert_sheet_connections").update({ status: "syncing", last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
+    const range = encodeURIComponent(`${connection.worksheet_name}!A:Z`);
+    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error?.message || "Não foi possível ler a planilha Google Sheets.");
+    const values = Array.isArray(payload.values) ? payload.values : [];
+    if (!values.length) throw new Error("A aba da planilha está vazia.");
+    const headers = values[0].map(norm);
+    const rows = values.slice(1).filter((row: unknown[]) => row.some((cell) => String(cell ?? "").trim()));
+    let upserted = 0;
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index] as unknown[];
+      const raw = Object.fromEntries(headers.map((header, column) => [header || `coluna_${column + 1}`, row[column] ?? ""]));
+      const name = String(raw.nome || raw.aluna || raw.aluno || raw.paciente || "").trim();
+      if (!name) continue;
+      const rowHash = await hashRow(raw);
+      const { error } = await admin.from("expert_sales").upsert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, participant_type: connection.participant_type, source_row_hash: rowHash, source_row_number: index + 2, name, sale_date: dateValue(raw.data_venda || raw.data || raw.data_de_venda), class_name: String(raw.turma || raw.nome_da_turma || "").trim() || null, gross_amount_cents: cents(raw.valor_bruto || raw.valor || raw.valor_total), cash_received_cents: cents(raw.valor_recebido || raw.caixa_real || raw.valor_pago), status: String(raw.status || "confirmed").trim() || "confirmed", seller_name: String(raw.vendedor || raw.responsavel || "").trim() || null, payment_method: String(raw.forma_pagamento || raw.pagamento || "").trim() || null, utm_campaign: String(raw.utm_campaign || raw.campanha || "").trim() || null, utm_content: String(raw.utm_content || raw.criativo || "").trim() || null, notes: String(raw.observacoes || raw.obs || "").trim() || null, raw_row: raw, source_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "sheet_connection_id,source_row_hash" });
+      if (error) throw error;
+      upserted += 1;
+    }
+    const finished = new Date().toISOString();
+    await admin.from("expert_sheet_connections").update({ status: "fresh", last_sync_at: finished, last_valid_snapshot_at: finished, last_error: null, updated_at: finished }).eq("id", connection.id);
+    await admin.from("expert_sales_sync_runs").update({ status: "success", rows_read: rows.length, rows_upserted: upserted, errors: [], finished_at: finished }).eq("id", runId);
+    return json({ success: true, status: "success", rows_read: rows.length, rows_upserted: upserted, synced_at: finished });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro ao sincronizar planilha.";
+    return json({ success: false, status: "error", error: message }, 500);
+  }
+});
