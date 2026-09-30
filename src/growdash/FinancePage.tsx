@@ -8,6 +8,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Leg
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useInsights } from "@/hooks/useInsights";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuth } from "@/contexts/AuthContext";
@@ -81,6 +82,7 @@ export default function FinancePage() {
   const accounts = adAccountIds.length ? unitAccounts.filter((account) => adAccountIds.includes(account.id)) : unitAccounts;
   const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: metaInsightsStartDate, endDate });
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accounts.map((account) => account.id), startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, accounts.length > 0);
   const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, adAccountIds, startDate, endDate });
   const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
   const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
@@ -194,7 +196,7 @@ export default function FinancePage() {
   const roas = adjustedSpend > 0 ? aggregateSales(visibleSales).totalNet / adjustedSpend : 0;
   const isLoading = loadingAccounts || loadingInsights || loadingSales || loadingEntries || loadingTransactions || loadingBalanceEvents || loadingFundingTransactions;
 
-  const rows = useMemo(() => accounts.map((account) => { const ai = insights.filter((item) => item.ad_account_id === account.id); const as = sales.filter((item) => item.ad_account_id === account.id); const accountSpend = ai.reduce((sum, item) => sum + Number(item.spend || 0), 0); const saleTotals = aggregateSales(as); const revenue = saleTotals.totalNet; return { account, spend: accountSpend, balance: Number(account.remaining_balance || 0), leads: ai.reduce((sum, item) => sum + Number(item.leads || 0), 0), sales: saleTotals.totalQuantity, revenue, roas: accountSpend > 0 ? revenue / accountSpend : 0 }; }), [accounts, insights, sales]);
+  const rows = useMemo(() => accounts.map((account) => { const ai = insights.filter((item) => item.ad_account_id === account.id); const as = sales.filter((item) => item.ad_account_id === account.id); const accountSpend = ai.reduce((sum, item) => sum + Number(item.spend || 0), 0); const saleTotals = aggregateSales(as); const revenue = saleTotals.totalNet; return { account, spend: accountSpend, balance: Number(account.remaining_balance || 0), leads: metaTraffic.data.leadBreakdownByAccount[account.id]?.totalLeads ?? 0, sales: saleTotals.totalQuantity, revenue, roas: accountSpend > 0 ? revenue / accountSpend : 0 }; }), [accounts, insights, metaTraffic.data.leadBreakdownByAccount, sales]);
 
   const monthlyHistory = useMemo(() => eachMonthOfInterval({ start: twelveMonthsAgo, end: new Date() }).map((month) => { const key = format(month, "yyyy-MM"); const revenue = aggregateSales(historicalSales.filter((sale) => (!sale.ad_account_id || unitAccountIds.has(sale.ad_account_id)) && String(sale.sale_date).startsWith(key))).totalNet + historicalEntries.filter((item) => item.entry_type === "revenue" && item.competence_date.startsWith(key) && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0); const mediaOriginal = historicalInsights.filter((item) => unitAccountIds.has(item.ad_account_id) && String(item.date).startsWith(key)).reduce((sum, item) => sum + Number(item.spend || 0), 0); const media = mediaOriginal * (includeMetaTax ? 1 + metaTaxRate : 1); const operational = historicalEntries.filter((item) => item.entry_type === "expense" && item.competence_date.startsWith(key) && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0); return { key, label: format(month, "MM/yy"), revenue, media, operational, expense: media + operational, result: revenue - media - operational }; }), [historicalEntries, historicalInsights, historicalSales, includeMetaTax, twelveMonthsAgo, unitAccountIds]);
   const avgRevenue = monthlyHistory.reduce((sum, month) => sum + month.revenue, 0) / Math.max(monthlyHistory.length, 1);

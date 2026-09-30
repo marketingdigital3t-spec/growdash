@@ -20,8 +20,9 @@ import { useFunnels, useCreateFunnel, useUpdateFunnel, useDeleteFunnel, type Fun
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow, subDays, startOfDay, endOfDay } from "date-fns";
+import { format, formatDistanceToNow, subDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Dialog,
@@ -778,6 +779,12 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
     endDate: endOfDay(dateRange.end),
     enabled: isLinked,
   });
+  const metaTraffic = useMetaTrafficMetrics({
+    adAccountIds: isLinked && adAccountId ? [adAccountId] : [],
+    campaignIds: campaignIds?.length ? campaignIds : undefined,
+    startDate: format(dateRange.start, "yyyy-MM-dd"),
+    endDate: format(dateRange.end, "yyyy-MM-dd"),
+  }, isLinked);
 
   // Filter insights by selected campaigns
   const filteredInsights = useMemo(() => {
@@ -794,7 +801,7 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
     const totalImpressions = filteredInsights.reduce((s, r) => s + r.impressions, 0);
     const totalReach = filteredInsights.reduce((s, r) => s + r.reach, 0);
     const totalClicks = filteredInsights.reduce((s, r) => s + r.clicks, 0);
-    const totalLeads = filteredInsights.reduce((s, r) => s + r.leads, 0);
+    const totalLeads = metaTraffic.data.totalLeads;
     const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
     const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
     const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
@@ -815,7 +822,7 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
       frequency: avgFrequency,
       efficiency_rate: efficiencyRate,
     } as Record<string, number>;
-  }, [filteredInsights]);
+  }, [filteredInsights, metaTraffic.data.totalLeads]);
 
   // Auto-populate nodes with linked data
   const displayNodes = useMemo(() => {

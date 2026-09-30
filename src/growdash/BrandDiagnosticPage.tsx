@@ -31,6 +31,7 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
@@ -130,6 +131,7 @@ export default function BrandDiagnosticPage() {
 
   const campaignsQuery = useCampaigns(accountId);
   const insightsQuery = useInsights({ adAccountId: accountId, startDate, endDate, enabled: !!accountId });
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountId ? [accountId] : [], startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, !!accountId);
   const rdQuery = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountId, enabled: !!accountId });
   const salesQuery = useSales({ startDate, endDate, adAccountId: accountId, enabled: !!accountId });
   const campaigns = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);
@@ -142,7 +144,7 @@ export default function BrandDiagnosticPage() {
     const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
     const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
     const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
-    const leads = insights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+    const leads = metaTraffic.data.totalLeads;
     const saleTotals = aggregateSales(sales);
     const revenue = saleTotals.totalNet;
     return {
@@ -162,7 +164,7 @@ export default function BrandDiagnosticPage() {
       roas: spend > 0 ? revenue / spend : 0,
       activeCampaigns: campaigns.filter((item) => ["ACTIVE", "active", "Ativa"].includes(String(item.status))).length,
     };
-  }, [campaigns, deals, insights, sales]);
+  }, [campaigns, deals, insights, metaTraffic.data.totalLeads, sales]);
 
   const campaignPerformance = useMemo(() => {
     const groups = new Map<string, { id: string; name: string; spend: number; impressions: number; clicks: number; leads: number }>();
@@ -172,11 +174,11 @@ export default function BrandDiagnosticPage() {
       current.spend += Number(row.spend || 0);
       current.impressions += Number(row.impressions || 0);
       current.clicks += Number(row.clicks || 0);
-      current.leads += Number(row.leads || 0);
+      current.leads += metaTraffic.data.leadBreakdownByAd[String(row.ad_id)]?.totalLeads ?? 0;
       groups.set(id, current);
     }
     return [...groups.values()].sort((a, b) => b.spend - a.spend).slice(0, 8);
-  }, [insights]);
+  }, [insights, metaTraffic.data.leadBreakdownByAd]);
 
   const stages = useMemo(() => {
     const grouped = new Map<string, number>();

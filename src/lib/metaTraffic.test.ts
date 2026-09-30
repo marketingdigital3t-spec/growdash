@@ -60,4 +60,18 @@ describe("Meta traffic metrics", () => {
     expect(result.resultBreakdown).toHaveLength(1);
     expect(result.resultBreakdown[0]).toMatchObject({ campaignId: "camp-1", resultType: "leads", value: 3 });
   });
+
+  it("expõe totais canônicos por conta e anúncio", () => {
+    const result = aggregateMetaTrafficMetrics([
+      { ad_id: "ad-1", ad_account_id: "acc-1", spend: 10, impressions: 100, reach: 80, clicks: 5 },
+    ], {
+      metaLeadActions: { forms: 2, site: 3, conversations: 4, total: 9 },
+      totalsByAd: { "ad-1": { omni_lead: 2, "offsite_conversion.fb_pixel_lead": 3, "onsite_conversion.messaging_conversation_started_7d": 4 } },
+      dailyMetaLeadByAccount: { "acc-1": { "2026-09-30": { forms: 2, site: 3, conversations: 4, total: 9 } } },
+    }, "2026-09-30T12:00:00.000Z", [], Date.parse("2026-09-30T12:01:00.000Z"));
+
+    expect(result.totalLeads).toBe(9);
+    expect(result.leadBreakdownByAccount["acc-1"]).toEqual({ formLeads: 2, siteLeads: 3, conversations: 4, totalLeads: 9 });
+    expect(result.leadBreakdownByAd["ad-1"]).toEqual({ formLeads: 2, siteLeads: 3, conversations: 4, totalLeads: 9 });
+  });
 });

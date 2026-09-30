@@ -45,6 +45,8 @@ export interface MetaTrafficMetrics {
   coveredAccounts: string[];
   rowCount: number;
   errors: string[];
+  leadBreakdownByAccount: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
+  leadBreakdownByAd: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
 }
 
 type InsightRow = {
@@ -64,6 +66,7 @@ type ActionData = {
   metaLeadActions?: { forms: number; site: number; conversations: number; total: number };
   totalsByAd?: Record<string, Record<string, number>>;
   valueTotalsByAd?: Record<string, Record<string, number>>;
+  dailyMetaLeadByAccount?: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }> >;
 };
 
 export function aggregateMetaTrafficMetrics(
@@ -93,6 +96,21 @@ export function aggregateMetaTrafficMetrics(
 
   const leadTotals = actions?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 };
   const leads = leadTotals.total;
+  const leadBreakdownByAccount: MetaTrafficMetrics["leadBreakdownByAccount"] = {};
+  for (const [accountId, daily] of Object.entries(actions?.dailyMetaLeadByAccount || {})) {
+    const totals = Object.values(daily).reduce((sum, value) => ({
+      formLeads: sum.formLeads + Number(value.forms || 0),
+      siteLeads: sum.siteLeads + Number(value.site || 0),
+      conversations: sum.conversations + Number(value.conversations || 0),
+      totalLeads: sum.totalLeads + Number(value.total || 0),
+    }), { formLeads: 0, siteLeads: 0, conversations: 0, totalLeads: 0 });
+    leadBreakdownByAccount[accountId] = totals;
+  }
+  const leadBreakdownByAd: MetaTrafficMetrics["leadBreakdownByAd"] = {};
+  for (const [adId, actionTotals] of Object.entries(actions?.totalsByAd || {})) {
+    const resolved = resolveMetaLeadActions(actionTotals);
+    leadBreakdownByAd[adId] = { formLeads: resolved.forms, siteLeads: resolved.site, conversations: resolved.conversations, totalLeads: resolved.total };
+  }
   const seenResultAds = new Set<string>();
   const resultBreakdownByCampaign = new Map<string, { accountId: string; campaignId: string; campaignName: string; objective: string | null; resultType: string; value: number }>();
   rows.forEach((row) => {
@@ -146,6 +164,8 @@ export function aggregateMetaTrafficMetrics(
     coveredAccounts,
     rowCount: rows.length,
     errors,
+    leadBreakdownByAccount,
+    leadBreakdownByAd,
   };
 }
 

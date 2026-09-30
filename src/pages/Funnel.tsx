@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { Pencil, Check, X, BarChart3, Filter } from "lucide-react";
 import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { FunnelChartView } from "@/components/funnel/FunnelChartView";
 import { useDateFilter } from "@/hooks/useDateFilter";
 import { useInsights } from "@/hooks/useInsights";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { aggregateMetrics } from "@/lib/metrics";
@@ -118,11 +120,17 @@ const Funnel = () => {
     endDate,
     enabled: hasAccountSelected,
   });
+  const metaTraffic = useMetaTrafficMetrics({
+    adAccountIds: hasAccountSelected ? [selectedAccount] : [],
+    campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined,
+    startDate: format(startDate, "yyyy-MM-dd"),
+    endDate: format(endDate, "yyyy-MM-dd"),
+  }, hasAccountSelected);
 
   const [manualSales, setManualSales] = useState<number | null>(null);
   const [manualRevenue, setManualRevenue] = useState<number | null>(null);
 
-  const metrics = aggregateMetrics(insights);
+  const metrics = { ...aggregateMetrics(insights), totalLeads: metaTraffic.data.totalLeads, avgCPL: metaTraffic.data.totalLeads > 0 ? aggregateMetrics(insights).totalSpend / metaTraffic.data.totalLeads : 0 };
 
   const totalClicks = insights.reduce((s, r) => s + r.clicks, 0);
   const totalImpressions = insights.reduce((s, r) => s + r.impressions, 0);

@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, format } from "date-fns";
 import { AlertTriangle, Bot, ChartNoAxesCombined, CircleCheck, Clock3, Link2Off, MessageSquareText, ShieldCheck, Sparkles, TrendingUp, UserRoundCheck } from "lucide-react";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
-import { useInsights } from "@/hooks/useInsights";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import type { RDDealLite } from "@/hooks/useRDDealsForPeriod";
 import type { Sale } from "@/hooks/useSales";
 import { realizedSales } from "@/lib/saleRevenue";
@@ -17,11 +18,12 @@ type Props = { deals: RDDealLite[]; sales: Sale[]; accountId?: string };
 
 export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
   const { startDate, endDate } = useGlobalFilters();
+  const { data: accounts = [] } = useAdAccounts();
   // Sem uma conta específica, a IA deve analisar todas as contas liberadas ao
   // usuário — o seletor "Todas as contas" não pode transformar Meta em zero.
-  const { data: insights = [] } = useInsights({ adAccountId: accountId, startDate, endDate, enabled: true });
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountId ? [accountId] : accounts.map((account) => account.id), startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, !!accountId || accounts.length > 0);
   const [monitored, setMonitored] = useState(() => window.localStorage.getItem("growdash:crm-ai-monitored") === "true");
-  const analytics = useMemo(() => analyze(deals, insights, sales), [deals, insights, sales]);
+  const analytics = useMemo(() => analyze(deals, metaTraffic.data.totalLeads, sales), [deals, metaTraffic.data.totalLeads, sales]);
 
   function toggleMonitored() {
     const next = !monitored;
@@ -67,8 +69,7 @@ export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
   </div>;
 }
 
-function analyze(deals: RDDealLite[], insights: Array<{ leads?: number | null }>, sales: Sale[]) {
-  const metaLeads = insights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+function analyze(deals: RDDealLite[], metaLeads: number, sales: Sale[]) {
   const coverage = metaLeads ? deals.length / metaLeads * 100 : deals.length ? 100 : 0;
   const difference = metaLeads ? Math.abs(deals.length - metaLeads) / metaLeads * 100 : deals.length ? 100 : 0;
   const missingUtm = deals.filter((deal) => !deal.utm_source || !deal.utm_campaign);
