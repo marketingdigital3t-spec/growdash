@@ -53,4 +53,12 @@ describe("dedupeRDDeals", () => {
   it("does not merge separate RD deals", () => {
     expect(dedupeRDDeals([base(), base({ id: "row-2", rd_deal_id: "rd-2" })])).toHaveLength(2);
   });
+
+  it("ignora linhas sem identidade do provedor RD", () => {
+    expect(dedupeRDDeals([
+      base({ id: "incomplete-1", rd_deal_id: null }),
+      base({ id: "incomplete-2", rd_deal_id: "" }),
+      base({ id: "valid", rd_deal_id: "rd-valid" }),
+    ])).toHaveLength(1);
+  });
 });

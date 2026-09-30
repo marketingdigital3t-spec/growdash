@@ -61,7 +61,12 @@ export interface RDDealLite {
 export function dedupeRDDeals<T extends RDDealLite>(rows: T[]) {
   const unique = new Map<string, T>();
   for (const row of rows) {
-    const key = `${row.rd_connection_id || row.ad_account_id || "legacy"}:${row.rd_deal_id || row.id}`;
+    // A provider identity is required for a CRM fact. Rows without
+    // rd_deal_id are incomplete sync artifacts and must not inflate a lead
+    // count or be treated as independent deals by their local row id.
+    const providerId = String(row.rd_deal_id || "").trim();
+    if (!providerId) continue;
+    const key = `${row.rd_connection_id || row.ad_account_id || "legacy"}:${providerId}`;
     const current = unique.get(key);
     const rowTime = new Date(row.updated_at || row.stage_updated_at || row.closed_at || row.lead_created_at || 0).getTime();
     const currentTime = current ? new Date(current.updated_at || current.stage_updated_at || current.closed_at || current.lead_created_at || 0).getTime() : -Infinity;

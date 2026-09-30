@@ -26,7 +26,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
   const rdLeadValue = rdLeadsError ? null : rdLeadsLoading ? null : rdLeads;
   const cards = [
     { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-foreground", format: "brl" as const },
-    { label: "Lead", value: rdLeadValue, icon: Users, color: "text-foreground", format: "int" as const, detail: rdLeadsError ? "Falha ao carregar métricas Meta" : "Formulários + site + conversas iniciadas · Meta Ads" },
+    { label: "Lead", value: rdLeadValue, icon: Users, color: "text-foreground", format: "int" as const, detail: rdLeadsError ? "Falha ao carregar negociações RD Station" : "Negociações criadas no RD Station · período e filtros selecionados" },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-foreground", format: "int" as const },
     { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-foreground", format: "pct" as const, decimals: 2 },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: "text-foreground", format: "days" as const, detail: timeChange == null ? "Sem período anterior" : `${Math.abs(timeChange).toFixed(0)}% ${timeChange <= 0 ? "menor" : "maior"} que período anterior` },
