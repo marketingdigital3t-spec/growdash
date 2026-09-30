@@ -129,7 +129,7 @@ async function callFunction(
   }
 }
 
-function applyReportedFailure(result: FunctionResult): FunctionResult {
+function applyReportedFailure(result: FunctionResult, critical = true): FunctionResult {
   const body = result.body || {};
   const errors = Array.isArray(body.errors) ? body.errors : [];
   const failedAccounts = Number(body.failedAccounts ?? body.failed_accounts ?? 0);
@@ -141,7 +141,9 @@ function applyReportedFailure(result: FunctionResult): FunctionResult {
   // rows for disabled accounts. It is not a failure of the active-account
   // snapshot and must not make the five-minute run partial by itself.
   const hasReportedFailure = errors.length > 0 || failedAccounts > 0 || accountErrors;
-  const nonSuccessStatus = ["partial", "failed", "blocked", "stale_snapshot"].includes(String(body.status || ""));
+  const nonSuccessStatus = critical
+    ? ["partial", "failed", "blocked", "stale_snapshot"].includes(String(body.status || ""))
+    : ["failed", "blocked", "stale_snapshot"].includes(String(body.status || ""));
   return hasReportedFailure || nonSuccessStatus ? { ...result, ok: false } : result;
 }
 
@@ -338,9 +340,9 @@ Deno.serve(async (req) => {
           startDate: syncWindow.startDate,
           endDate: syncWindow.endDate,
           triggerSource: "five_minute_incremental",
-        }))
+        }), false)
         : { ok: false, status: 0, durationMs: 0, body: { error: "Insights parcial; leads preservados do último snapshot válido." } };
-      const hourly = insights.ok && leads.ok
+      const hourly = insights.ok
         ? applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-hourly", {
           ...accountScope,
           startDate: syncWindow.startDate,
@@ -348,9 +350,9 @@ Deno.serve(async (req) => {
           timezone,
           attributionWindow,
           triggerSource: "five_minute_incremental",
-        }))
-        : { ok: false, status: 0, durationMs: 0, body: { error: "Dependência anterior parcial; hourly preservado do último snapshot válido." } };
-      const accountOk = insights.ok && leads.ok && hourly.ok;
+        }), false)
+        : { ok: false, status: 0, durationMs: 0, body: { error: "Insights parcial; hourly preservado do último snapshot válido." } };
+      const accountOk = insights.ok;
       const accountErrors = [insights.body?.error, insights.body?.errors, leads.body?.error, leads.body?.errors, hourly.body?.error, hourly.body?.errors]
         .filter(Boolean).map((value) => typeof value === "string" ? value : JSON.stringify(value)).join("; ") || null;
       const finished = new Date().toISOString();
@@ -470,7 +472,10 @@ Deno.serve(async (req) => {
       "rd-reconcile-metrics",
       { run_id: run.id, trigger_source: "five_minute_incremental" },
     );
-    const allOk = metaInsights.ok && metaLeads.ok && metaHourly.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
+    // Insights is the primary KPI snapshot. Leads/forms and hourly remain
+    // observable auxiliary blocks and are retried without downgrading valid
+    // daily investment/delivery data to a global partial state.
+    const allOk = metaInsights.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
     const status = allOk ? "success" : "partial";
     const finishedAt = new Date().toISOString();
 

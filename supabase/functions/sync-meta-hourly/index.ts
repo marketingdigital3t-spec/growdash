@@ -135,6 +135,11 @@ Deno.serve(async (req) => {
           errors.push(`Conta ${account.name}${res.errorCode ? ` [Meta ${res.errorCode}]` : ""}: ${res.error}`);
           continue;
         }
+        if (res.truncated || res.repeatedCursor) {
+          failedAccounts++;
+          errors.push(`Conta ${account.name}: paginação horária incompleta; snapshot anterior preservado.`);
+          continue;
+        }
 
         // Aggregate by (ad_id, date, hour) to dedupe within the page set.
         type Row = { ad_account_id: string; campaign_id: string | null; ad_id: string; date: string; hour: number; leads: number; clicks: number; spend: number };
@@ -335,11 +340,14 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<any> {
   return { error: { message: lastMessage, is_transient: true }, __retryable: true };
 }
 
-async function fetchMetaPaginated(url: string, maxPages = 80): Promise<{ data: any[]; error?: string; errorCode?: number; retryable?: boolean }> {
+async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY): Promise<{ data: any[]; pages?: number; error?: string; errorCode?: number; retryable?: boolean; repeatedCursor?: boolean; truncated?: boolean }> {
   const all: any[] = [];
   let next: string | undefined = url;
   let pages = 0;
+  const seen = new Set<string>();
   while (next && pages < maxPages) {
+    if (seen.has(next)) return { data: all, pages, repeatedCursor: true, error: "A Meta repetiu o cursor de paginação horária." };
+    seen.add(next);
     const res = await fetchMeta(next);
     if (res.error) return {
       data: all,
@@ -351,7 +359,7 @@ async function fetchMetaPaginated(url: string, maxPages = 80): Promise<{ data: a
     next = res.paging?.next;
     pages++;
   }
-  return { data: all };
+  return { data: all, pages, truncated: Boolean(next) };
 }
 
 function sleep(ms: number) {

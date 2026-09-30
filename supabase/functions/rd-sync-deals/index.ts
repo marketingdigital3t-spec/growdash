@@ -1464,8 +1464,15 @@ Deno.serve(async (req) => {
         : [{ name: "ongoing", stageId: null, params: "", won: false }];
       analyticsRangeComplete = analytics_mode;
 
+      const cursorPrefix = `${funnel.id}|${start_date || ""}|${end_date || ""}`;
+      const { data: storedCursors } = analytics_mode
+        ? await admin.from("rd_sync_cursors").select("scope_key,segment,next_page").eq("funnel_id", funnel.id).like("scope_key", `${cursorPrefix}|%`)
+        : { data: [] as Array<{ scope_key: string; segment: string; next_page: number }> };
+      const cursorBySegment = new Map((storedCursors || []).map((row: any) => [String(row.segment), Number(row.next_page) || 1]));
+
       segmentLoop: for (const segment of analyticsSegments) {
-        let page = 1;
+        const cursorKey = `${cursorPrefix}|${segment.name}`;
+        let page = cursorBySegment.get(segment.name) || 1;
         let segmentComplete = false;
 
         while (page <= maxPages) {
@@ -1544,10 +1551,11 @@ Deno.serve(async (req) => {
             // parameters and repeat a page already consumed by the previous
             // segment. Stop that segment when it contributes no new IDs;
             // otherwise a full-history run can loop forever at page 2+.
-            if (rangedDeals.length === 0) {
-              segmentComplete = true;
-              break;
-            }
+          if (rangedDeals.length === 0) {
+            segmentComplete = true;
+            await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+            break;
+          }
             await persistAnalyticsBatch(rangedDeals);
             totalDeals += rangedDeals.length;
 
@@ -1572,10 +1580,12 @@ Deno.serve(async (req) => {
             );
             if (deals.length < 200) {
               segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
               break;
             }
             if (pageBeforeRange) {
               segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
               break;
             }
             if (totalDeals >= maxAnalyticsDeals) {
@@ -1583,6 +1593,18 @@ Deno.serve(async (req) => {
               break segmentLoop;
             }
             page++;
+            await admin.from("rd_sync_cursors").upsert({
+              scope_key: cursorKey,
+              funnel_id: funnel.id,
+              rd_connection_id: funnel.rd_connection_id,
+              start_date: start_date || null,
+              end_date: end_date || null,
+              segment: segment.name,
+              next_page: page,
+              status: "partial",
+              last_error: null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "scope_key" });
             continue;
           }
 

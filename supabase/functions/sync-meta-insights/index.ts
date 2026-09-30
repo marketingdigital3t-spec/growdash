@@ -181,9 +181,13 @@ Deno.serve(async (req) => {
     for (const account of accounts) {
       const attemptedAt = new Date().toISOString();
       let accountHadError = false;
-      const recordPagination = (result: { pages?: number; lastCursor?: string }) => {
+      const recordPagination = (result: { pages?: number; lastCursor?: string; truncated?: boolean; repeatedCursor?: boolean }, label = "consulta") => {
         totalPages += Number(result.pages || 0);
         if (result.lastCursor) lastCursor = result.lastCursor;
+        if (result.truncated || result.repeatedCursor) {
+          accountHadError = true;
+          errors.push(`Conta ${account.name} ${label}: paginação incompleta; o snapshot anterior foi preservado.`);
+        }
       };
       try {
         const effectiveTimezone = account.timezone_name || "America/Sao_Paulo";
@@ -472,7 +476,7 @@ Deno.serve(async (req) => {
         const insightsRes = await fetchMetaPaginated(
           `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
         );
-        recordPagination(insightsRes);
+        recordPagination(insightsRes, "insights");
         if (insightsRes.error) {
           errors.push(`Conta ${account.name} insights: ${insightsRes.error}`);
           failedAccounts++;
@@ -489,6 +493,11 @@ Deno.serve(async (req) => {
             // Preserve an explicit manual deactivation made during the sync.
             .eq("id", account.id)
             .neq("connection_status", "disconnected");
+          continue;
+        }
+        if (accountHadError) {
+          // A truncated/repeated primary response is not a valid snapshot.
+          // Do not upsert or clean rows from a partial Meta page walk.
           continue;
         }
         const allInsights = insightsRes.data;
@@ -754,7 +763,7 @@ Deno.serve(async (req) => {
             const bRes = await fetchMetaPaginated(
               `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
-            recordPagination(bRes);
+            recordPagination(bRes, `breakdown ${breakdown.type}`);
             if (bRes.error) {
               const message = `Conta ${account.name} breakdown ${breakdown.type}: ${bRes.error}`;
               errors.push(message);
@@ -951,6 +960,7 @@ async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINI
   pages: number;
   lastCursor?: string;
   repeatedCursor?: boolean;
+  truncated?: boolean;
   error?: string;
   errorCode?: number;
   errorSubcode?: number;
@@ -988,8 +998,9 @@ async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINI
     lastCursor = next;
     pages++;
   }
-  if (next && Number.isFinite(maxPages)) console.warn(`fetchMetaPaginated hit maxPages=${maxPages}`);
-  return { data: all, pages, lastCursor };
+  const truncated = Boolean(next);
+  if (truncated && Number.isFinite(maxPages)) console.warn(`fetchMetaPaginated hit maxPages=${maxPages}`);
+  return { data: all, pages, lastCursor, truncated };
 }
 
 function sleep(ms: number) {

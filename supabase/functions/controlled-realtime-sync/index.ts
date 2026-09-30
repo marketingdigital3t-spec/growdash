@@ -31,6 +31,7 @@ type RunResult = {
   reason?: string;
   synced?: number;
   errors?: unknown;
+  warnings?: unknown;
   synced_at?: string;
   freshness_seconds?: number | null;
 };
@@ -120,6 +121,17 @@ Deno.serve(async (req) => {
           if (insights.error || insights.data?.error || ["failed", "blocked"].includes(String(insights.data?.status || ""))) return insights;
           if (insights.data?.status === "partial") return { data: { ...insights.data, success: true, status: "partial" } };
 
+          // Leads/forms are an auxiliary Meta resource. Run it after the
+          // daily snapshot, but do not invalidate daily KPIs when its token,
+          // permission or form discovery is temporarily unavailable.
+          const leads = await invokeFunction(supabaseUrl, authHeader, "sync-meta-leads", {
+            adAccountId: body.adAccountId,
+            adAccountIds: body.adAccountIds,
+            startDate,
+            endDate,
+            triggerSource: "controlled_realtime",
+          });
+
           const hourly = await invokeFunction(supabaseUrl, authHeader, "sync-meta-hourly", {
             adAccountId: body.adAccountId,
             adAccountIds: body.adAccountIds,
@@ -129,19 +141,33 @@ Deno.serve(async (req) => {
             timezone: body.timezone,
             attributionWindow: body.attributionWindow,
           });
-          const errors = [insights.data?.errors, hourly.data?.errors, hourly.data?.status === "partial" ? "Sincronização horária parcial." : null, hourly.error].filter(Boolean);
-          const status = insights.data?.status === "partial" || hourly.data?.status === "partial"
+          const warnings = [
+            leads.error || leads.data?.error,
+            leads.data?.errors,
+            leads.data?.status === "partial" ? "Leads/forms Meta parcialmente atualizados." : null,
+            hourly.data?.errors,
+            hourly.data?.status === "partial" ? "Distribuição horária Meta parcialmente atualizada." : null,
+            hourly.error,
+          ].filter(Boolean);
+          const status = insights.data?.status === "partial"
             ? "partial"
-            : insights.data?.status === "failed" || hourly.data?.status === "failed"
+            : insights.data?.status === "failed"
               ? "failed"
-              : insights.data?.status || hourly.data?.status || "success";
+              : "success";
           return {
             data: {
-              success: !hourly.error && hourly.data?.success !== false && hourly.data?.status !== "failed",
+              // The controlled result is successful when the primary daily
+              // snapshot is successful. Auxiliary warnings remain structured
+              // and are retried on the next cycle without a red global state.
+              success: true,
               status,
               synced: Number(insights.data?.synced || 0) + Number(hourly.data?.synced || 0),
-              errors: errors.length ? errors : undefined,
-              error: hourly.error || hourly.data?.error,
+              warnings: warnings.length ? warnings : undefined,
+              block_status: {
+                insights: insights.data?.status || "success",
+                leads: leads.data?.status || (leads.error ? "error" : "success"),
+                hourly: hourly.data?.status || (hourly.error ? "error" : "success"),
+              },
             },
           };
         },
@@ -189,6 +215,10 @@ Deno.serve(async (req) => {
     }
 
     const metaResult = results.find((result) => result.provider === "meta");
+    const warnings = results.flatMap((result) => {
+      if (result.provider !== "meta" || result.warnings == null) return [];
+      return Array.isArray(result.warnings) ? result.warnings : [result.warnings];
+    });
     return json({
       success: results.every((result) => result.skipped || result.status !== "failed"),
       status: results.some((result) => result.status === "failed")
@@ -206,6 +236,7 @@ Deno.serve(async (req) => {
       },
       synchronized_date: endDate,
       duration_ms: Date.now() - startedAt,
+      warnings: warnings.length ? warnings : undefined,
       results,
     });
   } catch (error) {
@@ -306,6 +337,7 @@ async function runControlled(args: {
       errors: hasError || partial
         ? (error || stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado."))
         : undefined,
+      warnings: payload?.warnings,
       synced_at: typeof payload?.synced_at === "string" ? payload.synced_at : finishedAt,
       freshness_seconds: payload?.freshness_seconds == null ? null : Number(payload.freshness_seconds),
     };

@@ -106,11 +106,14 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, ti
       if (error || data?.error || data?.success === false || ["failed", "error"].includes(String(data?.status || ""))) {
         throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
       }
-      setSyncError(null);
+      const auxiliaryWarnings = Array.isArray(data?.warnings)
+        ? data.warnings.map((warning: unknown) => String(warning)).join(" · ")
+        : "";
+      setSyncError(auxiliaryWarnings || null);
       if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
       setLastUpdatedAt(new Date());
       setState(data?.status === "partial" ? "error" : "fresh");
-      if (data?.status === "partial") setSyncError("Sincronização parcial; o último snapshot válido foi preservado.");
+      if (data?.status === "partial") setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
       invalidateLiveQueries();
     })().catch((error) => {
       // Falha silenciosa: o histórico armazenado permanece visível e uma nova

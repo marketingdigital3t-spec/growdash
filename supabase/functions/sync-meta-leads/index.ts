@@ -203,6 +203,15 @@ async function fetchAll(
   return { data: all, pages, lastCursor };
 }
 
+function timezoneOffsetMinutes(instant: number, timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "longOffset" }).formatToParts(new Date(instant));
+  const value = parts.find((part) => part.type === "timeZoneName")?.value || "GMT";
+  const match = value.match(/GMT([+-])(\d{2})(?::?(\d{2}))?/);
+  if (!match) return 0;
+  const minutes = Number(match[2]) * 60 + Number(match[3] || 0);
+  return match[1] === "-" ? -minutes : minutes;
+}
+
 function parseExactDateRange(body: Record<string, unknown>): {
   startDate: string;
   endDate: string;
@@ -221,8 +230,13 @@ function parseExactDateRange(body: Record<string, unknown>): {
     throw new Error("startDate não pode ser posterior a endDate");
   }
 
-  const startMs = Date.parse(`${startDate}T00:00:00-03:00`);
-  const endMs = Date.parse(`${endDate}T00:00:00-03:00`) + 86400000;
+  const timezone = typeof body.timezone === "string" && body.timezone.trim()
+    ? body.timezone.trim()
+    : "America/Sao_Paulo";
+  const startUtc = Date.parse(`${startDate}T00:00:00Z`);
+  const endUtc = Date.parse(`${endDate}T00:00:00Z`);
+  const startMs = startUtc - timezoneOffsetMinutes(startUtc, timezone) * 60_000;
+  const endMs = endUtc - timezoneOffsetMinutes(endUtc, timezone) * 60_000 + 86400000;
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
     throw new Error("Intervalo de datas inválido");
   }
