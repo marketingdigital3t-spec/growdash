@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { Pencil, Check, X, BarChart3, Filter } from "lucide-react";
-import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { FunnelChartView } from "@/components/funnel/FunnelChartView";
-import { useDateFilter } from "@/hooks/useDateFilter";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
-import { useAdAccounts } from "@/hooks/useAdAccounts";
-import { useCampaigns } from "@/hooks/useCampaigns";
 import { aggregateMetrics } from "@/lib/metrics";
 import { Button } from "@/components/ui/button";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -106,23 +103,19 @@ function EditableValue({
 const Funnel = () => {
   const [viewMode, setViewMode] = useState<"funnel" | "chart">("funnel");
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
-  const { preset, setPreset, customRange, setCustomRange, startDate, endDate } = useDateFilter();
-  const [selectedAccount, setSelectedAccount] = useState("all");
-  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
-  const { data: adAccounts = [] } = useAdAccounts();
-  const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
-  const hasAccountSelected = selectedAccount !== "all";
+  const { adAccountIds, startDate, endDate } = useGlobalFilters();
+  const selectedAccount = adAccountIds.length === 1 ? adAccountIds[0] : "all";
+  const hasAccountSelected = adAccountIds.length > 0;
 
-  const { data: insights = [], isLoading, refetch } = useInsights({
+  const { data: insights = [], isLoading } = useInsights({
     adAccountId: hasAccountSelected ? selectedAccount : undefined,
-    campaignIds: selectedCampaignIds.length > 0 ? selectedCampaignIds : undefined,
+    adAccountIds: adAccountIds.length > 1 ? adAccountIds : undefined,
     startDate,
     endDate,
     enabled: hasAccountSelected,
   });
   const metaTraffic = useMetaTrafficMetrics({
-    adAccountIds: hasAccountSelected ? [selectedAccount] : [],
-    campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined,
+    adAccountIds,
     startDate: format(startDate, "yyyy-MM-dd"),
     endDate: format(endDate, "yyyy-MM-dd"),
   }, hasAccountSelected);
@@ -160,25 +153,6 @@ const Funnel = () => {
       <MotionItem>
         <h1 className="text-2xl font-bold">Funil de Conversão</h1>
         <p className="text-sm text-muted-foreground mt-1">Desempenho de campanhas em formato de funil</p>
-      </MotionItem>
-
-      <MotionItem>
-        <DateFilterBar
-          preset={preset}
-          onPresetChange={setPreset}
-          customRange={customRange}
-          onCustomRangeChange={setCustomRange}
-          startDate={startDate}
-          endDate={endDate}
-          adAccounts={adAccounts.map((a) => ({ id: a.id, name: a.name }))}
-          selectedAccount={selectedAccount}
-          onAccountChange={(id) => { setSelectedAccount(id); setSelectedCampaignIds([]); }}
-          campaigns={campaigns?.map((c) => ({ id: c.id, name: c.name })) || []}
-          selectedCampaignIds={selectedCampaignIds}
-          onCampaignIdsChange={setSelectedCampaignIds}
-          onRefresh={() => refetch()}
-          isRefreshing={isLoading}
-        />
       </MotionItem>
 
       <MotionItem>

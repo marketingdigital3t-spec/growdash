@@ -7,8 +7,6 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
-import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { FunnelKPIs } from "@/components/funnel-analysis/FunnelKPIs";
 import { FunnelStageDistribution } from "@/components/funnel-analysis/FunnelStageDistribution";
 import { FunnelStageConversion } from "@/components/funnel-analysis/FunnelStageConversion";
@@ -69,7 +67,7 @@ function HelpBlock({ help, children, className }: { help: readonly string[]; chi
 }
 
 export default function FunnelAnalysis() {
-  const { adAccountIds, setAdAccountIds, funnelIds: selectedFunnelIds, setFunnelIds: setSelectedFunnelIds, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
+  const { adAccountIds, funnelIds: selectedFunnelIds, setFunnelIds: setSelectedFunnelIds, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
@@ -613,30 +611,6 @@ export default function FunnelAnalysis() {
 
       <MotionItem>
         <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
-          <AccountMultiSelect
-            accounts={visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome"), connection_status: account.connection_status }))}
-            selectedIds={selectedAccountIds}
-            onChange={setAdAccountIds}
-            className="gd-filter-account bg-background/60"
-          />
-          <CampaignMultiSelect
-            campaigns={activeFunnels.map((funnel) => ({ id: funnel.id, name: funnel.name }))}
-            selectedIds={selectedFunnelIds}
-            onChange={setSelectedFunnelIds}
-            placeholder="Todos os funis RD"
-            entityLabel="funil"
-            className="gd-filter-control w-full bg-background/60 sm:w-[220px]"
-          />
-          <MetaDateRangePicker
-            preset={preset}
-            onPresetChange={setPreset}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-            startDate={startDate}
-            endDate={endDate}
-            className="gd-filter-control gd-filter-date"
-          />
-
           <FilterSelect label="Origem" value={selectedSource} onChange={setSelectedSource} options={sources} />
           <CampaignMultiSelect campaigns={campaigns.map((name) => ({ id: name, name }))} selectedIds={selectedCampaigns} onChange={setSelectedCampaigns} placeholder="Todas as campanhas" className="gd-filter-control w-full bg-background/60 sm:w-[180px]" />
           <FilterSelect label="Estado" value={selectedState} onChange={setSelectedState} options={states} />

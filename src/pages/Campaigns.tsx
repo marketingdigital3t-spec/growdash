@@ -14,8 +14,6 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
-import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
-import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { motion, AnimatePresence } from "framer-motion";
@@ -288,16 +286,11 @@ export default function Campaigns() {
   };
 
   const {
-    preset,
-    setPreset,
-    customRange,
-    setCustomRange,
     startDate,
     endDate,
     adAccountId: selectedAccount,
     setAdAccountId: setSelectedAccount,
     adAccountIds: selectedAccountIds,
-    setAdAccountIds: setSelectedAccountIds,
     funnelIds,
     businessUnitId,
     segment,
@@ -971,8 +964,6 @@ export default function Campaigns() {
               </TabsTrigger>
             </TabsList>
             <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5">
-              <div className="w-[205px] [&_.gd-filter-date]:!w-full [&_.gd-filter-date]:!min-w-0 [&_button]:!h-8 [&_button]:!min-h-0 [&_button]:!px-2 [&_button]:text-[10px]"><DateFilterBar preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} adAccounts={[]} selectedAccount="" onAccountChange={() => {}} showSummary={false} /></div>
-              <AccountMultiSelect accounts={visibleAdAccounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))} selectedIds={selectedAccountIds} onChange={setSelectedAccountIds} className="h-8 min-h-0 w-[205px] text-[10px]" />
             </div>
           </div>
 

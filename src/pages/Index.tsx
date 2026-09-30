@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Plus } from "lucide-react";
-import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { SalesDialog } from "@/components/dashboard/SalesDialog";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
@@ -36,26 +35,18 @@ import { useEventClasses } from "@/hooks/useEventClasses";
 
 const Index = () => {
   const {
-    preset,
-    setPreset,
-    customRange,
-    setCustomRange,
     startDate,
     endDate,
     adAccountId: selectedAccount,
     setAdAccountId: setSelectedAccount,
     adAccountIds: selectedAccountIds,
-    setAdAccountIds: setSelectedAccountIds,
     funnelIds: selectedFunnelIds,
     businessUnitId,
     segment,
   } = useGlobalFilters();
-  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem("dash:campaigns");
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
+  // O Dashboard usa exclusivamente a barra global do shell para calendário,
+  // contas Meta e funis RD. Não mantenha uma segunda cópia de filtros locais.
+  const selectedCampaignIds = useMemo<string[]>(() => [], []);
   const [salesDialogOpen, setSalesDialogOpen] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -141,10 +132,6 @@ const Index = () => {
   const canEditDashboard = Boolean(
     canEditWorkspace && activeView && activeView.id !== FALLBACK_DASHBOARD_VIEW_ID,
   );
-
-  useEffect(() => {
-    try { localStorage.setItem("dash:campaigns", JSON.stringify(selectedCampaignIds)); } catch {}
-  }, [selectedCampaignIds]);
 
   useEffect(() => {
     // A lista fica vazia antes da primeira resposta. Não transforme essa fase
@@ -374,42 +361,7 @@ const Index = () => {
       </MotionItem>
 
       <MotionItem className="mx-3">
-        <div className="flex flex-col gap-3 border-b border-border/60 pb-3 lg:flex-row lg:items-center">
-          <div className="min-w-0 flex-1">
-            <DateFilterBar
-              preset={preset}
-              onPresetChange={setPreset}
-              customRange={customRange}
-              onCustomRangeChange={setCustomRange}
-              startDate={startDate}
-              endDate={endDate}
-              adAccounts={visibleAccounts.map((a) => ({ id: a.id, name: a.name }))}
-              selectedAccount={selectedAccount}
-              onAccountChange={(id) => { setSelectedAccount(id); setSelectedCampaignIds([]); }}
-              selectedAccountIds={selectedAccountIds}
-              onAccountIdsChange={(ids) => { setSelectedAccountIds(ids); setSelectedCampaignIds([]); }}
-              campaigns={(() => {
-                const spendByCamp = new Map<string, number>();
-                const imprByCamp = new Map<string, number>();
-                for (const r of visiblePickerInsights as any[]) {
-                  if (!r.campaign_id) continue;
-                  spendByCamp.set(r.campaign_id, (spendByCamp.get(r.campaign_id) || 0) + (r.spend ?? 0));
-                  imprByCamp.set(r.campaign_id, (imprByCamp.get(r.campaign_id) || 0) + (r.impressions ?? 0));
-                }
-                return visibleCampaigns
-                  .filter((c: any) => (spendByCamp.get(c.id) || 0) > 0 || (imprByCamp.get(c.id) || 0) > 0)
-                  .map((c: any) => ({ id: c.id, name: c.name, spend: spendByCamp.get(c.id) || 0 }))
-                  .sort((a, b) => b.spend - a.spend)
-                  .map(({ id, name }) => ({ id, name }));
-              })()}
-              selectedCampaignIds={selectedCampaignIds}
-              onCampaignIdsChange={setSelectedCampaignIds}
-              onRefresh={handleSync}
-              isRefreshing={syncMeta.isPending || isLoading}
-              showSummary={false}
-            />
-          </div>
-
+        <div className="flex justify-end border-b border-border/60 pb-3">
           {canEditDashboard && activeView && !isEditing && (
             <Button
               size="sm"

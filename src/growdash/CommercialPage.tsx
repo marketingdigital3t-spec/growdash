@@ -12,8 +12,6 @@ import { useSales, type Sale } from "@/hooks/useSales";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { PageHeading } from "./shared";
-import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
-import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { buildCommercialAccountRankings, type CommercialAccountRanking, type CommercialSaleRow } from "@/lib/commercialRanking";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -39,16 +37,10 @@ function formatSaleDate(value: string | null | undefined) {
 export default function CommercialPage() {
   const {
     adAccountId,
-    setAdAccountId,
     adAccountIds,
-    setAdAccountIds,
     funnelIds,
     startDate,
     endDate,
-    preset,
-    setPreset,
-    customRange,
-    setCustomRange,
     businessUnitId,
     segment,
   } = useGlobalFilters();
@@ -153,8 +145,6 @@ export default function CommercialPage() {
         description="Descubra o melhor vendedor em cada conta de anúncio com base nas vendas confirmadas e metas configuradas."
         actions={(
           <div className="flex flex-wrap gap-2">
-            <MetaDateRangePicker preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} className="min-w-[235px]" />
-            <AccountMultiSelect accounts={accountOptions} selectedIds={adAccountIds} onChange={setAdAccountIds} className="min-w-44" />
             <select aria-label="Filtrar por vendedor" className="gd-button min-w-40" value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)}><option value="all">Todos os vendedores</option>{sellers.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
             <select aria-label="Filtrar por produto" className="gd-button min-w-40" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
           </div>

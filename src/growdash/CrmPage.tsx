@@ -39,11 +39,9 @@ import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
 import { classifyLead, dedupeRDDeals, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
 import { useCreateRDDealNote, useRDDealNotes } from "@/hooks/useRDDealNotes";
 import { useSales } from "@/hooks/useSales";
-import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
@@ -125,7 +123,6 @@ export default function CrmPage() {
     adAccountId,
     setAdAccountId,
     adAccountIds,
-    setAdAccountIds,
     funnelIds: selectedFunnelIds,
     setFunnelIds: setSelectedFunnelIds,
     preset,
@@ -572,33 +569,10 @@ export default function CrmPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input aria-label="Buscar negociações" value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-10" placeholder="Buscar contato, e-mail, campanha, produto ou cidade" />
           </label>
-          <AccountMultiSelect accounts={availableAccounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))} selectedIds={adAccountIds} onChange={setAdAccountIds} loading={loadingAdAccounts} errorMessage={adAccountsError ? `Falha ao carregar contas: ${adAccountsQueryError instanceof Error ? adAccountsQueryError.message : "verifique a conexão"}` : undefined} onRetry={() => void refetchAdAccounts()} className="h-11" popoverClassName="crm-filter-popover" />
-          <AccountMultiSelect
-            accounts={availableFunnels.map((funnel) => ({ id: funnel.id, name: funnel.name }))}
-            selectedIds={scopedSelectedFunnelIds}
-            onChange={setSelectedFunnelIds}
-            className="h-11"
-            popoverClassName="crm-filter-popover"
-            emptyLabel="Todos os funis da conta"
-            singularLabel="funil"
-            pluralLabel="funis"
-            ariaLabel="Selecionar funis RD"
-            searchPlaceholder="Pesquisar funil…"
-          />
           <select aria-label="Filtrar por responsável" value={owner} onChange={(event) => setOwner(event.target.value)} className="gd-button h-11 min-w-0">
             <option value="all">Todos os responsáveis</option>
             {owners.map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
-          <MetaDateRangePicker
-            preset={preset}
-            onPresetChange={setPreset}
-            customRange={customRange}
-            onCustomRangeChange={setCustomRange}
-            startDate={startDate}
-            endDate={endDate}
-            className="h-11"
-            popoverClassName="crm-filter-popover"
-          />
           <div className="crm-filter-status flex min-w-0 gap-1 overflow-x-auto rounded-xl border border-border bg-muted/30 p-1">
             {([ ["all", "Todos"], ["open", "Abertos"], ["won", "Ganhos"], ["lost", "Perdidos"] ] as [StatusFilter, string][]).map(([id, label]) => (
               <button key={id} type="button" aria-pressed={status === id} onClick={() => setStatus(id)} className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-black transition", status === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}>{label}</button>

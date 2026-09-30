@@ -31,7 +31,6 @@ import { FunnelAudienceProfile, useAudienceProfileData } from "@/components/funn
 import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
 import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
-import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import CampaignsManager from "@/pages/Campaigns";
 import funnelCaptacaoDireta from "@/assets/zntt-funnels/01-captacao-direta.png";
 import funnelPilulaAulaGratuita from "@/assets/zntt-funnels/02-pilula-aula-gratuita.png";
@@ -61,7 +60,7 @@ export default function TrafficPage() {
   const { toast } = useToast();
   const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
   const campaignAnalysisMode = activeTab === "campaigns" && ["alerts", "intelligence"].includes(params.get("analise") || "");
-  const { adAccountId, setAdAccountId, adAccountIds, setAdAccountIds, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
+  const { adAccountId, setAdAccountId, adAccountIds, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
     ? accounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
@@ -81,13 +80,6 @@ export default function TrafficPage() {
       <nav data-traffic-rail className="group/traffic-rail absolute right-3 top-1/2 z-50 flex w-16 max-h-[calc(100%-28px)] -translate-y-1/2 flex-col gap-1.5 overflow-visible rounded-2xl border border-border bg-card/95 p-1.5 shadow-2xl backdrop-blur" aria-label="Áreas de Tráfego Pago">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} title={label} aria-label={label} onClick={() => setParams({ aba: id })} className={cn("group/traffic-item relative flex h-11 w-full shrink-0 items-center justify-center rounded-xl text-left text-[11px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-5 w-5 shrink-0" /><span className="pointer-events-none absolute right-full mr-2 hidden whitespace-nowrap rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-bold text-foreground shadow-lg group-hover/traffic-item:block group-focus-within/traffic-item:block">{label}</span></button>)}
       </nav>
-
-      {activeTab !== "campaigns" && activeTab !== "ai" && activeTab !== "presentation" && <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center">
-        <span className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conta de anúncio</span>
-        <AccountMultiSelect accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, connection_status: item.connection_status }))} selectedIds={adAccountIds} onChange={setAdAccountIds} className="h-9 sm:max-w-md" />
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1.5 text-[10px] font-bold text-emerald-600"><Check className="h-3 w-3" />Dados sincronizados</span>
-        <span className="text-[10px] text-muted-foreground sm:ml-auto"><CalendarRange className="mr-1 inline h-3.5 w-3.5" />{format(startDate, "dd/MM/yyyy")}–{format(endDate, "dd/MM/yyyy")}</span>
-      </section>}
 
       {activeTab === "campaigns" && <CampaignsManager />}
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}

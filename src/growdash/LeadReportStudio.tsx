@@ -9,9 +9,6 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
-import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { cn } from "@/lib/utils";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import type { InsightRow } from "@/hooks/useInsights";
@@ -68,7 +65,6 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const { data: workspace } = useWorkspace();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { preset, setPreset, customRange, setCustomRange } = useGlobalFilters();
   const [selected, setSelected] = useState<MetricId[]>(["spend", "leads", "conversations", "cpl", "impressions", "clicks", "rd", "sales", "revenue"]);
   const [presenting, setPresenting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -161,8 +157,6 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
       <header className="flex flex-col gap-3 border-b border-border p-4 2xl:flex-row 2xl:items-center">
         <div><h2 className="flex items-center gap-2 font-black"><Presentation className="h-4 w-4 text-primary" />Estúdio do relatório de leads</h2><p className="mt-1 text-[10px] text-muted-foreground">Escolha período e métricas, gere uma página premium e compartilhe um link independente.</p></div>
         <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,320px)_minmax(280px,auto)_auto_auto] 2xl:ml-auto">
-          <Select value={accountId} onValueChange={onAccountChange}><SelectTrigger className="h-10 min-w-0 bg-background"><SelectValue placeholder="Selecione uma conta" /></SelectTrigger><SelectContent>{accounts.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select>
-          <MetaDateRangePicker preset={preset} onPresetChange={setPreset} customRange={customRange} onCustomRangeChange={setCustomRange} startDate={startDate} endDate={endDate} applyPresetOnClick className="h-10 min-w-0" />
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(event) => upload(event.target.files?.[0])} />
           <Button variant="outline" className="h-10" onClick={() => inputRef.current?.click()}><ImageUp className="mr-2 h-4 w-4" />Banner</Button>
           <Button className="gold-action h-10" disabled={saving || analysisLoading || audienceLoading || !selected.length || accountId === "all"} onClick={generate}><Sparkles className="mr-2 h-4 w-4" />{saving ? "Publicando…" : analysisLoading ? "Analisando 2 meses…" : audienceLoading ? "Carregando público…" : "Gerar página"}</Button>

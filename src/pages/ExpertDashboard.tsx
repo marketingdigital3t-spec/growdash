@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { BarChart3, LockKeyhole, ShieldCheck, UsersRound } from "lucide-react";
 import { MotionItem, MotionPage } from "@/components/motion/MotionContainer";
-import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { KPIWidget } from "@/components/dashboard/widgets/KPIWidget";
 import { PaymentChartWidget, PlatformDistributionWidget } from "@/components/dashboard/widgets/FinancialOverviewWidgets";
@@ -33,7 +32,7 @@ function expertGreeting(name: string) {
  * integrations, CRM details, campaign editor, or dashboard configuration.
  */
 export default function ExpertDashboard() {
-  const { preset, setPreset, customRange, setCustomRange, startDate, endDate, adAccountIds, setAdAccountIds, funnelIds } = useGlobalFilters();
+  const { startDate, endDate, adAccountIds, setAdAccountIds, funnelIds } = useGlobalFilters();
   const { data: accounts = [], isLoading: loadingAccounts } = useAdAccounts();
   const accountId = adAccountIds.length === 1 ? adAccountIds[0] : "all";
   const selectedAccountName = useMemo(() => {
@@ -61,7 +60,6 @@ export default function ExpertDashboard() {
   const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
-  const permittedAccounts = useMemo(() => accounts.map((account) => ({ id: account.id, name: account.name })), [accounts]);
   // useInsights keeps the previous query result while a filter changes. Always
   // reapply the permitted account scope so the all-accounts total can never
   // briefly include a prior account or an account outside this expert access.
@@ -120,23 +118,6 @@ export default function ExpertDashboard() {
           </div>
           <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[.07] px-3 py-1.5 text-xs font-semibold text-primary"><ShieldCheck className="h-3.5 w-3.5" />Somente leitura</div>
         </div>
-      </MotionItem>
-
-      <MotionItem>
-        <DateFilterBar
-          preset={preset}
-          onPresetChange={setPreset}
-          customRange={customRange}
-          onCustomRangeChange={setCustomRange}
-          startDate={startDate}
-          endDate={endDate}
-          adAccounts={permittedAccounts}
-          selectedAccount={accountId}
-          onAccountChange={(id) => setAdAccountIds(id === "all" ? [] : [id])}
-          selectedAccountIds={adAccountIds}
-          onAccountIdsChange={setAdAccountIds}
-          showSummary
-        />
       </MotionItem>
 
       <DashboardProvider value={{

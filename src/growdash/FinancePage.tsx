@@ -25,7 +25,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
 import { InvoicePdfStudio } from "@/components/finance/InvoicePdfStudio";
-import { DateFilterBar } from "@/components/dashboard/DateFilterBar";
 import { calculateTrafficFundsAdded } from "@/lib/trafficFunding";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -52,14 +51,8 @@ export default function FinancePage() {
   const { data: workspace } = useWorkspace();
   const {
     adAccountId,
-    setAdAccountId,
     adAccountIds,
-    setAdAccountIds,
     funnelIds,
-    preset,
-    setPreset,
-    customRange,
-    setCustomRange,
     startDate,
     endDate,
     businessUnitId,
@@ -296,22 +289,6 @@ export default function FinancePage() {
   return (
     <div className="gd-module-shell mx-auto w-full max-w-[1920px] space-y-5">
       <PageHeading eyebrow="Gestão" title="Financeiro" description={`DRE, caixa, previsões e mídia da unidade ${segment === "saas" ? "SaaS" : "Infoproduto"}, com dados reais e filtros globais.`} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportCsv} disabled={!rows.length}><Download className="mr-2 h-4 w-4" />Exportar</Button><Button onClick={() => setEntryOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo lançamento</Button></div>} />
-
-      <section aria-label="Filtros financeiros" className="mb-4 rounded-xl border border-border bg-card p-3 shadow-sm">
-        <DateFilterBar
-          preset={preset}
-          onPresetChange={setPreset}
-          customRange={customRange}
-          onCustomRangeChange={setCustomRange}
-          startDate={startDate}
-          endDate={endDate}
-          adAccounts={unitAccounts}
-          selectedAccount={adAccountId}
-          onAccountChange={setAdAccountId}
-          selectedAccountIds={adAccountIds}
-          onAccountIdsChange={setAdAccountIds}
-        />
-      </section>
 
       <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"><span className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">Unidade ativa: {segment === "saas" ? "SaaS" : "Infoproduto"}</span><div className="flex items-center gap-3"><div className="text-right"><b className="block text-xs">Incluir imposto Meta</b><span className="text-[10px] text-muted-foreground">Simulação de 12,15%; o dado bruto permanece intacto.</span></div><Switch checked={includeMetaTax} onCheckedChange={setIncludeMetaTax} /></div></div>
 
