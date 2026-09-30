@@ -121,9 +121,9 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, startDate, endD
 
   useEffect(() => {
     if (!enabled) return;
-    // A primeira pintura deve mostrar o cache local. A sincronização com Meta/RD
-    // só entra depois que a tela já ficou utilizável.
-    const initial = window.setTimeout(() => void refresh(false), 1_500);
+    // Revalida assim que a tela entra. O React Query mantém o último snapshot
+    // visível enquanto esta chamada acontece em segundo plano.
+    const initial = window.setTimeout(() => void refresh(false), 0);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => void refresh(false);
     const onVisibility = () => {

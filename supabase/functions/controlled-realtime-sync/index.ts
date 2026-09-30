@@ -25,6 +25,7 @@ type SyncBody = {
 
 type RunResult = {
   provider: SyncProvider;
+  status?: "success" | "partial" | "failed";
   scope?: string;
   skipped?: boolean;
   reason?: string;
@@ -116,7 +117,8 @@ Deno.serve(async (req) => {
             incremental: true,
             includeBreakdowns: false,
           });
-          if (insights.error || insights.data?.error || insights.data?.success === false || ["partial", "failed", "blocked"].includes(String(insights.data?.status || ""))) return insights;
+          if (insights.error || insights.data?.error || ["failed", "blocked"].includes(String(insights.data?.status || ""))) return insights;
+          if (insights.data?.status === "partial") return { data: { ...insights.data, success: true, status: "partial" } };
 
           const hourly = await invokeFunction(supabaseUrl, authHeader, "sync-meta-hourly", {
             adAccountId: body.adAccountId,
@@ -133,7 +135,7 @@ Deno.serve(async (req) => {
               : insights.data?.status || hourly.data?.status || "success";
           return {
             data: {
-              success: !hourly.error && hourly.data?.success !== false && hourly.data?.status !== "partial" && hourly.data?.status !== "failed",
+              success: !hourly.error && hourly.data?.success !== false && hourly.data?.status !== "failed",
               status,
               synced: Number(insights.data?.synced || 0) + Number(hourly.data?.synced || 0),
               errors: errors.length ? errors : undefined,
@@ -180,7 +182,10 @@ Deno.serve(async (req) => {
 
     const metaResult = results.find((result) => result.provider === "meta");
     return json({
-      success: results.every((result) => result.skipped || !result.errors),
+      success: results.every((result) => result.skipped || result.status !== "failed"),
+      status: results.some((result) => result.status === "failed")
+        ? "failed"
+        : results.some((result) => result.status === "partial") ? "partial" : "success",
       freshness_seconds: metaResult?.freshness_seconds ?? null,
       synced_at: metaResult?.synced_at || new Date().toISOString(),
       scope: {
@@ -250,26 +255,34 @@ async function runControlled(args: {
   try {
     const response = await run();
     const payload = response?.data ?? response ?? {};
-    const hasError = Boolean(response?.error || payload?.error || payload?.success === false || ["partial", "failed", "blocked", "stale_snapshot"].includes(String(payload?.status || "")));
+    const partial = String(payload?.status || "") === "partial";
+    const hasError = Boolean(response?.error || payload?.error || payload?.success === false || ["failed", "blocked", "stale_snapshot"].includes(String(payload?.status || "")));
     const finishedAt = new Date().toISOString();
     const error = hasError
       ? stringifyError(response?.error || payload?.error || payload?.errors || "Falha na sincronização")
       : null;
 
     await admin.from("realtime_sync_state").update({
-      status: hasError ? "failed" : "success",
+      status: hasError ? "failed" : partial ? "partial" : "success",
       last_finished_at: finishedAt,
-      last_success_at: hasError ? current?.last_success_at ?? null : finishedAt,
-      last_error: error,
+      last_success_at: hasError || partial ? current?.last_success_at ?? null : finishedAt,
+      last_error: hasError
+        ? error
+        : partial
+          ? stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado.")
+          : null,
       locked_until: null,
       updated_at: finishedAt,
     }).eq("user_id", userId).eq("provider", provider).eq("scope_key", scopeKey);
 
     return {
       provider,
+      status: hasError ? "failed" : partial ? "partial" : "success",
       scope: scopeKey,
       synced: Number(payload?.synced || payload?.deals || payload?.updated || 0),
-      errors: hasError ? error : undefined,
+      errors: hasError || partial
+        ? (error || stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado."))
+        : undefined,
       synced_at: typeof payload?.synced_at === "string" ? payload.synced_at : finishedAt,
       freshness_seconds: payload?.freshness_seconds == null ? null : Number(payload.freshness_seconds),
     };
@@ -282,7 +295,7 @@ async function runControlled(args: {
       locked_until: null,
       updated_at: finishedAt,
     }).eq("user_id", userId).eq("provider", provider).eq("scope_key", scopeKey);
-    return { provider, scope: scopeKey, errors: (error as Error).message };
+    return { provider, scope: scopeKey, status: "failed", errors: (error as Error).message };
   }
 }
 

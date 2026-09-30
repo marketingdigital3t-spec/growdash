@@ -27,7 +27,8 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     retry: 3,
     retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 5_000),
     refetchOnReconnect: true,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });

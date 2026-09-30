@@ -185,8 +185,9 @@ export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled =
       if (error) throw error;
       return (data || []) as RDDealStageHistory[];
     },
-    staleTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -294,9 +295,10 @@ export function useRDDeals(params: Params) {
       }
       return dedupeRDDeals(all);
     },
-    staleTime: 15 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -356,9 +358,10 @@ export function useRDClosedDeals(params: Params) {
       if (includeHistory || (!startDate && !endDate)) return won;
       return canonicalWonDealsInPeriod(won, startDate ?? endDate!, endDate ?? startDate!);
     },
-    staleTime: 15 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -381,7 +384,8 @@ export function useFunnelStagesForIds(funnelIds: string[]) {
       if (error) throw error;
       return (data || []) as unknown as FunnelStage[];
     },
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 

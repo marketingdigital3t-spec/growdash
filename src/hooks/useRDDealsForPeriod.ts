@@ -161,9 +161,10 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
       }));
       return dedupeRDDeals(scoped);
     },
-    staleTime: 15 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -213,9 +214,10 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
       // has no trustworthy sales date and must remain out of period KPIs.
       return dedupeRDDeals(all).filter((deal) => isCanonicalWonDealInPeriod(deal, startDate, endDate));
     },
-    staleTime: 15 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -266,9 +268,10 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
 
       return dedupeRDDeals(all);
     },
-    staleTime: 15 * 60 * 1_000,
+    staleTime: 5 * 60 * 1_000,
     gcTime: 24 * 60 * 60 * 1_000,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
