@@ -8141,3 +8141,95 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   border-color: #f1f3f5 !important;
   background: #f1f3f5 !important;
 }
+
+/* Calendar visual contract (last rule): neutral in both themes. DayPicker
+   applies range modifiers to cells and pseudo-elements, so every layer is
+   reset before the compact start/middle/end states are painted. */
+.gd-date-range-popover {
+  color-scheme: light;
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+.dark .gd-date-range-popover { color-scheme: dark; }
+.gd-date-range-popover .gd-date-range-presets {
+  background: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+.gd-date-range-popover .gd-date-range-presets p,
+.gd-date-range-popover .rdp-head_cell,
+.gd-date-range-popover > div > div:last-child > div,
+.gd-date-range-popover .rdp-day_outside {
+  color: hsl(var(--muted-foreground)) !important;
+}
+.gd-date-range-popover .gd-date-range-presets button,
+.gd-date-range-popover .rdp-caption_label,
+.gd-date-range-popover .rdp-caption_dropdowns select,
+.gd-date-range-popover .rdp-nav_button,
+.gd-date-range-popover .rdp-day {
+  color: hsl(var(--foreground)) !important;
+}
+.gd-date-range-popover .gd-date-range-presets button:hover,
+.gd-date-range-popover .rdp-day:not([aria-selected="true"]):hover,
+.gd-date-range-popover .rdp-day_outside:not([aria-selected="true"]):hover,
+.gd-date-range-popover .rdp-nav_button:hover,
+.gd-date-range-popover .rdp-caption_dropdowns select:hover {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.gd-date-range-popover .rdp td,
+.gd-date-range-popover .rdp td::before,
+.gd-date-range-popover .rdp td::after,
+.gd-date-range-popover .rdp-day,
+.gd-date-range-popover .rdp-day_range_start,
+.gd-date-range-popover .rdp-day_range_middle,
+.gd-date-range-popover .rdp-day_range_end,
+.gd-date-range-popover .rdp-day_selected {
+  border: 0 !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+.gd-date-range-popover .rdp-day_range_middle[aria-selected="true"] {
+  background: hsl(var(--muted) / .72) !important;
+  color: hsl(var(--foreground)) !important;
+  border-radius: 0 !important;
+}
+.gd-date-range-popover .rdp-day_range_start[aria-selected="true"],
+.gd-date-range-popover .rdp-day_range_end[aria-selected="true"],
+.gd-date-range-popover .rdp-day_selected[aria-selected="true"] {
+  background: hsl(var(--foreground)) !important;
+  color: hsl(var(--background)) !important;
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+}
+.dark .gd-date-range-popover .rdp-day_range_start[aria-selected="true"],
+.dark .gd-date-range-popover .rdp-day_range_end[aria-selected="true"],
+.dark .gd-date-range-popover .rdp-day_selected[aria-selected="true"] {
+  background: #f1f3f5 !important;
+  color: #111111 !important;
+}
+.gd-date-range-popover .gd-date-range-presets button[aria-pressed="true"] {
+  background: hsl(var(--muted) / .72) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+  box-shadow: none !important;
+}
+.gd-date-range-popover .gd-date-range-presets button[aria-pressed="true"] > span:first-child,
+.gd-date-range-popover .gd-date-range-presets button[aria-pressed="true"] > span:first-child > span {
+  border-color: hsl(var(--foreground)) !important;
+  background: hsl(var(--foreground)) !important;
+}
+.gd-date-range-popover .rdp-button:focus-visible,
+.gd-date-range-popover .rdp-caption_dropdowns select:focus-visible {
+  outline: 2px solid hsl(var(--foreground) / .65) !important;
+  outline-offset: 2px;
+}
+.gd-date-range-popover > div > div:last-child {
+  border-color: hsl(var(--border)) !important;
+}
+.gd-date-range-popover > div > div:last-child button:last-child {
+  background: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--foreground)) !important;
+  color: hsl(var(--background)) !important;
+  box-shadow: none !important;
+}
