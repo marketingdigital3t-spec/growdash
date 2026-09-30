@@ -11,6 +11,7 @@ export interface MetaTrafficScope {
 
 export interface MetaTrafficMetrics {
   spend: number;
+  dailySpend: number;
   impressions: number;
   reach: number;
   frequency: number;
@@ -23,6 +24,7 @@ export interface MetaTrafficMetrics {
   formLeads: number;
   siteLeads: number;
   conversations: number;
+  checkout: number;
   purchases: number;
   purchaseValue: number;
   ctr: number;
@@ -34,10 +36,14 @@ export interface MetaTrafficMetrics {
     accountId: string;
     campaignId: string;
     campaignName: string;
+    adId?: string;
     objective: string | null;
     resultType: string;
     value: number;
   }>;
+  breakdowns: MetaBreakdowns;
+  attributionWindow: string | null;
+  timezone: string | null;
   source: "meta";
   syncedAt: string | null;
   freshnessSeconds: number | null;
@@ -49,6 +55,27 @@ export interface MetaTrafficMetrics {
   leadBreakdownByAd: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
 }
 
+export interface BreakdownSegment {
+  key: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  leads: number;
+  cpl: number;
+  ctr: number;
+  cpm: number;
+}
+
+export interface MetaBreakdowns {
+  age: BreakdownSegment[];
+  gender: BreakdownSegment[];
+  region: BreakdownSegment[];
+  country: BreakdownSegment[];
+  platform: BreakdownSegment[];
+  placement: BreakdownSegment[];
+  device: BreakdownSegment[];
+}
+
 type InsightRow = {
   ad_id?: string | null;
   ad_account_id?: string | null;
@@ -56,6 +83,7 @@ type InsightRow = {
   campaign_name?: string | null;
   campaign_objective?: string | null;
   optimization_goal?: string | null;
+  date?: string | null;
   spend?: number | null;
   impressions?: number | null;
   reach?: number | null;
@@ -67,6 +95,11 @@ type ActionData = {
   totalsByAd?: Record<string, Record<string, number>>;
   valueTotalsByAd?: Record<string, Record<string, number>>;
   dailyMetaLeadByAccount?: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }> >;
+  breakdowns?: MetaBreakdowns;
+};
+
+const EMPTY_BREAKDOWNS: MetaBreakdowns = {
+  age: [], gender: [], region: [], country: [], platform: [], placement: [], device: [],
 };
 
 export function aggregateMetaTrafficMetrics(
@@ -75,6 +108,7 @@ export function aggregateMetaTrafficMetrics(
   syncedAt: string | null,
   errors: string[] = [],
   now = Date.now(),
+  context?: { attributionWindow?: string | null; timezone?: string | null },
 ): MetaTrafficMetrics {
   const totals = rows.reduce((acc, row) => ({
     spend: acc.spend + Number(row.spend || 0),
@@ -85,13 +119,18 @@ export function aggregateMetaTrafficMetrics(
 
   let purchases = 0;
   let purchaseValue = 0;
+  let checkout = 0;
+  const seenActionAds = new Set<string>();
   for (const row of rows) {
     const adId = String(row.ad_id || "");
+    if (!adId || seenActionAds.has(adId)) continue;
+    seenActionAds.add(adId);
     const actionTotals = actions?.totalsByAd?.[adId];
     const valueTotals = actions?.valueTotalsByAd?.[adId];
     const resolved = resolveMetaActionMetrics(actionTotals, valueTotals);
     purchases += resolved.purchases;
     purchaseValue += resolved.purchaseValue;
+    checkout += resolved.checkouts;
   }
 
   const leadTotals = actions?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 };
@@ -112,7 +151,7 @@ export function aggregateMetaTrafficMetrics(
     leadBreakdownByAd[adId] = { formLeads: resolved.forms, siteLeads: resolved.site, conversations: resolved.conversations, totalLeads: resolved.total };
   }
   const seenResultAds = new Set<string>();
-  const resultBreakdownByCampaign = new Map<string, { accountId: string; campaignId: string; campaignName: string; objective: string | null; resultType: string; value: number }>();
+  const resultBreakdownByCampaign = new Map<string, { accountId: string; campaignId: string; campaignName: string; adId?: string; objective: string | null; resultType: string; value: number }>();
   rows.forEach((row) => {
     const adKey = String(row.ad_id || "");
     if (!adKey || seenResultAds.has(adKey)) return;
@@ -128,6 +167,7 @@ export function aggregateMetaTrafficMetrics(
       accountId: String(row.ad_account_id || ""),
       campaignId: String(row.campaign_id || ""),
       campaignName: String(row.campaign_name || ""),
+      adId: adKey,
       objective: row.campaign_objective || null,
       resultType,
       value,
@@ -138,9 +178,11 @@ export function aggregateMetaTrafficMetrics(
   const freshnessSeconds = syncedAt ? Math.max(0, Math.floor((now - new Date(syncedAt).getTime()) / 1000)) : null;
   const status = errors.length ? "error" : freshnessSeconds === null || freshnessSeconds > 300 ? "stale" : "fresh";
   const coveredAccounts = Array.from(new Set(rows.map((row) => row.ad_account_id).filter(Boolean) as string[]));
+  const coveredDates = new Set(rows.map((row) => row.date).filter(Boolean) as string[]).size;
 
   return {
     ...totals,
+    dailySpend: coveredDates > 0 ? totals.spend / coveredDates : 0,
     frequency: totals.reach > 0 ? totals.impressions / totals.reach : 0,
     leads,
     totalLeads: leads,
@@ -149,6 +191,7 @@ export function aggregateMetaTrafficMetrics(
     formLeads: leadTotals.forms,
     siteLeads: leadTotals.site,
     conversations: leadTotals.conversations,
+    checkout,
     purchases,
     purchaseValue,
     ctr: totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0,
@@ -157,6 +200,9 @@ export function aggregateMetaTrafficMetrics(
     cpl: leads > 0 ? totals.spend / leads : 0,
     roas: totals.spend > 0 ? purchaseValue / totals.spend : 0,
     resultBreakdown,
+    breakdowns: actions?.breakdowns || EMPTY_BREAKDOWNS,
+    attributionWindow: context?.attributionWindow || null,
+    timezone: context?.timezone || null,
     source: "meta",
     syncedAt,
     freshnessSeconds,

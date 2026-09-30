@@ -773,7 +773,7 @@ Deno.serve(async (req) => {
                   date: r.date_start,
                   breakdown_type: breakdown.type,
                   segment_key: breakdown.type === "platform_position" && r.publisher_platform
-                    ? `${r.publisher_platform} · ${r.platform_position}`
+                    ? [r.publisher_platform, r.platform_position, r.impression_device].filter(Boolean).join(" · ")
                     : String(r[breakdown.type]),
                   spend: Number(r.spend || 0),
                   impressions: Number(r.impressions || 0),

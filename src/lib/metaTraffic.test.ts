@@ -74,4 +74,25 @@ describe("Meta traffic metrics", () => {
     expect(result.leadBreakdownByAccount["acc-1"]).toEqual({ formLeads: 2, siteLeads: 3, conversations: 4, totalLeads: 9 });
     expect(result.leadBreakdownByAd["ad-1"]).toEqual({ formLeads: 2, siteLeads: 3, conversations: 4, totalLeads: 9 });
   });
+
+  it("expõe custo diário, checkout, atribuição e breakdowns sem alterar o total Meta", () => {
+    const result = aggregateMetaTrafficMetrics([
+      { ad_id: "ad-1", ad_account_id: "acc-1", date: "2026-09-29", spend: 40, impressions: 1000, reach: 500, clicks: 20 },
+      { ad_id: "ad-1", ad_account_id: "acc-1", date: "2026-09-30", spend: 60, impressions: 1200, reach: 600, clicks: 30 },
+    ], {
+      metaLeadActions: { forms: 2, site: 1, conversations: 1, total: 4 },
+      totalsByAd: { "ad-1": { initiate_checkout: 3, omni_purchase: 1 } },
+      breakdowns: {
+        age: [{ key: "25-34", spend: 100, impressions: 2200, clicks: 50, leads: 4, cpl: 25, ctr: 2.27, cpm: 45.45 }],
+        gender: [], region: [], country: [], platform: [], placement: [], device: [],
+      },
+    }, "2026-09-30T12:00:00.000Z", [], Date.parse("2026-09-30T12:01:00.000Z"), { attributionWindow: "7d_click", timezone: "America/Sao_Paulo" });
+
+    expect(result.dailySpend).toBe(50);
+    expect(result.checkout).toBe(3);
+    expect(result.totalLeads).toBe(4);
+    expect(result.breakdowns.age[0].key).toBe("25-34");
+    expect(result.attributionWindow).toBe("7d_click");
+    expect(result.timezone).toBe("America/Sao_Paulo");
+  });
 });

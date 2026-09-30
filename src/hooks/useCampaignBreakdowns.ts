@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
-export type BreakdownType = "age" | "gender" | "publisher_platform" | "platform_position";
+export type BreakdownType = "age" | "gender" | "region" | "country" | "publisher_platform" | "platform_position";
 
 export interface BreakdownSegment {
   key: string;
@@ -17,8 +17,11 @@ export interface BreakdownSegment {
 export interface CampaignBreakdowns {
   age: BreakdownSegment[];
   gender: BreakdownSegment[];
+  region: BreakdownSegment[];
+  country: BreakdownSegment[];
   publisher_platform: BreakdownSegment[];
   platform_position: BreakdownSegment[];
+  device: BreakdownSegment[];
 }
 
 function aggregate(rows: any[]): BreakdownSegment[] {
@@ -57,8 +60,11 @@ export function useCampaignBreakdowns(campaignId?: string, startDate?: Date, end
       return {
         age: aggregate(rows.filter(r => r.breakdown_type === "age")),
         gender: aggregate(rows.filter(r => r.breakdown_type === "gender")),
+        region: aggregate(rows.filter(r => r.breakdown_type === "region")),
+        country: aggregate(rows.filter(r => r.breakdown_type === "country")),
         publisher_platform: aggregate(rows.filter(r => r.breakdown_type === "publisher_platform")),
         platform_position: aggregate(rows.filter(r => r.breakdown_type === "platform_position")),
+        device: aggregate(rows.filter(r => r.breakdown_type === "platform_position" && /·\s*[^·]+\s*·/.test(String(r.segment_key || "")))),
       };
     },
   });
