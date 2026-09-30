@@ -254,16 +254,26 @@ Deno.serve(async (req) => {
         }
         // Do not erase a valid hourly snapshot before the new one has been
         // written successfully. Keep the campaign scope bounded as well.
-        let cleanup = supabaseAdmin
-          .from("insights_hourly")
-          .delete()
-          .eq("ad_account_id", account.id)
-          .gte("date", startDate)
-          .lte("date", endDate);
-        if (requestedCampaignIds.length) cleanup = cleanup.in("campaign_id", requestedCampaignIds);
-        if (rows.length) cleanup = cleanup.not("ad_id", "in", `(${[...new Set(rows.map((row) => `'${String(row.ad_id).replace(/'/g, "''")}'`))].join(",")})`);
-        const { error: hourlyDeleteError } = await cleanup;
-        if (hourlyDeleteError) throw new Error(`limpeza horária da conta ${account.name}: ${hourlyDeleteError.message}`);
+        const incomingByDate = new Map<string, Set<string>>();
+        for (const row of rows) {
+          const ids = incomingByDate.get(row.date) || new Set<string>();
+          ids.add(row.ad_id);
+          incomingByDate.set(row.date, ids);
+        }
+        const cursor = new Date(`${startDate}T00:00:00Z`);
+        const last = new Date(`${endDate}T00:00:00Z`);
+        for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+          const date = cursor.toISOString().slice(0, 10);
+          let cleanup = supabaseAdmin.from("insights_hourly").delete()
+            .eq("ad_account_id", account.id).eq("date", date);
+          if (requestedCampaignIds.length) cleanup = cleanup.in("campaign_id", requestedCampaignIds);
+          const incoming = [...(incomingByDate.get(date) || new Set<string>())];
+          if (incoming.length) {
+            cleanup = cleanup.not("ad_id", "in", `(${incoming.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",")})`);
+          }
+          const { error: hourlyDeleteError } = await cleanup;
+          if (hourlyDeleteError) throw new Error(`limpeza horária da conta ${account.name}: ${hourlyDeleteError.message}`);
+        }
         console.log(`hourly ${account.name}: ${rows.length} rows`);
       } catch (e) {
         failedAccounts++;

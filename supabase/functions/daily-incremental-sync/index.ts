@@ -145,6 +145,31 @@ function applyReportedFailure(result: FunctionResult): FunctionResult {
   return hasReportedFailure || nonSuccessStatus ? { ...result, ok: false } : result;
 }
 
+function aggregateMetaResults(
+  results: Array<{ account_id: string; insights: FunctionResult; leads: FunctionResult; hourly: FunctionResult }>,
+  key: "insights" | "leads" | "hourly",
+): FunctionResult {
+  const selected = results.map((result) => result[key]);
+  const failed = selected.filter((result) => !result.ok);
+  const errors = selected.flatMap((result) => {
+    const values = [result.body?.error, result.body?.errors].filter(Boolean);
+    return values.map((value) => typeof value === "string" ? value : JSON.stringify(value));
+  });
+  return {
+    ok: selected.length > 0 && failed.length === 0,
+    status: selected.length === 0 ? 204 : failed.length === selected.length ? 500 : failed.length > 0 ? 207 : 200,
+    durationMs: selected.reduce((sum, result) => sum + result.durationMs, 0),
+    body: {
+      success: failed.length === 0,
+      status: selected.length === 0 ? "skipped" : failed.length === 0 ? "success" : failed.length === selected.length ? "failed" : "partial",
+      accounts: results.length,
+      failed_accounts: failed.length,
+      errors: errors.length ? errors : undefined,
+      account_results: results.map((result) => ({ account_id: result.account_id, ok: result[key].ok, status: result[key].body?.status, error: result[key].body?.error || result[key].body?.errors })),
+    },
+  };
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -264,30 +289,87 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Both Meta jobs are exact-date and use idempotent upserts. They may run in
-    // parallel because they persist to independent fact tables.
-    const [metaInsightsRaw, metaLeadsRaw, metaHourlyRaw] = await Promise.all([
-      callFunction(supabaseUrl, serviceKey, "sync-meta-insights", {
+    // Meta facts are synchronized account-by-account and in dependency order.
+    // Running Insights, lead records and hourly facts for every account in
+    // parallel caused hourly rows to observe an incomplete daily snapshot and
+    // made a slow account affect the watermark of all others.
+    const { data: metaAccounts, error: metaAccountsError } = await admin
+      .from("ad_accounts")
+      .select("id,timezone_name,attribution_window,connection_status")
+      .neq("connection_status", "disconnected");
+    if (metaAccountsError) throw metaAccountsError;
+
+    const metaAccountResults: Array<{ account_id: string; timezone: string; attribution_window: string; insights: FunctionResult; leads: FunctionResult; hourly: FunctionResult }> = [];
+    for (const account of (metaAccounts || []) as any[]) {
+      const timezone = String(account.timezone_name || "America/Sao_Paulo");
+      const attributionWindow = String(account.attribution_window || "account_default");
+      const campaignScope = "all-campaigns";
+      const scopePayload = {
+        ad_account_id: account.id,
+        campaign_scope: campaignScope,
+        start_date: syncWindow.startDate,
+        end_date: syncWindow.endDate,
+        timezone,
+        attribution_window: attributionWindow,
+        status: "running",
+        last_started_at: startedAt,
+        covered: false,
+        last_error: null,
+        updated_at: startedAt,
+      };
+      await admin.from("meta_sync_scope_state").upsert(scopePayload, {
+        onConflict: "ad_account_id,campaign_scope,start_date,end_date,timezone,attribution_window",
+      });
+
+      const accountScope = { adAccountIds: [account.id] };
+      const insights = applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-insights", {
+        ...accountScope,
         startDate: syncWindow.startDate,
         endDate: syncWindow.endDate,
+        timezone,
+        attributionWindow,
         incremental: true,
         includeBreakdowns: false,
         triggerSource: "five_minute_incremental",
-      }),
-      callFunction(supabaseUrl, serviceKey, "sync-meta-leads", {
-        startDate: syncWindow.startDate,
-        endDate: syncWindow.endDate,
-        triggerSource: "five_minute_incremental",
-      }),
-      callFunction(supabaseUrl, serviceKey, "sync-meta-hourly", {
-        startDate: syncWindow.startDate,
-        endDate: syncWindow.endDate,
-        triggerSource: "five_minute_incremental",
-      }),
-    ]);
-    const metaInsights = applyReportedFailure(metaInsightsRaw);
-    const metaLeads = applyReportedFailure(metaLeadsRaw);
-    const metaHourly = applyReportedFailure(metaHourlyRaw);
+      }));
+      const leads = insights.ok
+        ? applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-leads", {
+          ...accountScope,
+          startDate: syncWindow.startDate,
+          endDate: syncWindow.endDate,
+          triggerSource: "five_minute_incremental",
+        }))
+        : { ok: false, status: 0, durationMs: 0, body: { error: "Insights parcial; leads preservados do último snapshot válido." } };
+      const hourly = insights.ok && leads.ok
+        ? applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-hourly", {
+          ...accountScope,
+          startDate: syncWindow.startDate,
+          endDate: syncWindow.endDate,
+          timezone,
+          attributionWindow,
+          triggerSource: "five_minute_incremental",
+        }))
+        : { ok: false, status: 0, durationMs: 0, body: { error: "Dependência anterior parcial; hourly preservado do último snapshot válido." } };
+      const accountOk = insights.ok && leads.ok && hourly.ok;
+      const accountErrors = [insights.body?.error, insights.body?.errors, leads.body?.error, leads.body?.errors, hourly.body?.error, hourly.body?.errors]
+        .filter(Boolean).map((value) => typeof value === "string" ? value : JSON.stringify(value)).join("; ") || null;
+      const finished = new Date().toISOString();
+      await admin.from("meta_sync_scope_state").update({
+        status: accountOk ? "success" : "partial",
+        last_finished_at: finished,
+        last_success_at: accountOk ? finished : undefined,
+        last_valid_snapshot_at: accountOk ? finished : undefined,
+        last_error: accountErrors,
+        covered: accountOk,
+        updated_at: finished,
+      }).eq("ad_account_id", account.id).eq("campaign_scope", campaignScope)
+        .eq("start_date", syncWindow.startDate).eq("end_date", syncWindow.endDate)
+        .eq("timezone", timezone).eq("attribution_window", attributionWindow);
+      metaAccountResults.push({ account_id: account.id, timezone, attribution_window: attributionWindow, insights, leads, hourly });
+    }
+    const metaInsights = aggregateMetaResults(metaAccountResults, "insights");
+    const metaLeads = aggregateMetaResults(metaAccountResults, "leads");
+    const metaHourly = aggregateMetaResults(metaAccountResults, "hourly");
 
     const rdConnections = await listAuthorizedRDConnections(admin);
     const ownerIds = Array.from(new Set(rdConnections.map((row) => String(row.user_id))));

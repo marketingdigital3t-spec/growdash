@@ -37,6 +37,9 @@ type SyncState = "idle" | "refreshing" | "fresh" | "error";
 interface Params {
   adAccountId?: string;
   adAccountIds?: string[];
+  campaignIds?: string[];
+  timezone?: string;
+  attributionWindow?: string;
   startDate?: Date;
   endDate?: Date;
   enabled?: boolean;
@@ -51,7 +54,7 @@ interface Params {
  * Assim, os KPIs permanecem visíveis e mudam sem um loader central nem novo
  * backfill do histórico a cada navegação.
  */
-export function useNearRealtimeSync({ adAccountId, adAccountIds, startDate, endDate, enabled = true }: Params = {}) {
+export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, timezone, attributionWindow, startDate, endDate, enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
   const inFlight = useRef<Promise<void> | null>(null);
   const invalidateTimer = useRef<number | null>(null);
@@ -59,7 +62,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, startDate, endD
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${startDate?.toISOString().slice(0, 10) || "today"}:${endDate?.toISOString().slice(0, 10) || "today"}`;
+  const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${startDate?.toISOString().slice(0, 10) || "today"}:${endDate?.toISOString().slice(0, 10) || "today"}:${timezone || "account"}:${attributionWindow || "account_default"}`;
 
   const invalidateLiveQueries = useCallback(() => {
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
@@ -88,8 +91,11 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, startDate, endD
         body: {
           adAccountId,
           adAccountIds,
+          campaignIds,
           startDate: startDate?.toISOString().slice(0, 10),
           endDate: endDate?.toISOString().slice(0, 10),
+          timezone,
+          attributionWindow,
           includeMeta: true,
           includeRD: true,
           includeBalance: true,
@@ -97,13 +103,14 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, startDate, endD
           force,
         },
       });
-      if (error || data?.error || data?.success === false) {
+      if (error || data?.error || data?.success === false || ["failed", "error"].includes(String(data?.status || ""))) {
         throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
       }
       setSyncError(null);
       if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
       setLastUpdatedAt(new Date());
-      setState("fresh");
+      setState(data?.status === "partial" ? "error" : "fresh");
+      if (data?.status === "partial") setSyncError("Sincronização parcial; o último snapshot válido foi preservado.");
       invalidateLiveQueries();
     })().catch((error) => {
       // Falha silenciosa: o histórico armazenado permanece visível e uma nova
@@ -117,7 +124,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, startDate, endD
 
     inFlight.current = task;
     return task;
-  }, [adAccountId, adAccountIds, endDate, enabled, invalidateLiveQueries, scope, startDate]);
+  }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, enabled, invalidateLiveQueries, scope, startDate, timezone]);
 
   useEffect(() => {
     if (!enabled) return;

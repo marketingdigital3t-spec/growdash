@@ -688,26 +688,39 @@ Deno.serve(async (req) => {
         // only after all current rows are safely stored. The attribution
         // predicate is mandatory: another attribution window is a separate
         // fact and must never be deleted by this run.
-        for (let i = 0; i < factAdIds.length; i += 500) {
-          const adChunk = factAdIds.slice(i, i + 500);
-          const { error: actionDeleteError } = await supabaseAdmin
-            .from("insight_actions")
-            .delete()
-            .in("ad_id", adChunk)
-            .eq("attribution_window", effectiveAttributionWindow)
-            .gte("date", startDate)
-            .lte("date", endDate)
-            .not("ad_id", "in", `(${allInsights.map((i: any) => `'${String(i.ad_id).replace(/'/g, "''")}'`).join(",") || "''"})`);
-          if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
-          const { error: insightDeleteError } = await supabaseAdmin
-            .from("insights")
-            .delete()
-            .in("ad_id", adChunk)
-            .eq("attribution_window", effectiveAttributionWindow)
-            .gte("date", startDate)
-            .lte("date", endDate)
-            .not("ad_id", "in", `(${allInsights.map((i: any) => `'${String(i.ad_id).replace(/'/g, "''")}'`).join(",") || "''"})`);
-          if (insightDeleteError) throw new Error(`limpeza dos insights da conta ${account.name}: ${insightDeleteError.message}`);
+        // Reconcile by (date, ad_id), never by ad_id alone.  A daily response
+        // can contain an ad on one day and omit it on another; deleting by ad
+        // only would erase the valid day as well.
+        const incomingByDate = new Map<string, Set<string>>();
+        for (const insight of allInsights) {
+          const date = String(insight.date_start || "");
+          const adId = String(insight.ad_id || "");
+          if (!date || !adId) continue;
+          const ids = incomingByDate.get(date) || new Set<string>();
+          ids.add(adId);
+          incomingByDate.set(date, ids);
+        }
+        const cursor = new Date(`${startDate}T00:00:00Z`);
+        const last = new Date(`${endDate}T00:00:00Z`);
+        for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+          const date = cursor.toISOString().slice(0, 10);
+          const incoming = [...(incomingByDate.get(date) || new Set<string>())];
+          for (let i = 0; i < factAdIds.length; i += 500) {
+            const adChunk = factAdIds.slice(i, i + 500);
+            let actionDelete = supabaseAdmin.from("insight_actions").delete()
+              .in("ad_id", adChunk).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
+            let insightDelete = supabaseAdmin.from("insights").delete()
+              .in("ad_id", adChunk).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
+            if (incoming.length) {
+              const quoted = `(${incoming.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",")})`;
+              actionDelete = actionDelete.not("ad_id", "in", quoted);
+              insightDelete = insightDelete.not("ad_id", "in", quoted);
+            }
+            const { error: actionDeleteError } = await actionDelete;
+            if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
+            const { error: insightDeleteError } = await insightDelete;
+            if (insightDeleteError) throw new Error(`limpeza dos insights da conta ${account.name}: ${insightDeleteError.message}`);
+          }
         }
 
         // 5. Buscar breakdowns somente quando explicitamente solicitado. Eles
