@@ -8233,3 +8233,37 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   color: hsl(var(--background)) !important;
   box-shadow: none !important;
 }
+
+/* The shared Button primitive adds `.premium-button` to DayPicker buttons.
+   Target the actual `name="day"` element (not the old rdp-day class) so the
+   global silver/gold button skin cannot repaint every calendar week. */
+.gd-date-range-popover button[name="day"] {
+  background: transparent !important;
+  background-image: none !important;
+  color: hsl(var(--foreground)) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.gd-date-range-popover button[name="day"]:hover {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.gd-date-range-popover button[name="day"][aria-selected="true"] {
+  background: hsl(var(--foreground)) !important;
+  color: hsl(var(--background)) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+}
+.gd-date-range-popover button[name="day"].day-range-middle[aria-selected="true"] {
+  background: hsl(var(--muted) / .72) !important;
+  color: hsl(var(--foreground)) !important;
+  border-radius: 0 !important;
+}
+.dark .gd-date-range-popover button[name="day"][aria-selected="true"] {
+  background: #f1f3f5 !important;
+  color: #111111 !important;
+}
+.dark .gd-date-range-popover button[name="day"].day-range-middle[aria-selected="true"] {
+  background: rgba(255,255,255,.14) !important;
+  color: #f8fafc !important;
+}
