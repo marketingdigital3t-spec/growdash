@@ -53,7 +53,11 @@ export default function ExpertDashboard() {
   // not every RD deal without attribution. The latter is a reconciliation item
   // and must never inflate the owner-facing dashboard total.
   const selectedAccountIds = useMemo(() => adAccountIds.length ? adAccountIds : accounts.map((account) => account.id), [adAccountIds, accounts]);
-  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
+  const attributionWindowsByAccount = useMemo(
+    () => Object.fromEntries(accounts.filter((account) => selectedAccountIds.includes(account.id)).map((account) => [account.id, account.attribution_window || "account_default"])),
+    [accounts, selectedAccountIds],
+  );
+  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, attributionWindowsByAccount, startDate, endDate });
   const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
   const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
   const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
@@ -85,7 +89,7 @@ export default function ExpertDashboard() {
     startDate,
     endDate,
     actionAccountMap,
-    { adAccountIds: selectedAccountIds },
+    { adAccountIds: selectedAccountIds, attributionWindowsByAccount },
   );
   const expertLeadActions = useMemo(() => actionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [actionData?.metaLeadActions]);
   const expertMetrics = useMemo(
