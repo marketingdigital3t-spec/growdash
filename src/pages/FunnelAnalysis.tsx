@@ -503,9 +503,14 @@ export default function FunnelAnalysis() {
             body: {
               funnel_id: funnel.id,
               analytics_mode: true,
-              // A análise de funil precisa reconciliar todos os segmentos e
-              // páginas do RD; a Edge Function encerra somente no fim real.
-              full_history: true,
+              // A atualização manual precisa respeitar exatamente o período
+              // visível no calendário. Enviar full_history sem as datas fazia
+              // a Edge Function varrer o arquivo inteiro e misturar negócios
+              // fora do escopo atual nos KPIs.
+              full_history: false,
+              start_date: format(startDate, "yyyy-MM-dd"),
+              end_date: format(endDate, "yyyy-MM-dd"),
+              max_pages: 50,
             },
           });
           if (error) {

@@ -56,8 +56,13 @@ export function isRDDealInScopePeriod(deal: ScopedDeal, scope: RDQueryScope) {
 export function dedupeRDDealsById<T extends ScopedDeal>(deals: T[]) {
   const seen = new Set<string>();
   return deals.filter((deal) => {
-    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${String(deal.rd_deal_id || "").trim()}`;
-    if (!id || seen.has(id)) return false;
+    // A row without the provider ID is not a valid RD fact. Treating every
+    // such row as `legacy:` made unrelated incomplete records collapse into a
+    // single lead (or, worse, allowed an invalid row into a KPI).
+    const rawId = String(deal.rd_deal_id || "").trim();
+    if (!rawId) return false;
+    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${rawId}`;
+    if (seen.has(id)) return false;
     seen.add(id);
     return true;
   });

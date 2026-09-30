@@ -46,6 +46,14 @@ describe("RD query scope", () => {
     expect(dedupeRDDealsById([{ rd_deal_id: "deal-1" }, { rd_deal_id: "deal-1" }, { rd_deal_id: "deal-2" }])).toHaveLength(2);
   });
 
+  it("does not count rows that have no RD provider identity", () => {
+    expect(dedupeRDDealsById([
+      { rd_deal_id: null },
+      { rd_deal_id: "" },
+      { rd_deal_id: "deal-1" },
+    ])).toEqual([{ rd_deal_id: "deal-1" }]);
+  });
+
   it("keeps the same external deal separate when it belongs to different RD connections", () => {
     expect(dedupeRDDealsById([
       { rd_deal_id: "deal-1", rd_connection_id: "connection-a" },
