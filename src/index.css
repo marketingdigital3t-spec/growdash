@@ -8246,8 +8246,8 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   box-shadow: none !important;
 }
 html[data-accent] .gd-date-range-popover button[name="day"] {
-  background: transparent !important;
-  background-color: transparent !important;
+  background: rgba(0,0,0,.001) !important;
+  background-color: rgba(0,0,0,.001) !important;
   background-image: none !important;
   box-shadow: none !important;
 }
