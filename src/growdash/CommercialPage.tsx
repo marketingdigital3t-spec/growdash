@@ -37,6 +37,8 @@ function formatSaleDate(value: string | null | undefined) {
 export default function CommercialPage() {
   const {
     adAccountId,
+    setAdAccountId,
+    setAdAccountIds,
     adAccountIds,
     funnelIds,
     startDate,
@@ -45,11 +47,11 @@ export default function CommercialPage() {
     segment,
   } = useGlobalFilters();
   const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
-  const { data: sales = [], isLoading } = useSales({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
-  const { data: rdDeals = [] } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
-  const { data: products = [] } = useProducts();
-  const { data: adAccounts = [] } = useAdAccounts();
-  const { data: goalData } = useSalesGoals(new Date());
+  const { data: sales = [], isLoading, isError: salesIsError, error: salesError } = useSales({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
+  const { data: rdDeals = [], isError: rdIsError, error: rdError } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
+  const { data: products = [], isError: productsIsError, error: productsError } = useProducts();
+  const { data: adAccounts = [], isError: accountsIsError, error: accountsError } = useAdAccounts();
+  const { data: goalData, isError: goalsIsError, error: goalsError } = useSalesGoals(startDate);
   const [sellerFilter, setSellerFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
   const [detailAccountFilter, setDetailAccountFilter] = useState("all");
@@ -73,8 +75,15 @@ export default function CommercialPage() {
   const rankingAccountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [visibleAccounts]);
 
   useEffect(() => {
-    if (adAccountId !== "all" && accessibleAccounts.length && !accessibleAccounts.some((account) => account.id === adAccountId)) setAdAccountId("all");
-  }, [accessibleAccounts, adAccountId, setAdAccountId]);
+    if (!accessibleAccounts.length) return;
+    const accessibleIds = new Set(accessibleAccounts.map((account) => account.id));
+    if (adAccountIds.length) {
+      const validIds = adAccountIds.filter((id) => accessibleIds.has(id));
+      if (validIds.length !== adAccountIds.length) setAdAccountIds(validIds);
+      return;
+    }
+    if (adAccountId !== "all" && !accessibleIds.has(adAccountId)) setAdAccountId("all");
+  }, [accessibleAccounts, adAccountId, adAccountIds, setAdAccountId, setAdAccountIds]);
   const productNames = useMemo(() => new Map(products.map((product) => [product.id, product.name])), [products]);
   const dealOwners = useMemo(() => new Map(rdDeals.map((deal) => [deal.rd_deal_id, deal.deal_owner_name || "Não informado"])), [rdDeals]);
   const enriched = useMemo<CommercialSaleRow[]>(() => sales.map((sale) => {
@@ -137,6 +146,14 @@ export default function CommercialPage() {
   const selectedTarget = leaderboardAccount?.target || 0;
   const selectedRevenue = leaderboardAccount?.totalRevenue || 0;
   const selectedSales = leaderboardAccount?.totalCount || 0;
+  const queryErrors = [
+    salesIsError ? salesError : null,
+    rdIsError ? rdError : null,
+    productsIsError ? productsError : null,
+    accountsIsError ? accountsError : null,
+    goalsIsError ? goalsError : null,
+  ].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error));
+  const salesUnavailable = salesIsError && sales.length === 0;
   return (
     <div className="gd-module-shell mx-auto max-w-[1600px] space-y-5">
       <PageHeading
@@ -151,7 +168,19 @@ export default function CommercialPage() {
         )}
       />
 
-      <CommercialLeaderboard
+      {queryErrors.length > 0 && (
+        <section role="alert" className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <b>Não foi possível atualizar todos os dados comerciais.</b>
+          <p className="mt-1 text-xs text-amber-100/80">O último snapshot disponível foi preservado. Detalhes: {Array.from(new Set(queryErrors)).join(" · ")}</p>
+        </section>
+      )}
+
+      {salesUnavailable ? (
+        <section role="status" className="gd-panel rounded-2xl border-amber-500/30 bg-amber-500/10 p-6 text-amber-100">
+          <h2 className="font-black">Vendas indisponíveis</h2>
+          <p className="mt-1 text-sm text-amber-100/80">Não foi possível consultar as vendas deste período. Nenhum zero foi inferido; tente novamente quando a fonte estiver disponível.</p>
+        </section>
+      ) : <CommercialLeaderboard
         account={leaderboardAccount}
         accounts={accountRankings}
         isLoading={isLoading}
@@ -165,12 +194,12 @@ export default function CommercialPage() {
         periodLabel={format(startDate, "MMMM yyyy", { locale: ptBR }).toLocaleUpperCase("pt-BR")}
         totals={{ revenue: selectedRevenue, sales: selectedSales, target: selectedTarget, ticket: selectedSales ? selectedRevenue / selectedSales : 0 }}
         series={performanceSeries}
-      />
+      />}
 
-      <section className="gd-panel mt-4 overflow-hidden">
+      {!salesUnavailable && <section className="gd-panel mt-4 overflow-hidden">
         <div className={`${isDetailedSalesCollapsed ? "" : "border-b border-border"} p-5`}><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-black">Vendas detalhadas</h2><p className="text-xs text-muted-foreground">A comissão só aparece quando recebida em campo explícito; a plataforma não estima valores.</p></div><div className="flex items-center gap-2"><span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">{detailedFiltered.length} venda(s)</span><Button type="button" variant="outline" size="icon" aria-label={isDetailedSalesCollapsed ? "Expandir vendas detalhadas" : "Minimizar vendas detalhadas"} aria-expanded={!isDetailedSalesCollapsed} onClick={() => setIsDetailedSalesCollapsed((collapsed) => !collapsed)}>{isDetailedSalesCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</Button></div></div>{!isDetailedSalesCollapsed && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(190px,1.4fr)_repeat(4,minmax(135px,1fr))_auto]"><label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Buscar venda por cliente" className="h-10 pl-9" value={detailSearch} onChange={(event) => setDetailSearch(event.target.value)} placeholder="Buscar cliente, vendedor ou produto" /></label><DetailFilter label="Conta" value={detailAccountFilter} onChange={setDetailAccountFilter} options={accountOptions.map((item) => ({ value: item.id, label: item.name }))} /><DetailFilter label="Vendedor" value={detailSellerFilter} onChange={setDetailSellerFilter} options={sellers.map((item) => ({ value: item, label: item }))} /><DetailFilter label="Produto" value={detailProductFilter} onChange={setDetailProductFilter} options={Array.from(new Set(filtered.map((item) => item.product))).sort((a, b) => a.localeCompare(b, "pt-BR")).map((item) => ({ value: item, label: item }))} /><DetailFilter label="Status" value={detailStatusFilter} onChange={setDetailStatusFilter} options={Array.from(new Set(filtered.map((item) => item.sale.status))).sort().map((item) => ({ value: item, label: item }))} /><Button type="button" variant="outline" className="h-10" onClick={() => { setDetailAccountFilter("all"); setDetailSellerFilter("all"); setDetailProductFilter("all"); setDetailStatusFilter("all"); setDetailSearch(""); }}><X className="mr-1.5 h-4 w-4" />Limpar</Button></div>}</div>
         {!isDetailedSalesCollapsed && <div className="overflow-x-auto"><table className="w-full min-w-[1180px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr>{["Data", "Conta de anúncio", "Cliente", "Vendedor", "Campanha / criativo", "Produto", "Valor líquido", "Status"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{detailedFiltered.map((row) => <tr key={row.sale.id}><td className="px-4 py-4">{formatSaleDate(row.sale.sale_date)}</td><td className="max-w-48 truncate px-4 py-4">{accountOptions.find((account) => account.id === row.sale.ad_account_id)?.name || "Sem conta de anúncio"}</td><td className="px-4 py-4 font-black">{row.sale.contact_name || row.sale.contact_email || "Não informado"}</td><td className="px-4 py-4">{row.seller}</td><td className="max-w-56 px-4 py-4"><b className="block truncate" title={row.sale.utm_campaign || row.sale.rd_campaign_name || ""}>{row.sale.utm_campaign || row.sale.rd_campaign_name || "Não atribuída"}</b><span className="block truncate text-[9px] text-muted-foreground" title={row.sale.utm_content || ""}>{row.sale.utm_content ? `Criativo: ${row.sale.utm_content}` : row.sale.ad_id ? `Anúncio: ${row.sale.ad_id}` : "Sem UTM de criativo"}</span></td><td className="px-4 py-4">{row.product}</td><td className="px-4 py-4 font-black">{brl.format(Number(row.sale.net_revenue || 0))}</td><td className="px-4 py-4"><span className="rounded-full bg-muted px-2 py-1 text-[9px] font-bold">{row.sale.status}</span></td></tr>)}{!isLoading && !detailedFiltered.length && <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">Nenhuma venda encontrada com estes filtros.</td></tr>}</tbody></table></div>}
-      </section>
+      </section>}
     </div>
   );
 }

@@ -6,6 +6,11 @@ describe("Growdash sidebar navigation", () => {
     expect(ALL_MODULES.some((module) => module.label === "Intelligence")).toBe(false);
   });
 
+  it("removes Paid Traffic from the sidebar while keeping Commercial visible", () => {
+    expect(ALL_MODULES.some((module) => module.label === "Tráfego Pago")).toBe(false);
+    expect(ALL_MODULES.some((module) => module.label === "Comercial" && module.path === "/comercial")).toBe(true);
+  });
+
   it("uses a unique route for every sidebar item", () => {
     const paths = ALL_MODULES.map((module) => module.path);
     expect(new Set(paths).size).toBe(paths.length);

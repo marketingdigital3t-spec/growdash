@@ -12,7 +12,6 @@ import {
   HardDrive,
   Headphones,
   LayoutDashboard,
-  Megaphone,
   MessageCircle,
   PanelTop,
   PackageOpen,
@@ -89,14 +88,6 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Inteligência",
     items: [
-      {
-        label: "Tráfego Pago",
-        path: "/campanhas",
-        icon: Megaphone,
-        description: "Gerencie campanhas, mídia e performance de aquisição.",
-        metrics: [],
-        highlights: [],
-      },
       {
         label: "Análise de Funis",
         path: "/analise-de-funis",
