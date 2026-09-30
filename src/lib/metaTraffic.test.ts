@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateMetaTrafficMetrics } from "./metaTraffic";
+import { aggregateMetaTrafficMetrics, resolveCanonicalMetaLeadBreakdown } from "./metaTraffic";
 
 describe("Meta traffic metrics", () => {
   it("agrega mídia e ações sem somar aliases duplicados", () => {
@@ -36,6 +36,27 @@ describe("Meta traffic metrics", () => {
   it("marca dado ausente como stale e falha de sincronização como error", () => {
     expect(aggregateMetaTrafficMetrics([], undefined, null).status).toBe("stale");
     expect(aggregateMetaTrafficMetrics([], undefined, "2026-09-28T12:00:00.000Z", ["rate limit"], Date.parse("2026-09-28T12:01:00.000Z")).status).toBe("error");
+  });
+
+  it("mantém snapshot parcial explícito sem transformar a resposta em zero", () => {
+    const result = aggregateMetaTrafficMetrics([
+      { ad_id: "ad-1", ad_account_id: "acc-1", spend: 25, impressions: 100, clicks: 4 },
+    ], { metaLeadActions: { forms: 2, site: 1, conversations: 0, total: 3 } }, "2026-09-30T12:00:00.000Z", ["conta acc-2: rate limit"], Date.parse("2026-09-30T12:01:00.000Z"));
+    expect(result.status).toBe("partial");
+    expect(result.spend).toBe(25);
+    expect(result.totalLeads).toBe(3);
+    expect(result.errors).toEqual(["conta acc-2: rate limit"]);
+  });
+
+  it("expõe o contrato de leads com zero legítimo e sem somar aliases", () => {
+    expect(resolveCanonicalMetaLeadBreakdown({
+      metaLeadActions: { forms: 0, site: 4, conversations: 2, total: 999 },
+    })).toEqual({ forms: 0, site: 4, conversations: 2, total: 6 });
+    expect(resolveCanonicalMetaLeadBreakdown({
+      totalsByAd: {
+        "ad-1": { omni_lead: 3, leadgen_grouped: 3, "offsite_conversion.fb_pixel_lead": 2, "onsite_conversion.messaging_conversation_started_7d": 1 },
+      },
+    })).toEqual({ forms: 3, site: 2, conversations: 1, total: 6 });
   });
 
   it("mantém métricas zeradas quando não há impressões, cliques ou leads", () => {

@@ -1,8 +1,15 @@
 import type { InsightRow } from "@/hooks/useInsights";
 
-export function aggregateMetrics(rows: InsightRow[]) {
+export interface CanonicalMetricLeads {
+  totalLeads?: number;
+  formLeads?: number;
+  siteLeads?: number;
+  conversations?: number;
+}
+
+export function aggregateMetrics(rows: InsightRow[], canonicalLeads?: CanonicalMetricLeads) {
   const totalSpend = rows.reduce((s, r) => s + r.spend, 0);
-  const totalLeads = rows.reduce((s, r) => s + r.leads, 0);
+  const totalLeads = canonicalLeads?.totalLeads ?? rows.reduce((s, r) => s + r.leads, 0);
   const totalClicks = rows.reduce((s, r) => s + r.clicks, 0);
   const totalImpressions = rows.reduce((s, r) => s + r.impressions, 0);
 

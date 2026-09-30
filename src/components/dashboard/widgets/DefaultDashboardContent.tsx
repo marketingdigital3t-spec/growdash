@@ -68,7 +68,7 @@ interface Props {
 }
 
 export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false, showAcquisitionAnalytics = false, showCampaignFunnel = true }: Props) {
-  const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId, leadBreakdown } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
   const { data: accountAdsets = [] } = useAccountAdsets(adAccountId);
@@ -83,7 +83,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     messages: [],
   });
 
-  const adMetrics = aggregateMetrics(insights);
+  const adMetrics = aggregateMetrics(insights, leadBreakdown ? { totalLeads: leadBreakdown.total } : undefined);
   const salesMetrics = aggregateRevenueSources(sales, revenueDeals);
 
   // === STEP 1: fetch action totals for ALL ads in the period ===

@@ -47,12 +47,20 @@ export interface MetaTrafficMetrics {
   source: "meta";
   syncedAt: string | null;
   freshnessSeconds: number | null;
-  status: "fresh" | "syncing" | "stale" | "error";
+  status: "fresh" | "syncing" | "stale" | "partial" | "error";
   coveredAccounts: string[];
   rowCount: number;
   errors: string[];
   leadBreakdownByAccount: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
   leadBreakdownByAd: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
+}
+
+/** Canonical Meta lead distribution shared by every media KPI. */
+export interface CanonicalMetaLeadBreakdown {
+  forms: number;
+  site: number;
+  conversations: number;
+  total: number;
 }
 
 export interface BreakdownSegment {
@@ -176,7 +184,9 @@ export function aggregateMetaTrafficMetrics(
   const resultBreakdown = Array.from(resultBreakdownByCampaign.values());
   const results = resultBreakdown.reduce((sum, item) => sum + item.value, 0);
   const freshnessSeconds = syncedAt ? Math.max(0, Math.floor((now - new Date(syncedAt).getTime()) / 1000)) : null;
-  const status = errors.length ? "error" : freshnessSeconds === null || freshnessSeconds > 300 ? "stale" : "fresh";
+  const status = errors.length
+    ? rows.length ? "partial" : "error"
+    : freshnessSeconds === null || freshnessSeconds > 300 ? "stale" : "fresh";
   const coveredAccounts = Array.from(new Set(rows.map((row) => row.ad_account_id).filter(Boolean) as string[]));
   const coveredDates = new Set(rows.map((row) => row.date).filter(Boolean) as string[]).size;
 
@@ -213,6 +223,30 @@ export function aggregateMetaTrafficMetrics(
     leadBreakdownByAccount,
     leadBreakdownByAd,
   };
+}
+
+/**
+ * Resolves the only lead contract allowed by the UI. `metaLeadActions` is
+ * already alias-safe (max per equivalent Meta event), while the fallback keeps
+ * the helper useful for tests and small consumers that only have ad totals.
+ */
+export function resolveCanonicalMetaLeadBreakdown(actions?: ActionData): CanonicalMetaLeadBreakdown {
+  const totals = actions?.metaLeadActions;
+  if (totals) {
+    const forms = Math.max(0, Number(totals.forms ?? 0));
+    const site = Math.max(0, Number(totals.site ?? 0));
+    const conversations = Math.max(0, Number(totals.conversations ?? 0));
+    return { forms, site, conversations, total: forms + site + conversations };
+  }
+  const result = Object.values(actions?.totalsByAd || {}).reduce((acc, row) => {
+    const resolved = resolveMetaLeadActions(row);
+    return {
+      forms: acc.forms + resolved.forms,
+      site: acc.site + resolved.site,
+      conversations: acc.conversations + resolved.conversations,
+    };
+  }, { forms: 0, site: 0, conversations: 0 });
+  return { ...result, total: result.forms + result.site + result.conversations };
 }
 
 export function resolveMetaTrafficLeadActions(actionTotals?: Record<string, number>, siteAction?: string | null) {

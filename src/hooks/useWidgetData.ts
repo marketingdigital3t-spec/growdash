@@ -5,14 +5,16 @@ import { aggregateMetrics } from "@/lib/metrics";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import type { RDRevenueDeal } from "@/lib/revenueAggregation";
 import { format, parseISO } from "date-fns";
+import type { CanonicalMetaLeadBreakdown } from "@/lib/metaTraffic";
 
 export function computeKpi(
   metric: WidgetMetric,
   insights: any[],
   sales: any[],
   rdDeals: RDRevenueDeal[] = [],
+  leadBreakdown?: CanonicalMetaLeadBreakdown,
 ): { value: number; prefix?: string; suffix?: string; decimals: number } {
-  const ad = aggregateMetrics(insights);
+  const ad = aggregateMetrics(insights, leadBreakdown ? { totalLeads: leadBreakdown.total } : undefined);
   const s = aggregateRevenueSources(sales, rdDeals);
   switch (metric) {
     case "spend":
