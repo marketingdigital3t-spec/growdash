@@ -91,7 +91,7 @@ export default function TrafficPage() {
 
       {activeTab === "campaigns" && <CampaignsManager />}
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
-      {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accountName={account?.name} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} onAccountChange={setAdAccountId} />}
+      {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accountName={account?.name} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, attribution_window: item.attribution_window }))} onAccountChange={setAdAccountId} />}
       {activeTab === "funnels" && <TrafficFunnels />}
       {activeTab === "presentation" && <PaidTrafficPresentation />}
       {activeTab === "tools" && <MetaToolsWorkspace
@@ -250,11 +250,15 @@ function BudgetAccountCard({ item }: { item: BudgetAnalysisItem }) {
   return <article data-budget-account-severity={item.severity} className={cn("rounded-xl border p-4", severitySurface, urgent && "shadow-[0_0_26px_-12px_rgba(239,68,68,.8)]")}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-black">{item.name}</h3><p className="mt-1 text-[10px] text-muted-foreground">{item.summary}</p></div><span className={cn("rounded-full px-2 py-1 text-[9px] font-black uppercase", item.severity === "critical" ? "bg-red-500/10 text-red-500" : item.severity === "warning" ? "bg-amber-500/10 text-amber-500" : "bg-emerald-500/10 text-emerald-500")}>{item.severity === "critical" ? "Crítico" : item.severity === "warning" ? "Atenção" : "Saudável"}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3"><SmallMetric label="Orçamento diário (ativos)" value={brl.format(item.dailyBudgetActive)} /><SmallMetric label="Gasto médio/dia" value={brl.format(item.avgDailySpend)} /><SmallMetric label="Saldo restante" value={item.balance == null ? "Não informado" : brl.format(item.balance)} /><SmallMetric label="Saldo dura" value={item.daysBalanceLasts == null ? "Sem estimativa" : `${item.daysBalanceLasts} dia(s)`} /><SmallMetric label={`Previsão próximos ${item.daysUntilMonday} dias`} value={brl.format(item.projectedSpendUntilMonday)} /><SmallMetric label="Folga até segunda" value={mondayBuffer == null ? "Saldo não informado" : brl.format(mondayBuffer)} /></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full", use > 100 ? "bg-red-500" : use > 85 ? "bg-amber-500" : "bg-primary")} style={{ width: `${Math.min(use, 100)}%` }} /></div><div className="mt-4 space-y-2 border-t border-border/60 pt-3 text-[10px] text-muted-foreground"><p>⏱ Próxima recarga: {nextTopUp?.hasEnoughHistory && nextTopUp.estimatedDate ? <b className="text-foreground">~ {format(nextTopUp.estimatedDate, "dd/MM/yyyy")} · {brl.format(nextTopUp.avgAmount)}</b> : <i>histórico insuficiente</i>}</p><p>⊕ Último aporte: {lastTopUp ? <b className="text-foreground">{brl.format(Number(lastTopUp.delta))} em {format(new Date(lastTopUp.event_at), "dd/MM/yyyy")}</b> : <i>nenhum aporte registrado</i>}</p>{item.reasons.length > 0 && <p><CircleAlert className="mr-1 inline h-3.5 w-3.5" />{item.reasons[0]}</p>}</div></article>;
 }
 
-function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAccountChange }: { accountId: string; accountIds: string[]; accountName?: string; accounts: Array<{ id: string; name: string }>; onAccountChange: (id: string) => void }) {
+function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAccountChange }: { accountId: string; accountIds: string[]; accountName?: string; accounts: Array<{ id: string; name: string; attribution_window?: string | null }>; onAccountChange: (id: string) => void }) {
   const { startDate, endDate } = useGlobalFilters();
+  const attributionWindowsByAccount = useMemo(
+    () => Object.fromEntries(accounts.filter((account: any) => accountIds.includes(account.id)).map((account: any) => [account.id, account.attribution_window || "account_default"])),
+    [accountIds, accounts],
+  );
   const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountIds, startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, accountIds.length > 0);
   const single = accountId !== "all" ? accountId : undefined;
-  const { data: insights = [], isLoading: loadingMeta } = useInsights({ adAccountId: single, adAccountIds: accountIds, startDate, endDate, enabled: accountIds.length > 0 });
+  const { data: insights = [], isLoading: loadingMeta } = useInsights({ adAccountId: single, adAccountIds: accountIds, attributionWindowsByAccount, startDate, endDate, enabled: accountIds.length > 0 });
   const { data: deals = [], isLoading: loadingRD } = useRDDealsForPeriod({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, enabled: accountIds.length > 0 });
   const { data: sales = [], isLoading: loadingSales } = useSales({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, enabled: accountIds.length > 0 });
   const audienceCampaignIds = useMemo(() => Array.from(new Set(insights.map((item) => item.campaign_id).filter((id): id is string => !!id))), [insights]);
@@ -267,7 +271,7 @@ function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAcco
   const revenue = saleTotals.totalNet;
   const actionAdIds = useMemo(() => Array.from(new Set(insights.map((item: any) => item.ad_id).filter(Boolean))), [insights]);
   const actionAccountMap = useMemo(() => Object.fromEntries(insights.map((item: any) => [item.ad_id, item.ad_account_id])), [insights]);
-  const { data: actionData } = useActionTotalsByAds(actionAdIds, startDate, endDate, actionAccountMap, { adAccountIds: accountIds });
+  const { data: actionData } = useActionTotalsByAds(actionAdIds, startDate, endDate, actionAccountMap, { adAccountIds: accountIds, attributionWindowsByAccount });
   const canonicalMeta = actionData?.metaLeadActions;
   const hasCanonicalMetaRows = metaTraffic.data.rowCount > 0;
   const metaLeads = hasCanonicalMetaRows ? metaTraffic.data.leads : (canonicalMeta?.total ?? metaLeadsFromInsights);

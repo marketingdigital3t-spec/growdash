@@ -86,6 +86,7 @@ const Index = () => {
   const { data: allInsights = [], isLoading } = useInsights({
     adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
     adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
+    attributionWindowsByAccount: Object.fromEntries(visibleAccounts.map((account) => [account.id, account.attribution_window || "account_default"])),
     startDate,
     endDate,
     enabled: true,
@@ -196,7 +197,7 @@ const Index = () => {
     startDate,
     endDate,
     dashboardActionAccountMap,
-    { adAccountIds: selectedAccountIds.length ? selectedAccountIds : visibleAccountIdList, campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined },
+    { adAccountIds: selectedAccountIds.length ? selectedAccountIds : visibleAccountIdList, campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined, attributionWindowsByAccount: Object.fromEntries(visibleAccounts.map((account) => [account.id, account.attribution_window || "account_default"])) },
   );
   const dashboardActions = useMemo(() => dashboardActionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [dashboardActionData?.metaLeadActions]);
   const glassConversations = hasCanonicalMetaRows ? dashboardMeta.data.conversations : dashboardActions.conversations;
