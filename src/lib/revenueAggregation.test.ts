@@ -31,4 +31,18 @@ describe("aggregateRevenueSources", () => {
     expect(result.confirmedSalesCount).toBe(14);
     expect(result.rdOnlyCount).toBe(1);
   });
+  it("não usa venda financeira sem vínculo RD para inflar o KPI de vendas realizadas", () => {
+    const result = aggregateRevenueSources([sale({ rd_deal_id: null })], []);
+    expect(result.totalNet).toBe(90);
+    expect(result.confirmedSalesCount).toBe(0);
+    expect(result.rdWonDealsCount).toBe(0);
+  });
+  it("deduplica snapshots pelo vínculo conexão RD + negócio", () => {
+    const result = aggregateRevenueSources([], [
+      deal({ rd_connection_id: "connection-a", rd_deal_id: "same" }),
+      deal({ rd_connection_id: "connection-a", rd_deal_id: "same", amount_total: 999 }),
+      deal({ rd_connection_id: "connection-b", rd_deal_id: "same", amount_total: 700 }),
+    ]);
+    expect(result.confirmedSalesCount).toBe(2);
+  });
 });

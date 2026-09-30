@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, format } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
-import { canonicalWonDeals, canonicalWonDate, isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
+import { canonicalWonDeals, canonicalWonDate, canonicalWonDealsInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 import { withRequestTimeout } from "@/lib/resilience";
 
@@ -354,7 +354,7 @@ export function useRDClosedDeals(params: Params) {
       // vendas reais por causa da ordem de sincronização.
       const won = dedupeRDDeals(all).filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
       if (includeHistory || (!startDate && !endDate)) return won;
-      return won.filter((deal) => isCanonicalWonDealInPeriod(deal, startDate ?? endDate!, endDate ?? startDate!));
+      return canonicalWonDealsInPeriod(won, startDate ?? endDate!, endDate ?? startDate!);
     },
     staleTime: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
@@ -505,11 +505,9 @@ export function computeFunnelAnalytics(
     ...closedDeals,
     ...deals.filter((deal) => deal.win || wonStageIds.has(canonicalDealStageId(deal)) || isWonRDStageName(deal.rd_stage_name)),
   ].map((deal) => wonStageIds.has(canonicalDealStageId(deal)) ? { ...deal, win: true } : deal);
-  const confirmedClosedDeals = canonicalWonDeals(
-    dateRange
-      ? dedupeRDDeals(wonCandidates).filter((deal) => isCanonicalWonDealInPeriod(deal, dateRange.startDate, dateRange.endDate))
-      : dedupeRDDeals(wonCandidates),
-  );
+  const confirmedClosedDeals = dateRange
+    ? canonicalWonDealsInPeriod(wonCandidates, dateRange.startDate, dateRange.endDate)
+    : canonicalWonDeals(wonCandidates);
 
   // Mapa: stage_id -> índice na sequência
   const indexInSeq = new Map<string, number>();

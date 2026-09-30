@@ -15,6 +15,8 @@ export interface RevenueSale {
 
 export interface RDRevenueDeal {
   rd_deal_id: string;
+  rd_connection_id?: string | null;
+  ad_account_id?: string | null;
   amount_total: number | null;
   amount_total_effective?: number | null;
   win: boolean;
@@ -27,6 +29,10 @@ export interface RDRevenueDeal {
  * impostos, estornos e chargebacks seguem vindo exclusivamente de `sales`.
  */
 export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenueDeal[] = []) {
+  // Quantidade de vendas realizadas é um fato do RD, não da tabela financeira.
+  // `sales` continua fornecendo receita, impostos, reembolsos e chargebacks,
+  // mas linhas confirmadas sem uma negociação RD não entram no KPI de vendas.
+  const canonicalRDDeals = canonicalWonDeals(rdDeals);
   const wonDealIds = canonicalWonDealIds(rdDeals);
   const confirmed = sales.filter((sale) => sale.status === "confirmed" && (!sale.rd_deal_id || wonDealIds.has(sale.rd_deal_id)));
   const salesTotals = {
@@ -55,26 +61,31 @@ export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenue
   const realizedWonDealIds = new Set([...realizedSaleDealIds].filter((id) => wonDealIds.has(id)));
   const confirmedWithoutRD = confirmed.filter((sale) => !sale.rd_deal_id);
   const includedDealIds = new Set<string>();
-  const rdOnlyWonDeals = canonicalWonDeals(rdDeals).filter((deal) => {
+  const rdOnlyWonDeals = canonicalRDDeals.filter((deal) => {
     const dealId = deal.rd_deal_id?.trim();
+    const dealKey = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${dealId || ""}`;
     const amount = getRDDealAmount(deal);
     if (!dealId || !Number.isFinite(amount)) return false;
-    if (realizedSaleDealIds.has(dealId) || includedDealIds.has(dealId)) return false;
-    includedDealIds.add(dealId);
+    if (realizedSaleDealIds.has(dealId) || includedDealIds.has(dealKey)) return false;
+    includedDealIds.add(dealKey);
     return true;
   });
   const rdOnlyRevenue = rdOnlyWonDeals.reduce((total, deal) => total + getRDDealAmount(deal), 0);
   const rdOnlyCount = rdOnlyWonDeals.length;
+  const rdWonDealsCount = canonicalRDDeals.length;
   return {
     ...salesTotals,
     totalGross: salesTotals.totalGross + rdOnlyRevenue,
     totalNet: salesTotals.totalNet + rdOnlyRevenue,
-    totalQuantity: confirmedWithoutRD.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0) + realizedWonDealIds.size + rdOnlyCount,
+    totalQuantity: rdWonDealsCount,
     rdOnlyRevenue,
     rdOnlyCount,
-    confirmedSalesCount: confirmedWithoutRD.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0) + realizedWonDealIds.size + rdOnlyCount,
+    // Deliberadamente não inclui `sales.quantity`: uma venda financeira sem
+    // vínculo RD não pode alterar a quantidade oficial de vendas realizadas.
+    confirmedSalesCount: rdWonDealsCount,
+    rdWonDealsCount,
     refundRate,
     chargebackRate,
-    arpu: salesTotals.totalQuantity > 0 ? salesTotals.totalNet / salesTotals.totalQuantity : 0,
+    arpu: rdWonDealsCount > 0 ? (salesTotals.totalNet + rdOnlyRevenue) / rdWonDealsCount : 0,
   };
 }

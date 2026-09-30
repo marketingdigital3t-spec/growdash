@@ -67,9 +67,27 @@ export function canonicalWonDealIds<T extends CanonicalWonDeal>(deals: T[]) {
 export function canonicalWonDeals<T extends CanonicalWonDeal>(deals: T[]) {
   const seen = new Set<string>();
   return deals.filter((deal) => {
-    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${String(deal.rd_deal_id || "").trim()}`;
-    if (!id || !isCanonicalWonDeal(deal) || seen.has(id)) return false;
+    const providerId = String(deal.rd_deal_id || "").trim();
+    const id = `${deal.rd_connection_id || deal.ad_account_id || "legacy"}:${providerId}`;
+    // A row without the provider identity is an incomplete sync artifact,
+    // never an independent sale. This keeps snapshots from inflating KPIs.
+    if (!providerId || !isCanonicalWonDeal(deal) || seen.has(id)) return false;
     seen.add(id);
     return true;
   });
+}
+
+/**
+ * Canonical RD sales for a calendar scope. Every report that displays a
+ * quantity of realized sales should use this set, rather than counting rows
+ * from `sales` or the current pipeline stage. The closing timestamp is the
+ * business date; stage_updated_at is only the legacy fallback when closing
+ * was not persisted by the provider.
+ */
+export function canonicalWonDealsInPeriod<T extends CanonicalWonDeal>(
+  deals: T[],
+  startDate: Date,
+  endDate: Date,
+) {
+  return canonicalWonDeals(deals).filter((deal) => isCanonicalWonDealInPeriod(deal, startDate, endDate));
 }
