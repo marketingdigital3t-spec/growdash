@@ -510,8 +510,21 @@ export default function FunnelAnalysis() {
             },
           });
           if (error) {
+            // O lock do RD é por funil. Um ciclo automático pode já estar
+            // reconciliando o mesmo funil; isso não é falha nem motivo para
+            // zerar o último snapshot visível.
+            const httpStatus = Number((error as any)?.context?.status || (error as any)?.status || 0);
+            const errorText = `${(error as any)?.message || ""} ${(error as any)?.context?.body || ""}`;
+            if (httpStatus === 409 || /409|already.?running|sincroniza[cç][aã]o.*andamento/i.test(errorText)) {
+              rdResults.push({ status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } });
+              continue;
+            }
             const details = await edgeFunctionErrorDetails(error);
             throw new Error(formatEdgeFunctionError(details));
+          }
+          if (data?.status === "already_running") {
+            rdResults.push({ status: "fulfilled", value: { status: "running", message: data.message } });
+            continue;
           }
           if (data?.error || data?.success === false || data?.partial === true || (data?.status && data.status !== "success")) {
             const details = Array.isArray(data?.errors) && data.errors.length ? `: ${data.errors.join(" · ")}` : "";
@@ -535,19 +548,32 @@ export default function FunnelAnalysis() {
       await queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] });
       await queryClient.invalidateQueries({ queryKey: ["sales"] });
       await refetch();
+      // Quando o lock pertence ao ciclo automático, a função manual retorna
+      // antes da escrita. Reconsulta o snapshot após a janela normal de uma
+      // página RD, sem bloquear o usuário no botão.
+      if (rdResults.some((result) => result.status === "fulfilled" && (result.value as any)?.status === "running")) {
+        window.setTimeout(() => {
+          void queryClient.invalidateQueries({ queryKey: ["rd_deals"] });
+          void queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] });
+          void queryClient.invalidateQueries({ queryKey: ["rd_closed_deals"] });
+        }, 5_000);
+      }
 
       const metaPartial = metaResult.status === "fulfilled" && Boolean((metaResult.value as any)?.status && (metaResult.value as any).status !== "success");
-      if (metaResult.status === "rejected" || metaPartial || rdFailures.length > 0) {
+      const rdRunning = rdResults.some((result) => result.status === "fulfilled" && (result.value as any)?.status === "running");
+      if (metaResult.status === "rejected" || metaPartial || rdFailures.length > 0 || rdRunning) {
         const metaMessage = metaResult.status === "rejected"
           ? (metaResult.reason instanceof Error ? metaResult.reason.message : String(metaResult.reason))
           : metaPartial
             ? ((metaResult.value as any)?.errors?.join(" · ") || "A Meta concluiu apenas parte da sincronização.")
             : "";
-        const rdMessage = rdFailures
+        const rdMessage = rdRunning
+          ? "Um ciclo do RD já está em andamento; o snapshot anterior foi preservado e será atualizado automaticamente."
+          : rdFailures
           .map((result) => result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "")
           .filter(Boolean)
           .join(" · ");
-        toast.warning("Sincronização parcial", {
+        toast.warning(rdRunning && !rdFailures.length && metaResult.status === "fulfilled" && !metaPartial ? "RD em sincronização" : "Sincronização parcial", {
           description: [metaMessage && `Meta: ${metaMessage}`, rdMessage && `RD: ${rdMessage}`].filter(Boolean).join(" · "),
         });
       } else {
