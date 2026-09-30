@@ -651,11 +651,11 @@ export default function FunnelAnalysis() {
             </div>
             <FunnelKPIs
               a={periodAnalytics}
-              rdLeads={periodAnalytics.totalLeads}
-              rdLeadsLoading={loadingPeriodDeals}
-              rdLeadsError={!!periodDealsError}
+              rdLeads={mediaMetrics.metaLeads}
+              rdLeadsLoading={funnelMeta.isLoading}
+              rdLeadsError={funnelMeta.isError}
               trafficSpend={mediaMetrics.spend}
-              cpl={mediaMetrics.rdCpl}
+              cpl={mediaMetrics.metaCpl}
               cac={mediaMetrics.cac}
               roas={mediaMetrics.roas}
               salesConversionRate={mediaMetrics.salesConversionRate}
