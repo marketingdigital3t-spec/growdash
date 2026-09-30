@@ -8244,6 +8244,11 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   border: 0 !important;
   box-shadow: none !important;
 }
+html[data-accent] .gd-date-range-popover button[name="day"] {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
 .gd-date-range-popover button[name="day"]:hover {
   background: hsl(var(--muted)) !important;
   color: hsl(var(--foreground)) !important;
@@ -8254,10 +8259,18 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   border-radius: 999px !important;
   box-shadow: none !important;
 }
+html[data-accent] .gd-date-range-popover button[name="day"][aria-selected="true"] {
+  background: hsl(var(--foreground)) !important;
+  color: hsl(var(--background)) !important;
+}
 .gd-date-range-popover button[name="day"].day-range-middle[aria-selected="true"] {
   background: hsl(var(--muted) / .72) !important;
   color: hsl(var(--foreground)) !important;
   border-radius: 0 !important;
+}
+html[data-accent] .gd-date-range-popover button[name="day"].day-range-middle[aria-selected="true"] {
+  background: hsl(var(--muted) / .72) !important;
+  color: hsl(var(--foreground)) !important;
 }
 .dark .gd-date-range-popover button[name="day"][aria-selected="true"] {
   background: #f1f3f5 !important;
