@@ -235,9 +235,21 @@ function RDConnectionFunnelsBlock({ connectionId, accountName, funnels }: { conn
   </div>;
 }
 
+function OrphanFunnelsBlock({ funnels }: { funnels: RDFunnel[] }) {
+  return <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
+    <div>
+      <p className="font-medium text-sm">Funis RD cadastrados</p>
+      <p className="text-xs text-muted-foreground">A conexão não foi listada nesta consulta, mas o vínculo permanece disponível para ativação ou desativação.</p>
+    </div>
+    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} />)}</AnimatePresence>
+  </div>;
+}
+
 export function RDFunnelsSection() {
   const { data: allFunnels = [] } = useRDFunnels(undefined, true);
   const { data: connections = [] } = useRDAccountConnections();
+  const listedConnectionIds = new Set(connections.map((connection) => connection.id));
+  const orphanFunnels = allFunnels.filter((funnel) => !funnel.rd_connection_id || !listedConnectionIds.has(funnel.rd_connection_id));
 
   return (
     <Card>
@@ -250,10 +262,11 @@ export function RDFunnelsSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {connections.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p> : connections.map((connection) => {
+        {connections.length === 0 && !allFunnels.length ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p> : connections.map((connection) => {
           const connectionFunnels = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id);
           return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} />;
         })}
+        {orphanFunnels.length > 0 && <OrphanFunnelsBlock funnels={orphanFunnels} />}
       </CardContent>
     </Card>
   );
