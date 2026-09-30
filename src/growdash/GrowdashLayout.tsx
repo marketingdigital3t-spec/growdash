@@ -42,6 +42,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
 import { SpaceMissionStrip, SpacePhaseBackground, type SpacePhase } from "@/components/space/SpacePhaseBackground";
+import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -513,6 +514,7 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
+            <GlobalScopeToolbar />
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
               <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>

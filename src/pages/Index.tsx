@@ -46,6 +46,7 @@ const Index = () => {
     setAdAccountId: setSelectedAccount,
     adAccountIds: selectedAccountIds,
     setAdAccountIds: setSelectedAccountIds,
+    funnelIds: selectedFunnelIds,
     businessUnitId,
     segment,
   } = useGlobalFilters();
@@ -79,6 +80,12 @@ const Index = () => {
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
   const { data: rdFunnels = [] } = useRDFunnels();
+  const scopedRDfunnelIds = useMemo(() => {
+    const active = rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id);
+    return selectedFunnelIds.length
+      ? active.filter((funnel) => selectedFunnelIds.includes(funnel.id)).map((funnel) => funnel.id)
+      : active.map((funnel) => funnel.id);
+  }, [rdFunnels, selectedFunnelIds]);
   // Universo estável de campanhas com veiculação no período/conta — não muda quando
   // o usuário marca/desmarca campanhas, para que o popover continue listando todas.
   // O filtro por campanha é aplicado em memória porque este universo completo já é
@@ -110,13 +117,17 @@ const Index = () => {
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
-    funnelIds: rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id).map((funnel) => funnel.id),
+    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
+    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
+    funnelIds: scopedRDfunnelIds,
     enabled: isRDAccountScopeReady,
   });
   const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
     startDate,
     endDate,
-    funnelIds: rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id).map((funnel) => funnel.id),
+    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
+    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
+    funnelIds: scopedRDfunnelIds,
     enabled: isRDAccountScopeReady,
   });
   const { data: alerts = [] } = useAlerts();
@@ -155,11 +166,7 @@ const Index = () => {
     () => excludedOperationalRDDealIds([...rdDeals, ...rdWonDeals], rdFunnels),
     [rdDeals, rdFunnels, rdWonDeals],
   );
-  const activeScopedFunnelIds = useMemo(() => new Set(
-    rdFunnels
-      .filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id)
-      .map((funnel) => funnel.id),
-  ), [rdFunnels]);
+  const activeScopedFunnelIds = useMemo(() => new Set(scopedRDfunnelIds), [scopedRDfunnelIds]);
   // `sales` é a fonte canônica de vendas, receita, reembolso e chargeback.
   // Uma venda RD histórica pode não ter `ad_account_id`, mas ainda pertence à
   // conta pelo funil. Incluí-la por esse vínculo evita que Dashboard e Análise

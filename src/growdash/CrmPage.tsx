@@ -126,6 +126,8 @@ export default function CrmPage() {
     setAdAccountId,
     adAccountIds,
     setAdAccountIds,
+    funnelIds: selectedFunnelIds,
+    setFunnelIds: setSelectedFunnelIds,
     preset,
     setPreset,
     customRange,
@@ -156,7 +158,6 @@ export default function CrmPage() {
   const canReadCrm = crmPipelineEnabled(!!user);
   // RD funnels are an independent source and are never scoped by a Meta account.
   const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
-  const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
   const availableFunnels = useMemo(
     () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id),
     [funnelData],
@@ -176,6 +177,8 @@ export default function CrmPage() {
     error: dealsQueryError,
     refetch: refetchDeals,
   } = useRDCRMDeals({
+    adAccountId: accountFilter,
+    adAccountIds: accountScopeIds,
     funnelIds: requestedFunnelIds,
     startDate: preset === "max" ? undefined : startDate,
     endDate: preset === "max" ? undefined : endDate,

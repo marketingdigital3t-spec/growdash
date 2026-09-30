@@ -8106,3 +8106,38 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
 .dark .brand-shell .growdash-main label:has(> input[placeholder*="Buscar"], > input[placeholder*="Pesquisar"], > input[placeholder*="Pesquise"]) > svg {
   color: #ffffff !important;
 }
+
+/* Final calendar contract: monochrome selection in dark mode. This block is
+   intentionally last because the calendar is rendered in a portal and older
+   theme rules previously reintroduced blue selection/focus surfaces. */
+.gd-date-range-popover .rdp-day:not([aria-selected="true"]),
+.gd-date-range-popover .rdp-day_outside:not([aria-selected="true"]) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.dark .gd-date-range-popover .rdp-day[aria-selected="true"]:not(.rdp-day_range_middle) {
+  background: #f1f3f5 !important;
+  color: #111111 !important;
+  border-radius: 999px !important;
+}
+.dark .gd-date-range-popover .rdp-day_range_middle[aria-selected="true"] {
+  background: rgba(255,255,255,.14) !important;
+  color: #f8fafc !important;
+  border-radius: 0 !important;
+}
+.dark .gd-date-range-popover .rdp-day:not([aria-selected="true"]):hover,
+.dark .gd-date-range-popover .rdp-day_outside:not([aria-selected="true"]):hover,
+.dark .gd-date-range-popover .rdp-nav_button:hover,
+.dark .gd-date-range-popover .rdp-caption_dropdowns select:hover {
+  background: #303030 !important;
+  color: #ffffff !important;
+}
+.dark .gd-date-range-popover .rdp-button:focus-visible,
+.dark .gd-date-range-popover .rdp-caption_dropdowns select:focus-visible {
+  outline-color: rgba(255,255,255,.7) !important;
+}
+.dark .gd-date-range-popover .gd-date-range-presets button[aria-pressed="true"] > span:first-child,
+.dark .gd-date-range-popover .gd-date-range-presets button[aria-pressed="true"] > span:first-child > span {
+  border-color: #f1f3f5 !important;
+  background: #f1f3f5 !important;
+}

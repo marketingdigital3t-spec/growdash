@@ -42,6 +42,17 @@ function addDays(value: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function dateMonthsAgo(months: number) {
+  const date = new Date();
+  date.setUTCMonth(date.getUTCMonth() - months);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -73,7 +84,10 @@ Deno.serve(async (req) => {
   const items: Array<Record<string, unknown>> = [];
   let failures = 0;
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  const historicalStart = String(body.start_date || body.startDate || "2000-01-01");
+  // Meta Insights has a practical provider limit of roughly 37 months. Keep
+  // the default deterministic and bounded while still allowing an explicit
+  // administrator-selected start date for older RD-only archives.
+  const historicalStart = String(body.start_date || body.startDate || dateMonthsAgo(37));
 
   try {
     const rdOnly = body.rd_only === true;
