@@ -28,6 +28,8 @@ export interface ActionScope {
   /** Optional campaign restriction applied while resolving the account ads. */
   campaignIds?: string[];
   attributionWindow?: string;
+  /** Per-account windows used when a consolidated view has mixed settings. */
+  attributionWindowsByAccount?: Record<string, string>;
 }
 
 /**
@@ -51,6 +53,8 @@ export function useActionTotalsByAds(
   const scopedAccounts = [...(scope?.adAccountIds || [])].sort();
   const scopedCampaigns = [...(scope?.campaignIds || [])].sort();
   const attributionWindow = scope?.attributionWindow || "account_default";
+  const attributionWindowsByAccount = scope?.attributionWindowsByAccount || {};
+  const attributionWindowsSignature = JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b)));
   const accountMapSignature = adAccountByAdId
     ? JSON.stringify(Object.entries(adAccountByAdId).sort(([a], [b]) => a.localeCompare(b)))
     : "";
@@ -61,6 +65,7 @@ export function useActionTotalsByAds(
       scopedAccounts.join(","),
       scopedCampaigns.join(","),
       attributionWindow,
+      attributionWindowsSignature,
       startDate?.toISOString(),
       endDate?.toISOString(),
       accountMapSignature,
@@ -146,14 +151,28 @@ export function useActionTotalsByAds(
       // === Sum insight_actions only for allowed ads ===
       const CHUNK = 200;
       const PAGE = 1000;
-      for (let i = 0; i < allowedIds.length; i += CHUNK) {
-        const chunk = allowedIds.slice(i, i + CHUNK);
-        for (let from = 0; ; from += PAGE) {
+      // A consolidated dashboard may contain accounts configured with
+      // different Meta attribution windows. Query each account/window pair
+      // separately; applying one global window silently drops valid actions
+      // from every account using another setting.
+      const actionGroups = new Map<string, { window: string; ids: string[] }>();
+      for (const id of allowedIds) {
+        const accountId = resolvedAccountByAd[id] || "";
+        const window = attributionWindowsByAccount[accountId] || attributionWindow;
+        const key = `${accountId}::${window}`;
+        const group = actionGroups.get(key) || { window, ids: [] };
+        group.ids.push(id);
+        actionGroups.set(key, group);
+      }
+      for (const group of actionGroups.values()) {
+        for (let i = 0; i < group.ids.length; i += CHUNK) {
+          const chunk = group.ids.slice(i, i + CHUNK);
+          for (let from = 0; ; from += PAGE) {
           let q = supabase
             .from("insight_actions" as any)
             .select("ad_id, action_type, value, value_amount, date")
             .in("ad_id", chunk);
-          q = q.eq("attribution_window", attributionWindow);
+          q = q.eq("attribution_window", group.window);
           if (start) q = q.gte("date", start);
           if (end) q = q.lte("date", end);
           const { data, error } = await q.range(from, from + PAGE - 1);
@@ -180,6 +199,7 @@ export function useActionTotalsByAds(
             }
           }
           if (rows.length < PAGE) break;
+          }
         }
       }
       const accountIds = Array.from(new Set(allowedIds.map((id) => resolvedAccountByAd[id]).filter(Boolean))) as string[];

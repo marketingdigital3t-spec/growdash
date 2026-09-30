@@ -10,6 +10,7 @@ interface UseInsightsParams {
   campaignIds?: string[];
   objectives?: string[];
   attributionWindow?: string;
+  attributionWindowsByAccount?: Record<string, string>;
   startDate: Date;
   endDate: Date;
   enabled?: boolean;
@@ -61,9 +62,9 @@ export function dedupeDailyInsights(rows: InsightRow[]) {
   return Array.from(unique.values());
 }
 
-export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", startDate, endDate, enabled = true }: UseInsightsParams) {
+export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", attributionWindowsByAccount = {}, startDate, endDate, enabled = true }: UseInsightsParams) {
   return useQuery({
-    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, startDate.toISOString(), endDate.toISOString()],
+    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))), startDate.toISOString(), endDate.toISOString()],
     queryFn: async () => {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
@@ -108,30 +109,40 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       }).filter(Boolean) as string[];
       if (adIds.length === 0) return [];
 
-      let query = supabase
-        .from("insights")
-        .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value")
-        .in("ad_id", adIds)
-        .eq("attribution_window", attributionWindow)
-        .gte("date", start)
-        .lte("date", end)
-        .order("date", { ascending: true });
-
       // Paginar para evitar o limite default de 1000 linhas do Supabase.
       const INSIGHTS_PAGE = 1000;
       let allRows: any[] = [];
-      // Do not truncate long-running accounts after an arbitrary number of
-      // pages. The selected interval is already enforced by the database.
-      for (let page = 0; ; page++) {
-        const from = page * INSIGHTS_PAGE;
-        const to = from + INSIGHTS_PAGE - 1;
-        // A provider delay must surface as a recoverable query failure rather
-        // than leaving every Meta KPI in a permanent loading state.
-        const { data, error } = await withRequestTimeout(query.range(from, to), 15_000);
-        if (error) throw error;
-        const batch = data || [];
-        allRows = allRows.concat(batch);
-        if (batch.length < INSIGHTS_PAGE) break;
+      const insightGroups = new Map<string, { window: string; ids: string[] }>();
+      for (const adId of adIds) {
+        const accountId = String(adCatalog[adId]?.adsets?.campaigns?.ad_account_id || "");
+        const window = attributionWindowsByAccount[accountId] || attributionWindow;
+        const key = `${accountId}::${window}`;
+        const group = insightGroups.get(key) || { window, ids: [] };
+        group.ids.push(adId);
+        insightGroups.set(key, group);
+      }
+      for (const group of insightGroups.values()) {
+        let query = supabase
+          .from("insights")
+          .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value")
+          .in("ad_id", group.ids)
+          .eq("attribution_window", group.window)
+          .gte("date", start)
+          .lte("date", end)
+          .order("date", { ascending: true });
+        // Do not truncate long-running accounts after an arbitrary number of
+        // pages. The selected interval is already enforced by the database.
+        for (let page = 0; ; page++) {
+          const from = page * INSIGHTS_PAGE;
+          const to = from + INSIGHTS_PAGE - 1;
+          // A provider delay must surface as a recoverable query failure rather
+          // than leaving every Meta KPI in a permanent loading state.
+          const { data, error } = await withRequestTimeout(query.range(from, to), 15_000);
+          if (error) throw error;
+          const batch = data || [];
+          allRows = allRows.concat(batch);
+          if (batch.length < INSIGHTS_PAGE) break;
+        }
       }
 
       return dedupeDailyInsights(allRows.map((row: any) => {
