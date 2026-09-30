@@ -84,6 +84,17 @@ export default function FunnelAnalysis() {
   );
   const selectedAccountIdSet = useMemo(() => new Set(selectedAccountIds), [selectedAccountIds]);
   const allAccountsSelected = selectedAccountIds.length === 0;
+  const selectedMetaScope = useMemo(() => {
+    const scoped = selectedAccountIds.length
+      ? visibleAccounts.filter((account) => selectedAccountIdSet.has(account.id))
+      : visibleAccounts;
+    const windows = Array.from(new Set(scoped.map((account) => account.attribution_window || "account_default")));
+    const timezones = Array.from(new Set(scoped.map((account) => account.timezone_name || "America/Sao_Paulo")));
+    return {
+      attributionWindow: windows.length === 1 ? windows[0] : "account_default",
+      timezone: timezones.length === 1 ? timezones[0] : "account",
+    };
+  }, [selectedAccountIdSet, selectedAccountIds.length, visibleAccounts]);
   const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels();
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
@@ -410,13 +421,15 @@ export default function FunnelAnalysis() {
     startDate,
     endDate,
     actionAccountMap,
-    { adAccountIds: actionScopeAccountIds, campaignIds: actionScopeCampaignIds },
+    { adAccountIds: actionScopeAccountIds, campaignIds: actionScopeCampaignIds, attributionWindow: selectedMetaScope.attributionWindow },
   );
   const funnelMeta = useMetaTrafficMetrics({
     adAccountIds: actionScopeAccountIds,
     campaignIds: actionScopeCampaignIds,
     startDate: format(startDate, "yyyy-MM-dd"),
     endDate: format(endDate, "yyyy-MM-dd"),
+    attributionWindow: selectedMetaScope.attributionWindow,
+    timezone: selectedMetaScope.timezone,
   }, visibleAccounts.length > 0);
 
   const mediaMetrics = useMemo(
@@ -429,16 +442,23 @@ export default function FunnelAnalysis() {
         clicks: funnelMeta.data.clicks,
         leads: funnelMeta.data.leads,
       }] : scopedInsights;
+      const canonicalActions = funnelMeta.data.rowCount > 0
+        ? { forms: funnelMeta.data.formLeads, site: funnelMeta.data.siteLeads, conversations: funnelMeta.data.conversations }
+        : { forms: actions.forms, site: actions.site, conversations: actions.conversations };
       const computed = computeFunnelMediaMetrics(
       mediaRows as any,
-      funnelMeta.data.conversations || actions.conversations,
+      canonicalActions.conversations,
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,
-      funnelMeta.data.formLeads || actions.forms,
-      funnelMeta.data.siteLeads || actions.site,
-    );
-      return { ...computed, spend: funnelMeta.data.spend || computed.spend, metaLeads: funnelMeta.data.leads || computed.metaLeads };
+      canonicalActions.forms,
+      canonicalActions.site,
+      );
+      return {
+        ...computed,
+        spend: funnelMeta.data.rowCount > 0 ? funnelMeta.data.spend : computed.spend,
+        metaLeads: funnelMeta.data.rowCount > 0 ? funnelMeta.data.leads : computed.metaLeads,
+      };
     },
     [actionData?.metaLeadActions, funnelMeta.data, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
   );
@@ -468,6 +488,8 @@ export default function FunnelAnalysis() {
             breakdownStartDate: format(startDate, "yyyy-MM-dd"),
             breakdownEndDate: format(endDate, "yyyy-MM-dd"),
             force: true,
+            attributionWindow: selectedMetaScope.attributionWindow,
+            timezone: selectedMetaScope.timezone,
           }),
         };
       } catch (reason) {

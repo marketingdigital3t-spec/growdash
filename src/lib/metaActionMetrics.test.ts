@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateMetaLeadActionDays, resolveMetaActionMetrics, resolveMetaLeadActions } from "./metaActionMetrics";
+import { aggregateMetaLeadActionDays, resolveMetaActionMetrics, resolveMetaCampaignResult, resolveMetaLeadActions } from "./metaActionMetrics";
 
 describe("Meta action metrics", () => {
   it("prioriza a ação omni para não duplicar checkout e compra", () => {
@@ -84,5 +84,17 @@ describe("Meta action metrics", () => {
     expect(result.totals).toEqual({ forms: 7, site: 0, conversations: 0, total: 7 });
     expect(result.dailyByAccount["account-1"]["2026-09-27"].total).toBe(4);
     expect(result.dailyByAccount["account-1"]["2026-09-28"].total).toBe(3);
+  });
+
+  it("resolve o resultado oficial por objetivo sem somar mecanismos diferentes", () => {
+    expect(resolveMetaCampaignResult("OUTCOME_LEADS", "LEAD_GENERATION", {
+      "onsite_conversion.lead_grouped": 4,
+      "offsite_conversion.fb_pixel_lead": 9,
+      "onsite_conversion.messaging_conversation_started_7d": 12,
+    })).toEqual({ resultType: "leads", value: 13 });
+    expect(resolveMetaCampaignResult("OUTCOME_ENGAGEMENT", "CONVERSATIONS", {
+      "onsite_conversion.messaging_conversation_started_7d": 12,
+      "onsite_conversion.messaging_conversation_started": 20,
+    })).toEqual({ resultType: "conversations", value: 20 });
   });
 });

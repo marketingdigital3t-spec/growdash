@@ -14,6 +14,57 @@ function connectionStatusForMetaError(errorCode: number | undefined, retryable: 
   return "error";
 }
 
+const FORM_ACTIONS = ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"];
+const SITE_ACTIONS = ["offsite_conversion.fb_pixel_lead", "offsite_conversion.lead"];
+const CONVERSATION_ACTIONS = [
+  "onsite_conversion.messaging_conversation_started_7d",
+  "onsite_conversion.messaging_conversation_started_28d",
+  "onsite_conversion.messaging_conversation_started",
+  "onsite_conversion.total_messaging_connection",
+];
+const PURCHASE_ACTIONS = ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"];
+
+function preferredAction(actions: any[], aliases: string[]) {
+  const values = aliases
+    .map((alias) => actions.find((item: any) => item.action_type === alias))
+    .filter(Boolean)
+    .map((item: any) => Math.max(0, Number(item.value || 0)));
+  return values.length ? Math.max(...values) : 0;
+}
+
+function canonicalLeadParts(actions: any[], lpAction: string | null) {
+  const hasForm = FORM_ACTIONS.some((type) => actions.some((item: any) => item.action_type === type));
+  const hasConversation = CONVERSATION_ACTIONS.some((type) => actions.some((item: any) => item.action_type === type));
+  const forms = hasForm
+    ? preferredAction(actions, FORM_ACTIONS)
+    : hasConversation || SITE_ACTIONS.some((type) => actions.some((item: any) => item.action_type === type))
+      ? 0
+      : preferredAction(actions, ["lead"]);
+  const siteAliases = lpAction && !FORM_ACTIONS.includes(lpAction) && lpAction !== "lead" ? [lpAction] : SITE_ACTIONS;
+  const site = preferredAction(actions, siteAliases);
+  const conversations = preferredAction(actions, CONVERSATION_ACTIONS);
+  return { forms, site, conversations };
+}
+
+function canonicalResult(objective: string | null, optimizationGoal: string | null, actions: any[], lpAction: string | null) {
+  const objectiveKey = String(objective || "").toUpperCase();
+  const goalKey = String(optimizationGoal || "").toUpperCase();
+  const leads = canonicalLeadParts(actions, lpAction);
+  if (objectiveKey.includes("SALES") || objectiveKey.includes("CONVERSION") || goalKey.includes("PURCHASE")) {
+    return { type: "purchase", value: preferredAction(actions, PURCHASE_ACTIONS) };
+  }
+  if (objectiveKey.includes("TRAFFIC") || goalKey.includes("LANDING_PAGE_VIEW")) {
+    return { type: "landing_page_view", value: preferredAction(actions, ["landing_page_view", "link_click"]) };
+  }
+  if (objectiveKey.includes("ENGAGEMENT") || objectiveKey.includes("MESSAGING") || goalKey.includes("CONVERSATION")) {
+    return { type: "conversations", value: leads.conversations };
+  }
+  if (objectiveKey.includes("AWARENESS") || goalKey.includes("REACH")) {
+    return { type: "reach", value: 0 };
+  }
+  return { type: "leads", value: leads.forms + leads.site };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -134,7 +185,7 @@ Deno.serve(async (req) => {
       };
       try {
         const accountToday = new Intl.DateTimeFormat("en-CA", {
-          timeZone: account.timezone_name || "America/Sao_Paulo",
+          timeZone: effectiveTimezone,
           year: "numeric", month: "2-digit", day: "2-digit",
         }).format(new Date());
         const startDate = requestedStartDate || accountToday;
@@ -148,6 +199,8 @@ Deno.serve(async (req) => {
           : account.attribution_window && account.attribution_window !== "account_default"
           ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
           : [];
+        const effectiveAttributionWindow = attributionWindows.length ? attributionWindows.join(",") : "account_default";
+        const effectiveTimezone = account.timezone_name || "America/Sao_Paulo";
         const attributionParam = attributionWindows.length
           ? `&action_attribution_windows=${encodeURIComponent(JSON.stringify(attributionWindows))}`
           : "";
@@ -242,7 +295,7 @@ Deno.serve(async (req) => {
 
         // 2. Fetch adsets (incluindo arquivadas)
         const adsetsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`
+          `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type,optimization_goal&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`
         );
         recordPagination(adsetsRes);
         if (adsetsRes.error) errors.push(`Conta ${account.name} conjuntos: ${adsetsRes.error}`);
@@ -271,6 +324,7 @@ Deno.serve(async (req) => {
               daily_budget: a.daily_budget ? Number(a.daily_budget) / 100 : null,
               status: newStatus, previous_status: prevStatus, last_activated_at,
               destination_type: a.destination_type ?? null,
+              optimization_goal: a.optimization_goal ?? null,
             };
           });
           throwIfError(await supabaseAdmin.from("adsets").upsert(rows, { onConflict: "id" }), `conjuntos da conta ${account.name}`);
@@ -465,6 +519,7 @@ Deno.serve(async (req) => {
             .from("insight_actions")
             .delete()
             .in("ad_id", adChunk)
+            .eq("attribution_window", effectiveAttributionWindow)
             .gte("date", startDate)
             .lte("date", endDate);
           if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
@@ -573,6 +628,8 @@ Deno.serve(async (req) => {
               action_type: String(a.action_type),
               value: Number(a.value || 0),
               value_amount: valueMap.get(String(a.action_type)) || 0,
+              attribution_window: effectiveAttributionWindow,
+              timezone: effectiveTimezone,
             });
           }
         }
@@ -580,10 +637,13 @@ Deno.serve(async (req) => {
           const chunk = actionRows.slice(i, i + 500);
           const { error: aErr } = await supabaseAdmin
             .from("insight_actions")
-            .upsert(chunk, { onConflict: "ad_id,date,action_type", ignoreDuplicates: false });
+            .upsert(chunk, { onConflict: "ad_id,date,action_type,attribution_window", ignoreDuplicates: false });
           if (aErr) throw new Error(`ações da conta ${account.name}: ${aErr.message}`);
         }
         if (actionRows.length > 0) console.log(`insight_actions: ${actionRows.length} rows`);
+
+        const campaignById = new Map((campaigns || []).map((campaign: any) => [String(campaign.id), campaign]));
+        const adsetById = new Map((adsetsList || []).map((adset: any) => [String(adset.id), adset]));
 
         // Batch upsert insights (chunks of 100)
         const insightRows = allInsights.map((insight: any) => {
@@ -598,16 +658,14 @@ Deno.serve(async (req) => {
           const frequency = Number(insight.frequency || 0);
 
           const actions = insight.actions || [];
-          const findVal = (type: string): number => {
-            const a = actions.find((x: any) => x.action_type === type);
-            return a ? Number(a.value || 0) : 0;
-          };
           // Leads = Formulário Instantâneo + LP configurada. Algumas contas/API
           // antigas retornam apenas `lead` (sem `lead_grouped`); nesse caso ele
           // é o único resultado de formulário disponível e não pode ser perdido.
-          const nativeLeads = nativeFormValue(actions);
-          const lpLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
-          const leads = nativeLeads + lpLeads;
+          const campaign = campaignById.get(String(insight.campaign_id || ""));
+          const adset = adsetById.get(String(insight.adset_id || ""));
+          const parts = canonicalLeadParts(actions, lpAction);
+          const leads = parts.forms + parts.site;
+          const result = canonicalResult(campaign?.objective || null, adset?.optimization_goal || null, actions, lpAction);
           const cpl = leads > 0 ? spend / leads : 0;
           const conversionRate = clicks > 0 ? (leads / clicks) * 100 : 0;
           const efficiencyRate = impressions > 0 ? (leads / impressions) * 100 : 0;
@@ -623,6 +681,14 @@ Deno.serve(async (req) => {
             ctr, cpm, frequency,
             leads, cpl, conversion_rate: conversionRate,
             efficiency_rate: efficiencyRate, health_score: healthScore,
+            attribution_window: effectiveAttributionWindow,
+            timezone: effectiveTimezone,
+            optimization_goal: adset?.optimization_goal || null,
+            result_type: result.type,
+            result_value: result.type === "reach" ? reach : result.value,
+            form_leads: parts.forms,
+            site_leads: parts.site,
+            conversations: parts.conversations,
           };
         });
 
@@ -631,7 +697,7 @@ Deno.serve(async (req) => {
           const chunk = insightRows.slice(i, i + 100);
           const { error: upsertError } = await supabaseAdmin
             .from("insights")
-            .upsert(chunk, { onConflict: "ad_id,date", ignoreDuplicates: false });
+            .upsert(chunk, { onConflict: "ad_id,date,attribution_window", ignoreDuplicates: false });
           if (upsertError) throw new Error(`insights da conta ${account.name}: ${upsertError.message}`);
           totalSynced += chunk.length;
         }

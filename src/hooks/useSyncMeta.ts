@@ -12,6 +12,8 @@ interface SyncParams {
   breakdownStartDate?: string;
   breakdownEndDate?: string;
   force?: boolean;
+  attributionWindow?: string;
+  timezone?: string;
 }
 
 type SyncResponse = {
@@ -25,7 +27,7 @@ type SyncResponse = {
   leads?: number;
   synced_at?: string;
   freshness_seconds?: number;
-  scope?: { ad_account_ids?: string[]; start_date?: string | null; end_date?: string | null };
+  scope?: { ad_account_ids?: string[]; campaign_ids?: string[]; start_date?: string | null; end_date?: string | null; attribution_window?: string; timezone?: string };
 };
 
 async function invokeSyncFunction(name: string, body: Record<string, unknown>): Promise<SyncResponse> {
@@ -90,6 +92,8 @@ export function useSyncMeta() {
         breakdownStartDate: params.breakdownStartDate,
         breakdownEndDate: params.breakdownEndDate,
         force: params.force === true,
+        attributionWindow: params.attributionWindow,
+        timezone: params.timezone,
       };
       // Hourly reconciliation reads the daily rows. Running both in parallel
       // caused races, inflated API usage and occasional non-2xx responses.

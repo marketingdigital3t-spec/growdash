@@ -1,5 +1,4 @@
-import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
-import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { resolveMetaActionMetrics, resolveMetaCampaignResult, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 export interface MetaTrafficScope {
   adAccountIds: string[];
@@ -18,6 +17,9 @@ export interface MetaTrafficMetrics {
   clicks: number;
   leads: number;
   totalLeads: number;
+  /** Sum of the official Ads Manager Result value by campaign objective. */
+  results: number;
+  resultValue: number;
   formLeads: number;
   siteLeads: number;
   conversations: number;
@@ -51,6 +53,7 @@ type InsightRow = {
   campaign_id?: string | null;
   campaign_name?: string | null;
   campaign_objective?: string | null;
+  optimization_goal?: string | null;
   spend?: number | null;
   impressions?: number | null;
   reach?: number | null;
@@ -97,23 +100,9 @@ export function aggregateMetaTrafficMetrics(
     if (!adKey || seenResultAds.has(adKey)) return;
     seenResultAds.add(adKey);
     const actionTotals = actions?.totalsByAd?.[String(row.ad_id || "")] || {};
-    const perAdLeads = resolveMetaLeadActions(actionTotals);
-    const objective = String(row.campaign_objective || "").toUpperCase();
-    const preferred = (aliases: string[]) => aliases.reduce((max, alias) => Math.max(max, Number(actionTotals[alias] || 0)), 0);
-    const resultType = objective.includes("TRAFFIC")
-      ? "landing_page_view"
-      : objective.includes("ENGAGEMENT") || objective.includes("MESSAGING")
-        ? "conversations"
-        : objective.includes("SALES") || objective.includes("CONVERSIONS")
-          ? "purchase"
-          : "leads";
-    const value = resultType === "landing_page_view"
-      ? preferred(["landing_page_view", "link_click"])
-      : resultType === "conversations"
-        ? preferred(["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started", "onsite_conversion.total_messaging_connection"])
-        : resultType === "purchase"
-          ? preferred(["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"])
-          : perAdLeads.forms + perAdLeads.site;
+    const result = resolveMetaCampaignResult(row.campaign_objective, row.optimization_goal, actionTotals);
+    const resultType = result.resultType;
+    const value = resultType === "reach" ? Number(row.reach || 0) : result.value;
     if (value <= 0) return;
     const key = `${row.ad_account_id || ""}|${row.campaign_id || ""}|${resultType}`;
     const previous = resultBreakdownByCampaign.get(key);
@@ -127,6 +116,7 @@ export function aggregateMetaTrafficMetrics(
     });
   });
   const resultBreakdown = Array.from(resultBreakdownByCampaign.values());
+  const results = resultBreakdown.reduce((sum, item) => sum + item.value, 0);
   const freshnessSeconds = syncedAt ? Math.max(0, Math.floor((now - new Date(syncedAt).getTime()) / 1000)) : null;
   const status = errors.length ? "error" : freshnessSeconds === null || freshnessSeconds > 300 ? "stale" : "fresh";
   const coveredAccounts = Array.from(new Set(rows.map((row) => row.ad_account_id).filter(Boolean) as string[]));
@@ -136,6 +126,8 @@ export function aggregateMetaTrafficMetrics(
     frequency: totals.reach > 0 ? totals.impressions / totals.reach : 0,
     leads,
     totalLeads: leads,
+    results,
+    resultValue: results,
     formLeads: leadTotals.forms,
     siteLeads: leadTotals.site,
     conversations: leadTotals.conversations,

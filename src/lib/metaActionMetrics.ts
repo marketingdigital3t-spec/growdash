@@ -64,6 +64,42 @@ export function resolveMetaLeadActions(actionTotals?: Record<string, number>, si
   };
 }
 
+export type MetaResultType = "leads" | "conversations" | "landing_page_view" | "purchase" | "reach";
+
+/**
+ * Resolves the single Result column used by Ads Manager for a campaign.
+ * Objective is the primary signal; the action aliases are only fallbacks and
+ * are always resolved with max(), never added together.
+ */
+export function resolveMetaCampaignResult(
+  objective: string | null | undefined,
+  optimizationGoal: string | null | undefined,
+  actionTotals?: Record<string, number>,
+) {
+  const objectiveKey = String(objective || "").toUpperCase();
+  const goalKey = String(optimizationGoal || "").toUpperCase();
+  const value = (aliases: readonly string[]) => preferredValue(actionTotals, aliases);
+  const conversations = value(META_ACTION_TYPES.conversations);
+  const purchases = value(META_ACTION_TYPES.purchase);
+  const landingPageViews = value(META_ACTION_TYPES.landingPageView);
+  const linkClicks = value(META_ACTION_TYPES.linkClick);
+  const leadActions = resolveMetaLeadActions(actionTotals);
+
+  if (objectiveKey.includes("SALES") || objectiveKey.includes("CONVERSION") || goalKey.includes("PURCHASE")) {
+    return { resultType: "purchase" as const, value: purchases };
+  }
+  if (objectiveKey.includes("TRAFFIC") || goalKey.includes("LANDING_PAGE_VIEW")) {
+    return { resultType: "landing_page_view" as const, value: landingPageViews || linkClicks };
+  }
+  if (objectiveKey.includes("ENGAGEMENT") || objectiveKey.includes("MESSAGING") || goalKey.includes("CONVERSATION")) {
+    return { resultType: "conversations" as const, value: conversations };
+  }
+  if (objectiveKey.includes("AWARENESS") || goalKey.includes("REACH")) {
+    return { resultType: "reach" as const, value: 0 };
+  }
+  return { resultType: "leads" as const, value: leadActions.forms + leadActions.site };
+}
+
 export function aggregateMetaLeadActionDays(
   dailyActionsByAd: Record<string, Record<string, Record<string, number>>>,
   accountByAd: Record<string, string | null | undefined>,

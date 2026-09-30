@@ -9,6 +9,7 @@ interface UseInsightsParams {
   campaignId?: string;
   campaignIds?: string[];
   objectives?: string[];
+  attributionWindow?: string;
   startDate: Date;
   endDate: Date;
   enabled?: boolean;
@@ -33,6 +34,9 @@ export interface InsightRow {
   adset_name: string;
   campaign_name: string;
   campaign_objective?: string | null;
+  optimization_goal?: string | null;
+  result_type?: string | null;
+  result_value?: number | null;
   thumbnail_url?: string | null;
   ad_status?: string | null;
   adset_status?: string | null;
@@ -57,9 +61,9 @@ export function dedupeDailyInsights(rows: InsightRow[]) {
   return Array.from(unique.values());
 }
 
-export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, startDate, endDate, enabled = true }: UseInsightsParams) {
+export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", startDate, endDate, enabled = true }: UseInsightsParams) {
   return useQuery({
-    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), startDate.toISOString(), endDate.toISOString()],
+    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, startDate.toISOString(), endDate.toISOString()],
     queryFn: async () => {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
@@ -106,8 +110,9 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
 
       let query = supabase
         .from("insights")
-        .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score")
+        .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value")
         .in("ad_id", adIds)
+        .eq("attribution_window", attributionWindow)
         .gte("date", start)
         .lte("date", end)
         .order("date", { ascending: true });
@@ -153,6 +158,9 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         adset_name: adset.name ?? "",
         campaign_name: campaign.name ?? "",
         campaign_objective: campaign.objective ?? null,
+        optimization_goal: row.optimization_goal ?? null,
+        result_type: row.result_type ?? null,
+        result_value: row.result_value ?? null,
         ad_status: ad.status ?? null,
         adset_status: adset.status ?? null,
         campaign_status: campaign.status ?? null,

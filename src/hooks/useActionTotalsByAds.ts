@@ -27,6 +27,7 @@ export interface ActionScope {
   adAccountIds?: string[];
   /** Optional campaign restriction applied while resolving the account ads. */
   campaignIds?: string[];
+  attributionWindow?: string;
 }
 
 /**
@@ -49,6 +50,7 @@ export function useActionTotalsByAds(
   const sortedIds = [...(adIds || [])].sort();
   const scopedAccounts = [...(scope?.adAccountIds || [])].sort();
   const scopedCampaigns = [...(scope?.campaignIds || [])].sort();
+  const attributionWindow = scope?.attributionWindow || "account_default";
   const accountMapSignature = adAccountByAdId
     ? JSON.stringify(Object.entries(adAccountByAdId).sort(([a], [b]) => a.localeCompare(b)))
     : "";
@@ -58,6 +60,7 @@ export function useActionTotalsByAds(
       sortedIds.join(","),
       scopedAccounts.join(","),
       scopedCampaigns.join(","),
+      attributionWindow,
       startDate?.toISOString(),
       endDate?.toISOString(),
       accountMapSignature,
@@ -81,7 +84,12 @@ export function useActionTotalsByAds(
       const CHUNK_IDS = 500;
       let resolvedIds = sortedIds;
       const resolvedAccountByAd: Record<string, string | null> = { ...(adAccountByAdId || {}) };
-      if (scopedAccounts.length > 0 || scopedCampaigns.length > 0) {
+      // When the caller already supplied the ad universe from the canonical
+      // Insights query, never widen it back to every ad in the account. That
+      // was the source of cross-campaign totals and stale rows leaking into a
+      // selected calendar scope. An empty universe still resolves the account
+      // catalog so a brand-new ad can be reconciled.
+      if (resolvedIds.length === 0 && (scopedAccounts.length > 0 || scopedCampaigns.length > 0)) {
         let campaignQuery = supabase.from("campaigns").select("id, ad_account_id");
         if (scopedAccounts.length > 0) campaignQuery = campaignQuery.in("ad_account_id", scopedAccounts);
         if (scopedCampaigns.length > 0) campaignQuery = campaignQuery.in("id", scopedCampaigns);
@@ -145,6 +153,7 @@ export function useActionTotalsByAds(
             .from("insight_actions" as any)
             .select("ad_id, action_type, value, value_amount, date")
             .in("ad_id", chunk);
+          q = q.eq("attribution_window", attributionWindow);
           if (start) q = q.gte("date", start);
           if (end) q = q.lte("date", end);
           const { data, error } = await q.range(from, from + PAGE - 1);
