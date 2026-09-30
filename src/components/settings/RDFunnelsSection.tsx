@@ -103,6 +103,15 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
   const remove = useDeleteRDFunnel();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const linked = !!funnel.rd_funnel_id;
+  const toggleActive = (value: boolean) => update.mutate({ id: funnel.id, is_active: value }, {
+    onSuccess: () => toast({
+      title: value ? "Funil ativado" : "Funil desativado",
+      description: value
+        ? "O funil voltará a aparecer nas abas e no ciclo de sincronização."
+        : "O funil foi ocultado das abas e não será sincronizado.",
+    }),
+    onError: (error: Error) => toast({ title: "Não foi possível alterar o funil", description: error.message, variant: "destructive" }),
+  });
 
   const sync = useMutation({
     mutationFn: async () => {
@@ -175,8 +184,11 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
         </Button>
         <Switch
           checked={funnel.is_active}
-          onCheckedChange={(v) => update.mutate({ id: funnel.id, is_active: v })}
+          disabled={update.isPending}
+          onCheckedChange={toggleActive}
+          aria-label={`${funnel.is_active ? "Desativar" : "Ativar"} funil ${funnel.name}`}
         />
+        <span className={`text-[10px] font-black uppercase ${funnel.is_active ? "text-emerald-600" : "text-muted-foreground"}`}>{funnel.is_active ? "Ativo" : "Desativado"}</span>
         <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteOpen(true)} title={`Excluir vínculo ${funnel.name}`} aria-label={`Excluir vínculo ${funnel.name}`}>
           <Trash2 className="h-3.5 w-3.5" />
         </Button>

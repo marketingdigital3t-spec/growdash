@@ -78,6 +78,7 @@ const Index = () => {
   const isRDAccountScopeReady = selectedAccount !== "all" || (!loadingAdAccounts && visibleAccountIdList.length > 0);
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
+  const { data: rdFunnels = [] } = useRDFunnels();
   // Universo estável de campanhas com veiculação no período/conta — não muda quando
   // o usuário marca/desmarca campanhas, para que o popover continue listando todas.
   // O filtro por campanha é aplicado em memória porque este universo completo já é
@@ -108,18 +109,15 @@ const Index = () => {
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
-    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-    adAccountIds: selectedAccountIds.length > 1 || selectedAccountIds.length === 0 ? scopedAccountIds : undefined,
+    funnelIds: rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id).map((funnel) => funnel.id),
     enabled: isRDAccountScopeReady,
   });
   const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
     startDate,
     endDate,
-    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-    adAccountIds: selectedAccountIds.length > 1 || selectedAccountIds.length === 0 ? scopedAccountIds : undefined,
+    funnelIds: rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id).map((funnel) => funnel.id),
     enabled: isRDAccountScopeReady,
   });
-  const { data: rdFunnels = [] } = useRDFunnels();
   const { data: alerts = [] } = useAlerts();
   const { data: eventClasses = [] } = useEventClasses();
   const syncMeta = useSyncMeta();
@@ -158,10 +156,9 @@ const Index = () => {
   );
   const activeScopedFunnelIds = useMemo(() => new Set(
     rdFunnels
-      .filter((funnel) => funnel.is_active && visibleAccountIds.has(funnel.ad_account_id)
-        && (selectedAccountIds.length === 0 || selectedAccountIds.includes(funnel.ad_account_id)))
+      .filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id)
       .map((funnel) => funnel.id),
-  ), [rdFunnels, selectedAccountIds, visibleAccountIds]);
+  ), [rdFunnels]);
   // `sales` é a fonte canônica de vendas, receita, reembolso e chargeback.
   // Uma venda RD histórica pode não ter `ad_account_id`, mas ainda pertence à
   // conta pelo funil. Incluí-la por esse vínculo evita que Dashboard e Análise
@@ -183,12 +180,8 @@ const Index = () => {
       ad_account_id: campaign.ad_account_id,
     })))
     : canonicalUnitSales, [canonicalUnitSales, selectedCampaignIds.length, selectedCampaigns]);
-  const dashboardDeals = useMemo(() => operationalRDDeals.filter((deal) => !!deal.ad_account_id
-    && visibleAccountIds.has(deal.ad_account_id)
-    && (selectedAccountIds.length === 0 || selectedAccountIds.includes(deal.ad_account_id))), [operationalRDDeals, selectedAccountIds, visibleAccountIds]);
-  const dashboardRevenueDeals = useMemo(() => operationalRDWonDeals.filter((deal) => !!deal.ad_account_id
-    && visibleAccountIds.has(deal.ad_account_id)
-    && (selectedAccountIds.length === 0 || selectedAccountIds.includes(deal.ad_account_id))), [operationalRDWonDeals, selectedAccountIds, visibleAccountIds]);
+  const dashboardDeals = useMemo(() => operationalRDDeals.filter((deal) => !!deal.rd_funnel_id && activeScopedFunnelIds.has(deal.rd_funnel_id)), [activeScopedFunnelIds, operationalRDDeals]);
+  const dashboardRevenueDeals = useMemo(() => operationalRDWonDeals.filter((deal) => !!deal.rd_funnel_id && activeScopedFunnelIds.has(deal.rd_funnel_id)), [activeScopedFunnelIds, operationalRDWonDeals]);
   // O Dashboard e a Análise de Funis usam a mesma fonte canônica. Os ganhos
   // do RD abaixo ficam apenas como reconciliação para registros que ainda não
   // chegaram a `sales`; uma venda de checkout nunca é descartada por o RD

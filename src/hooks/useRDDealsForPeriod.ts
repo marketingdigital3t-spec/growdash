@@ -79,6 +79,7 @@ interface Params {
    * unassigned RD deals out of an advertising-account total.
    */
   adAccountIds?: string[];
+  funnelIds?: string[];
   enabled?: boolean;
 }
 
@@ -94,7 +95,7 @@ export interface RDCRMQueryScope {
 const FIELDS =
   "id, rd_deal_id, rd_connection_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_attribution_method, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, updated_at";
 
-export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, enabled = true }: Params) {
+export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
   return useQuery({
     queryKey: [
       "rd_deals_period",
@@ -102,6 +103,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
       format(endDate, "yyyy-MM-dd"),
       adAccountId ?? "all",
       adAccountIds?.slice().sort().join(",") ?? "",
+      funnelIds?.slice().sort().join(",") ?? "",
     ],
     enabled,
     queryFn: async () => {
@@ -131,6 +133,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         // generates an invalid `in.()` filter and makes the module fail to
         // load for users whose filters have not been initialized yet.
         else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
+        if (funnelIds?.length) q = q.in("rd_funnel_id", funnelIds);
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await withRequestTimeout(q.range(from, to), 15_000);
@@ -164,9 +167,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
  * fechado. Para integrações antigas que ainda não preenchem `closed_at`, a
  * última alteração de etapa é o fallback para não ocultar vendas reais.
  */
-export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, enabled = true }: Params) {
+export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
   return useQuery({
-    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
+    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? "", funnelIds?.slice().sort().join(",") ?? ""],
     enabled,
     queryFn: async () => {
       const bounds = saoPauloDayBounds(startDate, endDate);
@@ -185,6 +188,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
             : query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd);
           if (adAccountId) query = query.eq("ad_account_id", adAccountId);
           else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
+          if (funnelIds?.length) query = query.in("rd_funnel_id", funnelIds);
           const { data, error } = await withRequestTimeout(query.range(page * PAGE, (page + 1) * PAGE - 1), 15_000);
           if (error) throw error;
           const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({

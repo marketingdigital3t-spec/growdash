@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMaster } from "@/hooks/useIsMaster";
@@ -90,7 +90,8 @@ export default function UsersPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data: adAccounts = [] } = useAdAccounts();
-  const { data: rdFunnels = [] } = useRDFunnels();
+  const { data: allRDFunnels = [] } = useRDFunnels();
+  const rdFunnels = useMemo(() => allRDFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id), [allRDFunnels]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);

@@ -157,12 +157,10 @@ export default function FunnelAnalysis() {
     includeHistory: true,
     enabled: funnelScopeIds.length > 0,
   });
-  // Este recorte representa as negociações RD criadas no período selecionado,
-  // já limitado à conta Meta escolhida quando houver vínculo de conta.
+  // Funis RD são independentes da Meta: o recorte usa somente os funis ativos
+  // selecionados e o período/filtros do CRM.
   const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError } = useRDDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -197,8 +195,6 @@ export default function FunnelAnalysis() {
   });
   const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,

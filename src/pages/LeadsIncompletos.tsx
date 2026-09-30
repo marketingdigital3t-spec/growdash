@@ -44,7 +44,7 @@ export default function LeadsIncompletos() {
     queryKey: ["rd_funnels", session?.user.id],
     enabled: !!session?.user.id,
     queryFn: async () => {
-      const { data, error } = await supabase.from("rd_funnels").select("id, name").eq("user_id", session!.user.id);
+      const { data, error } = await supabase.from("rd_funnels").select("id, name").eq("user_id", session!.user.id).eq("is_active", true).not("rd_funnel_id", "is", null);
       if (error) throw error;
       return data as { id: string; name: string }[];
     },
