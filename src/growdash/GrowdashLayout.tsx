@@ -69,6 +69,7 @@ const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
   "/usuarios": () => import("@/pages/Users"),
   "/agenda-turmas": () => import("@/pages/EventClasses"),
   "/agentes": () => import("@/growdash/AgentOfficeControlPage"),
+  "/whatsapp": () => import("@/pages/WhatsApp"),
   "/chamados": () => import("@/growdash/ModulePage"),
   "/automacoes": () => import("@/growdash/ModulePage"),
   "/marcas": () => import("@/growdash/ModulePage"),
@@ -228,6 +229,7 @@ export default function GrowdashLayout() {
       "/anuncios": permissions.canAnnouncements,
       "/usuarios": permissions.canUsers,
       "/agentes": permissions.canAgents,
+      "/whatsapp": permissions.canIntegrations,
       "/configuracoes": permissions.canSettings,
       "/saude-dos-dados": permissions.canDataHealth,
     };
