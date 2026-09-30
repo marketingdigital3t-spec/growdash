@@ -184,6 +184,7 @@ Deno.serve(async (req) => {
         if (result.lastCursor) lastCursor = result.lastCursor;
       };
       try {
+        const effectiveTimezone = account.timezone_name || "America/Sao_Paulo";
         const accountToday = new Intl.DateTimeFormat("en-CA", {
           timeZone: effectiveTimezone,
           year: "numeric", month: "2-digit", day: "2-digit",
@@ -200,7 +201,6 @@ Deno.serve(async (req) => {
           ? String(account.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
           : [];
         const effectiveAttributionWindow = attributionWindows.length ? attributionWindows.join(",") : "account_default";
-        const effectiveTimezone = account.timezone_name || "America/Sao_Paulo";
         const attributionParam = attributionWindows.length
           ? `&action_attribution_windows=${encodeURIComponent(JSON.stringify(attributionWindows))}`
           : "";
