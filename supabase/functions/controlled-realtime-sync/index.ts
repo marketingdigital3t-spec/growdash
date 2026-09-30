@@ -32,6 +32,7 @@ type RunResult = {
   synced?: number;
   errors?: unknown;
   warnings?: unknown;
+  block_status?: Record<string, unknown>;
   synced_at?: string;
   freshness_seconds?: number | null;
 };
@@ -224,6 +225,12 @@ Deno.serve(async (req) => {
       status: results.some((result) => result.status === "failed")
         ? "failed"
         : results.some((result) => result.status === "partial") ? "partial" : "success",
+      // Consumers that monitor one provider must not infer its health from
+      // another provider's pending pages. Keep the aggregate for audit
+      // screens, while exposing the per-provider statuses explicitly.
+      meta_status: metaResult?.status || (metaResult?.skipped ? "skipped" : "unknown"),
+      rd_status: results.find((result) => result.provider === "rd")?.status || "skipped",
+      balance_status: results.find((result) => result.provider === "balance")?.status || "skipped",
       freshness_seconds: metaResult?.freshness_seconds ?? null,
       synced_at: metaResult?.synced_at || new Date().toISOString(),
       scope: {
@@ -338,6 +345,7 @@ async function runControlled(args: {
         ? (error || stringifyError(payload?.errors || "Resposta parcial; snapshot anterior preservado."))
         : undefined,
       warnings: payload?.warnings,
+      block_status: payload?.block_status,
       synced_at: typeof payload?.synced_at === "string" ? payload.synced_at : finishedAt,
       freshness_seconds: payload?.freshness_seconds == null ? null : Number(payload.freshness_seconds),
     };

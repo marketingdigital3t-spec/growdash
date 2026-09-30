@@ -103,17 +103,23 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, ti
           force,
         },
       });
-      if (error || data?.error || data?.success === false || ["failed", "error"].includes(String(data?.status || ""))) {
+      const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
+      if (error || data?.error || ["failed", "error"].includes(metaStatus)) {
         throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
       }
+      // The controlled endpoint aggregates Meta, RD and balance for audit
+      // purposes. A pending RD page or balance refresh must not mark the Meta
+      // KPI snapshot as failed; use the provider-specific status instead.
       const auxiliaryWarnings = Array.isArray(data?.warnings)
         ? data.warnings.map((warning: unknown) => String(warning)).join(" · ")
         : "";
       setSyncError(auxiliaryWarnings || null);
       if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
       setLastUpdatedAt(new Date());
-      setState(data?.status === "partial" ? "error" : "fresh");
-      if (data?.status === "partial") setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
+      setState(["failed", "partial", "error"].includes(metaStatus) ? "error" : "fresh");
+      if (["failed", "partial", "error"].includes(metaStatus)) {
+        setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
+      }
       invalidateLiveQueries();
     })().catch((error) => {
       // Falha silenciosa: o histórico armazenado permanece visível e uma nova
