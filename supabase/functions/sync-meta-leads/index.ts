@@ -556,9 +556,18 @@ Deno.serve(async (req) => {
 
     const hasErrors = accountResults.some((result: any) => Boolean(result.error) || (Array.isArray(result.errors) && result.errors.length > 0));
     const skippedDisconnected = disconnectedAccounts?.length || 0;
+    const failedAccounts = accountResults.filter((result: any) => Boolean(result.error) || (Array.isArray(result.errors) && result.errors.length > 0)).length;
+    const status = accounts?.length === 0
+      ? "skipped"
+      : failedAccounts === 0
+      ? "success"
+      : failedAccounts >= accounts.length
+      ? "failed"
+      : "partial";
     return new Response(
       JSON.stringify({
-        success: !hasErrors && skippedDisconnected === 0,
+        success: !hasErrors,
+        status,
         skipped_disconnected: skippedDisconnected,
         disconnected_accounts: (disconnectedAccounts || []).map((account: any) => ({ id: account.id, account_id: account.account_id, name: account.name })),
         upserted: totalUpserted,
@@ -568,7 +577,9 @@ Deno.serve(async (req) => {
           ? { startDate: exactRange.startDate, endDate: exactRange.endDate }
           : { days },
       }),
-      { status: hasErrors || skippedDisconnected > 0 ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      // `status` carries per-provider outcome; HTTP 200 keeps the structured
+      // partial coverage/errors readable through supabase.functions.invoke.
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {

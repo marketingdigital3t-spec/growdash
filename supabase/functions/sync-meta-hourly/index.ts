@@ -62,7 +62,13 @@ Deno.serve(async (req) => {
     const { data: accounts, error: accErr } = await q;
     if (accErr) throw accErr;
     if (!accounts || accounts.length === 0) {
-      return new Response(JSON.stringify({ success: true, synced: 0 }), {
+      return new Response(JSON.stringify({
+        success: true,
+        status: "skipped",
+        synced: 0,
+        accounts: 0,
+        message: "Nenhuma conta Meta ativa no escopo informado.",
+      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -258,7 +264,8 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success: failedAccounts < accounts.length,
+        success: failedAccounts === 0,
+        status: accounts.length === 0 ? "skipped" : failedAccounts === 0 ? "success" : failedAccounts >= accounts.length ? "failed" : "partial",
         synced: totalSynced,
         accounts: accounts.length,
         errors: errors.length ? errors : undefined,

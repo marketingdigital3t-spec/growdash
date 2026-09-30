@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
             incremental: true,
             includeBreakdowns: false,
           });
-          if (insights.error || insights.data?.error || insights.data?.success === false) return insights;
+          if (insights.error || insights.data?.error || insights.data?.success === false || ["partial", "failed", "blocked"].includes(String(insights.data?.status || ""))) return insights;
 
           const hourly = await invokeFunction(supabaseUrl, authHeader, "sync-meta-hourly", {
             adAccountId: body.adAccountId,
@@ -125,10 +125,16 @@ Deno.serve(async (req) => {
             endDate,
             attributionWindow: body.attributionWindow,
           });
-          const errors = [insights.data?.errors, hourly.data?.errors, hourly.error].filter(Boolean);
+          const errors = [insights.data?.errors, hourly.data?.errors, hourly.data?.status === "partial" ? "Sincronização horária parcial." : null, hourly.error].filter(Boolean);
+          const status = insights.data?.status === "partial" || hourly.data?.status === "partial"
+            ? "partial"
+            : insights.data?.status === "failed" || hourly.data?.status === "failed"
+              ? "failed"
+              : insights.data?.status || hourly.data?.status || "success";
           return {
             data: {
-              success: !hourly.error && hourly.data?.success !== false,
+              success: !hourly.error && hourly.data?.success !== false && hourly.data?.status !== "partial" && hourly.data?.status !== "failed",
+              status,
               synced: Number(insights.data?.synced || 0) + Number(hourly.data?.synced || 0),
               errors: errors.length ? errors : undefined,
               error: hourly.error || hourly.data?.error,
@@ -244,7 +250,7 @@ async function runControlled(args: {
   try {
     const response = await run();
     const payload = response?.data ?? response ?? {};
-    const hasError = Boolean(response?.error || payload?.error || payload?.success === false);
+    const hasError = Boolean(response?.error || payload?.error || payload?.success === false || ["partial", "failed", "blocked", "stale_snapshot"].includes(String(payload?.status || "")));
     const finishedAt = new Date().toISOString();
     const error = hasError
       ? stringifyError(response?.error || payload?.error || payload?.errors || "Falha na sincronização")

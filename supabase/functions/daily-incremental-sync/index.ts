@@ -434,7 +434,9 @@ Deno.serve(async (req) => {
         rdResync,
       }),
       {
-        status: allOk ? 200 : 207,
+        // Partial coverage is a valid structured result. Return it as JSON
+        // with HTTP 200 so callers can read errors, coverage and snapshots.
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );

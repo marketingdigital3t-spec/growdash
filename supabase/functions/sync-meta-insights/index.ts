@@ -165,7 +165,9 @@ Deno.serve(async (req) => {
           freshness_seconds: null,
           scope: { ad_account_ids: adAccountIds.length ? adAccountIds : adAccountId ? [adAccountId] : [], start_date: requestedStartDate || null, end_date: requestedEndDate || null },
         }),
-        { status: blocked === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        // Keep the structured blocked status available to Supabase clients;
+        // HTTP 200 does not mean the sync succeeded, `status` carries that.
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
