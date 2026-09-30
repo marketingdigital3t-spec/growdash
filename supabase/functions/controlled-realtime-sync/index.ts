@@ -123,8 +123,10 @@ Deno.serve(async (req) => {
           const hourly = await invokeFunction(supabaseUrl, authHeader, "sync-meta-hourly", {
             adAccountId: body.adAccountId,
             adAccountIds: body.adAccountIds,
+            campaignIds: body.campaignIds,
             startDate,
             endDate,
+            timezone: body.timezone,
             attributionWindow: body.attributionWindow,
           });
           const errors = [insights.data?.errors, hourly.data?.errors, hourly.data?.status === "partial" ? "Sincronização horária parcial." : null, hourly.error].filter(Boolean);
@@ -158,10 +160,12 @@ Deno.serve(async (req) => {
             admin,
             userId: user.id,
             provider: "rd",
-            scopeKey: String(funnel.id),
+            scopeKey: `funnel:${funnel.id}:${startDate}:${endDate}:${body.timezone || "America/Sao_Paulo"}`,
             force,
             run: () => invokeFunction(supabaseUrl, authHeader, "rd-sync-deals", {
               funnel_id: funnel.id,
+              start_date: startDate,
+              end_date: endDate,
               realtime,
               analytics_mode: realtime,
               // No explicit dates: the current RD pipeline is a snapshot of
@@ -223,7 +227,10 @@ async function runControlled(args: {
     .eq("scope_key", scopeKey)
     .maybeSingle();
 
-  if (!force && current?.locked_until && new Date(current.locked_until).getTime() > now.getTime()) {
+  // A forced refresh may bypass the five-minute freshness interval, but it
+  // must never bypass an active lock. Doing so creates concurrent writers and
+  // can mix partial snapshots from different runs.
+  if (current?.locked_until && new Date(current.locked_until).getTime() > now.getTime()) {
     return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já em andamento." };
   }
 
@@ -242,15 +249,15 @@ async function runControlled(args: {
   }
 
   const lockedUntil = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
-  await admin.from("realtime_sync_state").upsert({
-    user_id: userId,
-    provider,
-    scope_key: scopeKey,
-    status: "running",
-    last_started_at: now.toISOString(),
-    locked_until: lockedUntil,
-    updated_at: now.toISOString(),
-  }, { onConflict: "user_id,provider,scope_key" });
+  const { data: acquired, error: lockError } = await admin.rpc("acquire_realtime_sync_lock", {
+    p_user_id: userId,
+    p_provider: provider,
+    p_scope_key: scopeKey,
+    p_now: now.toISOString(),
+    p_locked_until: lockedUntil,
+  });
+  if (lockError) throw lockError;
+  if (!acquired) return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já está em andamento." };
 
   try {
     const response = await run();

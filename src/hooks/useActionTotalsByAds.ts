@@ -94,31 +94,13 @@ export function useActionTotalsByAds(
       // was the source of cross-campaign totals and stale rows leaking into a
       // selected calendar scope. An empty universe still resolves the account
       // catalog so a brand-new ad can be reconciled.
+      // Actions are facts for the exact ad universe returned by the canonical
+      // Insights scope. Expanding an empty result to every ad in the account
+      // leaks stale/archived ads into the selected period and is a common
+      // source of inflated leads. An empty universe is therefore a valid
+      // empty snapshot; the sync layer will fill it on the next run.
       if (resolvedIds.length === 0 && (scopedAccounts.length > 0 || scopedCampaigns.length > 0)) {
-        let campaignQuery = supabase.from("campaigns").select("id, ad_account_id");
-        if (scopedAccounts.length > 0) campaignQuery = campaignQuery.in("ad_account_id", scopedAccounts);
-        if (scopedCampaigns.length > 0) campaignQuery = campaignQuery.in("id", scopedCampaigns);
-        const { data: campaigns, error: campaignsError } = await campaignQuery;
-        if (campaignsError) throw campaignsError;
-        const campaignRows = (campaigns || []) as Array<{ id: string; ad_account_id: string | null }>;
-        const campaignIds = campaignRows.map((row) => row.id);
-        const campaignAccount = Object.fromEntries(campaignRows.map((row) => [row.id, row.ad_account_id]));
-        const adsetRows: Array<{ id: string; campaign_id: string }> = [];
-        for (let i = 0; i < campaignIds.length; i += CHUNK_IDS) {
-          const { data, error } = await supabase.from("adsets").select("id, campaign_id").in("campaign_id", campaignIds.slice(i, i + CHUNK_IDS));
-          if (error) throw error;
-          adsetRows.push(...((data || []) as Array<{ id: string; campaign_id: string }>));
-        }
-        const adsetIds = adsetRows.map((row) => row.id);
-        const adRows: Array<{ id: string; adset_id: string }> = [];
-        for (let i = 0; i < adsetIds.length; i += CHUNK_IDS) {
-          const { data, error } = await supabase.from("ads").select("id, adset_id").in("adset_id", adsetIds.slice(i, i + CHUNK_IDS));
-          if (error) throw error;
-          adRows.push(...((data || []) as Array<{ id: string; adset_id: string }>));
-        }
-        const campaignByAdset = Object.fromEntries(adsetRows.map((row) => [row.id, row.campaign_id]));
-        resolvedIds = adRows.map((row) => row.id);
-        for (const row of adRows) resolvedAccountByAd[row.id] = campaignAccount[campaignByAdset[row.adset_id]] || null;
+        return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, dailyMetaLeadByAccount };
       }
       const resolvedSortedIds = [...new Set(resolvedIds)].sort();
       const adsetByAd: Record<string, string> = {};

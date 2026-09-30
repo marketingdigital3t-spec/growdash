@@ -494,10 +494,9 @@ Deno.serve(async (req) => {
         const allInsights = insightsRes.data;
         console.log(`Total ${allInsights.length} insight rows for account ${account.name}`);
 
-        // A successful Meta response is a snapshot for this account/date
-        // scope. Remove facts that disappeared from the response before
-        // writing the new snapshot; otherwise a lead/spend row deleted or
-        // re-attributed by Meta remains forever in Growdash.
+        // Keep the previous snapshot intact until all incoming facts have
+        // been persisted successfully. Deleting first made a transient
+        // upsert/timeout turn a valid snapshot into zero rows.
         const { data: storedCampaigns } = await supabaseAdmin
           .from("campaigns")
           .select("id")
@@ -515,25 +514,6 @@ Deno.serve(async (req) => {
           ...allInsights.map((insight: any) => String(insight.ad_id || "")).filter(Boolean),
           ...(storedAds || []).map((ad: any) => String(ad.id || "")).filter(Boolean),
         ])];
-        for (let i = 0; i < factAdIds.length; i += 500) {
-          const adChunk = factAdIds.slice(i, i + 500);
-          const { error: actionDeleteError } = await supabaseAdmin
-            .from("insight_actions")
-            .delete()
-            .in("ad_id", adChunk)
-            .eq("attribution_window", effectiveAttributionWindow)
-            .gte("date", startDate)
-            .lte("date", endDate);
-          if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
-          const { error: insightDeleteError } = await supabaseAdmin
-            .from("insights")
-            .delete()
-            .in("ad_id", adChunk)
-            .gte("date", startDate)
-            .lte("date", endDate);
-          if (insightDeleteError) throw new Error(`limpeza dos insights da conta ${account.name}: ${insightDeleteError.message}`);
-        }
-
         // 4.1 Hidratar ads/adsets/campaigns ausentes (necessário para o join do dashboard)
         const insightAdIds = [...new Set(allInsights.map((i: any) => i.ad_id).filter(Boolean))];
         if (insightAdIds.length > 0) {
@@ -702,6 +682,32 @@ Deno.serve(async (req) => {
             .upsert(chunk, { onConflict: "ad_id,date,attribution_window", ignoreDuplicates: false });
           if (upsertError) throw new Error(`insights da conta ${account.name}: ${upsertError.message}`);
           totalSynced += chunk.length;
+        }
+
+        // Reconcile rows that disappeared from the completed Meta response
+        // only after all current rows are safely stored. The attribution
+        // predicate is mandatory: another attribution window is a separate
+        // fact and must never be deleted by this run.
+        for (let i = 0; i < factAdIds.length; i += 500) {
+          const adChunk = factAdIds.slice(i, i + 500);
+          const { error: actionDeleteError } = await supabaseAdmin
+            .from("insight_actions")
+            .delete()
+            .in("ad_id", adChunk)
+            .eq("attribution_window", effectiveAttributionWindow)
+            .gte("date", startDate)
+            .lte("date", endDate)
+            .not("ad_id", "in", `(${allInsights.map((i: any) => `'${String(i.ad_id).replace(/'/g, "''")}'`).join(",") || "''"})`);
+          if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
+          const { error: insightDeleteError } = await supabaseAdmin
+            .from("insights")
+            .delete()
+            .in("ad_id", adChunk)
+            .eq("attribution_window", effectiveAttributionWindow)
+            .gte("date", startDate)
+            .lte("date", endDate)
+            .not("ad_id", "in", `(${allInsights.map((i: any) => `'${String(i.ad_id).replace(/'/g, "''")}'`).join(",") || "''"})`);
+          if (insightDeleteError) throw new Error(`limpeza dos insights da conta ${account.name}: ${insightDeleteError.message}`);
         }
 
         // 5. Buscar breakdowns somente quando explicitamente solicitado. Eles

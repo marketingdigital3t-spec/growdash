@@ -50,6 +50,9 @@ Deno.serve(async (req) => {
       ? body.adAccountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
     const requestedAttributionWindow = typeof body.attributionWindow === "string" ? body.attributionWindow.trim() : "";
+    const requestedCampaignIds = Array.isArray(body.campaignIds)
+      ? body.campaignIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
+      : [];
     const requestedStartDate: string | undefined = body.startDate;
     const requestedEndDate: string | undefined = body.endDate;
     const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
@@ -100,6 +103,9 @@ Deno.serve(async (req) => {
         const attributionParam = attributionWindows.length
           ? `&action_attribution_windows=${encodeURIComponent(JSON.stringify(attributionWindows))}`
           : "";
+        const campaignFilter = requestedCampaignIds.length
+          ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: requestedCampaignIds }]))}`
+          : "";
 
         // Match daily sync: leads = onsite_conversion.lead_grouped + per-account configured LP event.
         const { data: lpCfg } = await supabaseAdmin
@@ -116,6 +122,7 @@ Deno.serve(async (req) => {
           `&breakdowns=hourly_stats_aggregated_by_audience_time_zone` +
           `&fields=ad_id,campaign_id,spend,clicks,actions` +
           `&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}` +
+          campaignFilter +
           attributionParam +
           `&use_unified_attribution_setting=true` +
           `&access_token=${accessToken}` +
@@ -234,16 +241,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Replace the successful account/date hourly snapshot so hours that
-        // disappeared from Meta do not remain as stale spend or lead facts.
-        const { error: hourlyDeleteError } = await supabaseAdmin
-          .from("insights_hourly")
-          .delete()
-          .eq("ad_account_id", account.id)
-          .gte("date", startDate)
-          .lte("date", endDate);
-        if (hourlyDeleteError) throw new Error(`limpeza horária da conta ${account.name}: ${hourlyDeleteError.message}`);
-
         for (let i = 0; i < rows.length; i += 500) {
           const chunk = rows.slice(i, i + 500);
           const { error: upErr } = await supabaseAdmin
@@ -255,6 +252,18 @@ Deno.serve(async (req) => {
           }
           totalSynced += chunk.length;
         }
+        // Do not erase a valid hourly snapshot before the new one has been
+        // written successfully. Keep the campaign scope bounded as well.
+        let cleanup = supabaseAdmin
+          .from("insights_hourly")
+          .delete()
+          .eq("ad_account_id", account.id)
+          .gte("date", startDate)
+          .lte("date", endDate);
+        if (requestedCampaignIds.length) cleanup = cleanup.in("campaign_id", requestedCampaignIds);
+        if (rows.length) cleanup = cleanup.not("ad_id", "in", `(${[...new Set(rows.map((row) => `'${String(row.ad_id).replace(/'/g, "''")}'`))].join(",")})`);
+        const { error: hourlyDeleteError } = await cleanup;
+        if (hourlyDeleteError) throw new Error(`limpeza horária da conta ${account.name}: ${hourlyDeleteError.message}`);
         console.log(`hourly ${account.name}: ${rows.length} rows`);
       } catch (e) {
         failedAccounts++;

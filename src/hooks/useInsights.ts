@@ -44,6 +44,7 @@ export interface InsightRow {
   campaign_status?: string | null;
   campaign_id?: string | null;
   ad_account_id?: string | null;
+  attribution_window?: string | null;
 }
 
 /**
@@ -56,7 +57,7 @@ export interface InsightRow {
 export function dedupeDailyInsights(rows: InsightRow[]) {
   const unique = new Map<string, InsightRow>();
   for (const row of rows) {
-    const key = `${row.ad_id}::${row.date}`;
+    const key = `${row.ad_id}::${row.date}::${row.attribution_window || "account_default"}`;
     if (!unique.has(key)) unique.set(key, row);
   }
   return Array.from(unique.values());
@@ -124,7 +125,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       for (const group of insightGroups.values()) {
         let query = supabase
           .from("insights")
-          .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value")
+          .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value, attribution_window")
           .in("ad_id", group.ids)
           .eq("attribution_window", group.window)
           .gte("date", start)
@@ -152,6 +153,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         return {
         ad_id: row.ad_id,
         date: row.date,
+        attribution_window: row.attribution_window ?? null,
         spend: row.spend ?? 0,
         impressions: row.impressions ?? 0,
         reach: row.reach ?? 0,
