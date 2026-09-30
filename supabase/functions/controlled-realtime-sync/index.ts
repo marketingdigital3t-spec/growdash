@@ -255,6 +255,18 @@ async function runControlled(args: {
   try {
     const response = await run();
     const payload = response?.data ?? response ?? {};
+    // RD serializa a sincronização por funil. Um 409/ already_running é um
+    // lock legítimo de outra execução, não uma falha de credencial ou dados.
+    if (String(payload?.status || "") === "already_running" || String(payload?.status || "") === "running") {
+      await admin.from("realtime_sync_state").update({
+        status: "success",
+        last_finished_at: new Date().toISOString(),
+        last_error: null,
+        locked_until: null,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", userId).eq("provider", provider).eq("scope_key", scopeKey);
+      return { provider, scope: scopeKey, status: "success", skipped: true, reason: payload?.message || "Sincronização já está em andamento." };
+    }
     const partial = String(payload?.status || "") === "partial";
     const hasError = Boolean(response?.error || payload?.error || payload?.success === false || ["failed", "blocked", "stale_snapshot"].includes(String(payload?.status || "")));
     const finishedAt = new Date().toISOString();
@@ -311,6 +323,9 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
       });
       const data = await response.json().catch(() => null);
       if (response.ok) return { data };
+      if (response.status === 409 && data?.status === "already_running") {
+        return { data: { ...data, success: true, status: "running" } };
+      }
       last = { error: data?.error || `${name} failed with HTTP ${response.status}`, data };
       if (![429, 500, 502, 503, 504].includes(response.status) || attempt === delays.length - 1) break;
       const retryAfter = Number(response.headers.get("Retry-After") || 0);
