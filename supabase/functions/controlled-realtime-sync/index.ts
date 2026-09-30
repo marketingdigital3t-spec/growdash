@@ -175,8 +175,12 @@ Deno.serve(async (req) => {
               // records. This keeps all connected funnels represented in the
               // near-realtime snapshot; manual full_history remains the
               // authoritative unbounded reconciliation.
-              max_pages: realtime ? 50 : 50,
-              max_deals: realtime ? 10_000 : 3_000,
+              // The five-minute cycle must stay bounded. Full pagination is
+              // reserved for the historical/backfill job; otherwise one
+              // large funnel keeps the whole UI in "syncing" and no snapshot
+              // is refreshed for any other account.
+              max_pages: realtime ? 3 : 50,
+              max_deals: realtime ? 200 : 3_000,
               trigger_source: realtime ? "auto_realtime" : "manual",
             }),
           }));
@@ -323,11 +327,15 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
   let last: { error?: unknown; data?: any } | null = null;
   for (let attempt = 0; attempt < delays.length; attempt++) {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45_000);
       const response = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
         method: "POST",
         headers: { Authorization: authHeader, "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await response.json().catch(() => null);
       if (response.ok) return { data };
       if (response.status === 409 && data?.status === "already_running") {
@@ -338,7 +346,7 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
       const retryAfter = Number(response.headers.get("Retry-After") || 0);
       await sleep(retryAfter > 0 ? retryAfter * 1_000 : delays[attempt]);
     } catch (error) {
-      last = { error: (error as Error).message };
+      last = { error: error instanceof DOMException && error.name === "AbortError" ? `${name} excedeu 45s; snapshot anterior preservado.` : (error as Error).message };
       if (attempt === delays.length - 1) break;
       await sleep(delays[attempt]);
     }

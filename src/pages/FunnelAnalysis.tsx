@@ -506,7 +506,9 @@ export default function FunnelAnalysis() {
               full_history: false,
               start_date: format(startDate, "yyyy-MM-dd"),
               end_date: format(endDate, "yyyy-MM-dd"),
-              max_pages: 50,
+              // Manual refresh follows the same bounded recent-sync budget;
+              // complete history is handled by the dedicated backfill path.
+              max_pages: 10,
             },
           });
           if (error) {
