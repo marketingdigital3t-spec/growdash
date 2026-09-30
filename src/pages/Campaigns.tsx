@@ -306,6 +306,10 @@ export default function Campaigns() {
   const visibleAdAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : adAccounts, [adAccounts, businessUnitId, segment]);
+  const attributionWindowsByAccount = useMemo(
+    () => Object.fromEntries(visibleAdAccounts.map((account) => [account.id, account.attribution_window || "account_default"])),
+    [visibleAdAccounts],
+  );
 
   useEffect(() => {
     const requestedAccount = searchParams.get("conta");
@@ -368,7 +372,7 @@ export default function Campaigns() {
   };
 
   const { data: campaignBaseRows = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
-    queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
+    queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), JSON.stringify(attributionWindowsByAccount), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
     queryFn: async () => {
       let query = supabase
         .from("campaigns")
@@ -378,7 +382,7 @@ export default function Campaigns() {
             id, name, daily_budget, status,
             ads(
               id, name, thumbnail_url, status,
-              insights(spend, leads, clicks, inline_link_clicks, unique_inline_link_clicks, impressions, reach, ctr, cpm, cpl, frequency, conversion_rate, health_score, date)
+              insights(spend, leads, clicks, inline_link_clicks, unique_inline_link_clicks, impressions, reach, ctr, cpm, cpl, frequency, conversion_rate, health_score, date, attribution_window)
             )
           )
         `)
@@ -404,6 +408,8 @@ export default function Campaigns() {
             for (const i of ad.insights || []) {
               if (startDate && i.date < format(startDate, "yyyy-MM-dd")) continue;
               if (endDate && i.date > format(endDate, "yyyy-MM-dd")) continue;
+              const expectedWindow = attributionWindowsByAccount[c.ad_account_id] || "account_default";
+              if (i.attribution_window && i.attribution_window !== expectedWindow) continue;
               spend += i.spend ?? 0;
               leads += i.leads ?? 0;
               clicks += i.clicks ?? 0;
@@ -448,6 +454,7 @@ export default function Campaigns() {
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => [currentAd.id, campaign.ad_account_id])))), [campaignBaseRows]);
   const { data: actionData } = useActionTotalsByAds(campaignAdIds, startDate, endDate, campaignAdAccountMap, {
     adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : [selectedAccount],
+    attributionWindowsByAccount,
   });
   const campaigns = useMemo(() => campaignBaseRows.map((campaign: any) => {
     const actionMetrics = { linkClicks: 0, landingPageViews: 0, checkouts: 0, purchases: 0, purchaseValue: 0 };
