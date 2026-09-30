@@ -68,6 +68,16 @@ describe("Meta action metrics", () => {
       .toEqual({ forms: 0, site: 50, conversations: 0, total: 50 });
   });
 
+  it("soma formulário, site e conversa somente uma vez cada", () => {
+    expect(resolveMetaLeadActions({
+      "onsite_conversion.lead_grouped": 12,
+      omni_lead: 12,
+      "offsite_conversion.fb_pixel_lead": 4,
+      "onsite_conversion.messaging_conversation_started_7d": 7,
+      "onsite_conversion.messaging_conversation_started": 9,
+    })).toEqual({ forms: 12, site: 4, conversations: 9, total: 25 });
+  });
+
   it("resolve site sem misturar com formulário ou lead auxiliar", () => {
     expect(resolveMetaLeadActions({ lead: 9, offsite_registration: 4 }, "offsite_registration"))
       .toEqual({ forms: 0, site: 4, conversations: 0, total: 4 });
