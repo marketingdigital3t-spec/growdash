@@ -298,6 +298,7 @@ export default function Campaigns() {
     setAdAccountId: setSelectedAccount,
     adAccountIds: selectedAccountIds,
     setAdAccountIds: setSelectedAccountIds,
+    funnelIds,
     businessUnitId,
     segment,
   } = useGlobalFilters();
@@ -318,7 +319,7 @@ export default function Campaigns() {
     }
   }, [searchParams, selectedAccount, setSelectedAccount, visibleAdAccounts]);
 
-  const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount, adAccountIds: selectedAccountIds });
+  const { data: sales = [], dataUpdatedAt: salesUpdatedAt } = useSales({ startDate, endDate, adAccountId: selectedAccount === "all" ? undefined : selectedAccount, adAccountIds: selectedAccountIds, funnelIds });
 
   const salesForAd = useMemo(() => {
     const map = new Map<string, { count: number; revenue: number }>();

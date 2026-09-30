@@ -251,7 +251,7 @@ function BudgetAccountCard({ item }: { item: BudgetAnalysisItem }) {
 }
 
 function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAccountChange }: { accountId: string; accountIds: string[]; accountName?: string; accounts: Array<{ id: string; name: string; attribution_window?: string | null }>; onAccountChange: (id: string) => void }) {
-  const { startDate, endDate } = useGlobalFilters();
+  const { startDate, endDate, funnelIds } = useGlobalFilters();
   const attributionWindowsByAccount = useMemo(
     () => Object.fromEntries(accounts.filter((account: any) => accountIds.includes(account.id)).map((account: any) => [account.id, account.attribution_window || "account_default"])),
     [accountIds, accounts],
@@ -259,8 +259,8 @@ function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAcco
   const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountIds, startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, accountIds.length > 0);
   const single = accountId !== "all" ? accountId : undefined;
   const { data: insights = [], isLoading: loadingMeta } = useInsights({ adAccountId: single, adAccountIds: accountIds, attributionWindowsByAccount, startDate, endDate, enabled: accountIds.length > 0 });
-  const { data: deals = [], isLoading: loadingRD } = useRDDealsForPeriod({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, enabled: accountIds.length > 0 });
-  const { data: sales = [], isLoading: loadingSales } = useSales({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, enabled: accountIds.length > 0 });
+  const { data: deals = [], isLoading: loadingRD } = useRDDealsForPeriod({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, funnelIds, enabled: accountIds.length > 0 });
+  const { data: sales = [], isLoading: loadingSales } = useSales({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, funnelIds, enabled: accountIds.length > 0 });
   const audienceCampaignIds = useMemo(() => Array.from(new Set(insights.map((item) => item.campaign_id).filter((id): id is string => !!id))), [insights]);
   const audience = useAudienceProfileData({ deals, campaignIds: audienceCampaignIds, accountIds, startDate, endDate });
   const { toast } = useToast();

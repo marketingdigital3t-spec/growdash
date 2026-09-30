@@ -33,7 +33,7 @@ function expertGreeting(name: string) {
  * integrations, CRM details, campaign editor, or dashboard configuration.
  */
 export default function ExpertDashboard() {
-  const { preset, setPreset, customRange, setCustomRange, startDate, endDate, adAccountIds, setAdAccountIds } = useGlobalFilters();
+  const { preset, setPreset, customRange, setCustomRange, startDate, endDate, adAccountIds, setAdAccountIds, funnelIds } = useGlobalFilters();
   const { data: accounts = [], isLoading: loadingAccounts } = useAdAccounts();
   const accountId = adAccountIds.length === 1 ? adAccountIds[0] : "all";
   const selectedAccountName = useMemo(() => {
@@ -58,9 +58,9 @@ export default function ExpertDashboard() {
     [accounts, selectedAccountIds],
   );
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, attributionWindowsByAccount, startDate, endDate });
-  const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
-  const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
-  const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, startDate, endDate });
+  const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const permittedAccounts = useMemo(() => accounts.map((account) => ({ id: account.id, name: account.name })), [accounts]);
   // useInsights keeps the previous query result while a filter changes. Always
   // reapply the permitted account scope so the all-accounts total can never

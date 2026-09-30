@@ -55,6 +55,7 @@ export default function FinancePage() {
     setAdAccountId,
     adAccountIds,
     setAdAccountIds,
+    funnelIds,
     preset,
     setPreset,
     customRange,
@@ -83,9 +84,9 @@ export default function FinancePage() {
   const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: metaInsightsStartDate, endDate });
   const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accounts.map((account) => account.id), startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, accounts.length > 0);
-  const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, adAccountIds, startDate, endDate });
+  const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate, endDate });
   const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
-  const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
+  const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate: twelveMonthsAgo, endDate: futureMonth });
 
   const { data: balanceEvents = [], isLoading: loadingBalanceEvents } = useQuery({
     queryKey: ["finance-balance-events", accountIds, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],

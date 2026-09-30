@@ -42,6 +42,7 @@ export default function CommercialPage() {
     setAdAccountId,
     adAccountIds,
     setAdAccountIds,
+    funnelIds,
     startDate,
     endDate,
     preset,
@@ -52,8 +53,8 @@ export default function CommercialPage() {
     segment,
   } = useGlobalFilters();
   const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
-  const { data: sales = [], isLoading } = useSales({ startDate, endDate, adAccountId: accountFilter, adAccountIds });
-  const { data: rdDeals = [] } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds });
+  const { data: sales = [], isLoading } = useSales({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
+  const { data: rdDeals = [] } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
   const { data: products = [] } = useProducts();
   const { data: adAccounts = [] } = useAdAccounts();
   const { data: goalData } = useSalesGoals(new Date());

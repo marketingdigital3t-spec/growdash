@@ -107,6 +107,7 @@ const Index = () => {
   const { data: sales = [] } = useSales({
     startDate,
     endDate,
+    funnelIds: scopedRDfunnelIds,
     adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
     adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
   });

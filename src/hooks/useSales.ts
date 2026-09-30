@@ -68,6 +68,7 @@ interface UseSalesParams {
   productId?: string;
   adAccountId?: string;
   adAccountIds?: string[];
+  funnelIds?: string[];
   enabled?: boolean;
 }
 
@@ -103,7 +104,7 @@ export function dedupeCanonicalSales<T extends Sale>(rows: T[]) {
 
 export function useSales(params?: UseSalesParams) {
   return useQuery({
-    queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId, params?.adAccountIds?.slice().sort().join(",")],
+    queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId, params?.adAccountIds?.slice().sort().join(","), params?.funnelIds?.slice().sort().join(",")],
     enabled: params?.enabled !== false,
     queryFn: async () => {
       let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
@@ -123,6 +124,7 @@ export function useSales(params?: UseSalesParams) {
       } else if (params?.adAccountId && params.adAccountId !== "all") {
         query = query.eq("ad_account_id", params.adAccountId);
       }
+      if (params?.funnelIds?.length) query = query.in("rd_funnel_id", params.funnelIds);
 
       // Paginar para evitar o corte de 1000 linhas do Supabase.
       const PAGE = 1000;
