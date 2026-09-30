@@ -861,7 +861,13 @@ Deno.serve(async (req) => {
         },
         pagination: { pages: totalPages, last_cursor: lastCursor },
       }),
-      { status: failedAccounts === 0 ? 200 : 207, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      // Partial synchronization is a valid application response. Returning
+      // HTTP 207 makes supabase.functions.invoke expose only a generic
+      // "non-2xx" error and discards the structured coverage/errors payload
+      // that the UI needs to preserve the last valid snapshot. Keep transport
+      // success at 200 and let the typed `status: "partial"` describe the
+      // result.
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     return new Response(
