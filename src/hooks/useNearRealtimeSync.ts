@@ -89,26 +89,30 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
 
     const task = (async () => {
       setState("refreshing");
-      // The first request after entering always reconciles every authorized
-      // account/funnel. Subsequent requests follow the selected scope.
+      // The selected slice must be refreshed first. A global reconciliation
+      // can include many accounts/funnels and may legitimately outlive the
+      // browser request timeout; it must never prevent the selected cards
+      // from being populated. Once the selected slice returns, start the
+      // global pass in the background on the first entry.
       const global = initialGlobalSync.current;
       initialGlobalSync.current = false;
+      const selectedBody = {
+        adAccountId,
+        adAccountIds,
+        campaignIds,
+        funnelIds,
+        startDate: startDate?.toISOString().slice(0, 10),
+        endDate: endDate?.toISOString().slice(0, 10),
+        timezone,
+        attributionWindow,
+        includeMeta: true,
+        includeRD: true,
+        includeBalance: true,
+        realtime: true,
+        force,
+      };
       const { data, error } = await supabase.functions.invoke("controlled-realtime-sync", {
-        body: {
-          adAccountId: global ? undefined : adAccountId,
-          adAccountIds: global ? undefined : adAccountIds,
-          campaignIds,
-          funnelIds: global ? undefined : funnelIds,
-          startDate: startDate?.toISOString().slice(0, 10),
-          endDate: endDate?.toISOString().slice(0, 10),
-          timezone,
-          attributionWindow,
-          includeMeta: true,
-          includeRD: true,
-          includeBalance: true,
-          realtime: true,
-          force,
-        },
+        body: selectedBody,
       });
       const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
       if (error || data?.error || ["failed", "error"].includes(metaStatus)) {
@@ -128,6 +132,28 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
       }
       invalidateLiveQueries();
+
+      if (global) {
+        // Do not await this request. It is deliberately global and is only
+        // responsible for warming every account/funnel for the next visit.
+        // The selected response above remains the source of the current UI.
+        void supabase.functions.invoke("controlled-realtime-sync", {
+          body: {
+            ...selectedBody,
+            adAccountId: undefined,
+            adAccountIds: undefined,
+            funnelIds: undefined,
+          },
+        }).then(({ data: globalData, error: globalError }) => {
+          if (globalError || globalData?.error) {
+            console.warn("[near-realtime-sync] global reconciliation", globalError || globalData?.error);
+            return;
+          }
+          invalidateLiveQueries();
+        }).catch((globalError) => {
+          console.warn("[near-realtime-sync] global reconciliation", globalError);
+        });
+      }
     })().catch((error) => {
       // Falha silenciosa: o histórico armazenado permanece visível e uma nova
       // tentativa ocorrerá ao recuperar foco ou no próximo ciclo.
