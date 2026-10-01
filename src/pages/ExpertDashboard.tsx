@@ -61,7 +61,7 @@ export default function ExpertDashboard() {
   const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
-  const [view, setView] = useState<"executive" | "operations">("executive");
+  const [view, setView] = useState<"executive" | "operations">("operations");
   // useInsights keeps the previous query result while a filter changes. Always
   // reapply the permitted account scope so the all-accounts total can never
   // briefly include a prior account or an account outside this expert access.
