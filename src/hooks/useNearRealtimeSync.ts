@@ -141,7 +141,9 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     if (!enabled) return;
     // Revalida assim que a tela entra. O React Query mantém o último snapshot
     // visível enquanto esta chamada acontece em segundo plano.
-    const initial = window.setTimeout(() => void refresh(false), 0);
+    // Cada entrada/recarregamento solicita uma nova tentativa do escopo atual.
+    // O lock persistido no backend continua impedindo duplicidade entre abas.
+    const initial = window.setTimeout(() => void refresh(true), 0);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => void refresh(false);
     const onVisibility = () => {
