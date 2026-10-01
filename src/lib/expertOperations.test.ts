@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixedParticipantRows, rankExpertSales } from "./expertOperations";
+import { fixedParticipantRows, isPaidOperationStatus, normalizeClassName, rankExpertSales } from "./expertOperations";
 
 describe("expert operations", () => {
   it("mantém dez posições fixas e não cria participantes vazios", () => {
@@ -7,6 +7,16 @@ describe("expert operations", () => {
     expect(rows).toHaveLength(10);
     expect(rows[0]).toEqual({ name: "A" });
     expect(rows[2]).toBeNull();
+  });
+
+  it("classifica somente pagamentos confirmados como ocupação paga", () => {
+    expect(isPaidOperationStatus("paid")).toBe(true);
+    expect(isPaidOperationStatus("cancelled")).toBe(false);
+    expect(isPaidOperationStatus("pending")).toBe(false);
+  });
+
+  it("normaliza nomes de turma para correspondência sem acentos", () => {
+    expect(normalizeClassName("Turma Presencial · 20 e 21 de Junho")).toBe("turma_presencial_20_e_21_de_junho");
   });
 
   it("agrupa vendedores, preserva caixa e aplica meta", () => {

@@ -1,4 +1,7 @@
 export type OperationSaleLike = { seller_name?: string | null; gross_amount_cents?: number | null; cash_received_cents?: number | null };
+export const PAID_OPERATION_STATUSES = ["paid", "confirmed", "received", "completed", "payment_confirmed"] as const;
+export function isPaidOperationStatus(status: unknown) { return PAID_OPERATION_STATUSES.includes(String(status ?? "").trim().toLocaleLowerCase() as typeof PAID_OPERATION_STATUSES[number]); }
+export function normalizeClassName(value: unknown) { return String(value ?? "").trim().toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); }
 
 export function fixedParticipantRows<T>(rows: T[], size = 10) {
   return Array.from({ length: size }, (_, index) => rows[index] ?? null);

@@ -6,7 +6,7 @@ export type EventClassStatus = "open" | "sold_out" | "upcoming" | "cancelled" | 
 export type MemberType = "student" | "model_patient";
 
 export interface EventClass {
-  id: string; user_id: string; expert_name: string | null; title: string; date_start: string; date_end: string | null; location: string | null;
+  id: string; user_id: string; expert_id?: string | null; expert_name: string | null; title: string; date_start: string; date_end: string | null; location: string | null;
   max_students: number; max_people: number; max_model_patients: number; status: EventClassStatus; notes: string | null; created_at: string; updated_at: string;
   ad_account_id?: string | null; rd_funnel_id?: string | null; rd_model_patient_funnel_id?: string | null; has_model_patients?: boolean;
   allowed_student_stage_ids?: string[]; allowed_model_patient_stage_ids?: string[];

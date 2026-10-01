@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const norm = (value: unknown) => String(value ?? "").trim().toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+const rawClassId = (raw: Record<string, unknown>) => String(raw.turma_id || raw.id_turma || raw.class_id || "").trim() || null;
 const cents = (value: unknown) => {
   const raw = String(value ?? "").replace(/[^0-9,.-]/g, "").trim();
   if (!raw) return 0;
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
     if (!connectionId) return json({ error: "Informe a conexão da planilha." }, 400);
     const { data: connection, error: connectionError } = await admin.from("expert_sheet_connections").select("*").eq("id", connectionId).maybeSingle();
     if (connectionError || !connection) return json({ error: "Conexão de planilha não encontrada." }, 404);
-    const { data: expert } = await admin.from("experts").select("id,workspace_id").eq("id", connection.expert_id).maybeSingle();
+    const { data: expert } = await admin.from("experts").select("id,workspace_id,nome").eq("id", connection.expert_id).maybeSingle();
     const { data: membership } = await admin.from("workspace_members").select("id").eq("workspace_id", expert?.workspace_id).eq("user_id", user.id).maybeSingle();
     if (!membership && expert?.workspace_id) return json({ error: "Sem permissão para este expert." }, 403);
     const { data: integration } = await admin.from("integrations").select("id,api_token,token_expires_at").eq("user_id", user.id).eq("provider", "google_workspace").eq("is_active", true).maybeSingle();
@@ -63,21 +64,40 @@ Deno.serve(async (req) => {
     if (!values.length) throw new Error("A aba da planilha está vazia.");
     const headers = values[0].map(norm);
     const rows = values.slice(1).filter((row: unknown[]) => row.some((cell) => String(cell ?? "").trim()));
+    const { data: classes } = await admin.from("event_classes").select("id,title,expert_name,expert_id");
+    const expertName = norm(expert?.nome);
+    const classRows = (classes || []).filter((item: any) => item.expert_id === connection.expert_id || (Boolean(expertName) && norm(item.expert_name) === expertName));
+    const classById = new Map(classRows.map((item: any) => [String(item.id), item]));
+    const classByName = new Map<string, any[]>();
+    for (const item of classRows) {
+      const key = norm(item.title);
+      if (!key) continue;
+      classByName.set(key, [...(classByName.get(key) || []), item]);
+    }
     let upserted = 0;
+    const syncErrors: string[] = [];
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index] as unknown[];
       const raw = Object.fromEntries(headers.map((header, column) => [header || `coluna_${column + 1}`, row[column] ?? ""]));
       const name = String(raw.nome || raw.aluna || raw.aluno || raw.paciente || "").trim();
       if (!name) continue;
       const rowHash = await hashRow(raw);
-      const { error } = await admin.from("expert_sales").upsert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, participant_type: connection.participant_type, source_row_hash: rowHash, source_row_number: index + 2, name, sale_date: dateValue(raw.data_venda || raw.data || raw.data_de_venda), class_name: String(raw.turma || raw.nome_da_turma || "").trim() || null, gross_amount_cents: cents(raw.valor_bruto || raw.valor || raw.valor_total), cash_received_cents: cents(raw.valor_recebido || raw.caixa_real || raw.valor_pago), status: String(raw.status || "confirmed").trim() || "confirmed", seller_name: String(raw.vendedor || raw.responsavel || "").trim() || null, payment_method: String(raw.forma_pagamento || raw.pagamento || "").trim() || null, utm_campaign: String(raw.utm_campaign || raw.campanha || "").trim() || null, utm_content: String(raw.utm_content || raw.criativo || "").trim() || null, notes: String(raw.observacoes || raw.obs || "").trim() || null, raw_row: raw, source_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "sheet_connection_id,source_row_hash" });
+      const sourceClassId = rawClassId(raw);
+      const className = String(raw.turma || raw.nome_da_turma || "").trim() || null;
+      const direct = sourceClassId ? classById.get(sourceClassId) : null;
+      const named = className ? classByName.get(norm(className)) || [] : [];
+      const matchedClass = direct || (named.length === 1 ? named[0] : null);
+      const classMatchStatus = matchedClass ? "matched" : (named.length > 1 ? "ambiguous" : "unmatched");
+      if (!matchedClass && (sourceClassId || className)) syncErrors.push(`Linha ${index + 2}: turma ${className || sourceClassId} não foi vinculada (${classMatchStatus}).`);
+      const { error } = await admin.from("expert_sales").upsert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, participant_type: connection.participant_type, source_row_hash: rowHash, source_row_number: index + 2, name, sale_date: dateValue(raw.data_venda || raw.data || raw.data_de_venda), source_class_id: sourceClassId, event_class_id: matchedClass?.id || null, class_name: className, class_match_status: classMatchStatus, gross_amount_cents: cents(raw.valor_bruto || raw.valor || raw.valor_total), cash_received_cents: cents(raw.valor_recebido || raw.caixa_real || raw.valor_pago), status: String(raw.status || "confirmed").trim() || "confirmed", seller_name: String(raw.vendedor || raw.responsavel || "").trim() || null, payment_method: String(raw.forma_pagamento || raw.pagamento || "").trim() || null, utm_campaign: String(raw.utm_campaign || raw.campanha || "").trim() || null, utm_content: String(raw.utm_content || raw.criativo || "").trim() || null, notes: String(raw.observacoes || raw.obs || "").trim() || null, raw_row: raw, source_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "sheet_connection_id,source_row_hash" });
       if (error) throw error;
       upserted += 1;
     }
     const finished = new Date().toISOString();
-    await admin.from("expert_sheet_connections").update({ status: "fresh", last_sync_at: finished, last_valid_snapshot_at: finished, last_error: null, updated_at: finished }).eq("id", connection.id);
-    await admin.from("expert_sales_sync_runs").update({ status: "success", rows_read: rows.length, rows_upserted: upserted, errors: [], finished_at: finished }).eq("id", runId);
-    return json({ success: true, status: "success", rows_read: rows.length, rows_upserted: upserted, synced_at: finished });
+    const finalStatus = syncErrors.length ? "partial" : "success";
+    await admin.from("expert_sheet_connections").update({ status: "fresh", last_sync_at: finished, last_valid_snapshot_at: finished, last_error: syncErrors.length ? syncErrors.slice(0, 20).join(" ") : null, updated_at: finished }).eq("id", connection.id);
+    await admin.from("expert_sales_sync_runs").update({ status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, finished_at: finished }).eq("id", runId);
+    return json({ success: true, status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, synced_at: finished });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao sincronizar planilha.";
     return json({ success: false, status: "error", error: message }, 500);
