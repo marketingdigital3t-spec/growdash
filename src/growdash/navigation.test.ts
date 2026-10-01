@@ -6,9 +6,11 @@ describe("Growdash sidebar navigation", () => {
     expect(ALL_MODULES.some((module) => module.label === "Intelligence")).toBe(false);
   });
 
-  it("removes Paid Traffic from the sidebar while keeping Commercial visible", () => {
-    expect(ALL_MODULES.some((module) => module.label === "Tráfego Pago")).toBe(false);
+  it("restores the functional historical modules while keeping Commercial visible", () => {
+    expect(ALL_MODULES.some((module) => module.label === "Tráfego Pago" && module.path === "/campanhas")).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "Comercial" && module.path === "/comercial")).toBe(true);
+    expect(["Growdash Flow", "Estratégia", "Análise de Mídia Social", "Alertas", "Leads incompletos", "Automações"]
+      .every((label) => ALL_MODULES.some((module) => module.label === label))).toBe(true);
   });
 
   it("uses a unique route for every sidebar item", () => {
@@ -16,10 +18,12 @@ describe("Growdash sidebar navigation", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
-  it("places Business directly after Funnel Analysis", () => {
+  it("keeps the core intelligence modules together", () => {
     const intelligence = NAV_SECTIONS.find((section) => section.label === "Inteligência");
     const labels = intelligence?.items.map((item) => item.label) ?? [];
-    expect(labels.indexOf("Business")).toBe(labels.indexOf("Análise de Funis") + 1);
+    expect(labels.indexOf("Análise de Funis")).toBeGreaterThanOrEqual(0);
+    expect(labels.indexOf("Tráfego Pago")).toBeGreaterThan(labels.indexOf("Análise de Funis"));
+    expect(labels.indexOf("Business")).toBeGreaterThan(labels.indexOf("Análise de Funis"));
   });
 
   it("resolves content for every sidebar destination", () => {

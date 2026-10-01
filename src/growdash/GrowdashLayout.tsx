@@ -55,6 +55,8 @@ const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
   "/crm": () => import("@/growdash/CrmPage"),
   "/comercial": () => import("@/growdash/CommercialPage"),
   "/campanhas": () => import("@/growdash/TrafficPage"),
+  "/alertas": () => import("@/pages/Alerts"),
+  "/leads-incompletos": () => import("@/pages/LeadsIncompletos"),
   "/analise-de-funis": () => import("@/pages/FunnelAnalysis"),
   "/business": () => import("@/growdash/BusinessPage"),
   "/growdash-flow": () => import("@/pages/Funnelytics"),
@@ -116,7 +118,9 @@ export default function GrowdashLayout() {
   // still connected. Start optimistic and only show the warning after the
   // browser emits a real offline transition.
   const [isOnline, setIsOnline] = useState(true);
-  const [loadBackgroundData, setLoadBackgroundData] = useState(false);
+  // O cache/último snapshot aparece imediatamente; a sincronização começa em
+  // segundo plano no mesmo mount, sem esperar o navegador ficar ocioso.
+  const [loadBackgroundData] = useState(true);
   const { editor } = useDashboardEditor();
   const { pathname, search } = useLocation();
   const { theme, setTheme } = useTheme();
@@ -136,6 +140,7 @@ export default function GrowdashLayout() {
   const {
     adAccountId,
     adAccountIds,
+    funnelIds,
     setAdAccountId,
     segment,
     setSegment,
@@ -177,6 +182,7 @@ export default function GrowdashLayout() {
   const liveSync = useNearRealtimeSync({
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
     adAccountIds: adAccountId === "all" ? adAccountIds : undefined,
+    funnelIds,
     startDate,
     endDate,
     enabled: loadBackgroundData,
@@ -244,20 +250,6 @@ export default function GrowdashLayout() {
   // unrelated pages compete with the active screen for network and memory.
 
   useEffect(() => setMobileOpen(false), [pathname]);
-  useEffect(() => {
-    const idleWindow = window as Window & typeof globalThis & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-    const enableBackgroundData = () => setLoadBackgroundData(true);
-    const idleHandle = idleWindow.requestIdleCallback?.(enableBackgroundData, { timeout: 2_500 });
-    const timeoutHandle = idleHandle === undefined ? window.setTimeout(enableBackgroundData, 1_500) : undefined;
-
-    return () => {
-      if (idleHandle !== undefined) idleWindow.cancelIdleCallback?.(idleHandle);
-      if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
-    };
-  }, []);
   useEffect(() => {
     try { window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed)); } catch { /* preferência apenas nesta sessão */ }
   }, [collapsed]);
