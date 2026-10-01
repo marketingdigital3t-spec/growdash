@@ -53,6 +53,8 @@ export interface MetaTrafficMetrics {
   coveredAccounts: string[];
   rowCount: number;
   errors: string[];
+  /** Availability is explicit so consumers never interpret a missing fact as zero. */
+  metricAvailability: Record<string, { available: boolean; reason?: string }>;
   leadBreakdownByAccount: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
   leadBreakdownByAd: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
 }
@@ -192,7 +194,7 @@ export function aggregateMetaTrafficMetrics(
     : errors[0] || "Nenhum snapshot Meta encontrado no período e escopo selecionados.";
   const status = errors.length
     ? rows.length ? "partial" : "error"
-    : !available || freshnessSeconds === null || freshnessSeconds > 600 ? "stale" : "fresh";
+    : !available || freshnessSeconds === null || freshnessSeconds > 300 ? "stale" : "fresh";
   const coveredAccounts = Array.from(new Set(rows.map((row) => row.ad_account_id).filter(Boolean) as string[]));
   const coveredDates = new Set(rows.map((row) => row.date).filter(Boolean) as string[]).size;
 
@@ -228,6 +230,14 @@ export function aggregateMetaTrafficMetrics(
     coveredAccounts,
     rowCount: rows.length,
     errors,
+    metricAvailability: Object.fromEntries([
+      ["spend", { available, reason: unavailableReason || undefined }],
+      ["impressions", { available, reason: unavailableReason || undefined }],
+      ["reach", { available, reason: unavailableReason || undefined }],
+      ["clicks", { available, reason: unavailableReason || undefined }],
+      ["leads", { available: Boolean(actions?.metaLeadActions), reason: actions?.metaLeadActions ? undefined : unavailableReason || "Ações Meta ainda não sincronizadas." }],
+      ["breakdowns", { available: Boolean(actions?.breakdowns && Object.values(actions.breakdowns).some((segment) => segment.length > 0)), reason: actions?.breakdowns ? undefined : "Breakdowns ainda não sincronizados." }],
+    ]),
     leadBreakdownByAccount,
     leadBreakdownByAd,
   };

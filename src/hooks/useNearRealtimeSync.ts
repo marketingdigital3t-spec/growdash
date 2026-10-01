@@ -7,8 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 // browser whenever someone changes tabs or returns to the application.
 // The sync function fetches deltas, so a short watermark window keeps the CRM
 // close to RD without re-running a full historical reconciliation.
-const REFRESH_INTERVAL_MS = 10 * 60_000;
-const LOCAL_DEDUP_WINDOW_MS = 9 * 60_000;
+const REFRESH_INTERVAL_MS = 5 * 60_000;
+const LOCAL_DEDUP_WINDOW_MS = 4 * 60_000;
 const STORAGE_PREFIX = "growdash:last-background-sync";
 // A Meta/RD sync can write several related rows in rapid succession. Waiting
 // for a quiet window prevents each write from reloading the same heavy traffic
