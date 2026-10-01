@@ -20,7 +20,6 @@ import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardGrid, buildWidgetFromDef } from "@/components/dashboard/grid/DashboardGrid";
 import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView, type DashboardView } from "@/hooks/useDashboardViews";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Pencil } from "lucide-react";
 import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip";
 import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
@@ -243,14 +242,6 @@ const Index = () => {
     widgets: JSON.parse(JSON.stringify(view.widgets || [])),
   }), []);
 
-  const beginDashboardEdit = useCallback(() => {
-    if (!activeView || !canEditDashboard) return;
-    const original = cloneView(activeView);
-    originalViewRef.current = original;
-    setDraftView(cloneView(original));
-    setIsEditing(true);
-  }, [activeView, canEditDashboard, cloneView]);
-
   const cancelDashboardEdit = useCallback(() => {
     setDraftView(null);
     originalViewRef.current = null;
@@ -357,22 +348,6 @@ const Index = () => {
           <Button onClick={() => { setEditingSale(null); setSalesDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />Registrar Venda
           </Button>
-        </div>
-      </MotionItem>
-
-      <MotionItem className="mx-3">
-        <div className="flex justify-end border-b border-border/60 pb-3">
-          {canEditDashboard && activeView && !isEditing && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={beginDashboardEdit}
-              className="w-full shrink-0 gap-1.5 lg:w-auto"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Editar dashboard
-            </Button>
-          )}
         </div>
       </MotionItem>
 
