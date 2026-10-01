@@ -16,7 +16,6 @@ import {
   UserRound,
   Palette,
   BadgeDollarSign,
-  RefreshCw,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { endOfMonth, startOfMonth } from "date-fns";
@@ -143,7 +142,6 @@ export default function GrowdashLayout() {
     funnelIds,
     setAdAccountId,
     segment,
-    setSegment,
     businessUnitId,
     startDate,
     endDate,
@@ -179,7 +177,7 @@ export default function GrowdashLayout() {
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
-  const liveSync = useNearRealtimeSync({
+  useNearRealtimeSync({
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
     adAccountIds: adAccountId === "all" ? adAccountIds : undefined,
     funnelIds,
@@ -470,26 +468,6 @@ export default function GrowdashLayout() {
           <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
             <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} />
           </div>
-          <div className="order-2 ml-auto flex shrink-0 items-center rounded-full border border-white/15 bg-white/[.05] p-0.5 text-[10px] lg:order-none">
-            <button
-              type="button"
-              onClick={() => setSegment("infoproduto")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "infoproduto" ? "premium-glow bg-primary text-primary-foreground" : "text-white/55")}
-            >
-              Infoproduto
-            </button>
-            <button
-              type="button"
-              onClick={() => setSegment("saas")}
-              className={cn("rounded-full px-3 py-1 font-bold transition", segment === "saas" ? "premium-glow bg-primary text-primary-foreground" : "text-white/55")}
-            >
-              SaaS
-            </button>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => void liveSync.refresh(true)} disabled={liveSync.state === "refreshing"} className="order-2 h-8 shrink-0 gap-1.5 border-white/15 bg-white/[.04] text-[10px] text-white/75 hover:bg-white/10 hover:text-white lg:order-none" title={liveSync.syncError || "Atualizar métricas Meta agora"}>
-            <RefreshCw className={cn("h-3.5 w-3.5", liveSync.state === "refreshing" && "animate-spin")} />
-            <span className="hidden sm:inline">{liveSync.state === "refreshing" ? "Sincronizando…" : "Atualizar Meta"}</span>
-          </Button>
         </header>
         <main
           className={cn(
