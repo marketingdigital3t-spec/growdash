@@ -69,6 +69,108 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
     queryFn: async () => {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
+      const scopedAccountIds = adAccountIds?.length ? adAccountIds : adAccountId ? [adAccountId] : [];
+
+      // Facts are now directly scoped by the internal account id. This path
+      // avoids returning an empty snapshot when the campaign/ad catalog is
+      // incomplete after an interrupted Meta sync.
+      if (scopedAccountIds.length) {
+        const PAGE = 1000;
+        const directRows: any[] = [];
+        let directAvailable = true;
+        const directQuery = (supabase as any)
+          .from("insights")
+          .select("ad_id,ad_account_id,date,spend,impressions,reach,clicks,ctr,cpm,frequency,leads,cpl,conversion_rate,efficiency_rate,health_score,optimization_goal,result_type,result_value,attribution_window")
+          .in("ad_account_id", scopedAccountIds)
+          .gte("date", start)
+          .lte("date", end)
+          .order("date", { ascending: true });
+        for (let page = 0; ; page++) {
+          const { data, error } = await withRequestTimeout(directQuery.range(page * PAGE, page * PAGE + PAGE - 1), 15_000);
+          if (error) {
+            // Older deployments without the additive column continue through
+            // the legacy catalog path below; the migration makes this branch
+            // authoritative after deployment.
+            if (!/ad_account_id|column/i.test(error.message || "")) throw error;
+            directAvailable = false;
+            break;
+          }
+          const batch = data || [];
+          directRows.push(...batch);
+          if (batch.length < PAGE) break;
+        }
+        if (directAvailable && directRows.length > 0) {
+          const adIds = Array.from(new Set(directRows.map((row) => String(row.ad_id || "")).filter(Boolean)));
+          const adCatalog: Record<string, any> = {};
+          const adsetIds: string[] = [];
+          if (adIds.length) {
+            const { data: ads } = await withRequestTimeout((supabase as any).from("ads").select("id,name,thumbnail_url,adset_id").in("id", adIds), 15_000);
+            for (const ad of ads || []) {
+              adCatalog[String(ad.id)] = ad;
+              if (ad.adset_id) adsetIds.push(String(ad.adset_id));
+            }
+          }
+          const adsetCatalog = new Map<string, any>();
+          const campaignIdsFromAds: string[] = [];
+          if (adsetIds.length) {
+            const { data: adsets } = await withRequestTimeout((supabase as any).from("adsets").select("id,name,campaign_id").in("id", Array.from(new Set(adsetIds))), 15_000);
+            for (const adset of adsets || []) {
+              adsetCatalog.set(String(adset.id), adset);
+              if (adset.campaign_id) campaignIdsFromAds.push(String(adset.campaign_id));
+            }
+          }
+          const campaignCatalog = new Map<string, any>();
+          if (campaignIdsFromAds.length) {
+            const { data: campaigns } = await withRequestTimeout((supabase as any).from("campaigns").select("id,name,objective,ad_account_id,status").in("id", Array.from(new Set(campaignIdsFromAds))), 15_000);
+            for (const campaign of campaigns || []) campaignCatalog.set(String(campaign.id), campaign);
+          }
+          const allowedCampaigns = campaignIds?.length ? new Set(campaignIds.map(String)) : null;
+          return dedupeDailyInsights(directRows
+            .filter((row) => {
+              const accountWindow = attributionWindowsByAccount[String(row.ad_account_id)] || attributionWindow;
+              if (row.attribution_window !== accountWindow) return false;
+              if (!allowedCampaigns) return true;
+              const ad = adCatalog[String(row.ad_id)];
+              const adset = ad ? adsetCatalog.get(String(ad.adset_id)) : null;
+              return !!adset?.campaign_id && allowedCampaigns.has(String(adset.campaign_id));
+            })
+            .map((row) => {
+              const ad = adCatalog[String(row.ad_id)] || {};
+              const adset = adsetCatalog.get(String(ad.adset_id)) || {};
+              const campaign = campaignCatalog.get(String(adset.campaign_id)) || {};
+              return {
+                ad_id: row.ad_id,
+                date: row.date,
+                attribution_window: row.attribution_window ?? null,
+                spend: row.spend ?? 0,
+                impressions: row.impressions ?? 0,
+                reach: row.reach ?? 0,
+                clicks: row.clicks ?? 0,
+                ctr: row.ctr ?? 0,
+                cpm: row.cpm ?? 0,
+                frequency: row.frequency ?? 0,
+                leads: row.leads ?? 0,
+                cpl: row.cpl ?? 0,
+                conversion_rate: row.conversion_rate ?? 0,
+                efficiency_rate: row.efficiency_rate ?? 0,
+                health_score: row.health_score ?? 0,
+                ad_name: ad.name ?? "",
+                thumbnail_url: ad.thumbnail_url ?? null,
+                adset_name: adset.name ?? "",
+                campaign_name: campaign.name ?? "",
+                campaign_objective: campaign.objective ?? null,
+                optimization_goal: row.optimization_goal ?? null,
+                result_type: row.result_type ?? null,
+                result_value: row.result_value ?? null,
+                ad_status: ad.status ?? null,
+                adset_status: adset.status ?? null,
+                campaign_status: campaign.status ?? null,
+                campaign_id: adset.campaign_id ?? null,
+                ad_account_id: row.ad_account_id ?? campaign.ad_account_id ?? null,
+              };
+            }) as InsightRow[]);
+        }
+      }
 
       // Build the media catalog with separate queries. The previous nested
       // inner join discarded valid daily facts when a historical adset or

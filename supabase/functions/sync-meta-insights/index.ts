@@ -615,6 +615,7 @@ Deno.serve(async (req) => {
           for (const a of actions) {
             actionRows.push({
               ad_id: insight.ad_id,
+              ad_account_id: account.id,
               date: insight.date_start,
               action_type: String(a.action_type),
               value: Number(a.value || 0),
@@ -665,6 +666,7 @@ Deno.serve(async (req) => {
 
           return {
             ad_id: insight.ad_id,
+            ad_account_id: account.id,
             date: insight.date_start,
             spend, impressions, reach, clicks,
             inline_link_clicks: inlineLinkClicks,

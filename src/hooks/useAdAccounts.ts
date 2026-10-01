@@ -30,8 +30,12 @@ function isProfileDisconnected(account: { connection_status?: string | null; met
     && Boolean(account.metadata && typeof account.metadata === "object" && (account.metadata as Record<string, unknown>).profile_disconnected === true);
 }
 
-export function isActiveMetaAccount(account: { connection_status?: string | null; metadata?: unknown }) {
-  return account.connection_status === "connected" && !isProfileDisconnected(account);
+export function isActiveMetaAccount(account: { connection_status?: string | null; last_sync_success_at?: string | null; metadata?: unknown }) {
+  if (isProfileDisconnected(account) || account.connection_status === "disconnected") return false;
+  // A transient sync/block error must not hide a valid last snapshot from the
+  // global scope selector. The metrics contract will expose the stale/error
+  // state while keeping the account's last valid values visible.
+  return account.connection_status === "connected" || Boolean(account.last_sync_success_at);
 }
 
 // Product screens use only accounts with an active Meta integration. The
