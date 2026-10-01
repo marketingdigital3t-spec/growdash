@@ -128,7 +128,11 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           return dedupeDailyInsights(directRows
             .filter((row) => {
               const accountWindow = attributionWindowsByAccount[String(row.ad_account_id)] || attributionWindow;
-              if (row.attribution_window !== accountWindow) return false;
+              const rowWindow = row.attribution_window || "account_default";
+              // Older snapshots may have a null window. Treat null and the
+              // explicit default as equivalent, but never mix configured
+              // windows between accounts.
+              if (rowWindow !== accountWindow && !(accountWindow === "account_default" && rowWindow === "account_default")) return false;
               if (!allowedCampaigns) return true;
               const ad = adCatalog[String(row.ad_id)];
               const adset = ad ? adsetCatalog.get(String(ad.adset_id)) : null;
@@ -229,10 +233,14 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           .from("insights")
           .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value, attribution_window")
           .in("ad_id", group.ids)
-          .eq("attribution_window", group.window)
           .gte("date", start)
           .lte("date", end)
           .order("date", { ascending: true });
+        if (group.window === "account_default") {
+          query = query.or("attribution_window.eq.account_default,attribution_window.is.null");
+        } else {
+          query = query.eq("attribution_window", group.window);
+        }
         // Do not truncate long-running accounts after an arbitrary number of
         // pages. The selected interval is already enforced by the database.
         for (let page = 0; ; page++) {
@@ -285,10 +293,11 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       }) as InsightRow[]);
     },
     enabled,
-    // The backend reconciles Meta every five minutes. Keep the UI cache on
-    // that same cadence so account totals do not remain stale for 15 minutes.
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
+    // The backend reconciles Meta every ten minutes. Keep the UI cache on
+    // that same cadence so account totals do not remain stale longer.
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: true,
   });

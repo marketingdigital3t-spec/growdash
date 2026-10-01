@@ -34,7 +34,10 @@ describe("Meta traffic metrics", () => {
   });
 
   it("marca dado ausente como stale e falha de sincronização como error", () => {
-    expect(aggregateMetaTrafficMetrics([], undefined, null).status).toBe("stale");
+    const unavailable = aggregateMetaTrafficMetrics([], undefined, null);
+    expect(unavailable.status).toBe("stale");
+    expect(unavailable.available).toBe(false);
+    expect(unavailable.unavailableReason).toContain("Nenhum snapshot");
     expect(aggregateMetaTrafficMetrics([], undefined, "2026-09-28T12:00:00.000Z", ["rate limit"], Date.parse("2026-09-28T12:01:00.000Z")).status).toBe("error");
   });
 

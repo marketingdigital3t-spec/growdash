@@ -7,8 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 // browser whenever someone changes tabs or returns to the application.
 // The sync function fetches deltas, so a short watermark window keeps the CRM
 // close to RD without re-running a full historical reconciliation.
-const REFRESH_INTERVAL_MS = 5 * 60_000;
-const LOCAL_DEDUP_WINDOW_MS = 4 * 60_000;
+const REFRESH_INTERVAL_MS = 10 * 60_000;
+const LOCAL_DEDUP_WINDOW_MS = 9 * 60_000;
 const STORAGE_PREFIX = "growdash:last-background-sync";
 // A Meta/RD sync can write several related rows in rapid succession. Waiting
 // for a quiet window prevents each write from reloading the same heavy traffic
@@ -58,6 +58,7 @@ interface Params {
 export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, funnelIds, timezone, attributionWindow, startDate, endDate, enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
   const inFlight = useRef<Promise<void> | null>(null);
+  const initialGlobalSync = useRef(true);
   const invalidateTimer = useRef<number | null>(null);
   const [state, setState] = useState<SyncState>("idle");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -88,12 +89,16 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
 
     const task = (async () => {
       setState("refreshing");
+      // The first request after entering always reconciles every authorized
+      // account/funnel. Subsequent requests follow the selected scope.
+      const global = initialGlobalSync.current;
+      initialGlobalSync.current = false;
       const { data, error } = await supabase.functions.invoke("controlled-realtime-sync", {
         body: {
-          adAccountId,
-          adAccountIds,
+          adAccountId: global ? undefined : adAccountId,
+          adAccountIds: global ? undefined : adAccountIds,
           campaignIds,
-          funnelIds,
+          funnelIds: global ? undefined : funnelIds,
           startDate: startDate?.toISOString().slice(0, 10),
           endDate: endDate?.toISOString().slice(0, 10),
           timezone,

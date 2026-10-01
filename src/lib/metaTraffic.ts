@@ -48,6 +48,8 @@ export interface MetaTrafficMetrics {
   syncedAt: string | null;
   freshnessSeconds: number | null;
   status: "fresh" | "syncing" | "stale" | "partial" | "error";
+  available: boolean;
+  unavailableReason: string | null;
   coveredAccounts: string[];
   rowCount: number;
   errors: string[];
@@ -184,9 +186,13 @@ export function aggregateMetaTrafficMetrics(
   const resultBreakdown = Array.from(resultBreakdownByCampaign.values());
   const results = resultBreakdown.reduce((sum, item) => sum + item.value, 0);
   const freshnessSeconds = syncedAt ? Math.max(0, Math.floor((now - new Date(syncedAt).getTime()) / 1000)) : null;
+  const available = rows.length > 0;
+  const unavailableReason = available
+    ? null
+    : errors[0] || "Nenhum snapshot Meta encontrado no período e escopo selecionados.";
   const status = errors.length
     ? rows.length ? "partial" : "error"
-    : freshnessSeconds === null || freshnessSeconds > 300 ? "stale" : "fresh";
+    : !available || freshnessSeconds === null || freshnessSeconds > 600 ? "stale" : "fresh";
   const coveredAccounts = Array.from(new Set(rows.map((row) => row.ad_account_id).filter(Boolean) as string[]));
   const coveredDates = new Set(rows.map((row) => row.date).filter(Boolean) as string[]).size;
 
@@ -217,6 +223,8 @@ export function aggregateMetaTrafficMetrics(
     syncedAt,
     freshnessSeconds,
     status,
+    available,
+    unavailableReason,
     coveredAccounts,
     rowCount: rows.length,
     errors,

@@ -154,7 +154,11 @@ export function useActionTotalsByAds(
             .from("insight_actions" as any)
             .select("ad_id, action_type, value, value_amount, date")
             .in("ad_id", chunk);
-          q = q.eq("attribution_window", group.window);
+          if (group.window === "account_default") {
+            q = q.or("attribution_window.eq.account_default,attribution_window.is.null");
+          } else {
+            q = q.eq("attribution_window", group.window);
+          }
           if (start) q = q.gte("date", start);
           if (end) q = q.lte("date", end);
           const { data, error } = await q.range(from, from + PAGE - 1);

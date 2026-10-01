@@ -41,7 +41,7 @@ type RunResult = {
 // A UI pode chamar esta função ao abrir, ao recuperar foco e a cada minuto.
 // A trava persistida garante que várias abas/dispositivos nunca multipliquem o
 // consumo das APIs para a mesma conta/funil.
-const CONTROLLED_SYNC_INTERVAL_MS = 5 * 60 * 1_000;
+const CONTROLLED_SYNC_INTERVAL_MS = 10 * 60 * 1_000;
 const RETRY_AFTER_FAILURE_MS = 60 * 1_000;
 const LOCK_TTL_MS = 12 * 60 * 1_000;
 

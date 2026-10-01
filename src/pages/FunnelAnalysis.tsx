@@ -70,8 +70,10 @@ export default function FunnelAnalysis() {
   const { adAccountIds, funnelIds: selectedFunnelIds, setFunnelIds: setSelectedFunnelIds, businessUnitId, segment, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: adAccounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
-    ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
-    : adAccounts, [adAccounts, businessUnitId, segment]);
+    ? adAccounts.filter((account) => adAccountIds.length
+      ? adAccountIds.includes(account.id)
+      : account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccountIds, adAccounts, businessUnitId, segment]);
   const integratedAccountIds = useMemo(
     () => new Set(visibleAccounts.map((account) => account.id)),
     [visibleAccounts],
@@ -142,8 +144,6 @@ export default function FunnelAnalysis() {
   const { data: stages = [], isLoading: loadingStages } = useFunnelStagesForIds(funnelScopeIds);
   const { data: deals = [], isLoading, refetch } = useRDDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -158,8 +158,6 @@ export default function FunnelAnalysis() {
   // selecionados e o período/filtros do CRM.
   const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError } = useRDDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -175,8 +173,6 @@ export default function FunnelAnalysis() {
   // mesma consulta e não há uma segunda requisição.
   const { data: filterDeals = [], isLoading: loadingFilterDeals } = useRDDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     // Filtros devem listar todos os valores que existem no pipeline, não só
     // os valores de leads recém-criados.
     includeHistory: true,
@@ -184,8 +180,6 @@ export default function FunnelAnalysis() {
   });
   const { data: closedDeals = [], isLoading: loadingClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -198,8 +192,6 @@ export default function FunnelAnalysis() {
   });
   const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -218,8 +210,7 @@ export default function FunnelAnalysis() {
   const { data: periodSales = [], isLoading: loadingPeriodSales } = useSales({
     startDate,
     endDate,
-    adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
+    funnelIds: funnelScopeIds,
   });
 
   // A mesma regra operacional do CRM vale para relatórios: o lote legado de

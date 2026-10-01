@@ -173,6 +173,7 @@ export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled =
   return useQuery({
     queryKey: ["rd_deal_stage_history", scopeIds.join(","), startDate.toISOString(), endDate.toISOString()],
     enabled: enabled && scopeIds.length > 0,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const bounds = saoPauloDayBounds(startDate, endDate);
       const { data, error } = await withRequestTimeout(supabase
@@ -254,6 +255,7 @@ export function useRDDeals(params: Params) {
       includeHistory ? "history" : "period",
     ],
     enabled: enabled && scopeIds.length > 0,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       let query = supabase
         .from("rd_deals")
