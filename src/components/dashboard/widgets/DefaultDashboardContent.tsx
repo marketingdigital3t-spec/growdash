@@ -68,7 +68,7 @@ interface Props {
 }
 
 export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false, showAcquisitionAnalytics = false, showCampaignFunnel = true }: Props) {
-  const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId, leadBreakdown } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId, leadBreakdown, metaAvailability } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
   const { data: accountAdsets = [] } = useAccountAdsets(adAccountId);
@@ -559,7 +559,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Visão geral</p><h2 id="dashboard-summary-title">Resumo executivo</h2></div><p className="dashboard-section-description">Resultado consolidado no período selecionado.</p></div>
         <div className="dashboard-primary-kpis gap-2 sm:gap-3">
         <MetricCard title="Faturamento Bruto" value={salesMetrics.totalGross} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
-        <MetricCard title="Gastos com Anúncios" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} />
+        <MetricCard title="Investimento em anúncio" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} tooltip="Investimento atribuído pela Meta Ads no período selecionado." unavailableReason={metaAvailability?.spend ? null : (metaAvailability?.reason || undefined)} />
         <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
         <MetricCard
           title="Lucro"

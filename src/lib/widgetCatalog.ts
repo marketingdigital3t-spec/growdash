@@ -338,7 +338,7 @@ export const DEFAULT_VIEW = {
   ],
   widgets: [
     { id: "primary_revenue", type: "kpi" as WidgetType, title: "Faturamento Bruto", config: { metric: "revenue_gross" } },
-    { id: "primary_spend", type: "kpi" as WidgetType, title: "Gastos com Anúncios", config: { metric: "spend" } },
+    { id: "primary_spend", type: "kpi" as WidgetType, title: "Investimento em anúncio", config: { metric: "spend" } },
     { id: "primary_roas", type: "kpi" as WidgetType, title: "ROAS", config: { metric: "roas" } },
     { id: "primary_profit", type: "kpi" as WidgetType, title: "Lucro", config: { metric: "profit" } },
     { id: "payment_chart", type: "payment_chart" as WidgetType, title: "Vendas por Pagamento", config: {} },

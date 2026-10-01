@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 import { aggregateMetaLeadActionDays } from "@/lib/metaActionMetrics";
+import { businessDateKey } from "@/lib/businessDate";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -66,8 +66,8 @@ export function useActionTotalsByAds(
       scopedCampaigns.join(","),
       attributionWindow,
       attributionWindowsSignature,
-      startDate?.toISOString(),
-      endDate?.toISOString(),
+      startDate ? businessDateKey(startDate) : null,
+      endDate ? businessDateKey(endDate) : null,
       accountMapSignature,
     ],
     enabled: sortedIds.length > 0 || scopedAccounts.length > 0 || scopedCampaigns.length > 0,
@@ -80,8 +80,8 @@ export function useActionTotalsByAds(
       const valueTotalsByAd: Record<string, Record<string, number>> = {};
       const metaLeadActions = { forms: 0, site: 0, conversations: 0, total: 0 };
       const dailyMetaLeadByAccount: ActionTotalsResult["dailyMetaLeadByAccount"] = {};
-      const start = startDate ? format(startDate, "yyyy-MM-dd") : null;
-      const end = endDate ? format(endDate, "yyyy-MM-dd") : null;
+      const start = startDate ? businessDateKey(startDate) : null;
+      const end = endDate ? businessDateKey(endDate) : null;
 
       // Resolve the complete account/campaign ad universe first. This is
       // intentionally independent of `insights`: an ad can have valid Meta

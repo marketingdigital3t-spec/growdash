@@ -23,6 +23,10 @@ export interface DashboardContextValue {
     conversations: number;
     total: number;
   };
+  metaAvailability?: {
+    spend: boolean;
+    reason?: string | null;
+  };
   /**
    * Read-only dashboards can provide a metric whose business definition is
    * different from the acquisition dashboard (for example, sold / RD leads).

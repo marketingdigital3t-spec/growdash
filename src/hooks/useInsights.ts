@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 import { withRequestTimeout } from "@/lib/resilience";
+import { businessDateKey } from "@/lib/businessDate";
 
 interface UseInsightsParams {
   adAccountId?: string;
@@ -65,10 +65,10 @@ export function dedupeDailyInsights(rows: InsightRow[]) {
 
 export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", attributionWindowsByAccount = {}, startDate, endDate, enabled = true }: UseInsightsParams) {
   return useQuery({
-    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))), startDate.toISOString(), endDate.toISOString()],
+    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))), businessDateKey(startDate), businessDateKey(endDate)],
     queryFn: async () => {
-      const start = format(startDate, "yyyy-MM-dd");
-      const end = format(endDate, "yyyy-MM-dd");
+      const start = businessDateKey(startDate);
+      const end = businessDateKey(endDate);
       const scopedAccountIds = adAccountIds?.length ? adAccountIds : adAccountId ? [adAccountId] : [];
 
       // Facts are now directly scoped by the internal account id. This path

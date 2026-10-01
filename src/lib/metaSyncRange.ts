@@ -1,4 +1,5 @@
-import { format, subMonths } from "date-fns";
+import { subMonths } from "date-fns";
+import { businessDateKey } from "@/lib/businessDate";
 
 /**
  * Meta rejects requests whose initial date is more than 37 months old. We use
@@ -10,7 +11,7 @@ export function getMetaSyncRange(now = new Date(), requestedStart?: Date, reques
   const start = requestedStart && requestedStart > oldestAllowed ? requestedStart : oldestAllowed;
   const end = requestedEnd && requestedEnd < now ? requestedEnd : now;
   return {
-    startDate: format(start, "yyyy-MM-dd"),
-    endDate: format(end, "yyyy-MM-dd"),
+    startDate: businessDateKey(start),
+    endDate: businessDateKey(end),
   };
 }

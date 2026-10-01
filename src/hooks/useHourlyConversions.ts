@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
+import { businessDateKey } from "@/lib/businessDate";
 import { useDashboard, type DashboardContextValue } from "@/contexts/DashboardContext";
 import { useCanonicalLeadsByAccountDate } from "@/hooks/useCanonicalLeadsByAccountDate";
 
@@ -34,8 +35,8 @@ type RawHourlyRow = {
 export function useHourlyConversions() {
   const { startDate, endDate, adAccountId, adAccounts, isLoading: dashboardLoading } = useDashboard();
   const { targetByAccountDate: canonicalTargets, isLoading: canonicalLoading } = useCanonicalLeadsByAccountDate();
-  const start = format(startDate, "yyyy-MM-dd");
-  const end = format(endDate, "yyyy-MM-dd");
+  const start = businessDateKey(startDate);
+  const end = businessDateKey(endDate);
 
   const scopedIds: string[] = (adAccounts || [])
     .filter((a: DashboardAdAccount) => (adAccountId ? a.id === adAccountId : true))
@@ -218,4 +219,3 @@ export function useHourlyConversions() {
     isLoading: Boolean(dashboardLoading || hourlyQ.isLoading || canonicalLoading),
   };
 }
-

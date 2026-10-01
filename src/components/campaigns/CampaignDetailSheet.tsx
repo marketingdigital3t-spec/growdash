@@ -246,7 +246,7 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, startDate, e
         {/* KPIs */}
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {[
-            { label: "Gastos", value: fmt(campaign.spend, "R$ ") },
+            { label: "Investimento em anúncio", value: fmt(campaign.spend, "R$ ") },
             { label: "Leads", value: fmtInt(campaign.leads) },
             { label: "CPL", value: fmt(campaign.cpl, "R$ ") },
             { label: "CTR", value: `${campaign.ctr.toFixed(2)}%` },

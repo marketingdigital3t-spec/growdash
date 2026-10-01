@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { businessDateKey } from "@/lib/businessDate";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -64,7 +65,9 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDate?.toISOString().slice(0, 10) || "today"}:${endDate?.toISOString().slice(0, 10) || "today"}:${timezone || "account"}:${attributionWindow || "account_default"}`;
+  const startDateKey = startDate ? businessDateKey(startDate, timezone || undefined) : "today";
+  const endDateKey = endDate ? businessDateKey(endDate, timezone || undefined) : "today";
+  const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDateKey}:${endDateKey}:${timezone || "account"}:${attributionWindow || "account_default"}`;
 
   const invalidateLiveQueries = useCallback(() => {
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
@@ -101,8 +104,8 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         adAccountIds,
         campaignIds,
         funnelIds,
-        startDate: startDate?.toISOString().slice(0, 10),
-        endDate: endDate?.toISOString().slice(0, 10),
+        startDate: startDate ? startDateKey : undefined,
+        endDate: endDate ? endDateKey : undefined,
         timezone,
         attributionWindow,
         includeMeta: true,

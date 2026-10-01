@@ -14,6 +14,7 @@ import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsF
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { excludedOperationalRDDealIds, filterOperationalRDDeals } from "@/lib/crmPipelineStages";
 import { differenceInCalendarDays, format } from "date-fns";
+import { businessDateKey } from "@/lib/businessDate";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -91,8 +92,8 @@ const Index = () => {
   const dashboardMeta = useMetaTrafficMetrics({
     adAccountIds: selectedAccountIds.length ? selectedAccountIds : scopedAccountIds,
     campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined,
-    startDate: format(startDate, "yyyy-MM-dd"),
-    endDate: format(endDate, "yyyy-MM-dd"),
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
   }, !loadingAdAccounts);
   const { data: sales = [] } = useSales({
     startDate,
@@ -210,8 +211,8 @@ const Index = () => {
     // A mutation já invalida as consultas de insights ao terminar. Refazer a
     // consulta antes e depois da sincronização só competia por rede e fazia o
     // dashboard trocar desnecessariamente para estado de carregamento.
-    const syncStart = format(startDate, "yyyy-MM-dd");
-    const syncEnd = format(endDate, "yyyy-MM-dd");
+    const syncStart = businessDateKey(startDate);
+    const syncEnd = businessDateKey(endDate);
     syncMeta.mutate({
       adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
       adAccountIds: selectedAccountIds.length > 1 || selectedAccountIds.length === 0 ? scopedAccountIds : undefined,
@@ -230,7 +231,7 @@ const Index = () => {
   const autoSyncKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (loadingAdAccounts || isLoading || syncMeta.isPending || allInsights.length > 0 || selectedAccountIds.length === 0) return;
-    const key = `${selectedAccountIds.slice().sort().join(",")}|${format(startDate, "yyyy-MM-dd")}|${format(endDate, "yyyy-MM-dd")}`;
+    const key = `${selectedAccountIds.slice().sort().join(",")}|${businessDateKey(startDate)}|${businessDateKey(endDate)}`;
     if (autoSyncKeyRef.current === key) return;
     autoSyncKeyRef.current = key;
     handleSync();
@@ -379,6 +380,10 @@ const Index = () => {
             products,
             isLoading,
             leadBreakdown,
+            metaAvailability: {
+              spend: hasCanonicalMetaRows || dashboardInsights.length > 0,
+              reason: hasCanonicalMetaRows || dashboardInsights.length > 0 ? null : dashboardMeta.data.unavailableReason,
+            },
           }}
         >
           <DashboardGrid

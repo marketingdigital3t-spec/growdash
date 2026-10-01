@@ -8,6 +8,9 @@ import {
   endOfWeek,
   subWeeks,
 } from "date-fns";
+import { businessDateKey } from "@/lib/businessDate";
+
+export { businessDateKey } from "@/lib/businessDate";
 
 export type DatePreset =
   | "today_yesterday"
@@ -46,21 +49,6 @@ const isValidDate = (value: unknown): value is Date =>
   value instanceof Date && !Number.isNaN(value.getTime());
 
 const BUSINESS_TIMEZONE = "America/Sao_Paulo";
-
-/** Return a calendar date in the business timezone, independent of the
- * browser/Edge machine timezone. Date filters are calendar dates, not UTC
- * instants; using the host timezone made the current day shift at midnight
- * and produced empty Meta/RD results. */
-export function businessDateKey(value: Date): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: BUSINESS_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(value);
-  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${map.year}-${map.month}-${map.day}`;
-}
 
 function businessBoundary(value: Date, endOfDay = false): Date {
   const key = businessDateKey(value);

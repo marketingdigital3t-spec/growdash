@@ -35,6 +35,7 @@ import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperation
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
+import { businessDateKey } from "@/lib/businessDate";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
@@ -411,8 +412,8 @@ export default function FunnelAnalysis() {
   const funnelMeta = useMetaTrafficMetrics({
     adAccountIds: actionScopeAccountIds,
     campaignIds: actionScopeCampaignIds,
-    startDate: format(startDate, "yyyy-MM-dd"),
-    endDate: format(endDate, "yyyy-MM-dd"),
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
     attributionWindow: selectedMetaScope.attributionWindow,
     timezone: selectedMetaScope.timezone,
   }, visibleAccounts.length > 0);
@@ -470,8 +471,8 @@ export default function FunnelAnalysis() {
             startDate: metaSyncRange.startDate,
             endDate: metaSyncRange.endDate,
             includeBreakdowns: true,
-            breakdownStartDate: format(startDate, "yyyy-MM-dd"),
-            breakdownEndDate: format(endDate, "yyyy-MM-dd"),
+            breakdownStartDate: businessDateKey(startDate),
+            breakdownEndDate: businessDateKey(endDate),
             force: true,
             attributionWindow: selectedMetaScope.attributionWindow,
             timezone: selectedMetaScope.timezone,
@@ -493,8 +494,8 @@ export default function FunnelAnalysis() {
               // a Edge Function varrer o arquivo inteiro e misturar negócios
               // fora do escopo atual nos KPIs.
               full_history: false,
-              start_date: format(startDate, "yyyy-MM-dd"),
-              end_date: format(endDate, "yyyy-MM-dd"),
+              start_date: businessDateKey(startDate),
+              end_date: businessDateKey(endDate),
               // Manual refresh follows the same bounded recent-sync budget;
               // complete history is handled by the dedicated backfill path.
               max_pages: 10,

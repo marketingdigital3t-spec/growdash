@@ -195,8 +195,17 @@ Deno.serve(async (req) => {
           timeZone: effectiveTimezone,
           year: "numeric", month: "2-digit", day: "2-digit",
         }).format(new Date());
-        const startDate = requestedStartDate || accountToday;
-        const endDate = requestedEndDate || accountToday;
+        // Calendar scopes are inclusive business dates. Never let a browser
+        // timezone conversion turn "Hoje" into a future Meta day; Meta has no
+        // facts for that day yet and would otherwise look like a false zero.
+        const requestedStart = typeof requestedStartDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(requestedStartDate)
+          ? requestedStartDate
+          : accountToday;
+        const requestedEnd = typeof requestedEndDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(requestedEndDate)
+          ? requestedEndDate
+          : accountToday;
+        const endDate = requestedEnd > accountToday ? accountToday : requestedEnd;
+        const startDate = requestedStart > endDate ? endDate : requestedStart;
         // Audience reports multiply Graph API calls. Keep their range scoped
         // to the visible dashboard period, independent from media backfills.
         const breakdownStartDate = requestedBreakdownStartDate || startDate;
