@@ -11,6 +11,9 @@ interface Props {
   rdLeadsLoading?: boolean;
   rdLeadsError?: boolean;
   trafficSpend: number;
+  trafficLoading?: boolean;
+  trafficUnavailable?: boolean;
+  trafficReason?: string | null;
   cpl?: number | null;
   cac?: number | null;
   roas?: number | null;
@@ -21,11 +24,11 @@ interface Props {
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, cpl, cac, roas, salesConversionRate, previousAvgDaysToConvert }: Props) {
+export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, trafficLoading = false, trafficUnavailable = false, trafficReason, cpl, cac, roas, salesConversionRate, previousAvgDaysToConvert }: Props) {
   const timeChange = previousAvgDaysToConvert && previousAvgDaysToConvert > 0 ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100 : null;
   const rdLeadValue = rdLeadsError ? null : rdLeadsLoading ? null : rdLeads;
   const cards = [
-    { label: "Investimento em tráfego", value: trafficSpend, icon: DollarSign, color: "text-foreground", format: "brl" as const },
+    { label: "Investimento em anúncio", value: trafficSpend, icon: DollarSign, color: "text-foreground", format: "brl" as const, unavailable: trafficLoading || trafficUnavailable, detail: trafficReason || "Investimento atribuído pela Meta Ads no período selecionado." },
     { label: "Lead", value: rdLeadValue, icon: Users, color: "text-foreground", format: "int" as const, detail: rdLeadsError ? "Falha ao carregar negociações RD Station" : "Negociações criadas no RD Station · período e filtros selecionados" },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-foreground", format: "int" as const },
     { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-foreground", format: "pct" as const, decimals: 2 },
@@ -58,7 +61,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
                   {c.format === "int" && (rdLeadsLoading && c.label === "Lead" ? "Carregando…" : rdLeadsError && c.label === "Lead" ? "Indisponível" : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
                   {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={c.decimals ?? 1} />%</>}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
-                  {c.format === "brl" && fmtBRL(c.value)}
+                  {c.format === "brl" && (("unavailable" in c && c.unavailable) ? "Aguardando sincronização" : fmtBRL(c.value))}
                   {c.format === "custom" && <span>{c.custom}</span>}
                 </div>
                 {c.detail && <p className="gd-funnel-kpi-detail text-muted-foreground">{c.detail}</p>}

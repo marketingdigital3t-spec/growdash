@@ -10,6 +10,7 @@ import { realizedSales } from "@/lib/saleRevenue";
 import { Button } from "@/components/ui/button";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { cn } from "@/lib/utils";
+import { businessDateKey } from "@/lib/businessDate";
 
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -21,7 +22,7 @@ export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
   const { data: accounts = [] } = useAdAccounts();
   // Sem uma conta específica, a IA deve analisar todas as contas liberadas ao
   // usuário — o seletor "Todas as contas" não pode transformar Meta em zero.
-  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountId ? [accountId] : accounts.map((account) => account.id), startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, !!accountId || accounts.length > 0);
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountId ? [accountId] : accounts.map((account) => account.id), startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, !!accountId || accounts.length > 0);
   const [monitored, setMonitored] = useState(() => window.localStorage.getItem("growdash:crm-ai-monitored") === "true");
   const analytics = useMemo(() => analyze(deals, metaTraffic.data.totalLeads, sales), [deals, metaTraffic.data.totalLeads, sales]);
 

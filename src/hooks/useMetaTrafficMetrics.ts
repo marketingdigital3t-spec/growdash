@@ -4,6 +4,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useInsights } from "@/hooks/useInsights";
 import { aggregateMetaTrafficMetrics, type MetaTrafficMetrics, type MetaTrafficScope } from "@/lib/metaTraffic";
 import { useMetaBreakdowns } from "@/hooks/useMetaBreakdowns";
+import { parseBusinessDate } from "@/lib/businessDate";
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; isLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
@@ -21,14 +22,14 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     campaignIds: scope.campaignIds,
     attributionWindow,
     attributionWindowsByAccount,
-    startDate: new Date(`${scope.startDate}T00:00:00`),
-    endDate: new Date(`${scope.endDate}T00:00:00`),
+    startDate: parseBusinessDate(scope.startDate, scope.timezone),
+    endDate: parseBusinessDate(scope.endDate, scope.timezone),
     enabled: enabled && accountIds.length > 0,
   });
   const rows = useMemo(() => insights.data || [], [insights.data]);
   const adIds = useMemo(() => Array.from(new Set(rows.map((row) => row.ad_id).filter(Boolean))), [rows]);
   const adAccountByAdId = useMemo(() => Object.fromEntries(rows.map((row) => [row.ad_id, row.ad_account_id])), [rows]);
-  const actions = useActionTotalsByAds(adIds, new Date(`${scope.startDate}T00:00:00`), new Date(`${scope.endDate}T00:00:00`), adAccountByAdId, { adAccountIds: accountIds, campaignIds: scope.campaignIds, attributionWindow, attributionWindowsByAccount });
+  const actions = useActionTotalsByAds(adIds, parseBusinessDate(scope.startDate, scope.timezone), parseBusinessDate(scope.endDate, scope.timezone), adAccountByAdId, { adAccountIds: accountIds, campaignIds: scope.campaignIds, attributionWindow, attributionWindowsByAccount });
   const campaignIds = useMemo(() => Array.from(new Set((scope.campaignIds?.length ? scope.campaignIds : rows.map((row) => row.campaign_id).filter(Boolean)) as string[])), [rows, scope.campaignIds]);
   const breakdowns = useMetaBreakdowns(campaignIds, scope.startDate, scope.endDate, enabled && accountIds.length > 0);
   // Consolidated freshness is bounded by the oldest selected account, not the

@@ -31,6 +31,7 @@ import { FunnelAudienceProfile, useAudienceProfileData } from "@/components/funn
 import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
 import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { businessDateKey } from "@/lib/businessDate";
 import CampaignsManager from "@/pages/Campaigns";
 import funnelCaptacaoDireta from "@/assets/zntt-funnels/01-captacao-direta.png";
 import funnelPilulaAulaGratuita from "@/assets/zntt-funnels/02-pilula-aula-gratuita.png";
@@ -248,7 +249,7 @@ function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAcco
     () => Object.fromEntries(accounts.filter((account: any) => accountIds.includes(account.id)).map((account: any) => [account.id, account.attribution_window || "account_default"])),
     [accountIds, accounts],
   );
-  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountIds, startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, accountIds.length > 0);
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountIds, startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, accountIds.length > 0);
   const single = accountId !== "all" ? accountId : undefined;
   const { data: insights = [], isLoading: loadingMeta } = useInsights({ adAccountId: single, adAccountIds: accountIds, attributionWindowsByAccount, startDate, endDate, enabled: accountIds.length > 0 });
   const { data: deals = [], isLoading: loadingRD } = useRDDealsForPeriod({ startDate, endDate, adAccountId: single, adAccountIds: accountIds, funnelIds, enabled: accountIds.length > 0 });

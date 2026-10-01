@@ -204,6 +204,7 @@ export function useActionTotalsByAds(
     },
     staleTime: 120_000,
     gcTime: 15 * 60_000,
+    placeholderData: (previousData) => previousData,
     refetchOnWindowFocus: false,
   });
 }

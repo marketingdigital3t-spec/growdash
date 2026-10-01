@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { isPaidOperationStatus, normalizeClassName, rankExpertSales } from "@/lib/expertOperations";
+import { businessDateKey } from "@/lib/businessDate";
 
 const norm = normalizeClassName;
 
@@ -52,7 +53,7 @@ export function useExpertOperations(expertId: string | undefined) {
   });
   const accountIds = useMemo(() => Array.from(new Set((sources.data || []).map((source) => source.ad_account_id).filter(Boolean) as string[])), [sources.data]);
   const attributionWindowsByAccount = useMemo(() => Object.fromEntries((sources.data || []).filter((source) => source.ad_account_id).map((source) => [source.ad_account_id, source.attribution_window || "account_default"])), [sources.data]);
-  const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: startDate.toISOString().slice(0, 10), endDate: endDate.toISOString().slice(0, 10), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(expertId && accountIds.length));
+  const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(expertId && accountIds.length));
   const filteredClasses = useMemo(() => (classes.data || []).filter((item: any) => {
     if (item.expert_id && item.expert_id !== expertId) return false;
     if (!item.expert_id && norm(item.expert_name) !== norm(expert.data?.nome)) return false;

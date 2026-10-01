@@ -22,6 +22,9 @@ type SyncBody = {
   includeBalance?: boolean;
   force?: boolean;
   realtime?: boolean;
+  /** Fast entry path: persist daily Insights only; auxiliary blocks continue
+   * in the global/background cycle and must not delay the selected snapshot. */
+  fast?: boolean;
 };
 
 type RunResult = {
@@ -82,6 +85,7 @@ Deno.serve(async (req) => {
     const includeBalance = body.includeBalance !== false;
     const force = body.force === true;
     const realtime = body.realtime !== false;
+    const fast = body.fast === true;
     const results: RunResult[] = [];
 
     if (includeBalance) {
@@ -126,6 +130,23 @@ Deno.serve(async (req) => {
           // Leads/forms are an auxiliary Meta resource. Run it after the
           // daily snapshot, but do not invalidate daily KPIs when its token,
           // permission or form discovery is temporarily unavailable.
+          if (fast) {
+            return {
+              data: {
+                success: true,
+                status: insights.data?.status === "partial" ? "partial" : "success",
+                synced: Number(insights.data?.synced || 0),
+                warnings: ["Leads/forms, hourly e saldo continuarão em segundo plano."],
+                block_status: {
+                  insights: insights.data?.status || "success",
+                  leads: "pending",
+                  hourly: "pending",
+                },
+                synced_at: insights.data?.synced_at,
+              },
+            };
+          }
+
           const leads = await invokeFunction(supabaseUrl, authHeader, "sync-meta-leads", {
             adAccountId: body.adAccountId,
             adAccountIds: body.adAccountIds,

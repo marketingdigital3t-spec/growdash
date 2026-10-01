@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { motion } from "framer-motion";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
+import { businessDateKey } from "@/lib/businessDate";
 
 const FUNNEL_COLORS = [
   "hsl(221, 83%, 53%)",
@@ -116,8 +117,8 @@ const Funnel = () => {
   });
   const metaTraffic = useMetaTrafficMetrics({
     adAccountIds,
-    startDate: format(startDate, "yyyy-MM-dd"),
-    endDate: format(endDate, "yyyy-MM-dd"),
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
   }, hasAccountSelected);
 
   const [manualSales, setManualSales] = useState<number | null>(null);

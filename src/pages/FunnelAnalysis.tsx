@@ -650,6 +650,9 @@ export default function FunnelAnalysis() {
               rdLeadsLoading={loadingPeriodDeals}
               rdLeadsError={!!periodDealsError}
               trafficSpend={mediaMetrics.spend}
+              trafficLoading={funnelMeta.isLoading || loadingMetaActions}
+              trafficUnavailable={!funnelMeta.data.available && !scopedInsights.length}
+              trafficReason={funnelMeta.data.unavailableReason}
               cpl={mediaMetrics.rdCpl}
               cac={mediaMetrics.cac}
               roas={mediaMetrics.roas}

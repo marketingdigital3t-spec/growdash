@@ -24,6 +24,7 @@ import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow, subDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { businessDateKey } from "@/lib/businessDate";
 import {
   Dialog,
   DialogContent,
@@ -782,8 +783,8 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
   const metaTraffic = useMetaTrafficMetrics({
     adAccountIds: isLinked && adAccountId ? [adAccountId] : [],
     campaignIds: campaignIds?.length ? campaignIds : undefined,
-    startDate: format(dateRange.start, "yyyy-MM-dd"),
-    endDate: format(dateRange.end, "yyyy-MM-dd"),
+    startDate: businessDateKey(dateRange.start),
+    endDate: businessDateKey(dateRange.end),
   }, isLinked);
 
   // Filter insights by selected campaigns

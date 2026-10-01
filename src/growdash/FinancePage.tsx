@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
 import { InvoicePdfStudio } from "@/components/finance/InvoicePdfStudio";
 import { calculateTrafficFundsAdded } from "@/lib/trafficFunding";
+import { businessDateKey } from "@/lib/businessDate";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
@@ -76,7 +77,7 @@ export default function FinancePage() {
   const accounts = adAccountIds.length ? unitAccounts.filter((account) => adAccountIds.includes(account.id)) : unitAccounts;
   const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: metaInsightsStartDate, endDate });
-  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accounts.map((account) => account.id), startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, accounts.length > 0);
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accounts.map((account) => account.id), startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, accounts.length > 0);
   const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate, endDate });
   const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
   const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate: twelveMonthsAgo, endDate: futureMonth });

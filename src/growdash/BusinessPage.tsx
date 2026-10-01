@@ -10,6 +10,7 @@ import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
+import { businessDateKey } from "@/lib/businessDate";
 import { Button } from "@/components/ui/button";
 import { PageHeading } from "./shared";
 
@@ -51,8 +52,8 @@ export default function BusinessPage() {
   });
   const metaTraffic = useMetaTrafficMetrics({
     adAccountIds: selectedId ? [selectedId] : adAccountIds,
-    startDate: format(startDate, "yyyy-MM-dd"),
-    endDate: format(endDate, "yyyy-MM-dd"),
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
   }, !!selectedId || adAccountIds.length > 0);
   const socialQuery = useQuery({
     queryKey: ["business_social_accounts", user?.id, workspaceId, selectedId, startDate.toISOString(), endDate.toISOString()],

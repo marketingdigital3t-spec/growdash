@@ -33,6 +33,7 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { businessDateKey } from "@/lib/businessDate";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
@@ -131,7 +132,7 @@ export default function BrandDiagnosticPage() {
 
   const campaignsQuery = useCampaigns(accountId);
   const insightsQuery = useInsights({ adAccountId: accountId, startDate, endDate, enabled: !!accountId });
-  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountId ? [accountId] : [], startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, !!accountId);
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accountId ? [accountId] : [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, !!accountId);
   const rdQuery = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountId, enabled: !!accountId });
   const salesQuery = useSales({ startDate, endDate, adAccountId: accountId, enabled: !!accountId });
   const campaigns = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);

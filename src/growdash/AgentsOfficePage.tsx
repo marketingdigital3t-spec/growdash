@@ -31,6 +31,7 @@ import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { buildAgentAnswer, type AgentMetrics } from "@/lib/agentOffice";
+import { businessDateKey } from "@/lib/businessDate";
 import { buildCoreAccountSummaries, type CoreAccountInput, type CoreAgentConfig, type CoreAreaId, type CoreSchedule } from "@/lib/agentCore";
 import { AGENT_NEED_META, advanceAgentLifeState, createInitialAgentLifeStates, formatAgentClock, getAgentPhaseLabel, type AgentLifeState, type AgentNeedKey } from "@/lib/agentLife";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,7 @@ export default function AgentsOfficePage() {
   const activeAccountId = activeAgent ? assignments[activeAgent.id] : undefined;
   const account = visibleAccounts.find((item) => item.id === activeAccountId);
   const { data: insights = [], isFetching: loadingInsights } = useInsights({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
-  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: activeAccountId ? [activeAccountId] : [], startDate: format(startDate, "yyyy-MM-dd"), endDate: format(endDate, "yyyy-MM-dd") }, !!activeAccountId);
+  const metaTraffic = useMetaTrafficMetrics({ adAccountIds: activeAccountId ? [activeAccountId] : [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, !!activeAccountId);
   const { data: deals = [], isFetching: loadingDeals } = useRDDealsForPeriod({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
   const { data: sales = [] } = useSales({ adAccountId: activeAccountId, startDate, endDate, enabled: !!activeAccountId });
 

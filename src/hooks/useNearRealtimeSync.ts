@@ -109,8 +109,9 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         timezone,
         attributionWindow,
         includeMeta: true,
-        includeRD: true,
-        includeBalance: true,
+        includeRD: false,
+        includeBalance: false,
+        fast: true,
         realtime: true,
         force,
       };
@@ -146,6 +147,9 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
             adAccountId: undefined,
             adAccountIds: undefined,
             funnelIds: undefined,
+            includeRD: true,
+            includeBalance: true,
+            fast: false,
           },
         }).then(({ data: globalData, error: globalError }) => {
           if (globalError || globalData?.error) {
@@ -169,7 +173,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
 
     inFlight.current = task;
     return task;
-  }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, enabled, funnelIds, invalidateLiveQueries, scope, startDate, timezone]);
+  }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, endDateKey, enabled, funnelIds, invalidateLiveQueries, scope, startDate, startDateKey, timezone]);
 
   useEffect(() => {
     if (!enabled) return;

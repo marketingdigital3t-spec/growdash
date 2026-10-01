@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { BreakdownSegment, MetaBreakdowns } from "@/lib/metaTraffic";
 
@@ -50,8 +49,8 @@ export function useMetaBreakdowns(campaignIds: string[], startDate: string, endD
             .select("breakdown_type,segment_key,spend,impressions,clicks,leads,date")
             .in("campaign_id", ids.slice(offset, offset + 200))
             .in("breakdown_type", sourceTypes)
-            .gte("date", format(new Date(`${startDate}T12:00:00`), "yyyy-MM-dd"))
-            .lte("date", format(new Date(`${endDate}T12:00:00`), "yyyy-MM-dd"));
+            .gte("date", startDate)
+            .lte("date", endDate);
           if (error) throw error;
           rows.push(...(data || []));
         }
