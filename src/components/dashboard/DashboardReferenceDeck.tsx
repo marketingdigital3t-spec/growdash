@@ -9,6 +9,7 @@ type Props = {
   roas: number;
   cpl: number;
   loading?: boolean;
+  hasSnapshot?: boolean;
 };
 
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -18,20 +19,22 @@ function pct(value: number, base: number) {
   return base > 0 ? `${((value / base) * 100).toFixed(2)}%` : "—";
 }
 
-export function DashboardReferenceDeck({ impressions, clicks, leads, clients, roas, cpl, loading = false }: Props) {
-  const display = (value: string) => loading ? "Carregando…" : value;
+export function DashboardReferenceDeck({ impressions, clicks, leads, clients, roas, cpl, loading = false, hasSnapshot = true }: Props) {
+  const display = (value: string) => !hasSnapshot
+    ? (loading ? "Aguardando sincronização" : "Indisponível")
+    : value;
   const cards = [
-    { label: "Impressões", value: display(integer.format(impressions)), detail: loading ? "consultando Meta" : `${pct(clicks, impressions)} CTR`, icon: <Eye /> },
+    { label: "Impressões", value: display(integer.format(impressions)), detail: !hasSnapshot ? (loading ? "aguardando Meta" : "Meta sem dados") : `${pct(clicks, impressions)} CTR`, icon: <Eye /> },
     { label: "ROAS", value: display(`${roas.toFixed(2)}x`), detail: "retorno sobre mídia", icon: <Crosshair /> },
     { label: "CPL", value: display(brl.format(cpl)), detail: "custo por lead", icon: <UserRound /> },
-    { label: "Leads", value: display(integer.format(leads)), detail: loading ? "consultando Meta" : `${pct(clients, leads)} clientes`, icon: <UsersRound /> },
+    { label: "Leads", value: display(integer.format(leads)), detail: !hasSnapshot ? (loading ? "aguardando Meta" : "Meta sem dados") : `${pct(clients, leads)} clientes`, icon: <UsersRound /> },
   ];
 
   const funnel = [
     ["IMPRESSÕES", display(integer.format(impressions))],
-    ["CLIQUES", loading ? "Carregando…" : `${integer.format(clicks)} (${pct(clicks, impressions)})`],
-    ["LEADS", loading ? "Carregando…" : `${integer.format(leads)} (${pct(leads, clicks)})`],
-    ["CLIENTES", loading ? "Carregando…" : `${integer.format(clients)} (${pct(clients, leads)})`],
+    ["CLIQUES", display(`${integer.format(clicks)} (${pct(clicks, impressions)})`)],
+    ["LEADS", display(`${integer.format(leads)} (${pct(leads, clicks)})`)],
+    ["CLIENTES", display(`${integer.format(clients)} (${pct(clients, leads)})`)],
   ];
 
   return <section className="dashboard-reference-deck" aria-label="Visão espacial do Dashboard">

@@ -177,7 +177,7 @@ export default function GrowdashLayout() {
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
-  useNearRealtimeSync({
+  const backgroundSync = useNearRealtimeSync({
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
     adAccountIds: adAccountId === "all" ? adAccountIds : undefined,
     funnelIds,
@@ -486,7 +486,7 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
-            <GlobalScopeToolbar />
+            <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} />
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
               <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>

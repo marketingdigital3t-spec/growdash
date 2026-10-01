@@ -8,7 +8,7 @@ import { CampaignMultiSelect } from "@/components/dashboard/CampaignMultiSelect"
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 
 /** Shared scope controls rendered by the authenticated shell on every module. */
-export function GlobalScopeToolbar() {
+export function GlobalScopeToolbar({ syncing = false }: { syncing?: boolean }) {
   const { adAccountIds, setAdAccountIds, funnelIds, setFunnelIds, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
   // Keep RD-only funnels visible in the selector. When an ad account is
@@ -48,6 +48,12 @@ export function GlobalScopeToolbar() {
         endDate={endDate}
         className="min-h-9 sm:h-9"
       />
+      {syncing && (
+        <span role="status" aria-live="polite" className="order-last inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold text-amber-400 sm:order-none">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" aria-hidden="true" />
+          Sincronizando
+        </span>
+      )}
       <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">
         {format(startDate, "dd/MM/yyyy")} – {format(endDate, "dd/MM/yyyy")} · São Paulo
       </span>

@@ -184,6 +184,7 @@ const Index = () => {
   // ainda não ter atualizado a etapa.
   const glassSales = aggregateRevenueSources(dashboardSales, dashboardRevenueDeals);
   const hasCanonicalMetaRows = dashboardMeta.data.rowCount > 0;
+  const hasMetaSnapshot = hasCanonicalMetaRows || dashboardInsights.length > 0;
   const glassSpend = hasCanonicalMetaRows ? dashboardMeta.data.spend : dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
   const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
@@ -353,11 +354,11 @@ const Index = () => {
       </MotionItem>
 
       <div className="mx-3">
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || syncMeta.isPending} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} />
       </div>
 
       <div className="mx-3">
-        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || syncMeta.isPending} />
+        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} />
       </div>
 
       <div className="mx-3">
