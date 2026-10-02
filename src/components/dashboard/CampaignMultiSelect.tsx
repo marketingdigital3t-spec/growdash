@@ -59,11 +59,11 @@ export function CampaignMultiSelect({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className={cn("min-h-11 w-full min-w-0 justify-between bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto sm:min-w-[220px]", className)}
+          className={cn("gd-filter-control gd-filter-account min-h-11 w-full min-w-0 justify-between bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto sm:min-w-[220px]", className)}
         >
           <span className="flex items-center gap-2 truncate">
             {!allSelected && (
-              <Badge variant="secondary" className="h-5 px-1.5">
+              <Badge variant="secondary" className="gd-account-count h-5 px-1.5">
                 {selectedIds.length}
               </Badge>
             )}

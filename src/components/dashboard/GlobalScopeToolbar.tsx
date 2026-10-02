@@ -23,7 +23,7 @@ export function GlobalScopeToolbar({ syncing = false }: { syncing?: boolean }) {
   const safeFunnelIds = funnelIds.filter((id) => activeFunnelIds.has(id));
 
   return (
-    <div className="gd-global-scope-toolbar mb-4 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card/80 p-2 shadow-sm">
+    <div className="gd-global-scope-toolbar gd-filter-strip mb-4 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card/80 p-2 shadow-sm">
       <AccountMultiSelect
         accounts={accounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))}
         selectedIds={adAccountIds}

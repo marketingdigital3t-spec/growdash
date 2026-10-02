@@ -127,7 +127,7 @@ export function MetaDateRangePicker({
           type="button"
           aria-label={`Selecionar período: ${formatTrigger(preset, startDate, endDate)}`}
           className={cn(
-            "gd-filter-date min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto",
+            "gd-filter-control gd-filter-account gd-filter-date min-h-11 w-full min-w-0 justify-start bg-card font-normal sm:h-10 sm:min-h-0 sm:w-auto",
             className,
           )}
         >
