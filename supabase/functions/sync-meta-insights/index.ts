@@ -184,14 +184,23 @@ Deno.serve(async (req) => {
     for (const account of accounts) {
       const attemptedAt = new Date().toISOString();
       let accountHadError = false;
+      // Insights is the primary KPI snapshot. Auxiliary audience breakdowns
+      // may fail independently without invalidating the daily media facts.
+      const auxiliaryErrors: string[] = [];
       let accountLockScopeKey: string | null = null;
       let accountLockAcquired = false;
       const recordPagination = (result: { pages?: number; lastCursor?: string; truncated?: boolean; repeatedCursor?: boolean }, label = "consulta") => {
         totalPages += Number(result.pages || 0);
         if (result.lastCursor) lastCursor = result.lastCursor;
         if (result.truncated || result.repeatedCursor) {
-          accountHadError = true;
-          errors.push(`Conta ${account.name} ${label}: paginação incompleta; o snapshot anterior foi preservado.`);
+          const message = `Conta ${account.name} ${label}: paginação incompleta; o snapshot anterior foi preservado.`;
+          if (label === "insights") {
+            accountHadError = true;
+            errors.push(message);
+          } else {
+            auxiliaryErrors.push(message);
+            errors.push(message);
+          }
         }
       };
       try {
@@ -245,6 +254,17 @@ Deno.serve(async (req) => {
           continue;
         }
         accountLockAcquired = true;
+        await writeMetaScopeState(supabaseAdmin, {
+          accountId: account.id,
+          campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+          startDate,
+          endDate,
+          timezone: effectiveTimezone,
+          attributionWindow: effectiveAttributionWindow,
+          status: "syncing",
+          lastAttemptAt: attemptedAt,
+          blockStatus: { insights: { status: "syncing" }, actions: { status: "pending" }, hourly: { status: "pending" }, breakdowns: { status: "pending" } },
+        });
 
         console.log(`Syncing: ${account.name} (${metaAccountId})`);
 
@@ -440,7 +460,7 @@ Deno.serve(async (req) => {
             if (actData.error) {
               const message = `Conta ${account.name} atividades: ${actData.error.message}`;
               errors.push(message);
-              accountHadError = true;
+              auxiliaryErrors.push(message);
               console.warn(message);
               break;
             }
@@ -525,11 +545,19 @@ Deno.serve(async (req) => {
             // Preserve an explicit manual deactivation made during the sync.
             .eq("id", account.id)
             .neq("connection_status", "disconnected");
+          if (accountLockAcquired && accountLockScopeKey) {
+            await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
+              .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
+          }
           continue;
         }
         if (accountHadError) {
           // A truncated/repeated primary response is not a valid snapshot.
           // Do not upsert or clean rows from a partial Meta page walk.
+          if (accountLockAcquired && accountLockScopeKey) {
+            await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
+              .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
+          }
           continue;
         }
         const allInsights = insightsRes.data;
@@ -801,7 +829,7 @@ Deno.serve(async (req) => {
             if (bRes.error) {
               const message = `Conta ${account.name} breakdown ${breakdown.type}: ${bRes.error}`;
               errors.push(message);
-              accountHadError = true;
+              auxiliaryErrors.push(message);
               console.warn(message);
               continue;
             }
@@ -855,7 +883,7 @@ Deno.serve(async (req) => {
         } catch (bErr) {
           const message = `Conta ${account.name} breakdowns: ${(bErr as Error).message}`;
           errors.push(message);
-          accountHadError = true;
+          auxiliaryErrors.push(message);
           console.warn(message);
         }
 
@@ -873,6 +901,27 @@ Deno.serve(async (req) => {
           // A completed sync is not authorization to reactivate an account.
           .eq("id", account.id)
           .neq("connection_status", "disconnected");
+        await writeMetaScopeState(supabaseAdmin, {
+          accountId: account.id,
+          campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+          startDate,
+          endDate,
+          timezone: effectiveTimezone,
+          attributionWindow: effectiveAttributionWindow,
+          status: accountHadError ? "partial" : "fresh",
+          lastAttemptAt: attemptedAt,
+          lastSuccessAt: accountHadError ? undefined : attemptedAt,
+          lastValidSnapshotAt: accountHadError ? undefined : attemptedAt,
+          coveredStartDate: startDate,
+          coveredEndDate: endDate,
+          pagesProcessed: totalPages,
+          blockStatus: {
+            insights: { status: accountHadError ? "partial" : "fresh", coveredScope: { startDate, endDate }, pagesProcessed: totalPages },
+            actions: { status: "fresh" },
+            hourly: { status: "pending" },
+            breakdowns: { status: auxiliaryErrors.length ? "partial" : "pending", errorMessage: auxiliaryErrors.join("; ") || null },
+          },
+        });
         if (accountLockAcquired && accountLockScopeKey) {
           await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
             .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
@@ -892,6 +941,18 @@ Deno.serve(async (req) => {
           // error is handled after the account has been switched off.
           .eq("id", account.id)
           .neq("connection_status", "disconnected");
+        await writeMetaScopeState(supabaseAdmin, {
+          accountId: account.id,
+          campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+          startDate: requestedStartDate || new Intl.DateTimeFormat("en-CA", { timeZone: account.timezone_name || "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+          endDate: requestedEndDate || new Intl.DateTimeFormat("en-CA", { timeZone: account.timezone_name || "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
+          timezone: account.timezone_name || "America/Sao_Paulo",
+          attributionWindow: requestedAttributionWindow || account.attribution_window || "account_default",
+          status: "error",
+          lastAttemptAt: attemptedAt,
+          errorMessage: msg,
+          blockStatus: { insights: { status: "error", errorMessage: msg } },
+        });
         if (accountLockAcquired && accountLockScopeKey) {
           await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
             .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
@@ -1055,4 +1116,46 @@ function safeParse(s: string): any {
 
 function throwIfError(result: { error?: { message?: string } | null }, context: string) {
   if (result.error) throw new Error(`Falha ao persistir ${context}: ${result.error.message || "erro desconhecido"}`);
+}
+
+async function writeMetaScopeState(admin: any, args: {
+  accountId: string;
+  campaignScope: string;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+  attributionWindow: string;
+  status: string;
+  lastAttemptAt: string;
+  lastSuccessAt?: string;
+  lastValidSnapshotAt?: string;
+  coveredStartDate?: string;
+  coveredEndDate?: string;
+  pagesProcessed?: number;
+  errorMessage?: string;
+  blockStatus?: Record<string, unknown>;
+}) {
+  const payload: Record<string, unknown> = {
+    ad_account_id: args.accountId,
+    campaign_scope: args.campaignScope,
+    start_date: args.startDate,
+    end_date: args.endDate,
+    timezone: args.timezone,
+    attribution_window: args.attributionWindow,
+    status: args.status,
+    last_started_at: args.lastAttemptAt,
+    last_finished_at: args.status === "syncing" ? null : new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (args.lastSuccessAt) payload.last_success_at = args.lastSuccessAt;
+  if (args.lastValidSnapshotAt) payload.last_valid_snapshot_at = args.lastValidSnapshotAt;
+  if (args.coveredStartDate) payload.covered_start_date = args.coveredStartDate;
+  if (args.coveredEndDate) payload.covered_end_date = args.coveredEndDate;
+  if (args.pagesProcessed != null) payload.pages_processed = args.pagesProcessed;
+  if (args.errorMessage !== undefined) payload.last_error = args.errorMessage;
+  if (args.blockStatus) payload.block_status = args.blockStatus;
+  const { error } = await admin.from("meta_sync_scope_state").upsert(payload, {
+    onConflict: "ad_account_id,campaign_scope,start_date,end_date,timezone,attribution_window",
+  });
+  if (error) console.warn("Falha ao registrar estado do escopo Meta:", error.message);
 }

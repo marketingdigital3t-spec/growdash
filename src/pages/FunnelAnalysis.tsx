@@ -298,7 +298,7 @@ export default function FunnelAnalysis() {
   const { data: hierarchyRows = [] } = useQuery({
     queryKey: ["funnel-attribution-hierarchy", effectiveAdAccountId, effectiveAdAccountIds?.slice().sort().join(",")],
     enabled: visibleAccounts.length > 0,
-    staleTime: 15 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       let query = (supabase as any)
         .from("ads")

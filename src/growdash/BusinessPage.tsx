@@ -64,7 +64,7 @@ export default function BusinessPage() {
       if (error) throw error;
       return (data ?? []) as SocialAccount[];
     },
-    staleTime: 15 * 60_000,
+    staleTime: 5 * 60_000,
   });
 
   const totals = useMemo(() => ({

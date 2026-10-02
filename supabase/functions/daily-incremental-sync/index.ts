@@ -57,7 +57,7 @@ function incrementalWindow(now: Date, previousEnd?: string | null): SyncWindow {
   // sources that completed; their explicit status remains visible to the UI
   // and unresolved records are retried by webhook/manual reconciliation.
   const previousIsRecent = parsedPrevious && Number.isFinite(parsedPrevious.getTime())
-    ? end.getTime() - parsedPrevious.getTime() <= 15 * 60_000
+    ? end.getTime() - parsedPrevious.getTime() <= 5 * 60_000
     : false;
   const watermark = previousIsRecent && parsedPrevious
     ? parsedPrevious

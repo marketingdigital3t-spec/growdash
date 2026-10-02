@@ -7,6 +7,19 @@ import { dedupeCanonicalSales } from "@/lib/canonicalSales";
 export type MetricSource = "meta" | "rd" | "sales" | "finance" | "derived";
 export type AnalyticsSyncState = "fresh" | "syncing" | "stale" | "partial" | "error";
 
+export type MetaSyncBlock = "insights" | "actions" | "hourly" | "breakdowns";
+
+export interface MetaSyncBlockStatus {
+  status: AnalyticsSyncState | "pending";
+  requestedScope?: GlobalAnalyticsScope;
+  coveredScope?: { startDate: string | null; endDate: string | null };
+  pagesProcessed?: number;
+  lastAttemptAt?: string | null;
+  lastValidSnapshotAt?: string | null;
+  errorCode?: string | number | null;
+  errorMessage?: string | null;
+}
+
 export interface GlobalAnalyticsScope {
   adAccountIds: string[];
   funnelIds: string[];
@@ -36,6 +49,9 @@ export interface AnalyticsSyncStatus {
   failedFunnels: string[];
   requestedScope: GlobalAnalyticsScope;
   errors: string[];
+  blocks?: Partial<Record<MetaSyncBlock, MetaSyncBlockStatus>>;
+  pagesProcessed?: number;
+  lastAttemptAt?: string | null;
 }
 
 export interface MetaMetricContract {

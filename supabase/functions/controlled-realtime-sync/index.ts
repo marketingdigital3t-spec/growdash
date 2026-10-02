@@ -41,10 +41,10 @@ type RunResult = {
   freshness_seconds?: number | null;
 };
 
-// A UI pode chamar esta função ao abrir, ao recuperar foco e a cada 15 minutos.
+// A UI pode chamar esta função ao abrir, ao recuperar foco e a cada cinco minutos.
 // A trava persistida garante que várias abas/dispositivos nunca multipliquem o
 // consumo das APIs para a mesma conta/funil.
-const CONTROLLED_SYNC_INTERVAL_MS = 15 * 60 * 1_000;
+const CONTROLLED_SYNC_INTERVAL_MS = 5 * 60 * 1_000;
 const RETRY_AFTER_FAILURE_MS = 60 * 1_000;
 const LOCK_TTL_MS = 7 * 60 * 1_000;
 
@@ -131,15 +131,30 @@ Deno.serve(async (req) => {
           // daily snapshot, but do not invalidate daily KPIs when its token,
           // permission or form discovery is temporarily unavailable.
           if (fast) {
+            // Ações/leads alimentam os cards de conversão e CPL. Elas precisam
+            // seguir a confirmação do Insights do recorte selecionado, mas o
+            // hourly e os breakdowns ficam para a reconciliação global em
+            // segundo plano para não bloquear a primeira renderização.
+            const leads = await invokeFunction(supabaseUrl, authHeader, "sync-meta-leads", {
+              adAccountId: body.adAccountId,
+              adAccountIds: body.adAccountIds,
+              startDate,
+              endDate,
+              triggerSource: "controlled_realtime_selected",
+            });
             return {
               data: {
                 success: true,
                 status: insights.data?.status === "partial" ? "partial" : "success",
                 synced: Number(insights.data?.synced || 0),
-                warnings: ["Leads/forms, hourly e saldo continuarão em segundo plano."],
+                warnings: [
+                  leads.error || leads.data?.error,
+                  leads.data?.status === "partial" ? "Leads/forms Meta parcialmente atualizados." : null,
+                  "Hourly, breakdowns, saldo e RD continuarão em segundo plano.",
+                ].filter(Boolean),
                 block_status: {
                   insights: insights.data?.status || "success",
-                  leads: "pending",
+                  leads: leads.data?.status || (leads.error ? "error" : "success"),
                   hourly: "pending",
                 },
                 synced_at: insights.data?.synced_at,
