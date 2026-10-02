@@ -16,12 +16,13 @@ interface Props {
   leadsBreakdown?: { forms: number; site: number; conversations: number; total: number };
   loading?: boolean;
   hasSnapshot?: boolean;
+  unavailableReason?: string | null;
 }
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 
-export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast30, sales, leadsBreakdown, loading = false, hasSnapshot = true }: Props) {
+export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast30, sales, leadsBreakdown, loading = false, hasSnapshot = true, unavailableReason }: Props) {
   const isMobile = useIsMobile();
   const [showLeadBreakdown, setShowLeadBreakdown] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
@@ -30,11 +31,11 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
   useEffect(() => { try { localStorage.setItem("growdash:glass-strip-collapsed", collapsed ? "1" : "0"); } catch {} }, [collapsed]);
   const compact = isMobile && collapsed;
   const display = (value: string) => !hasSnapshot
-    ? (loading ? "Aguardando sincronização" : "Indisponível")
+    ? (loading ? "Aguardando sincronização" : unavailableReason || "Indisponível")
     : value;
   const metrics: GlassMetric[] = [
     { label: "Faturamento bruto", value: display(brl.format(revenue)), icon: <DollarSign /> },
-    { label: "Investimento", value: display(brl.format(spend)), icon: <Coins /> },
+    { label: "Investimento em anúncio", value: display(brl.format(spend)), icon: <Coins /> },
     { label: "Leads", value: display(integer.format(leads)), icon: <Users /> },
     { label: "CPL", value: display(brl.format(cpl)), icon: <BarChart3 /> },
     { label: "ROAS", value: display(`${roas.toFixed(2)}x`), icon: <TrendingUp />, tone: roas >= 1 ? "good" : undefined },

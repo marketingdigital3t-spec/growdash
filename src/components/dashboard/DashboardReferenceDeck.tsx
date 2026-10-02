@@ -10,6 +10,7 @@ type Props = {
   cpl: number;
   loading?: boolean;
   hasSnapshot?: boolean;
+  unavailableReason?: string | null;
 };
 
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
@@ -19,9 +20,9 @@ function pct(value: number, base: number) {
   return base > 0 ? `${((value / base) * 100).toFixed(2)}%` : "—";
 }
 
-export function DashboardReferenceDeck({ impressions, clicks, leads, clients, roas, cpl, loading = false, hasSnapshot = true }: Props) {
+export function DashboardReferenceDeck({ impressions, clicks, leads, clients, roas, cpl, loading = false, hasSnapshot = true, unavailableReason }: Props) {
   const display = (value: string) => !hasSnapshot
-    ? (loading ? "Aguardando sincronização" : "Indisponível")
+    ? (loading ? "Aguardando sincronização" : unavailableReason || "Indisponível")
     : value;
   const cards = [
     { label: "Impressões", value: display(integer.format(impressions)), detail: !hasSnapshot ? (loading ? "aguardando Meta" : "Meta sem dados") : `${pct(clicks, impressions)} CTR`, icon: <Eye /> },

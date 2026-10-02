@@ -350,11 +350,11 @@ const Index = () => {
       </MotionItem>
 
       <div className="mx-3">
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} unavailableReason={dashboardMeta.data.unavailableReason} />
       </div>
 
       <div className="mx-3">
-        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} />
+        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} unavailableReason={dashboardMeta.data.unavailableReason} />
       </div>
 
       <div className="mx-3">

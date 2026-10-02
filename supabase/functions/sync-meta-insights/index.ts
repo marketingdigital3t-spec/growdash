@@ -289,23 +289,13 @@ Deno.serve(async (req) => {
         );
         recordPagination(campaignsRes);
         if (campaignsRes.error) {
-          failedAccounts++;
-          errors.push(`Conta ${account.name}: ${campaignsRes.error}`);
-          const tokenExpired = campaignsRes.errorCode === 190;
-          needsReauth ||= tokenExpired;
-          await supabaseAdmin
-            .from("ad_accounts")
-            .update({
-              connection_status: connectionStatusForMetaError(campaignsRes.errorCode, campaignsRes.retryable),
-              last_sync_error: campaignsRes.error,
-              last_sync_error_code: campaignsRes.errorCode ?? null,
-              last_sync_attempt_at: attemptedAt,
-            })
-            // A user may disable an account while this request is in flight.
-            // Never replace that explicit choice with an automatic sync state.
-            .eq("id", account.id)
-            .neq("connection_status", "disconnected");
-          continue;
+          const message = `Conta ${account.name} catálogo de campanhas: ${campaignsRes.error}`;
+          auxiliaryErrors.push(message);
+          errors.push(message);
+          // Catalog enrichment is deliberately non-blocking. Insights below
+          // is the source of truth for spend/delivery and must still run when
+          // Meta denies or times out the campaign catalog.
+          console.warn(message);
         }
         const campaigns = campaignsRes.data;
         console.log(`Found ${campaigns.length} campaigns (incl. archived/completed)`);
@@ -345,9 +335,23 @@ Deno.serve(async (req) => {
               previous_status: prevStatus, last_activated_at,
             };
           });
-          throwIfError(await supabaseAdmin.from("campaigns").upsert(upsertRows, { onConflict: "id" }), `campanhas da conta ${account.name}`);
+          try {
+            throwIfError(await supabaseAdmin.from("campaigns").upsert(upsertRows, { onConflict: "id" }), `campanhas da conta ${account.name}`);
+          } catch (error) {
+            const message = `Conta ${account.name} catálogo de campanhas: ${(error as Error).message}`;
+            auxiliaryErrors.push(message);
+            errors.push(message);
+            console.warn(message);
+          }
           if (campaignChanges.length > 0) {
-            throwIfError(await supabaseAdmin.from("campaign_changes").insert(campaignChanges), `histórico de campanhas da conta ${account.name}`);
+            try {
+              throwIfError(await supabaseAdmin.from("campaign_changes").insert(campaignChanges), `histórico de campanhas da conta ${account.name}`);
+            } catch (error) {
+              const message = `Conta ${account.name} histórico de campanhas: ${(error as Error).message}`;
+              auxiliaryErrors.push(message);
+              errors.push(message);
+              console.warn(message);
+            }
           }
         }
 
@@ -356,8 +360,11 @@ Deno.serve(async (req) => {
           `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type,optimization_goal&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`
         );
         recordPagination(adsetsRes);
-        if (adsetsRes.error) errors.push(`Conta ${account.name} conjuntos: ${adsetsRes.error}`);
-        if (adsetsRes.error) accountHadError = true;
+        if (adsetsRes.error) {
+          const message = `Conta ${account.name} conjuntos: ${adsetsRes.error}`;
+          errors.push(message);
+          auxiliaryErrors.push(message);
+        }
         const adsetsList = adsetsRes.data;
         if (adsetsList.length > 0) {
           console.log(`Found ${adsetsList.length} adsets`);
@@ -385,8 +392,15 @@ Deno.serve(async (req) => {
               optimization_goal: a.optimization_goal ?? null,
             };
           });
-          throwIfError(await supabaseAdmin.from("adsets").upsert(rows, { onConflict: "id" }), `conjuntos da conta ${account.name}`);
-          if (changes.length > 0) throwIfError(await supabaseAdmin.from("campaign_changes").insert(changes), `histórico de conjuntos da conta ${account.name}`);
+          try {
+            throwIfError(await supabaseAdmin.from("adsets").upsert(rows, { onConflict: "id" }), `conjuntos da conta ${account.name}`);
+            if (changes.length > 0) throwIfError(await supabaseAdmin.from("campaign_changes").insert(changes), `histórico de conjuntos da conta ${account.name}`);
+          } catch (error) {
+            const message = `Conta ${account.name} catálogo de conjuntos: ${(error as Error).message}`;
+            errors.push(message);
+            auxiliaryErrors.push(message);
+            console.warn(message);
+          }
         }
 
         // 3. Fetch ads (incluindo arquivados)
@@ -394,8 +408,11 @@ Deno.serve(async (req) => {
           `${graphBase}/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${adStatusFilter}&access_token=${accessToken}&limit=200`
         );
         recordPagination(adsRes);
-        if (adsRes.error) errors.push(`Conta ${account.name} anúncios: ${adsRes.error}`);
-        if (adsRes.error) accountHadError = true;
+        if (adsRes.error) {
+          const message = `Conta ${account.name} anúncios: ${adsRes.error}`;
+          errors.push(message);
+          auxiliaryErrors.push(message);
+        }
         const adsList = adsRes.data;
         if (adsList.length > 0) {
           console.log(`Found ${adsList.length} ads`);
@@ -428,8 +445,15 @@ Deno.serve(async (req) => {
               status: newStatus, previous_status: prevStatus, last_activated_at,
             };
           });
-          throwIfError(await supabaseAdmin.from("ads").upsert(rows, { onConflict: "id" }), `anúncios da conta ${account.name}`);
-          if (changes.length > 0) throwIfError(await supabaseAdmin.from("campaign_changes").insert(changes), `histórico de anúncios da conta ${account.name}`);
+          try {
+            throwIfError(await supabaseAdmin.from("ads").upsert(rows, { onConflict: "id" }), `anúncios da conta ${account.name}`);
+            if (changes.length > 0) throwIfError(await supabaseAdmin.from("campaign_changes").insert(changes), `histórico de anúncios da conta ${account.name}`);
+          } catch (error) {
+            const message = `Conta ${account.name} catálogo de anúncios: ${(error as Error).message}`;
+            errors.push(message);
+            auxiliaryErrors.push(message);
+            console.warn(message);
+          }
         }
 
         // 3.5 O histórico de atividades dos últimos 60 dias é pesado. Ele roda

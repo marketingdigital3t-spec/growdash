@@ -117,7 +117,10 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           directRows.push(...batch);
           if (batch.length < PAGE) break;
         }
-        if (directAvailable && directRows.length > 0) {
+        // An account-scoped facts query is authoritative even when it returns
+        // no rows. Falling back to the catalog in that case made a broken or
+        // incomplete catalog look like a different zero-valued snapshot.
+        if (directAvailable) {
           const adIds = Array.from(new Set(directRows.map((row) => String(row.ad_id || "")).filter(Boolean)));
           const adCatalog: Record<string, any> = {};
           const adsetIds: string[] = [];
@@ -154,6 +157,9 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
               if (!allowedCampaigns) return true;
               const ad = adCatalog[String(row.ad_id)];
               const adset = ad ? adsetCatalog.get(String(ad.adset_id)) : null;
+              // Campaign filtering can use the catalog when available. When
+              // enrichment is delayed, keep the fact visible only if its ad
+              // can be resolved; never discard the whole account snapshot.
               return !!adset?.campaign_id && allowedCampaigns.has(String(adset.campaign_id));
             })
             .map((row) => {
