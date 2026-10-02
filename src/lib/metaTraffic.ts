@@ -56,6 +56,7 @@ export interface MetaTrafficMetrics {
   /** Availability is explicit so consumers never interpret a missing fact as zero. */
   metricAvailability: Record<string, { available: boolean; reason?: string }>;
   leadBreakdownByAccount: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
+  spendByAccount: Record<string, number>;
   leadBreakdownByAd: Record<string, { formLeads: number; siteLeads: number; conversations: number; totalLeads: number }>;
 }
 
@@ -148,6 +149,11 @@ export function aggregateMetaTrafficMetrics(
   const leadTotals = actions?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 };
   const leads = leadTotals.total;
   const leadBreakdownByAccount: MetaTrafficMetrics["leadBreakdownByAccount"] = {};
+  const spendByAccount: Record<string, number> = {};
+  for (const row of rows) {
+    const accountId = String(row.ad_account_id || "");
+    if (accountId) spendByAccount[accountId] = (spendByAccount[accountId] || 0) + Number(row.spend || 0);
+  }
   for (const [accountId, daily] of Object.entries(actions?.dailyMetaLeadByAccount || {})) {
     const totals = Object.values(daily).reduce((sum, value) => ({
       formLeads: sum.formLeads + Number(value.forms || 0),
@@ -239,6 +245,7 @@ export function aggregateMetaTrafficMetrics(
       ["breakdowns", { available: Boolean(actions?.breakdowns && Object.values(actions.breakdowns).some((segment) => segment.length > 0)), reason: actions?.breakdowns ? undefined : "Breakdowns ainda não sincronizados." }],
     ]),
     leadBreakdownByAccount,
+    spendByAccount,
     leadBreakdownByAd,
   };
 }

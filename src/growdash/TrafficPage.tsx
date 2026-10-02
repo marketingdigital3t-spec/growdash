@@ -260,7 +260,7 @@ function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAcco
   // `insights.leads` is a legacy aggregate and is never the primary KPI.
   // Actions are resolved once per alias and then summed as forms + site + conversations.
   const metaLeadsFromInsights = 0;
-  const spend = insights.reduce((sum, item) => sum + Number(item.spend || 0), 0);
+  const spend = metaTraffic.data.spend;
   const saleTotals = aggregateSales(sales);
   const won = saleTotals.totalQuantity;
   const revenue = saleTotals.totalNet;

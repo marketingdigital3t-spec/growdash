@@ -141,10 +141,10 @@ export default function BrandDiagnosticPage() {
   const sales = useMemo(() => salesQuery.data ?? [], [salesQuery.data]);
 
   const totals = useMemo(() => {
-    const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-    const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
-    const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
-    const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
+    const spend = metaTraffic.data.spend;
+    const impressions = metaTraffic.data.impressions;
+    const reach = metaTraffic.data.reach;
+    const clicks = metaTraffic.data.clicks;
     const leads = metaTraffic.data.totalLeads;
     const saleTotals = aggregateSales(sales);
     const revenue = saleTotals.totalNet;
@@ -165,7 +165,7 @@ export default function BrandDiagnosticPage() {
       roas: spend > 0 ? revenue / spend : 0,
       activeCampaigns: campaigns.filter((item) => ["ACTIVE", "active", "Ativa"].includes(String(item.status))).length,
     };
-  }, [campaigns, deals, insights, metaTraffic.data.totalLeads, sales]);
+  }, [campaigns, deals, metaTraffic.data.clicks, metaTraffic.data.impressions, metaTraffic.data.reach, metaTraffic.data.spend, metaTraffic.data.totalLeads, sales]);
 
   const campaignPerformance = useMemo(() => {
     const groups = new Map<string, { id: string; name: string; spend: number; impressions: number; clicks: number; leads: number }>();

@@ -67,12 +67,12 @@ export default function BusinessPage() {
     staleTime: 15 * 60_000,
   });
 
-  const totals = useMemo(() => (insightsQuery.data ?? []).reduce((sum, row) => ({
-    spend: sum.spend + Number(row.spend || 0),
-    impressions: sum.impressions + Number(row.impressions || 0),
-    reach: sum.reach + Number(row.reach || 0),
-    clicks: sum.clicks + Number(row.clicks || 0),
-  }), { spend: 0, impressions: 0, reach: 0, clicks: 0 }), [insightsQuery.data]);
+  const totals = useMemo(() => ({
+    spend: metaTraffic.data.spend,
+    impressions: metaTraffic.data.impressions,
+    reach: metaTraffic.data.reach,
+    clicks: metaTraffic.data.clicks,
+  }), [metaTraffic.data.clicks, metaTraffic.data.impressions, metaTraffic.data.reach, metaTraffic.data.spend]);
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : null;
   const cpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : null;
   const canonicalLeads = metaTraffic.data.totalLeads;

@@ -5,8 +5,9 @@ import { useInsights } from "@/hooks/useInsights";
 import { aggregateMetaTrafficMetrics, type MetaTrafficMetrics, type MetaTrafficScope } from "@/lib/metaTraffic";
 import { useMetaBreakdowns } from "@/hooks/useMetaBreakdowns";
 import { parseBusinessDate } from "@/lib/businessDate";
+import { metaMetricContract, type MetaMetricContract } from "@/lib/analyticsContract";
 
-export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; isLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
+export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; metrics: MetaMetricContract; isLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
   const accountIds = scope.adAccountIds.filter(Boolean);
   const scopedAccounts = (accounts.data || []).filter((account) => accountIds.length === 0 || accountIds.includes(account.id));
@@ -44,5 +45,6 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     const base = aggregateMetaTrafficMetrics(rows, { ...actions.data, breakdowns: breakdowns.data }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null });
     return isLoading ? { ...base, status: "syncing" as const } : base;
   }, [actions.data, attributionWindow, breakdowns.data, errors, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
-  return { data, isLoading, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError), error: insights.error || actions.error || accounts.error || breakdowns.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); } };
+  const metrics = useMemo(() => metaMetricContract(data), [data]);
+  return { data, metrics, isLoading, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError), error: insights.error || actions.error || accounts.error || breakdowns.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); } };
 }

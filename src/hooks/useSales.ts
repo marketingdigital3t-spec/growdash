@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toLocalDateString } from "@/lib/dateRange";
 import { withRequestTimeout } from "@/lib/resilience";
+import { canonicalSaleKey, dedupeCanonicalSales } from "@/lib/canonicalSales";
 
 
 export interface Sale {
@@ -81,26 +82,7 @@ interface UseSalesParams {
  * Vendas manuais sem identidade externa preservam o próprio UUID: duas
  * vendas manuais iguais continuam sendo duas operações legítimas.
  */
-export function canonicalSaleKey(sale: Pick<Sale, "id" | "rd_deal_id" | "source_provider" | "source_record_id">) {
-  if (sale.rd_deal_id?.trim()) return `rd:${sale.rd_deal_id.trim()}`;
-  if (sale.source_provider?.trim() && sale.source_record_id?.trim()) {
-    return `source:${sale.source_provider.trim().toLowerCase()}:${sale.source_record_id.trim()}`;
-  }
-  return `sale:${sale.id}`;
-}
-
-/** Keep the newest representation of each externally identified sale. */
-export function dedupeCanonicalSales<T extends Sale>(rows: T[]) {
-  const unique = new Map<string, T>();
-  for (const row of rows) {
-    const key = canonicalSaleKey(row);
-    const current = unique.get(key);
-    const rowTime = new Date(row.updated_at || row.created_at || 0).getTime();
-    const currentTime = current ? new Date(current.updated_at || current.created_at || 0).getTime() : -Infinity;
-    if (!current || rowTime >= currentTime) unique.set(key, row);
-  }
-  return Array.from(unique.values());
-}
+export { canonicalSaleKey, dedupeCanonicalSales };
 
 export function useSales(params?: UseSalesParams) {
   return useQuery({
