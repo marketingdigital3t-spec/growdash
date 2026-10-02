@@ -8,19 +8,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateEventClass, useUpdateEventClass, type EventClass, type EventClassStatus } from "@/hooks/useEventClasses";
 import { toast } from "@/hooks/use-toast";
 
-interface Props { open: boolean; onOpenChange: (value: boolean) => void; eventClass?: EventClass | null; }
+interface Props { open: boolean; onOpenChange: (value: boolean) => void; eventClass?: EventClass | null; defaultExpertName?: string; }
 const STATUS_OPTIONS: { value: EventClassStatus; label: string }[] = [
   { value: "open", label: "Aberta" }, { value: "upcoming", label: "Em breve" }, { value: "sold_out", label: "Esgotada" }, { value: "cancelled", label: "Cancelada" }, { value: "finished", label: "Finalizada" },
 ];
 const empty = { title: "", expert_name: "", date_start: "", date_end: "", location: "", max_students: 0, max_people: 0, max_model_patients: 0, status: "open" as EventClassStatus, notes: "" };
 
-export function EventClassFormDialog({ open, onOpenChange, eventClass }: Props) {
+export function EventClassFormDialog({ open, onOpenChange, eventClass, defaultExpertName }: Props) {
   const create = useCreateEventClass(); const update = useUpdateEventClass();
   const [form, setForm] = useState(empty);
   useEffect(() => {
     if (eventClass) setForm({ title: eventClass.title, expert_name: eventClass.expert_name || "", date_start: eventClass.date_start, date_end: eventClass.date_end || "", location: eventClass.location || "", max_students: Number(eventClass.max_students || eventClass.max_people || 0), max_people: Number(eventClass.max_people || eventClass.max_students || 0), max_model_patients: Number(eventClass.max_model_patients || 0), status: eventClass.status, notes: eventClass.notes || "" });
-    else if (open) setForm(empty);
-  }, [eventClass, open]);
+    else if (open) setForm({ ...empty, expert_name: defaultExpertName || "" });
+  }, [defaultExpertName, eventClass, open]);
   const set = (key: keyof typeof form, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => {
     if (!form.title.trim() || !form.expert_name.trim() || !form.date_start) { toast({ title: "Informe nome, expert e data inicial.", variant: "destructive" }); return; }
