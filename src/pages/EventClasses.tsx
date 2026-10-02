@@ -10,6 +10,7 @@ import { EventClassFormDialog } from "@/components/event-classes/EventClassFormD
 import { motion } from "framer-motion";
 import { parseISO, isAfter, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ExpertOperationsView } from "@/components/expert/ExpertOperationsView";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "Todos os status" },
@@ -43,7 +44,7 @@ export default function EventClasses() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [formOpen, setFormOpen] = useState(false);
-  const [activeView, setActiveView] = useState<"classes" | "agenda">("classes");
+  const [activeView, setActiveView] = useState<"classes" | "agenda" | "operation">("classes");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -107,9 +108,10 @@ export default function EventClasses() {
 
   return (
     <div className="event-classes-page mx-auto w-full max-w-[1600px] space-y-6">
-      <nav className="grid max-w-md grid-cols-2 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
+      <nav className="grid max-w-2xl grid-cols-3 rounded-xl border border-border bg-muted/60 p-1" aria-label="Visualização de datas e turmas" role="tablist">
         <button type="button" role="tab" aria-selected={activeView === "classes"} onClick={() => setActiveView("classes")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "classes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><CalendarDays className="h-4 w-4" aria-hidden="true" />Datas & Turmas</button>
         <button type="button" role="tab" aria-selected={activeView === "agenda"} onClick={() => setActiveView("agenda")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "agenda" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Clock3 className="h-4 w-4" aria-hidden="true" />Agenda</button>
+        <button type="button" role="tab" aria-selected={activeView === "operation"} onClick={() => setActiveView("operation")} className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${activeView === "operation" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Users className="h-4 w-4" aria-hidden="true" />Operação</button>
       </nav>
 
       {activeView === "classes" ? <>
@@ -183,7 +185,7 @@ export default function EventClasses() {
           <EventClassCard key={ec.id} ec={ec} />
         ))}
       </div>
-      </> : <AgendaPanel classes={filtered} isLoading={isLoading} onCreate={() => setFormOpen(true)} />}
+      </> : activeView === "agenda" ? <AgendaPanel classes={filtered} isLoading={isLoading} onCreate={() => setFormOpen(true)} /> : <ExpertOperationsView />}
 
       <EventClassFormDialog open={formOpen} onOpenChange={setFormOpen} />
     </div>
