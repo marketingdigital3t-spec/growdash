@@ -184,6 +184,8 @@ Deno.serve(async (req) => {
     for (const account of accounts) {
       const attemptedAt = new Date().toISOString();
       let accountHadError = false;
+      let accountLockScopeKey: string | null = null;
+      let accountLockAcquired = false;
       const recordPagination = (result: { pages?: number; lastCursor?: string; truncated?: boolean; repeatedCursor?: boolean }, label = "consulta") => {
         totalPages += Number(result.pages || 0);
         if (result.lastCursor) lastCursor = result.lastCursor;
@@ -225,6 +227,24 @@ Deno.serve(async (req) => {
         const accessToken = account.access_token;
         const rawAccountId = account.account_id;
         const metaAccountId = rawAccountId.startsWith("act_") ? rawAccountId : `act_${rawAccountId}`;
+
+        // Every writer (manual, cron or backfill) takes the same per-account
+        // lock. The coordinator lock alone is not enough because direct
+        // function calls could otherwise write the same facts concurrently.
+        accountLockScopeKey = `meta-account:${account.id}:${startDate}:${endDate}:${effectiveTimezone}:${effectiveAttributionWindow}`;
+        const { data: acquired, error: lockError } = await supabaseAdmin.rpc("acquire_realtime_sync_lock", {
+          p_user_id: account.user_id,
+          p_provider: "meta",
+          p_scope_key: accountLockScopeKey,
+          p_now: new Date().toISOString(),
+          p_locked_until: new Date(Date.now() + 7 * 60_000).toISOString(),
+        });
+        if (lockError) throw lockError;
+        if (!acquired) {
+          errors.push(`Conta ${account.name}: sincronização já está em andamento; snapshot preservado.`);
+          continue;
+        }
+        accountLockAcquired = true;
 
         console.log(`Syncing: ${account.name} (${metaAccountId})`);
 
@@ -853,6 +873,10 @@ Deno.serve(async (req) => {
           // A completed sync is not authorization to reactivate an account.
           .eq("id", account.id)
           .neq("connection_status", "disconnected");
+        if (accountLockAcquired && accountLockScopeKey) {
+          await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
+            .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
+        }
       } catch (e) {
         failedAccounts++;
         const msg = (e as Error).message;
@@ -868,6 +892,10 @@ Deno.serve(async (req) => {
           // error is handled after the account has been switched off.
           .eq("id", account.id)
           .neq("connection_status", "disconnected");
+        if (accountLockAcquired && accountLockScopeKey) {
+          await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
+            .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
+        }
       }
     }
 
