@@ -486,7 +486,10 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
-            <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} />
+            {/* Agenda & Turmas usa somente o expert selecionado dentro da
+                própria operação; conta Meta, funil RD e calendário são
+                filtros das telas analíticas e não devem aparecer aqui. */}
+            {pathname !== "/agenda-turmas" && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} />}
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
               <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>
