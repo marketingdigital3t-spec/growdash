@@ -27,6 +27,9 @@ export interface InsightRow {
   cpm: number;
   frequency: number;
   leads: number;
+  form_leads?: number;
+  site_leads?: number;
+  conversations?: number;
   cpl: number;
   conversion_rate: number;
   efficiency_rate: number;
@@ -45,6 +48,21 @@ export interface InsightRow {
   campaign_id?: string | null;
   ad_account_id?: string | null;
   attribution_window?: string | null;
+}
+
+function canonicalInsightLeads(row: any) {
+  const forms = Number(row.form_leads ?? 0);
+  const site = Number(row.site_leads ?? 0);
+  const conversations = Number(row.conversations ?? 0);
+  const hasCanonicalFields = row.form_leads !== null && row.form_leads !== undefined
+    || row.site_leads !== null && row.site_leads !== undefined
+    || row.conversations !== null && row.conversations !== undefined;
+  return {
+    forms,
+    site,
+    conversations,
+    total: hasCanonicalFields ? forms + site + conversations : Number(row.leads ?? 0),
+  };
 }
 
 /**
@@ -80,7 +98,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         let directAvailable = true;
         const directQuery = (supabase as any)
           .from("insights")
-          .select("ad_id,ad_account_id,date,spend,impressions,reach,clicks,ctr,cpm,frequency,leads,cpl,conversion_rate,efficiency_rate,health_score,optimization_goal,result_type,result_value,attribution_window")
+          .select("ad_id,ad_account_id,date,spend,impressions,reach,clicks,ctr,cpm,frequency,leads,form_leads,site_leads,conversations,cpl,conversion_rate,efficiency_rate,health_score,optimization_goal,result_type,result_value,attribution_window")
           .in("ad_account_id", scopedAccountIds)
           .gte("date", start)
           .lte("date", end)
@@ -153,7 +171,10 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
                 ctr: row.ctr ?? 0,
                 cpm: row.cpm ?? 0,
                 frequency: row.frequency ?? 0,
-                leads: row.leads ?? 0,
+                leads: canonicalInsightLeads(row).total,
+                form_leads: canonicalInsightLeads(row).forms,
+                site_leads: canonicalInsightLeads(row).site,
+                conversations: canonicalInsightLeads(row).conversations,
                 cpl: row.cpl ?? 0,
                 conversion_rate: row.conversion_rate ?? 0,
                 efficiency_rate: row.efficiency_rate ?? 0,
@@ -231,7 +252,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       for (const group of insightGroups.values()) {
         let query = supabase
           .from("insights")
-          .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value, attribution_window")
+          .select("ad_id, date, spend, impressions, reach, clicks, ctr, cpm, frequency, leads, form_leads, site_leads, conversations, cpl, conversion_rate, efficiency_rate, health_score, optimization_goal, result_type, result_value, attribution_window")
           .in("ad_id", group.ids)
           .gte("date", start)
           .lte("date", end)
@@ -271,7 +292,10 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         ctr: row.ctr ?? 0,
         cpm: row.cpm ?? 0,
         frequency: row.frequency ?? 0,
-        leads: row.leads ?? 0,
+          leads: canonicalInsightLeads(row).total,
+          form_leads: canonicalInsightLeads(row).forms,
+          site_leads: canonicalInsightLeads(row).site,
+          conversations: canonicalInsightLeads(row).conversations,
         cpl: row.cpl ?? 0,
         conversion_rate: row.conversion_rate ?? 0,
         efficiency_rate: row.efficiency_rate ?? 0,
