@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
 import { normalizeCustomDateRange, resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useRDFunnels } from "@/hooks/useRDFunnels";
 
 export type BusinessSegment = "infoproduto" | "saas";
 
@@ -49,6 +50,7 @@ function readStored() {
 
 export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   const { data: workspace } = useWorkspace();
+  const { data: rdFunnels = [], isLoading: loadingRDFunnels } = useRDFunnels(undefined, true);
   const stored = typeof window === "undefined" ? null : readStored();
   const [adAccountIds, setAdAccountIds] = useState<string[]>(() => stored?.adAccountIds?.length ? stored.adAccountIds : stored?.adAccountId && stored.adAccountId !== "all" ? [stored.adAccountId] : []);
   const [funnelIds, setFunnelIds] = useState<string[]>(() => stored?.funnelIds ?? []);
@@ -60,6 +62,20 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
     setStoredCustomRange(normalizeCustomDateRange(value));
   }, []);
   const [segment, setSegment] = useState<BusinessSegment>(stored?.segment ?? "infoproduto");
+
+  // A conta Meta is the only visible global scope control. Once its RD link
+  // is loaded, keep the CRM scope in lockstep so every module shows the Meta
+  // and RD data belonging to that account without a second funnel selector.
+  useEffect(() => {
+    if (loadingRDFunnels) return;
+    const active = rdFunnels.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id);
+    const selectedAccountIds = new Set(adAccountIds);
+    const linked = adAccountIds.length
+      ? active.filter((funnel) => funnel.ad_account_id && selectedAccountIds.has(funnel.ad_account_id))
+      : active;
+    const nextIds = linked.map((funnel) => funnel.id);
+    setFunnelIds((current) => current.length === nextIds.length && current.every((id, index) => id === nextIds[index]) ? current : nextIds);
+  }, [adAccountIds, loadingRDFunnels, rdFunnels]);
 
   useEffect(() => {
     try {
