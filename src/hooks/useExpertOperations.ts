@@ -44,24 +44,30 @@ export function useExpertOperations(expertId: string | undefined) {
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId, startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)], enabled: Boolean(expertId),
+    queryKey: ["expert-operation-classes", expertId || "all", startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)], enabled: true,
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
       if (error) throw error;
-      return data || [];
+      const rows = data || [];
+      if (!rows.length) return [];
+      const { data: participants, error: participantsError } = await (supabase as any).from("event_class_participants").select("*").in("event_class_id", rows.map((row: any) => row.id)).order("created_at", { ascending: true });
+      if (participantsError) throw participantsError;
+      const byClass = new Map<string, any[]>();
+      (participants || []).forEach((participant: any) => byClass.set(participant.event_class_id, [...(byClass.get(participant.event_class_id) || []), participant]));
+      return rows.map((row: any) => ({ ...row, participants: byClass.get(row.id) || [] }));
     },
   });
   const accountIds = useMemo(() => Array.from(new Set((sources.data || []).map((source) => source.ad_account_id).filter(Boolean) as string[])), [sources.data]);
   const attributionWindowsByAccount = useMemo(() => Object.fromEntries((sources.data || []).filter((source) => source.ad_account_id).map((source) => [source.ad_account_id, source.attribution_window || "account_default"])), [sources.data]);
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(expertId && accountIds.length));
   const filteredClasses = useMemo(() => (classes.data || []).filter((item: any) => {
+    if (!expertId) return true;
     if (item.expert_id && item.expert_id !== expertId) return false;
     if (!item.expert_id && norm(item.expert_name) !== norm(expert.data?.nome)) return false;
-    const start = String(item.date_start || "");
-    const end = String(item.date_end || item.date_start || "");
-    const from = startDate.toISOString().slice(0, 10);
-    const to = endDate.toISOString().slice(0, 10);
-    return start <= to && end >= from;
+    // O carrossel de turmas é um inventário operacional. O período global
+    // continua filtrando tráfego e vendas, mas não deve esconder turmas
+    // futuras ou históricas do calendário.
+    return true;
   }), [classes.data, expertId, expert.data?.nome, startDate, endDate]);
   const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, startDate.toISOString().slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${startDate.toISOString().slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {

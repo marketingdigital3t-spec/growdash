@@ -26,8 +26,14 @@ function ClassCard({ eventClass, sales, expertId, sources, onRefresh }: { eventC
   const [sheetOpen, setSheetOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const classSales = sales.filter((row) => row.event_class_id ? row.event_class_id === eventClass.id : (row.class_match_status !== "ambiguous" && row.class_name && row.class_name.toLocaleLowerCase() === String(eventClass.title).toLocaleLowerCase()));
-  const students = classSales.filter((row) => row.participant_type === "student");
-  const patients = classSales.filter((row) => row.participant_type === "model_patient");
+  const manualParticipants = Array.isArray(eventClass.participants) ? eventClass.participants.map((row: any) => ({ ...row, cash_received_cents: row.investment_cents, gross_amount_cents: row.investment_cents })) : [];
+  const mergeParticipants = (type: "student" | "model_patient") => {
+    const imported = classSales.filter((row) => row.participant_type === type);
+    const names = new Set(imported.map((row) => String(row.name || "").trim().toLocaleLowerCase()));
+    return [...imported, ...manualParticipants.filter((row: any) => row.participant_type === type && !names.has(String(row.name || "").trim().toLocaleLowerCase()))];
+  };
+  const students = mergeParticipants("student");
+  const patients = mergeParticipants("model_patient");
   const capacity = Number(eventClass.max_students || eventClass.max_people || 10);
   const occupancy = capacity ? Math.min(students.length / capacity * 100, 100) : 0;
   const studentRevenue = students.reduce((sum, row) => sum + Number(row.gross_amount_cents || 0), 0);
