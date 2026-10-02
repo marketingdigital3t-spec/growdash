@@ -80,6 +80,7 @@ export function useActionTotalsByAds(
       const valueTotalsByAd: Record<string, Record<string, number>> = {};
       const metaLeadActions = { forms: 0, site: 0, conversations: 0, total: 0 };
       const dailyMetaLeadByAccount: ActionTotalsResult["dailyMetaLeadByAccount"] = {};
+      const seenFacts = new Set<string>();
       const start = startDate ? businessDateKey(startDate) : null;
       const end = endDate ? businessDateKey(endDate) : null;
 
@@ -152,7 +153,7 @@ export function useActionTotalsByAds(
           for (let from = 0; ; from += PAGE) {
           let q = supabase
             .from("insight_actions" as any)
-            .select("ad_id, action_type, value, value_amount, date")
+            .select("ad_id, action_type, value, value_amount, date, attribution_window")
             .in("ad_id", chunk);
           if (group.window === "account_default") {
             q = q.or("attribution_window.eq.account_default,attribution_window.is.null");
@@ -165,6 +166,9 @@ export function useActionTotalsByAds(
           if (error) throw error;
           const rows = (data || []) as any[];
           for (const r of rows) {
+            const factKey = `${r.ad_id}|${r.date}|${r.action_type}|${r.attribution_window || "account_default"}`;
+            if (seenFacts.has(factKey)) continue;
+            seenFacts.add(factKey);
             const v = Number(r.value || 0);
             totals[r.action_type] = (totals[r.action_type] || 0) + v;
             if (!totalsByAd[r.ad_id]) totalsByAd[r.ad_id] = {};

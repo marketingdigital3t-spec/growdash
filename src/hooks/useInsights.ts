@@ -294,10 +294,9 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
     },
     enabled,
     placeholderData: (previousData) => previousData,
-    // The backend reconciles Meta every five minutes. Keep the UI cache on
-    // that same cadence so account totals do not remain stale longer.
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    // The coordinator refreshes on entry/filter events and every 15 minutes.
+    staleTime: 15 * 60 * 1000,
+    refetchInterval: 15 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnWindowFocus: true,
   });

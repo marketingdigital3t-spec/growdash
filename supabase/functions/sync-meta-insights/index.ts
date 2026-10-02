@@ -728,9 +728,9 @@ Deno.serve(async (req) => {
           for (let i = 0; i < factAdIds.length; i += 500) {
             const adChunk = factAdIds.slice(i, i + 500);
             let actionDelete = supabaseAdmin.from("insight_actions").delete()
-              .in("ad_id", adChunk).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
+              .in("ad_id", adChunk).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
             let insightDelete = supabaseAdmin.from("insights").delete()
-              .in("ad_id", adChunk).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
+              .in("ad_id", adChunk).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
             if (incoming.length) {
               const quoted = `(${incoming.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",")})`;
               actionDelete = actionDelete.not("ad_id", "in", quoted);
