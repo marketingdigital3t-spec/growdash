@@ -44,7 +44,9 @@ export default function EventClasses() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [formOpen, setFormOpen] = useState(false);
-  const [activeView, setActiveView] = useState<"classes" | "agenda" | "operation">("classes");
+  // A operação é a visão principal da agenda: a equipe vê turmas e resultado
+  // na mesma tela, mantendo os cadastros detalhados nas abas auxiliares.
+  const [activeView, setActiveView] = useState<"classes" | "agenda" | "operation">("operation");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
