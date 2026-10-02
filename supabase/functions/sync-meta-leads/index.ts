@@ -350,7 +350,6 @@ Deno.serve(async (req) => {
       const result = new Map<string, string[]>();
       const pagesRes = await fetchAll(
         `${GRAPH}/me/accounts?fields=id,leadgen_forms.limit(200){id,account_id}&limit=100&access_token=${token}`,
-        1,
       );
       if (!pagesRes.error) {
         for (const page of pagesRes.data || []) {
@@ -378,16 +377,15 @@ Deno.serve(async (req) => {
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
           `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id,creative{object_story_spec}&limit=50&access_token=${token}`;
-        // Lead forms are discovered from the first creative page; this keeps
-        // the 15-minute all-account job bounded even for very large accounts.
-        let adsRes = await fetchAll(adsUrl, 1);
+        // Follow every ads page. Discovering only the first page silently
+        // omitted forms from larger accounts and made lead KPIs look partial.
+        let adsRes = await fetchAll(adsUrl);
         if (adsRes.error) {
           // Older tokens/API versions may reject nested creative fields. Keep
           // lead synchronization alive with the minimal ad listing, while
           // retaining the error only if the fallback also fails.
           const fallbackAds = await fetchAll(
             `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id&limit=200&access_token=${token}`,
-            1,
           );
           if (!fallbackAds.error) adsRes = fallbackAds;
           else adsRes = { ...adsRes, error: `ads: ${adsRes.error}; fallback: ${fallbackAds.error}` };

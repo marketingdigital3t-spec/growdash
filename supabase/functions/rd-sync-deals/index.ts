@@ -459,12 +459,26 @@ Deno.serve(async (req) => {
         opts.status === "failed"
           ? `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} falhou: ${opts.errorMessage || "erro desconhecido"}`
           : `Sincronização do RD${opts.funnelName ? ` (${opts.funnelName})` : ""} demorou ${(duration / 1000).toFixed(1)}s (acima do esperado).`;
-      await admin.from("alerts").insert({
-        user_id: userId,
-        alert_type: "rd_sync",
-        severity,
-        message,
-      });
+      // Automatic cycles must not create an identical alert every run. Keep
+      // the alert stream useful by deduplicating the same funnel/error for a
+      // short window; a changed error or a later manual run can still alert.
+      const { data: recentAlert } = await admin
+        .from("alerts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("alert_type", "rd_sync")
+        .eq("message", message)
+        .gte("created_at", new Date(Date.now() - 15 * 60_000).toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (!recentAlert) {
+        await admin.from("alerts").insert({
+          user_id: userId,
+          alert_type: "rd_sync",
+          severity,
+          message,
+        });
+      }
     }
     console.log(
       `[sync_runs] finished status=${opts.status} duration=${duration}ms retries=${metrics.retries} errors=${metrics.errors} details=${metrics.details} contacts=${metrics.contacts}`,

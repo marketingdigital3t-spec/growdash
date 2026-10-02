@@ -67,10 +67,10 @@ const Index = () => {
     () => selectedAccountIds.length ? selectedAccountIds : visibleAccountIdList,
     [selectedAccountIds, visibleAccountIdList],
   );
-  const isRDAccountScopeReady = selectedAccount !== "all" || (!loadingAdAccounts && visibleAccountIdList.length > 0);
   const { data: campaigns = [] } = useCampaigns(selectedAccount === "all" ? undefined : selectedAccount);
   const { data: products = [] } = useProducts();
-  const { data: rdFunnels = [] } = useRDFunnels();
+  const { data: rdFunnels = [], isLoading: loadingRDFunnels } = useRDFunnels();
+  const isRDScopeReady = !loadingRDFunnels;
   const scopedRDfunnelIds = useMemo(() => {
     const active = rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id);
     return selectedFunnelIds.length
@@ -109,18 +109,14 @@ const Index = () => {
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
-    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
     funnelIds: scopedRDfunnelIds,
-    enabled: isRDAccountScopeReady,
+    enabled: isRDScopeReady,
   });
   const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
     startDate,
     endDate,
-    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
     funnelIds: scopedRDfunnelIds,
-    enabled: isRDAccountScopeReady,
+    enabled: isRDScopeReady,
   });
   const { data: alerts = [] } = useAlerts();
   const { data: eventClasses = [] } = useEventClasses();

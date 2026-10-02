@@ -246,6 +246,7 @@ Deno.serve(async (req) => {
           }
         }
 
+        let persistenceFailed = false;
         for (let i = 0; i < rows.length; i += 500) {
           const chunk = rows.slice(i, i + 500);
           const { error: upErr } = await supabaseAdmin
@@ -253,12 +254,14 @@ Deno.serve(async (req) => {
             .upsert(chunk, { onConflict: "ad_id,date,hour", ignoreDuplicates: false });
           if (upErr) {
             errors.push(`Upsert ${account.name}: ${upErr.message}`);
+            persistenceFailed = true;
             break;
           }
           totalSynced += chunk.length;
         }
         // Do not erase a valid hourly snapshot before the new one has been
         // written successfully. Keep the campaign scope bounded as well.
+        if (persistenceFailed) continue;
         const incomingByDate = new Map<string, Set<string>>();
         for (const row of rows) {
           const ids = incomingByDate.get(row.date) || new Set<string>();

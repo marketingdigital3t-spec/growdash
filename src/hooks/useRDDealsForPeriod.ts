@@ -106,8 +106,6 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
       "rd_deals_period",
       format(startDate, "yyyy-MM-dd"),
       format(endDate, "yyyy-MM-dd"),
-      adAccountId ?? "all",
-      adAccountIds?.slice().sort().join(",") ?? "",
       funnelIds?.slice().sort().join(",") ?? "",
     ],
     enabled,
@@ -133,11 +131,8 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
           // the selected interval must not be lost by a lead_created filter.
           .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
           .order("lead_created_at", { ascending: false });
-        if (adAccountId) q = q.eq("ad_account_id", adAccountId);
-        // An empty selection means "all accounts". Passing [] to PostgREST
-        // generates an invalid `in.()` filter and makes the module fail to
-        // load for users whose filters have not been initialized yet.
-        else if (adAccountIds?.length) q = q.in("ad_account_id", adAccountIds);
+        // RD is an independent source. Meta account filters must never hide a
+        // funnel whose local ad_account_id is null or linked to another account.
         if (funnelIds?.length) q = q.in("rd_funnel_id", funnelIds);
         const from = p * PAGE;
         const to = from + PAGE - 1;
@@ -153,7 +148,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         if (batch.length < PAGE) break;
       }
       const scoped = all.filter((deal) => isRDDealInScopePeriod(deal, {
-        accountIds: adAccountId ? [adAccountId] : (adAccountIds ?? []),
+        accountIds: [],
         funnelIds: [],
         startDate,
         endDate,
@@ -175,7 +170,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
  */
 export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
   return useQuery({
-    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? "", funnelIds?.slice().sort().join(",") ?? ""],
+    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), funnelIds?.slice().sort().join(",") ?? ""],
     enabled,
     queryFn: async () => {
       const bounds = saoPauloDayBounds(startDate, endDate);
@@ -192,8 +187,6 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
           query = fallbackToStageUpdate
             ? query.is("closed_at", null).gte("stage_updated_at", rangeStart).lte("stage_updated_at", rangeEnd)
             : query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd);
-          if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-          else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
           if (funnelIds?.length) query = query.in("rd_funnel_id", funnelIds);
           const { data, error } = await withRequestTimeout(query.range(page * PAGE, (page + 1) * PAGE - 1), 15_000);
           if (error) throw error;
@@ -227,10 +220,9 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
  * visível no pipeline, exatamente como no RD Station.
  */
 export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, enabled = true }: RDCRMQueryScope) {
-  const accountScope = adAccountIds?.slice().sort().join(",") ?? "";
   const funnelScope = funnelIds?.slice().sort().join(",") ?? "";
   return useQuery({
-    queryKey: ["rd_crm_deals", adAccountId ?? "all", accountScope, funnelScope, startDate ? format(startDate, "yyyy-MM-dd") : "all", endDate ? format(endDate, "yyyy-MM-dd") : "all"],
+    queryKey: ["rd_crm_deals", funnelScope, startDate ? format(startDate, "yyyy-MM-dd") : "all", endDate ? format(endDate, "yyyy-MM-dd") : "all"],
     enabled,
     queryFn: async () => {
       const pageSize = 1_000;
@@ -244,8 +236,6 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
           .select(FIELDS)
           .order("stage_updated_at", { ascending: false, nullsFirst: false })
           .order("lead_created_at", { ascending: false, nullsFirst: false });
-        if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-        else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
         if (funnelIds?.length) query = query.in("rd_funnel_id", funnelIds);
         if (startDate && endDate) {
           const bounds = saoPauloDayBounds(startDate, endDate);

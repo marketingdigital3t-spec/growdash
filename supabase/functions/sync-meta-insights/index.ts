@@ -62,7 +62,10 @@ function canonicalResult(objective: string | null, optimizationGoal: string | nu
   if (objectiveKey.includes("AWARENESS") || goalKey.includes("REACH")) {
     return { type: "reach", value: 0 };
   }
-  return { type: "leads", value: leads.forms + leads.site };
+  // The canonical Meta lead KPI is the sum of the three disjoint components.
+  // Conversations are intentionally included here so result cards and
+  // `insights.leads` cannot disagree with the action totals used by the UI.
+  return { type: "leads", value: leads.forms + leads.site + leads.conversations };
 }
 
 Deno.serve(async (req) => {
@@ -665,7 +668,7 @@ Deno.serve(async (req) => {
           const campaign = campaignById.get(String(insight.campaign_id || ""));
           const adset = adsetById.get(String(insight.adset_id || ""));
           const parts = canonicalLeadParts(actions, lpAction);
-          const leads = parts.forms + parts.site;
+          const leads = parts.forms + parts.site + parts.conversations;
           const result = canonicalResult(campaign?.objective || null, adset?.optimization_goal || null, actions, lpAction);
           const cpl = leads > 0 ? spend / leads : 0;
           const conversionRate = clicks > 0 ? (leads / clicks) * 100 : 0;
