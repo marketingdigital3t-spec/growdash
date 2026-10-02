@@ -180,6 +180,7 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
     let needsReauth = false;
     let failedAccounts = 0;
+    const accountResults: any[] = [];
 
     for (const account of accounts) {
       const attemptedAt = new Date().toISOString();
@@ -573,6 +574,20 @@ Deno.serve(async (req) => {
             await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
               .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
           }
+          accountResults.push({
+            internalAccountId: account.id,
+            externalAccountId: metaAccountId,
+            requestedPeriod: { startDate, endDate },
+            coveredPeriod: null,
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            pagesProcessed: insightsRes.pages || 0,
+            rowsPersisted: 0,
+            spendPersisted: null,
+            status: "error",
+            lastSuccessAt: account.last_sync_success_at || null,
+            error: insightsRes.error,
+          });
           continue;
         }
         if (accountHadError) {
@@ -946,6 +961,20 @@ Deno.serve(async (req) => {
             breakdowns: { status: auxiliaryErrors.length ? "partial" : "pending", errorMessage: auxiliaryErrors.join("; ") || null },
           },
         });
+        accountResults.push({
+          internalAccountId: account.id,
+          externalAccountId: metaAccountId,
+          requestedPeriod: { startDate, endDate },
+          coveredPeriod: { startDate, endDate },
+          timezone: effectiveTimezone,
+          attributionWindow: effectiveAttributionWindow,
+          pagesProcessed: insightsRes.pages || 0,
+          rowsPersisted: insightRows.length,
+          spendPersisted: insightRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0),
+          status: accountHadError ? "partial" : "fresh",
+          lastSuccessAt: accountHadError ? account.last_sync_success_at || null : attemptedAt,
+          errors: auxiliaryErrors,
+        });
         if (accountLockAcquired && accountLockScopeKey) {
           await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
             .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
@@ -976,6 +1005,20 @@ Deno.serve(async (req) => {
           lastAttemptAt: attemptedAt,
           errorMessage: msg,
           blockStatus: { insights: { status: "error", errorMessage: msg } },
+        });
+        accountResults.push({
+          internalAccountId: account.id,
+          externalAccountId: typeof account.account_id === "string" && account.account_id.startsWith("act_") ? account.account_id : `act_${account.account_id}`,
+          requestedPeriod: { startDate: requestedStartDate || null, endDate: requestedEndDate || null },
+          coveredPeriod: null,
+          timezone: account.timezone_name || "America/Sao_Paulo",
+          attributionWindow: requestedAttributionWindow || account.attribution_window || "account_default",
+          pagesProcessed: 0,
+          rowsPersisted: 0,
+          spendPersisted: null,
+          status: "error",
+          lastSuccessAt: account.last_sync_success_at || null,
+          error: msg,
         });
         if (accountLockAcquired && accountLockScopeKey) {
           await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
@@ -1017,6 +1060,7 @@ Deno.serve(async (req) => {
           timezone: typeof body.timezone === "string" ? body.timezone : "account",
         },
         pagination: { pages: totalPages, last_cursor: lastCursor },
+        accountResults,
       }),
       // Partial synchronization is a valid application response. Returning
       // HTTP 207 makes supabase.functions.invoke expose only a generic
