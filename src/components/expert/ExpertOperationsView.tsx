@@ -185,8 +185,8 @@ function ClassCard({
     <>
       <Card className="h-full w-full overflow-hidden border-border/80 bg-card/95 shadow-lg">
         <CardHeader className="relative space-y-1.5 p-2.5 pb-1.5">
-          <div className="flex flex-col gap-1.5">
-            <div className="min-w-0 pr-20">
+          <div className="grid grid-cols-[minmax(0,1fr)_88px] items-start gap-2">
+            <div className="min-w-0">
               <Badge
                 className="text-[10px]"
                 variant={
@@ -209,30 +209,30 @@ function ClassCard({
                 {eventClass.location ? ` · ${eventClass.location}` : ""}
               </p>
             </div>
-            <div className="absolute right-0 top-0 flex items-center justify-end gap-0">
-              <Button
-                className="h-7 w-7"
-                size="icon"
-                variant="ghost"
-                aria-label="Editar turma"
-                onClick={() => setEditOpen(true)}
-              >
-                <Edit className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                className="h-7 w-7"
-                size="icon"
-                variant="ghost"
-                aria-label="Vincular planilhas"
-                onClick={() => setSheetOpen(true)}
-              >
-                <Link2 className="h-3.5 w-3.5" />
-              </Button>
-              <div className="pl-0.5 text-right text-[10px] text-muted-foreground">
-                <div>
-                  {students.length}/{target}
-                </div>
-                <Progress value={occupancy} className="mt-1 h-1.5 w-12" />
+            <div className="flex min-w-0 flex-col items-end gap-1">
+              <div className="flex items-center gap-0.5">
+                <Button
+                  className="h-7 w-7 shrink-0 rounded-full"
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Editar turma"
+                  onClick={() => setEditOpen(true)}
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  className="h-7 w-7 shrink-0 rounded-full"
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Vincular planilhas"
+                  onClick={() => setSheetOpen(true)}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="w-full text-right text-[10px] leading-none text-muted-foreground">
+                <span>{students.length}/{target}</span>
+                <Progress value={occupancy} className="ml-auto mt-1 h-1.5 w-16" />
               </div>
             </div>
           </div>
@@ -258,14 +258,13 @@ function ClassCard({
         </CardHeader>
         <CardContent className="space-y-2 p-2.5 pt-1">
           <div className="grid grid-cols-2 gap-1 text-[8px] font-black uppercase leading-tight tracking-wider text-muted-foreground">
-            <span>
-              Alunas{" "}
-              <b className="float-right text-foreground">
-                {students.length}/{target}
-              </b>
+            <span className="flex items-center justify-between gap-1">
+              <span>Alunas</span>
+              <b className="shrink-0 text-foreground">{students.length}/{target}</b>
             </span>
-            <span>
-              Paciente-modelo <b className="float-right text-foreground">{patients.length}/10</b>
+            <span className="flex items-center justify-between gap-1">
+              <span className="truncate">Paciente-modelo</span>
+              <b className="shrink-0 text-foreground">{patients.length}/10</b>
             </span>
           </div>
           <div className="grid gap-1.5 lg:grid-cols-2">
