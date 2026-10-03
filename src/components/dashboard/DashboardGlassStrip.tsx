@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { metricDescription } from "@/lib/metricPresentation";
 
-interface GlassMetric { label: string; value: string; icon: ReactNode; tone?: "good"; }
+interface GlassMetric { label: string; value: string; icon: ReactNode; tone?: "good"; requiresMeta?: boolean; }
 interface Props {
   revenue: number;
   spend: number;
@@ -30,17 +30,17 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
   });
   useEffect(() => { try { localStorage.setItem("growdash:glass-strip-collapsed", collapsed ? "1" : "0"); } catch {} }, [collapsed]);
   const compact = isMobile && collapsed;
-  const display = (value: string) => !hasSnapshot
-    ? (loading ? "Aguardando sincronização" : unavailableReason || "Indisponível")
-    : value;
+  const display = (value: string, requiresMeta = true) => !requiresMeta || hasSnapshot
+    ? value
+    : (loading ? "Aguardando sincronização" : unavailableReason || "Indisponível");
   const metrics: GlassMetric[] = [
-    { label: "Faturamento bruto", value: display(brl.format(revenue)), icon: <DollarSign /> },
+    { label: "Faturamento bruto", value: display(brl.format(revenue), false), icon: <DollarSign /> },
     { label: "Investimento em anúncio", value: display(brl.format(spend)), icon: <Coins /> },
     { label: "Leads", value: display(integer.format(leads)), icon: <Users /> },
     { label: "CPL", value: display(brl.format(cpl)), icon: <BarChart3 /> },
     { label: "ROAS", value: display(`${roas.toFixed(2)}x`), icon: <TrendingUp />, tone: roas >= 1 ? "good" : undefined },
-    { label: "Previsão 30d", value: display(brl.format(forecast30)), icon: <TrendingUp /> },
-    { label: "Vendas", value: display(integer.format(sales)), icon: <ShoppingCart /> },
+    { label: "Previsão 30d", value: display(brl.format(forecast30), false), icon: <TrendingUp /> },
+    { label: "Vendas", value: display(integer.format(sales), false), icon: <ShoppingCart /> },
   ];
 
   return <section className="dashboard-summary-strip sticky top-[calc(88px+env(safe-area-inset-top))] z-20 min-w-0 lg:top-[49px]" aria-label="Resumo fixo do Dashboard">
