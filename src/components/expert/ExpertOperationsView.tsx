@@ -183,8 +183,8 @@ function ClassCard({
             : "Aberta";
   return (
     <>
-      <Card className="h-full w-full overflow-hidden border-border/80 bg-card/95 shadow-lg">
-        <CardHeader className="relative space-y-1.5 p-2.5 pb-1.5">
+      <Card className="flex h-full w-full flex-col overflow-hidden border-border/80 bg-card/95 shadow-lg">
+        <CardHeader className="relative min-h-[148px] space-y-1.5 p-3 pb-2">
           <div className="grid grid-cols-[minmax(0,1fr)_88px] items-start gap-2">
             <div className="min-w-0">
               <Badge
@@ -241,14 +241,14 @@ function ClassCard({
           >
             {occupancyAlert.text}
           </div>
-          <div className="grid grid-cols-2 gap-1">
-            <div className="rounded-md border border-border/60 bg-background/35 p-1">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-md border border-border/60 bg-background/35 p-2">
               <div className="text-[8px] uppercase leading-tight tracking-wider text-muted-foreground">
                 Fat. alunas
               </div>
               <div className="mt-0.5 text-xs font-bold text-emerald-400">{brl(studentRevenue)}</div>
             </div>
-            <div className="rounded-md border border-border/60 bg-background/35 p-1">
+            <div className="rounded-md border border-border/60 bg-background/35 p-2">
               <div className="text-[8px] uppercase leading-tight tracking-wider text-muted-foreground">
                 Fat. pacientes
               </div>
@@ -256,7 +256,7 @@ function ClassCard({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-2 p-2.5 pt-1">
+        <CardContent className="flex flex-1 flex-col space-y-2 p-3 pt-1.5">
           <div className="grid grid-cols-2 gap-1 text-[8px] font-black uppercase leading-tight tracking-wider text-muted-foreground">
             <span className="flex items-center justify-between gap-1">
               <span>Alunas</span>
@@ -267,7 +267,7 @@ function ClassCard({
               <b className="shrink-0 text-foreground">{patients.length}/10</b>
             </span>
           </div>
-          <div className="grid gap-1.5 lg:grid-cols-2">
+          <div className="grid flex-1 gap-1.5 lg:grid-cols-2">
             <section>
               <ParticipantRows
                 rows={students}
@@ -283,7 +283,7 @@ function ClassCard({
               />
             </section>
           </div>
-          <div className="grid gap-1">
+          <div className="mt-auto grid gap-1 pt-2">
             <Button
               className="h-7 w-full text-[11px]"
               size="sm"
@@ -467,11 +467,11 @@ export function ExpertOperationsView() {
             </Button>
           </div>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+        <div className="grid items-stretch gap-3 pb-2 sm:grid-cols-2 lg:grid-cols-4">
           {visibleClasses.length ? (
             visibleClasses.map((eventClass: any) => (
               <div
-                className="w-[min(82vw,320px)] shrink-0 snap-start lg:w-[calc((100%-1.5rem)/4)]"
+                className="min-w-0 h-full"
                 key={eventClass.id}
               >
                 <ClassCard
