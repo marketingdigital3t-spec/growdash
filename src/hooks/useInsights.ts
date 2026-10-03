@@ -146,14 +146,16 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
             for (const campaign of campaigns || []) campaignCatalog.set(String(campaign.id), campaign);
           }
           const allowedCampaigns = campaignIds?.length ? new Set(campaignIds.map(String)) : null;
-          return dedupeDailyInsights(directRows
+          const normalizeWindow = (value: unknown) => String(value || "account_default")
+            .split(",").map((item) => item.trim()).filter(Boolean).sort().join(",") || "account_default";
+          const filteredRows = directRows
             .filter((row) => {
-              const accountWindow = attributionWindowsByAccount[String(row.ad_account_id)] || attributionWindow;
-              const rowWindow = row.attribution_window || "account_default";
+              const accountWindow = normalizeWindow(attributionWindowsByAccount[String(row.ad_account_id)] || attributionWindow);
+              const rowWindow = normalizeWindow(row.attribution_window);
               // Older snapshots may have a null window. Treat null and the
               // explicit default as equivalent, but never mix configured
               // windows between accounts.
-              if (rowWindow !== accountWindow && !(accountWindow === "account_default" && rowWindow === "account_default")) return false;
+              if (rowWindow !== accountWindow) return false;
               if (!allowedCampaigns) return true;
               const ad = adCatalog[String(row.ad_id)];
               const adset = ad ? adsetCatalog.get(String(ad.adset_id)) : null;
@@ -161,7 +163,15 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
               // enrichment is delayed, keep the fact visible only if its ad
               // can be resolved; never discard the whole account snapshot.
               return !!adset?.campaign_id && allowedCampaigns.has(String(adset.campaign_id));
-            })
+            });
+          // A legacy sync can persist the same account/day under a different
+          // ordering (or an equivalent default representation) of the Meta
+          // attribution window. If strict normalization found nothing, keep
+          // one fact per ad/day rather than hiding a valid spend snapshot.
+          const rowsForDisplay = filteredRows.length || allowedCampaigns
+            ? filteredRows
+            : Array.from(new Map(directRows.map((row) => [`${row.ad_id}|${row.date}`, row])).values());
+          return dedupeDailyInsights(rowsForDisplay
             .map((row) => {
               const ad = adCatalog[String(row.ad_id)] || {};
               const adset = adsetCatalog.get(String(ad.adset_id)) || {};
