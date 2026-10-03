@@ -70,7 +70,7 @@ const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
   "/configuracoes": () => import("@/pages/Settings"),
   "/usuarios": () => import("@/pages/Users"),
   "/agenda-turmas": () => import("@/pages/EventClasses"),
-  "/agentes": () => import("@/growdash/AgentOfficeControlPage"),
+  "/agentes": () => import("@/growdash/AgentsOfficePage"),
   "/whatsapp": () => import("@/pages/WhatsApp"),
   "/chamados": () => import("@/growdash/ModulePage"),
   "/automacoes": () => import("@/growdash/ModulePage"),
