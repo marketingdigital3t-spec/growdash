@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { businessDateKey } from "@/lib/businessDate";
 
 export interface CampaignActionTotal {
   action_type: string;
@@ -8,9 +9,9 @@ export interface CampaignActionTotal {
 }
 
 /** Soma todos os action_types do Meta para uma campanha (via insight_actions ↔ ads ↔ adsets ↔ campaign). */
-export function useCampaignActionTotals(campaignId?: string) {
+export function useCampaignActionTotals(campaignId?: string, startDate?: Date, endDate?: Date, attributionWindow = "account_default") {
   return useQuery({
-    queryKey: ["campaign-action-totals", campaignId],
+    queryKey: ["campaign-action-totals", campaignId, startDate ? businessDateKey(startDate) : null, endDate ? businessDateKey(endDate) : null, attributionWindow],
     enabled: !!campaignId,
     queryFn: async (): Promise<CampaignActionTotal[]> => {
       // 1) ads dessa campanha
@@ -34,11 +35,18 @@ export function useCampaignActionTotals(campaignId?: string) {
       // paginate to avoid 1000 limit
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase
+        let query = supabase
           .from("insight_actions" as any)
           .select("action_type, value, value_amount")
-          .in("ad_id", adIds)
-          .range(from, from + PAGE - 1);
+          .in("ad_id", adIds);
+        if (startDate) query = query.gte("date", businessDateKey(startDate));
+        if (endDate) query = query.lte("date", businessDateKey(endDate));
+        if (attributionWindow === "account_default") {
+          query = query.or("attribution_window.eq.account_default,attribution_window.is.null");
+        } else {
+          query = query.eq("attribution_window", attributionWindow);
+        }
+        const { data, error } = await query.range(from, from + PAGE - 1);
         if (error) throw error;
         const rows = (data || []) as any[];
         for (const r of rows) {

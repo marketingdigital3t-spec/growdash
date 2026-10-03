@@ -35,6 +35,7 @@ interface Ad {
 }
 interface CampaignDetail {
   id: string;
+  ad_account_id: string;
   name: string;
   status: string;
   spend: number; leads: number; clicks: number; impressions: number;
@@ -49,6 +50,7 @@ interface Props {
   campaign: CampaignDetail | null;
   startDate?: Date;
   endDate?: Date;
+  attributionWindow?: string;
   onEdit?: (campaign: CampaignDetail) => void;
   onViewAds?: (campaign: CampaignDetail) => void;
 }
@@ -78,13 +80,13 @@ function aggregate(insights: Insight[]) {
   return { spend, leads, clicks, impressions, cpl, ctr, conv, freq };
 }
 
-export function CampaignDetailSheet({ open, onOpenChange, campaign, startDate, endDate, onEdit, onViewAds }: Props) {
+export function CampaignDetailSheet({ open, onOpenChange, campaign, startDate, endDate, attributionWindow = "account_default", onEdit, onViewAds }: Props) {
   const { toast } = useToast();
   const { data: targetData } = useCampaignTarget(campaign?.id);
   const setTarget = useSetCampaignTarget();
   const { data: changes = [] } = useCampaignChanges(campaign?.id);
   const { data: breakdowns } = useCampaignBreakdowns(campaign?.id);
-  const { data: actionTotals = [] } = useCampaignActionTotals(campaign?.id);
+  const { data: actionTotals = [], error: actionError, isError: actionIsError } = useCampaignActionTotals(campaign?.id, startDate, endDate, attributionWindow);
   const { data: customMetrics = [] } = useCustomMetrics();
   const [targetInput, setTargetInput] = useState("");
   const [panelSize, setPanelSize] = useState<"compact" | "normal" | "maximized">("normal");
@@ -264,11 +266,12 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, startDate, e
           type="button"
           className="mt-3 flex w-full items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-left transition hover:border-primary/45 hover:bg-primary/10"
           onClick={() => document.getElementById("campaign-meta-events")?.scrollIntoView({ behavior: "smooth", block: "center" })}
-          title={actionTotals.length ? actionTotals.map((item) => `${friendlyActionLabel(item.action_type)}: ${Number(item.total || 0).toLocaleString("pt-BR")}`).join("\n") : "Nenhum evento detalhado foi sincronizado neste período."}
+          title={actionIsError ? (actionError instanceof Error ? actionError.message : "Falha ao consultar eventos Meta.") : actionTotals.length ? actionTotals.map((item) => `${friendlyActionLabel(item.action_type)}: ${Number(item.total || 0).toLocaleString("pt-BR")}`).join("\n") : "Nenhum evento detalhado foi sincronizado neste período."}
         >
           <span><b className="block text-xs">Resultados e eventos da campanha</b><small className="text-[10px] text-muted-foreground">Passe o mouse para ver o resumo ou clique para abrir o detalhamento.</small></span>
-          <span className="shrink-0 rounded-full border border-primary/30 bg-background px-2 py-1 text-[10px] font-black text-primary">{actionEventTotal.toLocaleString("pt-BR")} eventos</span>
+          <span className={cn("shrink-0 rounded-full border px-2 py-1 text-[10px] font-black", actionIsError ? "border-destructive/40 bg-destructive/5 text-destructive" : "border-primary/30 bg-background text-primary")}>{actionIsError ? "Erro ao consultar" : `${actionEventTotal.toLocaleString("pt-BR")} eventos`}</span>
         </button>
+        {actionIsError && <p className="mt-2 text-[11px] text-destructive" role="alert">Não foi possível consultar os eventos Meta: {actionError instanceof Error ? actionError.message : "erro desconhecido"}</p>}
 
         {/* Daily mini chart */}
         {dailyData.length > 0 && (

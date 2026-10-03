@@ -138,7 +138,7 @@ function firstRelation(value: any) {
 function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date) {
   const start = startDate ? formatApiDate(startDate) : null;
   const end = endDate ? formatApiDate(endDate) : null;
-  const totals = { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 };
+  const totals = { spend: 0, leads: 0, formLeads: 0, siteLeads: 0, conversations: 0, legacyLeads: 0, hasCanonicalLeadParts: false, clicks: 0, impressions: 0, reach: 0 };
 
   for (const ad of ads || []) {
     for (const insight of ad.insights || []) {
@@ -146,6 +146,18 @@ function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date) {
       if (end && insight.date > end) continue;
       totals.spend += insight.spend ?? 0;
       totals.leads += insight.leads ?? 0;
+      const rowForms = Number(insight.form_leads || 0);
+      const rowSite = Number(insight.site_leads || 0);
+      const rowConversations = Number(insight.conversations || 0);
+      const rowHasCanonicalParts = rowForms + rowSite + rowConversations > 0 || Number(insight.leads || 0) === 0;
+      totals.hasCanonicalLeadParts ||= rowHasCanonicalParts;
+      if (rowHasCanonicalParts) {
+        totals.formLeads += rowForms;
+        totals.siteLeads += rowSite;
+        totals.conversations += rowConversations;
+      } else {
+        totals.legacyLeads += Number(insight.leads || 0);
+      }
       totals.clicks += insight.clicks ?? 0;
       totals.impressions += insight.impressions ?? 0;
       totals.reach += insight.reach ?? 0;
@@ -376,7 +388,7 @@ export default function Campaigns() {
             id, name, daily_budget, status,
             ads(
               id, name, thumbnail_url, status,
-              insights(spend, leads, clicks, inline_link_clicks, unique_inline_link_clicks, impressions, reach, ctr, cpm, cpl, frequency, conversion_rate, health_score, date, attribution_window)
+              insights(spend, leads, form_leads, site_leads, conversations, clicks, inline_link_clicks, unique_inline_link_clicks, impressions, reach, ctr, cpm, cpl, frequency, conversion_rate, health_score, date, attribution_window)
             )
           )
         `)
@@ -392,7 +404,8 @@ export default function Campaigns() {
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((c: any) => {
-        let spend = 0, leads = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
+        let spend = 0, leads = 0, formLeads = 0, siteLeads = 0, conversations = 0, legacyLeads = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
+        let hasCanonicalLeadParts = false;
         const adsets = c.adsets || [];
         let adsetBudget = 0;
 
@@ -406,6 +419,20 @@ export default function Campaigns() {
               if (i.attribution_window && i.attribution_window !== expectedWindow) continue;
               spend += i.spend ?? 0;
               leads += i.leads ?? 0;
+              const rowForms = Number(i.form_leads || 0);
+              const rowSite = Number(i.site_leads || 0);
+              const rowConversations = Number(i.conversations || 0);
+              const rowHasCanonicalParts = rowForms + rowSite + rowConversations > 0 || Number(i.leads || 0) === 0;
+              hasCanonicalLeadParts ||= rowHasCanonicalParts;
+              if (rowHasCanonicalParts) {
+                formLeads += rowForms;
+                siteLeads += rowSite;
+                conversations += rowConversations;
+              } else {
+                // Additive columns defaulted to zero for pre-migration rows.
+                // Keep their old total visible but do not invent its category.
+                legacyLeads += Number(i.leads || 0);
+              }
               clicks += i.clicks ?? 0;
               linkClicks += i.inline_link_clicks ?? 0;
               uniqueLinkClicks += i.unique_inline_link_clicks ?? 0;
@@ -437,7 +464,7 @@ export default function Campaigns() {
         const uniqueLinkCtr = reach > 0 ? uniqueLinkClicks / reach * 100 : 0;
 
         const budget = Number(c.daily_budget || 0) > 0 ? Number(c.daily_budget) : adsetBudget;
-        return { ...c, adsets, budget, spend, leads, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
+        return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
       });
     },
   });
@@ -446,7 +473,7 @@ export default function Campaigns() {
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => currentAd.id))), [campaignBaseRows]);
   const campaignAdAccountMap = useMemo(() => Object.fromEntries(campaignBaseRows.flatMap((campaign: any) =>
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => [currentAd.id, campaign.ad_account_id])))), [campaignBaseRows]);
-  const { data: actionData } = useActionTotalsByAds(campaignAdIds, startDate, endDate, campaignAdAccountMap, {
+  const { data: actionData, error: actionError, isError: actionIsError } = useActionTotalsByAds(campaignAdIds, startDate, endDate, campaignAdAccountMap, {
     adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : [selectedAccount],
     attributionWindowsByAccount,
   });
@@ -468,7 +495,12 @@ export default function Campaigns() {
     }
 
     const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
-    const results = resolveCampaignResults(campaign.leads, actionEventTotals, lpConfigs[campaign.ad_account_id]?.action_type);
+    const results = resolveCampaignResults(campaign.leads, actionEventTotals, lpConfigs[campaign.ad_account_id]?.action_type, campaign.hasCanonicalLeadParts || campaign.legacyLeads > 0 ? {
+      forms: campaign.formLeads,
+      site: campaign.siteLeads,
+      conversations: campaign.conversations,
+      legacyLeads: campaign.legacyLeads,
+    } : undefined);
     const primaryResult = resolveCampaignPrimaryResult(campaign.objective, results).value;
     return {
       ...campaign,
@@ -743,7 +775,16 @@ export default function Campaigns() {
           for (const date of dates) {
             const insight = insightsByDate.get(date);
             const current = byDate.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
-            const dailyResults = resolveCampaignResults(Number(insight?.leads || 0), actionDays[date] || {}, lpConfigs[campaign.ad_account_id]?.action_type);
+            const rowForms = Number(insight?.form_leads || 0);
+            const rowSite = Number(insight?.site_leads || 0);
+            const rowConversations = Number(insight?.conversations || 0);
+            const hasCanonicalParts = Boolean(insight && (rowForms + rowSite + rowConversations > 0 || Number(insight.leads || 0) === 0));
+            const dailyResults = resolveCampaignResults(Number(insight?.leads || 0), actionDays[date] || {}, lpConfigs[campaign.ad_account_id]?.action_type, insight ? {
+              forms: hasCanonicalParts ? rowForms : 0,
+              site: hasCanonicalParts ? rowSite : 0,
+              conversations: hasCanonicalParts ? rowConversations : 0,
+              legacyLeads: hasCanonicalParts ? 0 : Number(insight.leads || 0),
+            } : undefined);
             current.leads += dailyResults.total;
             current.hasData = true;
             byDate.set(date, current);
@@ -838,7 +879,12 @@ export default function Campaigns() {
         // Meta registram o resultado em insight_actions. Sem esta composição,
         // os criativos exibiam cliques e investimento corretos, porém zero
         // resultados apesar de a campanha ter conversas iniciadas.
-        const results = resolveCampaignResults(metrics.leads, actionData?.totalsByAd[currentAd.id] || {}, lpConfigs[campaign?.ad_account_id]?.action_type);
+        const results = resolveCampaignResults(metrics.leads, actionData?.totalsByAd[currentAd.id] || {}, lpConfigs[campaign?.ad_account_id]?.action_type, metrics.hasCanonicalLeadParts || metrics.legacyLeads > 0 ? {
+          forms: metrics.formLeads,
+          site: metrics.siteLeads,
+          conversations: metrics.conversations,
+          legacyLeads: metrics.legacyLeads,
+        } : undefined);
         const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results);
         const saleMetrics = salesForAd.get(currentAd.id) ?? { count: 0, revenue: 0 };
         return {
@@ -948,6 +994,7 @@ export default function Campaigns() {
       </MotionItem>
 
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
+      {actionIsError && <MotionItem className="border-b border-amber-500/30 bg-amber-500/5 p-3" role="alert"><p className="text-xs text-amber-700 dark:text-amber-300"><b>Não foi possível consultar as ações de resultado da Meta.</b> Os resultados por evento podem estar incompletos; os valores canônicos já salvos nos Insights permanecem em uso. {actionError instanceof Error ? actionError.message : "Tente atualizar os dados."}</p></MotionItem>}
 
       <MotionItem className={cn(!analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn(!analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
@@ -1443,6 +1490,7 @@ export default function Campaigns() {
         campaign={detailCampaignId ? (campaigns.find((c: any) => c.id === detailCampaignId) || null) : null}
         startDate={startDate}
         endDate={endDate}
+        attributionWindow={detailCampaignId ? (attributionWindowsByAccount[campaigns.find((item: any) => item.id === detailCampaignId)?.ad_account_id || ""] || "account_default") : "account_default"}
         onEdit={(campaign) => { setDetailCampaignId(null); setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: (campaign as any).daily_budget ?? (campaign as any).budget }); }}
         onViewAds={(campaign) => { setSelectedIds(new Set([campaign.id])); setActiveTab("ads"); setDetailCampaignId(null); }}
       />

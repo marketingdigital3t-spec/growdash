@@ -6,19 +6,44 @@ export type CampaignPrimaryResult = { label: "Leads" | "Conversas iniciadas"; va
  * action event. Conversations are a separate, valid lead origin and must be
  * exposed separately, without counting clicks, page views, checkout or purchases.
  */
-export function resolveCampaignResults(insightLeads: number, actionTotals: Record<string, number>, siteAction?: string | null) {
+export function resolveCampaignResults(
+  insightLeads: number,
+  actionTotals: Record<string, number>,
+  siteAction?: string | null,
+  insightParts?: { forms?: number | null; site?: number | null; conversations?: number | null; legacyLeads?: number | null },
+) {
   const leadsFromInsights = Math.max(0, Number(insightLeads || 0));
   const actionLeads = resolveMetaLeadActions(actionTotals, siteAction);
-  const leadsFromEvents = actionLeads.forms + actionLeads.site;
-  // The action rows are the auditable Meta event source. `insights.leads` is
-  // retained strictly as a fallback for legacy rows not yet reprocessed.
-  const hasAuditableEvent = Object.keys(actionTotals).length > 0;
-  const leadCount = hasAuditableEvent ? leadsFromEvents : leadsFromInsights;
-  const conversations = actionLeads.conversations;
+  const siteAliases = siteAction && !META_ACTION_TYPES.forms.includes(siteAction as any) && siteAction !== "lead"
+    ? [siteAction]
+    : [...META_ACTION_TYPES.site];
+  const hasFormEvents = META_ACTION_TYPES.forms.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
+  const hasSiteEvents = siteAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
+  const hasConversationEvents = META_ACTION_TYPES.conversations.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
+  const hasGenericLead = Object.prototype.hasOwnProperty.call(actionTotals, "lead") && !hasFormEvents && !hasSiteEvents && !hasConversationEvents;
+  // Each component is resolved independently: a forms event cannot suppress a
+  // persisted conversation count when the Meta action response is incomplete.
+  const hasFormEventSource = hasFormEvents || hasGenericLead;
+  const hasPersistedParts = Boolean(insightParts && [insightParts.forms, insightParts.site, insightParts.conversations, insightParts.legacyLeads]
+    .some((value) => value !== null && value !== undefined));
+  const forms = hasFormEventSource
+    ? actionLeads.forms
+    : hasPersistedParts ? Math.max(0, Number(insightParts?.forms || 0)) : 0;
+  const site = hasSiteEvents
+    ? actionLeads.site
+    : hasPersistedParts ? Math.max(0, Number(insightParts?.site || 0)) : 0;
+  const conversations = hasConversationEvents
+    ? actionLeads.conversations
+    : hasPersistedParts ? Math.max(0, Number(insightParts?.conversations || 0)) : 0;
+  const legacyLeads = hasFormEventSource || hasSiteEvents || hasConversationEvents ? 0 : hasPersistedParts
+    ? Math.max(0, Number(insightParts?.legacyLeads || 0))
+    : leadsFromInsights;
+  const leadCount = forms + site + legacyLeads;
   const breakdown: CampaignResultBreakdown[] = [];
 
-  if (leadCount > 0) breakdown.push({ label: hasAuditableEvent ? "Leads por evento" : "Leads Meta (fallback não reprocessado)", value: leadCount });
-  if (actionLeads.site > 0) breakdown.push({ label: "Leads de site", value: actionLeads.site });
+  if (forms + site > 0) breakdown.push({ label: hasFormEventSource || hasSiteEvents ? "Leads por evento" : "Leads Meta", value: forms + site });
+  if (legacyLeads > 0) breakdown.push({ label: "Leads Meta (fallback não reprocessado)", value: legacyLeads });
+  if (site > 0) breakdown.push({ label: "Leads de site", value: site });
   if (conversations > 0) breakdown.push({ label: "Conversas iniciadas", value: conversations });
 
   return { total: leadCount + conversations, leadCount, conversations, breakdown };
@@ -47,4 +72,4 @@ export function resolveCampaignPrimaryResult(
   if (leads === conversations) return isLeadCampaign ? { label: "Leads", value: leads } : { label: "Conversas iniciadas", value: conversations };
   return leads > conversations ? { label: "Leads", value: leads } : { label: "Conversas iniciadas", value: conversations };
 }
-import { resolveMetaLeadActions } from "./metaActionMetrics";
+import { META_ACTION_TYPES, resolveMetaLeadActions } from "./metaActionMetrics";
