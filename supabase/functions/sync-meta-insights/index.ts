@@ -599,7 +599,45 @@ Deno.serve(async (req) => {
           }
           continue;
         }
-        const allInsights = insightsRes.data;
+        let allInsights = insightsRes.data;
+        // Meta can temporarily return an empty ad/day page while the account
+        // already has processed hourly delivery. Retry the exact same civil
+        // scope without time_increment before deciding that the snapshot is
+        // unavailable. This is especially important for the current day.
+        if (allInsights.length === 0 && startDate === endDate) {
+          const aggregateRes = await fetchMetaPaginated(
+            `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
+          );
+          recordPagination(aggregateRes, "insights fallback");
+          if (!aggregateRes.error && !aggregateRes.truncated && !aggregateRes.repeatedCursor && aggregateRes.data.length > 0) {
+            allInsights = aggregateRes.data.map((row: any) => ({ ...row, date_start: row.date_start || startDate }));
+            console.log(`Daily fallback returned ${allInsights.length} rows for account ${account.name}`);
+          }
+        }
+        if (allInsights.length === 0) {
+          const message = `Conta ${account.name}: Meta não retornou linhas de Insights para ${startDate} a ${endDate}; snapshot anterior preservado.`;
+          accountHadError = true;
+          errors.push(message);
+          if (accountLockAcquired && accountLockScopeKey) {
+            await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
+              .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
+          }
+          accountResults.push({
+            internalAccountId: account.id,
+            externalAccountId: metaAccountId,
+            requestedPeriod: { startDate, endDate },
+            coveredPeriod: null,
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            pagesProcessed: insightsRes.pages || 0,
+            rowsPersisted: 0,
+            spendPersisted: null,
+            status: "stale",
+            lastSuccessAt: account.last_sync_success_at || null,
+            error: message,
+          });
+          continue;
+        }
         console.log(`Total ${allInsights.length} insight rows for account ${account.name}`);
 
         // Keep the previous snapshot intact until all incoming facts have
