@@ -45,12 +45,11 @@ type ChatMessage = { id: string; role: "agent" | "user"; text: string };
 const LifeSimPage = lazy(() => import("@/growdash/LifeSimPage"));
 
 const AGENTS = [
-  { id: "atlas", name: "Ágata", role: "Gestora de tráfego", specialty: "Mídia & escala", task: "Otimizando campanhas", color: "#e9b72d", desk: "station-traffic", position: "npc-atlas", look: "look-a", skin: "#c88b68", hair: "#291c19", outfit: "#b87924", pants: "#25252b" },
-  { id: "fina", name: "Bianca", role: "Gestora financeira", specialty: "Caixa & margem", task: "Conciliando receita", color: "#34d399", desk: "station-finance", position: "npc-fina", look: "look-b", skin: "#e0a07d", hair: "#4b2b24", outfit: "#266e59", pants: "#343038" },
-  { id: "dora", name: "Camila", role: "Gestora comercial", specialty: "Vendas & CRM", task: "Revisando pipeline", color: "#fb7185", desk: "station-sales", position: "npc-dora", look: "look-c", skin: "#b87556", hair: "#161518", outfit: "#a63e5d", pants: "#272128" },
-  { id: "otto", name: "Júlia", role: "Especialista SEO", specialty: "Busca & conteúdo", task: "Mapeando oportunidades", color: "#38bdf8", desk: "station-seo", position: "npc-otto", look: "look-d", skin: "#efb08d", hair: "#7e3f29", outfit: "#27648d", pants: "#34383d" },
-  { id: "nina", name: "Natália", role: "Analista de funil", specialty: "Jornadas & conversão", task: "Investigando gargalos", color: "#a78bfa", desk: "station-funnel", position: "npc-nina", look: "look-e", skin: "#d29272", hair: "#211a23", outfit: "#6c4fa5", pants: "#24232b" },
-  { id: "milo", name: "Marina", role: "Diretora de criativos", specialty: "Criativos & testes", task: "Avaliando criativos", color: "#f97316", desk: "station-creative", position: "npc-milo", look: "look-f", skin: "#f0b18d", hair: "#c36c37", outfit: "#a84e24", pants: "#39333a" },
+  { id: "ceo", name: "Helena", role: "CEO · Chief of Staff", specialty: "Prioridades & decisões", task: "Consolidando a operação", color: "#e9b72d", desk: "station-traffic", position: "npc-atlas", look: "look-a", skin: "#c88b68", hair: "#291c19", outfit: "#b87924", pants: "#25252b" },
+  { id: "marketing", name: "Ágata", role: "Gestora de Marketing", specialty: "Tráfego & crescimento", task: "Analisando campanhas", color: "#38bdf8", desk: "station-creative", position: "npc-milo", look: "look-f", skin: "#f0b18d", hair: "#c36c37", outfit: "#a84e24", pants: "#39333a" },
+  { id: "commercial", name: "Camila", role: "Diretora Comercial", specialty: "CRM & vendas", task: "Revisando pipeline", color: "#fb7185", desk: "station-sales", position: "npc-dora", look: "look-c", skin: "#b87556", hair: "#161518", outfit: "#a63e5d", pants: "#272128" },
+  { id: "finance", name: "Bianca", role: "CFO", specialty: "Caixa & margem", task: "Conciliando resultado", color: "#34d399", desk: "station-finance", position: "npc-fina", look: "look-b", skin: "#e0a07d", hair: "#4b2b24", outfit: "#266e59", pants: "#343038" },
+  { id: "legal", name: "Júlia", role: "Advogada", specialty: "Risco & compliance", task: "Auditando permissões", color: "#a78bfa", desk: "station-seo", position: "npc-otto", look: "look-d", skin: "#efb08d", hair: "#7e3f29", outfit: "#27648d", pants: "#34383d" },
 ] as const;
 
 const INITIAL_LIFE_STATES = createInitialAgentLifeStates(AGENTS);
@@ -178,14 +177,14 @@ export default function AgentsOfficePage() {
           <div className="office-sim-presence" aria-label="Agentes presentes no escritório">
             {AGENTS.map((agent) => <button key={agent.id} type="button" onClick={() => openAgent(agent.id)} className={cn("office-presence-agent", `is-${statuses[agent.id] || "working"}`)} style={{ "--agent-color": agent.color } as React.CSSProperties}><span className="office-presence-avatar"><Bot className="h-3 w-3" /></span><span><b>{agent.name}</b><small>{statuses[agent.id] === "working" ? "online" : statuses[agent.id] === "walking" ? "andando" : "livre"}</small></span><i /></button>)}
           </div>
-          <div className="office-sim-live"><span className="office-live-dot" /><span><b>Operação ao vivo</b><small>6 agentes conectados</small></span><button type="button" onClick={() => updateStatus("atlas", "walking")} aria-label="Abrir standup da equipe">STANDUP BOARD</button></div>
+          <div className="office-sim-live"><span className="office-live-dot" /><span><b>Operação ao vivo</b><small>5 diretores conectados</small></span><button type="button" onClick={() => updateStatus("ceo", "walking")} aria-label="Abrir standup da equipe">STANDUP BOARD</button></div>
         </div>
         <aside className="office-sim-rail" aria-label="Navegação do escritório">
           <span className="office-rail-logo"><Sparkles className="h-4 w-4" /></span>
           <button type="button" className="is-active" aria-label="Escritório"><BriefcaseBusiness className="h-4 w-4" /></button>
           <button type="button" onClick={() => setView("map")} aria-label="Mapa de inteligência"><Network className="h-4 w-4" /></button>
           <button type="button" onClick={() => openAgent(activeAgentId || AGENTS[0].id)} aria-label="Chat dos agentes"><MessageCircle className="h-4 w-4" /></button>
-          <button type="button" onClick={() => updateStatus("atlas", "working")} aria-label="Ativar operação"><Activity className="h-4 w-4" /></button>
+          <button type="button" onClick={() => updateStatus("ceo", "working")} aria-label="Ativar operação"><Activity className="h-4 w-4" /></button>
           <span className="office-rail-spacer" />
           <button type="button" onClick={() => setOfficeAngle(0)} aria-label="Recentrar escritório"><RotateCcw className="h-4 w-4" /></button>
         </aside>

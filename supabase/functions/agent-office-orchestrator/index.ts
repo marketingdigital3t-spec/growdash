@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
   for (const workspace of workspaces || []) {
     const { data: existing } = await admin.from("agent_office_runs").select("id,status").eq("workspace_id", workspace.id).eq("lock_key", runKey).maybeSingle();
     if (existing) { results.push({ workspace_id: workspace.id, status: "blocked", reason: "RUN_ALREADY_EXISTS" }); continue; }
-    const { data: run, error: runInsertError } = await admin.from("agent_office_runs").insert({ workspace_id: workspace.id, trigger, lock_key: runKey, status: "investigating", metadata: { ai: "blocked", reason: "AI_PROVIDER_NOT_CONFIGURED" } }).select("id").single();
+    const { data: run, error: runInsertError } = await admin.from("agent_office_runs").insert({ workspace_id: workspace.id, trigger, lock_key: runKey, status: "investigating", metadata: { ai: Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY") ? "configured" : "unavailable" } }).select("id").single();
     if (runInsertError || !run) {
       results.push({ workspace_id: workspace.id, status: runInsertError?.code === "23505" ? "blocked" : "failed", reason: runInsertError?.code === "23505" ? "RUN_ALREADY_EXISTS" : "RUN_CREATE_FAILED" });
       continue;
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       const consecutiveFailures = (previousRuns || []).length === 2 && (previousRuns || []).every((item: { status: string }) => item.status === "failed");
       if (consecutiveFailures) findings.push({ fingerprint: `three-failures:${workspace.id}:${bucket()}`, severity: "critical", category: "reliability", source: "agent_office_runs", description: "Três ciclos consecutivos do Agent Office falharam ou ficaram parciais.", evidence: { previous_statuses: (previousRuns || []).map((item: { status: string }) => item.status), alert: true } });
       for (const finding of findings) {
-        const role = finding.category === "meta" || finding.category === "rd" || finding.category === "sync" ? "backend_meta_rd" : "backend_security";
+        const role = finding.category === "meta" || finding.category === "sync" ? "marketing" : finding.category === "rd" ? "commercial" : finding.category === "finance" ? "finance" : finding.category === "legal" || finding.category === "permissions" ? "legal" : "ceo";
         const agentId = byRole.get(role) || byRole.get("ceo");
         const { data: saved, error: findingError } = await admin.from("agent_office_findings").upsert({ workspace_id: workspace.id, run_id: run.id, agent_id: agentId, ...finding }, { onConflict: "workspace_id,fingerprint" }).select("id").single();
         if (findingError || !saved) throw findingError || new Error("FINDING_SAVE_FAILED");
@@ -124,9 +124,13 @@ Deno.serve(async (req) => {
           const { error: taskError } = await admin.from("agent_office_tasks").upsert({ workspace_id: workspace.id, run_id: run.id, agent_id: agentId, finding_id: saved.id, task_type: `investigate_${finding.category}`, priority: finding.severity === "critical" ? "critical" : finding.severity === "high" ? "high" : "medium", status: "detected", scope: { account_id: finding.account_id || null, funnel_id: finding.funnel_id || null }, payload: { finding_id: saved.id, description: finding.description } }, { onConflict: "workspace_id,run_id,finding_id" });
           if (taskError) throw taskError;
         }
+        if (finding.severity === "critical" || finding.severity === "high") {
+          await admin.from("agent_office_events").insert({ workspace_id: workspace.id, agent_id: agentId, event_type: "finding", severity: finding.severity === "critical" ? "critical" : "warning", title: `Atenção: ${finding.category}`, body: finding.description });
+        }
       }
       const status = findings.some((finding) => finding.severity === "critical" || finding.severity === "high") ? "partial" : "success";
-      const { error: finishError } = await admin.from("agent_office_runs").update({ status, finished_at: new Date().toISOString(), summary: findings.length ? `${findings.length} achado(s) registrados; IA bloqueada por configuração ausente.` : "Verificações determinísticas concluídas; IA bloqueada por configuração ausente." }).eq("id", run.id);
+      await admin.from("agent_office_agents").update({ runtime_status: findings.some((finding) => finding.severity === "critical") ? "error" : "analyzing", last_run_at: new Date().toISOString(), next_run_at: new Date(Date.now() + 15 * 60_000).toISOString() }).eq("workspace_id", workspace.id);
+      const { error: finishError } = await admin.from("agent_office_runs").update({ status, finished_at: new Date().toISOString(), summary: findings.length ? `${findings.length} achado(s) registrados.` : "Verificações determinísticas concluídas." }).eq("id", run.id);
       if (finishError) throw finishError;
       results.push({ workspace_id: workspace.id, run_id: run.id, status, findings: findings.length, ai: "blocked" });
     } catch (error) {

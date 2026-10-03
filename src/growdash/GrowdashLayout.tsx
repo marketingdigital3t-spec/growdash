@@ -42,6 +42,7 @@ import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
 import { SpaceMissionStrip, SpacePhaseBackground, type SpacePhase } from "@/components/space/SpacePhaseBackground";
 import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
+import { AgentChatDock } from "@/components/agents/AgentChatDock";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -504,6 +505,7 @@ export default function GrowdashLayout() {
           Você está offline. Os dados exibidos podem estar desatualizados e nenhuma alteração será enviada até a conexão voltar.
         </div>
       )}
+      {permissions.canAgents && <AgentChatDock />}
     </div>
   );
 }
