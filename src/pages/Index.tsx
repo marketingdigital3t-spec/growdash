@@ -57,8 +57,14 @@ const Index = () => {
 
   const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
-    ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
-    : adAccounts, [adAccounts, businessUnitId, segment]);
+    // An explicit account selection is authoritative for Meta facts. Do not
+    // discard its rows because the account has no unit yet (or belongs to a
+    // different segment); the segment filter only applies to the unselected
+    // consolidated view.
+    ? adAccounts.filter((account) => selectedAccountIds.length
+      ? selectedAccountIds.includes(account.id)
+      : account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
+    : adAccounts, [adAccounts, businessUnitId, selectedAccountIds, segment]);
   const visibleAccountIds = useMemo(() => new Set(visibleAccounts.map((account) => account.id)), [visibleAccounts]);
   const visibleAccountIdList = useMemo(() => visibleAccounts.map((account) => account.id), [visibleAccounts]);
   // A seleção explícita é uma fronteira de dados. Só usamos todas as contas
