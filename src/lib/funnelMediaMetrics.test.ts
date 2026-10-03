@@ -60,4 +60,22 @@ describe("computeFunnelMediaMetrics", () => {
     const result = computeFunnelMediaMetrics([row({ leads: 664 })], 0, 24, 9, 0);
     expect(result.salesConversionRate).toBeCloseTo(1.3554216867, 8);
   });
+
+  it("usa formulários, site e conversas canônicos e ignora o agregado legado de leads", () => {
+    const result = computeFunnelMediaMetrics(
+      [row({ spend: 120, leads: 999 })],
+      3,
+      8,
+      1,
+      0,
+      4,
+      2,
+    );
+    expect(result.formLeads).toBe(4);
+    expect(result.siteLeads).toBe(2);
+    expect(result.conversations).toBe(3);
+    expect(result.metaLeads).toBe(9);
+    expect(result.metaCpl).toBeCloseTo(120 / 9);
+    expect(result.rdCpl).toBe(15);
+  });
 });

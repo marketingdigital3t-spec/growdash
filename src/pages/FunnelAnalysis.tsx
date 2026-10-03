@@ -32,7 +32,6 @@ import { MetricHelpTooltip } from "@/components/help/MetricHelpTooltip";
 import { useSales } from "@/hooks/useSales";
 import { filterCanonicalFunnelSales } from "@/lib/funnelRevenue";
 import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages } from "@/lib/crmPipelineStages";
-import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
 import { businessDateKey } from "@/lib/businessDate";
@@ -233,11 +232,12 @@ export default function FunnelAnalysis() {
 
   useEffect(() => {
     if (loadingFilterDeals) return;
+    if (selectedCampaigns.some((campaign) => !rdCampaigns.includes(campaign))) setSelectedCampaigns([]);
     if (selectedSource !== "all" && !sources.includes(selectedSource)) setSelectedSource("all");
     if (selectedState !== "all" && !states.includes(selectedState)) setSelectedState("all");
     if (selectedOwner !== "all" && !owners.includes(selectedOwner)) setSelectedOwner("all");
     if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
-  }, [loadingFilterDeals, owners, products, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
+  }, [loadingFilterDeals, owners, products, rdCampaigns, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
 
   const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
@@ -336,82 +336,34 @@ export default function FunnelAnalysis() {
     () => campaignRows.filter((campaign) => integratedAccountIds.has(campaign.ad_account_id)),
     [campaignRows, integratedAccountIds],
   );
-  const campaigns = useMemo(() => Array.from(new Set([
-    ...rdCampaigns,
-    ...visibleCampaignRows.map((campaign) => campaign.name).filter(Boolean),
-  ])).sort((a, b) => a.localeCompare(b, "pt-BR")), [rdCampaigns, visibleCampaignRows]);
   const scopedInsights = useMemo(() => {
     const allowedAccountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     // Mesmo que a política do banco permita consultar histórico legado, a
     // mídia exibida aqui deve pertencer exclusivamente às contas integradas.
-    const accountScopedInsights = insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
-    if (!selectedCampaigns.length) return accountScopedInsights;
-    const campaigns = selectedCampaigns.map((value) => value.trim().toLocaleLowerCase("pt-BR"));
-    const matches = accountScopedInsights.filter((row) => {
-      // Older Meta insight rows may have no campaign name. They must not
-      // crash the whole analysis while a campaign filter is active.
-      const metaName = String(row.campaign_name ?? "").trim().toLocaleLowerCase("pt-BR");
-      if (!metaName) return false;
-      return campaigns.some((campaign) => metaName === campaign || metaName.includes(campaign) || campaign.includes(metaName));
-    });
-    // UTMs e campanhas Meta podem ter nomes diferentes. Exibir todas as
-    // campanhas neste caso distorce investimento, CPL e ROAS do funil.
-    return matches;
-  }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet, selectedCampaigns]);
+    // O filtro `selectedCampaigns` é uma UTM do RD, não um ID de campanha Meta.
+    // Comparar os nomes aproximados fazia a mídia sumir ou selecionar campanhas
+    // erradas. Sem vínculo canônico salvo, mídia fica no escopo conta + período.
+    return insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
+  }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet]);
 
   // O filtro de campanha do RD usa UTM e nem sempre tem o mesmo nome da
   // campanha na Meta. Use os IDs reais das campanhas visíveis e, como
-  // fallback, os IDs presentes nos insights sincronizados; assim o perfil de
-  // público continua carregando para campanhas de formulário, mensagem e
-  // outros objetivos mesmo quando os nomes divergem.
+  // Os filtros de campanha nesta tela são UTMs do RD. Não há vínculo canônico
+  // UTM→Meta para inferir IDs comparando nomes; o perfil Meta respeita conta e
+  // período e permanece independente do filtro CRM.
   const audienceCampaignIds = useMemo(() => {
-    const filters = selectedCampaigns.map((value) => value.trim().toLocaleLowerCase("pt-BR"));
     const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     const candidates = visibleCampaignRows.filter((campaign: any) => accountIds.has(campaign.ad_account_id));
-    const matching = !selectedCampaigns.length
-      ? candidates
-      : candidates.filter((campaign: any) => {
-        const name = String(campaign.name || "").toLocaleLowerCase("pt-BR");
-        return filters.some((filter) => name.includes(filter) || filter.includes(name));
-      });
     const insightIds = scopedInsights
       .filter((row) => !!row.campaign_id && !!row.ad_account_id && accountIds.has(row.ad_account_id))
       .map((row) => String(row.campaign_id));
-    const ids = (matching.length ? matching.map((campaign: any) => String(campaign.id)) : candidates.map((campaign: any) => String(campaign.id))).concat(insightIds).filter(Boolean);
+    const ids = candidates.map((campaign: any) => String(campaign.id)).concat(insightIds).filter(Boolean);
     return Array.from(new Set(ids));
-  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, selectedCampaigns, visibleCampaignRows]);
+  }, [allAccountsSelected, integratedAccountIds, scopedInsights, selectedAccountIdSet, visibleCampaignRows]);
 
-  // O total de aquisição da Análise de Funis é uma métrica da Meta: cada
-  // conversa iniciada por anúncio é um lead a ser trabalhado. Buscamos os
-  // eventos apenas dos anúncios já delimitados pela conta, campanha e período.
-  const actionAdIds = useMemo(
-    () => Array.from(new Set(scopedInsights.map((insight) => insight.ad_id).filter(Boolean))),
-    [scopedInsights],
-  );
-  const actionAccountMap = useMemo(
-    () => Object.fromEntries(scopedInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
-    [scopedInsights],
-  );
   const actionScopeAccountIds = allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds;
-  const actionScopeCampaignIds = useMemo(() => {
-    if (!selectedCampaigns.length) return undefined;
-    const selectedNames = new Set(selectedCampaigns.map((name) => name.trim().toLocaleLowerCase("pt-BR")));
-    const ids = visibleCampaignRows
-      .filter((campaign: any) => selectedNames.has(String(campaign.name || "").trim().toLocaleLowerCase("pt-BR")))
-      .map((campaign: any) => String(campaign.id))
-      .filter(Boolean);
-    return ids.length ? Array.from(new Set(ids)) : undefined;
-  }, [selectedCampaigns, visibleCampaignRows]);
-  const { data: actionData, isLoading: loadingMetaActions } = useActionTotalsByAds(
-    actionAdIds,
-    startDate,
-    endDate,
-    actionAccountMap,
-    { adAccountIds: actionScopeAccountIds, campaignIds: actionScopeCampaignIds, attributionWindow: selectedMetaScope.attributionWindow },
-  );
   const funnelMeta = useMetaTrafficMetrics({
     adAccountIds: actionScopeAccountIds,
-    campaignIds: actionScopeCampaignIds,
     startDate: businessDateKey(startDate),
     endDate: businessDateKey(endDate),
     attributionWindow: selectedMetaScope.attributionWindow,
@@ -420,34 +372,44 @@ export default function FunnelAnalysis() {
 
   const mediaMetrics = useMemo(
     () => {
-      const actions = actionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 };
-      const mediaRows = funnelMeta.data.rowCount > 0 ? [{
+      // Use somente o adaptador canônico Meta. `insights.leads` é legado e não
+      // pode substituir nem completar ações quando o snapshot estiver ausente.
+      const mediaRows = funnelMeta.data.available ? [{
         spend: funnelMeta.data.spend,
         impressions: funnelMeta.data.impressions,
         reach: funnelMeta.data.reach,
         clicks: funnelMeta.data.clicks,
-        leads: funnelMeta.data.leads,
-      }] : scopedInsights;
-      const canonicalActions = funnelMeta.data.rowCount > 0
-        ? { forms: funnelMeta.data.formLeads, site: funnelMeta.data.siteLeads, conversations: funnelMeta.data.conversations }
-        : { forms: actions.forms, site: actions.site, conversations: actions.conversations };
+      }] : [];
       const computed = computeFunnelMediaMetrics(
       mediaRows as any,
-      canonicalActions.conversations,
+      funnelMeta.data.conversations,
       periodAnalytics.totalLeads,
       periodAnalytics.conversions,
       periodAnalytics.revenue,
-      canonicalActions.forms,
-      canonicalActions.site,
+      funnelMeta.data.formLeads,
+      funnelMeta.data.siteLeads,
       );
       return {
         ...computed,
-        spend: funnelMeta.data.rowCount > 0 ? funnelMeta.data.spend : computed.spend,
-        metaLeads: funnelMeta.data.rowCount > 0 ? funnelMeta.data.leads : computed.metaLeads,
+        spend: funnelMeta.data.available ? funnelMeta.data.spend : 0,
+        metaLeads: funnelMeta.data.available ? funnelMeta.data.leads : 0,
       };
     },
-    [actionData?.metaLeadActions, funnelMeta.data, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads, scopedInsights],
+    [funnelMeta.data, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads],
   );
+  const funnelTableInsights = useMemo(() => {
+    const countedAds = new Set<string>();
+    return scopedInsights.map((row) => {
+      const adId = String(row.ad_id || "");
+      const canonicalLeads = funnelMeta.data.leadBreakdownByAd[adId]?.totalLeads ?? 0;
+      // CampaignResultsTable expects daily facts and sums them by ad. Put the
+      // period-level canonical action total on one row only; never re-sum the
+      // legacy `insights.leads` column or multiply an ad's actions by days.
+      const leads = countedAds.has(adId) ? 0 : canonicalLeads;
+      countedAds.add(adId);
+      return { ...row, leads, form_leads: 0, site_leads: 0, conversations: 0 };
+    });
+  }, [funnelMeta.data.leadBreakdownByAd, scopedInsights]);
 
   async function handleSync() {
     if (!funnelId && visibleAccounts.length === 0) return;
@@ -604,7 +566,7 @@ export default function FunnelAnalysis() {
       <MotionItem>
         <div className="gd-filter-strip gd-funnel-filter-strip rounded-xl border border-border bg-card p-3 shadow-sm">
           <FilterSelect label="Origem" value={selectedSource} onChange={setSelectedSource} options={sources} />
-          <CampaignMultiSelect campaigns={campaigns.map((name) => ({ id: name, name }))} selectedIds={selectedCampaigns} onChange={setSelectedCampaigns} placeholder="Todas as campanhas" className="gd-filter-control w-full bg-background/60 sm:w-[180px]" />
+          <CampaignMultiSelect campaigns={rdCampaigns.map((name) => ({ id: name, name }))} selectedIds={selectedCampaigns} onChange={setSelectedCampaigns} placeholder="Campanhas / UTM RD" className="gd-filter-control w-full bg-background/60 sm:w-[180px]" />
           <FilterSelect label="Estado" value={selectedState} onChange={setSelectedState} options={states} />
           <FilterSelect label="Responsável" value={selectedOwner} onChange={setSelectedOwner} options={owners} />
           <FilterSelect label="Produto" value={selectedProduct} onChange={setSelectedProduct} options={products} />
@@ -642,7 +604,7 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Histórico completo do RD:</span> {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) {selectedFunnelIds.length === 1 ? "neste funil" : `em ${funnelScopeIds.length} funil(is) selecionado(s)`}. A conta Meta selecionada é usada somente para mídia. Os KPIs e gráficos abaixo usam somente o período selecionado.
+              <span className="font-semibold text-foreground">Escopos separados:</span> a conta e o período selecionados definem a mídia Meta; o filtro Campanhas / UTM RD afeta somente os negócios do CRM e não tenta adivinhar correspondência por nome. {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) no histórico RD.
             </div>
             <FunnelKPIs
               a={periodAnalytics}
@@ -650,10 +612,15 @@ export default function FunnelAnalysis() {
               rdLeadsLoading={loadingPeriodDeals}
               rdLeadsError={!!periodDealsError}
               trafficSpend={mediaMetrics.spend}
-              trafficLoading={funnelMeta.isLoading || loadingMetaActions}
-              trafficUnavailable={!funnelMeta.data.available && !scopedInsights.length}
+              metaLeads={mediaMetrics.metaLeads}
+              metaLeadsAvailable={funnelMeta.data.available && (funnelMeta.data.metricAvailability.leads?.available ?? false)}
+              metaLeadsLoading={funnelMeta.actionsLoading}
+              trafficLoading={funnelMeta.insightsLoading}
+              trafficUnavailable={!funnelMeta.data.available}
               trafficReason={funnelMeta.data.unavailableReason}
-              cpl={mediaMetrics.rdCpl}
+              cpl={mediaMetrics.metaCpl}
+              rdCpl={mediaMetrics.rdCpl}
+              metaCplLoading={funnelMeta.actionsLoading}
               cac={mediaMetrics.cac}
               roas={mediaMetrics.roas}
               salesConversionRate={mediaMetrics.salesConversionRate}
@@ -704,17 +671,19 @@ export default function FunnelAnalysis() {
                 startDate,
                 endDate,
                 adAccountId: effectiveAdAccountId,
-                insights: scopedInsights,
+                insights: funnelTableInsights,
                 sales: periodFunnelSales,
                 rdDeals: operationalPeriodDeals,
                 revenueDeals: operationalPeriodDeals,
                 alerts: [],
                 campaigns: visibleCampaignRows,
                 adAccounts: visibleAccounts,
-                isLoading: loadingInsights || loadingMetaActions,
+                isLoading: loadingInsights || funnelMeta.isLoading,
               }}>
                 <div className="space-y-6">
-                  <CampaignResultsTable />
+                  {funnelMeta.actionsLoading
+                    ? <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground" role="status">Aguardando confirmação das ações Meta para mostrar leads por campanha.</div>
+                    : <CampaignResultsTable />}
                   <AskAICard />
                 </div>
               </DashboardProvider>

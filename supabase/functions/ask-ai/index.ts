@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, type MetaLeadAction, type MetaLeadInsight } from "../_shared/metaLeadMetrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,16 +10,12 @@ const AI_API_URL = Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat
 const AI_MODEL = Deno.env.get("AI_MODEL") || "gpt-4.1-mini";
 const DAY = 86_400_000;
 
-type Insight = {
-  ad_id: string; date: string; spend: number | null; impressions: number | null; reach: number | null;
+type Insight = MetaLeadInsight & {
+  ad_id: string; ad_account_id: string; attribution_window: string | null; date: string; spend: number | null; impressions: number | null; reach: number | null;
   clicks: number | null; leads: number | null; frequency: number | null;
 };
-type ActionRow = { ad_id: string; date: string; action_type: string; value: number | null };
+type ActionRow = MetaLeadAction & { attribution_window?: string | null };
 type Totals = { spend: number; impressions: number; reach: number; clicks: number; leads: number };
-const FORM_ACTION_TYPES = ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"];
-// Only explicit conversation-start events are leads. Replies/connections are
-// downstream activity and must never inflate the started-conversation KPI.
-const CONVERSATION_ACTION_TYPES = ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started"];
 
 function responseError(error: string, status = 400) {
   return new Response(JSON.stringify({ error }), { status, headers: jsonHeaders });
@@ -36,27 +33,6 @@ function totals(rows: Insight[]): Totals {
     spend: acc.spend + Number(row.spend || 0), impressions: acc.impressions + Number(row.impressions || 0),
     reach: acc.reach + Number(row.reach || 0), clicks: acc.clicks + Number(row.clicks || 0), leads: acc.leads + Number(row.leads || 0),
   }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
-}
-function canonicalMetaLeads(rows: Insight[], actions: ActionRow[], lpAction?: string) {
-  const byAdDate = new Map<string, Record<string, number>>();
-  for (const row of actions) {
-    const key = `${row.ad_id}|${row.date}`;
-    const values = byAdDate.get(key) || {};
-    values[row.action_type] = (values[row.action_type] || 0) + Math.max(0, Number(row.value || 0));
-    byAdDate.set(key, values);
-  }
-  const maxAlias = (values: Record<string, number>, aliases: string[]) => Math.max(0, ...aliases.map((alias) => Number(values[alias] || 0)));
-  return rows.map((row) => {
-    const values = byAdDate.get(`${row.ad_id}|${row.date}`);
-    if (!values) return row;
-    const hasNative = FORM_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
-    const conversations = maxAlias(values, CONVERSATION_ACTION_TYPES);
-    const forms = hasNative ? maxAlias(values, FORM_ACTION_TYPES) : conversations > 0 ? 0 : maxAlias(values, ["lead"]);
-    const site = lpAction && !FORM_ACTION_TYPES.includes(lpAction) && lpAction !== "lead" ? maxAlias(values, [lpAction]) : 0;
-    // A zero event set is a valid observation. Only use the old aggregate
-    // column when action rows were not synced at all for that ad/day.
-    return { ...row, leads: forms + site + conversations };
-  });
 }
 function derived(metric: Totals, revenue = 0) {
   return {
@@ -129,7 +105,7 @@ Deno.serve(async (req) => {
     const previousMonthEndStr = dateString(previousMonthEnd);
 
     const admin = createClient(supabaseUrl, serviceKey);
-    let accountQuery = admin.from("ad_accounts").select("id, account_id, name, daily_budget, remaining_balance, target_cpl, min_spend_threshold").eq("user_id", user.id);
+    let accountQuery = admin.from("ad_accounts").select("id, account_id, name, timezone_name, attribution_window, daily_budget, remaining_balance, target_cpl, min_spend_threshold").eq("user_id", user.id);
     if (accountId && accountId !== "all") accountQuery = accountQuery.eq("id", accountId);
     const { data: accounts, error: accountError } = await accountQuery;
     if (accountError) throw accountError;
@@ -156,40 +132,56 @@ Deno.serve(async (req) => {
     const allInsights: Insight[] = [];
     for (let offset = 0; ; offset += 1000) {
       const { data: page, error: insightError } = await admin.from("insights")
-        .select("ad_id, date, spend, impressions, reach, clicks, leads, frequency")
+        .select("ad_id, ad_account_id, attribution_window, date, spend, impressions, reach, clicks, leads, frequency")
         .gte("date", dataStartStr).lte("date", endStr)
-        .in("ad_id", adIds.length ? adIds : ["x"])
+        .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
         .order("date", { ascending: true }).order("ad_id", { ascending: true })
         .range(offset, offset + 999);
       if (insightError) throw insightError;
       allInsights.push(...((page || []) as Insight[]));
       if (!page || page.length < 1000) break;
     }
-    let lpAction: string | undefined;
-    if (accountIds.length === 1) {
-      const { data: lpConfig } = await admin.from("account_lp_config").select("action_type").eq("ad_account_id", accountIds[0]).maybeSingle();
-      lpAction = lpConfig?.action_type || undefined;
+    const siteActionByAccount: Record<string, string | undefined> = {};
+    if (accountIds.length) {
+      const { data: lpConfigs, error: lpConfigError } = await admin.from("account_lp_config").select("ad_account_id, action_type").in("ad_account_id", accountIds);
+      if (lpConfigError) throw lpConfigError;
+      for (const config of lpConfigs || []) siteActionByAccount[config.ad_account_id] = config.action_type || undefined;
     }
-    // The aggregate `insights.leads` field can lag an event reprocessing and
-    // does not include messaging consistently. Build the same canonical lead
-    // composition used by the Dashboard and Funnel: max(form aliases) +
-    // max(conversation aliases), per ad/day. Pagination is mandatory here: a
-    // partial event set must never be presented to the model as complete.
+    const allowedAdIds = new Set(adIds);
+    const scopedInsights = allInsights.filter((row) => {
+      const account = accounts?.find((item) => item.id === row.ad_account_id);
+      const expectedWindow = account?.attribution_window || "account_default";
+      if ((row.attribution_window || "account_default") !== expectedWindow) return false;
+      return !selectedCampaignIds.length || allowedAdIds.has(row.ad_id);
+    });
+    const uniqueScopedInsights = Array.from(new Map(scopedInsights.map((row) => [`${row.ad_account_id}|${row.ad_id}|${row.date}|${row.attribution_window || "account_default"}`, row])).values());
+    // Use the same canonical event groups as Meta traffic KPIs. Fetch all site
+    // aliases plus each account's configured LP event, and never source leads
+    // from the legacy insights.leads aggregate.
     const actionRows: ActionRow[] = [];
-    const actionTypes = [...FORM_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES];
-    for (let offset = 0; ; offset += 1000) {
-      const { data: page, error: actionError } = await admin.from("insight_actions")
-        .select("ad_id, date, action_type, value")
-        .in("ad_id", adIds.length ? adIds : ["x"])
-        .in("action_type", actionTypes)
-        .gte("date", dataStartStr).lte("date", endStr)
-        .order("date", { ascending: true }).order("ad_id", { ascending: true })
-        .range(offset, offset + 999);
-      if (actionError) throw actionError;
-      actionRows.push(...((page || []) as ActionRow[]));
-      if (!page || page.length < 1000) break;
+    const actionTypes = Array.from(new Set([...FORM_ACTION_TYPES, ...SITE_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter((value): value is string => !!value)]));
+    for (const account of accounts || []) {
+      const accountAdIds = Array.from(new Set(uniqueScopedInsights.filter((row) => row.ad_account_id === account.id).map((row) => row.ad_id)));
+      if (!accountAdIds.length) continue;
+      const expectedWindow = account.attribution_window || "account_default";
+      for (let offset = 0; ; offset += 1000) {
+        let query = admin.from("insight_actions")
+          .select("ad_id, date, action_type, value, attribution_window")
+          .in("ad_id", accountAdIds)
+          .in("action_type", actionTypes)
+          .gte("date", dataStartStr).lte("date", endStr);
+        query = expectedWindow === "account_default"
+          ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
+          : query.eq("attribution_window", expectedWindow);
+        const { data: page, error: actionError } = await query
+          .order("date", { ascending: true }).order("ad_id", { ascending: true })
+          .range(offset, offset + 999);
+        if (actionError) throw actionError;
+        actionRows.push(...((page || []) as ActionRow[]));
+        if (!page || page.length < 1000) break;
+      }
     }
-    const canonicalInsights = canonicalMetaLeads(allInsights, actionRows, lpAction);
+    const canonicalInsights = canonicalMetaLeads(uniqueScopedInsights, actionRows, siteActionByAccount);
     const currentInsights = canonicalInsights.filter((row) => row.date >= startStr && row.date <= endStr);
     const previousInsights = canonicalInsights.filter((row) => row.date >= previousStartStr && row.date <= previousEndStr);
 
@@ -302,7 +294,9 @@ Deno.serve(async (req) => {
         insights_rows: currentInsights.length,
         meta_action_rows: actionRows.filter((row) => row.date >= startStr && row.date <= endStr).length,
         meta_action_rows_by_type: Object.fromEntries(actionTypes.map((type) => [type, actionRows.filter((row) => row.date >= startStr && row.date <= endStr && row.action_type === type).length])),
-        lead_definition: "max(form aliases) + max(conversation aliases), por anúncio e dia; aliases não são somados",
+        lead_definition: "max(form aliases) + max(site aliases) + max(conversation aliases), por conta/anúncio/dia; aliases equivalentes não são somados; insights.leads nunca é fonte de leads",
+        attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),
+        timezone_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
         unavailable_dimensions: ["idade individual", "gênero individual", "atribuição sem UTM ou vínculo Meta"],
       },
       previous_period: { from: previousStartStr, to: previousEndStr, days },
@@ -332,7 +326,7 @@ Deno.serve(async (req) => {
       data_completeness: {
         campaigns_loaded: campaigns?.length || 0,
         ads_loaded: ads?.length || 0,
-        insight_rows_loaded: allInsights.length,
+        insight_rows_loaded: uniqueScopedInsights.length,
         confirmed_sales_loaded: confirmedSales.length,
         pending_sales_excluded: (allSales || []).filter((sale) => sale.status === "pending").length,
         note: "Os números acima são o limite factual desta resposta. Não extrapole para entidades que não aparecem no JSON. Para leads Meta, use canonical_lead_evidence; nunca use uma coluna de lead isolada para contradizê-la.",
