@@ -11,19 +11,23 @@ type FurnitureKind = "desk" | "chair" | "monitor" | "meeting-table" | "sofa" | "
 type FurnitureBlueprint = { id: string; kind: FurnitureKind; x: number; z: number; rotation?: number };
 
 const FURNITURE_COPY: Record<FurnitureKind, string> = { desk: "Mesa", chair: "Cadeira", monitor: "Monitor", "meeting-table": "Reunião", sofa: "Sofá", plant: "Planta" };
-const NPC_COPY = { traffic: "Tráfego", finance: "Finanças", commercial: "Comercial", seo: "SEO", funnels: "Funis" } as const;
+// The five visible stations are the business directors. Technical specialists
+// remain backend subagents and are not represented as principals in the room.
+const NPC_COPY = { traffic: "Marketing", finance: "CFO", commercial: "Comercial", seo: "Jurídico", funnels: "CEO" } as const;
 const NPC_DETAILS = {
-  traffic: { name: "Ágata", specialty: "Escala e mídia", color: "#d79a32" },
+  traffic: { name: "Ágata", specialty: "Tráfego e crescimento", color: "#d79a32" },
   finance: { name: "Bianca", specialty: "Caixa e margem", color: "#8aaf72" },
   commercial: { name: "Camila", specialty: "Pipeline e vendas", color: "#b57961" },
-  seo: { name: "Júlia", specialty: "Busca e conteúdo", color: "#c79e58" },
-  funnels: { name: "Natália", specialty: "Jornadas e conversão", color: "#947a51" },
+  seo: { name: "Júlia", specialty: "Risco e compliance", color: "#c79e58" },
+  funnels: { name: "Helena", specialty: "Visão e prioridades", color: "#947a51" },
 } as const;
 const DEFAULT_FURNITURE: FurnitureBlueprint[] = [
   { id: "traffic-desk", kind: "desk", x: -6, z: -4, rotation: Math.PI }, { id: "traffic-chair", kind: "chair", x: -6, z: -2.75, rotation: Math.PI }, { id: "traffic-monitor", kind: "monitor", x: -6, z: -4.35, rotation: Math.PI },
   { id: "finance-desk", kind: "desk", x: 0, z: -4, rotation: Math.PI }, { id: "finance-chair", kind: "chair", x: 0, z: -2.75, rotation: Math.PI }, { id: "finance-monitor", kind: "monitor", x: 0, z: -4.35, rotation: Math.PI },
   { id: "commercial-desk", kind: "desk", x: 6, z: -4, rotation: Math.PI }, { id: "commercial-chair", kind: "chair", x: 6, z: -2.75, rotation: Math.PI }, { id: "commercial-monitor", kind: "monitor", x: 6, z: -4.35, rotation: Math.PI },
   { id: "meeting", kind: "meeting-table", x: -7, z: 5 }, { id: "strategy-sofa", kind: "sofa", x: 6.5, z: 5, rotation: Math.PI / 2 }, { id: "strategy-plant", kind: "plant", x: 9, z: 6.8 },
+  { id: "legal-desk", kind: "desk", x: -7, z: 7.6, rotation: Math.PI }, { id: "legal-chair", kind: "chair", x: -7, z: 6.35, rotation: Math.PI }, { id: "legal-monitor", kind: "monitor", x: -7, z: 8.05, rotation: Math.PI },
+  { id: "ceo-desk", kind: "desk", x: 7, z: 7.6, rotation: Math.PI }, { id: "ceo-chair", kind: "chair", x: 7, z: 6.35, rotation: Math.PI }, { id: "ceo-monitor", kind: "monitor", x: 7, z: 8.05, rotation: Math.PI },
 ];
 
 const DEFAULT_OFFICE_PLAN: WallBlueprint[] = [
@@ -126,8 +130,8 @@ export default function LifeSimPage() {
     };
     const npcObjects: NpcRig[] = [];
     const npcSeeds = [
-      { id: "traffic", name: "TRÁFEGO", x: -6, z: -2.75, color: "#d79a32" }, { id: "finance", name: "FINANÇAS", x: 0, z: -2.75, color: "#8aaf72" }, { id: "commercial", name: "COMERCIAL", x: 6, z: -2.75, color: "#b57961" },
-      { id: "seo", name: "SEO", x: -7, z: 6.8, color: "#c79e58" }, { id: "funnels", name: "FUNIS", x: 7, z: 6.6, color: "#947a51" },
+      { id: "traffic", name: "MARKETING", x: -6, z: -2.75, color: "#d79a32" }, { id: "finance", name: "CFO", x: 0, z: -2.75, color: "#8aaf72" }, { id: "commercial", name: "COMERCIAL", x: 6, z: -2.75, color: "#b57961" },
+      { id: "seo", name: "JURÍDICO", x: -7, z: 6.8, color: "#c79e58" }, { id: "funnels", name: "CEO", x: 7, z: 6.6, color: "#947a51" },
     ];
     const createNpc = (seed: typeof npcSeeds[number], index: number) => {
       const root = new THREE.Group(); root.position.set(seed.x, 0, seed.z); root.rotation.y = Math.PI;

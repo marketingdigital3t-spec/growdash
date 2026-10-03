@@ -65,7 +65,9 @@ export default function AgentsOfficePage() {
     ? accounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : accounts, [accounts, businessUnitId, segment]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
-  const [view, setView] = useState<"map" | "office">("map");
+  // The authenticated /agentes route opens directly on the operating room;
+  // the neural map remains available as a secondary view.
+  const [view, setView] = useState<"map" | "office">("office");
   const showLegacyOfficePreview = window.location.hash === "#legacy-office";
   const [officeAngle, setOfficeAngle] = useState(0);
   const officeDragStart = useRef<number | null>(null);
