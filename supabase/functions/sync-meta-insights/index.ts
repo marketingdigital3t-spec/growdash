@@ -617,6 +617,7 @@ Deno.serve(async (req) => {
         if (allInsights.length === 0) {
           const message = `Conta ${account.name}: Meta não retornou linhas de Insights para ${startDate} a ${endDate}; snapshot anterior preservado.`;
           accountHadError = true;
+          failedAccounts++;
           errors.push(message);
           if (accountLockAcquired && accountLockScopeKey) {
             await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
