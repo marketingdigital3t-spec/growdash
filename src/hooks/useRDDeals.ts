@@ -5,6 +5,7 @@ import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { canonicalWonDeals, canonicalWonDate, canonicalWonDealsInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 import { withRequestTimeout } from "@/lib/resilience";
+import { isSameQueryScope } from "@/lib/queryScope";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -170,10 +171,11 @@ export function consolidateFunnelStages(stages: FunnelStage[]) {
 
 export function useRDDealStageHistory({ funnelIds, startDate, endDate, enabled = true }: { funnelIds: string[]; startDate: Date; endDate: Date; enabled?: boolean }) {
   const scopeIds = Array.from(new Set(funnelIds)).sort();
+  const queryKey = ["rd_deal_stage_history", scopeIds.join(","), startDate.toISOString(), endDate.toISOString()] as const;
   return useQuery({
-    queryKey: ["rd_deal_stage_history", scopeIds.join(","), startDate.toISOString(), endDate.toISOString()],
+    queryKey,
     enabled: enabled && scopeIds.length > 0,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : undefined,
     queryFn: async () => {
       const bounds = saoPauloDayBounds(startDate, endDate);
       const { data, error } = await withRequestTimeout(supabase

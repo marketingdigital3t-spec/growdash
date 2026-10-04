@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { aggregateMetaLeadActionDays, META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { businessDateKey } from "@/lib/businessDate";
+import { isSameQueryScope } from "@/lib/queryScope";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -62,18 +63,19 @@ export function useActionTotalsByAds(
   const accountMapSignature = adAccountByAdId
     ? JSON.stringify(Object.entries(adAccountByAdId).sort(([a], [b]) => a.localeCompare(b)))
     : "";
+  const queryKey = [
+    "action-totals-by-ads",
+    sortedIds.join(","),
+    scopedAccounts.join(","),
+    scopedCampaigns.join(","),
+    attributionWindow,
+    attributionWindowsSignature,
+    startDate ? businessDateKey(startDate) : null,
+    endDate ? businessDateKey(endDate) : null,
+    accountMapSignature,
+  ] as const;
   return useQuery({
-    queryKey: [
-      "action-totals-by-ads",
-      sortedIds.join(","),
-      scopedAccounts.join(","),
-      scopedCampaigns.join(","),
-      attributionWindow,
-      attributionWindowsSignature,
-      startDate ? businessDateKey(startDate) : null,
-      endDate ? businessDateKey(endDate) : null,
-      accountMapSignature,
-    ],
+    queryKey,
     enabled: sortedIds.length > 0 || scopedAccounts.length > 0 || scopedCampaigns.length > 0,
     queryFn: async (): Promise<ActionTotalsResult> => {
       const totals: Record<string, number> = {};
@@ -235,7 +237,7 @@ export function useActionTotalsByAds(
     },
     staleTime: 120_000,
     gcTime: 15 * 60_000,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : undefined,
     refetchOnWindowFocus: false,
   });
 }

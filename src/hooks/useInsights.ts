@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
 import { businessDateKey } from "@/lib/businessDate";
+import { isSameQueryScope } from "@/lib/queryScope";
 
 interface UseInsightsParams {
   adAccountId?: string;
@@ -102,8 +103,9 @@ export function filterInsightsByCampaignScope<T extends { ad_id: string; campaig
 }
 
 export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", attributionWindowsByAccount = {}, startDate, endDate, enabled = true }: UseInsightsParams) {
+  const queryKey = ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))), businessDateKey(startDate), businessDateKey(endDate)] as const;
   return useQuery({
-    queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))), businessDateKey(startDate), businessDateKey(endDate)],
+    queryKey,
     queryFn: async () => {
       const start = businessDateKey(startDate);
       const end = businessDateKey(endDate);
@@ -344,7 +346,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       }) as InsightRow[]);
     },
     enabled,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => isSameQueryScope(previousQuery?.queryKey, queryKey) ? previousData : undefined,
     // The coordinator refreshes on entry/filter events and every five minutes.
     // Keep the previous result during the request so a pending Meta response
     // can never make the selected cards flash to zero.
