@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -152,31 +153,12 @@ Deno.serve(async (req) => {
           if (Number.isNaN(hour)) continue;
 
           const actions: any[] = Array.isArray(r.actions) ? r.actions : [];
-          const findVal = (type: string): number => {
-            const a = actions.find((x: any) => x.action_type === type);
-            return a ? Number(a.value || 0) : 0;
-          };
-          // Keep hourly form leads aligned with the daily sync. Meta account
-          // versions expose different aliases; use the strongest canonical
-          // value and never add aliases that represent the same submission.
-          const formAliases = [
-            "onsite_conversion.lead_grouped",
-            "omni_lead",
-            "leadgen_grouped",
-            "offsite_conversion.fb_pixel_lead",
-          ];
-          const canonicalForms = formAliases.map(findVal);
-          const hasConversation = [
-            "onsite_conversion.messaging_conversation_started_7d",
-            "onsite_conversion.messaging_conversation_started_28d",
-            "onsite_conversion.messaging_conversation_started",
-            "onsite_conversion.total_messaging_connection",
-          ].some((type) => actions.some((item) => item.action_type === type));
-          const nativeLeads = canonicalForms.some((value) => value > 0)
-            ? Math.max(...canonicalForms)
-            : hasConversation ? 0 : findVal("lead");
-          const lpLeads = lpAction && ![...formAliases, "lead"].includes(lpAction) ? findVal(lpAction) : 0;
-          const leads = nativeLeads + lpLeads;
+          const actionValues: Record<string, number> = {};
+          for (const action of actions) {
+            const type = String(action.action_type || "");
+            actionValues[type] = Math.max(actionValues[type] || 0, Math.max(0, Number(action.value || 0)));
+          }
+          const leads = resolveMetaLeadParts(actionValues, lpAction || undefined).total;
 
           const key = `${r.ad_id}|${r.date_start}|${hour}`;
           const prev = map.get(key);
@@ -195,11 +177,10 @@ Deno.serve(async (req) => {
 
         let rows = [...map.values()];
 
-        // Reconciliação: o breakdown horário do Meta SÓ retorna `onsite_conversion.lead_grouped`.
-        // Para qualquer outro evento configurado (fb_pixel_lead, custom, etc.), os leads horários
-        // ficam 0 mesmo com clicks/spend reais. Distribuímos os leads diários (vindos da tabela
-        // `insights`) proporcionalmente aos clicks de cada hora.
-        const needsReconciliation = !!lpAction && lpAction !== "onsite_conversion.lead_grouped";
+        // Hourly breakdowns can omit configured site events and conversation
+        // aliases. Reconcile against the daily canonical snapshot for every
+        // account so hourly totals cannot drift from the official KPI.
+        const needsReconciliation = rows.length > 0;
         if (needsReconciliation && rows.length > 0) {
           const adIds = [...new Set(rows.map((r) => r.ad_id))];
           const dates = [...new Set(rows.map((r) => r.date))].sort();

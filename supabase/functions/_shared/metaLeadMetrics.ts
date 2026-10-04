@@ -1,9 +1,12 @@
 export const FORM_ACTION_TYPES = [
+  // `lead_grouped` is the official Ads Manager result for Instant Forms.
+  // Other action types are legacy/aggregate aliases; prefer this exact event
+  // whenever Meta returns it so an inflated alias cannot replace its count.
   "onsite_conversion.lead_grouped",
-  "onsite_conversion.lead",
-  "omni_lead",
   "leadgen_grouped",
+  "onsite_conversion.lead",
   "leadgen.other",
+  "omni_lead",
 ] as const;
 export const SITE_ACTION_TYPES = ["offsite_conversion.fb_pixel_lead", "offsite_conversion.lead"] as const;
 export const CONVERSATION_ACTION_TYPES = [
@@ -18,8 +21,9 @@ export const CONVERSATION_ACTION_TYPES = [
   "total_messaging_connection",
 ] as const;
 
-function maxAlias(values: Record<string, number>, aliases: readonly string[]) {
-  return Math.max(0, ...aliases.map((alias) => Number(values[alias] || 0)));
+function firstAliasValue(values: Record<string, number>, aliases: readonly string[]) {
+  const alias = aliases.find((type) => Object.prototype.hasOwnProperty.call(values, type));
+  return alias ? Math.max(0, Number(values[alias] || 0)) : 0;
 }
 
 export function resolveMetaLeadParts(
@@ -31,16 +35,22 @@ export function resolveMetaLeadParts(
     && configuredSiteAction !== "lead"
     ? [configuredSiteAction]
     : SITE_ACTION_TYPES;
-  const hasNative = FORM_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
+  const formAction = FORM_ACTION_TYPES.find((type) => Object.prototype.hasOwnProperty.call(values, type));
   const hasSite = siteAliases.some((type) => Object.prototype.hasOwnProperty.call(values, type));
   const hasConversation = CONVERSATION_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
-  const forms = hasNative
-    ? maxAlias(values, FORM_ACTION_TYPES)
+  // These action types are alternate representations of the same result, not
+  // additive events. Use the first canonical event present (including zero),
+  // never the largest alias: broad `omni_lead`/`lead` values can exceed the
+  // grouped Instant Form result shown by Ads Manager.
+  const forms = formAction
+    ? Math.max(0, Number(values[formAction] || 0))
     : hasSite || hasConversation
       ? 0
-      : maxAlias(values, ["lead"]);
-  const site = maxAlias(values, siteAliases);
-  const conversations = maxAlias(values, CONVERSATION_ACTION_TYPES);
+      // Very old accounts can return only this ambiguous aggregate. Use it
+      // solely as a last-resort fallback when no other lead mechanism exists.
+      : Math.max(0, Number(values.lead || 0));
+  const site = firstAliasValue(values, siteAliases);
+  const conversations = firstAliasValue(values, CONVERSATION_ACTION_TYPES);
   return { forms, site, conversations, total: forms + site + conversations };
 }
 

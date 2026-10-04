@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       insights_status: insightsConfirmed ? "confirmed" : "unavailable",
       leads: leadActionSnapshotAvailable ? facts.leads : null,
       leads_status: leadActionSnapshotAvailable ? "confirmed" : "unavailable",
-      lead_definition: "max(form aliases) + max(site aliases) + max(conversation aliases), por anúncio/dia; nunca usar insights.leads",
+      lead_definition: "por conta/anúncio/dia e janela de atribuição: selecionar o primeiro alias presente por prioridade canônica em cada grupo (formulário, site, conversa) e somar apenas os três grupos distintos; nunca usar insights.leads",
       rows: facts.rows,
       action_rows: actionRowCount,
       attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),

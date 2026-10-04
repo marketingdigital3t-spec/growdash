@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
+import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -828,6 +829,9 @@ Deno.serve(async (req) => {
     const stageOrderMap = new Map<string, number>();
     const stageWonMap = new Map<string, boolean>();
     const stageLostMap = new Map<string, boolean>();
+    let stageSnapshotSource: "rd_api" | "deal_snapshot" | "unavailable" = "unavailable";
+    let stageSyncWarning: string | null = null;
+    let stagesPersisted = 0;
     try {
       const sr = await fetchWithRetry(
         `https://crm.rdstation.com/api/v1/deal_stages?token=${encodeURIComponent(token)}&deal_pipeline_id=${encodeURIComponent(funnel.rd_funnel_id)}&limit=200`,
@@ -874,6 +878,8 @@ Deno.serve(async (req) => {
             .from("rd_funnel_stages")
             .upsert(rows, { onConflict: "rd_funnel_id,rd_stage_id" });
           if (stagesUpsertError) throw stagesUpsertError;
+          stageSnapshotSource = "rd_api";
+          stagesPersisted = rows.length;
           // A pipeline can be edited directly in RD Station. Retaining a
           // deleted or renamed stage locally makes the CRM render columns that
           // no longer exist in RD, so remove only stages absent from a
@@ -903,12 +909,52 @@ Deno.serve(async (req) => {
             }
           }
           console.log(`[stages] sincronizadas ${rows.length} etapas reais do funil ${funnel.name}`);
+        } else {
+          stageSyncWarning = "O RD respondeu sem etapas para este funil.";
         }
       } else {
+        stageSyncWarning = `A API de etapas do RD respondeu HTTP ${sr.status}.`;
         console.log(`[stages] fetch failed status=${sr.status}`);
       }
     } catch (e) {
+      stageSyncWarning = `Falha ao buscar etapas do RD: ${(e as Error).message}`;
       console.log(`[stages] erro: ${(e as Error).message}`);
+    }
+
+    // The RD deals snapshot carries the provider's real current stage id,
+    // label, order and won/lost status. Use it as a safe recovery source when
+    // the separate stages endpoint fails or returns an empty payload, rather
+    // than reporting a successful CRM refresh with no Kanban columns.
+    if (stageSnapshotSource === "unavailable") {
+      try {
+        const snapshotDeals: any[] = [];
+        const pageSize = 1_000;
+        for (let page = 0; ; page++) {
+          const { data, error } = await admin
+            .from("rd_deals")
+            .select("rd_stage_id,rd_stage_name,rd_stage_order,stage_bucket,win")
+            .eq("rd_funnel_id", funnel.id)
+            .range(page * pageSize, page * pageSize + pageSize - 1);
+          if (error) throw error;
+          const batch = data || [];
+          snapshotDeals.push(...batch);
+          if (batch.length < pageSize) break;
+        }
+        const fallbackRows = stagesFromRDDealSnapshot(funnel, snapshotDeals);
+        if (fallbackRows.length) {
+          const { error } = await admin.from("rd_funnel_stages")
+            .upsert(fallbackRows, { onConflict: "rd_funnel_id,rd_stage_id" });
+          if (error) throw error;
+          stageSnapshotSource = "deal_snapshot";
+          stagesPersisted = fallbackRows.length;
+          console.warn(`[stages] ${fallbackRows.length} etapas restauradas do snapshot de negócios do RD para ${funnel.name}`);
+        } else {
+          stageSyncWarning ||= "Não há etapas nem negócios com estágio conhecido para reconstruir o pipeline.";
+        }
+      } catch (e) {
+        stageSyncWarning = `${stageSyncWarning ? `${stageSyncWarning} ` : ""}Não foi possível reconstruir etapas das negociações: ${(e as Error).message}`;
+        console.warn(`[stages] fallback de negócios falhou: ${(e as Error).message}`);
+      }
     }
 
     let totalCreated = 0,
@@ -1792,7 +1838,7 @@ Deno.serve(async (req) => {
     }
 
     const fieldCatalog = await syncObservedFieldCatalog();
-    const status = metrics.errors > 0 || (analytics_mode && !analyticsRangeComplete) ? "partial" : "success";
+    const status = metrics.errors > 0 || (analytics_mode && !analyticsRangeComplete) || Boolean(stageSyncWarning) ? "partial" : "success";
     await finishRun({
       status,
       deals: totalDeals,
@@ -1800,9 +1846,12 @@ Deno.serve(async (req) => {
       updated: totalUpdated,
       skipped: totalSkipped,
       funnelName: funnel.name,
-      errorMessage: snapshotMissingIds.length || snapshotDuplicateCount > 0
-        ? `Snapshot RD incompleto: ${snapshotMissingIds.length} ID(s) ausente(s), ${snapshotDuplicateCount} duplicidade(s)`
-        : undefined,
+      errorMessage: [
+        snapshotMissingIds.length || snapshotDuplicateCount > 0
+          ? `Snapshot RD incompleto: ${snapshotMissingIds.length} ID(s) ausente(s), ${snapshotDuplicateCount} duplicidade(s)`
+          : null,
+        stageSyncWarning,
+      ].filter(Boolean).join(" ") || undefined,
     });
 
     return new Response(
@@ -1823,6 +1872,9 @@ Deno.serve(async (req) => {
         fields_created: fieldCatalog.created,
         fields_updated: fieldCatalog.updated,
         complete: analytics_mode ? analyticsRangeComplete : undefined,
+        stage_snapshot_source: stageSnapshotSource,
+        stages_persisted: stagesPersisted,
+        stage_sync_warning: stageSyncWarning,
         pages_processed: pagesProcessed,
         snapshot_missing_ids: snapshotMissingIds,
         snapshot_duplicate_count: snapshotDuplicateCount,

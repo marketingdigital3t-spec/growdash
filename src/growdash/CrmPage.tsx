@@ -157,7 +157,7 @@ export default function CrmPage() {
   const canReadCrm = crmPipelineEnabled(!!user);
   // RD remains its own source; global account selection scopes it only through
   // the explicit RD-connection-to-Meta-account mapping in GlobalFiltersContext.
-  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
+  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope, isError: funnelsError, error: funnelsQueryError, refetch: refetchFunnels } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
   const availableFunnels = useMemo(
     () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id),
     [funnelData],
@@ -201,7 +201,7 @@ export default function CrmPage() {
 
   useEffect(() => {
     setSelectedFunnelIds((current) => current.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id)));
-  }, [availableFunnelIds]);
+  }, [availableFunnelIds, setSelectedFunnelIds]);
 
   // Query cache keeps the previous screen visible globally, which is useful
   // for a silent refresh of the same scope. A different account is a hard
@@ -298,8 +298,12 @@ export default function CrmPage() {
     endDate,
     dateRule: "lead_created_at",
   }), [accountScopeIds, endDate, funnelScopeIds, startDate]);
-  const dealsInPipeline = useMemo(
-    () => scopedDeals.filter((deal) => preset === "max" ? true : isRDDealInScopePeriod(deal, rdScope)),
+  // The CRM board is the current RD pipeline, not a lead-creation report.
+  // Keep older open negotiations visible when the calendar is set to Today;
+  // only the summary KPIs below use the selected period.
+  const dealsInPipeline = scopedDeals;
+  const dealsInSelectedPeriod = useMemo(
+    () => preset === "max" ? scopedDeals : scopedDeals.filter((deal) => isRDDealInScopePeriod(deal, rdScope)),
     [preset, rdScope, scopedDeals],
   );
   const owners = useMemo(
@@ -332,28 +336,26 @@ export default function CrmPage() {
     // KPIs describe the selected account/date scope, never a transient board
     // search or status filter. In "Todas as contas" this is the union of all
     // connected Meta accounts and RD funnels.
-    // The CRM is a replica of the RD board filtered by "Data de criação".
-    // dealsInPipeline has already applied that canonical scope, so the won KPI
-    // must count the won records in the same snapshot instead of re-filtering
-    // them by closed_at (which belongs to sales analytics, not this board).
-    const won = dealsInPipeline.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
-    const lost = dealsInPipeline.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
-    const active = dealsInPipeline.filter((deal) => {
+    // Summary KPIs use the selected period while the Kanban above remains the
+    // current RD pipeline, including older negotiations still in progress.
+    const won = dealsInSelectedPeriod.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
+    const lost = dealsInSelectedPeriod.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
+    const active = dealsInSelectedPeriod.filter((deal) => {
       const bucket = classifyLead(deal);
       return bucket === "open" || bucket === "qualified";
     });
     const wonIds = new Set(won.map((deal) => deal.rd_deal_id));
     const realized = aggregateRevenueSources(scopedSales.filter((sale) => sale.rd_deal_id && wonIds.has(sale.rd_deal_id)), won);
     return {
-      total: dealsInPipeline.length,
+      total: dealsInSelectedPeriod.length,
       active: active.length,
       openRevenue: active.reduce((sum, deal) => sum + getOpportunityAmount(deal), 0),
       won: won.length,
       wonRevenue: realized.totalNet,
       lost: lost.length,
-      conversion: dealsInPipeline.length ? (won.length / dealsInPipeline.length) * 100 : 0,
+      conversion: dealsInSelectedPeriod.length ? (won.length / dealsInSelectedPeriod.length) * 100 : 0,
     };
-  }, [dealsInPipeline, endDate, getOpportunityAmount, preset, scopedSales, startDate]);
+  }, [dealsInSelectedPeriod, getOpportunityAmount, scopedSales]);
 
   const boardStageModel = useMemo(() => {
     const map = new Map<string, PipelineStage>();
@@ -469,7 +471,7 @@ export default function CrmPage() {
     setSyncing(true);
     setSyncWarning(null);
     try {
-      const syncResults: Array<{ deals?: number; pages_processed?: number }> = [];
+      const syncResults: Array<{ deals?: number; pages_processed?: number; stage_sync_warning?: string | null }> = [];
       for (const funnel of connectedFunnels) {
         const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
           body: {
@@ -496,7 +498,7 @@ export default function CrmPage() {
             trigger_source: "crm_history_refresh",
           },
         });
-        if (error || data?.error || data?.success === false || data?.partial) {
+        if (error || data?.error || data?.success === false || (data?.partial && data?.complete === false)) {
           const details = data?.snapshot_missing_ids?.length
             ? ` IDs ausentes: ${data.snapshot_missing_ids.slice(0, 5).join(", ")}`
             : "";
@@ -513,7 +515,14 @@ export default function CrmPage() {
       ]);
       const deals = syncResults.reduce((sum, result) => sum + Number(result?.deals || 0), 0);
       const pages = syncResults.reduce((sum, result) => sum + Number(result?.pages_processed || 0), 0);
-      toast.success(`RD reconciliado: ${deals} negócios em ${pages} páginas.`);
+      const warnings = syncResults.map((result) => result.stage_sync_warning).filter(Boolean);
+      if (warnings.length) {
+        const message = `RD reconciliado: ${deals} negócios em ${pages} páginas. ${warnings.join(" ")}`;
+        setSyncWarning(message);
+        toast.warning(message);
+      } else {
+        toast.success(`RD reconciliado: ${deals} negócios em ${pages} páginas.`);
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Não foi possível sincronizar o RD Station.";
       setSyncWarning(`Último snapshot mantido; sincronização pendente: ${message}`);
@@ -546,7 +555,7 @@ export default function CrmPage() {
       <PageHeading
         eyebrow="RD Station CRM"
         title="Negociações"
-        description="Pipeline operacional sincronizado com os leads e negociações reais do RD Station."
+        description="Pipeline atual do RD Station, com negociações abertas independentemente da data de criação."
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Visualização das negociações">
@@ -565,7 +574,7 @@ export default function CrmPage() {
       <section className="crm-filter-strip gd-panel mb-4 p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
           <Search className="h-4 w-4 text-primary" />
-          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">Defina a conta, o período e as negociações exibidas abaixo.</p></div>
+          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados; o período afeta os indicadores, sem ocultar o pipeline atual.</p></div>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
@@ -640,7 +649,11 @@ export default function CrmPage() {
         </section>
       )}
 
-      {isLoadingSelectedScope ? <CRMLoading /> : dealsError ? (
+      {funnelsError ? (
+        <section role="alert" className="gd-panel mt-4 grid min-h-48 place-items-center p-6 text-center">
+          <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar os funis RD</h2><p className="mt-2 text-sm text-muted-foreground">{funnelsQueryError instanceof Error ? funnelsQueryError.message : "A consulta dos funis falhou. Verifique a conexão RD e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchFunnels()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
+        </section>
+      ) : isLoadingSelectedScope ? <CRMLoading /> : dealsError ? (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
           <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar as negociações</h2><p className="mt-2 text-sm text-muted-foreground">{dealsQueryError instanceof Error ? dealsQueryError.message : "A consulta do CRM falhou. Verifique seu acesso ao funil e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchDeals()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
         </section>
@@ -669,7 +682,7 @@ export default function CrmPage() {
         />
       )}
 
-      {!isLoadingSelectedScope && !dealsError && !deals.length && view !== "ai" && (
+      {!funnelsError && !isLoadingSelectedScope && !dealsError && !deals.length && view !== "ai" && (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">
           <div><UsersRound className="mx-auto h-9 w-9 text-primary" /><h2 className="mt-4 font-black">Nenhuma negociação encontrada</h2><p className="mt-2 text-sm text-muted-foreground">{crmEmptyState({ hasFunnels: !!connectedFunnels.length, hasOwnIntegration: rdEnabled })}</p></div>
         </section>

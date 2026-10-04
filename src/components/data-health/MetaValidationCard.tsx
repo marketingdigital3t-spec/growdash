@@ -10,6 +10,13 @@ import { Loader2, ShieldCheck } from "lucide-react";
 interface Row {
   accountId: string;
   name: string;
+  timezone?: string;
+  attributionWindow?: string;
+  startDate?: string;
+  endDate?: string;
+  metaRows?: number;
+  localRows?: number;
+  localActionRows?: number;
   error?: string;
   meta?: { spend: number; impressions: number; clicks: number; leads: number };
   db?: { spend: number; impressions: number; clicks: number; leads: number };
@@ -30,7 +37,6 @@ export function MetaValidationCard() {
   const [running, setRunning] = useState(false);
   const [days, setDays] = useState("7");
   const [results, setResults] = useState<Row[] | null>(null);
-  const [range, setRange] = useState<{ start: string; end: string } | null>(null);
 
   const run = async () => {
     setRunning(true);
@@ -38,7 +44,6 @@ export function MetaValidationCard() {
       const { data, error } = await supabase.functions.invoke("validate-meta-totals", { body: { days: Number(days) } });
       if (error) throw error;
       setResults((data as any).results || []);
-      setRange({ start: (data as any).startDate, end: (data as any).endDate });
       toast({ title: "Validação concluída", description: `${(data as any).results?.length || 0} contas comparadas` });
     } catch (e) {
       toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
@@ -79,9 +84,8 @@ export function MetaValidationCard() {
         {!results && (
           <p className="text-sm text-muted-foreground">Clique em "Validar" para comparar dashboard ↔ Meta na janela escolhida.</p>
         )}
-        {results && range && (
+        {results && (
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Janela: {range.start} → {range.end}</p>
             <div className="space-y-3">
               {results.map((r) => (
                 <div key={r.accountId} className="rounded-md border border-border/60 p-3">
@@ -89,6 +93,7 @@ export function MetaValidationCard() {
                     <span className="text-sm font-medium">{r.name}</span>
                     {r.error && <Badge variant="destructive" className="text-[10px]">{r.error}</Badge>}
                   </div>
+                  <p className="mb-2 text-[10px] text-muted-foreground">Janela {r.startDate} → {r.endDate} · {r.timezone || "timezone da conta"} · atribuição {r.attributionWindow || "padrão da conta"}{typeof r.metaRows === "number" ? ` · ${r.metaRows} linhas Meta / ${r.localRows ?? 0} locais / ${r.localActionRows ?? 0} ações` : ""}</p>
                   {r.meta && r.db && r.drift && (
                     <div className="grid grid-cols-4 gap-2 text-xs">
                       <Metric label="Spend" db={fmtMoney(r.db.spend)} meta={fmtMoney(r.meta.spend)} pct={r.drift.spendPct} />

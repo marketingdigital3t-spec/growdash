@@ -227,12 +227,12 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
  * pela data de criação: um lead antigo que continua aberto precisa permanecer
  * visível no pipeline, exatamente como no RD Station.
  */
-export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, enabled = true }: RDCRMQueryScope) {
+export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, enabled = true }: RDCRMQueryScope) {
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
   const funnelScope = resolvedFunnelIds?.join(",") ?? "all";
   const query = useQuery({
-    queryKey: ["rd_crm_deals", funnelScope, rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : "", startDate ? businessDateKey(startDate) : "all", endDate ? businessDateKey(endDate) : "all"],
+    queryKey: ["rd_crm_deals", funnelScope, rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : ""],
     enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
@@ -248,11 +248,6 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
           .order("stage_updated_at", { ascending: false, nullsFirst: false })
           .order("lead_created_at", { ascending: false, nullsFirst: false });
         if (resolvedFunnelIds?.length) query = query.in("rd_funnel_id", resolvedFunnelIds);
-        if (startDate && endDate) {
-          const bounds = saoPauloDayBounds(startDate, endDate);
-          query = query.gte("lead_created_at", bounds.start.toISOString()).lte("lead_created_at", bounds.end.toISOString());
-        }
-
         const from = page * pageSize;
         const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), 15_000);
         if (error) throw error;

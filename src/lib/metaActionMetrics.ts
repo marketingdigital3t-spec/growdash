@@ -5,13 +5,11 @@ export const META_ACTION_TYPES = {
   // native form events and only use it as a fallback when none is present.
   // Lead Ads and older Lead Ads aliases are exposed by Meta as result actions.
   // Website conversions stay in the separate `site` group below.
-  // Resolve them as aliases (max, never additive) so one submission is not
-  // counted twice when Meta returns more than one representation.
+  // Resolve them by canonical provider priority, never by maximum alias value.
   forms: FORM_ACTION_TYPES,
   site: SITE_ACTION_TYPES,
   // Older Meta accounts expose the same result as total_messaging_connection.
-  // It is a fallback alias only; preferredValue() prevents additive counting
-  // when a started-conversation alias is present in the same ad.
+  // It is a fallback alias only; shared provider priority selects one event.
   conversations: CONVERSATION_ACTION_TYPES,
   linkClick: ["link_click"],
   landingPageView: ["landing_page_view"],
@@ -48,7 +46,7 @@ export function resolveMetaActionMetrics(
 
 export function resolveMetaLeadActions(actionTotals?: Record<string, number>, siteAction?: string | null) {
   // The shared pure resolver is also used by Meta ingestion, MCP and AI/RAG.
-  // Equivalent aliases are max-resolved, while the three canonical groups sum.
+  // Aliases use shared provider precedence; only the three distinct groups sum.
   return resolveMetaLeadParts(actionTotals || {}, siteAction || undefined);
 }
 
@@ -56,8 +54,8 @@ export type MetaResultType = "leads" | "conversations" | "landing_page_view" | "
 
 /**
  * Resolves the single Result column used by Ads Manager for a campaign.
- * Objective is the primary signal; the action aliases are only fallbacks and
- * are always resolved with max(), never added together.
+ * Objective is the primary signal; action aliases follow shared provider
+ * priority rather than selecting the largest alternative event.
  */
 export function resolveMetaCampaignResult(
   objective: string | null | undefined,
@@ -67,7 +65,7 @@ export function resolveMetaCampaignResult(
   const objectiveKey = String(objective || "").toUpperCase();
   const goalKey = String(optimizationGoal || "").toUpperCase();
   const value = (aliases: readonly string[]) => preferredValue(actionTotals, aliases);
-  const conversations = value(META_ACTION_TYPES.conversations);
+  const conversations = resolveMetaLeadActions(actionTotals).conversations;
   const purchases = value(META_ACTION_TYPES.purchase);
   const landingPageViews = value(META_ACTION_TYPES.landingPageView);
   const linkClicks = value(META_ACTION_TYPES.linkClick);

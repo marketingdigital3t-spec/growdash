@@ -355,7 +355,7 @@ Deno.serve(async (req) => {
         insights_rows: currentInsights.length,
         meta_action_rows: actionRows.filter((row) => row.date >= startStr && row.date <= endStr).length,
         meta_action_rows_by_type: Object.fromEntries(actionTypes.map((type) => [type, actionRows.filter((row) => row.date >= startStr && row.date <= endStr && row.action_type === type).length])),
-        lead_definition: "max(form aliases) + max(site aliases) + max(conversation aliases), por conta/anúncio/dia; aliases equivalentes não são somados; insights.leads nunca é fonte de leads",
+        lead_definition: "por conta/anúncio/dia e janela de atribuição: selecionar o primeiro alias presente por prioridade canônica em cada grupo (formulário, site, conversa) e somar apenas os três grupos distintos; aliases equivalentes não são somados; insights.leads nunca é fonte de leads",
         action_coverage: currentActionsAvailable ? "confirmed_for_every_selected_account_and_requested_scope" : "incomplete_or_unconfirmed; lead_total_not_confirmed",
         action_coverage_gaps_by_account: currentActionCoverageGaps.map((account) => ({ account_id: account.id, name: account.name })),
         attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),

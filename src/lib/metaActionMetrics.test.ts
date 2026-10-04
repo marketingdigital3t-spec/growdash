@@ -38,7 +38,7 @@ describe("Meta action metrics", () => {
     expect(metrics.purchaseValue).toBe(500);
   });
 
-  it("usa o maior alias compatível por mecanismo sem duplicar o mesmo resultado", () => {
+  it("prioriza lead_grouped sobre aliases agregados e não soma eventos duplicados", () => {
     expect(resolveMetaLeadActions({
       "onsite_conversion.lead_grouped": 3,
       lead: 5,
@@ -46,12 +46,59 @@ describe("Meta action metrics", () => {
       "onsite_conversion.messaging_conversation_started_7d": 7,
       "onsite_conversion.messaging_conversation_started": 11,
       "onsite_conversion.total_messaging_connection": 11,
-    })).toEqual({ forms: 5, site: 0, conversations: 11, total: 16 });
+    })).toEqual({ forms: 3, site: 0, conversations: 7, total: 10 });
   });
 
-  it("usa lead somente quando não existe evento nativo de formulário", () => {
+  it("usa o alias genérico lead apenas quando nenhum alias canônico está disponível", () => {
     expect(resolveMetaLeadActions({ lead: 5 }))
       .toEqual({ forms: 5, site: 0, conversations: 0, total: 5 });
+  });
+
+  it("mantém o zero explícito do evento canônico em vez de usar alias inflado", () => {
+    expect(resolveMetaLeadActions({
+      "onsite_conversion.lead_grouped": 0,
+      "onsite_conversion.lead": 13,
+      omni_lead: 13,
+    })).toEqual({ forms: 0, site: 0, conversations: 0, total: 0 });
+  });
+
+  it("prefere leadgen_grouped a variantes não agrupadas", () => {
+    expect(resolveMetaLeadActions({
+      leadgen_grouped: 7,
+      "onsite_conversion.lead": 13,
+      omni_lead: 15,
+    })).toEqual({ forms: 7, site: 0, conversations: 0, total: 7 });
+  });
+
+  it("reproduz a divergência observada: 13 genéricos não substituem 7 formulários", () => {
+    const actions = {
+      "onsite_conversion.lead_grouped": 7,
+      lead: 13,
+      "offsite_conversion.fb_pixel_lead": 6,
+      "onsite_conversion.messaging_conversation_started_7d": 1,
+      "onsite_conversion.total_messaging_connection": 1,
+    };
+    expect(resolveMetaLeadActions(actions)).toEqual({ forms: 7, site: 6, conversations: 1, total: 14 });
+    expect(canonicalMetaLeads([
+      { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", leads: 0 },
+    ], Object.entries(actions).map(([action_type, value]) => ({
+      ad_id: "ad-1", date: "2026-10-04", action_type, value,
+    })), {}).at(0)).toMatchObject({ form_leads: 7, site_leads: 6, conversations: 1, leads: 14 });
+  });
+
+  it("resolve aliases por anúncio antes do total global entre contas", () => {
+    const rows = canonicalMetaLeads([
+      { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", leads: 0 },
+      { ad_id: "ad-2", ad_account_id: "ca02", date: "2026-10-04", leads: 0 },
+    ], [
+      { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 7 },
+      { ad_id: "ad-1", date: "2026-10-04", action_type: "lead", value: 13 },
+      { ad_id: "ad-2", date: "2026-10-04", action_type: "leadgen_grouped", value: 2 },
+      { ad_id: "ad-2", date: "2026-10-04", action_type: "lead", value: 5 },
+    ], {});
+
+    expect(rows.map((row) => row.form_leads)).toEqual([7, 2]);
+    expect(rows.reduce((sum, row) => sum + row.leads, 0)).toBe(9);
   });
 
   it("não trata lead auxiliar de campanha de mensagem como formulário", () => {
@@ -106,7 +153,7 @@ describe("Meta action metrics", () => {
       "offsite_conversion.fb_pixel_lead": 4,
       "onsite_conversion.messaging_conversation_started_7d": 7,
       "onsite_conversion.messaging_conversation_started": 9,
-    })).toEqual({ forms: 12, site: 4, conversations: 9, total: 25 });
+    })).toEqual({ forms: 12, site: 4, conversations: 7, total: 23 });
   });
 
   it("resolve site sem misturar com formulário ou lead auxiliar", () => {
@@ -122,9 +169,9 @@ describe("Meta action metrics", () => {
       },
     }, { ad1: "account-1" });
 
-    expect(result.totals).toEqual({ forms: 7, site: 0, conversations: 0, total: 7 });
+    expect(result.totals).toEqual({ forms: 6, site: 0, conversations: 0, total: 6 });
     expect(result.dailyByAccount["account-1"]["2026-09-27"].total).toBe(4);
-    expect(result.dailyByAccount["account-1"]["2026-09-28"].total).toBe(3);
+    expect(result.dailyByAccount["account-1"]["2026-09-28"].total).toBe(2);
   });
 
   it("resolve o resultado oficial por objetivo sem somar mecanismos diferentes", () => {
@@ -136,6 +183,6 @@ describe("Meta action metrics", () => {
     expect(resolveMetaCampaignResult("OUTCOME_ENGAGEMENT", "CONVERSATIONS", {
       "onsite_conversion.messaging_conversation_started_7d": 12,
       "onsite_conversion.messaging_conversation_started": 20,
-    })).toEqual({ resultType: "conversations", value: 20 });
+    })).toEqual({ resultType: "conversations", value: 12 });
   });
 });
