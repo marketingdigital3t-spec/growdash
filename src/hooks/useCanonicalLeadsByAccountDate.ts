@@ -4,41 +4,20 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
-import { useAccountAdsets } from "@/hooks/useAccountAdsets";
-import { META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
-
-const NATIVE_LEAD_GROUPED = "onsite_conversion.lead_grouped";
-const NATIVE_FORM_EVENTS = META_ACTION_TYPES.forms;
-const LP_VIEW_EVENT = "landing_page_view";
-const MESSAGE_EVENTS = META_ACTION_TYPES.conversations;
-
-const DEST_NATIVE = new Set(["ON_AD"]);
-const DEST_LANDING = new Set(["WEBSITE"]);
-const DEST_MESSAGES = new Set([
-  "MESSENGER", "WHATSAPP", "INSTAGRAM_DIRECT",
-  "MESSAGING_INSTAGRAM_DIRECT", "MESSAGING_MESSENGER", "MESSAGING_WHATSAPP",
-]);
-
-const isDeadStatus = (s?: string | null) => {
-  if (!s) return false;
-  const u = s.toUpperCase();
-  return u.includes("DELETED") || u.includes("ARCHIVED");
-};
+import { aggregateMetaLeadTargets } from "@/lib/metaActionMetrics";
 
 interface ActionRow {
   ad_id: string;
   action_type: string;
   value: number;
   date: string;
+  attribution_window?: string | null;
 }
 
 /**
- * Computes canonical Meta leads per (ad_account_id, date) using the SAME rule
- * as the dashboard KPI "Leads":
- *   - FORMS (ON_AD) campaigns: `onsite_conversion.lead_grouped`
- *   - LANDING (WEBSITE) campaigns: per-account configured action_type (`account_lp_config`)
- * Messaging campaigns contribute their initiated conversations, matching the
- * Ads Manager's overall Results total used by the dashboard.
+ * Uses exactly one global Meta rule per account/day: canonical forms + the
+ * configured site-lead event + initiated conversations. Catalog metadata is
+ * not required for a valid action fact to contribute.
  *
  * Returns `Map<"accountId|YYYY-MM-DD", number>`.
  *
@@ -46,9 +25,8 @@ interface ActionRow {
  * to the dashboard KPI (hourly conversion, weekday distribution, etc.).
  */
 export function useCanonicalLeadsByAccountDate() {
-  const { insights, campaigns, startDate, endDate, adAccountId } = useDashboard();
+  const { insights, startDate, endDate } = useDashboard();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
-  const { data: accountAdsets = [] } = useAccountAdsets(adAccountId);
 
   const start = businessDateKey(startDate);
   const end = businessDateKey(endDate);
@@ -79,7 +57,7 @@ export function useCanonicalLeadsByAccountDate() {
         for (let from = 0; ; from += PAGE) {
           const { data, error } = await supabase
             .from("insight_actions" as any)
-            .select("ad_id, action_type, value, date")
+            .select("ad_id, action_type, value, date, attribution_window")
             .in("ad_id", chunk)
             .gte("date", start)
             .lte("date", end)
@@ -96,113 +74,20 @@ export function useCanonicalLeadsByAccountDate() {
 
   const result = useMemo(() => {
     const targetByAccountDate = new Map<string, number>();
-    const actions = actionsQ.data || [];
-    if (actions.length === 0) return { targetByAccountDate, isLoading: actionsQ.isLoading };
-
-    // Build classification context.
-    // campaign status (from campaigns table) — used to exclude DELETED/ARCHIVED.
-    const campaignStatus: Record<string, string | null> = {};
-    for (const c of (campaigns || []) as any[]) {
-      if (c?.id) campaignStatus[c.id] = c.status ?? null;
-    }
-    // destination_type set per campaign (from adsets) — structural mechanic signal.
-    const destSetByCampaign: Record<string, Set<string>> = {};
-    for (const a of accountAdsets) {
-      if (!a.campaign_id || !a.destination_type) continue;
-      (destSetByCampaign[a.campaign_id] ||= new Set()).add(a.destination_type);
-    }
-
-    // Per-ad action totals for the whole window (used to classify campaigns by observed events).
-    const totalsByAd: Record<string, Record<string, number>> = {};
-    for (const r of actions) {
-      const t = (totalsByAd[r.ad_id] ||= {});
-      t[r.action_type] = (t[r.action_type] || 0) + Number(r.value || 0);
-    }
-
-    // Aggregate per-campaign event totals (mirrors DefaultDashboardContent logic).
-    const totalsByCampaign: Record<string, Record<string, number>> = {};
-    for (const adId of Object.keys(totalsByAd)) {
-      const meta = adMeta[adId];
-      const campId = meta?.campaign_id;
-      if (!campId) continue;
-      const t = (totalsByCampaign[campId] ||= {});
-      for (const [k, v] of Object.entries(totalsByAd[adId])) t[k] = (t[k] || 0) + v;
-    }
-
-    // account per campaign — derived from insights.
-    const accountByCampaign: Record<string, string> = {};
-    for (const r of insights) {
-      if (r.campaign_id && r.ad_account_id) accountByCampaign[r.campaign_id] = r.ad_account_id;
-    }
-
-    // Classify each campaign as native (FORMS) / landing / messages (same rules as the KPI).
-    const nativeCampaigns = new Set<string>();
-    const landingCampaigns = new Set<string>();
-    const messagesCampaigns = new Set<string>();
-    for (const campId of Object.keys(totalsByCampaign).concat(Object.keys(destSetByCampaign))) {
-      if (isDeadStatus(campaignStatus[campId])) continue;
-      const t = totalsByCampaign[campId] || {};
-      const ds = destSetByCampaign[campId] || new Set<string>();
-      const acc = accountByCampaign[campId];
-      const lpAction = acc ? (lpConfigs as any)[acc]?.action_type : undefined;
-      const hasNativeDest = Array.from(ds).some((d) => DEST_NATIVE.has(d));
-      const hasLandingDest = Array.from(ds).some((d) => DEST_LANDING.has(d));
-      const hasMessagesDest = Array.from(ds).some((d) => DEST_MESSAGES.has(d));
-
-      if (NATIVE_FORM_EVENTS.some((event) => (t[event] || 0) > 0) || hasNativeDest) nativeCampaigns.add(campId);
-      if (
-        lpAction &&
-        (hasLandingDest || ((t[LP_VIEW_EVENT] || 0) > 0 && !hasNativeDest))
-      ) {
-        landingCampaigns.add(campId);
+    const siteActionByAccount = Object.fromEntries(
+      Object.entries(lpConfigs as Record<string, { action_type?: string | null }>).map(([accountId, config]) => [accountId, config?.action_type || undefined]),
+    );
+    const canonical = aggregateMetaLeadTargets(insights, actionsQ.data || [], siteActionByAccount);
+    for (const [accountId, days] of Object.entries(canonical.dailyByAccount)) {
+      for (const [date, metrics] of Object.entries(days)) {
+        if (metrics.total > 0) targetByAccountDate.set(`${accountId}|${date}`, metrics.total);
       }
-      if (MESSAGE_EVENTS.some((event) => (t[event] || 0) > 0) || hasMessagesDest) messagesCampaigns.add(campId);
     }
-
-    // 4) Resolve aliases per ad/day before adding them to the daily series.
-    const byAdDate = new Map<string, Record<string, number>>();
-    for (const row of actions) {
-      const key = `${row.ad_id}|${row.date}`;
-      const values = byAdDate.get(key) || {};
-      values[row.action_type] = (values[row.action_type] || 0) + Number(row.value || 0);
-      byAdDate.set(key, values);
-    }
-    for (const [adDate, values] of byAdDate) {
-      const [adId, date] = adDate.split("|");
-      const meta = adMeta[adId];
-      if (!meta?.ad_account_id || !meta.campaign_id) continue;
-      const campId = meta.campaign_id;
-      const acc = meta.ad_account_id;
-      const isNative = nativeCampaigns.has(campId);
-      const isLanding = landingCampaigns.has(campId);
-      const isMessages = messagesCampaigns.has(campId);
-      if (!isNative && !isLanding && !isMessages) continue;
-
-      const resolved = resolveMetaLeadActions(values);
-      let value = isNative ? resolved.forms : 0;
-      if (isLanding) {
-        const lpAction = (lpConfigs as any)[acc]?.action_type;
-        if (lpAction && !NATIVE_FORM_EVENTS.includes(lpAction as any) && lpAction !== "lead") value += Number(values[lpAction] || 0);
-      }
-      if (isMessages) value += resolved.conversations;
-      if (value <= 0) continue;
-
-      const key = `${acc}|${date}`;
-      targetByAccountDate.set(key, (targetByAccountDate.get(key) || 0) + value);
-    }
-
-    return { targetByAccountDate, isLoading: false };
-  }, [actionsQ.data, actionsQ.isLoading, accountAdsets, campaigns, lpConfigs, adMeta, insights]);
+    return { targetByAccountDate, isLoading: actionsQ.isLoading };
+  }, [actionsQ.data, actionsQ.isLoading, insights, lpConfigs]);
 
   return {
     targetByAccountDate: result.targetByAccountDate,
     isLoading: Boolean(actionsQ.isLoading) || result.isLoading,
   };
 }
-
-// Re-export the canonical event constants for any caller that needs them.
-export const CANONICAL_EVENTS = {
-  NATIVE_LEAD_GROUPED,
-  LP_VIEW_EVENT,
-  MESSAGE_EVENT: MESSAGE_EVENTS[0],
-};

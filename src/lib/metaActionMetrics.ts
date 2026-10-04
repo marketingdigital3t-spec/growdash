@@ -1,4 +1,5 @@
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../../supabase/functions/_shared/metaLeadMetrics.ts";
+import { matchesMetaAttributionWindow, normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
@@ -111,4 +112,41 @@ export function aggregateMetaLeadActionDays(
   }
   totals.total = totals.forms + totals.site + totals.conversations;
   return { totals, dailyByAccount };
+}
+
+/**
+ * Resolve the global Meta lead contract per account/day from persisted action
+ * facts. Campaign destination/catalog metadata is deliberately not consulted:
+ * a missing campaign or adset must not hide a valid Meta conversion.
+ */
+export function aggregateMetaLeadTargets(
+  insightRows: Array<{ ad_id: string; ad_account_id?: string | null; attribution_window?: string | null }>,
+  actionRows: Array<{ ad_id: string; date: string; action_type: string; value: number | null; attribution_window?: string | null }>,
+  siteActionByAccount: Record<string, string | undefined> = {},
+) {
+  const accountByAd: Record<string, string | null> = {};
+  const attributionByAd: Record<string, string> = {};
+  for (const row of insightRows) {
+    accountByAd[row.ad_id] = row.ad_account_id || null;
+    attributionByAd[row.ad_id] = normalizeMetaAttributionWindow(row.attribution_window);
+  }
+
+  const facts = new Map<string, typeof actionRows[number]>();
+  for (const row of actionRows) {
+    const accountId = accountByAd[row.ad_id];
+    if (!accountId || !matchesMetaAttributionWindow(row.attribution_window, attributionByAd[row.ad_id])) continue;
+    const key = `${row.ad_id}|${row.date}|${row.action_type}`;
+    const previous = facts.get(key);
+    // Legacy NULL and explicit account_default rows describe the same fact.
+    if (!previous || (!previous.attribution_window && row.attribution_window)) facts.set(key, row);
+  }
+
+  const dailyByAd: Record<string, Record<string, Record<string, number>>> = {};
+  for (const row of facts.values()) {
+    const days = dailyByAd[row.ad_id] || (dailyByAd[row.ad_id] = {});
+    const actions = days[row.date] || (days[row.date] = {});
+    actions[row.action_type] = Math.max(actions[row.action_type] || 0, Math.max(0, Number(row.value || 0)));
+  }
+
+  return aggregateMetaLeadActionDays(dailyByAd, accountByAd, siteActionByAccount);
 }

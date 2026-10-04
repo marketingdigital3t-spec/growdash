@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateMetaLeadActionDays, resolveMetaActionMetrics, resolveMetaCampaignResult, resolveMetaLeadActions } from "./metaActionMetrics";
+import { aggregateMetaLeadActionDays, aggregateMetaLeadTargets, resolveMetaActionMetrics, resolveMetaCampaignResult, resolveMetaLeadActions } from "./metaActionMetrics";
 import { canonicalMetaLeads } from "../../supabase/functions/_shared/metaLeadMetrics";
 
 describe("Meta action metrics", () => {
@@ -172,6 +172,21 @@ describe("Meta action metrics", () => {
     expect(result.totals).toEqual({ forms: 6, site: 0, conversations: 0, total: 6 });
     expect(result.dailyByAccount["account-1"]["2026-09-27"].total).toBe(4);
     expect(result.dailyByAccount["account-1"]["2026-09-28"].total).toBe(2);
+  });
+
+  it("soma os três grupos Meta sem exigir catálogo de campanha e mantém o escopo de atribuição", () => {
+    const result = aggregateMetaLeadTargets(
+      [{ ad_id: "ad-1", ad_account_id: "account-1", attribution_window: "account_default" }],
+      [
+        { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 7, attribution_window: null },
+        { ad_id: "ad-1", date: "2026-10-04", action_type: "lead", value: 13, attribution_window: "account_default" },
+        { ad_id: "ad-1", date: "2026-10-04", action_type: "offsite_conversion.fb_pixel_lead", value: 2, attribution_window: "account_default" },
+        { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.messaging_conversation_started_7d", value: 1, attribution_window: "account_default" },
+        { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 99, attribution_window: "1d_click" },
+      ],
+    );
+
+    expect(result.dailyByAccount["account-1"]["2026-10-04"]).toEqual({ forms: 7, site: 2, conversations: 1, total: 10 });
   });
 
   it("resolve o resultado oficial por objetivo sem somar mecanismos diferentes", () => {

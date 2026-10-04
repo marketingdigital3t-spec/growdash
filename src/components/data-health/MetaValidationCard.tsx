@@ -46,7 +46,18 @@ export function MetaValidationCard() {
       setResults((data as any).results || []);
       toast({ title: "Validação concluída", description: `${(data as any).results?.length || 0} contas comparadas` });
     } catch (e) {
-      toast({ title: "Erro", description: (e as Error).message, variant: "destructive" });
+      const error = e as Error & { context?: Response };
+      let detail = error.message;
+      if (error.context) {
+        try {
+          const payload = await error.context.clone().json();
+          if (typeof payload?.error === "string") detail = payload.error;
+          else if (typeof payload?.message === "string") detail = payload.message;
+        } catch {
+          // Keep the SDK's message when the response does not contain JSON.
+        }
+      }
+      toast({ title: "Erro na reconciliação Meta", description: detail, variant: "destructive" });
     } finally {
       setRunning(false);
     }
