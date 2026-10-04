@@ -21,8 +21,14 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { useRDWonDealsForPeriod, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
+import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
+import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
+import { isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "@/lib/growdashFlowMetrics";
 import { useToast } from "@/hooks/use-toast";
-import { format, formatDistanceToNow, subDays, startOfDay, endOfDay } from "date-fns";
+import { formatDistanceToNow, subDays, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { businessDateKey } from "@/lib/businessDate";
 import {
@@ -55,6 +61,124 @@ import {
 import { GrowdashFlowCanvas } from "@/components/GrowdashFlow/GrowdashFlowCanvas";
 import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
 import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate } from "@/components/GrowdashFlow/utils/templates";
+
+function FlowDataScopePanel() {
+  const { adAccountIds, funnelIds, startDate, endDate } = useGlobalFilters();
+  const accounts = useAdAccounts();
+  const connections = useRDAccountConnections();
+  const selectedAccounts = accounts.data || [];
+  const effectiveAccountIds = resolveGrowdashFlowAccountIds(adAccountIds, selectedAccounts.map((account) => account.id));
+  const accountWindows = buildAttributionWindowsByAccount(
+    selectedAccounts,
+    effectiveAccountIds,
+  );
+  const distinctWindows = Array.from(new Set(Object.values(accountWindows)));
+  const metaWindow = distinctWindows.length === 1 ? distinctWindows[0] : "account_default";
+  const meta = useMetaTrafficMetrics({
+    adAccountIds: effectiveAccountIds,
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
+    attributionWindow: metaWindow,
+  }, !accounts.isLoading && effectiveAccountIds.length > 0);
+  const scopedAccountFilter = adAccountIds.length ? adAccountIds : undefined;
+  const hasNoLinkedFunnel = funnelIds.length === 1 && funnelIds[0] === NO_LINKED_RD_FUNNEL_SCOPE_ID;
+  const linkedFunnels = funnelIds.filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
+  // With no explicit funnel filter, let the RD scope resolver load the funnels
+  // linked to the selected Meta account. The sentinel explicitly means none.
+  const rdScopeEnabled = !accounts.isLoading && !hasNoLinkedFunnel;
+  const rdCreated = useRDCRMDeals({
+    adAccountIds: scopedAccountFilter,
+    funnelIds: linkedFunnels,
+    startDate,
+    endDate,
+    enabled: rdScopeEnabled,
+  });
+  const rdWon = useRDWonDealsForPeriod({
+    adAccountIds: scopedAccountFilter,
+    funnelIds: linkedFunnels,
+    startDate,
+    endDate,
+    enabled: rdScopeEnabled,
+  });
+
+  const accountByExternalId = new Map<string, string>();
+  selectedAccounts.forEach((account) => {
+    accountByExternalId.set(String(account.account_id || "").replace(/^act_/i, ""), account.id);
+  });
+  const relevantConnections = (connections.data || []).filter((connection) => {
+    const external = String(connection.external_account_id || "").replace(/^act_/i, "");
+    return effectiveAccountIds.some((id) => accountByExternalId.get(external) === id);
+  });
+  const connectedInternalAccountIds = new Set(relevantConnections
+    .map((connection) => accountByExternalId.get(String(connection.external_account_id || "").replace(/^act_/i, "")))
+    .filter((id): id is string => Boolean(id)));
+  const rdConfirmed = rdScopeEnabled
+    && effectiveAccountIds.every((id) => connectedInternalAccountIds.has(id))
+    && relevantConnections.every((connection) => connection.status === "connected" && Boolean(connection.last_success_at));
+  const rdSyncing = connections.isLoading || rdCreated.isLoading || rdWon.isLoading || accounts.isLoading;
+  const rdError = connections.isError || rdCreated.isError || rdWon.isError;
+  const rdDataAvailable = isGrowdashFlowRDDataAvailable({ scopeEnabled: rdScopeEnabled, loading: rdSyncing, error: rdError, confirmed: rdConfirmed });
+  const periodLabel = `${businessDateKey(startDate)} — ${businessDateKey(endDate)}`;
+  const money = (value: number | null | undefined) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
+  const count = (value: number | null | undefined) => new Intl.NumberFormat("pt-BR").format(Number(value || 0));
+  const metaValue = (key: string, value: number) => meta.data.metricAvailability[key]?.available ? count(value) : "Indisponível";
+  const metaMoney = (key: string, value: number) => meta.data.metricAvailability[key]?.available ? money(value) : "Indisponível";
+  const rdValue = (value: number) => !rdDataAvailable ? "Indisponível" : count(value);
+  const rdRevenue = () => !rdDataAvailable
+    ? "Indisponível"
+    : money(rdMetrics.revenue);
+  const rdDeals = rdCreated.data || [];
+  const wonDeals = rdWon.data || [];
+  const rdMetrics = summarizeGrowdashFlowRD(rdDeals, wonDeals);
+  const latestRDSync = relevantConnections.map((connection) => connection.last_success_at).filter(Boolean).sort().at(-1);
+
+  return (
+    <section aria-label="Métricas da conta e do período selecionados" className="gd-panel mb-4 p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-black">Dados reais da seleção</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Meta Ads para mídia e resultados · RD Station para negociações e vendas · {periodLabel}</p>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.data.status === "fresh" ? "bg-emerald-500/10 text-emerald-600" : meta.data.status === "syncing" ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+          Meta · {meta.data.status === "fresh" ? "Atualizado" : meta.data.status === "syncing" ? "Sincronizando" : meta.data.status === "partial" ? "Parcial" : meta.data.status === "error" ? "Erro" : "Aguardando"}
+        </span>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-xl border border-border/70 bg-background/40 p-3">
+          <div className="mb-2 text-[10px] font-black uppercase tracking-wider text-primary">Meta Ads</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            <FlowMetric label="Investimento" value={metaMoney("spend", meta.data.spend)} />
+            <FlowMetric label="Leads Meta" value={metaValue("leads", meta.data.totalLeads)} />
+            <FlowMetric label="CPM" value={metaMoney("impressions", meta.data.cpm)} />
+            <FlowMetric label="CPL" value={meta.data.metricAvailability.leads?.available ? money(meta.data.cpl) : "Indisponível"} />
+            <FlowMetric label="Impressões" value={metaValue("impressions", meta.data.impressions)} />
+            <FlowMetric label="Cliques" value={metaValue("clicks", meta.data.clicks)} />
+          </div>
+          {!meta.data.available && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">{meta.data.unavailableReason || meta.data.errors[0] || "Aguardando snapshot Meta confirmado."}</p>}
+        </div>
+        <div className="rounded-xl border border-border/70 bg-background/40 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600">RD Station</div>
+            <span className="text-[10px] text-muted-foreground">{rdSyncing ? "Sincronizando" : rdError ? "Erro" : rdConfirmed ? "Conexão confirmada" : "Sem vínculo / indisponível"}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            <FlowMetric label="Negociações criadas" value={rdDataAvailable ? count(rdMetrics.created) : "Indisponível"} />
+            <FlowMetric label="Oportunidades" value={rdDataAvailable ? count(rdMetrics.opportunities) : "Indisponível"} />
+            <FlowMetric label="Vendas ganhas" value={rdValue(rdMetrics.won)} />
+            <FlowMetric label="Receita RD" value={rdRevenue()} />
+          </div>
+          {latestRDSync && <p className="mt-2 text-[10px] text-muted-foreground">Última sincronização RD: {new Date(latestRDSync).toLocaleString("pt-BR")}</p>}
+          {hasNoLinkedFunnel && !rdSyncing && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">A conta selecionada não tem um funil RD vinculado.</p>}
+          {rdError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Não foi possível confirmar os dados do RD nesta seleção.</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FlowMetric({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0"><div className="truncate text-[10px] text-muted-foreground">{label}</div><div className="mt-0.5 truncate text-sm font-bold" title={value}>{value}</div></div>;
+}
 
 /* ─── Types ─── */
 interface FunnelNode {
@@ -682,6 +806,19 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
   adAccountId?: string | null;
   campaignIds?: string[];
 }) {
+  const globalFilters = useGlobalFilters();
+  const accountCatalog = useAdAccounts();
+  const effectiveAccountIds = resolveGrowdashFlowAccountIds(globalFilters.adAccountIds, accountCatalog.data?.map((account) => account.id) || [], adAccountId);
+  // A linked funnel's saved campaign set applies only while viewing its
+  // linked account. A different global account selection must never silently
+  // reuse that campaign list or make the selected account look empty.
+  const effectiveCampaignIds = resolveGrowdashFlowCampaignIds(globalFilters.adAccountIds, adAccountId, campaignIds);
+  const attributionWindowsByAccount = buildAttributionWindowsByAccount(
+    accountCatalog.data || [],
+    effectiveAccountIds,
+  );
+  const distinctAccountWindows = Array.from(new Set(Object.values(attributionWindowsByAccount)));
+  const attributionWindow = distinctAccountWindows.length === 1 ? distinctAccountWindows[0] : "account_default";
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -764,51 +901,50 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [redoHistory, undoHistory]);
 
-  // Date range for linked funnels
-  const [dateRange, setDateRange] = useState({
-    start: subDays(new Date(), 30),
-    end: new Date(),
-  });
-  const [datePreset, setDatePreset] = useState("30d");
-
   const isLinked = funnelType === "linked" && !!adAccountId;
 
-  // Fetch insights for linked funnels
+  // Every linked funnel follows the authenticated shell's account and calendar
+  // filters. Its saved campaign scope is retained only for its own account.
   const { data: insights = [], isLoading: insightsLoading, refetch: refetchInsights } = useInsights({
-    adAccountId: isLinked ? adAccountId! : undefined,
-    startDate: startOfDay(dateRange.start),
-    endDate: endOfDay(dateRange.end),
-    enabled: isLinked,
+    adAccountId: effectiveAccountIds.length === 1 ? effectiveAccountIds[0] : undefined,
+    adAccountIds: effectiveAccountIds.length > 1 ? effectiveAccountIds : undefined,
+    campaignIds: effectiveCampaignIds,
+    attributionWindow,
+    attributionWindowsByAccount,
+    startDate: globalFilters.startDate,
+    endDate: globalFilters.endDate,
+    enabled: isLinked && effectiveAccountIds.length > 0 && !accountCatalog.isLoading,
   });
   const metaTraffic = useMetaTrafficMetrics({
-    adAccountIds: isLinked && adAccountId ? [adAccountId] : [],
-    campaignIds: campaignIds?.length ? campaignIds : undefined,
-    startDate: businessDateKey(dateRange.start),
-    endDate: businessDateKey(dateRange.end),
+    adAccountIds: effectiveAccountIds,
+    campaignIds: effectiveCampaignIds?.length ? effectiveCampaignIds : undefined,
+    startDate: businessDateKey(globalFilters.startDate),
+    endDate: businessDateKey(globalFilters.endDate),
+    attributionWindow,
   }, isLinked);
-
-  // Filter insights by selected campaigns
-  const filteredInsights = useMemo(() => {
-    if (!isLinked || !campaignIds?.length) return insights;
-    // insights already have campaign_name but we need to filter by campaign_id
-    // Since useInsights joins through ads → adsets → campaigns, we filter what we get
-    return insights;
-  }, [insights, isLinked, campaignIds]);
+  const selectedDays = differenceInCalendarDays(globalFilters.endDate, globalFilters.startDate) + 1;
+  const datePreset = selectedDays === 7 ? "7d"
+    : selectedDays === 14 ? "14d"
+      : selectedDays === 30 ? "30d"
+        : selectedDays === 60 ? "60d"
+          : selectedDays === 90 ? "90d" : "";
 
   // Aggregated metrics from insights
   const aggregatedMetrics = useMemo(() => {
-    if (!filteredInsights.length) return null;
-    const totalSpend = filteredInsights.reduce((s, r) => s + r.spend, 0);
-    const totalImpressions = filteredInsights.reduce((s, r) => s + r.impressions, 0);
-    const totalReach = filteredInsights.reduce((s, r) => s + r.reach, 0);
-    const totalClicks = filteredInsights.reduce((s, r) => s + r.clicks, 0);
-    const totalLeads = metaTraffic.data.totalLeads;
+    if (!insights.length) return null;
+    const totalSpend = insights.reduce((s, r) => s + r.spend, 0);
+    const totalImpressions = insights.reduce((s, r) => s + r.impressions, 0);
+    const totalReach = insights.reduce((s, r) => s + r.reach, 0);
+    const totalClicks = insights.reduce((s, r) => s + r.clicks, 0);
+    const totalLeads = metaTraffic.data.metricAvailability.leads?.available
+      ? metaTraffic.data.totalLeads
+      : undefined;
     const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
     const avgCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
-    const avgCPL = totalLeads > 0 ? totalSpend / totalLeads : 0;
-    const conversionRate = totalClicks > 0 ? (totalLeads / totalClicks) * 100 : 0;
+    const avgCPL = totalLeads === undefined ? undefined : totalLeads > 0 ? totalSpend / totalLeads : 0;
+    const conversionRate = totalLeads === undefined ? undefined : totalClicks > 0 ? (totalLeads / totalClicks) * 100 : 0;
     const avgFrequency = totalReach > 0 ? totalImpressions / totalReach : 0;
-    const efficiencyRate = totalImpressions > 0 ? (totalLeads / totalImpressions) * 100 : 0;
+    const efficiencyRate = totalLeads === undefined ? undefined : totalImpressions > 0 ? (totalLeads / totalImpressions) * 100 : 0;
 
     return {
       spend: totalSpend,
@@ -822,8 +958,8 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
       conversion_rate: conversionRate,
       frequency: avgFrequency,
       efficiency_rate: efficiencyRate,
-    } as Record<string, number>;
-  }, [filteredInsights, metaTraffic.data.totalLeads]);
+    } as Record<string, number | undefined>;
+  }, [insights, metaTraffic.data.metricAvailability.leads?.available, metaTraffic.data.totalLeads]);
 
   // Auto-populate nodes with linked data
   const displayNodes = useMemo(() => {
@@ -836,15 +972,19 @@ function FunnelCanvas({ funnelId, initialNodes, initialConnections, initialName,
     });
   }, [nodes, isLinked, aggregatedMetrics]);
 
-  const handleDatePreset = (preset: string) => {
-    setDatePreset(preset);
+  const handleDatePreset = (rangePreset: string) => {
     const now = new Date();
-    switch (preset) {
-      case "7d": setDateRange({ start: subDays(now, 7), end: now }); break;
-      case "14d": setDateRange({ start: subDays(now, 14), end: now }); break;
-      case "30d": setDateRange({ start: subDays(now, 30), end: now }); break;
-      case "60d": setDateRange({ start: subDays(now, 60), end: now }); break;
-      case "90d": setDateRange({ start: subDays(now, 90), end: now }); break;
+    switch (rangePreset) {
+      case "7d": globalFilters.setPreset("7days"); break;
+      case "14d": globalFilters.setPreset("last_14_days"); break;
+      case "30d": globalFilters.setPreset("30days"); break;
+      case "60d":
+      case "90d": {
+        const days = rangePreset === "60d" ? 60 : 90;
+        globalFilters.setCustomRange({ from: subDays(now, days - 1), to: now });
+        globalFilters.setPreset("custom");
+        break;
+      }
     }
   };
 
@@ -1664,25 +1804,29 @@ const Funnelytics = () => {
 
   if (view === "canvas" && canvasData) {
     if (canvasData.funnelType === "blank") {
-      return <FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} />;
+      return <div className="space-y-4"><FlowDataScopePanel /><FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} /></div>;
     }
     return (
-      <FunnelCanvas
-        key={activeFunnelId || "new"}
-        funnelId={activeFunnelId}
-        initialNodes={canvasData.nodes}
-        initialConnections={canvasData.connections}
-        initialName={canvasData.name}
-        onBack={handleBack}
-        funnelType={canvasData.funnelType}
-        adAccountId={canvasData.adAccountId}
-        campaignIds={canvasData.campaignIds}
-      />
+      <div className="space-y-4">
+        <FlowDataScopePanel />
+        <FunnelCanvas
+          key={activeFunnelId || "new"}
+          funnelId={activeFunnelId}
+          initialNodes={canvasData.nodes}
+          initialConnections={canvasData.connections}
+          initialName={canvasData.name}
+          onBack={handleBack}
+          funnelType={canvasData.funnelType}
+          adAccountId={canvasData.adAccountId}
+          campaignIds={canvasData.campaignIds}
+        />
+      </div>
     );
   }
 
   return (
     <>
+      <FlowDataScopePanel />
       <FunnelListing onSelect={handleSelectFunnel} onCreate={() => setCreateDialogOpen(true)} />
       <CreateFunnelDialog
         open={createDialogOpen}

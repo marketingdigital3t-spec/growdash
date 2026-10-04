@@ -14,6 +14,13 @@ export function normalizeRDQueryScope(scope: RDQueryScope): RDQueryScope {
   return { ...scope, accountIds: Array.from(new Set(scope.accountIds.filter(Boolean))).sort(), rdConnectionIds: Array.from(new Set((scope.rdConnectionIds ?? []).filter(Boolean))).sort(), funnelIds: Array.from(new Set(scope.funnelIds.filter(Boolean))).sort() };
 }
 
+/** An account-scoped RD query must never fall back to every funnel when no
+ * linked funnel was resolved. An empty list means no linked RD scope, not all. */
+export function canQueryResolvedRDAccountScope(accountScoped: boolean, loading: boolean, funnelIds?: string[]) {
+  if (!accountScoped) return true;
+  return !loading && Boolean(funnelIds?.length);
+}
+
 export function rdScopeQueryKey(scope: RDQueryScope) {
   const normalized = normalizeRDQueryScope(scope);
   return [normalized.workspaceId ?? "", normalized.accountIds.join(","), (normalized.rdConnectionIds ?? []).join(","), normalized.funnelIds.join(","), normalized.startDate.toISOString(), normalized.endDate.toISOString(), normalized.dateRule] as const;

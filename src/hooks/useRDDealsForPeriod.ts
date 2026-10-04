@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
-import { isRDDealInScopePeriod } from "@/lib/rdQueryScope";
+import { canQueryResolvedRDAccountScope, isRDDealInScopePeriod } from "@/lib/rdQueryScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { businessDateKey } from "@/lib/businessDate";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
@@ -112,7 +112,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
       resolvedFunnelIds?.join(",") ?? "all",
       rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : "",
     ],
-    enabled: enabled && (!rdScope.accountScoped || !rdScope.loading),
+    enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
       // Calendar selections are local-midnight dates. Expand the bounds to the
@@ -177,7 +177,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
   const resolvedFunnelIds = rdScope.funnelIds;
   const query = useQuery({
     queryKey: ["rd_won_deals_period", businessDateKey(startDate), businessDateKey(endDate), resolvedFunnelIds?.join(",") ?? "all", rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : ""],
-    enabled: enabled && (!rdScope.accountScoped || !rdScope.loading),
+    enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
       const bounds = saoPauloDayBounds(startDate, endDate);
@@ -233,7 +233,7 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
   const funnelScope = resolvedFunnelIds?.join(",") ?? "all";
   const query = useQuery({
     queryKey: ["rd_crm_deals", funnelScope, rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : "", startDate ? businessDateKey(startDate) : "all", endDate ? businessDateKey(endDate) : "all"],
-    enabled: enabled && (!rdScope.accountScoped || !rdScope.loading),
+    enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
       const pageSize = 1_000;

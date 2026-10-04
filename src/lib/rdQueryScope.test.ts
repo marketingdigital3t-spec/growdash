@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeRDDealsById, isDealInRDQueryScope, isRDDealInScopePeriod, normalizeRDQueryScope } from "./rdQueryScope";
+import { canQueryResolvedRDAccountScope, dedupeRDDealsById, isDealInRDQueryScope, isRDDealInScopePeriod, normalizeRDQueryScope } from "./rdQueryScope";
 
 const scope = normalizeRDQueryScope({
   accountIds: ["account-b", "account-a", "account-a"],
@@ -10,6 +10,12 @@ const scope = normalizeRDQueryScope({
 });
 
 describe("RD query scope", () => {
+  it("does not turn a missing account-to-funnel link into an unscoped query", () => {
+    expect(canQueryResolvedRDAccountScope(true, false, [])).toBe(false);
+    expect(canQueryResolvedRDAccountScope(true, true, ["funnel"])).toBe(false);
+    expect(canQueryResolvedRDAccountScope(true, false, ["funnel"])).toBe(true);
+    expect(canQueryResolvedRDAccountScope(false, false, undefined)).toBe(true);
+  });
   it("requires account and funnel to be in the intersection", () => {
     expect(isDealInRDQueryScope({ ad_account_id: "account-a", rd_funnel_id: "funnel-a" }, scope)).toBe(true);
     expect(isDealInRDQueryScope({ ad_account_id: "account-b", rd_funnel_id: "funnel-a" }, scope)).toBe(true);
