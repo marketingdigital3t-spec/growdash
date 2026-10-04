@@ -633,11 +633,13 @@ export default function FunnelAnalysis() {
                     {activeFunnels.length === 0
                       ? "Nenhum funil RD ativo disponível."
                       : noStages
-                        ? "Os estágios reais do funil ainda não foram sincronizados."
+                        ? "O catálogo de etapas do RD não está disponível."
                         : "Nenhuma negociação encontrada no histórico sincronizado."}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    O histórico completo do RD será exibido assim que a sincronização for concluída. O período acima continua sendo usado para comparar a mídia Meta.
+                    {noStages
+                      ? "A distribuição usa as etapas salvas nas negociações; o histórico de movimentações entre etapas continua indisponível. O período acima continua sendo usado para comparar a mídia Meta."
+                      : "O período acima filtra os dados de CRM pela data de criação e compara a mídia Meta no mesmo intervalo."}
                   </p>
                 </div>
                 <Button onClick={handleSync} disabled={syncing || (!funnelId && visibleAccounts.length === 0)} size="sm" variant="outline" className="shrink-0">
