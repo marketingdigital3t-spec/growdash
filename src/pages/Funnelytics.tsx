@@ -130,6 +130,7 @@ function FlowDataScopePanel() {
   });
   const [rdSyncRequestInFlight, setRdSyncRequestInFlight] = useState(false);
   const [rdSyncRequestError, setRdSyncRequestError] = useState<string | null>(null);
+  const rdSyncInFlightRef = useRef(false);
   const rdScopeRows = useMemo(() => rdScopeCoverage.data || [], [rdScopeCoverage.data]);
   const scopedRDSyncRows = rdScopeRows.filter((row) => sortedFunnelIds.includes(row.funnel_id));
   const rdConfirmed = rdScopeEnabled
@@ -147,10 +148,9 @@ function FlowDataScopePanel() {
     if (hasFreshCoverage) return;
 
     let active = true;
-    let inFlight = false;
     const syncRD = async () => {
-      if (!active || inFlight || !navigator.onLine || document.visibilityState === "hidden") return;
-      inFlight = true;
+      if (!active || rdSyncInFlightRef.current || !navigator.onLine || document.visibilityState === "hidden") return;
+      rdSyncInFlightRef.current = true;
       setRdSyncRequestInFlight(true);
       setRdSyncRequestError(null);
       try {
@@ -180,8 +180,8 @@ function FlowDataScopePanel() {
           await queryClient.invalidateQueries({ queryKey: ["rd_won_deals_period"] });
           await queryClient.invalidateQueries({ queryKey: ["rd_account_connections"] });
         }
-        inFlight = false;
-        if (active) setRdSyncRequestInFlight(false);
+        rdSyncInFlightRef.current = false;
+        setRdSyncRequestInFlight(false);
       }
     };
     const timer = window.setTimeout(() => void syncRD(), 0);
