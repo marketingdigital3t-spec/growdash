@@ -18,6 +18,7 @@ interface UseInsightsParams {
 
 export interface InsightRow {
   ad_id: string;
+  campaign_id?: string | null;
   date: string;
   spend: number;
   impressions: number;
@@ -81,6 +82,25 @@ export function dedupeDailyInsights(rows: InsightRow[]) {
   return Array.from(unique.values());
 }
 
+/**
+ * Keep historical facts scoped by the campaign id persisted on the fact.
+ * The current ad -> adset -> campaign catalog is only a legacy fallback;
+ * archived or temporarily missing catalog rows must not turn valid Insights
+ * into an apparent zero snapshot.
+ */
+export function filterInsightsByCampaignScope<T extends { ad_id: string; campaign_id?: string | null }>(
+  rows: T[],
+  campaignIds: string[] | undefined,
+  campaignIdByAd: Record<string, string | null | undefined>,
+) {
+  if (!campaignIds?.length) return rows;
+  const allowedCampaigns = new Set(campaignIds.map(String));
+  return rows.filter((row) => {
+    const campaignId = row.campaign_id ?? campaignIdByAd[row.ad_id];
+    return campaignId != null && allowedCampaigns.has(String(campaignId));
+  });
+}
+
 export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", attributionWindowsByAccount = {}, startDate, endDate, enabled = true }: UseInsightsParams) {
   return useQuery({
     queryKey: ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))), businessDateKey(startDate), businessDateKey(endDate)],
@@ -98,7 +118,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         let directAvailable = true;
         const directQuery = (supabase as any)
           .from("insights")
-          .select("ad_id,ad_account_id,date,spend,impressions,reach,clicks,ctr,cpm,frequency,leads,form_leads,site_leads,conversations,cpl,conversion_rate,efficiency_rate,health_score,optimization_goal,result_type,result_value,attribution_window")
+          .select("ad_id,ad_account_id,campaign_id,date,spend,impressions,reach,clicks,ctr,cpm,frequency,leads,form_leads,site_leads,conversations,cpl,conversion_rate,efficiency_rate,health_score,optimization_goal,result_type,result_value,attribution_window")
           .in("ad_account_id", scopedAccountIds)
           .gte("date", start)
           .lte("date", end)
@@ -145,7 +165,6 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
             const { data: campaigns } = await withRequestTimeout((supabase as any).from("campaigns").select("id,name,objective,ad_account_id,status").in("id", Array.from(new Set(campaignIdsFromAds))), 15_000);
             for (const campaign of campaigns || []) campaignCatalog.set(String(campaign.id), campaign);
           }
-          const allowedCampaigns = campaignIds?.length ? new Set(campaignIds.map(String)) : null;
           const normalizeWindow = (value: unknown) => String(value || "account_default")
             .split(",").map((item) => item.trim()).filter(Boolean).sort().join(",") || "account_default";
           const filteredRows = directRows
@@ -156,21 +175,13 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
               // explicit default as equivalent, but never mix configured
               // windows between accounts.
               if (rowWindow !== accountWindow) return false;
-              if (!allowedCampaigns) return true;
-              const ad = adCatalog[String(row.ad_id)];
-              const adset = ad ? adsetCatalog.get(String(ad.adset_id)) : null;
-              // Campaign filtering can use the catalog when available. When
-              // enrichment is delayed, keep the fact visible only if its ad
-              // can be resolved; never discard the whole account snapshot.
-              return !!adset?.campaign_id && allowedCampaigns.has(String(adset.campaign_id));
+              return true;
             });
-          // A legacy sync can persist the same account/day under a different
-          // ordering (or an equivalent default representation) of the Meta
-          // attribution window. If strict normalization found nothing, keep
-          // one fact per ad/day rather than hiding a valid spend snapshot.
-          const rowsForDisplay = filteredRows.length || allowedCampaigns
-            ? filteredRows
-            : Array.from(new Map(directRows.map((row) => [`${row.ad_id}|${row.date}`, row])).values());
+          const campaignIdByAd = Object.fromEntries(Object.entries(adCatalog).map(([adId, ad]) => {
+            const adset = adsetCatalog.get(String(ad.adset_id));
+            return [adId, adset?.campaign_id ?? null];
+          }));
+          const rowsForDisplay = filterInsightsByCampaignScope(filteredRows, campaignIds, campaignIdByAd);
           return dedupeDailyInsights(rowsForDisplay
             .map((row) => {
               const ad = adCatalog[String(row.ad_id)] || {};
@@ -206,7 +217,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
                 ad_status: ad.status ?? null,
                 adset_status: adset.status ?? null,
                 campaign_status: campaign.status ?? null,
-                campaign_id: adset.campaign_id ?? null,
+                campaign_id: row.campaign_id ?? adset.campaign_id ?? null,
                 ad_account_id: row.ad_account_id ?? campaign.ad_account_id ?? null,
               };
             }) as InsightRow[]);
