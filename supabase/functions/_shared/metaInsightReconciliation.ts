@@ -4,6 +4,16 @@ export type MetaDailyInsightKey = {
 };
 
 /**
+ * Return only known account ads that are absent from a complete daily response.
+ * Using a positive ID list for deletion avoids relying on PostgREST's `not.in`
+ * filter serialization, which previously deleted the response's own ad facts.
+ */
+export function staleAdIdsForDailySnapshot(candidateAdIds: string[], incomingAdIds: Iterable<string>): string[] {
+  const incoming = new Set(Array.from(incomingAdIds, String));
+  return Array.from(new Set(candidateAdIds.map(String))).filter((adId) => !incoming.has(adId));
+}
+
+/**
  * An omitted day in a multi-day Insights response is ambiguous: it can mean
  * no delivery, Meta processing delay, or incomplete coverage. Do not use that
  * absence to delete a previously confirmed daily snapshot. Reconcile only

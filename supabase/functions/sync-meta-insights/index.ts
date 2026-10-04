@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { datesSafeToReconcile } from "../_shared/metaInsightReconciliation.ts";
+import { datesSafeToReconcile, staleAdIdsForDailySnapshot } from "../_shared/metaInsightReconciliation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -919,17 +919,18 @@ Deno.serve(async (req) => {
         }
         for (const date of datesSafeToReconcile(startDate, endDate, allInsights)) {
           const incoming = [...(incomingByDate.get(date) || new Set<string>())];
+          const incomingIds = new Set(incoming);
           for (let i = 0; i < factAdIds.length; i += 500) {
             const adChunk = factAdIds.slice(i, i + 500);
-            let actionDelete = supabaseAdmin.from("insight_actions").delete()
-              .in("ad_id", adChunk).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
-            let insightDelete = supabaseAdmin.from("insights").delete()
-              .in("ad_id", adChunk).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
-            if (incoming.length) {
-              const quoted = `(${incoming.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",")})`;
-              actionDelete = actionDelete.not("ad_id", "in", quoted);
-              insightDelete = insightDelete.not("ad_id", "in", quoted);
-            }
+            const staleAdIds = staleAdIdsForDailySnapshot(adChunk, incomingIds);
+            if (!staleAdIds.length) continue;
+            // Delete only explicitly identified stale IDs. The old `not.in`
+            // filter was serialized by PostgREST in a way that matched the
+            // incoming IDs too, removing every newly upserted fact for the day.
+            const actionDelete = supabaseAdmin.from("insight_actions").delete()
+              .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
+            const insightDelete = supabaseAdmin.from("insights").delete()
+              .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
             const { error: actionDeleteError } = await actionDelete;
             if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
             const { error: insightDeleteError } = await insightDelete;
