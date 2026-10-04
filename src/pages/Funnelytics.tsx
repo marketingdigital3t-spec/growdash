@@ -155,6 +155,7 @@ function FlowDataScopePanel() {
             <FlowMetric label="Cliques" value={metaValue("clicks", meta.data.clicks)} />
           </div>
           {!meta.data.available && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">{meta.data.unavailableReason || meta.data.errors[0] || "Aguardando snapshot Meta confirmado."}</p>}
+          {meta.data.available && !meta.data.metricAvailability.leads?.available && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Leads Meta: {meta.data.metricAvailability.leads?.reason || "Ações Meta ainda não confirmadas para este período."}</p>}
         </div>
         <div className="rounded-xl border border-border/70 bg-background/40 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
