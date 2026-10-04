@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { businessDateKey } from "@/lib/businessDate";
+import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -25,14 +26,6 @@ const LIVE_TABLES = [
 // A realtime write must refresh live data, but invalidating every cached query
 // makes expensive route modules re-render together and can freeze navigation.
 // Keep the list explicit and restricted to data fed by the realtime tables.
-const LIVE_QUERY_PREFIXES = new Set([
-  "ad_accounts", "campaigns", "campaigns_full", "meta-adsets-independent", "meta-ads-independent",
-  "insights", "insights_hourly", "daily_spend_by_account", "daily_budget_active_by_account",
-  "rd_deals", "rd_crm_deals", "rd_deals_period", "rd_won_deals_period", "rd_funnel_stages",
-  "sales", "alerts", "social_accounts", "social_media", "social_insights_daily",
-  "financial-entries", "financial-history", "kanban_boards", "kanban_board_details", "workspace-files",
-]);
-
 type SyncState = "idle" | "refreshing" | "fresh" | "partial" | "error";
 
 interface Params {
@@ -75,7 +68,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
       // Only queries derived from realtime tables become stale. This preserves
       // cached permission/layout/module data while a person changes pages.
       void queryClient.invalidateQueries({
-        predicate: (query) => LIVE_QUERY_PREFIXES.has(String(query.queryKey[0])),
+        predicate: (query) => shouldInvalidateLiveQuery(query.queryKey),
       });
       setLastUpdatedAt(new Date());
     }, REALTIME_UI_BATCH_MS);

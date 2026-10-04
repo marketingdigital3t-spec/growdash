@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "./growdashFlowMetrics";
+import { hasGrowdashFlowRDSnapshotEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "./growdashFlowMetrics";
 
 describe("Growdash Flow analytics scope", () => {
   it("only confirms RD metrics after a successful, completed, linked-scope query", () => {
@@ -7,6 +7,31 @@ describe("Growdash Flow analytics scope", () => {
     expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, loading: false, error: true, confirmed: true })).toBe(false);
     expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, loading: false, error: false, confirmed: false })).toBe(false);
     expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, loading: false, error: false, confirmed: true })).toBe(true);
+  });
+  it("accepts a persisted scoped snapshot for an active legacy link without a sync timestamp", () => {
+    expect(hasGrowdashFlowRDSnapshotEvidence(
+      ["selected"],
+      [{ id: "rd-connection", accountId: "selected", status: "connected", lastSuccessAt: null }],
+      ["rd-connection"],
+    )).toBe(true);
+    expect(hasGrowdashFlowRDSnapshotEvidence(
+      ["selected"],
+      [{ id: "rd-connection", accountId: "selected", status: "connected", lastSuccessAt: null }],
+      [],
+    )).toBe(false);
+    expect(hasGrowdashFlowRDSnapshotEvidence(
+      ["selected"],
+      [{ id: "rd-connection", accountId: "selected", status: "disconnected", lastSuccessAt: null }],
+      ["rd-connection"],
+    )).toBe(false);
+    expect(hasGrowdashFlowRDSnapshotEvidence(
+      ["selected", "other"],
+      [
+        { id: "rd-connection", accountId: "selected", status: "connected", lastSuccessAt: null },
+        { id: "other-connection", accountId: "other", status: "connected", lastSuccessAt: null },
+      ],
+      ["rd-connection"],
+    )).toBe(false);
   });
   it("uses the account selected in the global toolbar", () => {
     expect(resolveGrowdashFlowAccountIds(["selected"], ["selected", "other"], "saved"))

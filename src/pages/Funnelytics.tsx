@@ -26,7 +26,7 @@ import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
-import { isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "@/lib/growdashFlowMetrics";
+import { hasGrowdashFlowRDSnapshotEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "@/lib/growdashFlowMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow, subDays, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -109,12 +109,22 @@ function FlowDataScopePanel() {
     const external = String(connection.external_account_id || "").replace(/^act_/i, "");
     return effectiveAccountIds.some((id) => accountByExternalId.get(external) === id);
   });
-  const connectedInternalAccountIds = new Set(relevantConnections
-    .map((connection) => accountByExternalId.get(String(connection.external_account_id || "").replace(/^act_/i, "")))
-    .filter((id): id is string => Boolean(id)));
+  const rdSnapshotConnectionIds = [...(rdCreated.data || []), ...(rdWon.data || [])]
+    .map((deal) => deal.rd_connection_id)
+    .filter((id): id is string => Boolean(id));
   const rdConfirmed = rdScopeEnabled
-    && effectiveAccountIds.every((id) => connectedInternalAccountIds.has(id))
-    && relevantConnections.every((connection) => connection.status === "connected" && Boolean(connection.last_success_at));
+    && rdCreated.isSuccess
+    && rdWon.isSuccess
+    && hasGrowdashFlowRDSnapshotEvidence(
+      effectiveAccountIds,
+      relevantConnections.map((connection) => ({
+        id: connection.id,
+        accountId: accountByExternalId.get(String(connection.external_account_id || "").replace(/^act_/i, "")) || "",
+        status: connection.status,
+        lastSuccessAt: connection.last_success_at,
+      })),
+      rdSnapshotConnectionIds,
+    );
   const rdSyncing = connections.isLoading || rdCreated.isLoading || rdWon.isLoading || accounts.isLoading;
   const rdError = connections.isError || rdCreated.isError || rdWon.isError;
   const rdDataAvailable = isGrowdashFlowRDDataAvailable({ scopeEnabled: rdScopeEnabled, loading: rdSyncing, error: rdError, confirmed: rdConfirmed });
@@ -168,7 +178,9 @@ function FlowDataScopePanel() {
             <FlowMetric label="Vendas ganhas" value={rdValue(rdMetrics.won)} />
             <FlowMetric label="Receita RD" value={rdRevenue()} />
           </div>
-          {latestRDSync && <p className="mt-2 text-[10px] text-muted-foreground">Última sincronização RD: {new Date(latestRDSync).toLocaleString("pt-BR")}</p>}
+          {latestRDSync
+            ? <p className="mt-2 text-[10px] text-muted-foreground">Última sincronização RD: {new Date(latestRDSync).toLocaleString("pt-BR")}</p>
+            : rdDataAvailable && <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Leitura do snapshot RD confirmada; a conexão não registra data da última sincronização.</p>}
           {hasNoLinkedFunnel && !rdSyncing && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">A conta selecionada não tem um funil RD vinculado.</p>}
           {rdError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Não foi possível confirmar os dados do RD nesta seleção.</p>}
         </div>
