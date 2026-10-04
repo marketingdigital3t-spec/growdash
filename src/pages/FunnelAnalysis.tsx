@@ -33,6 +33,7 @@ import { useSales } from "@/hooks/useSales";
 import { filterCanonicalFunnelSales } from "@/lib/funnelRevenue";
 import { excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages } from "@/lib/crmPipelineStages";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { getMetaSyncRange } from "@/lib/metaSyncRange";
 import { businessDateKey } from "@/lib/businessDate";
 import { DashboardProvider } from "@/contexts/DashboardContext";
@@ -115,8 +116,8 @@ export default function FunnelAnalysis() {
   );
   const selectedFunnelIdSet = useMemo(() => new Set(selectedFunnelIds), [selectedFunnelIds]);
   const allFunnelsSelected = selectedFunnelIds.length === 0;
-  // Meta e RD têm escopos independentes: a conta de anúncios nunca escolhe
-  // ou limita automaticamente o funil CRM.
+  // RD continua sendo fonte independente; a seleção Meta resolve somente os
+  // funis RD explicitamente vinculados à conexão daquela conta.
   const scopedActiveFunnels = useMemo(
     () => allFunnelsSelected ? activeFunnels : activeFunnels.filter((funnel) => selectedFunnelIdSet.has(funnel.id)),
     [activeFunnels, allFunnelsSelected, selectedFunnelIdSet],
@@ -124,14 +125,16 @@ export default function FunnelAnalysis() {
   useEffect(() => {
     // Remove selections for funnels that were deactivated or deleted.
     if (!loadingFunnels && selectedFunnelIds.length) {
-      const valid = selectedFunnelIds.filter((id) => activeFunnels.some((funnel) => funnel.id === id));
+      const valid = selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || activeFunnels.some((funnel) => funnel.id === id));
       if (valid.length !== selectedFunnelIds.length) setSelectedFunnelIds(valid);
     }
   }, [activeFunnels, loadingFunnels, selectedFunnelIds, setSelectedFunnelIds]);
   const funnelId = selectedFunnelIds.length === 1 ? selectedFunnelIds[0] : "";
   const funnelScopeIds = useMemo(
-    () => scopedActiveFunnels.map((funnel) => funnel.id),
-    [scopedActiveFunnels],
+    () => selectedFunnelIds.includes(NO_LINKED_RD_FUNNEL_SCOPE_ID)
+      ? [NO_LINKED_RD_FUNNEL_SCOPE_ID]
+      : scopedActiveFunnels.map((funnel) => funnel.id),
+    [scopedActiveFunnels, selectedFunnelIds],
   );
   const effectiveAdAccountId = selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined;
   const effectiveAdAccountIds = selectedAccountIds.length > 1 ? selectedAccountIds : undefined;
@@ -163,8 +166,7 @@ export default function FunnelAnalysis() {
     includeHistory: true,
     enabled: funnelScopeIds.length > 0,
   });
-  // Funis RD são independentes da Meta: o recorte usa somente os funis ativos
-  // selecionados e o período/filtros do CRM.
+  // O recorte RD usa os funis vinculados à conta selecionada e os filtros do CRM.
   const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError } = useRDDeals({
     funnelIds: funnelScopeIds,
     startDate,
@@ -377,7 +379,7 @@ export default function FunnelAnalysis() {
   // campanha na Meta. Use os IDs reais das campanhas visíveis e, como
   // Os filtros de campanha nesta tela são UTMs do RD. Não há vínculo canônico
   // UTM→Meta para inferir IDs comparando nomes; o perfil Meta respeita conta e
-  // período e permanece independente do filtro CRM.
+  // período, enquanto o escopo dos fatos RD vem dos funis vinculados.
   const audienceCampaignIds = useMemo(() => {
     const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
     const candidates = visibleCampaignRows.filter((campaign: any) => accountIds.has(campaign.ad_account_id));

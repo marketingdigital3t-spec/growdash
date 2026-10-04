@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useProducts } from "@/hooks/useProducts";
@@ -153,7 +154,8 @@ export default function CrmPage() {
   // uma cópia pessoal do token. A consulta usa RLS e continua retornando
   // somente os funis atribuídos ao usuário atual.
   const canReadCrm = crmPipelineEnabled(!!user);
-  // RD funnels are an independent source and are never scoped by a Meta account.
+  // RD remains its own source; global account selection scopes it only through
+  // the explicit RD-connection-to-Meta-account mapping in GlobalFiltersContext.
   const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
   const availableFunnels = useMemo(
     () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id),
@@ -161,10 +163,10 @@ export default function CrmPage() {
   );
   const availableFunnelIds = useMemo(() => new Set(availableFunnels.map((funnel) => funnel.id)), [availableFunnels]);
   const scopedSelectedFunnelIds = useMemo(
-    () => selectedFunnelIds.filter((id) => availableFunnelIds.has(id)),
+    () => selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id)),
     [availableFunnelIds, selectedFunnelIds],
   );
-  const requestedFunnelIds = scopedSelectedFunnelIds.length ? scopedSelectedFunnelIds : availableFunnels.map((funnel) => funnel.id);
+  const requestedFunnelIds = selectedFunnelIds.length ? scopedSelectedFunnelIds : availableFunnels.map((funnel) => funnel.id);
   const {
     data: dealData = [],
     isLoading: loadingDeals,
@@ -197,7 +199,7 @@ export default function CrmPage() {
   const [stageLimits, setStageLimits] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    setSelectedFunnelIds((current) => current.filter((id) => availableFunnelIds.has(id)));
+    setSelectedFunnelIds((current) => current.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id)));
   }, [availableFunnelIds]);
 
   // Query cache keeps the previous screen visible globally, which is useful

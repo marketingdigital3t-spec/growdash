@@ -27,6 +27,7 @@ import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardReferenceDeck } from "@/components/dashboard/DashboardReferenceDeck";
 import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
@@ -80,7 +81,7 @@ const Index = () => {
   const scopedRDfunnelIds = useMemo(() => {
     const active = rdFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id);
     return selectedFunnelIds.length
-      ? active.filter((funnel) => selectedFunnelIds.includes(funnel.id)).map((funnel) => funnel.id)
+      ? selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || active.some((funnel) => funnel.id === id))
       : active.map((funnel) => funnel.id);
   }, [rdFunnels, selectedFunnelIds]);
   // Universo estável de campanhas com veiculação no período/conta — não muda quando

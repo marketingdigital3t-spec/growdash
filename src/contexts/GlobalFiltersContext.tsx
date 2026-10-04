@@ -3,6 +3,9 @@ import { normalizeCustomDateRange, resolvePreset, type DatePreset } from "@/hook
 import { businessDateKey } from "@/lib/businessDate";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID, resolveLinkedRDFunnelIds } from "@/lib/rdAccountScope";
 
 export type BusinessSegment = "infoproduto" | "saas";
 
@@ -52,9 +55,22 @@ function readStored() {
 export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   const { data: workspace } = useWorkspace();
   const { data: rdFunnels = [], isLoading: loadingRDFunnels } = useRDFunnels(undefined, true);
+  const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections();
+  const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
+  const accountScopeReady = !loadingRDFunnels && !loadingRDConnections && !loadingAdAccounts;
   const stored = typeof window === "undefined" ? null : readStored();
   const [adAccountIds, setAdAccountIds] = useState<string[]>(() => stored?.adAccountIds?.length ? stored.adAccountIds : stored?.adAccountId && stored.adAccountId !== "all" ? [stored.adAccountId] : []);
-  const [funnelIds, setFunnelIds] = useState<string[]>(() => stored?.funnelIds ?? []);
+  const [storedFunnelIds, setStoredFunnelIds] = useState<string[]>(() => stored?.funnelIds ?? []);
+  const resolvedFunnelIds = useMemo(
+    () => accountScopeReady
+      ? resolveLinkedRDFunnelIds(adAccountIds, adAccounts, rdConnections, rdFunnels)
+      : adAccountIds.length ? [NO_LINKED_RD_FUNNEL_SCOPE_ID] : storedFunnelIds,
+    [accountScopeReady, adAccountIds, adAccounts, rdConnections, rdFunnels, storedFunnelIds],
+  );
+  const setFunnelIds = useCallback((value: string[] | ((current: string[]) => string[])) => {
+    setStoredFunnelIds((current) => typeof value === "function" ? value(current) : value);
+  }, []);
+  const funnelIds = resolvedFunnelIds;
   const adAccountId = adAccountIds.length === 1 ? adAccountIds[0] : "all";
   const setAdAccountId = useCallback((value: string) => setAdAccountIds(value === "all" ? [] : [value]), []);
   const [preset, setPreset] = useState<DatePreset>(stored?.preset ?? "today_yesterday");
@@ -69,15 +85,9 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   // is loaded, keep the CRM scope in lockstep so every module shows the Meta
   // and RD data belonging to that account without a second funnel selector.
   useEffect(() => {
-    if (loadingRDFunnels) return;
-    const active = rdFunnels.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id);
-    const selectedAccountIds = new Set(adAccountIds);
-    const linked = adAccountIds.length
-      ? active.filter((funnel) => funnel.ad_account_id && selectedAccountIds.has(funnel.ad_account_id))
-      : active;
-    const nextIds = linked.map((funnel) => funnel.id);
-    setFunnelIds((current) => current.length === nextIds.length && current.every((id, index) => id === nextIds[index]) ? current : nextIds);
-  }, [adAccountIds, loadingRDFunnels, rdFunnels]);
+    if (!accountScopeReady) return;
+    setStoredFunnelIds((current) => current.length === resolvedFunnelIds.length && current.every((id, index) => id === resolvedFunnelIds[index]) ? current : resolvedFunnelIds);
+  }, [accountScopeReady, resolvedFunnelIds]);
 
   useEffect(() => {
     try {
