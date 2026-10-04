@@ -48,6 +48,14 @@ type DealLocation = {
   custom_fields?: Record<string, unknown> | null;
 };
 
+export function resolveRDPeriodDeals(
+  periodDeals: DealLocation[] | undefined,
+  allDeals: DealLocation[],
+) {
+  // An explicitly empty period is meaningful: never substitute the full RD history.
+  return periodDeals === undefined ? allDeals : periodDeals;
+}
+
 export const audienceBreakdowns: ReadonlyArray<{
   type: BreakdownType;
   title: string;
@@ -492,7 +500,7 @@ async function downloadAudiencePdf(data: AudienceProfileData, startDate: Date, e
 
 export function FunnelAudienceProfile({
   deals,
-  periodDeals = [],
+  periodDeals,
   campaignIds,
   accountIds = [],
   startDate,
@@ -568,7 +576,7 @@ export function FunnelAudienceProfile({
   const hasMetaLeadTotal = metaLeads != null;
   const hasMetaLeadIdentities = Boolean(metaLeadQuery.data?.length);
   const metaTotal = Number(metaLeads ?? 0);
-  const comparableDeals = periodDeals.length ? periodDeals : deals;
+  const comparableDeals = resolveRDPeriodDeals(periodDeals, deals);
   const reconciliation = useMemo(
     () => reconcileRDDealsToMetaLeads(comparableDeals as any, metaLeadQuery.data || []),
     [comparableDeals, metaLeadQuery.data],
