@@ -550,7 +550,8 @@ Deno.serve(async (req) => {
         );
         recordPagination(insightsRes, "insights");
         if (insightsRes.error) {
-          errors.push(`Conta ${account.name} insights: ${insightsRes.error}`);
+          const message = `Conta ${account.name} insights: ${insightsRes.error}`;
+          errors.push(message);
           failedAccounts++;
           const tokenExpired = insightsRes.errorCode === 190;
           needsReauth ||= tokenExpired;
@@ -565,6 +566,33 @@ Deno.serve(async (req) => {
             // Preserve an explicit manual deactivation made during the sync.
             .eq("id", account.id)
             .neq("connection_status", "disconnected");
+          await writeMetaScopeState(supabaseAdmin, {
+            accountId: account.id,
+            campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+            startDate,
+            endDate,
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            status: "error",
+            lastAttemptAt: attemptedAt,
+            pagesProcessed: insightsRes.pages || 0,
+            errorCode: insightsRes.errorCode ?? null,
+            errorMessage: message,
+            blockStatus: {
+              insights: {
+                status: "error",
+                reasonCode: "meta_graph_api_error",
+                errorMessage: insightsRes.error,
+                errorCode: insightsRes.errorCode ?? null,
+                errorSubcode: insightsRes.errorSubcode ?? null,
+                httpStatus: insightsRes.httpStatus ?? null,
+                pagesProcessed: insightsRes.pages || 0,
+              },
+              actions: { status: "pending" },
+              hourly: { status: "pending" },
+              breakdowns: { status: "pending" },
+            },
+          });
           if (accountLockAcquired && accountLockScopeKey) {
             await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
               .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
@@ -588,6 +616,33 @@ Deno.serve(async (req) => {
         if (accountHadError) {
           // A truncated/repeated primary response is not a valid snapshot.
           // Do not upsert or clean rows from a partial Meta page walk.
+          const message = errors.filter((entry) => entry.startsWith(`Conta ${account.name} insights:`)).join("; ")
+            || `Conta ${account.name}: paginação de Insights incompleta; snapshot anterior preservado.`;
+          await writeMetaScopeState(supabaseAdmin, {
+            accountId: account.id,
+            campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+            startDate,
+            endDate,
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            status: "error",
+            lastAttemptAt: attemptedAt,
+            pagesProcessed: insightsRes.pages || 0,
+            errorCode: null,
+            errorMessage: message,
+            blockStatus: {
+              insights: {
+                status: "error",
+                reasonCode: "meta_insights_pagination_incomplete",
+                errorMessage: message,
+                pagesProcessed: insightsRes.pages || 0,
+                responseComplete: false,
+              },
+              actions: { status: "pending" },
+              hourly: { status: "pending" },
+              breakdowns: { status: "pending" },
+            },
+          });
           if (accountLockAcquired && accountLockScopeKey) {
             await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
               .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
@@ -595,6 +650,9 @@ Deno.serve(async (req) => {
           continue;
         }
         let allInsights = insightsRes.data;
+        let aggregatePages = 0;
+        let emptyInsightsResponseVerified = true;
+        let emptyInsightsResponseError: string | null = null;
         // Meta can temporarily return an empty ad/day page while the account
         // already has processed hourly delivery. Retry the exact same civil
         // scope without time_increment before deciding that the snapshot is
@@ -603,17 +661,43 @@ Deno.serve(async (req) => {
           const aggregateRes = await fetchMetaPaginated(
             `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
           );
+          aggregatePages = aggregateRes.pages || 0;
           recordPagination(aggregateRes, "insights fallback");
+          emptyInsightsResponseVerified = !aggregateRes.error && !aggregateRes.truncated && !aggregateRes.repeatedCursor;
+          if (!emptyInsightsResponseVerified) emptyInsightsResponseError = aggregateRes.error || "paginação incompleta";
           if (!aggregateRes.error && !aggregateRes.truncated && !aggregateRes.repeatedCursor && aggregateRes.data.length > 0) {
             allInsights = aggregateRes.data.map((row: any) => ({ ...row, date_start: row.date_start || startDate }));
             console.log(`Daily fallback returned ${allInsights.length} rows for account ${account.name}`);
           }
         }
-        if (allInsights.length === 0) {
-          const message = `Conta ${account.name}: Meta não retornou linhas de Insights para ${startDate} a ${endDate}; snapshot anterior preservado.`;
+        if (allInsights.length === 0 && !emptyInsightsResponseVerified) {
+          const message = `Conta ${account.name}: não foi possível confirmar resultado vazio de Insights para ${startDate} a ${endDate}; ${emptyInsightsResponseError || "consulta de confirmação incompleta"}.`;
           accountHadError = true;
           failedAccounts++;
           errors.push(message);
+          await writeMetaScopeState(supabaseAdmin, {
+            accountId: account.id,
+            campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+            startDate,
+            endDate,
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            status: "error",
+            lastAttemptAt: attemptedAt,
+            pagesProcessed: (insightsRes.pages || 0) + aggregatePages,
+            errorMessage: message,
+            blockStatus: {
+              insights: { status: "error", reasonCode: "meta_empty_confirmation_failed", errorMessage: message, responseComplete: false },
+              actions: { status: "pending" },
+              hourly: { status: "pending" },
+              breakdowns: { status: "pending" },
+            },
+          });
+          await supabaseAdmin.from("ad_accounts").update({
+            last_sync_error: message,
+            last_sync_error_code: null,
+            last_sync_attempt_at: attemptedAt,
+          }).eq("id", account.id).neq("connection_status", "disconnected");
           if (accountLockAcquired && accountLockScopeKey) {
             await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
               .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
@@ -625,12 +709,138 @@ Deno.serve(async (req) => {
             coveredPeriod: null,
             timezone: effectiveTimezone,
             attributionWindow: effectiveAttributionWindow,
-            pagesProcessed: insightsRes.pages || 0,
+            pagesProcessed: (insightsRes.pages || 0) + aggregatePages,
             rowsPersisted: 0,
             spendPersisted: null,
-            status: "stale",
-            lastSuccessAt: account.last_sync_success_at || null,
+            status: "error",
             error: message,
+          });
+          continue;
+        }
+        if (allInsights.length === 0) {
+          // A successful, fully paginated empty response is a valid zero for
+          // this exact account/date/attribution scope. Reconcile only that
+          // scope so stale facts from an earlier Meta response cannot mask it.
+          // API errors and truncated pagination have already exited above.
+          let staleInsightQuery = supabaseAdmin.from("insights").delete()
+            .eq("ad_account_id", account.id)
+            .eq("attribution_window", effectiveAttributionWindow)
+            .gte("date", startDate).lte("date", endDate);
+          let scopedStaleAdIds: string[] | null = null;
+          if (campaignIds.length) {
+            staleInsightQuery = staleInsightQuery.in("campaign_id", campaignIds);
+            const { data: scopedFacts, error: scopedFactsError } = await supabaseAdmin.from("insights")
+              .select("ad_id")
+              .eq("ad_account_id", account.id)
+              .eq("attribution_window", effectiveAttributionWindow)
+              .in("campaign_id", campaignIds)
+              .gte("date", startDate).lte("date", endDate);
+            if (scopedFactsError) throw new Error(`leitura do escopo vazio Meta da conta ${account.name}: ${scopedFactsError.message}`);
+            scopedStaleAdIds = [...new Set((scopedFacts || []).map((row: any) => String(row.ad_id || "")).filter(Boolean))];
+          }
+          const { error: staleInsightsError } = await staleInsightQuery;
+          if (staleInsightsError) throw new Error(`reconciliação do snapshot vazio Meta da conta ${account.name}: ${staleInsightsError.message}`);
+          if (!campaignIds.length) {
+            const { error: staleActionsError } = await supabaseAdmin.from("insight_actions").delete()
+              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
+              .gte("date", startDate).lte("date", endDate);
+            if (staleActionsError) throw new Error(`reconciliação das ações vazias Meta da conta ${account.name}: ${staleActionsError.message}`);
+          } else if (scopedStaleAdIds?.length) {
+            const { error: staleActionsError } = await supabaseAdmin.from("insight_actions").delete()
+              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
+              .gte("date", startDate).lte("date", endDate).in("ad_id", scopedStaleAdIds);
+            if (staleActionsError) throw new Error(`reconciliação das ações vazias Meta da conta ${account.name}: ${staleActionsError.message}`);
+          }
+          let remainingInsightsQuery = supabaseAdmin.from("insights").select("ad_id", { count: "exact", head: true })
+            .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
+            .gte("date", startDate).lte("date", endDate);
+          if (campaignIds.length) remainingInsightsQuery = remainingInsightsQuery.in("campaign_id", campaignIds);
+          const { count: remainingInsights, error: remainingInsightsError } = await remainingInsightsQuery;
+          if (remainingInsightsError || (remainingInsights || 0) > 0) throw new Error(`verificação do snapshot Meta vazio da conta ${account.name}: ${remainingInsightsError?.message || `${remainingInsights} insight(s) antigos permaneceram`}.`);
+          let remainingActions = 0;
+          let remainingActionsError: { message: string } | null = null;
+          if (!campaignIds.length) {
+            const result = await supabaseAdmin.from("insight_actions").select("ad_id", { count: "exact", head: true })
+              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
+              .gte("date", startDate).lte("date", endDate);
+            remainingActions = result.count || 0;
+            remainingActionsError = result.error;
+          } else if (scopedStaleAdIds?.length) {
+            const result = await supabaseAdmin.from("insight_actions").select("ad_id", { count: "exact", head: true })
+              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
+              .gte("date", startDate).lte("date", endDate).in("ad_id", scopedStaleAdIds);
+            remainingActions = result.count || 0;
+            remainingActionsError = result.error;
+          }
+          if (remainingActionsError || (remainingActions || 0) > 0) throw new Error(`verificação das ações vazias Meta da conta ${account.name}: ${remainingActionsError?.message || `${remainingActions} ação(ões) antigas permaneceram`}.`);
+          const emptyEvidence = {
+            evidenceVersion: 2,
+            responseComplete: true,
+            persistenceVerified: true,
+            zeroResultConfirmed: true,
+          };
+          await writeMetaScopeState(supabaseAdmin, {
+            accountId: account.id,
+            campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+            startDate,
+            endDate,
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            status: "fresh",
+            lastAttemptAt: attemptedAt,
+            lastSuccessAt: attemptedAt,
+            lastValidSnapshotAt: attemptedAt,
+            coveredStartDate: startDate,
+            coveredEndDate: endDate,
+            pagesProcessed: (insightsRes.pages || 0) + aggregatePages,
+            errorCode: null,
+            errorMessage: null,
+            blockStatus: {
+              insights: {
+                status: "fresh",
+                reasonCode: "meta_confirmed_zero",
+                rowsPersisted: 0,
+                ...emptyEvidence,
+                pagesProcessed: (insightsRes.pages || 0) + aggregatePages,
+                responseComplete: true,
+              },
+              actions: {
+                status: "fresh",
+                sourceInsightRows: 0,
+                rowsPersisted: 0,
+                leadRowsPersisted: 0,
+                allActionRowsPersisted: 0,
+                allActionRowsExpected: 0,
+                ...emptyEvidence,
+              },
+              hourly: { status: "pending" },
+              breakdowns: { status: "pending" },
+            },
+          });
+          await supabaseAdmin.from("ad_accounts").update({
+            connection_status: "connected",
+            last_sync_error: null,
+            last_sync_error_code: null,
+            last_sync_attempt_at: attemptedAt,
+            last_sync_success_at: attemptedAt,
+          }).eq("id", account.id).neq("connection_status", "disconnected");
+          if (accountLockAcquired && accountLockScopeKey) {
+            await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
+              .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
+          }
+          accountResults.push({
+            internalAccountId: account.id,
+            externalAccountId: metaAccountId,
+            requestedPeriod: { startDate, endDate },
+            coveredPeriod: { startDate, endDate },
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            pagesProcessed: (insightsRes.pages || 0) + aggregatePages,
+            rowsPersisted: 0,
+            spendPersisted: 0,
+            status: "fresh",
+            zeroResultConfirmed: true,
+            lastSuccessAt: attemptedAt,
           });
           continue;
         }
@@ -1077,15 +1287,23 @@ Deno.serve(async (req) => {
               pagesProcessed: totalPages,
               rowsPersisted: insightRows.length,
               spendPersisted: insightRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0),
+              evidenceVersion: 2,
+              responseComplete: true,
+              persistenceVerified: true,
             },
             actions: {
-              status: persistedLeadActionRows.length > 0 ? "fresh" : "partial",
+              // Empty canonical lead actions are a confirmed zero only after
+              // complete Insights pagination and read-back of every action row.
+              status: "fresh",
               sourceInsightRows: insightRows.length,
               rowsPersisted: persistedLeadActionRows.length,
               leadRowsPersisted: persistedLeadActionRows.length,
+              allActionRowsPersisted: actionRows.length - missingActionKeys.length,
+              allActionRowsExpected: actionRows.length,
               evidenceVersion: 2,
-              allActionRowsPersisted: actionRows.length,
-              ...(persistedLeadActionRows.length === 0 ? { reason: "Meta não retornou linhas de ações de leads, site ou conversas para confirmar este período." } : {}),
+              responseComplete: true,
+              persistenceVerified: true,
+              zeroResultConfirmed: persistedLeadActionRows.length === 0,
             },
             hourly: { status: "pending" },
             breakdowns: { status: auxiliaryErrors.length ? "partial" : "pending", errorMessage: auxiliaryErrors.join("; ") || null },
@@ -1330,6 +1548,7 @@ async function writeMetaScopeState(admin: any, args: {
   coveredStartDate?: string;
   coveredEndDate?: string;
   pagesProcessed?: number;
+  errorCode?: number | string | null;
   errorMessage?: string | null;
   blockStatus?: Record<string, unknown>;
 }) {
@@ -1350,6 +1569,7 @@ async function writeMetaScopeState(admin: any, args: {
   if (args.coveredStartDate) payload.covered_start_date = args.coveredStartDate;
   if (args.coveredEndDate) payload.covered_end_date = args.coveredEndDate;
   if (args.pagesProcessed != null) payload.pages_processed = args.pagesProcessed;
+  if (args.errorCode !== undefined) payload.error_code = args.errorCode == null ? null : String(args.errorCode);
   if (args.errorMessage !== undefined) payload.last_error = args.errorMessage;
   if (args.blockStatus) payload.block_status = args.blockStatus;
   const { error } = await admin.from("meta_sync_scope_state").upsert(payload, {

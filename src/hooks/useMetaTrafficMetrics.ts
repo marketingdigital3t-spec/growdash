@@ -9,7 +9,7 @@ import { useMetaBreakdowns } from "@/hooks/useMetaBreakdowns";
 import { parseBusinessDate } from "@/lib/businessDate";
 import { metaMetricContract, type MetaMetricContract } from "@/lib/analyticsContract";
 import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
-import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
+import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; metrics: MetaMetricContract; isLoading: boolean; insightsLoading: boolean; actionsLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
@@ -29,7 +29,7 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("meta_sync_scope_state" as any)
-        .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,updated_at")
+        .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,last_error,error_code,last_finished_at,updated_at")
         .in("ad_account_id", effectiveAccountIds)
         .lte("start_date", scope.startDate)
         .gte("end_date", scope.endDate);
@@ -51,7 +51,12 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
         scope.campaignIds || [],
         block,
       ));
-      return { rows, actionGaps: gapsFor("actions"), insightGaps: gapsFor("insights") };
+      const issuesFor = (block: string) => accountScopes.flatMap(({ account, scope: accountScope }) => {
+        if (findMetaSyncCoverage(rows, accountScope, scope.startDate, scope.endDate, scope.campaignIds || [], block)) return [];
+        const issue = findMetaSyncIssue(rows, accountScope, scope.startDate, scope.endDate, scope.campaignIds || [], block);
+        return issue?.last_error ? [{ account, issue, block }] : [];
+      });
+      return { rows, actionGaps: gapsFor("actions"), insightGaps: gapsFor("insights"), issues: [...issuesFor("insights"), ...issuesFor("actions")] };
     },
     staleTime: 30_000,
     // The selected-scope sync updates Insights first and actions afterward.
@@ -85,8 +90,15 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   // newest one. Otherwise one recently synced account masks a stale account.
   const syncedAt = scopedAccounts.map((account) => account.last_sync_success_at).filter(Boolean).sort()[0] || null;
   const errors = useMemo(
-    () => [insights.error, actions.error, accounts.error, breakdowns.error, syncCoverage.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)),
-    [accounts.error, actions.error, breakdowns.error, insights.error, syncCoverage.error],
+    () => [
+      insights.error,
+      actions.error,
+      accounts.error,
+      breakdowns.error,
+      syncCoverage.error,
+      ...(syncCoverage.data?.issues || []).map(({ account, issue, block }) => `${account.name} · ${block === "insights" ? "Insights" : "ações Meta"}: ${issue.last_error}`),
+    ].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)),
+    [accounts.error, actions.error, breakdowns.error, insights.error, syncCoverage.data?.issues, syncCoverage.error],
   );
   const isLoading = insights.isLoading || actions.isLoading || accounts.isLoading || breakdowns.isLoading || syncCoverage.isLoading;
   const coverageComplete = accounts.isSuccess

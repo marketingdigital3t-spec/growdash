@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, type MetaLeadAction, type MetaLeadInsight } from "../_shared/metaLeadMetrics.ts";
-import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
+import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -139,12 +139,22 @@ Deno.serve(async (req) => {
     const adIds = (ads || []).map((ad) => ad.id);
     const dataStartStr = twoMonthStartStr < previousStartStr ? twoMonthStartStr : previousStartStr;
     const { data: syncCoverageRows, error: syncCoverageError } = await admin.from("meta_sync_scope_state")
-      .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,updated_at")
+      .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,last_error,error_code,last_finished_at,updated_at")
       .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
       .lte("start_date", endStr)
       .gte("end_date", dataStartStr);
     if (syncCoverageError) throw syncCoverageError;
     const confirmedCoverageRows = (syncCoverageRows || []) as unknown as MetaSyncCoverageRow[];
+    const syncIssuesFor = (from: string, to: string, block: string) => (accounts || []).flatMap((account) => {
+      const scope = {
+        accountId: account.id,
+        timezone: account.timezone_name || "America/Sao_Paulo",
+        attributionWindow: account.attribution_window || "account_default",
+      };
+      if (findMetaSyncCoverage(confirmedCoverageRows, scope, from, to, selectedCampaignIds, block)) return [];
+      const issue = findMetaSyncIssue(confirmedCoverageRows, scope, from, to, selectedCampaignIds, block);
+      return issue?.last_error ? [{ account_id: account.id, account_name: account.name, block, error: issue.last_error, error_code: issue.error_code ?? null, attempted_at: issue.last_started_at ?? null }] : [];
+    });
     const coverageGaps = (from: string, to: string, block = "actions") => (accounts || []).filter((account) => !findMetaSyncCoverage(
       confirmedCoverageRows,
       {
@@ -352,6 +362,7 @@ Deno.serve(async (req) => {
         timezone_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
         unavailable_dimensions: ["idade individual", "gênero individual", "atribuição sem UTM ou vínculo Meta"],
       },
+      meta_sync_issues: syncIssuesFor(startStr, endStr, "insights").concat(syncIssuesFor(startStr, endStr, "actions")),
       previous_period: { from: previousStartStr, to: previousEndStr, days },
       metrics: currentMetrics,
       previous_metrics: previousMetrics,

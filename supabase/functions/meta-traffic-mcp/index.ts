@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../_shared/metaLeadMetrics.ts";
-import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
+import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,6 +30,7 @@ type AccountCoverage = {
   insight_rows: number;
   action_rows: number;
   blocks: { insights: string; actions: string };
+  sync_issue?: { insights?: string; actions?: string };
   [key: string]: unknown;
 };
 
@@ -66,7 +67,7 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
   if (configError) throw configError;
   const siteActionByAccount = Object.fromEntries((lpConfigs || []).map((row: any) => [row.ad_account_id, row.action_type || undefined]));
   const { data: syncCoverageRows, error: syncCoverageError } = await admin.from("meta_sync_scope_state")
-    .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,updated_at")
+    .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,last_error,error_code,last_finished_at,updated_at")
     .in("ad_account_id", accountIds)
     .lte("start_date", endDate)
     .gte("end_date", startDate);
@@ -90,6 +91,8 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
     const accountScope = { accountId: account.id, timezone: account.timezone_name || "America/Sao_Paulo", attributionWindow };
     const insightScopeConfirmed = Boolean(findMetaSyncCoverage(coverageRows, accountScope, startDate, endDate, campaignIds, "insights"));
     const actionScopeConfirmed = Boolean(findMetaSyncCoverage(coverageRows, accountScope, startDate, endDate, campaignIds, "actions"));
+    const insightIssue = !insightScopeConfirmed ? findMetaSyncIssue(coverageRows, accountScope, startDate, endDate, campaignIds, "insights") : null;
+    const actionIssue = !actionScopeConfirmed ? findMetaSyncIssue(coverageRows, accountScope, startDate, endDate, campaignIds, "actions") : null;
 
     const adIds = Array.from(new Set(uniqueInsights.map((row) => row.ad_id).filter(Boolean)));
     let accountActions: any[] = [];
@@ -129,8 +132,12 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
         insights: insightScopeConfirmed ? "confirmed" : uniqueInsights.length ? "rows_present_unverified" : "unavailable",
         actions: actionScopeConfirmed ? "confirmed" : accountActions.length ? "rows_present_unverified" : "unavailable",
       },
+      sync_issue: insightIssue?.last_error || actionIssue?.last_error ? {
+        ...(insightIssue?.last_error ? { insights: insightIssue.last_error } : {}),
+        ...(actionIssue?.last_error ? { actions: actionIssue.last_error } : {}),
+      } : undefined,
       metrics: {
-        spend: { value: hasInsightSnapshot ? spend : null, available: hasInsightSnapshot },
+        spend: { value: hasInsightSnapshot ? spend : null, available: hasInsightSnapshot, reason: hasInsightSnapshot ? undefined : insightIssue?.last_error || "Insights sem cobertura confirmada para este recorte." },
         impressions: { value: hasInsightSnapshot ? impressions : null, available: hasInsightSnapshot },
         reach: { value: hasInsightSnapshot ? reach : null, available: hasInsightSnapshot, note: "Soma direcional das linhas diárias." },
         clicks: { value: hasInsightSnapshot ? clicks : null, available: hasInsightSnapshot },
@@ -140,7 +147,7 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
         form_leads: { value: hasActionSnapshot ? forms : null, available: hasActionSnapshot },
         site_leads: { value: hasActionSnapshot ? site : null, available: hasActionSnapshot },
         conversations: { value: hasActionSnapshot ? conversations : null, available: hasActionSnapshot },
-        total_leads: { value: hasActionSnapshot ? forms + site + conversations : null, available: hasActionSnapshot, reason: hasActionSnapshot ? undefined : "Ações de lead ainda não confirmadas neste recorte." },
+        total_leads: { value: hasActionSnapshot ? forms + site + conversations : null, available: hasActionSnapshot, reason: hasActionSnapshot ? undefined : actionIssue?.last_error || "Ações de lead ainda não confirmadas neste recorte." },
         cpl: { value: hasInsightSnapshot && hasActionSnapshot && forms + site + conversations > 0 ? spend / (forms + site + conversations) : null, available: hasInsightSnapshot && hasActionSnapshot && forms + site + conversations > 0 },
       },
     };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findMetaSyncCoverage, getMetaCoverageGaps, type MetaSyncCoverageRow } from "./metaSyncCoverage";
+import { findMetaSyncCoverage, findMetaSyncIssue, getMetaCoverageGaps, type MetaSyncCoverageRow } from "./metaSyncCoverage";
 
 const base: MetaSyncCoverageRow = {
   ad_account_id: "account-1",
@@ -33,11 +33,43 @@ describe("Meta sync coverage", () => {
     expect(findMetaSyncCoverage([{ ...base, status: "partial", block_status: { actions: { status: "partial" } } }], account, "2026-10-02", "2026-10-02")).toBeNull();
   });
 
-  it("rejects old fresh watermarks without evidence that rows were persisted", () => {
+  it("rejects legacy watermarks without evidence that rows were persisted", () => {
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh" }, actions: { status: "fresh" } } }], account, "2026-10-02", "2026-10-02", [], "insights")).toBeNull();
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh", rowsPersisted: 2 }, actions: { status: "fresh", rowsPersisted: 0 } } }], account, "2026-10-02", "2026-10-02", [], "actions")).toBeNull();
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh", rowsPersisted: 2 }, actions: { status: "fresh", rowsPersisted: 0, sourceInsightRows: 2 } } }], account, "2026-10-02", "2026-10-02", [], "actions")).toBeNull();
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh", rowsPersisted: 2 }, actions: { status: "fresh", rowsPersisted: 18, sourceInsightRows: 2 } } }], account, "2026-10-02", "2026-10-02", [], "actions")).toBeNull();
+  });
+
+  it("accepts zero leads only with complete v2 response and verified persistence evidence", () => {
+    const zeroActions = {
+      status: "fresh",
+      sourceInsightRows: 3,
+      rowsPersisted: 0,
+      leadRowsPersisted: 0,
+      allActionRowsPersisted: 4,
+      allActionRowsExpected: 4,
+      evidenceVersion: 2,
+      responseComplete: true,
+      persistenceVerified: true,
+      zeroResultConfirmed: true,
+    };
+    expect(findMetaSyncCoverage([{ ...base, block_status: { ...base.block_status, actions: zeroActions } }], account, "2026-10-02", "2026-10-02")).not.toBeNull();
+    expect(findMetaSyncCoverage([{ ...base, block_status: { ...base.block_status, actions: { ...zeroActions, persistenceVerified: false } } }], account, "2026-10-02", "2026-10-02")).toBeNull();
+    expect(findMetaSyncCoverage([{ ...base, block_status: { ...base.block_status, actions: { ...zeroActions, allActionRowsPersisted: 3 } } }], account, "2026-10-02", "2026-10-02")).toBeNull();
+    expect(findMetaSyncCoverage([{ ...base, block_status: { ...base.block_status, actions: { ...zeroActions, evidenceVersion: 1 } } }], account, "2026-10-02", "2026-10-02")).toBeNull();
+  });
+
+  it("accepts an empty Insights result only when the complete response and zero are confirmed", () => {
+    const confirmedZero = {
+      status: "fresh",
+      rowsPersisted: 0,
+      evidenceVersion: 2,
+      responseComplete: true,
+      persistenceVerified: true,
+      zeroResultConfirmed: true,
+    };
+    expect(findMetaSyncCoverage([{ ...base, block_status: { insights: confirmedZero } }], account, "2026-10-02", "2026-10-02", [], "insights")).not.toBeNull();
+    expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { ...confirmedZero, responseComplete: false } } }], account, "2026-10-02", "2026-10-02", [], "insights")).toBeNull();
   });
 
   it("accepts an all-campaign snapshot or an explicit superset, never a different campaign", () => {
@@ -49,5 +81,17 @@ describe("Meta sync coverage", () => {
   it("marks multi-account scopes incomplete when one account lacks confirmed coverage", () => {
     const second = { ...account, accountId: "account-2" };
     expect(getMetaCoverageGaps([base], [account, second], "2026-10-02", "2026-10-02")).toEqual([second]);
+  });
+
+  it("returns the actual failed sync reason for the exact scope without treating it as coverage", () => {
+    const failed = {
+      ...base,
+      status: "error",
+      last_error: "Meta não retornou linhas de Insights para 2026-10-02.",
+      block_status: { insights: { status: "error", reasonCode: "meta_returned_no_rows" } },
+    };
+    expect(findMetaSyncCoverage([failed], account, "2026-10-02", "2026-10-02", [], "insights")).toBeNull();
+    expect(findMetaSyncIssue([failed], account, "2026-10-02", "2026-10-02", [], "insights")?.last_error).toContain("Meta não retornou linhas");
+    expect(findMetaSyncIssue([failed], { ...account, timezone: "UTC" }, "2026-10-02", "2026-10-02", [], "insights")).toBeNull();
   });
 });
