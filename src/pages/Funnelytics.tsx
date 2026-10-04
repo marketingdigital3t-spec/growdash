@@ -242,6 +242,7 @@ function FlowDataScopePanel() {
             <FlowMetric label="Conversas iniciadas" value={meta.data.metricAvailability.leads?.available ? count(meta.data.conversations) : "Indisponível"} />
           </div>
           {!meta.data.available && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">{meta.data.unavailableReason || meta.data.errors[0] || "Aguardando snapshot Meta confirmado."}</p>}
+          {meta.data.available && meta.data.status === "partial" && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Snapshot Meta parcial: {meta.data.coverageReason || meta.data.errors[0] || "algum bloco auxiliar ainda não confirmou cobertura total. Os valores exibidos são o último snapshot disponível para este recorte."}</p>}
           {meta.data.available && !meta.data.metricAvailability.leads?.available && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Leads Meta: {meta.data.metricAvailability.leads?.reason || "Ações Meta ainda não confirmadas para este período."}</p>}
         </div>
         <div className="rounded-xl border border-border/70 bg-background/40 p-3">

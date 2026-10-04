@@ -108,6 +108,20 @@ describe("Meta traffic metrics", () => {
     expect(result.status).toBe("partial");
   });
 
+  it("explica cobertura incompleta sem esconder métricas do snapshot válido", () => {
+    const result = aggregateMetaTrafficMetrics([
+      { ad_id: "ad-1", ad_account_id: "acc-1", spend: 25, impressions: 100, clicks: 5 },
+    ], { actionsAvailable: true, metaLeadActions: { forms: 2, site: 1, conversations: 0, total: 3 } }, "2026-10-04T11:00:00.000Z", [], Date.parse("2026-10-04T11:01:00.000Z"), {
+      scopeConfirmed: false,
+      coverageReason: "Insights sem sincronização confirmada para: Conta B.",
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.metricAvailability.spend.available).toBe(true);
+    expect(result.metricAvailability.spend.reason).toContain("Conta B");
+    expect(result.coverageReason).toContain("Conta B");
+  });
+
   it("expõe resultados por objetivo sem repetir a mesma ação em cada dia", () => {
     const result = aggregateMetaTrafficMetrics([
       { ad_id: "ad-1", ad_account_id: "acc-1", campaign_id: "camp-1", campaign_name: "Leads", campaign_objective: "OUTCOME_LEADS", spend: 10, impressions: 100, reach: 80, clicks: 5 },

@@ -50,6 +50,7 @@ export interface MetaTrafficMetrics {
   status: "fresh" | "syncing" | "stale" | "partial" | "error";
   available: boolean;
   unavailableReason: string | null;
+  coverageReason: string | null;
   coveredAccounts: string[];
   rowCount: number;
   errors: string[];
@@ -124,7 +125,7 @@ export function aggregateMetaTrafficMetrics(
   syncedAt: string | null,
   errors: string[] = [],
   now = Date.now(),
-  context?: { attributionWindow?: string | null; timezone?: string | null; scopeConfirmed?: boolean },
+  context?: { attributionWindow?: string | null; timezone?: string | null; scopeConfirmed?: boolean; coverageReason?: string | null },
 ): MetaTrafficMetrics {
   const totals = rows.reduce((acc, row) => ({
     spend: acc.spend + Number(row.spend || 0),
@@ -242,14 +243,15 @@ export function aggregateMetaTrafficMetrics(
     status,
     available,
     unavailableReason,
+    coverageReason: context?.coverageReason || (errors.length ? errors[0] : null),
     coveredAccounts,
     rowCount: rows.length,
     errors,
     metricAvailability: Object.fromEntries([
-      ["spend", { available, reason: unavailableReason || undefined }],
-      ["impressions", { available, reason: unavailableReason || undefined }],
-      ["reach", { available, reason: unavailableReason || undefined }],
-      ["clicks", { available, reason: unavailableReason || undefined }],
+      ["spend", { available, reason: available ? context?.coverageReason || undefined : unavailableReason || undefined }],
+      ["impressions", { available, reason: available ? context?.coverageReason || undefined : unavailableReason || undefined }],
+      ["reach", { available, reason: available ? context?.coverageReason || undefined : unavailableReason || undefined }],
+      ["clicks", { available, reason: available ? context?.coverageReason || undefined : unavailableReason || undefined }],
       ["leads", { available: available && actions?.actionsAvailable === true, reason: !available ? unavailableReason || "Aguardando snapshot Meta." : actions?.actionsErrorReason || (actions?.actionsAvailable === true ? undefined : "Ações Meta ainda não confirmadas.") }],
       ["breakdowns", { available: Boolean(actions?.breakdowns && Object.values(actions.breakdowns).some((segment) => segment.length > 0)), reason: actions?.breakdowns ? undefined : "Breakdowns ainda não sincronizados." }],
     ]),
