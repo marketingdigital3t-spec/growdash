@@ -42,9 +42,14 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   );
   const isLoading = insights.isLoading || actions.isLoading || accounts.isLoading || breakdowns.isLoading;
   const data = useMemo(() => {
-    const base = aggregateMetaTrafficMetrics(rows, { ...actions.data, breakdowns: breakdowns.data }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null });
+    const base = aggregateMetaTrafficMetrics(rows, {
+      ...actions.data,
+      actionsAvailable: !actions.isLoading && !actions.isError,
+      actionsErrorReason: actions.error instanceof Error ? actions.error.message : actions.error ? String(actions.error) : null,
+      breakdowns: breakdowns.data,
+    }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null });
     return isLoading ? { ...base, status: "syncing" as const } : base;
-  }, [actions.data, attributionWindow, breakdowns.data, errors, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
+  }, [actions.data, actions.error, actions.isError, actions.isLoading, attributionWindow, breakdowns.data, errors, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
   const metrics = useMemo(() => metaMetricContract(data), [data]);
   return { data, metrics, isLoading, insightsLoading: insights.isLoading || accounts.isLoading, actionsLoading: actions.isLoading, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError), error: insights.error || actions.error || accounts.error || breakdowns.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); } };
 }

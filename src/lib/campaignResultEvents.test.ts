@@ -79,9 +79,13 @@ describe("resolveCampaignResults", () => {
       .toMatchObject({ total: 11, leadCount: 0, conversations: 11 });
   });
 
-  it("não zera leads persistidos quando só existem ações que não são de aquisição", () => {
+  it("ignora o agregado legado de leads quando só existem ações que não são de aquisição", () => {
     expect(resolveCampaignResults(4, { link_click: 20 }))
-      .toMatchObject({ total: 4, leadCount: 4, conversations: 0 });
+      .toMatchObject({ total: 0, leadCount: 0, conversations: 0 });
+  });
+
+  it("não usa insights.leads como lead quando a tabela de ações está vazia", () => {
+    expect(resolveCampaignResults(38, {})).toMatchObject({ total: 0, leadCount: 0, conversations: 0 });
   });
 
   it("usa os componentes canônicos persistidos quando a consulta de ações não trouxe conversas", () => {

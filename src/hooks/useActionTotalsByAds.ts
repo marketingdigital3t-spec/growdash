@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { aggregateMetaLeadActionDays } from "@/lib/metaActionMetrics";
+import { aggregateMetaLeadActionDays, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { businessDateKey } from "@/lib/businessDate";
 
 export interface ActionTotalsResult {
@@ -19,6 +19,8 @@ export interface ActionTotalsResult {
   /** Number of ad_ids excluded because their campaign was DELETED/ARCHIVED. */
   excludedAdCount: number;
   metaLeadActions: { forms: number; site: number; conversations: number; total: number };
+  /** Alias-safe Meta lead totals per ad, using configured site-event mapping. */
+  leadBreakdownByAd: Record<string, { forms: number; site: number; conversations: number; total: number }>;
   dailyMetaLeadByAccount: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }> >;
 }
 
@@ -79,6 +81,7 @@ export function useActionTotalsByAds(
       const totalsByAd: Record<string, Record<string, number>> = {};
       const valueTotalsByAd: Record<string, Record<string, number>> = {};
       const metaLeadActions = { forms: 0, site: 0, conversations: 0, total: 0 };
+      const leadBreakdownByAd: ActionTotalsResult["leadBreakdownByAd"] = {};
       const dailyMetaLeadByAccount: ActionTotalsResult["dailyMetaLeadByAccount"] = {};
       const seenFacts = new Set<string>();
       const start = startDate ? businessDateKey(startDate) : null;
@@ -101,7 +104,7 @@ export function useActionTotalsByAds(
       // source of inflated leads. An empty universe is therefore a valid
       // empty snapshot; the sync layer will fill it on the next run.
       if (resolvedIds.length === 0 && (scopedAccounts.length > 0 || scopedCampaigns.length > 0)) {
-        return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, dailyMetaLeadByAccount };
+        return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount };
       }
       const resolvedSortedIds = [...new Set(resolvedIds)].sort();
       const adsetByAd: Record<string, string> = {};
@@ -204,7 +207,19 @@ export function useActionTotalsByAds(
       const canonicalDaily = aggregateMetaLeadActionDays(dailyByAd, resolvedAccountByAd, lpByAccount);
       Object.assign(metaLeadActions, canonicalDaily.totals);
       Object.assign(dailyMetaLeadByAccount, canonicalDaily.dailyByAccount);
-      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, dailyMetaLeadByAccount };
+      for (const [adId, dates] of Object.entries(dailyByAd)) {
+        const accountId = resolvedAccountByAd[adId];
+        const aggregate = { forms: 0, site: 0, conversations: 0, total: 0 };
+        for (const dailyActions of Object.values(dates)) {
+          const resolved = resolveMetaLeadActions(dailyActions, accountId ? lpByAccount[accountId] : undefined);
+          aggregate.forms += resolved.forms;
+          aggregate.site += resolved.site;
+          aggregate.conversations += resolved.conversations;
+        }
+        aggregate.total = aggregate.forms + aggregate.site + aggregate.conversations;
+        leadBreakdownByAd[adId] = aggregate;
+      }
+      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount };
     },
     staleTime: 120_000,
     gcTime: 15 * 60_000,

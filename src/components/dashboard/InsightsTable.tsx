@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import type { InsightRow } from "@/hooks/useInsights";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { attributeSalesToAds } from "@/lib/salesAttribution";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { overlayCanonicalMetaLeads } from "@/lib/metaInsightLeadOverlay";
 
 interface InsightsTableProps {
   data: InsightRow[];
@@ -77,15 +79,29 @@ export function InsightsTable({ data }: InsightsTableProps) {
     window.addEventListener("mouseup", onUp);
   };
 
-  const campaigns = useMemo(() => [...new Set(data.map((r) => r.campaign_name))], [data]);
-
-  const { sales } = useDashboard();
-  const salesByAd = useMemo(() => attributeSalesToAds(sales, data).matched, [sales, data]);
+  const { sales, startDate, endDate, adAccountId, adAccounts } = useDashboard();
+  const adAccountByAdId = useMemo(() => Object.fromEntries(data.map((row) => [row.ad_id, row.ad_account_id])), [data]);
+  const actionQuery = useActionTotalsByAds(
+    Array.from(new Set(data.map((row) => row.ad_id).filter(Boolean))),
+    startDate,
+    endDate,
+    adAccountByAdId,
+    {
+      adAccountIds: adAccountId ? [adAccountId] : adAccounts.map((account: any) => account.id),
+      attributionWindowsByAccount: Object.fromEntries(adAccounts.map((account: any) => [account.id, account.attribution_window || "account_default"])),
+    },
+  );
+  const canonicalData = useMemo(
+    () => overlayCanonicalMetaLeads(data, actionQuery.data?.leadBreakdownByAd || {}),
+    [actionQuery.data?.leadBreakdownByAd, data],
+  );
+  const campaigns = useMemo(() => [...new Set(canonicalData.map((r) => r.campaign_name))], [canonicalData]);
+  const salesByAd = useMemo(() => attributeSalesToAds(sales, canonicalData).matched, [sales, canonicalData]);
 
   // Aggregate by ad
   const aggregated = useMemo(() => {
     const map = new Map<string, InsightRow & { count: number; vendas: number; cpv: number }>();
-    for (const r of data) {
+    for (const r of canonicalData) {
       const key = r.ad_id;
       const existing = map.get(key);
       if (existing) {
@@ -112,7 +128,7 @@ export function InsightsTable({ data }: InsightsTableProps) {
       row.cpv = row.vendas > 0 ? row.spend / row.vendas : 0;
     }
     return Array.from(map.values());
-  }, [data, salesByAd]);
+  }, [canonicalData, salesByAd]);
 
   const filtered = useMemo(() => {
     let result = aggregated;
@@ -226,6 +242,13 @@ export function InsightsTable({ data }: InsightsTableProps) {
   });
 
   const isSaturated = (r: InsightRow & { count: number }) => r.frequency > 3 && r.ctr < 1;
+
+  if (actionQuery.isLoading) {
+    return <div role="status" className="rounded-xl border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground">Sincronizando resultados canônicos de leads da Meta…</div>;
+  }
+  if (actionQuery.isError) {
+    return <div role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-300">Não foi possível confirmar leads e CPL da Meta neste recorte. A coluna legada `insights.leads` foi ignorada. {actionQuery.error instanceof Error ? actionQuery.error.message : ""}</div>;
+  }
 
   return (
     <div className="space-y-3">

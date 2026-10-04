@@ -7,10 +7,13 @@ import { useInsights } from "@/hooks/useInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { getCampaignActiveDays, getCampaignHealth, type CampaignHealth } from "@/lib/campaignHealth";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { overlayCanonicalMetaLeads } from "@/lib/metaInsightLeadOverlay";
 
 interface AccountOption {
   id: string;
   name: string;
+  attribution_window?: string | null;
 }
 
 interface CampaignAttentionPanelProps {
@@ -31,6 +34,21 @@ export function CampaignAttentionPanel({ accountId, accounts, startDate, endDate
     endDate,
     enabled: accounts.length > 0,
   });
+  const adAccountByAdId = useMemo(() => Object.fromEntries(insights.map((row) => [row.ad_id, row.ad_account_id])), [insights]);
+  const actions = useActionTotalsByAds(
+    Array.from(new Set(insights.map((row) => row.ad_id).filter(Boolean))),
+    startDate,
+    endDate,
+    adAccountByAdId,
+    {
+      adAccountIds: accounts.map((account) => account.id),
+      attributionWindowsByAccount: Object.fromEntries(accounts.map((account) => [account.id, account.attribution_window || "account_default"])),
+    },
+  );
+  const canonicalInsights = useMemo(
+    () => overlayCanonicalMetaLeads(insights, actions.data?.leadBreakdownByAd || {}),
+    [actions.data?.leadBreakdownByAd, insights],
+  );
 
   const visibleCampaigns = useMemo(() => campaignRows.filter((campaign) => visibleAccountIds.has(campaign.ad_account_id)), [campaignRows, visibleAccountIds]);
   const campaignIds = useMemo(() => visibleCampaigns.map((campaign) => campaign.id), [visibleCampaigns]);
@@ -54,7 +72,7 @@ export function CampaignAttentionPanel({ accountId, accounts, startDate, endDate
 
   const campaigns = useMemo(() => {
     const totals = new Map<string, { spend: number; leads: number; clicks: number; impressions: number; reach: number }>();
-    for (const insight of insights) {
+    for (const insight of canonicalInsights) {
       if (!insight.campaign_id || !insight.ad_account_id || !visibleAccountIds.has(insight.ad_account_id)) continue;
       const current = totals.get(insight.campaign_id) || { spend: 0, leads: 0, clicks: 0, impressions: 0, reach: 0 };
       current.spend += Number(insight.spend || 0);
@@ -73,7 +91,7 @@ export function CampaignAttentionPanel({ accountId, accounts, startDate, endDate
       const conversionRate = metrics.clicks > 0 ? metrics.leads / metrics.clicks * 100 : 0;
       return {
         ...campaign,
-        status: campaign.status || insights.find((insight) => insight.campaign_id === campaign.id)?.campaign_status || "PAUSED",
+        status: campaign.status || canonicalInsights.find((insight) => insight.campaign_id === campaign.id)?.campaign_status || "PAUSED",
         ...metrics,
         cpl,
         ctr,
@@ -88,7 +106,7 @@ export function CampaignAttentionPanel({ accountId, accounts, startDate, endDate
         adsets: [],
       };
     });
-  }, [insights, visibleAccountIds, visibleCampaigns]);
+  }, [canonicalInsights, visibleAccountIds, visibleCampaigns]);
 
   const averageCpl = useMemo(() => {
     const withLeads = campaigns.filter((campaign) => campaign.leads > 0 && campaign.spend > 0);
@@ -104,11 +122,12 @@ export function CampaignAttentionPanel({ accountId, accounts, startDate, endDate
     .slice(0, 6), [averageCpl, campaigns, targetByCampaign]);
 
   const selectedCampaign = detailCampaignId ? campaigns.find((campaign) => campaign.id === detailCampaignId) || null : null;
-  const isLoading = loadingCampaigns || loadingInsights;
+  const isLoading = loadingCampaigns || loadingInsights || actions.isLoading;
 
   if (isLoading) {
     return <section className="rounded-xl border border-border bg-card p-4"><div className="h-5 w-64 animate-pulse rounded bg-muted" /><div className="mt-3 grid gap-2 lg:grid-cols-2"><div className="h-40 animate-pulse rounded-xl bg-muted/60" /><div className="h-40 animate-pulse rounded-xl bg-muted/60" /></div></section>;
   }
+  if (actions.isError) return <section role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-700 dark:text-amber-300">Resultados Meta indisponíveis: não foi possível confirmar as ações canônicas de leads. Nenhum total legado será usado.</section>;
   if (problemCampaigns.length === 0) return null;
 
   return (

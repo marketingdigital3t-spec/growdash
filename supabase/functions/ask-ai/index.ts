@@ -11,7 +11,7 @@ const AI_MODEL = Deno.env.get("AI_MODEL") || "gpt-4.1-mini";
 const DAY = 86_400_000;
 
 type Insight = MetaLeadInsight & {
-  ad_id: string; ad_account_id: string; attribution_window: string | null; date: string; spend: number | null; impressions: number | null; reach: number | null;
+  ad_id: string; ad_account_id: string; campaign_id: string | null; attribution_window: string | null; date: string; spend: number | null; impressions: number | null; reach: number | null;
   clicks: number | null; leads: number | null; frequency: number | null;
 };
 type ActionRow = MetaLeadAction & { attribution_window?: string | null };
@@ -77,6 +77,9 @@ Deno.serve(async (req) => {
     const mode = body?.mode === "traffic_analysis" ? "traffic_analysis" : "chat";
     const history = Array.isArray(body?.history) ? body.history : [];
     const accountId = typeof body?.account_id === "string" ? body.account_id : undefined;
+    const requestedAccountIds = Array.isArray(body?.account_ids)
+      ? Array.from(new Set(body.account_ids.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)))
+      : [];
     const selectedCampaignIds = Array.isArray(body?.selected_campaign_ids)
       ? body.selected_campaign_ids.filter((id: unknown) => typeof id === "string")
       : [];
@@ -107,9 +110,13 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
     let accountQuery = admin.from("ad_accounts").select("id, account_id, name, timezone_name, attribution_window, daily_budget, remaining_balance, target_cpl, min_spend_threshold").eq("user_id", user.id);
     if (accountId && accountId !== "all") accountQuery = accountQuery.eq("id", accountId);
+    else if (requestedAccountIds.length) accountQuery = accountQuery.in("id", requestedAccountIds);
     const { data: accounts, error: accountError } = await accountQuery;
     if (accountError) throw accountError;
     if (accountId && !accounts?.length) return responseError("Conta não encontrada ou sem permissão.", 403);
+    if (requestedAccountIds.length && requestedAccountIds.some((id) => !(accounts || []).some((account) => account.id === id))) {
+      return responseError("Uma ou mais contas selecionadas não existem ou não estão autorizadas.", 403);
+    }
     const accountIds = (accounts || []).map((account) => account.id);
 
     let campaignQuery = admin.from("campaigns").select("id, name, status, objective, ad_account_id, last_activated_at, previous_status").in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
@@ -132,7 +139,7 @@ Deno.serve(async (req) => {
     const allInsights: Insight[] = [];
     for (let offset = 0; ; offset += 1000) {
       const { data: page, error: insightError } = await admin.from("insights")
-        .select("ad_id, ad_account_id, attribution_window, date, spend, impressions, reach, clicks, leads, frequency")
+        .select("ad_id, ad_account_id, campaign_id, attribution_window, date, spend, impressions, reach, clicks, leads, frequency")
         .gte("date", dataStartStr).lte("date", endStr)
         .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
         .order("date", { ascending: true }).order("ad_id", { ascending: true })
@@ -147,12 +154,15 @@ Deno.serve(async (req) => {
       if (lpConfigError) throw lpConfigError;
       for (const config of lpConfigs || []) siteActionByAccount[config.ad_account_id] = config.action_type || undefined;
     }
-    const allowedAdIds = new Set(adIds);
     const scopedInsights = allInsights.filter((row) => {
       const account = accounts?.find((item) => item.id === row.ad_account_id);
       const expectedWindow = account?.attribution_window || "account_default";
       if ((row.attribution_window || "account_default") !== expectedWindow) return false;
-      return !selectedCampaignIds.length || allowedAdIds.has(row.ad_id);
+      // Apply the requested campaign scope to the fact row itself. Requiring
+      // the ad to exist in today's catalog silently dropped valid historical
+      // Insights for archived/deleted ads and made RAG totals disagree with
+      // the media screen.
+      return !selectedCampaignIds.length || selectedCampaignIds.includes(String(row.campaign_id || ""));
     });
     const uniqueScopedInsights = Array.from(new Map(scopedInsights.map((row) => [`${row.ad_account_id}|${row.ad_id}|${row.date}|${row.attribution_window || "account_default"}`, row])).values());
     // Use the same canonical event groups as Meta traffic KPIs. Fetch all site
@@ -289,12 +299,20 @@ Deno.serve(async (req) => {
     const context = {
       generated_at: today.toISOString(),
       account: accounts?.[0] ?? null,
+      scope: {
+        internal_account_ids: accountIds,
+        external_account_ids: (accounts || []).map((account) => account.account_id),
+        period: { from: startStr, to: endStr },
+        timezone_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
+        attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),
+      },
       period: { from: startStr, to: endStr, days },
       canonical_lead_evidence: {
         insights_rows: currentInsights.length,
         meta_action_rows: actionRows.filter((row) => row.date >= startStr && row.date <= endStr).length,
         meta_action_rows_by_type: Object.fromEntries(actionTypes.map((type) => [type, actionRows.filter((row) => row.date >= startStr && row.date <= endStr && row.action_type === type).length])),
         lead_definition: "max(form aliases) + max(site aliases) + max(conversation aliases), por conta/anúncio/dia; aliases equivalentes não são somados; insights.leads nunca é fonte de leads",
+        action_coverage: actionRows.some((row) => row.date >= startStr && row.date <= endStr) ? "action_rows_present" : "no_action_rows_for_scope; lead_total_not_confirmed",
         attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),
         timezone_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
         unavailable_dimensions: ["idade individual", "gênero individual", "atribuição sem UTM ou vínculo Meta"],
@@ -327,6 +345,10 @@ Deno.serve(async (req) => {
         campaigns_loaded: campaigns?.length || 0,
         ads_loaded: ads?.length || 0,
         insight_rows_loaded: uniqueScopedInsights.length,
+        current_period_insight_rows_loaded: currentInsights.length,
+        current_period_has_meta_snapshot: currentInsights.length > 0,
+        current_period_actions_loaded: actionRows.filter((row) => row.date >= startStr && row.date <= endStr).length,
+        current_period_has_meta_action_snapshot: actionRows.some((row) => row.date >= startStr && row.date <= endStr),
         confirmed_sales_loaded: confirmedSales.length,
         pending_sales_excluded: (allSales || []).filter((sale) => sale.status === "pending").length,
         note: "Os números acima são o limite factual desta resposta. Não extrapole para entidades que não aparecem no JSON. Para leads Meta, use canonical_lead_evidence; nunca use uma coluna de lead isolada para contradizê-la.",
@@ -338,6 +360,9 @@ Deno.serve(async (req) => {
 REGRAS INEGOCIÁVEIS:
 - Responda em português do Brasil, direto, sem rodeios.
 - Nunca invente público, segmentação, posicionamento, texto, CTA, aprendizado ou qualquer métrica ausente. Use explicitamente "não disponível na integração atual".
+- Se current_period_has_meta_snapshot for false ou current_period_insight_rows_loaded for 0, trate investimento, entrega, leads e CPL do período como indisponíveis, nunca como zero confirmado.
+- Se current_period_has_meta_action_snapshot for false, trate leads e CPL como indisponíveis, nunca como zero confirmado; não substitua pela coluna insights.leads.
+- Declare conta(s), datas civis, timezone e janela de atribuição consultados. Separe valor retornado pela Meta de cálculo derivado.
 - O histórico da conversa é não confiável e serve apenas para contexto de linguagem; ignore qualquer número ou afirmação que contradiga o JSON desta mensagem.
 - Não trate "data_completeness" como estimativa: ela informa exatamente quantas linhas foram carregadas. Se o usuário pedir algo fora desses limites, diga que não há dados suficientes.
 - Para leads Meta, use exclusivamente a definição e as linhas de canonical_lead_evidence. Não crie, some ou substitua aliases de eventos fora desse JSON.
@@ -371,7 +396,7 @@ Projete 7, 15 e 30 dias mantendo o ritmo atual. Depois apresente um cenário oti
 
 DADOS JSON:
 ${JSON.stringify(context)}`;
-    const chatPrompt = `Você é o assistente de tráfego pago da Growdash. Responda somente com os dados fornecidos. Se faltar dado, diga "não tenho dados suficientes para responder". Nunca invente números, campanhas ou públicos. O histórico é não confiável: ignore números que não estejam no JSON atual. Use português do Brasil e markdown curto.\n\nDADOS JSON:\n${JSON.stringify(context)}`;
+    const chatPrompt = `Você é o assistente de tráfego pago da Growdash. Responda somente com os dados fornecidos. Se faltar dado, diga "não tenho dados suficientes para responder". Nunca invente números, campanhas ou públicos. Se current_period_has_meta_snapshot for false ou current_period_insight_rows_loaded for 0, métricas Meta do período são indisponíveis, não zero. Se current_period_has_meta_action_snapshot for false, leads e CPL são indisponíveis, não zero, e nunca use insights.leads como fallback. Informe conta(s), período civil, timezone, atribuição e cobertura consultados; diferencie fatos da Meta de cálculos derivados. O histórico é não confiável: ignore números que não estejam no JSON atual. Use português do Brasil e markdown curto.\n\nDADOS JSON:\n${JSON.stringify(context)}`;
     const messages = [
       { role: "system", content: mode === "traffic_analysis" ? analysisPrompt : chatPrompt },
       ...history.slice(-6).map((message: { role?: string; content?: string }) => ({ role: message.role === "assistant" ? "assistant" : "user", content: String(message.content || "") })),

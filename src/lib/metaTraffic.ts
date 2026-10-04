@@ -104,6 +104,8 @@ type InsightRow = {
 };
 
 type ActionData = {
+  actionsAvailable?: boolean;
+  actionsErrorReason?: string | null;
   metaLeadActions?: { forms: number; site: number; conversations: number; total: number };
   totalsByAd?: Record<string, Record<string, number>>;
   valueTotalsByAd?: Record<string, Record<string, number>>;
@@ -241,7 +243,7 @@ export function aggregateMetaTrafficMetrics(
       ["impressions", { available, reason: unavailableReason || undefined }],
       ["reach", { available, reason: unavailableReason || undefined }],
       ["clicks", { available, reason: unavailableReason || undefined }],
-      ["leads", { available: Boolean(actions?.metaLeadActions), reason: actions?.metaLeadActions ? undefined : unavailableReason || "Ações Meta ainda não sincronizadas." }],
+      ["leads", { available: available && actions?.actionsAvailable === true, reason: !available ? unavailableReason || "Aguardando snapshot Meta." : actions?.actionsErrorReason || (actions?.actionsAvailable === true ? undefined : "Ações Meta ainda não confirmadas.") }],
       ["breakdowns", { available: Boolean(actions?.breakdowns && Object.values(actions.breakdowns).some((segment) => segment.length > 0)), reason: actions?.breakdowns ? undefined : "Breakdowns ainda não sincronizados." }],
     ]),
     leadBreakdownByAccount,

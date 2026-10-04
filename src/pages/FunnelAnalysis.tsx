@@ -683,8 +683,10 @@ export default function FunnelAnalysis() {
                 <div className="space-y-6">
                   {funnelMeta.actionsLoading
                     ? <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground" role="status">Aguardando confirmação das ações Meta para mostrar leads por campanha.</div>
-                    : <CampaignResultsTable />}
-                  <AskAICard />
+                    : !funnelMeta.data.metricAvailability.leads?.available
+                      ? <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-xs text-amber-700 dark:text-amber-300" role="status">Leads Meta indisponíveis neste recorte; não exibiremos o total legado de `insights.leads`. {funnelMeta.data.metricAvailability.leads?.reason || "Ações Meta ainda não confirmadas."}</div>
+                      : <CampaignResultsTable />}
+                  <AskAICard accountIds={actionScopeAccountIds} startDate={businessDateKey(startDate)} endDate={businessDateKey(endDate)} />
                 </div>
               </DashboardProvider>
             </section>

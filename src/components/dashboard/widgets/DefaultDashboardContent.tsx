@@ -97,7 +97,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     for (const r of insights) m[r.ad_id] = r.ad_account_id;
     return m;
   }, [insights]);
-  const { data: actionData = { totals: {}, totalsByAccount: {}, dailyByAccount: {}, dailyByAd: {}, totalsByAd: {}, valueTotalsByAd: {}, excludedAdCount: 0, metaLeadActions: { forms: 0, site: 0, conversations: 0, total: 0 }, dailyMetaLeadByAccount: {} } } = useActionTotalsByAds(
+  const { data: actionData = { totals: {}, totalsByAccount: {}, dailyByAccount: {}, dailyByAd: {}, totalsByAd: {}, valueTotalsByAd: {}, excludedAdCount: 0, metaLeadActions: { forms: 0, site: 0, conversations: 0, total: 0 }, leadBreakdownByAd: {}, dailyMetaLeadByAccount: {} } } = useActionTotalsByAds(
     allAdIds,
     startDate,
     endDate,

@@ -60,7 +60,7 @@ const METRICS: Array<{ id: MetricId; label: string; description: string }> = [
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 
-export function LeadReportStudio({ accountId, accountName, accounts, onAccountChange, startDate, endDate, insights, deals, sales, audience, audienceLoading = false }: { accountId: string; accountName?: string; accounts: Array<{ id: string; name: string }>; onAccountChange: (id: string) => void; startDate: Date; endDate: Date; insights: InsightRow[]; deals: RDDealLite[]; sales: Sale[]; audience?: AudienceProfileData; audienceLoading?: boolean }) {
+export function LeadReportStudio({ accountId, accountName, accounts, onAccountChange, startDate, endDate, insights, deals, sales, audience, audienceLoading = false }: { accountId: string; accountName?: string; accounts: Array<{ id: string; name: string; attribution_window?: string | null }>; onAccountChange: (id: string) => void; startDate: Date; endDate: Date; insights: InsightRow[]; deals: RDDealLite[]; sales: Sale[]; audience?: AudienceProfileData; audienceLoading?: boolean }) {
   const { user } = useAuth();
   const { data: workspace } = useWorkspace();
   const { toast } = useToast();
@@ -86,11 +86,16 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
   const { data: actionData } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId, {
     adAccountIds: accountId === "all" ? accounts.map((account) => account.id) : [accountId],
+    attributionWindowsByAccount: Object.fromEntries(accounts.map((account) => [account.id, account.attribution_window || "account_default"])),
   });
   const metaLeadActions = actionData?.metaLeadActions;
   const conversations = metaLeadActions?.conversations || 0;
   const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, metaLeadActions), [filteredDeals, filteredInsights, filteredSales, metaLeadActions]);
-  const daily = useMemo(() => dailyRows(filteredInsights), [filteredInsights]);
+  const canonicalLeadsByDate = useMemo(() => Object.values(actionData?.dailyMetaLeadByAccount || {}).reduce((all, accountDays) => {
+    for (const [date, counts] of Object.entries(accountDays)) all[date] = (all[date] || 0) + Number(counts.total || 0);
+    return all;
+  }, {} as Record<string, number>), [actionData?.dailyMetaLeadByAccount]);
+  const daily = useMemo(() => dailyRows(filteredInsights, canonicalLeadsByDate), [canonicalLeadsByDate, filteredInsights]);
   const weekly = useMemo(() => weeklyRows(daily), [daily]);
   const analysisFromDate = useMemo(() => startOfMonth(subMonths(endDate, 1)), [endDate]);
   const analysisEnabled = accountId !== "all";
@@ -320,7 +325,8 @@ function formatAnalysisMetric(id: TwoMonthAnalysis["metricComparisons"][number][
 function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[], metaLeadActions?: { forms: number; site: number; conversations: number; total: number }): ReportTotals {
   const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const conversations = metaLeadActions?.conversations || 0;
-  const leads = metaLeadActions ? metaLeadActions.total : insights.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+  // The legacy `insights.leads` aggregate is intentionally not a fallback.
+  const leads = Number(metaLeadActions?.total || 0);
   const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
   const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
@@ -350,7 +356,7 @@ function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[]
     coverage: leads ? deals.length / leads * 100 : 0,
   };
 }
-function dailyRows(insights: InsightRow[]) { const map = new Map<string, { date: string; leads: number; spend: number }>(); insights.forEach((r) => { if (!r.date) return; const row = map.get(r.date) || { date: r.date, leads: 0, spend: 0 }; row.leads += Number(r.leads || 0); row.spend += Number(r.spend || 0); map.set(r.date, row); }); return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)); }
+function dailyRows(insights: InsightRow[], canonicalLeadsByDate: Record<string, number>) { const map = new Map<string, { date: string; leads: number; spend: number }>(); insights.forEach((r) => { if (!r.date) return; const row = map.get(r.date) || { date: r.date, leads: 0, spend: 0 }; row.spend += Number(r.spend || 0); map.set(r.date, row); }); for (const [date, leads] of Object.entries(canonicalLeadsByDate)) { const row = map.get(date) || { date, leads: 0, spend: 0 }; row.leads = leads; map.set(date, row); } return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)); }
 function weeklyRows(daily: ReturnType<typeof dailyRows>) { const map = new Map<string, { week: string; leads: number; spend: number; days: number }>(); daily.forEach((day) => { const week = format(startOfWeek(new Date(`${day.date}T12:00:00`), { weekStartsOn: 1 }), "yyyy-MM-dd"); const row = map.get(week) || { week, leads: 0, spend: 0, days: 0 }; row.leads += day.leads; row.spend += day.spend; row.days += 1; map.set(week, row); }); return Array.from(map.values()).sort((a, b) => a.week.localeCompare(b.week)); }
 function formatMetricValue(id: MetricId, value: number) {
   if (["spend", "cpl", "cpc", "cpm", "revenue", "cac", "profit"].includes(id)) return currency.format(value);

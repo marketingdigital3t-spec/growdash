@@ -17,6 +17,8 @@ import { ManualAttributionDialog } from "@/components/dashboard/ManualAttributio
 import { LeadDetailSheet } from "@/components/dashboard/LeadDetailSheet";
 import { CampaignLeadsSheet } from "@/components/dashboard/CampaignLeadsSheet";
 import { classifyLead } from "@/hooks/useRDDealsForPeriod";
+import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
+import { overlayCanonicalMetaLeads } from "@/lib/metaInsightLeadOverlay";
 import { cn } from "@/lib/utils";
 
 const fmtMoney = (v: number) =>
@@ -131,8 +133,25 @@ const STATUS_LABEL: Record<LeadStatusFilter, string> = {
 };
 
 export function CampaignResultsTable() {
-  const { insights, sales, rdDeals } = useDashboard();
+  const { insights, sales, rdDeals, startDate, endDate, adAccountId, adAccounts } = useDashboard();
   const { map: mappingMap } = useAccountUtmMappingMap();
+  const adAccountByAdId = useMemo(() => Object.fromEntries(insights.map((row) => [row.ad_id, row.ad_account_id])), [insights]);
+  const attributionWindowsByAccount = useMemo(
+    () => Object.fromEntries(adAccounts.map((account: any) => [account.id, account.attribution_window || "account_default"])),
+    [adAccounts],
+  );
+  const accountIds = adAccountId ? [adAccountId] : adAccounts.map((account: any) => account.id);
+  const actionQuery = useActionTotalsByAds(
+    Array.from(new Set(insights.map((row) => row.ad_id).filter(Boolean))),
+    startDate,
+    endDate,
+    adAccountByAdId,
+    { adAccountIds: accountIds, attributionWindowsByAccount },
+  );
+  const canonicalInsights = useMemo(
+    () => overlayCanonicalMetaLeads(insights, actionQuery.data?.leadBreakdownByAd || {}),
+    [actionQuery.data?.leadBreakdownByAd, insights],
+  );
 
   const [mode, setMode] = useState<Mode>("sales");
   const [leadStatus, setLeadStatus] = useState<LeadStatusFilter>("all");
@@ -154,24 +173,24 @@ export function CampaignResultsTable() {
 
   // ===== Sales attribution (modo Vendas) =====
   const attribution = useMemo(
-    () => attributeSalesToAds(sales, insights, mappingMap),
-    [sales, insights, mappingMap],
+    () => attributeSalesToAds(sales, canonicalInsights, mappingMap),
+    [sales, canonicalInsights, mappingMap],
   );
   const salesHierarchy = useMemo(
-    () => buildHierarchy(insights, attribution.matched, attribution.byCampaign),
-    [insights, attribution],
+    () => buildHierarchy(canonicalInsights, attribution.matched, attribution.byCampaign),
+    [canonicalInsights, attribution],
   );
 
   // ===== Leads attribution (modo Leads) =====
   const leadAttribution = useMemo(
-    () => attributeLeadsToCampaigns(rdDeals ?? [], insights, mappingMap),
-    [rdDeals, insights, mappingMap],
+    () => attributeLeadsToCampaigns(rdDeals ?? [], canonicalInsights, mappingMap),
+    [rdDeals, canonicalInsights, mappingMap],
   );
 
   const leadHierarchy: CampaignLeadRow[] = useMemo(() => {
     // spend per campaign vem do insights
     const spendByCampaign = new Map<string, { spend: number; metaLeads: number; name: string }>();
-    for (const r of insights) {
+    for (const r of canonicalInsights) {
       if (!r.campaign_id) continue;
       const cur = spendByCampaign.get(r.campaign_id) || { spend: 0, metaLeads: 0, name: r.campaign_name };
       cur.spend += r.spend;
@@ -197,7 +216,7 @@ export function CampaignResultsTable() {
       });
     }
     return rows;
-  }, [leadAttribution, insights]);
+  }, [leadAttribution, canonicalInsights]);
 
   // ===== Filtros & ordenação =====
   const filteredSales = useMemo(() => {
@@ -300,6 +319,9 @@ export function CampaignResultsTable() {
   const toggleAdset = (id: string) => {
     setExpandedAdsets((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
+
+  if (actionQuery.isLoading) return <section role="status" className="rounded-xl border border-border/60 bg-card/60 p-4 text-sm text-muted-foreground">Sincronizando resultados canônicos de leads da Meta…</section>;
+  if (actionQuery.isError) return <section role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-300">Não foi possível confirmar as ações de leads da Meta para este recorte. Os resultados não serão substituídos pela coluna legada de leads. {actionQuery.error instanceof Error ? actionQuery.error.message : ""}</section>;
 
   return (
     <div className="min-w-0">

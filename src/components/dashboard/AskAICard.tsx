@@ -8,6 +8,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useDashboard } from "@/contexts/DashboardContext";
+import { businessDateKey } from "@/lib/businessDate";
 
 interface Msg { role: "user" | "assistant"; content: string }
 
@@ -18,15 +20,18 @@ const SUGGESTIONS = [
   "O que aconteceu depois das últimas mudanças que fiz?",
 ];
 
-export function AskAICard() {
-  const unavailable = true;
+export function AskAICard(scope?: { accountIds: string[]; startDate: string; endDate: string }) {
+  const dashboard = useDashboard();
+  const accountIds = scope?.accountIds ?? (dashboard.adAccountId ? [dashboard.adAccountId] : dashboard.adAccounts.map((account: any) => account.id));
+  const startDate = scope?.startDate ?? businessDateKey(dashboard.startDate);
+  const endDate = scope?.endDate ?? businessDateKey(dashboard.endDate);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   async function ask(q: string) {
-    if (!q.trim() || loading) return;
+    if (!q.trim() || loading || accountIds.length === 0) return;
     const userMsg: Msg = { role: "user", content: q.trim() };
     const history = messages.slice(-6);
     setMessages((prev) => [...prev, userMsg, { role: "assistant", content: "" }]);
@@ -41,7 +46,7 @@ export function AskAICard() {
       const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ question: userMsg.content, history }),
+        body: JSON.stringify({ question: userMsg.content, history, account_ids: accountIds, start_date: startDate, end_date: endDate }),
         signal: abortRef.current.signal,
       });
 
@@ -106,7 +111,7 @@ export function AskAICard() {
           <CardTitle className="text-base flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" /> Pergunte à IA
           </CardTitle>
-          {unavailable && <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Indisponível no momento</span>}
+          <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Meta · {startDate} a {endDate}</span>
           {messages.length > 0 && (
             <Button variant="ghost" size="sm" onClick={() => setMessages([])} className="text-xs h-7">
               <Trash2 className="h-3 w-3 mr-1" /> Limpar
@@ -115,14 +120,13 @@ export function AskAICard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {unavailable && <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground" role="status">Este recurso está indisponível no momento. A consulta inteligente será liberada em uma próxima atualização.</div>}
-        {!unavailable && <>
+        {accountIds.length === 0 ? <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground" role="status">Selecione ao menos uma conta Meta para consultar a análise.</div> : <>
         <div className="flex gap-2">
           <Input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(question); } }}
-            placeholder="Ex: Qual conta gastou mais com menos leads esta semana?"
+            placeholder="Ex: Quanto investi e quantos leads Meta tive no período?"
             disabled={loading}
           />
           <Button onClick={() => ask(question)} disabled={loading || !question.trim()}>

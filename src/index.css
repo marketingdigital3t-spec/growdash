@@ -3719,8 +3719,9 @@ html:not(.dark) {
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-card { background: linear-gradient(145deg, #303030, #262626) !important; border-color: rgba(56,189,248,.68) !important; }
 .brand-shell[data-space-phase="terra"] .dashboard-page .dashboard-terra-metric-value { color: #7dd3fc !important; }
 
-/* Neutral legacy mode: remove the space scene and all Terra color accents. */
-.space-phase-bg { display: none !important; }
+/* Keep the globe scene on the dashboard and funnel analysis only. */
+.space-phase-bg:not([data-dashboard-scene="true"]) { display: none !important; }
+.space-phase-bg[data-dashboard-scene="true"] { display: block; }
 .brand-shell[data-space-phase] {
   --brand-accent-rgb: 255,255,255;
   --brand-gold: #ffffff;

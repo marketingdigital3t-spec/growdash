@@ -38,6 +38,7 @@ describe("Meta traffic metrics", () => {
     expect(unavailable.status).toBe("stale");
     expect(unavailable.available).toBe(false);
     expect(unavailable.unavailableReason).toContain("Nenhum snapshot");
+    expect(unavailable.metricAvailability.leads.available).toBe(false);
     expect(aggregateMetaTrafficMetrics([], undefined, "2026-09-28T12:00:00.000Z", ["rate limit"], Date.parse("2026-09-28T12:01:00.000Z")).status).toBe("error");
   });
 
@@ -63,13 +64,25 @@ describe("Meta traffic metrics", () => {
   });
 
   it("mantém métricas zeradas quando não há impressões, cliques ou leads", () => {
-    const result = aggregateMetaTrafficMetrics([], { metaLeadActions: { forms: 0, site: 0, conversations: 0, total: 0 } }, "2026-09-28T12:00:00.000Z", [], Date.parse("2026-09-28T12:00:10.000Z"));
+    const result = aggregateMetaTrafficMetrics([
+      { ad_id: "ad-1", ad_account_id: "acc-1", spend: 0, impressions: 0, clicks: 0, reach: 0 },
+    ], { actionsAvailable: true, metaLeadActions: { forms: 0, site: 0, conversations: 0, total: 0 } }, "2026-09-28T12:00:00.000Z", [], Date.parse("2026-09-28T12:00:10.000Z"));
     expect(result.ctr).toBe(0);
     expect(result.cpc).toBe(0);
     expect(result.cpm).toBe(0);
     expect(result.cpl).toBe(0);
     expect(result.roas).toBe(0);
-    expect(result.rowCount).toBe(0);
+    expect(result.rowCount).toBe(1);
+    expect(result.metricAvailability.leads.available).toBe(true);
+  });
+
+  it("não chama falta de ações sincronizadas de zero legítimo", () => {
+    const result = aggregateMetaTrafficMetrics([
+      { ad_id: "ad-1", ad_account_id: "acc-1", spend: 25, impressions: 100, clicks: 5 },
+    ], { actionsAvailable: false, metaLeadActions: { forms: 0, site: 0, conversations: 0, total: 0 } }, "2026-09-28T12:00:00.000Z");
+    expect(result.available).toBe(true);
+    expect(result.metricAvailability.spend.available).toBe(true);
+    expect(result.metricAvailability.leads.available).toBe(false);
   });
 
   it("expõe resultados por objetivo sem repetir a mesma ação em cada dia", () => {
