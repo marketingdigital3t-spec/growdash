@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { aggregateMetaLeadActionDays, META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { normalizeMetaAttributionWindow, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 import { businessDateKey } from "@/lib/businessDate";
 import { isSameQueryScope } from "@/lib/queryScope";
 
@@ -148,7 +149,7 @@ export function useActionTotalsByAds(
       const actionGroups = new Map<string, { window: string; ids: string[] }>();
       for (const id of allowedIds) {
         const accountId = resolvedAccountByAd[id] || "";
-        const window = attributionWindowsByAccount[accountId] || attributionWindow;
+        const window = normalizeMetaAttributionWindow(attributionWindowsByAccount[accountId] || attributionWindow);
         const key = `${accountId}::${window}`;
         const group = actionGroups.get(key) || { window, ids: [] };
         group.ids.push(id);
@@ -162,18 +163,14 @@ export function useActionTotalsByAds(
             .from("insight_actions" as any)
             .select("ad_id, action_type, value, value_amount, date, attribution_window")
             .in("ad_id", chunk);
-          if (group.window === "account_default") {
-            q = q.or("attribution_window.eq.account_default,attribution_window.is.null");
-          } else {
-            q = q.eq("attribution_window", group.window);
-          }
           if (start) q = q.gte("date", start);
           if (end) q = q.lte("date", end);
           const { data, error } = await q.range(from, from + PAGE - 1);
           if (error) throw error;
           const rows = (data || []) as any[];
           for (const r of rows) {
-            const factKey = `${r.ad_id}|${r.date}|${r.action_type}|${r.attribution_window || "account_default"}`;
+            if (!matchesMetaAttributionWindow(r.attribution_window, group.window)) continue;
+            const factKey = `${r.ad_id}|${r.date}|${r.action_type}|${normalizeMetaAttributionWindow(r.attribution_window)}`;
             if (seenFacts.has(factKey)) continue;
             seenFacts.add(factKey);
             const v = Number(r.value || 0);

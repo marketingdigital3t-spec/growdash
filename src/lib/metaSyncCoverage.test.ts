@@ -28,6 +28,12 @@ describe("Meta sync coverage", () => {
     expect(findMetaSyncCoverage([base], account, "2026-09-30", "2026-10-02")).toBeNull();
   });
 
+  it("matches configured attribution windows independent of serialized order", () => {
+    const configured = { ...account, attributionWindow: "7d_click,1d_view" };
+    const stored = { ...base, attribution_window: "1d_view,7d_click" };
+    expect(findMetaSyncCoverage([stored], configured, "2026-10-02", "2026-10-02", [], "insights")).toEqual(stored);
+  });
+
   it("requires the action block to be confirmed and does not treat missing rows as zero", () => {
     expect(findMetaSyncCoverage([{ ...base, block_status: { actions: { status: "pending" } } }], account, "2026-10-02", "2026-10-02")).toBeNull();
     expect(findMetaSyncCoverage([{ ...base, status: "partial", block_status: { actions: { status: "partial" } } }], account, "2026-10-02", "2026-10-02")).toBeNull();

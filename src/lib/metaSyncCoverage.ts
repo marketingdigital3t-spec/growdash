@@ -1,3 +1,5 @@
+import { normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
+
 export type MetaSyncCoverageRow = {
   ad_account_id: string;
   campaign_scope: string;
@@ -89,7 +91,7 @@ export function findMetaSyncIssue(
       const coveredEnd = row.covered_end_date || row.end_date;
       return row.ad_account_id === account.accountId
         && row.timezone === account.timezone
-        && (row.attribution_window || "account_default") === (account.attributionWindow || "account_default")
+        && normalizeMetaAttributionWindow(row.attribution_window) === normalizeMetaAttributionWindow(account.attributionWindow)
         && coveredStart <= startDate
         && coveredEnd >= endDate
         && Boolean(row.last_error)
@@ -114,7 +116,7 @@ export function findMetaSyncCoverage(
       const coveredEnd = row.covered_end_date || row.end_date;
       return row.ad_account_id === account.accountId
         && row.timezone === account.timezone
-        && (row.attribution_window || "account_default") === (account.attributionWindow || "account_default")
+        && normalizeMetaAttributionWindow(row.attribution_window) === normalizeMetaAttributionWindow(account.attributionWindow)
         && coveredStart <= startDate
         && coveredEnd >= endDate
         && ["fresh", "success", "partial"].includes(row.status)

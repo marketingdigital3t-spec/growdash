@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
 import { businessDateKey } from "@/lib/businessDate";
 import { isSameQueryScope } from "@/lib/queryScope";
+import { dedupeDailyMetaInsights, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 interface UseInsightsParams {
   adAccountId?: string;
@@ -74,14 +75,7 @@ function canonicalInsightLeads(row: any) {
  * at the boundary keeps the UI mathematically stable while reconciliation is
  * running in the background.
  */
-export function dedupeDailyInsights(rows: InsightRow[]) {
-  const unique = new Map<string, InsightRow>();
-  for (const row of rows) {
-    const key = `${row.ad_id}::${row.date}::${row.attribution_window || "account_default"}`;
-    if (!unique.has(key)) unique.set(key, row);
-  }
-  return Array.from(unique.values());
-}
+export const dedupeDailyInsights = dedupeDailyMetaInsights;
 
 /**
  * Keep historical facts scoped by the campaign id persisted on the fact.
@@ -172,12 +166,10 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           const filteredRows = directRows
             .filter((row) => {
               const accountWindow = normalizeWindow(attributionWindowsByAccount[String(row.ad_account_id)] || attributionWindow);
-              const rowWindow = normalizeWindow(row.attribution_window);
               // Older snapshots may have a null window. Treat null and the
               // explicit default as equivalent, but never mix configured
               // windows between accounts.
-              if (rowWindow !== accountWindow) return false;
-              return true;
+              return matchesMetaAttributionWindow(row.attribution_window, accountWindow);
             });
           const campaignIdByAd = Object.fromEntries(Object.entries(adCatalog).map(([adId, ad]) => {
             const adset = adsetCatalog.get(String(ad.adset_id));

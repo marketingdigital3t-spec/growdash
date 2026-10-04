@@ -28,7 +28,7 @@ import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFun
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
-import { hasGrowdashFlowRDScopeEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD, type FlowRDScopeEvidence } from "@/lib/growdashFlowMetrics";
+import { hasGrowdashFlowRDQuerySnapshot, hasGrowdashFlowRDScopeEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD, type FlowRDScopeEvidence } from "@/lib/growdashFlowMetrics";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow, subDays, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -199,15 +199,19 @@ function FlowDataScopePanel() {
   const rdSyncing = resolvedRDScope.loading || rdCreated.isLoading || rdWon.isLoading || rdScopeCoverage.isLoading || rdSyncRequestInFlight || rdScopeRows.some((row) => row.status === "syncing") || accounts.isLoading;
   const rdError = Boolean(resolvedRDScope.error || rdCreated.isError || rdWon.isError || rdScopeCoverage.isError);
   const rdDataAvailable = isGrowdashFlowRDDataAvailable({ scopeEnabled: rdScopeEnabled && sortedFunnelIds.length > 0, confirmed: rdConfirmed });
+  const rdSnapshotLoaded = hasGrowdashFlowRDQuerySnapshot({ createdDeals: rdCreated.data, wonDeals: rdWon.data });
+  const rdMetricsAvailable = rdDataAvailable && rdSnapshotLoaded;
   const periodLabel = `${businessDateKey(startDate)} — ${businessDateKey(endDate)}`;
   const money = (value: number | null | undefined) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
   const count = (value: number | null | undefined) => new Intl.NumberFormat("pt-BR").format(Number(value || 0));
   const metaValue = (key: string, value: number) => meta.data.metricAvailability[key]?.available ? count(value) : "Indisponível";
   const metaMoney = (key: string, value: number) => meta.data.metricAvailability[key]?.available ? money(value) : "Indisponível";
-  const rdValue = (value: number) => !rdDataAvailable ? "Indisponível" : count(value);
-  const rdRevenue = () => !rdDataAvailable
-    ? "Indisponível"
-    : money(rdMetrics.revenue);
+  const rdValue = (value: number) => rdMetricsAvailable
+    ? count(value)
+    : rdSyncing && !resolvedRDScope.error && !hasNoResolvedRDFunnel ? "Sincronizando" : "Indisponível";
+  const rdRevenue = () => rdMetricsAvailable
+    ? money(rdMetrics.revenue)
+    : rdSyncing && !resolvedRDScope.error && !hasNoResolvedRDFunnel ? "Sincronizando" : "Indisponível";
   const rdDeals = rdCreated.data || [];
   const wonDeals = rdWon.data || [];
   const rdMetrics = summarizeGrowdashFlowRD(rdDeals, wonDeals);
@@ -251,15 +255,15 @@ function FlowDataScopePanel() {
             <span className="text-[10px] text-muted-foreground">{!rdScopeEnabled || sortedFunnelIds.length === 0 ? "Sem vínculo" : rdSyncing ? "Sincronizando" : rdError || rdScopeCoverage.isError || rdSyncRequestError ? "Erro" : scopedRDSyncRows.some((row) => row.status === "partial") ? (rdConfirmed ? "Parcial · último snapshot" : "Parcial") : rdConfirmed ? "Atualizado" : "Indisponível"}</span>
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-            <FlowMetric label="Negociações criadas" value={rdDataAvailable ? count(rdMetrics.created) : "Indisponível"} />
-            <FlowMetric label="Oportunidades" value={rdDataAvailable ? count(rdMetrics.opportunities) : "Indisponível"} />
+            <FlowMetric label="Negociações criadas" value={rdValue(rdMetrics.created)} />
+            <FlowMetric label="Oportunidades" value={rdValue(rdMetrics.opportunities)} />
             <FlowMetric label="Vendas ganhas" value={rdValue(rdMetrics.won)} />
             <FlowMetric label="Receita RD" value={rdRevenue()} />
           </div>
           {latestRDSync
             ? <p className="mt-2 text-[10px] text-muted-foreground">Última sincronização RD: {new Date(latestRDSync).toLocaleString("pt-BR")}</p>
             : rdDataAvailable && <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Leitura do snapshot RD confirmada; a conexão não registra data da última sincronização.</p>}
-          {rdSyncing && rdDataAvailable && <p role="status" className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Mostrando o último snapshot RD confirmado para este funil e período enquanto a atualização termina.</p>}
+          {rdSyncing && rdMetricsAvailable && <p role="status" className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Mostrando o último snapshot RD confirmado para este funil e período enquanto a atualização termina.</p>}
           {rdSyncRequestError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Sincronização RD: {rdSyncRequestError}</p>}
           {hasNoResolvedRDFunnel && !rdSyncing && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">A conta selecionada não tem um funil RD vinculado.</p>}
           {rdError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Não foi possível confirmar os dados do RD nesta seleção.</p>}

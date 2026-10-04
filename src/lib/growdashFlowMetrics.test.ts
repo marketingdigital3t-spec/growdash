@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { hasGrowdashFlowRDScopeEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "./growdashFlowMetrics";
+import { hasGrowdashFlowRDQuerySnapshot, hasGrowdashFlowRDScopeEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "./growdashFlowMetrics";
 
 describe("Growdash Flow analytics scope", () => {
   it("only confirms RD metrics after a successful, completed, linked-scope query", () => {
     expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, confirmed: true })).toBe(true);
     expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, confirmed: false })).toBe(false);
+  });
+  it("does not present empty RD query data as a confirmed zero before fetching completes", () => {
+    expect(hasGrowdashFlowRDQuerySnapshot({ createdDeals: undefined, wonDeals: undefined })).toBe(false);
+    expect(hasGrowdashFlowRDQuerySnapshot({ createdDeals: [], wonDeals: undefined })).toBe(false);
+    expect(hasGrowdashFlowRDQuerySnapshot({ createdDeals: [], wonDeals: [] })).toBe(true);
   });
   it("confirms an empty RD result only when every linked funnel covered the requested dates", () => {
     const coverage = [{ funnel_id: "funnel-1", start_date: "2026-10-01", end_date: "2026-10-05", covered_start_date: "2026-10-01", covered_end_date: "2026-10-05", status: "success", last_success_at: "2026-10-05T12:00:00Z" }];

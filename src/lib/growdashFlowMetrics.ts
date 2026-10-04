@@ -40,6 +40,16 @@ export function isGrowdashFlowRDDataAvailable({ scopeEnabled, confirmed }: {
   return scopeEnabled && confirmed;
 }
 
+/** A watermark cannot turn an unfinished first fetch into a confirmed zero. */
+export function hasGrowdashFlowRDQuerySnapshot({ createdDeals, wonDeals }: {
+  createdDeals: unknown[] | undefined;
+  wonDeals: unknown[] | undefined;
+}) {
+  // Cached query data remains defined during background refetch, so the last
+  // confirmed snapshot stays visible while new results are loading.
+  return createdDeals !== undefined && wonDeals !== undefined;
+}
+
 /**
  * The global account picker wins over a board's saved account. With no global
  * selection, linked boards retain their saved account; free boards use all.

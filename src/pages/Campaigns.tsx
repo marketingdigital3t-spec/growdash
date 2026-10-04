@@ -14,6 +14,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
 import { businessDateKey } from "@/lib/businessDate";
+import { dedupeDailyMetaInsights, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -133,13 +134,16 @@ function firstRelation(value: any) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date) {
+function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date, attributionWindow = "account_default") {
   const start = startDate ? formatApiDate(startDate) : null;
   const end = endDate ? formatApiDate(endDate) : null;
   const totals = { spend: 0, leads: 0, formLeads: 0, siteLeads: 0, conversations: 0, legacyLeads: 0, hasCanonicalLeadParts: false, clicks: 0, impressions: 0, reach: 0 };
 
   for (const ad of ads || []) {
-    for (const insight of ad.insights || []) {
+    const scopedInsights = dedupeDailyMetaInsights((ad.insights || [])
+      .filter((insight: any) => matchesMetaAttributionWindow(insight.attribution_window, attributionWindow))
+      .map((insight: any) => ({ ...insight, ad_id: String(ad.id) })));
+    for (const insight of scopedInsights) {
       if (start && insight.date < start) continue;
       if (end && insight.date > end) continue;
       totals.spend += insight.spend ?? 0;
@@ -410,11 +414,13 @@ export default function Campaigns() {
         for (const adset of adsets) {
           adsetBudget += adset.daily_budget ?? 0;
           for (const ad of adset.ads || []) {
-            for (const i of ad.insights || []) {
+            const expectedWindow = attributionWindowsByAccount[c.ad_account_id] || "account_default";
+            const scopedInsights = dedupeDailyMetaInsights((ad.insights || [])
+              .filter((i: any) => matchesMetaAttributionWindow(i.attribution_window, expectedWindow))
+              .map((i: any) => ({ ...i, ad_id: String(ad.id) })));
+            for (const i of scopedInsights) {
               if (startDate && i.date < businessDateKey(startDate)) continue;
               if (endDate && i.date > businessDateKey(endDate)) continue;
-              const expectedWindow = attributionWindowsByAccount[c.ad_account_id] || "account_default";
-              if (i.attribution_window && i.attribution_window !== expectedWindow) continue;
               spend += i.spend ?? 0;
               leads += i.leads ?? 0;
               const rowForms = Number(i.form_leads || 0);
@@ -846,7 +852,8 @@ export default function Campaigns() {
       .map((currentAdset: any) => {
         const campaign = firstRelation(currentAdset.campaigns);
         const embeddedAdset = embeddedAdsetsById.get(currentAdset.id);
-        const metrics = aggregateInsights(embeddedAdset?.ads || [], startDate, endDate);
+        const accountId = String(campaign?.ad_account_id || "");
+        const metrics = aggregateInsights(embeddedAdset?.ads || [], startDate, endDate, attributionWindowsByAccount[accountId] || "account_default");
         const saleMetrics = (embeddedAdset?.ads || []).reduce((sum: { count: number; revenue: number }, currentAd: any) => {
           const value = salesForAd.get(currentAd.id);
           return { count: sum.count + (value?.count || 0), revenue: sum.revenue + (value?.revenue || 0) };
@@ -864,7 +871,7 @@ export default function Campaigns() {
       .filter((currentAdset: any) => statusFilter === "all" || normalizeStatus(currentAdset.status) === statusFilter)
       .filter((currentAdset: any) => !query || currentAdset.name.toLowerCase().includes(query) || currentAdset.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adsetSortKey, adsetSortAsc);
-  }, [accountAdsets, adsetSortAsc, adsetSortKey, descendantCampaignIds, embeddedAdsetsById, endDate, salesForAd, search, startDate, statusFilter]);
+  }, [accountAdsets, adsetSortAsc, adsetSortKey, attributionWindowsByAccount, descendantCampaignIds, embeddedAdsetsById, endDate, salesForAd, search, startDate, statusFilter]);
 
   const selectedAds = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -872,7 +879,8 @@ export default function Campaigns() {
       .map((currentAd: any) => {
         const currentAdset = firstRelation(currentAd.adsets);
         const campaign = firstRelation(currentAdset?.campaigns);
-        const metrics = aggregateInsights([embeddedAdsById.get(currentAd.id)].filter(Boolean), startDate, endDate);
+        const accountId = String(campaign?.ad_account_id || "");
+        const metrics = aggregateInsights([embeddedAdsById.get(currentAd.id)].filter(Boolean), startDate, endDate, attributionWindowsByAccount[accountId] || "account_default");
         // A tabela de insights guarda leads, mas as campanhas de mensagem da
         // Meta registram o resultado em insight_actions. Sem esta composição,
         // os criativos exibiam cliques e investimento corretos, porém zero
@@ -906,7 +914,7 @@ export default function Campaigns() {
       .filter((currentAd: any) => statusFilter === "all" || normalizeStatus(currentAd.status) === statusFilter)
       .filter((currentAd: any) => !query || currentAd.name.toLowerCase().includes(query) || currentAd.adsetName.toLowerCase().includes(query) || currentAd.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adSortKey, adSortAsc);
-  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, descendantCampaignIds, embeddedAdsById, endDate, lpConfigs, salesForAd, search, startDate, statusFilter]);
+  }, [accountAds, actionData?.totalsByAd, adSortAsc, adSortKey, attributionWindowsByAccount, descendantCampaignIds, embeddedAdsById, endDate, lpConfigs, salesForAd, search, startDate, statusFilter]);
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);

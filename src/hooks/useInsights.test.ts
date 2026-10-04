@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dedupeDailyInsights, filterInsightsByCampaignScope } from "./useInsights";
+import { matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 describe("daily insight scope", () => {
   it("deduplicates retries without collapsing different attribution windows", () => {
@@ -9,6 +10,31 @@ describe("daily insight scope", () => {
       { ad_id: "ad-1", date: "2026-09-30", attribution_window: "1d_view", spend: 3 },
     ];
     expect(dedupeDailyInsights(rows)).toHaveLength(2);
+  });
+
+  it("prefers the explicit account-default snapshot over its legacy null duplicate", () => {
+    const rows: any[] = [
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: null, spend: 19.11 },
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "account_default", spend: 18.66 },
+    ];
+
+    expect(dedupeDailyInsights(rows)).toEqual([rows[1]]);
+  });
+
+  it("treats a null attribution window as account_default only", () => {
+    expect(matchesMetaAttributionWindow(null, "account_default")).toBe(true);
+    expect(matchesMetaAttributionWindow(null, "7d_click")).toBe(false);
+    expect(matchesMetaAttributionWindow("1d_view", "7d_click")).toBe(false);
+    expect(matchesMetaAttributionWindow("1d_view,7d_click", "7d_click,1d_view")).toBe(true);
+  });
+
+  it("deduplicates equivalent attribution-window orderings", () => {
+    const rows: any[] = [
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "1d_view,7d_click", spend: 19.11 },
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "7d_click,1d_view", spend: 18.66 },
+    ];
+
+    expect(dedupeDailyInsights(rows)).toHaveLength(1);
   });
 
   it("keeps a selected campaign's historical fact when the live catalog is missing", () => {
