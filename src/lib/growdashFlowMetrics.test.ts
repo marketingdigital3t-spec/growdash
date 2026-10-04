@@ -1,37 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { hasGrowdashFlowRDSnapshotEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "./growdashFlowMetrics";
+import { hasGrowdashFlowRDScopeEvidence, isGrowdashFlowRDDataAvailable, resolveGrowdashFlowAccountIds, resolveGrowdashFlowCampaignIds, summarizeGrowdashFlowRD } from "./growdashFlowMetrics";
 
 describe("Growdash Flow analytics scope", () => {
   it("only confirms RD metrics after a successful, completed, linked-scope query", () => {
-    expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, loading: true, error: false, confirmed: true })).toBe(false);
-    expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, loading: false, error: true, confirmed: true })).toBe(false);
-    expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, loading: false, error: false, confirmed: false })).toBe(false);
-    expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, loading: false, error: false, confirmed: true })).toBe(true);
+    expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, confirmed: true })).toBe(true);
+    expect(isGrowdashFlowRDDataAvailable({ scopeEnabled: true, confirmed: false })).toBe(false);
   });
-  it("accepts a persisted scoped snapshot for an active legacy link without a sync timestamp", () => {
-    expect(hasGrowdashFlowRDSnapshotEvidence(
-      ["selected"],
-      [{ id: "rd-connection", accountId: "selected", status: "connected", lastSuccessAt: null }],
-      ["rd-connection"],
-    )).toBe(true);
-    expect(hasGrowdashFlowRDSnapshotEvidence(
-      ["selected"],
-      [{ id: "rd-connection", accountId: "selected", status: "connected", lastSuccessAt: null }],
-      [],
-    )).toBe(false);
-    expect(hasGrowdashFlowRDSnapshotEvidence(
-      ["selected"],
-      [{ id: "rd-connection", accountId: "selected", status: "disconnected", lastSuccessAt: null }],
-      ["rd-connection"],
-    )).toBe(false);
-    expect(hasGrowdashFlowRDSnapshotEvidence(
-      ["selected", "other"],
-      [
-        { id: "rd-connection", accountId: "selected", status: "connected", lastSuccessAt: null },
-        { id: "other-connection", accountId: "other", status: "connected", lastSuccessAt: null },
-      ],
-      ["rd-connection"],
-    )).toBe(false);
+  it("confirms an empty RD result only when every linked funnel covered the requested dates", () => {
+    const coverage = [{ funnel_id: "funnel-1", start_date: "2026-10-01", end_date: "2026-10-05", covered_start_date: "2026-10-01", covered_end_date: "2026-10-05", status: "success", last_success_at: "2026-10-05T12:00:00Z" }];
+    expect(hasGrowdashFlowRDScopeEvidence(["funnel-1"], "2026-10-04", "2026-10-04", coverage)).toBe(true);
+    expect(hasGrowdashFlowRDScopeEvidence(["funnel-1"], "2026-10-04", "2026-10-04", [{ ...coverage[0], status: "syncing" }])).toBe(true);
+    expect(hasGrowdashFlowRDScopeEvidence(["funnel-1"], "2026-09-30", "2026-10-04", coverage)).toBe(false);
+    expect(hasGrowdashFlowRDScopeEvidence(["funnel-1", "funnel-2"], "2026-10-04", "2026-10-04", coverage)).toBe(false);
+    expect(hasGrowdashFlowRDScopeEvidence(["funnel-1"], "2026-10-04", "2026-10-04", [{ ...coverage[0], last_success_at: null }])).toBe(false);
   });
   it("uses the account selected in the global toolbar", () => {
     expect(resolveGrowdashFlowAccountIds(["selected"], ["selected", "other"], "saved"))

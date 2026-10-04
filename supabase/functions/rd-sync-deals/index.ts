@@ -417,6 +417,14 @@ Deno.serve(async (req) => {
   let runId: string | null = null;
   let userId: string | null = null;
   let rdConnectionId: string | null = null;
+  let scopeFunnelId: string | null = null;
+  let scopeStartDate: string | null = null;
+  let scopeEndDate: string | null = null;
+  let scopeTimezone = "America/Sao_Paulo";
+  let previousScopeSuccessAt: string | null = null;
+  let previousScopeCoveredStart: string | null = null;
+  let previousScopeCoveredEnd: string | null = null;
+  let scopePagesProcessed = 0;
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -463,6 +471,28 @@ Deno.serve(async (req) => {
         .eq("id", rdConnectionId)
         .eq("user_id", userId);
       if (connectionUpdateError) console.error("Não foi possível atualizar o watermark da conexão RD", connectionUpdateError.message);
+    }
+    if (scopeFunnelId && scopeStartDate && scopeEndDate) {
+      const finishedAt = new Date().toISOString();
+      const snapshotValid = opts.status === "success";
+      const { error: scopeUpdateError } = await admin.from("rd_sync_scope_state").update({
+        status: opts.status,
+        last_attempt_at: finishedAt,
+        ...(snapshotValid ? {
+          last_success_at: finishedAt,
+          covered_start_date: scopeStartDate,
+          covered_end_date: scopeEndDate,
+          rows_persisted: opts.deals,
+          pages_processed: scopePagesProcessed,
+        } : {
+          last_success_at: previousScopeSuccessAt,
+          covered_start_date: previousScopeCoveredStart,
+          covered_end_date: previousScopeCoveredEnd,
+        }),
+        last_error: opts.status === "success" ? null : opts.errorMessage || `Sincronização RD ${opts.status}.`,
+        updated_at: finishedAt,
+      }).eq("funnel_id", scopeFunnelId).eq("start_date", scopeStartDate).eq("end_date", scopeEndDate).eq("timezone", scopeTimezone);
+      if (scopeUpdateError) console.error("Não foi possível atualizar a cobertura RD", scopeUpdateError.message);
     }
     // Alertas
     if (userId && (opts.status !== "success" || duration > 60000)) {
@@ -678,6 +708,35 @@ Deno.serve(async (req) => {
       .single();
     if (runError) throw runError;
     runId = runRow?.id || null;
+
+    if (analytics_mode && typeof start_date === "string" && typeof end_date === "string"
+      && /^\d{4}-\d{2}-\d{2}$/.test(start_date) && /^\d{4}-\d{2}-\d{2}$/.test(end_date)
+      && start_date <= end_date) {
+      scopeFunnelId = String(funnel.id);
+      scopeStartDate = start_date;
+      scopeEndDate = end_date;
+      const { data: previousScope, error: previousScopeError } = await admin.from("rd_sync_scope_state")
+        .select("last_success_at,covered_start_date,covered_end_date")
+        .eq("funnel_id", scopeFunnelId).eq("start_date", scopeStartDate).eq("end_date", scopeEndDate).eq("timezone", scopeTimezone)
+        .maybeSingle();
+      if (previousScopeError) throw new Error(`Falha ao ler cobertura RD: ${previousScopeError.message}`);
+      previousScopeSuccessAt = previousScope?.last_success_at || null;
+      previousScopeCoveredStart = previousScope?.covered_start_date || null;
+      previousScopeCoveredEnd = previousScope?.covered_end_date || null;
+      const { error: scopeStartError } = await admin.from("rd_sync_scope_state").upsert({
+        funnel_id: scopeFunnelId,
+        start_date: scopeStartDate,
+        end_date: scopeEndDate,
+        timezone: scopeTimezone,
+        status: "syncing",
+        last_attempt_at: new Date().toISOString(),
+        last_success_at: previousScopeSuccessAt,
+        covered_start_date: previousScopeCoveredStart,
+        covered_end_date: previousScopeCoveredEnd,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "funnel_id,start_date,end_date,timezone" });
+      if (scopeStartError) throw new Error(`Falha ao iniciar cobertura RD: ${scopeStartError.message}`);
+    }
 
     const { data: products, error: productsError } = await admin
       .from("products")
@@ -1508,6 +1567,7 @@ Deno.serve(async (req) => {
             break segmentLoop;
           }
           pagesProcessed++;
+          scopePagesProcessed = pagesProcessed;
           // O CRM replica o filtro "Data de criação" do RD. Todos os status
           // usam o mesmo intervalo; varrer o histórico inteiro para o
           // segmento ganho a cada ciclo de cinco minutos causava 429 e ainda

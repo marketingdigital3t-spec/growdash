@@ -5,38 +5,39 @@ type FlowDealMetric = {
   rd_connection_id?: string | null;
 };
 
-type FlowRDConnectionEvidence = {
-  id: string;
-  accountId: string;
-  status: string | null;
-  lastSuccessAt?: string | null;
+export type FlowRDScopeEvidence = {
+  funnel_id: string;
+  start_date: string;
+  end_date: string;
+  covered_start_date?: string | null;
+  covered_end_date?: string | null;
+  status: string;
+  last_success_at?: string | null;
 };
 
-/**
- * Legacy RD connections may not have a success timestamp even when a scoped,
- * persisted deal snapshot exists. Accept it only for the exact active link and
- * selected account; empty scopes still require a recorded successful sync.
- */
-export function hasGrowdashFlowRDSnapshotEvidence(
-  selectedAccountIds: string[],
-  connections: FlowRDConnectionEvidence[],
-  snapshotConnectionIds: string[],
+/** A successful empty result is valid only for a watermark covering this scope. */
+export function hasGrowdashFlowRDScopeEvidence(
+  funnelIds: string[],
+  startDate: string,
+  endDate: string,
+  rows: FlowRDScopeEvidence[],
 ) {
-  const snapshots = new Set(snapshotConnectionIds.filter(Boolean));
-  return selectedAccountIds.length > 0 && selectedAccountIds.every((accountId) =>
-    connections.some((connection) => connection.accountId === accountId
-      && connection.status === "connected"
-      && (Boolean(connection.lastSuccessAt) || snapshots.has(connection.id))),
-  );
+  return funnelIds.length > 0 && funnelIds.every((funnelId) => rows.some((row) => {
+    const coveredStart = row.covered_start_date || row.start_date;
+    const coveredEnd = row.covered_end_date || row.end_date;
+    return row.funnel_id === funnelId
+      && Boolean(row.last_success_at)
+      && coveredStart <= startDate
+      && coveredEnd >= endDate;
+  }));
 }
 
-export function isGrowdashFlowRDDataAvailable({ scopeEnabled, loading, error, confirmed }: {
+export function isGrowdashFlowRDDataAvailable({ scopeEnabled, confirmed }: {
   scopeEnabled: boolean;
-  loading: boolean;
-  error: boolean;
   confirmed: boolean;
 }) {
-  return scopeEnabled && !loading && !error && confirmed;
+  // Keep the last valid snapshot visible while a new request runs.
+  return scopeEnabled && confirmed;
 }
 
 /**

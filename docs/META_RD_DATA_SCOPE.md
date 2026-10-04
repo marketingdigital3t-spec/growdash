@@ -20,3 +20,5 @@
 - A data civil do RD é expandida para o início e fim do dia em `America/Sao_Paulo` antes de consultar colunas `timestamptz`.
 - Os fatos Meta por dia são consultados usando a mesma chave civil; o timezone e a janela de atribuição pertencem à conta.
 - Dia sem fatos confirmados, sincronização pendente e zero legítimo são estados distintos. Falha de fonte não pode ser convertida em zero.
+- A cobertura RD de métricas analíticas é confirmada por `rd_sync_scope_state`, vinculada a funil, intervalo civil e timezone. Um snapshot anterior válido continua utilizável durante uma nova tentativa; uma linha vazia só confirma zero depois que o período exato foi sincronizado com sucesso.
+- Agentes/RAG/MCP são consumidores analíticos e não alimentam os cards do Growdash Flow. O Flow consulta os snapshots canônicos diretamente; diferenças ou indisponibilidade precisam ser corrigidas no pipeline Meta/RD, não mascaradas na camada de IA.
