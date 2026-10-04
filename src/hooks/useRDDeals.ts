@@ -482,12 +482,38 @@ export function computeFunnelAnalytics(
 ): FunnelAnalytics {
   const totalLeads = deals.length;
 
-  const { stages: sortedStages } = consolidateFunnelStages(stages);
-  const preserveNativeStages = new Set(stages.map((stage) => stage.rd_funnel_id)).size === 1;
+  // Stage definitions can be temporarily unavailable even when RD deal
+  // snapshots already contain the native stage ID/name. Preserve the real
+  // current-stage distribution from those facts instead of rendering a
+  // misleading empty (zero-lead) pipeline. This fallback does not infer
+  // transitions or add stages with no persisted deals.
+  const dealStageId = (deal: RDDeal) => String(deal.rd_stage_id || `snapshot:${deal.stage_bucket}:${deal.rd_stage_name || "unknown"}`);
+  const knownStageKeys = new Set(stages.map((stage) => `${stage.rd_funnel_id}:${stage.rd_stage_id}`));
+  const stagesFromDealFacts: FunnelStage[] = [];
+  for (const deal of deals) {
+    if (!deal.rd_funnel_id || !deal.rd_stage_name) continue;
+    const stageId = dealStageId(deal);
+    const key = `${deal.rd_funnel_id}:${stageId}`;
+    if (knownStageKeys.has(key)) continue;
+    knownStageKeys.add(key);
+    const normalizedName = deal.rd_stage_name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    stagesFromDealFacts.push({
+      rd_funnel_id: deal.rd_funnel_id,
+      rd_stage_id: stageId,
+      name: deal.rd_stage_name,
+      order: Number(deal.rd_stage_order ?? Number.MAX_SAFE_INTEGER),
+      is_won: Boolean(deal.win || isWonRDStageName(deal.rd_stage_name)),
+      is_lost: deal.stage_bucket === "lost" || /perdid|perda|lost/.test(normalizedName),
+    });
+  }
+  const analyticsStages = stages.length ? [...stages, ...stagesFromDealFacts] : stagesFromDealFacts;
+
+  const { stages: sortedStages } = consolidateFunnelStages(analyticsStages);
+  const preserveNativeStages = new Set(analyticsStages.map((stage) => stage.rd_funnel_id)).size === 1;
   const canonicalDealStageId = (deal: RDDeal) => {
     // Stage IDs are scoped to an RD funnel. Resolving by ID alone mixed
     // identical stage IDs from different accounts in consolidated views.
-    const nativeStage = stages.find((stage) => stage.rd_funnel_id === deal.rd_funnel_id && stage.rd_stage_id === deal.rd_stage_id);
+    const nativeStage = analyticsStages.find((stage) => stage.rd_funnel_id === deal.rd_funnel_id && stage.rd_stage_id === dealStageId(deal));
     if (nativeStage && preserveNativeStages) return nativeStage.rd_stage_id;
     if (nativeStage) {
       return consolidatedCRMStage({
@@ -559,7 +585,7 @@ export function computeFunnelAnalytics(
   const cumulativeByCanonicalStage = new Map<string, number>();
   const pairCounts = new Map<string, { from: string; to: string; fromCount: number; toCount: number; order: number }>();
   const stagesByFunnel = new Map<string, FunnelStage[]>();
-  for (const stage of stages) {
+  for (const stage of analyticsStages) {
     const list = stagesByFunnel.get(stage.rd_funnel_id) || [];
     list.push(stage);
     stagesByFunnel.set(stage.rd_funnel_id, list);
@@ -646,11 +672,11 @@ export function computeFunnelAnalytics(
   // duas etapas adjacentes, sem criar uma sequência global entre contas.
   const stageConversion: FunnelAnalytics["stageConversion"] = [];
   const historyPairs = new Map<string, { from: string; to: string; fromCount: Set<string>; toCount: Set<string>; order: number }>();
-  const nativeStageByKey = new Map(stages.map((stage) => [`${stage.rd_funnel_id}:${stage.rd_stage_id}`, stage]));
+  const nativeStageByKey = new Map(analyticsStages.map((stage) => [`${stage.rd_funnel_id}:${stage.rd_stage_id}`, stage]));
   for (const event of stageHistory) {
     if (!event.from_stage_id || !event.to_stage_id) continue;
-    const fromId = preserveNativeStages ? event.from_stage_id : (consolidateFunnelStages(stages.filter((stage) => stage.rd_funnel_id === event.rd_funnel_id)).sourceToCanonicalId.get(event.from_stage_id) || event.from_stage_id);
-    const toId = preserveNativeStages ? event.to_stage_id : (consolidateFunnelStages(stages.filter((stage) => stage.rd_funnel_id === event.rd_funnel_id)).sourceToCanonicalId.get(event.to_stage_id) || event.to_stage_id);
+    const fromId = preserveNativeStages ? event.from_stage_id : (consolidateFunnelStages(analyticsStages.filter((stage) => stage.rd_funnel_id === event.rd_funnel_id)).sourceToCanonicalId.get(event.from_stage_id) || event.from_stage_id);
+    const toId = preserveNativeStages ? event.to_stage_id : (consolidateFunnelStages(analyticsStages.filter((stage) => stage.rd_funnel_id === event.rd_funnel_id)).sourceToCanonicalId.get(event.to_stage_id) || event.to_stage_id);
     const fromStage = nativeStageByKey.get(`${event.rd_funnel_id}:${event.from_stage_id}`);
     const toStage = nativeStageByKey.get(`${event.rd_funnel_id}:${event.to_stage_id}`);
     const order = toStage?.order ?? 9999;

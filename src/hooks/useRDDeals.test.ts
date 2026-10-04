@@ -30,6 +30,27 @@ describe("RD deals date scope", () => {
     expect(rows[0]).toMatchObject({ id: "new", amount_total: 15000 });
   });
 
+  it("shows the persisted RD deal stage distribution when stage definitions are missing", () => {
+    const deal: RDDeal = {
+      id: "snapshot-1", rd_deal_id: "rd-deal-1", rd_connection_id: "connection-1", ad_account_id: "account-1",
+      rd_funnel_id: "funnel-1", rd_stage_id: "stage-contact", rd_stage_name: "Em contato", rd_stage_order: 2,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "lead", win: false, lost_reason: null, amount_total: 0,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: null, lead_city: null, lead_created_at: "2026-10-04T12:00:00-03:00", stage_updated_at: null, closed_at: null,
+    };
+
+    const analytics = computeFunnelAnalytics([deal], []);
+
+    expect(analytics.totalLeads).toBe(1);
+    expect(analytics.stages).toHaveLength(1);
+    expect(analytics.stages[0]).toMatchObject({ rd_stage_id: "stage-contact", name: "Em contato", count: 1, pct: 100 });
+    // A current-stage snapshot is not proof of a historical stage transition.
+    expect(analytics.stageConversion).toEqual([]);
+
+    const withoutStageId = computeFunnelAnalytics([{ ...deal, id: "snapshot-2", rd_deal_id: "rd-deal-2", rd_stage_id: null }], []);
+    expect(withoutStageId.stages).toMatchObject([expect.objectContaining({ name: "Em contato", count: 1, pct: 100 })]);
+  });
+
   it("consolidates equal stages from different connected funnels into one pipeline", () => {
     const stages: FunnelStage[] = [
       { rd_funnel_id: "aluna", rd_stage_id: "a-lead", name: "Lead Novo", order: 1, is_won: false, is_lost: false },
