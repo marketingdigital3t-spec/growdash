@@ -1,4 +1,4 @@
-import { normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
+import { normalizeMetaAttributionWindow } from "./metaInsightFacts.ts";
 
 export type MetaSyncCoverageRow = {
   ad_account_id: string;

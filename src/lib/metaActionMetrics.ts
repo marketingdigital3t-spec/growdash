@@ -1,4 +1,4 @@
-import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../../supabase/functions/_shared/metaLeadMetrics";
+import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../../supabase/functions/_shared/metaLeadMetrics.ts";
 
 export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
