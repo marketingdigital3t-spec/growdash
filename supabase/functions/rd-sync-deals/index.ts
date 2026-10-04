@@ -416,6 +416,7 @@ Deno.serve(async (req) => {
   metrics.contacts = 0;
   let runId: string | null = null;
   let userId: string | null = null;
+  let rdConnectionId: string | null = null;
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -451,6 +452,17 @@ Deno.serve(async (req) => {
           error_message: opts.errorMessage ?? null,
         })
         .eq("id", runId);
+    }
+    if (rdConnectionId && userId) {
+      const finishedAt = new Date().toISOString();
+      const connectionState = opts.status === "success"
+        ? { last_attempt_at: finishedAt, last_success_at: finishedAt, last_error: null, updated_at: finishedAt }
+        : { last_attempt_at: finishedAt, last_error: opts.errorMessage || `Sincronização RD ${opts.status}.`, updated_at: finishedAt };
+      const { error: connectionUpdateError } = await admin.from("rd_account_connections")
+        .update(connectionState)
+        .eq("id", rdConnectionId)
+        .eq("user_id", userId);
+      if (connectionUpdateError) console.error("Não foi possível atualizar o watermark da conexão RD", connectionUpdateError.message);
     }
     // Alertas
     if (userId && (opts.status !== "success" || duration > 60000)) {
@@ -586,6 +598,7 @@ Deno.serve(async (req) => {
     let connection;
     try {
       connection = await resolveRDConnection(admin, { connectionId: funnel.rd_connection_id, funnelId: funnel.id, userId });
+      rdConnectionId = String(connection.id || funnel.rd_connection_id || "") || null;
     } catch (error) {
       return new Response(
         JSON.stringify({
