@@ -56,6 +56,12 @@ export function resolveRDPeriodDeals(
   return periodDeals === undefined ? allDeals : periodDeals;
 }
 
+export function rdPeriodCountLabel(count: number, loading: boolean, unavailable: boolean) {
+  if (loading) return "Sincronizando";
+  if (unavailable) return "Indisponível";
+  return `${count.toLocaleString("pt-BR")} cadastros`;
+}
+
 export const audienceBreakdowns: ReadonlyArray<{
   type: BreakdownType;
   title: string;
@@ -509,6 +515,8 @@ export function FunnelAudienceProfile({
   attributionWindowByCampaign = {},
   data: providedData,
   loading: providedLoading = false,
+  periodDealsLoading = false,
+  periodDealsUnavailable = false,
 }: {
   deals: DealLocation[];
   periodDeals?: DealLocation[];
@@ -520,6 +528,8 @@ export function FunnelAudienceProfile({
   attributionWindowByCampaign?: Record<string, string>;
   data?: AudienceProfileData;
   loading?: boolean;
+  periodDealsLoading?: boolean;
+  periodDealsUnavailable?: boolean;
 }) {
   const query = useAudienceProfileData({
     deals,
@@ -642,7 +652,7 @@ export function FunnelAudienceProfile({
           <b className="text-foreground">{hasMetaLeadTotal ? `${metaTotal.toLocaleString("pt-BR")} aquisições` : "Indisponível"}</b> · RD no
           período:{" "}
           <b className="text-foreground">
-            {comparableDeals.length.toLocaleString("pt-BR")} cadastros
+            {rdPeriodCountLabel(comparableDeals.length, periodDealsLoading, periodDealsUnavailable)}
           </b>{" "}
           · RD histórico:{" "}
           <b className="text-foreground">{data.registrations.toLocaleString("pt-BR")}</b> ·

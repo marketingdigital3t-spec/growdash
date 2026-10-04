@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rdField, resolveRDPeriodDeals } from "./FunnelAudienceProfile";
+import { rdField, rdPeriodCountLabel, resolveRDPeriodDeals } from "./FunnelAudienceProfile";
 
 describe("RD audience fields", () => {
   it("reads source-prefixed custom fields preserved by the sync", () => {
@@ -21,5 +21,11 @@ describe("RD period scope", () => {
   it("uses all supplied deals only when no period scope was provided", () => {
     const historicalDeals = [{ lead_created_at: "2026-10-03T12:00:00Z" }];
     expect(resolveRDPeriodDeals(undefined, historicalDeals)).toBe(historicalDeals);
+  });
+
+  it("does not show a prior period count while syncing or when RD is unavailable", () => {
+    expect(rdPeriodCountLabel(333, true, false)).toBe("Sincronizando");
+    expect(rdPeriodCountLabel(333, false, true)).toBe("Indisponível");
+    expect(rdPeriodCountLabel(0, false, false)).toBe("0 cadastros");
   });
 });

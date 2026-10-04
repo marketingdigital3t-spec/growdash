@@ -697,7 +697,7 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-              <FunnelAudienceProfile deals={operationalDeals} periodDeals={operationalPeriodDeals} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : undefined} attributionWindowByCampaign={breakdownAttributionByCampaign} />
+              <FunnelAudienceProfile deals={operationalDeals} periodDeals={operationalPeriodDeals} periodDealsLoading={loadingPeriodDeals} periodDealsUnavailable={!!periodDealsError} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : undefined} attributionWindowByCampaign={breakdownAttributionByCampaign} />
             </MotionItem>
 
           <MotionItem>
