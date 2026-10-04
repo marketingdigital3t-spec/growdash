@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
 import { normalizeCustomDateRange, resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
+import { businessDateKey } from "@/lib/businessDate";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 
@@ -58,6 +59,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   const setAdAccountId = useCallback((value: string) => setAdAccountIds(value === "all" ? [] : [value]), []);
   const [preset, setPreset] = useState<DatePreset>(stored?.preset ?? "today_yesterday");
   const [customRange, setStoredCustomRange] = useState(() => normalizeCustomDateRange(stored?.customRange));
+  const [clockNow, setClockNow] = useState(() => new Date());
   const setCustomRange = useCallback((value: { from: Date; to: Date }) => {
     setStoredCustomRange(normalizeCustomDateRange(value));
   }, []);
@@ -92,7 +94,22 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
     }
   }, [adAccountId, adAccountIds, funnelIds, preset, customRange, segment]);
 
-  const dates = useMemo(() => resolvePreset(preset, customRange), [preset, customRange]);
+  useEffect(() => {
+    const refreshBusinessDay = () => {
+      const now = new Date();
+      setClockNow((current) => businessDateKey(current) === businessDateKey(now) ? current : now);
+    };
+    const interval = window.setInterval(refreshBusinessDay, 60_000);
+    window.addEventListener("focus", refreshBusinessDay);
+    document.addEventListener("visibilitychange", refreshBusinessDay);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshBusinessDay);
+      document.removeEventListener("visibilitychange", refreshBusinessDay);
+    };
+  }, []);
+
+  const dates = useMemo(() => resolvePreset(preset, customRange, clockNow), [preset, customRange, clockNow]);
   const businessUnitId = workspace?.units.find((unit) => unit.kind === segment)?.id;
   const value = useMemo<GlobalFiltersValue>(() => ({
     adAccountId,

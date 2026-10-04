@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { normalizeCustomDateRange, resolvePreset } from "./useDateFilter";
+import { businessDateKey } from "@/lib/businessDate";
 
 describe("date filter maximum history", () => {
   it("does not turn the maximum preset into a rolling one-year window", () => {
     const range = resolvePreset("max", { from: new Date(2026, 0, 1), to: new Date(2026, 7, 13) });
     expect(range.startDate).toEqual(new Date(2000, 0, 1));
+  });
+
+  it("advances the Hoje preset when São Paulo crosses midnight even if the browser is on UTC", () => {
+    const yesterday = resolvePreset("today", { from: new Date(2026, 9, 1), to: new Date(2026, 9, 1) }, new Date("2026-10-04T02:59:59.000Z"));
+    const today = resolvePreset("today", { from: new Date(2026, 9, 1), to: new Date(2026, 9, 1) }, new Date("2026-10-04T03:00:01.000Z"));
+
+    expect(businessDateKey(yesterday.startDate)).toBe("2026-10-03");
+    expect(businessDateKey(today.startDate)).toBe("2026-10-04");
   });
 
   it("keeps both custom range boundaries inclusive", () => {

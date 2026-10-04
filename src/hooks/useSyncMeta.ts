@@ -178,6 +178,9 @@ export function useSyncMeta() {
       // Refresh every view that reads the synchronized daily/hourly rows,
       // including the action totals used by Forms/site/conversation KPIs.
       void queryClient.invalidateQueries({ queryKey: ["insights"] });
+      // Coverage is part of the metric contract. Refresh it with the facts so
+      // cards do not stay "Aguardando sincronização" after confirmed writes.
+      void queryClient.invalidateQueries({ queryKey: ["meta-action-sync-coverage"] });
       void queryClient.invalidateQueries({ queryKey: ["insights_hourly"] });
       void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       void queryClient.invalidateQueries({ queryKey: ["campaigns_full"] });

@@ -1103,6 +1103,7 @@ Deno.serve(async (req) => {
           lastAttemptAt: attemptedAt,
           lastSuccessAt: accountHadError ? undefined : attemptedAt,
           lastValidSnapshotAt: accountHadError ? undefined : attemptedAt,
+          errorMessage: accountHadError ? undefined : null,
           coveredStartDate: startDate,
           coveredEndDate: endDate,
           pagesProcessed: totalPages,
@@ -1358,7 +1359,7 @@ async function writeMetaScopeState(admin: any, args: {
   coveredStartDate?: string;
   coveredEndDate?: string;
   pagesProcessed?: number;
-  errorMessage?: string;
+  errorMessage?: string | null;
   blockStatus?: Record<string, unknown>;
 }) {
   const payload: Record<string, unknown> = {

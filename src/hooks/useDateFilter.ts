@@ -67,8 +67,8 @@ export function normalizeCustomDateRange(value: Partial<CustomDateRange> | null 
   return from.getTime() <= to.getTime() ? { from, to } : { from: to, to: from };
 }
 
-export function resolvePreset(preset: DatePreset, customRange: { from: Date; to: Date }) {
-  const today = businessBoundary(new Date());
+export function resolvePreset(preset: DatePreset, customRange: { from: Date; to: Date }, now = new Date()) {
+  const today = businessBoundary(now);
   const endToday = businessBoundary(today, true);
   const safeRange = normalizeCustomDateRange(customRange);
   switch (preset) {
