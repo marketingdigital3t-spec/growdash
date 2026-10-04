@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { META_ACTION_TYPES, resolveMetaLeadActions } from "../../../src/lib/metaActionMetrics.ts";
 import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
+import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     if (lpError) throw lpError;
     const siteActionByAccount = Object.fromEntries((lpConfigs || []).map((config) => [config.ad_account_id, config.action_type || undefined]));
     const actionsByAd: Record<string, Record<string, number>> = {};
-    const actionTypes = Array.from(new Set([...META_ACTION_TYPES.forms, ...META_ACTION_TYPES.site, ...META_ACTION_TYPES.conversations, "lead", ...Object.values(siteActionByAccount).filter(Boolean)]));
+    const actionTypes = Array.from(new Set([...FORM_ACTION_TYPES, ...SITE_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter(Boolean)]));
     const actionScope = new Map<string, { adAccountId: string; window: string; adIds: string[] }>();
     for (const account of accounts || []) {
       const adIds = Array.from(new Set(uniqueInsights.filter((row) => row.ad_account_id === account.id).map((row) => row.ad_id).filter(Boolean)));
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
     }
     const facts = uniqueInsights.reduce((acc, row) => {
       const actions = actionsByAd[`${row.ad_id}|${row.date}`] || {};
-      const leads = resolveMetaLeadActions(actions, siteActionByAccount[row.ad_account_id]);
+      const leads = resolveMetaLeadParts(actions, siteActionByAccount[row.ad_account_id]);
       const key = `${row.ad_account_id}|${row.ad_id}|${row.date}`;
       if (!acc.counted.has(key)) {
         acc.leads += leads.total;
