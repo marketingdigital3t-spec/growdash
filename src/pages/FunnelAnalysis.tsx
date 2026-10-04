@@ -37,6 +37,7 @@ import { getMetaSyncRange } from "@/lib/metaSyncRange";
 import { businessDateKey } from "@/lib/businessDate";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
+import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
 import { CampaignResultsTable } from "@/components/dashboard/CampaignResultsTable";
 import { CampaignMultiSelect } from "@/components/dashboard/CampaignMultiSelect";
 import { AskAICard } from "@/components/dashboard/AskAICard";
@@ -134,6 +135,14 @@ export default function FunnelAnalysis() {
   );
   const effectiveAdAccountId = selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined;
   const effectiveAdAccountIds = selectedAccountIds.length > 1 ? selectedAccountIds : undefined;
+  const insightScopeAccountIds = useMemo(
+    () => selectedAccountIds.length ? selectedAccountIds : Array.from(integratedAccountIds),
+    [integratedAccountIds, selectedAccountIds],
+  );
+  const insightAttributionWindowsByAccount = useMemo(
+    () => buildAttributionWindowsByAccount(visibleAccounts, insightScopeAccountIds),
+    [insightScopeAccountIds, visibleAccounts],
+  );
 
   // "Todas as contas" é uma escolha válida e não pode ser regravada pelo
   // carregamento de funis. Alterar o filtro global aqui fazia o Select alternar
@@ -286,10 +295,12 @@ export default function FunnelAnalysis() {
   }, [endDate, operationalClosedDeals, startDate]);
 
   const { data: insightRows = [], isLoading: loadingInsights } = useInsights({
-    // In "Todas as contas", undefined intentionally aggregates all accounts
-    // authorized by RLS instead of silently selecting the first funnel.
+    // Always scope facts to internal account UUIDs; the same per-account
+    // attribution windows are used by the canonical Meta KPI hook below.
     adAccountId: effectiveAdAccountId,
-    adAccountIds: effectiveAdAccountIds,
+    adAccountIds: effectiveAdAccountIds || (selectedAccountIds.length === 0 ? insightScopeAccountIds : undefined),
+    attributionWindow: selectedMetaScope.attributionWindow,
+    attributionWindowsByAccount: insightAttributionWindowsByAccount,
     startDate,
     endDate,
     enabled: visibleAccounts.length > 0,
