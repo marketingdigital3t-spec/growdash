@@ -26,8 +26,8 @@ export type MetaLeadAction = {
  * alternatives, not additive facts; the account's configured site event wins
  * when present. The legacy `insights.leads` aggregate is deliberately ignored.
  */
-export function canonicalMetaLeads(
-  rows: MetaLeadInsight[],
+export function canonicalMetaLeads<T extends MetaLeadInsight>(
+  rows: T[],
   actions: MetaLeadAction[],
   siteActionByAccount: Record<string, string | undefined>,
 ) {
@@ -51,6 +51,12 @@ export function canonicalMetaLeads(
     const forms = hasNative ? maxAlias(values, FORM_ACTION_TYPES) : hasSite || hasConversation ? 0 : maxAlias(values, ["lead"]);
     const site = maxAlias(values, siteAliases);
     const conversations = maxAlias(values, CONVERSATION_ACTION_TYPES);
-    return { ...row, leads: forms + site + conversations };
+    return {
+      ...row,
+      form_leads: forms,
+      site_leads: site,
+      conversations,
+      leads: forms + site + conversations,
+    };
   });
 }

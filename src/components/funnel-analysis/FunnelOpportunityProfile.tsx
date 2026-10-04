@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { RDDeal } from "@/hooks/useRDDeals";
 import type { InsightRow } from "@/hooks/useInsights";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { filterMetaBreakdownsByAttribution } from "@/lib/metaBreakdownScope";
 
 type Dimension = "state" | "city" | "age" | "gender" | "platform";
 type ProfileRow = { key: string; count: number };
@@ -25,25 +26,25 @@ const fieldValue = (deal: RDDeal, names: string[]) => {
 const add = (map: Map<string, number>, key: string | null) => { const safe = key?.trim() || "Não informado"; map.set(safe, (map.get(safe) || 0) + 1); };
 const rows = (map: Map<string, number>): ProfileRow[] => Array.from(map.entries()).map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key, "pt-BR"));
 
-export function FunnelOpportunityProfile({ deals, insights = [], campaignIds = [], startDate, endDate }: { deals: RDDeal[]; insights?: InsightRow[]; campaignIds?: string[]; startDate: Date; endDate: Date }) {
+export function FunnelOpportunityProfile({ deals, insights = [], campaignIds = [], startDate, endDate, attributionWindowByCampaign = {} }: { deals: RDDeal[]; insights?: InsightRow[]; campaignIds?: string[]; startDate: Date; endDate: Date; attributionWindowByCampaign?: Record<string, string> }) {
   const opportunities = useMemo(() => deals.filter((deal) => deal.stage_bucket === "opportunity"), [deals]);
   const accountIds = useMemo(() => Array.from(new Set(opportunities.map((deal) => deal.ad_account_id).filter(Boolean))), [opportunities]);
   const campaignAccount = useMemo(() => new Map(insights.filter((row) => row.campaign_id && row.ad_account_id).map((row) => [String(row.campaign_id), String(row.ad_account_id)])), [insights]);
   const opportunityKey = useMemo(() => opportunities.map((deal) => `${deal.rd_deal_id}:${deal.updated_at || deal.stage_updated_at || ""}`).sort().join(","), [opportunities]);
   const breakdownQuery = useQuery({
-    queryKey: ["funnel-opportunity-profile", campaignIds.slice().sort().join(","), accountIds.slice().sort().join(","), opportunityKey, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    queryKey: ["funnel-opportunity-profile", campaignIds.slice().sort().join(","), accountIds.slice().sort().join(","), opportunityKey, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), JSON.stringify(Object.entries(attributionWindowByCampaign).sort(([a], [b]) => a.localeCompare(b)))],
     enabled: campaignIds.length > 0,
     queryFn: async () => {
       const data: Array<{ campaign_id: string; breakdown_type: string; segment_key: string | null; leads: number | null }> = [];
       const PAGE = 1000;
       for (let page = 0; ; page += 1) {
-        const { data: batch, error } = await supabase.from("insights_breakdowns").select("campaign_id,breakdown_type,segment_key,leads").in("campaign_id", campaignIds).in("breakdown_type", ["age", "gender", "publisher_platform"]).gte("date", format(startDate, "yyyy-MM-dd")).lte("date", format(endDate, "yyyy-MM-dd")).range(page * PAGE, page * PAGE + PAGE - 1);
+        const { data: batch, error } = await (supabase as any).from("insights_breakdowns").select("campaign_id,attribution_window,breakdown_type,segment_key,leads").in("campaign_id", campaignIds).in("breakdown_type", ["age", "gender", "publisher_platform"]).gte("date", format(startDate, "yyyy-MM-dd")).lte("date", format(endDate, "yyyy-MM-dd")).range(page * PAGE, page * PAGE + PAGE - 1);
         if (error) throw error;
         data.push(...((batch || []) as typeof data));
         if (!batch || batch.length < PAGE) break;
       }
       const map = new Map<string, Map<Dimension, Map<string, number>>>();
-      for (const row of data || []) {
+      for (const row of filterMetaBreakdownsByAttribution(data, attributionWindowByCampaign)) {
         const accountId = campaignAccount.get(String(row.campaign_id));
         if (!accountId) continue;
         const dimension: Dimension = row.breakdown_type === "publisher_platform" ? "platform" : row.breakdown_type;

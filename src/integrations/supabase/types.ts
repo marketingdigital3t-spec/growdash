@@ -2629,6 +2629,7 @@ export type Database = {
       }
       insights_breakdowns: {
         Row: {
+          attribution_window: string
           breakdown_type: string
           campaign_id: string
           clicks: number | null
@@ -2641,6 +2642,7 @@ export type Database = {
           spend: number | null
         }
         Insert: {
+          attribution_window?: string
           breakdown_type: string
           campaign_id: string
           clicks?: number | null
@@ -2653,6 +2655,7 @@ export type Database = {
           spend?: number | null
         }
         Update: {
+          attribution_window?: string
           breakdown_type?: string
           campaign_id?: string
           clicks?: number | null

@@ -356,6 +356,22 @@ export default function FunnelAnalysis() {
     // erradas. Sem vínculo canônico salvo, mídia fica no escopo conta + período.
     return insightRows.filter((row) => !!row.ad_account_id && allowedAccountIds.has(row.ad_account_id));
   }, [allAccountsSelected, integratedAccountIds, insightRows, selectedAccountIdSet]);
+  const breakdownAttributionByCampaign = useMemo(() => {
+    const accountIds = allAccountsSelected ? integratedAccountIds : selectedAccountIdSet;
+    const result: Record<string, string> = {};
+    for (const campaign of visibleCampaignRows) {
+      if (accountIds.has(campaign.ad_account_id)) {
+        const account = visibleAccounts.find((item) => item.id === campaign.ad_account_id);
+        result[String(campaign.id)] = account?.attribution_window || "account_default";
+      }
+    }
+    for (const row of scopedInsights) {
+      if (row.campaign_id && row.ad_account_id) {
+        result[String(row.campaign_id)] = insightAttributionWindowsByAccount[row.ad_account_id] || "account_default";
+      }
+    }
+    return result;
+  }, [allAccountsSelected, insightAttributionWindowsByAccount, scopedInsights, selectedAccountIdSet, visibleAccounts, visibleCampaignRows, integratedAccountIds]);
 
   // O filtro de campanha do RD usa UTM e nem sempre tem o mesmo nome da
   // campanha na Meta. Use os IDs reais das campanhas visíveis e, como
@@ -403,7 +419,24 @@ export default function FunnelAnalysis() {
       return {
         ...computed,
         spend: funnelMeta.data.available ? funnelMeta.data.spend : 0,
-        metaLeads: funnelMeta.data.available ? funnelMeta.data.leads : 0,
+        metaLeads: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : 0,
+        rdCpl: funnelMeta.data.available && periodAnalytics.totalLeads > 0
+          ? funnelMeta.data.spend / periodAnalytics.totalLeads
+          : null,
+        metaCpl: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
+          ? funnelMeta.data.cpl
+          : null,
+        cac: funnelMeta.data.available && periodAnalytics.conversions > 0
+          ? funnelMeta.data.spend / periodAnalytics.conversions
+          : null,
+        // ROAS Meta is purchase value attributed by Meta / Meta spend. RD
+        // revenue is shown separately and must not be relabeled as Meta ROAS.
+        roas: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
+          ? funnelMeta.data.roas
+          : null,
+        salesConversionRate: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
+          ? computed.salesConversionRate
+          : null,
       };
     },
     [funnelMeta.data, periodAnalytics.conversions, periodAnalytics.revenue, periodAnalytics.totalLeads],
@@ -634,7 +667,7 @@ export default function FunnelAnalysis() {
               metaCplLoading={funnelMeta.actionsLoading}
               cac={mediaMetrics.cac}
               roas={mediaMetrics.roas}
-              salesConversionRate={mediaMetrics.salesConversionRate}
+              salesConversionRate={funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available ? mediaMetrics.salesConversionRate : null}
               previousAvgDaysToConvert={previousAvgDaysToConvert}
             />
           </MotionItem>
@@ -662,7 +695,7 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-              <FunnelAudienceProfile deals={operationalDeals} periodDeals={operationalPeriodDeals} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={mediaMetrics.metaLeads} />
+              <FunnelAudienceProfile deals={operationalDeals} periodDeals={operationalPeriodDeals} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : undefined} attributionWindowByCampaign={breakdownAttributionByCampaign} />
             </MotionItem>
 
           <MotionItem>
@@ -673,7 +706,7 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-            <FunnelOpportunityProfile deals={operationalPeriodDeals} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} />
+            <FunnelOpportunityProfile deals={operationalPeriodDeals} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} attributionWindowByCampaign={breakdownAttributionByCampaign} />
           </MotionItem>
 
           <MotionItem>

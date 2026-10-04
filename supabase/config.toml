@@ -3,6 +3,12 @@ project_id = "cixnvosxqlacjbpymjha"
 [functions.ask-ai]
 verify_jwt = true
 
+[functions.meta-traffic-mcp]
+verify_jwt = true
+
+[functions.agent-office-chat]
+verify_jwt = true
+
 [functions.meta-oauth-start]
 verify_jwt = true
 

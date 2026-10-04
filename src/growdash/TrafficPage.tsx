@@ -17,7 +17,6 @@ import { useBudgetAnalysis, type BudgetAnalysisItem } from "@/hooks/useBudgetAna
 import { useLastTopUp, useNextTopUpEstimate } from "@/hooks/useCampaignTargets";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
-import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { TrafficAIAnalysis } from "@/components/campaigns/TrafficAIAnalysis";
 import { CampaignAttentionPanel } from "@/components/campaigns/CampaignAttentionPanel";
@@ -29,7 +28,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 import { FunnelAudienceProfile, useAudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
-import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { businessDateKey } from "@/lib/businessDate";
 import CampaignsManager from "@/pages/Campaigns";
@@ -259,40 +257,39 @@ function AIAndLeadReports({ accountId, accountIds, accountName, accounts, onAcco
   const { toast } = useToast();
   // `insights.leads` is a legacy aggregate and is never the primary KPI.
   // Actions are resolved once per alias and then summed as forms + site + conversations.
-  const metaLeadsFromInsights = 0;
-  const spend = metaTraffic.data.spend;
   const saleTotals = aggregateSales(sales);
   const won = saleTotals.totalQuantity;
   const revenue = saleTotals.totalNet;
-  const actionAdIds = useMemo(() => Array.from(new Set(insights.map((item: any) => item.ad_id).filter(Boolean))), [insights]);
-  const actionAccountMap = useMemo(() => Object.fromEntries(insights.map((item: any) => [item.ad_id, item.ad_account_id])), [insights]);
-  const { data: actionData } = useActionTotalsByAds(actionAdIds, startDate, endDate, actionAccountMap, { adAccountIds: accountIds, attributionWindowsByAccount });
-  const canonicalMeta = actionData?.metaLeadActions;
-  const hasCanonicalMetaRows = metaTraffic.data.rowCount > 0;
-  const metaLeads = hasCanonicalMetaRows ? metaTraffic.data.totalLeads : (canonicalMeta?.total ?? metaLeadsFromInsights);
-  const conversations = hasCanonicalMetaRows ? metaTraffic.data.conversations : (canonicalMeta?.conversations ?? 0);
-  const canonicalSpend = hasCanonicalMetaRows ? metaTraffic.data.spend : spend;
-  const metaSnapshotAvailable = metaTraffic.data.available;
+  // Traffic KPIs and campaign rows use the same account/date/window-scoped
+  // Meta adapter. Never fall back to an unconfirmed parallel action query.
+  const metaLeads = metaTraffic.data.totalLeads;
+  const conversations = metaTraffic.data.conversations;
+  const canonicalSpend = metaTraffic.data.spend;
+  const metaSpendAvailable = metaTraffic.data.metricAvailability.spend?.available ?? metaTraffic.data.available;
+  const metaLeadsAvailable = metaTraffic.data.metricAvailability.leads?.available ?? false;
   const byCampaign = useMemo(() => {
-    const map = new Map<string, { leads: number; spend: number; conversations: number }>();
+    const map = new Map<string, { key: string; accountId: string; name: string; leads: number; spend: number; conversations: number }>();
     const seen = new Set<string>();
     for (const item of insights as any[]) {
       const name = item.campaign_name || "Sem campanha";
-      const row = map.get(name) || { leads: 0, spend: 0, conversations: 0 };
+      const accountId = String(item.ad_account_id || "");
+      const campaignId = String(item.campaign_id || name);
+      const key = `${accountId}|${campaignId}`;
+      const row = map.get(key) || { key, accountId, name, leads: 0, spend: 0, conversations: 0 };
       const adKey = String(item.ad_id || "");
-      const actions = resolveMetaLeadActions(actionData?.totalsByAd?.[adKey]);
+      const actions = metaTraffic.data.leadBreakdownByAd[adKey];
       row.spend += Number(item.spend || 0);
       if (!seen.has(adKey)) {
-        row.leads += actions.forms + actions.site + actions.conversations;
-        row.conversations += actions.conversations;
+        row.leads += Number(actions?.totalLeads || 0);
+        row.conversations += Number(actions?.conversations || 0);
         seen.add(adKey);
       }
-      map.set(name, row);
+      map.set(key, row);
     }
-    return Array.from(map, ([name, value]) => ({ name, ...value })).sort((a, b) => b.leads - a.leads);
-  }, [actionData?.totalsByAd, insights]);
-  const copyReport = async () => { const report = `Relatório de resultados Meta — ${accountName || "Conta"}\nPeríodo: ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}\nMeta Ads: ${integer.format(metaLeads)} resultados (${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas iniciadas) | ${brl.format(canonicalSpend)} investidos | custo por resultado ${brl.format(metaLeads ? canonicalSpend / metaLeads : 0)}\nRD Station: ${integer.format(deals.length)} negócios | ${won} vendas | ${brl.format(revenue)} em receita líquida`; await navigator.clipboard.writeText(report); toast({ title: "Relatório copiado" }); };
-  return <div className="space-y-4"><TrafficAIAnalysis accountId={accountId} accountName={accountName} startDate={startDate} endDate={endDate} selectedCampaignIds={[]} /><FunnelAudienceProfile deals={deals} campaignIds={audienceCampaignIds} accountIds={accountIds} startDate={startDate} endDate={endDate} data={audience.data} loading={audience.isLoading} /><LeadReportStudio accountId={single || "all"} accountName={accountName} accounts={accounts} onAccountChange={onAccountChange} startDate={startDate} endDate={endDate} insights={insights} deals={deals} sales={sales} audience={audience.data} audienceLoading={audience.isLoading} />{accountIds.length > 0 ? <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Kpi label="Resultados Meta" value={metaTraffic.isLoading || loadingMeta ? "Carregando…" : metaSnapshotAvailable ? integer.format(metaLeads) : "Indisponível"} note={metaSnapshotAvailable ? `${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas` : metaTraffic.data.unavailableReason || "Aguardando confirmação da Meta"} /><Kpi label="Conversas iniciadas" value={metaSnapshotAvailable ? integer.format(conversations) : "Indisponível"} note="Evento de conversa Meta" /><Kpi label="Investimento" value={metaTraffic.isLoading || loadingMeta ? "Carregando…" : metaSnapshotAvailable ? brl.format(canonicalSpend) : "Aguardando sincronização"} note={metaTraffic.data.status === "stale" ? "Meta · cobertura indisponível ou desatualizada" : "Meta Ads · fonte oficial"} /><Kpi label="Custo por resultado" value={metaSnapshotAvailable ? brl.format(metaLeads ? canonicalSpend / metaLeads : 0) : "—"} note="Investimento ÷ resultados Meta" emphasis /><Kpi label="Negócios RD" value={loadingRD ? "Carregando…" : integer.format(deals.length)} note={`${loadingSales ? "…" : won} venda(s) confirmada(s)`} /><Kpi label="Receita líquida RD" value={loadingSales ? "Carregando…" : brl.format(revenue)} note={canonicalSpend > 0 ? `ROAS atribuído ${(revenue / canonicalSpend).toFixed(2)}x` : "Sem gasto Meta disponível"} /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Relatório de leads por campanha</h2><p className="text-xs text-muted-foreground">Cada linha separa leads de Forms/site e conversas iniciadas pelo evento oficial da Meta.</p></div><Button variant="outline" size="sm" onClick={copyReport} className="sm:ml-auto"><Copy className="mr-2 h-4 w-4" />Copiar relatório</Button></header><div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs"><thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-4 py-3">Campanha</th><th className="px-4 py-3 text-right">Investimento</th><th className="px-4 py-3 text-right">Leads</th><th className="px-4 py-3 text-right">Conversas iniciadas</th><th className="px-4 py-3 text-right">CPL</th></tr></thead><tbody>{byCampaign.map((row) => <tr key={row.name} className="border-t border-border"><td className="px-4 py-3 font-bold">{row.name}</td><td className="px-4 py-3 text-right">{brl.format(row.spend)}</td><td className="px-4 py-3 text-right">{integer.format(row.leads)}</td><td className="px-4 py-3 text-right">{integer.format(row.conversations)}</td><td className="px-4 py-3 text-right">{brl.format(row.leads ? row.spend / row.leads : 0)}</td></tr>)}</tbody></table></div></section></> : <Empty text="Nenhuma conta selecionada." />}</div>;
+    return Array.from(map.values()).sort((a, b) => b.leads - a.leads);
+  }, [insights, metaTraffic.data.leadBreakdownByAd]);
+  const copyReport = async () => { const metaSummary = metaSpendAvailable && metaLeadsAvailable ? `Meta Ads: ${integer.format(metaLeads)} resultados (${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas iniciadas) | ${brl.format(canonicalSpend)} investidos | custo por resultado ${brl.format(metaLeads ? canonicalSpend / metaLeads : 0)}` : `Meta Ads: dados indisponíveis ou cobertura não confirmada (${metaTraffic.data.unavailableReason || "aguardando sincronização"})`; const report = `Relatório de resultados Meta — ${accountName || "Conta"}\nPeríodo: ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}\n${metaSummary}\nRD Station: ${integer.format(deals.length)} negócios | ${won} vendas | ${brl.format(revenue)} em receita líquida`; await navigator.clipboard.writeText(report); toast({ title: "Relatório copiado" }); };
+  return <div className="space-y-4"><TrafficAIAnalysis accountId={accountId} accountName={accountName} startDate={startDate} endDate={endDate} selectedCampaignIds={[]} /><FunnelAudienceProfile deals={deals} campaignIds={audienceCampaignIds} accountIds={accountIds} startDate={startDate} endDate={endDate} data={audience.data} loading={audience.isLoading} /><LeadReportStudio accountId={single || "all"} accountName={accountName} accounts={accounts} onAccountChange={onAccountChange} startDate={startDate} endDate={endDate} insights={insights} deals={deals} sales={sales} audience={audience.data} audienceLoading={audience.isLoading} />{accountIds.length > 0 ? <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Kpi label="Resultados Meta" value={metaTraffic.isLoading || loadingMeta ? "Carregando…" : metaLeadsAvailable ? integer.format(metaLeads) : "Indisponível"} note={metaLeadsAvailable ? `${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas` : metaTraffic.data.metricAvailability.leads?.reason || "Aguardando confirmação das ações Meta"} /><Kpi label="Conversas iniciadas" value={metaLeadsAvailable ? integer.format(conversations) : "Indisponível"} note="Evento de conversa Meta" /><Kpi label="Investimento" value={metaTraffic.isLoading || loadingMeta ? "Carregando…" : metaSpendAvailable ? brl.format(canonicalSpend) : "Aguardando sincronização"} note={metaTraffic.data.status === "stale" ? "Meta · cobertura indisponível ou desatualizada" : "Meta Ads · fonte oficial"} /><Kpi label="Custo por resultado" value={metaSpendAvailable && metaLeadsAvailable ? brl.format(metaLeads ? canonicalSpend / metaLeads : 0) : "—"} note="Investimento ÷ resultados Meta" emphasis /><Kpi label="Negócios RD" value={loadingRD ? "Carregando…" : integer.format(deals.length)} note={`${loadingSales ? "…" : won} venda(s) confirmada(s)`} /><Kpi label="Receita líquida RD" value={loadingSales ? "Carregando…" : brl.format(revenue)} note={metaSpendAvailable && canonicalSpend > 0 ? `ROAS Growdash/RD ${(revenue / canonicalSpend).toFixed(2)}x` : "Sem gasto Meta confirmado"} /></div><section className="overflow-hidden rounded-xl border border-border bg-card"><header className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Relatório de leads por campanha</h2><p className="text-xs text-muted-foreground">Cada linha separa leads de Forms/site e conversas iniciadas pelo evento oficial da Meta.</p></div><Button variant="outline" size="sm" onClick={copyReport} className="sm:ml-auto"><Copy className="mr-2 h-4 w-4" />Copiar relatório</Button></header><div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs"><thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-4 py-3">Campanha</th><th className="px-4 py-3 text-right">Investimento</th><th className="px-4 py-3 text-right">Leads</th><th className="px-4 py-3 text-right">Conversas iniciadas</th><th className="px-4 py-3 text-right">CPL</th></tr></thead><tbody>{byCampaign.map((row) => <tr key={row.key} className="border-t border-border"><td className="px-4 py-3 font-bold">{row.name}</td><td className="px-4 py-3 text-right">{metaSpendAvailable ? brl.format(row.spend) : "—"}</td><td className="px-4 py-3 text-right">{metaLeadsAvailable ? integer.format(row.leads) : "—"}</td><td className="px-4 py-3 text-right">{metaLeadsAvailable ? integer.format(row.conversations) : "—"}</td><td className="px-4 py-3 text-right">{metaSpendAvailable && metaLeadsAvailable ? brl.format(row.leads ? row.spend / row.leads : 0) : "—"}</td></tr>)}</tbody></table></div></section></> : <Empty text="Nenhuma conta selecionada." />}</div>;
 }
 
 function TrafficFunnels() {

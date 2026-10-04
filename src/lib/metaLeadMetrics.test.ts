@@ -17,6 +17,7 @@ describe("canonicalMetaLeads (AI/RAG evidence)", () => {
       {},
     );
     expect(result[0].leads).toBe(12);
+    expect(result[0]).toMatchObject({ form_leads: 5, site_leads: 3, conversations: 4 });
   });
 
   it("uses the configured site event per account and never falls back to insights.leads", () => {

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { BreakdownSegment, MetaBreakdowns } from "@/lib/metaTraffic";
+import { filterMetaBreakdownsByAttribution } from "@/lib/metaBreakdownScope";
 
 const TYPES: Array<[keyof MetaBreakdowns, string[]]> = [
   ["age", ["age"]],
@@ -34,10 +35,11 @@ function aggregate(rows: any[]): BreakdownSegment[] {
   })).sort((a, b) => b.spend - a.spend);
 }
 
-export function useMetaBreakdowns(campaignIds: string[], startDate: string, endDate: string, enabled = true) {
+export function useMetaBreakdowns(campaignIds: string[], startDate: string, endDate: string, enabled = true, attributionWindowByCampaign: Record<string, string> = {}) {
   const ids = [...new Set(campaignIds.filter(Boolean))].sort();
+  const attributionSignature = JSON.stringify(Object.entries(attributionWindowByCampaign).sort(([a], [b]) => a.localeCompare(b)));
   return useQuery({
-    queryKey: ["meta-breakdowns", ids.join(","), startDate, endDate],
+    queryKey: ["meta-breakdowns", ids.join(","), startDate, endDate, attributionSignature],
     enabled: enabled && ids.length > 0,
     queryFn: async () => {
       const result = empty();
@@ -46,7 +48,7 @@ export function useMetaBreakdowns(campaignIds: string[], startDate: string, endD
         for (let offset = 0; offset < ids.length; offset += 200) {
           const { data, error } = await supabase
             .from("insights_breakdowns" as any)
-            .select("breakdown_type,segment_key,spend,impressions,clicks,leads,date")
+            .select("breakdown_type,segment_key,spend,impressions,clicks,leads,date,attribution_window")
             .in("campaign_id", ids.slice(offset, offset + 200))
             .in("breakdown_type", sourceTypes)
             .gte("date", startDate)
@@ -54,12 +56,13 @@ export function useMetaBreakdowns(campaignIds: string[], startDate: string, endD
           if (error) throw error;
           rows.push(...(data || []));
         }
+        const correctlyAttributed = filterMetaBreakdownsByAttribution(rows, attributionWindowByCampaign);
         if (target === "device") {
-          result.device = aggregate(rows.filter((row) => /·\s*[^·]+\s*·/.test(String(row.segment_key || ""))));
+          result.device = aggregate(correctlyAttributed.filter((row) => /·\s*[^·]+\s*·/.test(String(row.segment_key || ""))));
         } else if (target === "placement") {
-          result.placement = aggregate(rows.filter((row) => String(row.segment_key || "").includes("·")));
+          result.placement = aggregate(correctlyAttributed.filter((row) => String(row.segment_key || "").includes("·")));
         } else {
-          result[target] = aggregate(rows);
+          result[target] = aggregate(correctlyAttributed);
         }
       }
       return result;

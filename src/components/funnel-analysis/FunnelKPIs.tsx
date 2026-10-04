@@ -37,7 +37,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
     { label: "Leads Meta", value: metaLeads, icon: Users, color: "text-foreground", format: "int" as const, unavailable: metaLeadsLoading || !metaLeadsAvailable, detail: "Formulários + leads de site + conversas iniciadas · Meta Ads" },
     { label: "Lead", value: rdLeadValue, icon: Users, color: "text-foreground", format: "int" as const, detail: rdLeadsError ? "Falha ao carregar negociações RD Station" : "Negociações criadas no RD Station · período e filtros selecionados" },
     { label: "Conversões / Vendas", value: a.conversions, icon: Trophy, color: "text-foreground", format: "int" as const },
-    { label: "Conversão Meta → venda", value: salesConversionRate ?? 0, icon: Percent, color: "text-foreground", format: "pct" as const, decimals: 2 },
+    { label: "Conversão Meta → venda", value: salesConversionRate, icon: Percent, color: "text-foreground", format: "pct" as const, decimals: 2, unavailable: !metaLeadsAvailable },
     { label: "Tempo médio até conversão", value: a.avgDaysToConvert, icon: Clock, color: "text-foreground", format: "days" as const, detail: timeChange == null ? "Sem período anterior" : `${Math.abs(timeChange).toFixed(0)}% ${timeChange <= 0 ? "menor" : "maior"} que período anterior` },
     { label: "Ticket médio", value: a.avgTicket, icon: Target, color: "text-foreground", format: "brl" as const },
     { label: "Receita gerada", value: a.revenue, icon: DollarSign, color: "text-foreground", format: "brl" as const },
@@ -67,7 +67,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
                 <div className={`gd-funnel-kpi-value ${c.color} dark:text-white`}>
                   {c.format === "int" && c.label === "Leads Meta" && (("unavailable" in c && c.unavailable) ? (metaLeadsLoading ? "Sincronizando…" : "Indisponível") : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
                   {c.format === "int" && c.label === "Lead" && (rdLeadsLoading ? "Carregando…" : rdLeadsError ? "Indisponível" : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
-                  {c.format === "pct" && <><AnimatedNumber value={c.value} decimals={c.decimals ?? 1} />%</>}
+                  {c.format === "pct" && ("unavailable" in c && c.unavailable ? "Indisponível" : <><AnimatedNumber value={c.value ?? 0} decimals={c.decimals ?? 1} />%</>)}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
                   {c.format === "brl" && (("unavailable" in c && c.unavailable) ? "Aguardando sincronização" : fmtBRL(c.value))}
                   {c.format === "custom" && <span>{c.custom}</span>}

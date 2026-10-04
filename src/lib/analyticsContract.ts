@@ -118,7 +118,10 @@ export function metricValue(value: number | null, available: boolean, source: Me
 
 /** Convert the legacy numeric Meta domain into the availability-aware contract. */
 export function metaMetricContract(meta: MetaTrafficMetrics): MetaMetricContract {
-  const available = meta.rowCount > 0;
+  // Rows can belong to an older or incomplete sync. The domain object's
+  // availability is already scoped to account, dates, attribution and sync
+  // coverage; row presence alone must never promote it to a confirmed metric.
+  const available = meta.available;
   const reason = meta.unavailableReason || undefined;
   const leadAvailable = available && !!meta.metricAvailability.leads?.available;
   const derived = (value: number, source: MetricSource = "derived") => metricValue(value, available, source, reason);

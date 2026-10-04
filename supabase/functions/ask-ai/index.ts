@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, type MetaLeadAction, type MetaLeadInsight } from "../_shared/metaLeadMetrics.ts";
+import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,13 +35,17 @@ function totals(rows: Insight[]): Totals {
     reach: acc.reach + Number(row.reach || 0), clicks: acc.clicks + Number(row.clicks || 0), leads: acc.leads + Number(row.leads || 0),
   }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
 }
-function derived(metric: Totals, revenue = 0) {
+function derived(metric: Totals, revenue = 0, leadsAvailable = true, insightsAvailable = true) {
   return {
-    spend: round(metric.spend), impressions: metric.impressions, reach: metric.reach, clicks: metric.clicks, leads: metric.leads,
-    cpl: metric.leads > 0 ? round(metric.spend / metric.leads) : null,
-    ctr: metric.impressions > 0 ? round((metric.clicks / metric.impressions) * 100) : null,
-    cpm: metric.impressions > 0 ? round((metric.spend / metric.impressions) * 1000) : null,
-    frequency: metric.reach > 0 ? round(metric.impressions / metric.reach) : null,
+    spend: insightsAvailable ? round(metric.spend) : null,
+    impressions: insightsAvailable ? metric.impressions : null,
+    reach: insightsAvailable ? metric.reach : null,
+    clicks: insightsAvailable ? metric.clicks : null,
+    leads: leadsAvailable ? metric.leads : null,
+    cpl: insightsAvailable && leadsAvailable && metric.leads > 0 ? round(metric.spend / metric.leads) : null,
+    ctr: insightsAvailable && metric.impressions > 0 ? round((metric.clicks / metric.impressions) * 100) : null,
+    cpm: insightsAvailable && metric.impressions > 0 ? round((metric.spend / metric.impressions) * 1000) : null,
+    frequency: insightsAvailable && metric.reach > 0 ? round(metric.impressions / metric.reach) : null,
     revenue: round(revenue), roas: metric.spend > 0 ? round(revenue / metric.spend) : null,
   };
 }
@@ -133,6 +138,25 @@ Deno.serve(async (req) => {
     const { data: ads } = await admin.from("ads").select("id, name, adset_id, status, thumbnail_url, creative_id").in("adset_id", adsetIds.length ? adsetIds : ["x"]);
     const adIds = (ads || []).map((ad) => ad.id);
     const dataStartStr = twoMonthStartStr < previousStartStr ? twoMonthStartStr : previousStartStr;
+    const { data: syncCoverageRows, error: syncCoverageError } = await admin.from("meta_sync_scope_state")
+      .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,updated_at")
+      .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
+      .lte("start_date", endStr)
+      .gte("end_date", dataStartStr);
+    if (syncCoverageError) throw syncCoverageError;
+    const confirmedCoverageRows = (syncCoverageRows || []) as unknown as MetaSyncCoverageRow[];
+    const coverageGaps = (from: string, to: string, block = "actions") => (accounts || []).filter((account) => !findMetaSyncCoverage(
+      confirmedCoverageRows,
+      {
+        accountId: account.id,
+        timezone: account.timezone_name || "America/Sao_Paulo",
+        attributionWindow: account.attribution_window || "account_default",
+      },
+      from,
+      to,
+      selectedCampaignIds,
+      block,
+    ));
     // PostgREST commonly caps a response at 1,000 rows. Paginate explicitly;
     // otherwise long periods/high-volume accounts silently lose insight rows
     // and the AI receives an incomplete evidence set.
@@ -194,6 +218,13 @@ Deno.serve(async (req) => {
     const canonicalInsights = canonicalMetaLeads(uniqueScopedInsights, actionRows, siteActionByAccount);
     const currentInsights = canonicalInsights.filter((row) => row.date >= startStr && row.date <= endStr);
     const previousInsights = canonicalInsights.filter((row) => row.date >= previousStartStr && row.date <= previousEndStr);
+    const currentActionCoverageGaps = coverageGaps(startStr, endStr);
+    const previousActionCoverageGaps = coverageGaps(previousStartStr, previousEndStr);
+    const currentInsightCoverageGaps = coverageGaps(startStr, endStr, "insights");
+    const previousInsightCoverageGaps = coverageGaps(previousStartStr, previousEndStr, "insights");
+    const currentMetaSnapshotAvailable = accountIds.length > 0 && currentInsightCoverageGaps.length === 0;
+    const currentActionsAvailable = accountIds.length > 0 && currentActionCoverageGaps.length === 0;
+    const previousActionsAvailable = accountIds.length > 0 && previousActionCoverageGaps.length === 0;
 
     const allSales: Array<Record<string, any>> = [];
     for (let offset = 0; ; offset += 1000) {
@@ -216,8 +247,8 @@ Deno.serve(async (req) => {
     const previousSales = confirmedSales.filter((sale) => sale.sale_date >= previousStartStr && sale.sale_date <= previousEndStr);
     const currentRevenue = currentSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
     const previousRevenue = previousSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
-    const currentMetrics = derived(totals(currentInsights), currentRevenue);
-    const previousMetrics = derived(totals(previousInsights), previousRevenue);
+    const currentMetrics = derived(totals(currentInsights), currentRevenue, currentActionsAvailable, currentMetaSnapshotAvailable);
+    const previousMetrics = derived(totals(previousInsights), previousRevenue, previousActionsAvailable, accountIds.length > 0 && previousInsightCoverageGaps.length === 0);
 
     const twoMonthInsights = canonicalInsights.filter((row) => row.date >= twoMonthStartStr && row.date <= endStr);
     const currentMonthInsights = twoMonthInsights.filter((row) => row.date >= dateString(currentMonthStart) && row.date <= endStr);
@@ -227,8 +258,8 @@ Deno.serve(async (req) => {
     const currentMonthRevenue = currentMonthSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
     const previousMonthRevenue = previousMonthSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
     const monthlyComparison = [
-      { month: "previous", from: twoMonthStartStr, to: previousMonthEndStr, days: Math.floor((previousMonthEnd.getTime() - previousMonthStart.getTime()) / DAY) + 1, ...derived(totals(previousMonthInsights), previousMonthRevenue), sales: previousMonthSales.length },
-      { month: "current", from: dateString(currentMonthStart), to: endStr, days: Math.floor((requestedEnd.getTime() - currentMonthStart.getTime()) / DAY) + 1, ...derived(totals(currentMonthInsights), currentMonthRevenue), sales: currentMonthSales.length },
+      { month: "previous", from: twoMonthStartStr, to: previousMonthEndStr, days: Math.floor((previousMonthEnd.getTime() - previousMonthStart.getTime()) / DAY) + 1, ...derived(totals(previousMonthInsights), previousMonthRevenue, coverageGaps(twoMonthStartStr, previousMonthEndStr).length === 0 && accountIds.length > 0, coverageGaps(twoMonthStartStr, previousMonthEndStr, "insights").length === 0 && accountIds.length > 0), sales: previousMonthSales.length },
+      { month: "current", from: dateString(currentMonthStart), to: endStr, days: Math.floor((requestedEnd.getTime() - currentMonthStart.getTime()) / DAY) + 1, ...derived(totals(currentMonthInsights), currentMonthRevenue, coverageGaps(dateString(currentMonthStart), endStr).length === 0 && accountIds.length > 0, coverageGaps(dateString(currentMonthStart), endStr, "insights").length === 0 && accountIds.length > 0), sales: currentMonthSales.length },
     ];
     const weeklyMap = new Map<string, { from: string; insights: Insight[]; sales: typeof confirmedSales }>();
     for (const row of twoMonthInsights) {
@@ -246,13 +277,16 @@ Deno.serve(async (req) => {
     const weeklyComparison = Array.from(weeklyMap.values()).sort((a, b) => a.from.localeCompare(b.from)).map((row) => {
       const weekEnd = dateString(new Date(new Date(`${row.from}T12:00:00Z`).getTime() + 6 * DAY));
       const revenue = row.sales.filter((sale) => sale.status === "confirmed").reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
-      return { week: row.from, from: row.from, to: weekEnd > endStr ? endStr : weekEnd, month: row.from >= dateString(currentMonthStart) ? "current" : "previous", ...derived(totals(row.insights), revenue), sales: row.sales.length };
+      const to = weekEnd > endStr ? endStr : weekEnd;
+      return { week: row.from, from: row.from, to, month: row.from >= dateString(currentMonthStart) ? "current" : "previous", ...derived(totals(row.insights), revenue, coverageGaps(row.from, to).length === 0 && accountIds.length > 0, coverageGaps(row.from, to, "insights").length === 0 && accountIds.length > 0), sales: row.sales.length };
     });
 
     const comparison = Object.fromEntries(["spend", "impressions", "reach", "clicks", "leads", "cpl", "ctr", "cpm", "frequency", "revenue", "roas"].map((key) => {
-      const current = Number((currentMetrics as Record<string, unknown>)[key] || 0);
-      const previous = Number((previousMetrics as Record<string, unknown>)[key] || 0);
-      return [key, { current: (currentMetrics as Record<string, unknown>)[key], previous: (previousMetrics as Record<string, unknown>)[key], variation_percent: delta(current, previous) }];
+      const currentValue = (currentMetrics as Record<string, unknown>)[key];
+      const previousValue = (previousMetrics as Record<string, unknown>)[key];
+      const current = Number(currentValue || 0);
+      const previous = Number(previousValue || 0);
+      return [key, { current: currentValue, previous: previousValue, variation_percent: currentValue == null || previousValue == null ? null : delta(current, previous) }];
     }));
 
     const adsetToCampaign = new Map((adsets || []).map((adset) => [adset.id, adset.campaign_id]));
@@ -265,7 +299,7 @@ Deno.serve(async (req) => {
     }
     const campaignSummary = (campaigns || []).map((campaign) => {
       const ids = new Set((ads || []).filter((ad) => adToCampaign.get(ad.id) === campaign.id).map((ad) => ad.id));
-      const metric = derived(totals(rowsForAds(ids)), salesByCampaign.get(campaign.id)?.revenue || 0);
+      const metric = derived(totals(rowsForAds(ids)), salesByCampaign.get(campaign.id)?.revenue || 0, currentActionsAvailable, currentMetaSnapshotAvailable);
       const budget = (adsets || []).filter((adset) => adset.campaign_id === campaign.id).reduce((sum, adset) => sum + Number(adset.daily_budget || 0), 0);
       const target = Number((targets || []).find((item) => item.campaign_id === campaign.id)?.target_cpl || accounts?.[0]?.target_cpl || currentMetrics.cpl || 0);
       const ratio = metric.cpl && target ? metric.cpl / target : null;
@@ -275,14 +309,14 @@ Deno.serve(async (req) => {
 
     const adsetSummary = (adsets || []).map((adset) => {
       const ids = new Set((ads || []).filter((ad) => ad.adset_id === adset.id).map((ad) => ad.id));
-      return { id: adset.id, name: adset.name, campaign_id: adset.campaign_id, status: adset.status, daily_budget: adset.daily_budget, destination_type: adset.destination_type, ...derived(totals(rowsForAds(ids))) };
-    }).filter((item) => item.spend > 0 || item.status === "ACTIVE");
+      return { id: adset.id, name: adset.name, campaign_id: adset.campaign_id, status: adset.status, daily_budget: adset.daily_budget, destination_type: adset.destination_type, ...derived(totals(rowsForAds(ids)), 0, currentActionsAvailable, currentMetaSnapshotAvailable) };
+    }).filter((item) => (item.spend || 0) > 0 || item.status === "ACTIVE");
     const adSummary = (ads || []).map((ad) => {
-      const metric = derived(totals(currentInsights.filter((row) => row.ad_id === ad.id)));
+      const metric = derived(totals(currentInsights.filter((row) => row.ad_id === ad.id)), 0, currentActionsAvailable, currentMetaSnapshotAvailable);
       return { id: ad.id, name: ad.name, adset_id: ad.adset_id, campaign_id: adToCampaign.get(ad.id), status: ad.status, thumbnail_url: ad.thumbnail_url, creative_id: ad.creative_id, ...metric };
-    }).filter((item) => item.spend > 0 || item.status === "ACTIVE").sort((a, b) => b.leads - a.leads || (a.cpl || Infinity) - (b.cpl || Infinity));
+    }).filter((item) => (item.spend || 0) > 0 || item.status === "ACTIVE").sort((a, b) => (b.leads || 0) - (a.leads || 0) || (a.cpl || Infinity) - (b.cpl || Infinity));
 
-    const daily = Array.from(new Set(currentInsights.map((row) => row.date))).sort().map((date) => ({ date, ...derived(totals(currentInsights.filter((row) => row.date === date))) }));
+    const daily = Array.from(new Set(currentInsights.map((row) => row.date))).sort().map((date) => ({ date, ...derived(totals(currentInsights.filter((row) => row.date === date)), 0, currentActionsAvailable, currentMetaSnapshotAvailable) }));
     const changes: Array<Record<string, unknown>> = [];
     for (let offset = 0; ; offset += 1000) {
       const { data: page, error: changesError } = await admin.from("campaign_changes")
@@ -312,7 +346,8 @@ Deno.serve(async (req) => {
         meta_action_rows: actionRows.filter((row) => row.date >= startStr && row.date <= endStr).length,
         meta_action_rows_by_type: Object.fromEntries(actionTypes.map((type) => [type, actionRows.filter((row) => row.date >= startStr && row.date <= endStr && row.action_type === type).length])),
         lead_definition: "max(form aliases) + max(site aliases) + max(conversation aliases), por conta/anúncio/dia; aliases equivalentes não são somados; insights.leads nunca é fonte de leads",
-        action_coverage: actionRows.some((row) => row.date >= startStr && row.date <= endStr) ? "action_rows_present" : "no_action_rows_for_scope; lead_total_not_confirmed",
+        action_coverage: currentActionsAvailable ? "confirmed_for_every_selected_account_and_requested_scope" : "incomplete_or_unconfirmed; lead_total_not_confirmed",
+        action_coverage_gaps_by_account: currentActionCoverageGaps.map((account) => ({ account_id: account.id, name: account.name })),
         attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),
         timezone_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
         unavailable_dimensions: ["idade individual", "gênero individual", "atribuição sem UTM ou vínculo Meta"],
@@ -346,9 +381,10 @@ Deno.serve(async (req) => {
         ads_loaded: ads?.length || 0,
         insight_rows_loaded: uniqueScopedInsights.length,
         current_period_insight_rows_loaded: currentInsights.length,
-        current_period_has_meta_snapshot: currentInsights.length > 0,
+        current_period_has_meta_snapshot: currentMetaSnapshotAvailable,
         current_period_actions_loaded: actionRows.filter((row) => row.date >= startStr && row.date <= endStr).length,
-        current_period_has_meta_action_snapshot: actionRows.some((row) => row.date >= startStr && row.date <= endStr),
+        current_period_has_meta_action_snapshot: currentActionsAvailable,
+        current_period_action_coverage_gaps: currentActionCoverageGaps.map((account) => ({ account_id: account.id, name: account.name })),
         confirmed_sales_loaded: confirmedSales.length,
         pending_sales_excluded: (allSales || []).filter((sale) => sale.status === "pending").length,
         note: "Os números acima são o limite factual desta resposta. Não extrapole para entidades que não aparecem no JSON. Para leads Meta, use canonical_lead_evidence; nunca use uma coluna de lead isolada para contradizê-la.",

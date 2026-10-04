@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { aggregateMetaLeadActionDays, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { aggregateMetaLeadActionDays, META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { businessDateKey } from "@/lib/businessDate";
 
 export interface ActionTotalsResult {
@@ -22,6 +22,8 @@ export interface ActionTotalsResult {
   /** Alias-safe Meta lead totals per ad, using configured site-event mapping. */
   leadBreakdownByAd: Record<string, { forms: number; site: number; conversations: number; total: number }>;
   dailyMetaLeadByAccount: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }> >;
+  /** Number of persisted lead-action facts; distinguishes absent facts from a valid zero. */
+  leadActionFactCount: number;
 }
 
 export interface ActionScope {
@@ -104,7 +106,7 @@ export function useActionTotalsByAds(
       // source of inflated leads. An empty universe is therefore a valid
       // empty snapshot; the sync layer will fill it on the next run.
       if (resolvedIds.length === 0 && (scopedAccounts.length > 0 || scopedCampaigns.length > 0)) {
-        return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount };
+        return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount: 0 };
       }
       const resolvedSortedIds = [...new Set(resolvedIds)].sort();
       const adsetByAd: Record<string, string> = {};
@@ -219,7 +221,17 @@ export function useActionTotalsByAds(
         aggregate.total = aggregate.forms + aggregate.site + aggregate.conversations;
         leadBreakdownByAd[adId] = aggregate;
       }
-      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount };
+      const leadActionAliases = new Set<string>([
+        ...META_ACTION_TYPES.forms,
+        ...META_ACTION_TYPES.site,
+        ...META_ACTION_TYPES.conversations,
+        "lead",
+        ...Object.values(lpByAccount).filter(Boolean),
+      ]);
+      const leadActionFactCount = Object.values(dailyByAd).reduce((count, days) => count + Object.values(days).filter((dayActions) =>
+        Object.keys(dayActions).some((actionType) => leadActionAliases.has(actionType)),
+      ).length, 0);
+      return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount };
     },
     staleTime: 120_000,
     gcTime: 15 * 60_000,

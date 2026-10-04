@@ -105,6 +105,7 @@ type InsightRow = {
 
 type ActionData = {
   actionsAvailable?: boolean;
+  leadActionFactCount?: number;
   actionsErrorReason?: string | null;
   metaLeadActions?: { forms: number; site: number; conversations: number; total: number };
   totalsByAd?: Record<string, Record<string, number>>;
@@ -123,7 +124,7 @@ export function aggregateMetaTrafficMetrics(
   syncedAt: string | null,
   errors: string[] = [],
   now = Date.now(),
-  context?: { attributionWindow?: string | null; timezone?: string | null },
+  context?: { attributionWindow?: string | null; timezone?: string | null; scopeConfirmed?: boolean },
 ): MetaTrafficMetrics {
   const totals = rows.reduce((acc, row) => ({
     spend: acc.spend + Number(row.spend || 0),
@@ -196,13 +197,19 @@ export function aggregateMetaTrafficMetrics(
   const resultBreakdown = Array.from(resultBreakdownByCampaign.values());
   const results = resultBreakdown.reduce((sum, item) => sum + item.value, 0);
   const freshnessSeconds = syncedAt ? Math.max(0, Math.floor((now - new Date(syncedAt).getTime()) / 1000)) : null;
-  const available = rows.length > 0;
+  // When the caller provides a synchronization scope, only its persisted
+  // watermark can confirm the period. Rows may belong to an old/partial run.
+  // Rows are already scoped by internal account, civil date and attribution.
+  // Keep this last persisted snapshot visible even if its latest watermark is
+  // partial; the status below communicates freshness separately from value.
+  const available = context?.scopeConfirmed === true || rows.length > 0;
   const unavailableReason = available
     ? null
     : errors[0] || "Nenhum snapshot Meta encontrado no período e escopo selecionados.";
   const status = errors.length
     ? rows.length ? "partial" : "error"
-    : !available || freshnessSeconds === null || freshnessSeconds > 300 ? "stale" : "fresh";
+    : !available || freshnessSeconds === null || freshnessSeconds > 300 ? "stale"
+      : context?.scopeConfirmed === false ? "partial" : "fresh";
   const coveredAccounts = Array.from(new Set(rows.map((row) => row.ad_account_id).filter(Boolean) as string[]));
   const coveredDates = new Set(rows.map((row) => row.date).filter(Boolean) as string[]).size;
 

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { datesSafeToReconcile } from "../_shared/metaInsightReconciliation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -241,7 +242,10 @@ Deno.serve(async (req) => {
         // Every writer (manual, cron or backfill) takes the same per-account
         // lock. The coordinator lock alone is not enough because direct
         // function calls could otherwise write the same facts concurrently.
-        accountLockScopeKey = `meta-account:${account.id}:${startDate}:${endDate}:${effectiveTimezone}:${effectiveAttributionWindow}`;
+        // Overlapping date windows for the same account can reconcile the
+        // same facts. Lock at account level so a wider/older sync cannot race
+        // a selected-day refresh and erase its newly persisted rows.
+        accountLockScopeKey = `meta-account:${account.id}`;
         const { data: acquired, error: lockError } = await supabaseAdmin.rpc("acquire_realtime_sync_lock", {
           p_user_id: account.user_id,
           p_provider: "meta",
@@ -562,7 +566,7 @@ Deno.serve(async (req) => {
           await supabaseAdmin
             .from("ad_accounts")
             .update({
-              connection_status: connectionStatusForMetaError(insightsRes.errorCode, insightsRes.retryable),
+              connection_status: connectionStatusForMetaError(insightsRes.errorCode, Boolean(insightsRes.retryable)),
               last_sync_error: insightsRes.error,
               last_sync_error_code: insightsRes.errorCode ?? null,
               last_sync_attempt_at: attemptedAt,
@@ -805,6 +809,10 @@ Deno.serve(async (req) => {
           return {
             ad_id: insight.ad_id,
             ad_account_id: account.id,
+            campaign_id: insight.campaign_id || null,
+            campaign_name: insight.campaign_name || campaign?.name || null,
+            adset_id: insight.adset_id || null,
+            adset_name: insight.adset_name || adset?.name || null,
             date: insight.date_start,
             spend, impressions, reach, clicks,
             inline_link_clicks: inlineLinkClicks,
@@ -833,6 +841,66 @@ Deno.serve(async (req) => {
           totalSynced += chunk.length;
         }
 
+        // A successful PostgREST upsert response is not enough to mark a
+        // snapshot fresh. Re-read the exact account/date/window facts and
+        // prove that every requested ad/day key became visible under the
+        // correct internal account before reconciliation can delete anything.
+        const expectedInsightKeys = new Set(insightRows.map((row: any) => `${row.ad_id}|${row.date}`));
+        const persistedInsightRows: any[] = [];
+        const persistedActionRows: any[] = [];
+        const verificationAdIds = [...new Set(insightRows.map((row: any) => String(row.ad_id)))];
+        for (let offset = 0; offset < verificationAdIds.length; offset += 200) {
+          const adChunk = verificationAdIds.slice(offset, offset + 200);
+          for (let page = 0; ; page += 1) {
+            const { data, error } = await supabaseAdmin.from("insights")
+              .select("ad_id,date,spend")
+              .eq("ad_account_id", account.id)
+              .eq("attribution_window", effectiveAttributionWindow)
+              .in("ad_id", adChunk)
+              .gte("date", startDate).lte("date", endDate)
+              .range(page * 1000, page * 1000 + 999);
+            if (error) throw new Error(`verificação dos insights da conta ${account.name}: ${error.message}`);
+            persistedInsightRows.push(...(data || []));
+            if (!data || data.length < 1000) break;
+          }
+          for (let page = 0; actionRows.length > 0; page += 1) {
+            let query = supabaseAdmin.from("insight_actions")
+              .select("ad_id,date,action_type")
+              .eq("ad_account_id", account.id)
+              .eq("attribution_window", effectiveAttributionWindow)
+              .in("ad_id", adChunk)
+              .gte("date", startDate).lte("date", endDate)
+              .range(page * 1000, page * 1000 + 999);
+            const { data, error } = await query;
+            if (error) throw new Error(`verificação das ações da conta ${account.name}: ${error.message}`);
+            persistedActionRows.push(...(data || []));
+            if (!data || data.length < 1000) break;
+          }
+        }
+        const persistedInsightKeys = new Set(persistedInsightRows.map((row) => `${row.ad_id}|${row.date}`));
+        const missingInsightKeys = [...expectedInsightKeys].filter((key) => !persistedInsightKeys.has(key));
+        const expectedActionKeys = new Set(actionRows.map((row) => `${row.ad_id}|${row.date}|${row.action_type}`));
+        const persistedActionKeys = new Set(persistedActionRows.map((row) => `${row.ad_id}|${row.date}|${row.action_type}`));
+        const missingActionKeys = [...expectedActionKeys].filter((key) => !persistedActionKeys.has(key));
+        const persistedSpend = persistedInsightRows
+          .filter((row) => expectedInsightKeys.has(`${row.ad_id}|${row.date}`))
+          .reduce((sum, row) => sum + Number(row.spend || 0), 0);
+        const requestedSpend = insightRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0);
+        if (missingInsightKeys.length || Math.abs(persistedSpend - requestedSpend) > 0.01) {
+          throw new Error(`snapshot Meta da conta ${account.name} não persistiu integralmente: ${missingInsightKeys.length} chave(s) ausente(s), gasto solicitado ${requestedSpend.toFixed(2)}, relido ${persistedSpend.toFixed(2)}.`);
+        }
+        if (missingActionKeys.length) {
+          throw new Error(`ações Meta da conta ${account.name} não persistiram integralmente: ${missingActionKeys.length} chave(s) ausente(s).`);
+        }
+        const persistenceVerification = {
+          insightsExpected: insightRows.length,
+          insightsReadBack: expectedInsightKeys.size,
+          actionsExpected: expectedActionKeys.size,
+          actionsReadBack: expectedActionKeys.size,
+          spendExpected: requestedSpend,
+          spendReadBack: persistedSpend,
+        };
+
         // Reconcile rows that disappeared from the completed Meta response
         // only after all current rows are safely stored. The attribution
         // predicate is mandatory: another attribution window is a separate
@@ -849,10 +917,7 @@ Deno.serve(async (req) => {
           ids.add(adId);
           incomingByDate.set(date, ids);
         }
-        const cursor = new Date(`${startDate}T00:00:00Z`);
-        const last = new Date(`${endDate}T00:00:00Z`);
-        for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-          const date = cursor.toISOString().slice(0, 10);
+        for (const date of datesSafeToReconcile(startDate, endDate, allInsights)) {
           const incoming = [...(incomingByDate.get(date) || new Set<string>())];
           for (let i = 0; i < factAdIds.length; i += 500) {
             const adChunk = factAdIds.slice(i, i + 500);
@@ -870,6 +935,51 @@ Deno.serve(async (req) => {
             const { error: insightDeleteError } = await insightDelete;
             if (insightDeleteError) throw new Error(`limpeza dos insights da conta ${account.name}: ${insightDeleteError.message}`);
           }
+        }
+
+        // Confirm the requested facts again after reconciliation. The earlier
+        // read-back protects against failed upserts; this one protects the
+        // watermark from being marked fresh if cleanup or a concurrent path
+        // removed any row before the sync completed.
+        const finalInsightKeys = new Set<string>();
+        const finalActionKeys = new Set<string>();
+        const finalSpendByKey = new Map<string, number>();
+        for (let offset = 0; offset < verificationAdIds.length; offset += 200) {
+          const adChunk = verificationAdIds.slice(offset, offset + 200);
+          for (let page = 0; ; page += 1) {
+            const { data, error } = await supabaseAdmin.from("insights")
+              .select("ad_id,date,spend")
+              .eq("ad_account_id", account.id)
+              .eq("attribution_window", effectiveAttributionWindow)
+              .in("ad_id", adChunk)
+              .gte("date", startDate).lte("date", endDate)
+              .range(page * 1000, page * 1000 + 999);
+            if (error) throw new Error(`verificação final dos insights da conta ${account.name}: ${error.message}`);
+            for (const row of data || []) {
+              const key = `${row.ad_id}|${row.date}`;
+              finalInsightKeys.add(key);
+              finalSpendByKey.set(key, Number(row.spend || 0));
+            }
+            if (!data || data.length < 1000) break;
+          }
+          for (let page = 0; actionRows.length > 0; page += 1) {
+            const { data, error } = await supabaseAdmin.from("insight_actions")
+              .select("ad_id,date,action_type")
+              .eq("ad_account_id", account.id)
+              .eq("attribution_window", effectiveAttributionWindow)
+              .in("ad_id", adChunk)
+              .gte("date", startDate).lte("date", endDate)
+              .range(page * 1000, page * 1000 + 999);
+            if (error) throw new Error(`verificação final das ações da conta ${account.name}: ${error.message}`);
+            for (const row of data || []) finalActionKeys.add(`${row.ad_id}|${row.date}|${row.action_type}`);
+            if (!data || data.length < 1000) break;
+          }
+        }
+        const missingAfterReconciliation = [...expectedInsightKeys].filter((key) => !finalInsightKeys.has(key));
+        const missingActionsAfterReconciliation = [...expectedActionKeys].filter((key) => !finalActionKeys.has(key));
+        const finalSpend = [...expectedInsightKeys].reduce((sum, key) => sum + (finalSpendByKey.get(key) || 0), 0);
+        if (missingAfterReconciliation.length || missingActionsAfterReconciliation.length || Math.abs(finalSpend - requestedSpend) > 0.01) {
+          throw new Error(`snapshot Meta da conta ${account.name} foi alterado após reconciliação: ${missingAfterReconciliation.length} insight(s) e ${missingActionsAfterReconciliation.length} ação(ões) ausentes; gasto solicitado ${requestedSpend.toFixed(2)}, relido ${finalSpend.toFixed(2)}.`);
         }
 
         // 5. Buscar breakdowns somente quando explicitamente solicitado. Eles
@@ -895,6 +1005,7 @@ Deno.serve(async (req) => {
               .from("insights_breakdowns")
               .delete()
               .in("campaign_id", campaignChunk)
+              .eq("attribution_window", effectiveAttributionWindow)
               .gte("date", breakdownStartDate)
               .lte("date", breakdownEndDate);
             if (breakdownDeleteError) throw new Error(`limpeza dos breakdowns da conta ${account.name}: ${breakdownDeleteError.message}`);
@@ -939,6 +1050,7 @@ Deno.serve(async (req) => {
                 return {
                   campaign_id: r.campaign_id,
                   date: r.date_start,
+                  attribution_window: effectiveAttributionWindow,
                   breakdown_type: breakdown.type,
                   segment_key: breakdown.type === "platform_position" && r.publisher_platform
                     ? [r.publisher_platform, r.platform_position, r.impression_device].filter(Boolean).join(" · ")
@@ -953,7 +1065,7 @@ Deno.serve(async (req) => {
               const chunk = bRows.slice(i, i + 200);
               const { error: bErr } = await supabaseAdmin
                 .from("insights_breakdowns")
-                .upsert(chunk, { onConflict: "campaign_id,date,breakdown_type,segment_key", ignoreDuplicates: false });
+                .upsert(chunk, { onConflict: "campaign_id,date,breakdown_type,segment_key,attribution_window", ignoreDuplicates: false });
               if (bErr) throw new Error(`breakdown ${breakdown.type} da conta ${account.name}: ${bErr.message}`);
             }
             console.log(`Breakdown ${breakdown.type}: ${bRows.length} rows`);
@@ -994,8 +1106,14 @@ Deno.serve(async (req) => {
           coveredEndDate: endDate,
           pagesProcessed: totalPages,
           blockStatus: {
-            insights: { status: accountHadError ? "partial" : "fresh", coveredScope: { startDate, endDate }, pagesProcessed: totalPages },
-            actions: { status: "fresh" },
+            insights: {
+              status: accountHadError ? "partial" : "fresh",
+              coveredScope: { startDate, endDate },
+              pagesProcessed: totalPages,
+              rowsPersisted: insightRows.length,
+              spendPersisted: insightRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0),
+            },
+            actions: { status: "fresh", sourceInsightRows: insightRows.length, rowsPersisted: actionRows.length },
             hourly: { status: "pending" },
             breakdowns: { status: auxiliaryErrors.length ? "partial" : "pending", errorMessage: auxiliaryErrors.join("; ") || null },
           },
