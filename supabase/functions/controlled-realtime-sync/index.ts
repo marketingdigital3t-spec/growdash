@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { canRunSelectedMetaLeadSync, selectedMetaSyncIsPartial } from "../../../src/lib/controlledMetaSync.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,8 +125,7 @@ Deno.serve(async (req) => {
             incremental: true,
             includeBreakdowns: false,
           });
-          if (insights.error || insights.data?.error || ["failed", "blocked"].includes(String(insights.data?.status || ""))) return insights;
-          if (insights.data?.status === "partial") return { data: { ...insights.data, success: true, status: "partial" } };
+          if (!canRunSelectedMetaLeadSync(insights)) return insights;
 
           // Leads/forms are an auxiliary Meta resource. Run it after the
           // daily snapshot, but do not invalidate daily KPIs when its token,
@@ -142,19 +142,22 @@ Deno.serve(async (req) => {
               endDate,
               triggerSource: "controlled_realtime_selected",
             });
+            const leadStatus = String(leads.data?.status || (leads.error || leads.data?.error ? "error" : "success"));
+            const leadPartial = ["partial", "failed", "error", "blocked"].includes(leadStatus);
             return {
               data: {
                 success: true,
-                status: insights.data?.status === "partial" ? "partial" : "success",
+                status: selectedMetaSyncIsPartial(insights, leads) ? "partial" : "success",
                 synced: Number(insights.data?.synced || 0),
                 warnings: [
                   leads.error || leads.data?.error,
-                  leads.data?.status === "partial" ? "Leads/forms Meta parcialmente atualizados." : null,
+                  leads.data?.errors,
+                  leadPartial ? "Leads/forms Meta não tiveram cobertura completa confirmada." : null,
                   "Hourly, breakdowns, saldo e RD continuarão em segundo plano.",
                 ].filter(Boolean),
                 block_status: {
                   insights: insights.data?.status || "success",
-                  leads: leads.data?.status || (leads.error ? "error" : "success"),
+                  leads: leadStatus,
                   hourly: "pending",
                 },
                 synced_at: insights.data?.synced_at,
