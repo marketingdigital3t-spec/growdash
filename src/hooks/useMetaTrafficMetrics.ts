@@ -6,17 +6,22 @@ import { aggregateMetaTrafficMetrics, type MetaTrafficMetrics, type MetaTrafficS
 import { useMetaBreakdowns } from "@/hooks/useMetaBreakdowns";
 import { parseBusinessDate } from "@/lib/businessDate";
 import { metaMetricContract, type MetaMetricContract } from "@/lib/analyticsContract";
+import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; metrics: MetaMetricContract; isLoading: boolean; insightsLoading: boolean; actionsLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
   const accountIds = scope.adAccountIds.filter(Boolean);
   const scopedAccounts = (accounts.data || []).filter((account) => accountIds.length === 0 || accountIds.includes(account.id));
-  const accountWindows = Array.from(new Set(scopedAccounts.map((account) => account.attribution_window || "account_default")));
-  const attributionWindow = scope.attributionWindow || (accountWindows.length === 1 ? accountWindows[0] : "account_default");
-  const attributionWindowsByAccount = useMemo(
-    () => Object.fromEntries(scopedAccounts.map((account) => [account.id, scope.attributionWindow || account.attribution_window || "account_default"])),
-    [scope.attributionWindow, scopedAccounts],
-  );
+  // `account_default` is an aggregate fallback, not an instruction to replace
+  // each account's real setting. This matters in consolidated views where
+  // accounts can legitimately use different attribution windows.
+  const explicitWindow = scope.attributionWindow && scope.attributionWindow !== "account_default"
+    ? scope.attributionWindow
+    : undefined;
+  const effectiveAccountIds = accountIds.length ? accountIds : scopedAccounts.map((account) => account.id);
+  const attributionWindowsByAccount = buildAttributionWindowsByAccount(scopedAccounts, effectiveAccountIds, explicitWindow);
+  const accountWindows = Array.from(new Set(Object.values(attributionWindowsByAccount)));
+  const attributionWindow = explicitWindow || (accountWindows.length === 1 ? accountWindows[0] : "account_default");
   const insights = useInsights({
     adAccountId: accountIds.length === 1 ? accountIds[0] : undefined,
     adAccountIds: accountIds.length > 1 ? accountIds : undefined,

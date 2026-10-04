@@ -20,4 +20,14 @@ describe("buildAttributionWindowsByAccount", () => {
       "uuid-meta": "account_default",
     });
   });
+
+  it("does not let the aggregate account_default fallback override individual account windows", () => {
+    expect(buildAttributionWindowsByAccount([
+      { id: "uuid-one", attribution_window: "7d_click,1d_view" },
+      { id: "uuid-two", attribution_window: "1d_click" },
+    ], ["uuid-one", "uuid-two"], "account_default")).toEqual({
+      "uuid-one": "7d_click,1d_view",
+      "uuid-two": "1d_click",
+    });
+  });
 });
