@@ -54,6 +54,10 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
       return { rows, actionGaps: gapsFor("actions"), insightGaps: gapsFor("insights") };
     },
     staleTime: 30_000,
+    // The selected-scope sync updates Insights first and actions afterward.
+    // Keep checking the tiny coverage row while actions are pending/missing so
+    // a valid zero is not left as "Indisponível" until navigation or focus.
+    refetchInterval: (query) => query.state.data?.actionGaps?.length ? 10_000 : false,
   });
   const accountWindows = Array.from(new Set(Object.values(attributionWindowsByAccount)));
   const attributionWindow = explicitWindow || (accountWindows.length === 1 ? accountWindows[0] : "account_default");
