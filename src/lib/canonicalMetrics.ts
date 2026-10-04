@@ -1,5 +1,5 @@
 import { isWonRDStageName } from "@/lib/rdDealStatus";
-import { format } from "date-fns";
+import { businessDateKey } from "@/lib/businessDate";
 
 export type CanonicalWonDeal = {
   rd_deal_id: string;
@@ -24,8 +24,8 @@ export function canonicalWonDate(deal: Pick<CanonicalWonDeal, "closed_at" | "sta
 
 /** Calendar boundaries for the business timezone used by the RD operation. */
 export function saoPauloDayBounds(startDate: Date, endDate: Date) {
-  const start = format(startDate, "yyyy-MM-dd");
-  const end = format(endDate, "yyyy-MM-dd");
+  const start = businessDateKey(startDate);
+  const end = businessDateKey(endDate);
   return {
     start: new Date(`${start}T00:00:00-03:00`),
     end: new Date(`${end}T23:59:59.999-03:00`),

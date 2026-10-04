@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { businessDateKey } from "@/lib/businessDate";
 import { useDashboard, type DashboardContextValue } from "@/contexts/DashboardContext";
 
 export type MissingReason = "token_expired" | "no_delivery" | "never_synced" | "lead_event_not_configured";
@@ -29,8 +29,8 @@ type AccountRefRow = { ad_account_id: string };
  */
 export function useHourlyCoverage(): HourlyCoverage {
   const { startDate, endDate, adAccountId, adAccounts } = useDashboard();
-  const start = format(startDate, "yyyy-MM-dd");
-  const end = format(endDate, "yyyy-MM-dd");
+  const start = businessDateKey(startDate);
+  const end = businessDateKey(endDate);
 
   const scopedAccounts = (adAccounts || []).filter((a: DashboardAdAccount) =>
     adAccountId ? a.id === adAccountId : true

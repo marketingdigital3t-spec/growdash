@@ -26,3 +26,14 @@ export function businessDateKey(value: Date, timezone = BUSINESS_TIMEZONE): stri
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${map.year}-${map.month}-${map.day}`;
 }
+
+/**
+ * Rebuild a business civil date as a host-local date for calendar widgets and
+ * date-fns formatting. Stored/query dates remain YYYY-MM-DD via
+ * `businessDateKey`; this Date is only a presentation/calendar adapter.
+ * Noon avoids DST/midnight transitions in the browser's own timezone.
+ */
+export function businessCalendarDate(value: Date, timezone = BUSINESS_TIMEZONE): Date {
+  const [year, month, day] = businessDateKey(value, timezone).split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+}

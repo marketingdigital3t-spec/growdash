@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHeader, TableRow } from 
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useSales } from "@/hooks/useSales";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
+import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
@@ -125,10 +126,7 @@ function campaignPrimaryResult(campaign: any) {
 }
 
 function formatApiDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return businessDateKey(date);
 }
 
 function firstRelation(value: any) {
@@ -413,8 +411,8 @@ export default function Campaigns() {
           adsetBudget += adset.daily_budget ?? 0;
           for (const ad of adset.ads || []) {
             for (const i of ad.insights || []) {
-              if (startDate && i.date < format(startDate, "yyyy-MM-dd")) continue;
-              if (endDate && i.date > format(endDate, "yyyy-MM-dd")) continue;
+              if (startDate && i.date < businessDateKey(startDate)) continue;
+              if (endDate && i.date > businessDateKey(endDate)) continue;
               const expectedWindow = attributionWindowsByAccount[c.ad_account_id] || "account_default";
               if (i.attribution_window && i.attribution_window !== expectedWindow) continue;
               spend += i.spend ?? 0;

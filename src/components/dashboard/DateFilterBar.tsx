@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { MetaDateRangePicker } from "./MetaDateRangePicker";
 import { CampaignMultiSelect } from "./CampaignMultiSelect";
 import { AccountMultiSelect } from "./AccountMultiSelect";
+import { businessCalendarDate } from "@/lib/businessDate";
 
 interface DateFilterBarProps {
   preset: DatePreset;
@@ -90,7 +91,7 @@ export function DateFilterBar({
       )}
 
       {showSummary && <span className="min-w-0 text-xs text-muted-foreground sm:ml-auto">
-        {format(startDate, "dd MMM", { locale: ptBR })} — {format(endDate, "dd MMM yyyy", { locale: ptBR })}
+        {format(businessCalendarDate(startDate), "dd MMM", { locale: ptBR })} — {format(businessCalendarDate(endDate), "dd MMM yyyy", { locale: ptBR })}
       </span>}
     </div>
   );

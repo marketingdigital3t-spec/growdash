@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import { DatePreset, PRESET_LABELS, resolvePreset } from "@/hooks/useDateFilter";
 
 interface Props {
@@ -43,12 +44,14 @@ const PRESET_ORDER: DatePreset[] = [
 ];
 
 function formatTrigger(preset: DatePreset, start: Date, end: Date) {
-  const sameDay = start.toDateString() === end.toDateString();
+  const calendarStart = businessCalendarDate(start);
+  const calendarEnd = businessCalendarDate(end);
+  const sameDay = businessDateKey(start) === businessDateKey(end);
   const label = PRESET_LABELS[preset];
   if (sameDay) {
-    return `${label}: ${format(start, "d 'de' MMM 'de' yyyy", { locale: ptBR })}`;
+    return `${label}: ${format(calendarStart, "d 'de' MMM 'de' yyyy", { locale: ptBR })}`;
   }
-  return `${label}: ${format(start, "d MMM", { locale: ptBR })} – ${format(end, "d MMM yyyy", { locale: ptBR })}`;
+  return `${label}: ${format(calendarStart, "d MMM", { locale: ptBR })} – ${format(calendarEnd, "d MMM yyyy", { locale: ptBR })}`;
 }
 
 export function MetaDateRangePicker({
@@ -65,8 +68,8 @@ export function MetaDateRangePicker({
   const [open, setOpen] = useState(false);
   const [pendingPreset, setPendingPreset] = useState<DatePreset>(preset);
   const [pendingRange, setPendingRange] = useState<DateRange>({
-    from: startDate,
-    to: endDate,
+    from: businessCalendarDate(startDate),
+    to: businessCalendarDate(endDate),
   });
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [comparePreset, setComparePreset] = useState<DatePreset>("yesterday");
@@ -74,7 +77,7 @@ export function MetaDateRangePicker({
   useEffect(() => {
     if (open) {
       setPendingPreset(preset);
-      setPendingRange({ from: startDate, to: endDate });
+      setPendingRange({ from: businessCalendarDate(startDate), to: businessCalendarDate(endDate) });
     }
   }, [open, preset, startDate, endDate]);
 

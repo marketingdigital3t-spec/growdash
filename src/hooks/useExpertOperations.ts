@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { isPaidOperationStatus, normalizeClassName, rankExpertSales } from "@/lib/expertOperations";
-import { businessDateKey } from "@/lib/businessDate";
 
 const norm = normalizeClassName;
 
@@ -36,15 +36,15 @@ export function useExpertOperations(expertId: string | undefined) {
     },
   });
   const sales = useQuery({
-    queryKey: ["expert-sales", expertId, startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)], enabled: Boolean(expertId),
+    queryKey: ["expert-sales", expertId, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId),
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("expert_sales").select("id,expert_id,event_class_id,participant_type,name,sale_date,class_name,source_class_id,class_match_status,gross_amount_cents,cash_received_cents,status,seller_name,payment_method,utm_campaign,utm_content").eq("expert_id", expertId!).gte("sale_date", startDate.toISOString().slice(0, 10)).lte("sale_date", endDate.toISOString().slice(0, 10)).order("sale_date", { ascending: true });
+      const { data, error } = await (supabase as any).from("expert_sales").select("id,expert_id,event_class_id,participant_type,name,sale_date,class_name,source_class_id,class_match_status,gross_amount_cents,cash_received_cents,status,seller_name,payment_method,utm_campaign,utm_content").eq("expert_id", expertId!).gte("sale_date", businessDateKey(startDate)).lte("sale_date", businessDateKey(endDate)).order("sale_date", { ascending: true });
       if (error) throw error;
       return ((data || []) as ExpertOperationSale[]).filter((row) => isPaidOperationStatus(row.status));
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "all", startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)], enabled: true,
+    queryKey: ["expert-operation-classes", expertId || "all", businessDateKey(startDate), businessDateKey(endDate)], enabled: true,
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
       if (error) throw error;
@@ -69,7 +69,7 @@ export function useExpertOperations(expertId: string | undefined) {
     // futuras ou históricas do calendário.
     return true;
   }), [classes.data, expertId, expert.data?.nome, startDate, endDate]);
-  const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, startDate.toISOString().slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${startDate.toISOString().slice(0, 7)}-01`); if (error) throw error; return data || []; } });
+  const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, businessDateKey(startDate).slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${businessDateKey(startDate).slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));
     return rankExpertSales(sales.data || [], Object.fromEntries(goals));

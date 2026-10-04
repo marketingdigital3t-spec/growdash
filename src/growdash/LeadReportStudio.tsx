@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { businessDateKey } from "@/lib/businessDate";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
@@ -77,8 +78,8 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
     setBanner(window.localStorage.getItem(`growdash:report-banner:${accountId}`) || "");
   }, [accountId]);
 
-  const reportFrom = format(startDate, "yyyy-MM-dd");
-  const reportTo = format(endDate, "yyyy-MM-dd");
+  const reportFrom = businessDateKey(startDate);
+  const reportTo = businessDateKey(endDate);
   const filteredInsights = useMemo(() => insights.filter((row) => !row.date || (row.date >= reportFrom && row.date <= reportTo)), [insights, reportFrom, reportTo]);
   const filteredDeals = useMemo(() => deals.filter((row) => !row.lead_created_at || (row.lead_created_at.slice(0, 10) >= reportFrom && row.lead_created_at.slice(0, 10) <= reportTo)), [deals, reportFrom, reportTo]);
   const filteredSales = useMemo(() => sales.filter((row) => row.sale_date >= reportFrom && row.sale_date <= reportTo), [sales, reportFrom, reportTo]);

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { reconcileRDDealsToMetaLeads, type MetaLeadIdentity } from "@/lib/leadReconciliation";
 import { filterMetaBreakdownsByAttribution } from "@/lib/metaBreakdownScope";
+import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 
 type BreakdownType =
   "age" | "gender" | "publisher_platform" | "platform_position" | "country" | "region";
@@ -177,8 +178,8 @@ export function useAudienceProfileData({
       "funnel-audience-breakdowns",
       campaignIds.slice().sort().join(","),
       accountIds.slice().sort().join(","),
-      format(startDate, "yyyy-MM-dd"),
-      format(endDate, "yyyy-MM-dd"),
+      businessDateKey(startDate),
+      businessDateKey(endDate),
       JSON.stringify(
         Object.entries(attributionWindowByCampaign).sort(([a], [b]) => a.localeCompare(b)),
       ),
@@ -215,8 +216,8 @@ export function useAudienceProfileData({
             "breakdown_type",
             audienceBreakdowns.map((item) => item.type),
           )
-          .gte("date", format(startDate, "yyyy-MM-dd"))
-          .lte("date", format(endDate, "yyyy-MM-dd"))
+          .gte("date", businessDateKey(startDate))
+          .lte("date", businessDateKey(endDate))
           .order("date", { ascending: true })
           .range(page * PAGE, page * PAGE + PAGE - 1);
         if (error) throw error;
@@ -418,7 +419,7 @@ async function downloadAudiencePdf(data: AudienceProfileData, startDate: Date, e
   draw("Perfil do público e entrega", margin, 20, bold);
   y -= 20;
   draw(
-    `Período: ${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}`,
+    `Período: ${format(businessCalendarDate(startDate), "dd/MM/yyyy")} a ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}`,
     margin,
     9,
     regular,
@@ -499,7 +500,7 @@ async function downloadAudiencePdf(data: AudienceProfileData, startDate: Date, e
   const file = new Blob([bytes], { type: "application/pdf" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(file);
-  link.download = `perfil-publico-${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.pdf`;
+  link.download = `perfil-publico-${businessDateKey(startDate)}_${businessDateKey(endDate)}.pdf`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -543,8 +544,8 @@ export function FunnelAudienceProfile({
     queryKey: [
       "funnel-meta-leads-reconciliation",
       accountIds.slice().sort().join(","),
-      format(startDate, "yyyy-MM-dd"),
-      format(endDate, "yyyy-MM-dd"),
+      businessDateKey(startDate),
+      businessDateKey(endDate),
     ],
     enabled: accountIds.length > 0,
     queryFn: async () => {

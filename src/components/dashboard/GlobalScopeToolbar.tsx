@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { businessCalendarDate } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
@@ -34,7 +35,7 @@ export function GlobalScopeToolbar({ syncing = false }: { syncing?: boolean }) {
         </span>
       )}
       <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">
-        {format(startDate, "dd/MM/yyyy")} – {format(endDate, "dd/MM/yyyy")} · São Paulo
+        {format(businessCalendarDate(startDate), "dd/MM/yyyy")} – {format(businessCalendarDate(endDate), "dd/MM/yyyy")} · São Paulo
       </span>
     </div>
   );

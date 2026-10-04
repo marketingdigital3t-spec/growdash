@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { businessDateKey } from "@/lib/businessDate";
 import { useMemo } from "react";
-import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
@@ -50,8 +50,8 @@ export function useCanonicalLeadsByAccountDate() {
   const { data: lpConfigs = {} } = useAccountLpConfigs();
   const { data: accountAdsets = [] } = useAccountAdsets(adAccountId);
 
-  const start = format(startDate, "yyyy-MM-dd");
-  const end = format(endDate, "yyyy-MM-dd");
+  const start = businessDateKey(startDate);
+  const end = businessDateKey(endDate);
 
   // Scope to ads present in the current dashboard insights (already filtered by account/period).
   const scopedAdIds = useMemo(() => Array.from(new Set(insights.map((r) => r.ad_id))), [insights]);

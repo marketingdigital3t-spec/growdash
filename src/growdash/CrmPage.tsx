@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { businessDateKey } from "@/lib/businessDate";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
@@ -489,8 +490,8 @@ export default function CrmPage() {
             // RD history instead of truncating at a page/deal ceiling.
             full_history: true,
             ...(preset === "max" ? {} : {
-              start_date: format(startDate, "yyyy-MM-dd"),
-              end_date: format(endDate, "yyyy-MM-dd"),
+              start_date: businessDateKey(startDate),
+              end_date: businessDateKey(endDate),
             }),
             trigger_source: "crm_history_refresh",
           },

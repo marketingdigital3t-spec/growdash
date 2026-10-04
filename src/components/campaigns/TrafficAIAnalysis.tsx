@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { splitTrafficAIReport, type TrafficAISectionKey } from "@/lib/trafficAIReport";
+import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 
 const sectionTabs: { key: TrafficAISectionKey; label: string }[] = [
   { key: "summary", label: "Resumo" }, { key: "monthly", label: "Análise mensal" }, { key: "weekly", label: "Comparação semanal" }, { key: "campaigns", label: "Campanhas" }, { key: "adsets", label: "Conjuntos" },
@@ -45,7 +46,7 @@ export function TrafficAIAnalysis({ accountId, accountName, startDate, endDate, 
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           mode: "traffic_analysis", account_id: accountId,
-          start_date: format(startDate, "yyyy-MM-dd"), end_date: format(endDate, "yyyy-MM-dd"),
+          start_date: businessDateKey(startDate), end_date: businessDateKey(endDate),
           selected_campaign_ids: selectedCampaignIds, question: focusQuestions[focus],
         }),
         signal: abortRef.current.signal,
@@ -90,7 +91,7 @@ export function TrafficAIAnalysis({ accountId, accountName, startDate, endDate, 
       </div>
       {!singleAccount && <div className="mx-3 mb-3 flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300 sm:mx-4"><TriangleAlert className="h-4 w-4" />Selecione uma conta Meta específica. A IA não mistura dados de contas diferentes.</div>}
       {open && <div className="border-t border-border bg-muted/20 p-3 sm:p-4">
-        <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />Somente dados da conta selecionada</span><span className="inline-flex items-center gap-1"><CalendarRange className="h-3.5 w-3.5" />{accountName || "Conta Meta"} · {format(startDate, "dd/MM/yyyy")}–{format(endDate, "dd/MM/yyyy")}</span>{selectedCampaignIds.length > 0 && <span>{selectedCampaignIds.length} campanha(s) selecionada(s)</span>}{generatedAt && <span>Gerado às {format(generatedAt, "HH:mm")}</span>}</div>
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><span className="inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />Somente dados da conta selecionada</span><span className="inline-flex items-center gap-1"><CalendarRange className="h-3.5 w-3.5" />{accountName || "Conta Meta"} · {format(businessCalendarDate(startDate), "dd/MM/yyyy")}–{format(businessCalendarDate(endDate), "dd/MM/yyyy")}</span>{selectedCampaignIds.length > 0 && <span>{selectedCampaignIds.length} campanha(s) selecionada(s)</span>}{generatedAt && <span>Gerado às {format(generatedAt, "HH:mm")}</span>}</div>
         {error && <div className="mb-3 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"><TriangleAlert className="h-4 w-4" />{error}<Button size="sm" variant="outline" className="ml-auto" onClick={generate}><RefreshCw className="mr-1 h-3.5 w-3.5" />Tentar novamente</Button></div>}
         {loading && !report && <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-border bg-card"><div className="text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" /><p className="mt-3 text-xs font-bold">Cruzando Meta, vendas, mês anterior e semanas…</p><p className="mt-1 text-[10px] text-muted-foreground">Nenhuma alteração será feita nas campanhas.</p></div></div>}
         {report && <Tabs defaultValue="summary"><TabsList className="growdash-scrollbar h-auto w-full justify-start overflow-x-auto bg-muted/70 p-1">{sectionTabs.map((item) => <TabsTrigger key={item.key} value={item.key} disabled={!sections[item.key]?.trim()}>{item.label}</TabsTrigger>)}</TabsList>{sectionTabs.map((item) => <TabsContent key={item.key} value={item.key} className="mt-3 rounded-xl border border-border bg-card p-4 sm:p-6"><Markdown>{sections[item.key] || "_Seção não retornada pela IA._"}</Markdown></TabsContent>)}</Tabs>}

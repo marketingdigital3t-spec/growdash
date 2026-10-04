@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 
 interface Adset {
   id: string;
@@ -105,8 +106,8 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, startDate, e
 
   const allInsights: Insight[] = useMemo(() => {
     if (!campaign) return [];
-    const from = startDate ? format(startDate, "yyyy-MM-dd") : null;
-    const to = endDate ? format(endDate, "yyyy-MM-dd") : null;
+    const from = startDate ? businessDateKey(startDate) : null;
+    const to = endDate ? businessDateKey(endDate) : null;
     return (campaign.adsets || []).flatMap(s => (s.ads || []).flatMap(a => a.insights || []))
       .filter((insight) => (!from || insight.date >= from) && (!to || insight.date <= to));
   }, [campaign, endDate, startDate]);
@@ -114,9 +115,9 @@ export function CampaignDetailSheet({ open, onOpenChange, campaign, startDate, e
   const dailyData = useMemo(() => {
     const map = new Map<string, { date: string; spend: number; leads: number; cpl: number }>();
     if (startDate && endDate) {
-      const last = format(endDate, "yyyy-MM-dd");
-      for (let cursor = startDate; format(cursor, "yyyy-MM-dd") <= last; cursor = addDays(cursor, 1)) {
-        const date = format(cursor, "yyyy-MM-dd");
+      const last = businessDateKey(endDate);
+      for (let cursor = businessCalendarDate(startDate); businessDateKey(cursor) <= last; cursor = addDays(cursor, 1)) {
+        const date = businessDateKey(cursor);
         map.set(date, { date, spend: 0, leads: 0, cpl: 0 });
       }
     }

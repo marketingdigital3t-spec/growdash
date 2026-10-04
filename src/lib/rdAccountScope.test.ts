@@ -29,6 +29,10 @@ describe("resolveLinkedRDFunnelIds", () => {
     expect(resolveLinkedRDFunnelIds(["missing"], accounts, connections, funnels)).toEqual([NO_LINKED_RD_FUNNEL_SCOPE_ID]);
   });
 
+  it("does not widen a multi-account request when one selected account cannot be resolved", () => {
+    expect(resolveLinkedRDFunnelIds(["meta-ca02", "missing"], accounts, connections, funnels)).toEqual([NO_LINKED_RD_FUNNEL_SCOPE_ID]);
+  });
+
   it("supports legacy direct internal-account links", () => {
     expect(resolveLinkedRDFunnelIds(["meta-ca02"], accounts, [], [
       { id: "legacy", ad_account_id: "meta-ca02", rd_funnel_id: "f-legacy", is_active: true },

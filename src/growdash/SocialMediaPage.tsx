@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInstagramOAuth } from "@/hooks/useInstagramOAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -146,7 +147,7 @@ export default function SocialMediaPage() {
     queryKey: ["social_insights_daily", selectedId, startDate.toISOString(), endDate.toISOString()],
     enabled: !!selectedId && !demoMode,
     queryFn: async () => {
-      return socialQuery((signal) => supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", format(startDate, "yyyy-MM-dd")).lte("insight_date", format(endDate, "yyyy-MM-dd")).order("insight_date").abortSignal(signal)) as Promise<DailyInsight[]>;
+      return socialQuery((signal) => supabase.from("social_insights_daily").select("*").eq("social_account_id", selectedId).gte("insight_date", businessDateKey(startDate)).lte("insight_date", businessDateKey(endDate)).order("insight_date").abortSignal(signal)) as Promise<DailyInsight[]>;
     },
   });
 

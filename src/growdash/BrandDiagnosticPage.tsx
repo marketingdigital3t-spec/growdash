@@ -32,6 +32,7 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { businessCalendarDate } from "@/lib/businessDate";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { businessDateKey } from "@/lib/businessDate";
 import { aggregateSales, useSales } from "@/hooks/useSales";
@@ -193,7 +194,7 @@ export default function BrandDiagnosticPage() {
 
   const loadingData = insightsQuery.isLoading || campaignsQuery.isLoading || rdQuery.isLoading;
   const syncOk = !account?.last_sync_error && !["error", "expired", "disconnected"].includes(String(account?.connection_status));
-  const dateLabel = `${format(startDate, "dd/MM/yyyy")} — ${format(endDate, "dd/MM/yyyy")}`;
+  const dateLabel = `${format(businessCalendarDate(startDate), "dd/MM/yyyy")} — ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}`;
 
   return (
     <div className="mx-auto w-full max-w-[1600px]">

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { businessDateKey } from "@/lib/businessDate";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 
 export type BreakdownType = "age" | "gender" | "region" | "country" | "publisher_platform" | "platform_position";
 
@@ -45,15 +45,15 @@ function aggregate(rows: any[]): BreakdownSegment[] {
 
 export function useCampaignBreakdowns(campaignId?: string, startDate?: Date, endDate?: Date) {
   return useQuery({
-    queryKey: ["campaign-breakdowns", campaignId, startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ["campaign-breakdowns", campaignId, startDate ? businessDateKey(startDate) : null, endDate ? businessDateKey(endDate) : null],
     enabled: !!campaignId,
     queryFn: async (): Promise<CampaignBreakdowns> => {
       let q = supabase
         .from("insights_breakdowns" as any)
         .select("breakdown_type, segment_key, spend, impressions, clicks, leads, date")
         .eq("campaign_id", campaignId!);
-      if (startDate) q = q.gte("date", format(startDate, "yyyy-MM-dd"));
-      if (endDate) q = q.lte("date", format(endDate, "yyyy-MM-dd"));
+      if (startDate) q = q.gte("date", businessDateKey(startDate));
+      if (endDate) q = q.lte("date", businessDateKey(endDate));
       const { data, error } = await q;
       if (error) throw error;
       const rows = (data || []) as any[];

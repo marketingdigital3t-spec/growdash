@@ -32,6 +32,9 @@ export function resolveLinkedRDFunnelIds(
   if (selectedAccountIds.length === 0) return activeFunnels.map((funnel) => funnel.id);
 
   const selectedAccounts = accounts.filter((account) => selectedAccountIds.includes(account.id));
+  // Never widen a partially resolved selection: if one requested account is
+  // missing from the authorized account list, the safe RD scope is empty.
+  if (selectedAccounts.length !== selectedAccountIds.length) return [NO_LINKED_RD_FUNNEL_SCOPE_ID];
   const externalIds = new Set(selectedAccounts.map((account) => canonicalExternalAccountId(account.account_id)).filter(Boolean));
   const connectionIds = new Set(
     connections

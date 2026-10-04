@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { RDDeal } from "@/hooks/useRDDeals";
 import type { InsightRow } from "@/hooks/useInsights";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { filterMetaBreakdownsByAttribution } from "@/lib/metaBreakdownScope";
+import { businessDateKey } from "@/lib/businessDate";
 
 type Dimension = "state" | "city" | "age" | "gender" | "platform";
 type ProfileRow = { key: string; count: number };
@@ -32,13 +32,13 @@ export function FunnelOpportunityProfile({ deals, insights = [], campaignIds = [
   const campaignAccount = useMemo(() => new Map(insights.filter((row) => row.campaign_id && row.ad_account_id).map((row) => [String(row.campaign_id), String(row.ad_account_id)])), [insights]);
   const opportunityKey = useMemo(() => opportunities.map((deal) => `${deal.rd_deal_id}:${deal.updated_at || deal.stage_updated_at || ""}`).sort().join(","), [opportunities]);
   const breakdownQuery = useQuery({
-    queryKey: ["funnel-opportunity-profile", campaignIds.slice().sort().join(","), accountIds.slice().sort().join(","), opportunityKey, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), JSON.stringify(Object.entries(attributionWindowByCampaign).sort(([a], [b]) => a.localeCompare(b)))],
+    queryKey: ["funnel-opportunity-profile", campaignIds.slice().sort().join(","), accountIds.slice().sort().join(","), opportunityKey, businessDateKey(startDate), businessDateKey(endDate), JSON.stringify(Object.entries(attributionWindowByCampaign).sort(([a], [b]) => a.localeCompare(b)))],
     enabled: campaignIds.length > 0,
     queryFn: async () => {
       const data: Array<{ campaign_id: string; breakdown_type: string; segment_key: string | null; leads: number | null }> = [];
       const PAGE = 1000;
       for (let page = 0; ; page += 1) {
-        const { data: batch, error } = await (supabase as any).from("insights_breakdowns").select("campaign_id,attribution_window,breakdown_type,segment_key,leads").in("campaign_id", campaignIds).in("breakdown_type", ["age", "gender", "publisher_platform"]).gte("date", format(startDate, "yyyy-MM-dd")).lte("date", format(endDate, "yyyy-MM-dd")).range(page * PAGE, page * PAGE + PAGE - 1);
+        const { data: batch, error } = await (supabase as any).from("insights_breakdowns").select("campaign_id,attribution_window,breakdown_type,segment_key,leads").in("campaign_id", campaignIds).in("breakdown_type", ["age", "gender", "publisher_platform"]).gte("date", businessDateKey(startDate)).lte("date", businessDateKey(endDate)).range(page * PAGE, page * PAGE + PAGE - 1);
         if (error) throw error;
         data.push(...((batch || []) as typeof data));
         if (!batch || batch.length < PAGE) break;

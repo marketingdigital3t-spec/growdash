@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { isRDDealInScopePeriod } from "@/lib/rdQueryScope";
 import { withRequestTimeout } from "@/lib/resilience";
+import { businessDateKey } from "@/lib/businessDate";
+import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 
 export interface RDDealLite {
   id: string;
@@ -101,15 +102,19 @@ const FIELDS =
   "id, rd_deal_id, rd_connection_id, ad_account_id, rd_funnel_id, rd_stage_id, rd_stage_name, rd_stage_order, stage_bucket, win, lost_reason, amount_total, amount_total_original, amount_total_manual, amount_total_effective, manual_override_enabled, manual_override_reason, utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_attribution_method, contact_name, contact_email, lead_state, lead_city, lead_created_at, stage_updated_at, closed_at, rd_product_name, deal_owner_name, first_touch_utm_campaign, last_touch_utm_campaign, custom_fields, updated_at";
 
 export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
-  return useQuery({
+  const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
+  const resolvedFunnelIds = rdScope.funnelIds;
+  const query = useQuery({
     queryKey: [
       "rd_deals_period",
-      format(startDate, "yyyy-MM-dd"),
-      format(endDate, "yyyy-MM-dd"),
-      funnelIds?.slice().sort().join(",") ?? "",
+      businessDateKey(startDate),
+      businessDateKey(endDate),
+      resolvedFunnelIds?.join(",") ?? "all",
+      rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : "",
     ],
-    enabled,
+    enabled: enabled && (!rdScope.accountScoped || !rdScope.loading),
     queryFn: async () => {
+      if (rdScope.error) throw rdScope.error;
       // Calendar selections are local-midnight dates. Expand the bounds to the
       // complete local days before comparing timestamptz columns; otherwise a
       // custom interval silently drops every deal created later on its end date.
@@ -131,9 +136,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
           // the selected interval must not be lost by a lead_created filter.
           .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
           .order("lead_created_at", { ascending: false });
-        // RD is an independent source. Meta account filters must never hide a
-        // funnel whose local ad_account_id is null or linked to another account.
-        if (funnelIds?.length) q = q.in("rd_funnel_id", funnelIds);
+        if (resolvedFunnelIds?.length) q = q.in("rd_funnel_id", resolvedFunnelIds);
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await withRequestTimeout(q.range(from, to), 15_000);
@@ -161,6 +164,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
+  return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
 }
 
 /**
@@ -169,10 +173,13 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
  * última alteração de etapa é o fallback para não ocultar vendas reais.
  */
 export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
-  return useQuery({
-    queryKey: ["rd_won_deals_period", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), funnelIds?.slice().sort().join(",") ?? ""],
-    enabled,
+  const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
+  const resolvedFunnelIds = rdScope.funnelIds;
+  const query = useQuery({
+    queryKey: ["rd_won_deals_period", businessDateKey(startDate), businessDateKey(endDate), resolvedFunnelIds?.join(",") ?? "all", rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : ""],
+    enabled: enabled && (!rdScope.accountScoped || !rdScope.loading),
     queryFn: async () => {
+      if (rdScope.error) throw rdScope.error;
       const bounds = saoPauloDayBounds(startDate, endDate);
       const rangeStart = bounds.start.toISOString();
       const rangeEnd = bounds.end.toISOString();
@@ -187,7 +194,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
           query = fallbackToStageUpdate
             ? query.is("closed_at", null).gte("stage_updated_at", rangeStart).lte("stage_updated_at", rangeEnd)
             : query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd);
-          if (funnelIds?.length) query = query.in("rd_funnel_id", funnelIds);
+          if (resolvedFunnelIds?.length) query = query.in("rd_funnel_id", resolvedFunnelIds);
           const { data, error } = await withRequestTimeout(query.range(page * PAGE, (page + 1) * PAGE - 1), 15_000);
           if (error) throw error;
           const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
@@ -212,6 +219,7 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
+  return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
 }
 
 /**
@@ -220,11 +228,14 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
  * visível no pipeline, exatamente como no RD Station.
  */
 export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, enabled = true }: RDCRMQueryScope) {
-  const funnelScope = funnelIds?.slice().sort().join(",") ?? "";
-  return useQuery({
-    queryKey: ["rd_crm_deals", funnelScope, startDate ? format(startDate, "yyyy-MM-dd") : "all", endDate ? format(endDate, "yyyy-MM-dd") : "all"],
-    enabled,
+  const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
+  const resolvedFunnelIds = rdScope.funnelIds;
+  const funnelScope = resolvedFunnelIds?.join(",") ?? "all";
+  const query = useQuery({
+    queryKey: ["rd_crm_deals", funnelScope, rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : "", startDate ? businessDateKey(startDate) : "all", endDate ? businessDateKey(endDate) : "all"],
+    enabled: enabled && (!rdScope.accountScoped || !rdScope.loading),
     queryFn: async () => {
+      if (rdScope.error) throw rdScope.error;
       const pageSize = 1_000;
       let all: RDDealLite[] = [];
 
@@ -236,7 +247,7 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
           .select(FIELDS)
           .order("stage_updated_at", { ascending: false, nullsFirst: false })
           .order("lead_created_at", { ascending: false, nullsFirst: false });
-        if (funnelIds?.length) query = query.in("rd_funnel_id", funnelIds);
+        if (resolvedFunnelIds?.length) query = query.in("rd_funnel_id", resolvedFunnelIds);
         if (startDate && endDate) {
           const bounds = saoPauloDayBounds(startDate, endDate);
           query = query.gte("lead_created_at", bounds.start.toISOString()).lte("lead_created_at", bounds.end.toISOString());
@@ -265,6 +276,7 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
+  return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
 }
 
 export type LeadBucket = "won" | "lost" | "disqualified" | "qualified" | "open";

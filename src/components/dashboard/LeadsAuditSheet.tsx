@@ -8,6 +8,7 @@ import { Download, Search } from "lucide-react";
 import { useLeadsAudit, type AuditLead } from "@/hooks/useLeadsAudit";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { businessDateKey } from "@/lib/businessDate";
 
 interface Props {
   open: boolean;
@@ -88,7 +89,7 @@ export function LeadsAuditSheet({ open, onOpenChange, adAccountId, startDate, en
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `auditoria-leads-${format(startDate, "yyyy-MM-dd")}_${format(endDate, "yyyy-MM-dd")}.csv`;
+    a.download = `auditoria-leads-${businessDateKey(startDate)}_${businessDateKey(endDate)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

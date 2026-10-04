@@ -6,6 +6,7 @@ import { addMonths, differenceInCalendarDays, eachDayOfInterval, eachMonthOfInte
 import { Building2, CircleDollarSign, CreditCard, Download, Landmark, Plus, ReceiptText, Sparkles, TrendingUp, WalletCards, ChevronDown } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { businessDateKey } from "@/lib/businessDate";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useInsights } from "@/hooks/useInsights";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
@@ -26,7 +27,6 @@ import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
 import { InvoicePdfStudio } from "@/components/finance/InvoicePdfStudio";
 import { calculateTrafficFundsAdded } from "@/lib/trafficFunding";
-import { businessDateKey } from "@/lib/businessDate";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
@@ -83,14 +83,14 @@ export default function FinancePage() {
   const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate: twelveMonthsAgo, endDate: futureMonth });
 
   const { data: balanceEvents = [], isLoading: loadingBalanceEvents } = useQuery({
-    queryKey: ["finance-balance-events", accountIds, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    queryKey: ["finance-balance-events", accountIds, businessDateKey(startDate), businessDateKey(endDate)],
     enabled: accountIds.length > 0,
     queryFn: async (): Promise<AccountBalanceEvent[]> => {
       const { data, error } = await (supabase as any).from("account_balance_events")
         .select("ad_account_id,delta,event_at")
         .in("ad_account_id", accountIds)
-        .gte("event_at", `${format(startDate, "yyyy-MM-dd")}T00:00:00`)
-        .lte("event_at", `${format(endDate, "yyyy-MM-dd")}T23:59:59`);
+        .gte("event_at", `${businessDateKey(startDate)}T00:00:00`)
+        .lte("event_at", `${businessDateKey(endDate)}T23:59:59`);
       if (error) {
         if (error.code === "42P01" || /account_balance_events|schema cache/i.test(error.message)) return [];
         throw error;
@@ -100,14 +100,14 @@ export default function FinancePage() {
   });
 
   const { data: fundingTransactions = [], isLoading: loadingFundingTransactions } = useQuery({
-    queryKey: ["finance-pix-funding", accountIds, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    queryKey: ["finance-pix-funding", accountIds, businessDateKey(startDate), businessDateKey(endDate)],
     enabled: accountIds.length > 0,
     queryFn: async (): Promise<AccountFundingTransaction[]> => {
       const { data, error } = await (supabase as any).from("account_transactions")
         .select("ad_account_id,amount,time,payment_method,status")
         .in("ad_account_id", accountIds)
-        .gte("time", `${format(startDate, "yyyy-MM-dd")}T00:00:00`)
-        .lte("time", `${format(endDate, "yyyy-MM-dd")}T23:59:59`);
+        .gte("time", `${businessDateKey(startDate)}T00:00:00`)
+        .lte("time", `${businessDateKey(endDate)}T23:59:59`);
       if (error) {
         if (error.code === "42P01" || /account_transactions|schema cache/i.test(error.message)) return [];
         throw error;
@@ -117,10 +117,10 @@ export default function FinancePage() {
   });
 
   const { data: entries = [], isLoading: loadingEntries } = useQuery({
-    queryKey: ["financial-entries", workspace?.id, businessUnitId, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    queryKey: ["financial-entries", workspace?.id, businessUnitId, businessDateKey(startDate), businessDateKey(endDate)],
     enabled: !!workspace?.id,
     queryFn: async (): Promise<FinancialEntry[]> => {
-      let request = (supabase as any).from("financial_entries").select("id, entry_type, description, amount, competence_date, due_date, paid_at, status, recurrence, notes, financial_categories(name)").eq("workspace_id", workspace!.id).gte("competence_date", format(startDate, "yyyy-MM-dd")).lte("competence_date", format(endDate, "yyyy-MM-dd")).order("competence_date", { ascending: false });
+      let request = (supabase as any).from("financial_entries").select("id, entry_type, description, amount, competence_date, due_date, paid_at, status, recurrence, notes, financial_categories(name)").eq("workspace_id", workspace!.id).gte("competence_date", businessDateKey(startDate)).lte("competence_date", businessDateKey(endDate)).order("competence_date", { ascending: false });
       if (businessUnitId) request = request.eq("business_unit_id", businessUnitId);
       const { data, error } = await request;
       if (error) {
@@ -142,11 +142,11 @@ export default function FinancePage() {
   });
 
   const { data: financialTransactions = [], isLoading: loadingTransactions } = useQuery({
-    queryKey: ["financial-transactions", workspace?.id, businessUnitId, format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
+    queryKey: ["financial-transactions", workspace?.id, businessUnitId, businessDateKey(startDate), businessDateKey(endDate)],
     enabled: !!workspace?.id,
     queryFn: async (): Promise<FinancialTransaction[]> => {
       if (!workspace?.id || workspace.id.startsWith("legacy-")) return [];
-      let request = (supabase as any).from("financial_transactions").select("id,amount,description,occurred_at,transaction_type,matched_entry_id").eq("workspace_id", workspace.id).gte("occurred_at", `${format(startDate, "yyyy-MM-dd")}T00:00:00`).lte("occurred_at", `${format(endDate, "yyyy-MM-dd")}T23:59:59`).order("occurred_at", { ascending: true });
+      let request = (supabase as any).from("financial_transactions").select("id,amount,description,occurred_at,transaction_type,matched_entry_id").eq("workspace_id", workspace.id).gte("occurred_at", `${businessDateKey(startDate)}T00:00:00`).lte("occurred_at", `${businessDateKey(endDate)}T23:59:59`).order("occurred_at", { ascending: true });
       if (businessUnitId && !businessUnitId.startsWith("legacy-")) request = request.eq("business_unit_id", businessUnitId);
       const { data, error } = await request;
       if (error) {
@@ -285,7 +285,7 @@ export default function FinancePage() {
     return Array.from(groups, ([label, investment]) => ({ label, investment })).slice(-16);
   }, [historicalInsights, includeMetaTax, unitAccountIds]);
 
-  function exportCsv() { const header = ["Conta", "ID Meta", "Investimento", "Leads", "Vendas", "Faturamento líquido", "ROAS"]; const data = rows.map((row) => [row.account.name, row.account.account_id, row.spend, row.leads, row.sales, row.revenue, row.roas]); downloadCsv(`growdash-financeiro-${format(startDate, "yyyy-MM-dd")}-${format(endDate, "yyyy-MM-dd")}.csv`, [header, ...data]); }
+  function exportCsv() { const header = ["Conta", "ID Meta", "Investimento", "Leads", "Vendas", "Faturamento líquido", "ROAS"]; const data = rows.map((row) => [row.account.name, row.account.account_id, row.spend, row.leads, row.sales, row.revenue, row.roas]); downloadCsv(`growdash-financeiro-${businessDateKey(startDate)}-${businessDateKey(endDate)}.csv`, [header, ...data]); }
 
   return (
     <div className="gd-module-shell mx-auto w-full max-w-[1920px] space-y-5">

@@ -31,7 +31,7 @@ import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { buildAgentAnswer, type AgentMetrics } from "@/lib/agentOffice";
-import { businessDateKey } from "@/lib/businessDate";
+import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import { buildCoreAccountSummaries, type CoreAccountInput, type CoreAgentConfig, type CoreAreaId, type CoreSchedule } from "@/lib/agentCore";
 import { AGENT_NEED_META, advanceAgentLifeState, createInitialAgentLifeStates, formatAgentClock, getAgentPhaseLabel, type AgentLifeState, type AgentNeedKey } from "@/lib/agentLife";
 import { cn } from "@/lib/utils";
@@ -146,7 +146,7 @@ export default function AgentsOfficePage() {
   const sendMessage = () => {
     if (!activeAgent || !input.trim()) return;
     const question = input.trim();
-    const period = `${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}`;
+    const period = `${format(businessCalendarDate(startDate), "dd/MM/yyyy")} a ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}`;
     const answer = activeAccountId
       ? buildAgentAnswer(question, metrics, account?.name || "Conta selecionada", period)
       : "Primeiro escolha uma conta de anúncio para este agente. Assim eu cruzo Meta Ads e RD Station sem misturar operações.";

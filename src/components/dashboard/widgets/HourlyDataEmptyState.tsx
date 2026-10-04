@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { HourlyCoverage, MissingAccount, MissingReason } from "@/hooks/useHourlyCoverage";
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useDashboard } from "@/contexts/DashboardContext";
-import { format } from "date-fns";
+import { businessDateKey } from "@/lib/businessDate";
 
 const REASON_TEXT: Record<MissingReason, (name: string) => string> = {
   token_expired: (n) =>
@@ -20,8 +20,8 @@ const REASON_TEXT: Record<MissingReason, (name: string) => string> = {
 export function HourlyDataEmptyState({ coverage }: { coverage: HourlyCoverage }) {
   const { startDate, endDate, adAccountId } = useDashboard();
   const sync = useSyncMeta();
-  const start = format(startDate, "yyyy-MM-dd");
-  const end = format(endDate, "yyyy-MM-dd");
+  const start = businessDateKey(startDate);
+  const end = businessDateKey(endDate);
 
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-6 py-4 gap-3">
