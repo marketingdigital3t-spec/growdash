@@ -3,6 +3,26 @@ export type MetaDailyInsightKey = {
   ad_id?: string | null;
 };
 
+export type MetaActionFactKey = { ad_id: string; date: string; action_type: string };
+export type MetaActionDailySnapshot = { ad_id: string; date: string };
+
+/**
+ * Action facts are a snapshot per ad/day. When a completed Meta response no
+ * longer contains an action type for an ad/day, remove that stale fact after
+ * the replacement actions have been persisted and verified. Do not reconcile
+ * ad/day pairs that were absent from the response.
+ */
+export function staleActionFactsForDailySnapshot(
+  existing: MetaActionFactKey[],
+  incoming: MetaActionFactKey[],
+  snapshots: MetaActionDailySnapshot[],
+): MetaActionFactKey[] {
+  const snapshotKeys = new Set(snapshots.map((row) => `${row.ad_id}|${row.date}`));
+  const incomingKeys = new Set(incoming.map((row) => `${row.ad_id}|${row.date}|${row.action_type}`));
+  return existing.filter((row) => snapshotKeys.has(`${row.ad_id}|${row.date}`)
+    && !incomingKeys.has(`${row.ad_id}|${row.date}|${row.action_type}`));
+}
+
 /**
  * Return only known account ads that are absent from a complete daily response.
  * Using a positive ID list for deletion avoids relying on PostgREST's `not.in`

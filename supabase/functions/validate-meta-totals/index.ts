@@ -60,10 +60,21 @@ Deno.serve(async (req) => {
         access_token: acc.access_token,
       });
       if (attributionWindows.length) params.set("action_attribution_windows", JSON.stringify(attributionWindows));
+      // Match the production sync contract exactly: Meta resolves the account's
+      // unified attribution setting for both media and action facts.
+      params.set("use_unified_attribution_setting", "true");
       let nextUrl: string | null = `${GRAPH_BASE}/${metaId}/insights?${params.toString()}`;
       const metaRows: any[] = [];
       let metaError: string | null = null;
+      let metaPages = 0;
+      const seenCursors = new Set<string>();
       while (nextUrl) {
+        if (seenCursors.has(nextUrl)) {
+          metaError = "Meta repetiu o cursor de paginação; validação incompleta.";
+          break;
+        }
+        seenCursors.add(nextUrl);
+        metaPages += 1;
         const response = await fetch(nextUrl, { signal: AbortSignal.timeout(15_000) });
         const payload = await response.json();
         if (!response.ok || payload.error) {
@@ -89,6 +100,17 @@ Deno.serve(async (req) => {
         { [acc.id]: lpConfig?.action_type || undefined },
       );
       const metaLeads = metaLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+      const sumLeadParts = (rows: any[]) => rows.reduce((sum, row) => ({
+        forms: sum.forms + Number(row.form_leads || 0),
+        site: sum.site + Number(row.site_leads || 0),
+        conversations: sum.conversations + Number(row.conversations || 0),
+      }), { forms: 0, site: 0, conversations: 0 });
+      const metaLeadParts = sumLeadParts(metaLeadSnapshot);
+      const metaActionTypeTotals = Object.fromEntries(metaRows.flatMap((row) => row.actions || []).reduce((totals: Map<string, number>, action: any) => {
+        const actionType = String(action.action_type || "");
+        totals.set(actionType, (totals.get(actionType) || 0) + Number(action.value || 0));
+        return totals;
+      }, new Map<string, number>()));
 
       // Local totals
       let dbSpend = 0, dbImp = 0, dbClicks = 0;
@@ -135,6 +157,12 @@ Deno.serve(async (req) => {
         { [acc.id]: lpConfig?.action_type || undefined },
       );
       const dbLeads = localLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
+      const dbLeadParts = sumLeadParts(localLeadSnapshot);
+      const dbActionTypeTotals = Object.fromEntries(localActionRows.reduce((totals: Map<string, number>, action: any) => {
+        const actionType = String(action.action_type || "");
+        totals.set(actionType, (totals.get(actionType) || 0) + Number(action.value || 0));
+        return totals;
+      }, new Map<string, number>()));
 
       const pctDiff = (a: number, b: number) => (b === 0 ? (a === 0 ? 0 : 100) : ((a - b) / b) * 100);
       return {
@@ -145,10 +173,12 @@ Deno.serve(async (req) => {
         startDate,
         endDate,
         metaRows: metaRows.length,
+        metaPages,
         localRows: localInsights.length,
         localActionRows: localActionRows.length,
-        meta: { spend: metaSpend, impressions: metaImpressions, clicks: metaClicks, leads: metaLeads },
-        db: { spend: dbSpend, impressions: dbImp, clicks: dbClicks, leads: dbLeads },
+        meta: { spend: metaSpend, impressions: metaImpressions, clicks: metaClicks, leads: metaLeads, leadParts: metaLeadParts },
+        db: { spend: dbSpend, impressions: dbImp, clicks: dbClicks, leads: dbLeads, leadParts: dbLeadParts },
+        leadActionTypeTotals: { meta: metaActionTypeTotals, db: dbActionTypeTotals },
         drift: {
           spendPct: pctDiff(dbSpend, metaSpend),
           leadsPct: pctDiff(dbLeads, metaLeads),

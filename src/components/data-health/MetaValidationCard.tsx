@@ -15,11 +15,13 @@ interface Row {
   startDate?: string;
   endDate?: string;
   metaRows?: number;
+  metaPages?: number;
   localRows?: number;
   localActionRows?: number;
   error?: string;
-  meta?: { spend: number; impressions: number; clicks: number; leads: number };
-  db?: { spend: number; impressions: number; clicks: number; leads: number };
+  meta?: { spend: number; impressions: number; clicks: number; leads: number; leadParts?: { forms: number; site: number; conversations: number } };
+  db?: { spend: number; impressions: number; clicks: number; leads: number; leadParts?: { forms: number; site: number; conversations: number } };
+  leadActionTypeTotals?: { meta: Record<string, number>; db: Record<string, number> };
   drift?: { spendPct: number; leadsPct: number; clicksPct: number; impressionsPct: number };
 }
 
@@ -104,14 +106,27 @@ export function MetaValidationCard() {
                     <span className="text-sm font-medium">{r.name}</span>
                     {r.error && <Badge variant="destructive" className="text-[10px]">{r.error}</Badge>}
                   </div>
-                  <p className="mb-2 text-[10px] text-muted-foreground">Janela {r.startDate} → {r.endDate} · {r.timezone || "timezone da conta"} · atribuição {r.attributionWindow || "padrão da conta"}{typeof r.metaRows === "number" ? ` · ${r.metaRows} linhas Meta / ${r.localRows ?? 0} locais / ${r.localActionRows ?? 0} ações` : ""}</p>
+                  <p className="mb-2 text-[10px] text-muted-foreground">Janela {r.startDate} → {r.endDate} · {r.timezone || "timezone da conta"} · atribuição {r.attributionWindow || "padrão da conta"}{typeof r.metaRows === "number" ? ` · ${r.metaPages ?? 0} páginas Meta / ${r.metaRows} linhas Meta / ${r.localRows ?? 0} locais / ${r.localActionRows ?? 0} ações` : ""}</p>
                   {r.meta && r.db && r.drift && (
-                    <div className="grid grid-cols-4 gap-2 text-xs">
+                    <>
+                    <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 xl:grid-cols-7">
                       <Metric label="Spend" db={fmtMoney(r.db.spend)} meta={fmtMoney(r.meta.spend)} pct={r.drift.spendPct} />
                       <Metric label="Leads" db={fmt(r.db.leads)} meta={fmt(r.meta.leads)} pct={r.drift.leadsPct} />
+                      <Metric label="Formulários" db={fmt(r.db.leadParts?.forms ?? 0)} meta={fmt(r.meta.leadParts?.forms ?? 0)} />
+                      <Metric label="Site" db={fmt(r.db.leadParts?.site ?? 0)} meta={fmt(r.meta.leadParts?.site ?? 0)} />
+                      <Metric label="Conversas" db={fmt(r.db.leadParts?.conversations ?? 0)} meta={fmt(r.meta.leadParts?.conversations ?? 0)} />
                       <Metric label="Clicks" db={fmt(r.db.clicks)} meta={fmt(r.meta.clicks)} pct={r.drift.clicksPct} />
                       <Metric label="Impressões" db={fmt(r.db.impressions)} meta={fmt(r.meta.impressions)} pct={r.drift.impressionsPct} />
                     </div>
+                    {r.leadActionTypeTotals && <details className="mt-2 text-[10px] text-muted-foreground">
+                      <summary className="cursor-pointer">Ver action types Meta × banco</summary>
+                      <div className="mt-1 space-y-1">
+                        {Array.from(new Set([...Object.keys(r.leadActionTypeTotals.meta), ...Object.keys(r.leadActionTypeTotals.db)])).sort().map((actionType) => (
+                          <p key={actionType} className="break-all"><span className="font-mono">{actionType}</span> · Meta {fmt(r.leadActionTypeTotals!.meta[actionType] || 0)} / banco {fmt(r.leadActionTypeTotals!.db[actionType] || 0)}</p>
+                        ))}
+                      </div>
+                    </details>}
+                    </>
                   )}
                 </div>
               ))}
@@ -123,13 +138,13 @@ export function MetaValidationCard() {
   );
 }
 
-function Metric({ label, db, meta, pct }: { label: string; db: string; meta: string; pct: number }) {
+function Metric({ label, db, meta, pct }: { label: string; db: string; meta: string; pct?: number }) {
   return (
     <div className="space-y-0.5">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="tabular-nums"><span className="text-muted-foreground">DB:</span> {db}</div>
       <div className="tabular-nums"><span className="text-muted-foreground">Meta:</span> {meta}</div>
-      <DriftBadge pct={pct} />
+      {pct !== undefined && <DriftBadge pct={pct} />}
     </div>
   );
 }

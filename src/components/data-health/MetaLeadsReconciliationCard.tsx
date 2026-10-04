@@ -133,6 +133,7 @@ export function MetaLeadsReconciliationCard() {
   const { data: rows, isLoading, refetch } = useReconciliation(daysNumber);
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncProgress, setSyncProgress] = useState<{ completed: number; total: number; accountName: string } | null>(null);
 
   const sync = async (account?: AccountRow) => {
     if (account) setSyncingId(account.id);
@@ -140,30 +141,40 @@ export function MetaLeadsReconciliationCard() {
     try {
       const targets = account ? [account] : (rows || []);
       if (!targets.length) return;
-      const groupedScopes = new Map<string, { startDate: string; endDate: string; accountIds: string[] }>();
+      setSyncProgress({ completed: 0, total: targets.length, accountName: targets[0].name });
+      const failures: string[] = [];
+      let completed = 0;
       for (const target of targets) {
-        const key = `${target.startDate}|${target.endDate}`;
-        const group = groupedScopes.get(key) || { startDate: target.startDate, endDate: target.endDate, accountIds: [] };
-        group.accountIds.push(target.id);
-        groupedScopes.set(key, group);
-      }
-      for (const scope of groupedScopes.values()) {
-        const { data, error } = await supabase.functions.invoke("sync-meta-insights", {
-          body: { adAccountIds: scope.accountIds, startDate: scope.startDate, endDate: scope.endDate, force: true, includeBreakdowns: false },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(String(data.error));
-        if (data?.success === false || ["error", "failed", "blocked"].includes(String(data?.status))) {
-          throw new Error(data?.message || data?.warnings?.join?.(" · ") || "A Meta não confirmou a sincronização deste escopo.");
+        setSyncProgress({ completed, total: targets.length, accountName: target.name });
+        try {
+          const { data, error } = await supabase.functions.invoke("sync-meta-insights", {
+            body: { adAccountIds: [target.id], startDate: target.startDate, endDate: target.endDate, force: true, includeBreakdowns: false },
+          });
+          const accountResult = data?.accountResults?.[0];
+          if (error || data?.error || data?.success === false || ["error", "failed", "blocked", "partial"].includes(String(accountResult?.status || data?.status))) {
+            const detail = error?.message || accountResult?.error || data?.error || data?.message || "A Meta não confirmou o snapshot desta conta.";
+            failures.push(`${target.name}: ${detail}`);
+          }
+        } catch (error) {
+          failures.push(`${target.name}: ${error instanceof Error ? error.message : String(error)}`);
         }
+        completed += 1;
       }
-      toast({ title: "Ações Meta atualizadas", description: `${targets.length} conta(s) solicitada(s); atualização baseada em Insights e ações.` });
+      setSyncProgress({ completed, total: targets.length, accountName: "Concluído" });
       await refetch();
+      toast({
+        title: failures.length ? "Sincronização Meta parcial" : "Ações Meta atualizadas",
+        description: failures.length
+          ? `${targets.length - failures.length}/${targets.length} contas concluídas. Falhas: ${failures.slice(0, 3).join(" · ")}`
+          : `${targets.length} conta(s) concluídas individualmente; atualização baseada em Insights e ações.`,
+        ...(failures.length ? { variant: "destructive" as const } : {}),
+      });
     } catch (error) {
       toast({ title: "Erro ao atualizar métricas Meta", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally {
       setSyncingId(null);
       setSyncingAll(false);
+      setSyncProgress(null);
     }
   };
 
@@ -207,6 +218,7 @@ export function MetaLeadsReconciliationCard() {
         ) : (
           <>
             <p className="mb-3 text-xs text-muted-foreground">Ações confirmadas em {availableCount} de {rows.length} contas · datas civis no timezone de cada conta.</p>
+            {syncProgress && <p className="mb-3 text-xs text-amber-600" role="status">Sincronizando conta {syncProgress.completed + (syncProgress.completed < syncProgress.total ? 1 : 0)} de {syncProgress.total}: {syncProgress.accountName}</p>}
             <div className="space-y-2">
               <div className="grid grid-cols-12 gap-2 border-b border-border/40 px-2 pb-2 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <div className="col-span-4">Conta · período local</div>

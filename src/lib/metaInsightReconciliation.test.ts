@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { datesSafeToReconcile, staleAdIdsForDailySnapshot } from "../../supabase/functions/_shared/metaInsightReconciliation";
+import { datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot } from "../../supabase/functions/_shared/metaInsightReconciliation";
 
 describe("Meta daily fact reconciliation", () => {
   it("preserves prior snapshot dates omitted by an otherwise non-empty range response", () => {
@@ -29,5 +29,33 @@ describe("Meta daily fact reconciliation", () => {
 
   it("does not reconcile a date when the completed response has no rows", () => {
     expect(datesSafeToReconcile("2026-10-03", "2026-10-03", [])).toEqual([]);
+  });
+
+  it("removes stale action aliases only for ad/day snapshots included in a complete response", () => {
+    expect(staleActionFactsForDailySnapshot(
+      [
+        { ad_id: "ad-1", date: "2026-10-03", action_type: "onsite_conversion.lead" },
+        { ad_id: "ad-1", date: "2026-10-03", action_type: "onsite_conversion.lead_grouped" },
+        { ad_id: "ad-2", date: "2026-10-03", action_type: "link_click" },
+      ],
+      [{ ad_id: "ad-1", date: "2026-10-03", action_type: "onsite_conversion.lead_grouped" }],
+      [{ ad_id: "ad-1", date: "2026-10-03" }],
+    )).toEqual([{ ad_id: "ad-1", date: "2026-10-03", action_type: "onsite_conversion.lead" }]);
+  });
+
+  it("clears old action rows when a returned ad/day now has no actions", () => {
+    expect(staleActionFactsForDailySnapshot(
+      [{ ad_id: "ad-1", date: "2026-10-03", action_type: "onsite_conversion.messaging_conversation_started_7d" }],
+      [],
+      [{ ad_id: "ad-1", date: "2026-10-03" }],
+    )).toHaveLength(1);
+  });
+
+  it("preserves action rows for ad/day pairs omitted from the response", () => {
+    expect(staleActionFactsForDailySnapshot(
+      [{ ad_id: "ad-1", date: "2026-10-03", action_type: "onsite_conversion.lead" }],
+      [],
+      [{ ad_id: "ad-2", date: "2026-10-03" }],
+    )).toEqual([]);
   });
 });

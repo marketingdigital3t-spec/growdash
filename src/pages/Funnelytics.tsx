@@ -98,6 +98,7 @@ function FlowDataScopePanel() {
     funnelIds: resolvedFunnelIds,
     startDate,
     endDate,
+    dateScope: "period",
     enabled: rdScopeEnabled,
   });
   const rdWon = useRDWonDealsForPeriod({

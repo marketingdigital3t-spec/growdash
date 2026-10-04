@@ -95,7 +95,14 @@ export interface RDCRMQueryScope {
   funnelIds?: string[];
   startDate?: Date;
   endDate?: Date;
+  dateScope?: "pipeline" | "period";
   enabled?: boolean;
+}
+
+export function rdLeadCreatedAtRange(startDate?: Date, endDate?: Date) {
+  if (!startDate || !endDate) return null;
+  const bounds = saoPauloDayBounds(startDate, endDate);
+  return { start: bounds.start.toISOString(), end: bounds.end.toISOString() };
 }
 
 const FIELDS =
@@ -227,15 +234,16 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
  * pela data de criação: um lead antigo que continua aberto precisa permanecer
  * visível no pipeline, exatamente como no RD Station.
  */
-export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, enabled = true }: RDCRMQueryScope) {
+export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, dateScope = "pipeline", enabled = true }: RDCRMQueryScope) {
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
   const funnelScope = resolvedFunnelIds?.join(",") ?? "all";
   const query = useQuery({
-    queryKey: ["rd_crm_deals", funnelScope, rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : ""],
+    queryKey: ["rd_crm_deals", funnelScope, rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : "", dateScope, dateScope === "period" && startDate ? businessDateKey(startDate) : null, dateScope === "period" && endDate ? businessDateKey(endDate) : null],
     enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
+      const periodBounds = dateScope === "period" ? rdLeadCreatedAtRange(startDate, endDate) : null;
       const pageSize = 1_000;
       let all: RDDealLite[] = [];
 
@@ -247,6 +255,11 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, enabled = 
           .select(FIELDS)
           .order("stage_updated_at", { ascending: false, nullsFirst: false })
           .order("lead_created_at", { ascending: false, nullsFirst: false });
+        if (periodBounds) {
+          query = query
+            .gte("lead_created_at", periodBounds.start)
+            .lte("lead_created_at", periodBounds.end);
+        }
         if (resolvedFunnelIds?.length) query = query.in("rd_funnel_id", resolvedFunnelIds);
         const from = page * pageSize;
         const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), 15_000);

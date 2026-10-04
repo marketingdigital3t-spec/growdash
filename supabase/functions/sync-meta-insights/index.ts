@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { datesSafeToReconcile, staleAdIdsForDailySnapshot } from "../_shared/metaInsightReconciliation.ts";
+import { datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot } from "../_shared/metaInsightReconciliation.ts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 
 const corsHeaders = {
@@ -724,51 +724,70 @@ Deno.serve(async (req) => {
           // API errors and truncated pagination have already exited above.
           let staleInsightQuery = supabaseAdmin.from("insights").delete()
             .eq("ad_account_id", account.id)
-            .eq("attribution_window", effectiveAttributionWindow)
             .gte("date", startDate).lte("date", endDate);
+          staleInsightQuery = effectiveAttributionWindow === "account_default"
+            ? staleInsightQuery.or("attribution_window.eq.account_default,attribution_window.is.null")
+            : staleInsightQuery.eq("attribution_window", effectiveAttributionWindow);
           let scopedStaleAdIds: string[] | null = null;
           if (campaignIds.length) {
             staleInsightQuery = staleInsightQuery.in("campaign_id", campaignIds);
-            const { data: scopedFacts, error: scopedFactsError } = await supabaseAdmin.from("insights")
+            let scopedFactsQuery = supabaseAdmin.from("insights")
               .select("ad_id")
               .eq("ad_account_id", account.id)
-              .eq("attribution_window", effectiveAttributionWindow)
               .in("campaign_id", campaignIds)
               .gte("date", startDate).lte("date", endDate);
+            scopedFactsQuery = effectiveAttributionWindow === "account_default"
+              ? scopedFactsQuery.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : scopedFactsQuery.eq("attribution_window", effectiveAttributionWindow);
+            const { data: scopedFacts, error: scopedFactsError } = await scopedFactsQuery;
             if (scopedFactsError) throw new Error(`leitura do escopo vazio Meta da conta ${account.name}: ${scopedFactsError.message}`);
             scopedStaleAdIds = [...new Set((scopedFacts || []).map((row: any) => String(row.ad_id || "")).filter(Boolean))];
           }
           const { error: staleInsightsError } = await staleInsightQuery;
           if (staleInsightsError) throw new Error(`reconciliação do snapshot vazio Meta da conta ${account.name}: ${staleInsightsError.message}`);
           if (!campaignIds.length) {
-            const { error: staleActionsError } = await supabaseAdmin.from("insight_actions").delete()
-              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
-              .gte("date", startDate).lte("date", endDate);
+            let staleActionsQuery = supabaseAdmin.from("insight_actions").delete()
+              .eq("ad_account_id", account.id).gte("date", startDate).lte("date", endDate);
+            staleActionsQuery = effectiveAttributionWindow === "account_default"
+              ? staleActionsQuery.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : staleActionsQuery.eq("attribution_window", effectiveAttributionWindow);
+            const { error: staleActionsError } = await staleActionsQuery;
             if (staleActionsError) throw new Error(`reconciliação das ações vazias Meta da conta ${account.name}: ${staleActionsError.message}`);
           } else if (scopedStaleAdIds?.length) {
-            const { error: staleActionsError } = await supabaseAdmin.from("insight_actions").delete()
-              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
-              .gte("date", startDate).lte("date", endDate).in("ad_id", scopedStaleAdIds);
+            let staleActionsQuery = supabaseAdmin.from("insight_actions").delete()
+              .eq("ad_account_id", account.id).gte("date", startDate).lte("date", endDate).in("ad_id", scopedStaleAdIds);
+            staleActionsQuery = effectiveAttributionWindow === "account_default"
+              ? staleActionsQuery.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : staleActionsQuery.eq("attribution_window", effectiveAttributionWindow);
+            const { error: staleActionsError } = await staleActionsQuery;
             if (staleActionsError) throw new Error(`reconciliação das ações vazias Meta da conta ${account.name}: ${staleActionsError.message}`);
           }
           let remainingInsightsQuery = supabaseAdmin.from("insights").select("ad_id", { count: "exact", head: true })
-            .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
-            .gte("date", startDate).lte("date", endDate);
+            .eq("ad_account_id", account.id).gte("date", startDate).lte("date", endDate);
+          remainingInsightsQuery = effectiveAttributionWindow === "account_default"
+            ? remainingInsightsQuery.or("attribution_window.eq.account_default,attribution_window.is.null")
+            : remainingInsightsQuery.eq("attribution_window", effectiveAttributionWindow);
           if (campaignIds.length) remainingInsightsQuery = remainingInsightsQuery.in("campaign_id", campaignIds);
           const { count: remainingInsights, error: remainingInsightsError } = await remainingInsightsQuery;
           if (remainingInsightsError || (remainingInsights || 0) > 0) throw new Error(`verificação do snapshot Meta vazio da conta ${account.name}: ${remainingInsightsError?.message || `${remainingInsights} insight(s) antigos permaneceram`}.`);
           let remainingActions = 0;
           let remainingActionsError: { message: string } | null = null;
           if (!campaignIds.length) {
-            const result = await supabaseAdmin.from("insight_actions").select("ad_id", { count: "exact", head: true })
-              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
-              .gte("date", startDate).lte("date", endDate);
+            let query = supabaseAdmin.from("insight_actions").select("ad_id", { count: "exact", head: true })
+              .eq("ad_account_id", account.id).gte("date", startDate).lte("date", endDate);
+            query = effectiveAttributionWindow === "account_default"
+              ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : query.eq("attribution_window", effectiveAttributionWindow);
+            const result = await query;
             remainingActions = result.count || 0;
             remainingActionsError = result.error;
           } else if (scopedStaleAdIds?.length) {
-            const result = await supabaseAdmin.from("insight_actions").select("ad_id", { count: "exact", head: true })
-              .eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow)
-              .gte("date", startDate).lte("date", endDate).in("ad_id", scopedStaleAdIds);
+            let query = supabaseAdmin.from("insight_actions").select("ad_id", { count: "exact", head: true })
+              .eq("ad_account_id", account.id).gte("date", startDate).lte("date", endDate).in("ad_id", scopedStaleAdIds);
+            query = effectiveAttributionWindow === "account_default"
+              ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : query.eq("attribution_window", effectiveAttributionWindow);
+            const result = await query;
             remainingActions = result.count || 0;
             remainingActionsError = result.error;
           }
@@ -1052,14 +1071,16 @@ Deno.serve(async (req) => {
             persistedInsightRows.push(...(data || []));
             if (!data || data.length < 1000) break;
           }
-          for (let page = 0; actionRows.length > 0; page += 1) {
+          for (let page = 0; ; page += 1) {
             let query = supabaseAdmin.from("insight_actions")
               .select("ad_id,date,action_type")
               .eq("ad_account_id", account.id)
-              .eq("attribution_window", effectiveAttributionWindow)
               .in("ad_id", adChunk)
               .gte("date", startDate).lte("date", endDate)
               .range(page * 1000, page * 1000 + 999);
+            query = effectiveAttributionWindow === "account_default"
+              ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : query.eq("attribution_window", effectiveAttributionWindow);
             const { data, error } = await query;
             if (error) throw new Error(`verificação das ações da conta ${account.name}: ${error.message}`);
             persistedActionRows.push(...(data || []));
@@ -1090,6 +1111,71 @@ Deno.serve(async (req) => {
           spendReadBack: persistedSpend,
         };
 
+        // Reconcile stale action types for ad/day pairs explicitly returned by
+        // the completed Meta response. Upsert alone leaves old action aliases
+        // behind when Meta stops returning them, which can inflate canonical
+        // form/site/conversation totals after attribution or processing shifts.
+        const actionSnapshots = allInsights
+          .filter((row: any) => row.ad_id && row.date_start)
+          .map((row: any) => ({ ad_id: String(row.ad_id), date: String(row.date_start) }));
+        const incomingActionFacts = actionRows.map((row: any) => ({
+          ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type),
+        }));
+        const existingActionFacts: Array<{ ad_id: string; date: string; action_type: string }> = [];
+        const actionAdIdsByDate = new Map<string, Set<string>>();
+        for (const snapshot of actionSnapshots) {
+          const ids = actionAdIdsByDate.get(snapshot.date) || new Set<string>();
+          ids.add(snapshot.ad_id);
+          actionAdIdsByDate.set(snapshot.date, ids);
+        }
+        for (const [date, ids] of actionAdIdsByDate) {
+          const scopedIds = [...ids];
+          for (let offset = 0; offset < scopedIds.length; offset += 200) {
+            const adChunk = scopedIds.slice(offset, offset + 200);
+            for (let page = 0; ; page += 1) {
+              let query = supabaseAdmin.from("insight_actions")
+                .select("ad_id,date,action_type")
+                .eq("ad_account_id", account.id)
+                .eq("date", date)
+                .in("ad_id", adChunk)
+                .range(page * 1000, page * 1000 + 999);
+              query = effectiveAttributionWindow === "account_default"
+                ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
+                : query.eq("attribution_window", effectiveAttributionWindow);
+              const { data, error } = await query;
+              if (error) throw new Error(`leitura das ações anteriores da conta ${account.name}: ${error.message}`);
+              existingActionFacts.push(...(data || []).map((row: any) => ({
+                ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type),
+              })));
+              if (!data || data.length < 1000) break;
+            }
+          }
+        }
+        const staleActionFacts = staleActionFactsForDailySnapshot(existingActionFacts, incomingActionFacts, actionSnapshots);
+        const staleActionGroups = new Map<string, Set<string>>();
+        for (const row of staleActionFacts) {
+          const key = `${row.date}|${row.action_type}`;
+          const ids = staleActionGroups.get(key) || new Set<string>();
+          ids.add(row.ad_id);
+          staleActionGroups.set(key, ids);
+        }
+        for (const [key, ids] of staleActionGroups) {
+          const [date, actionType] = key.split("|");
+          const staleIds = [...ids];
+          for (let offset = 0; offset < staleIds.length; offset += 500) {
+            let query = supabaseAdmin.from("insight_actions").delete()
+              .eq("ad_account_id", account.id)
+              .eq("date", date)
+              .eq("action_type", actionType)
+              .in("ad_id", staleIds.slice(offset, offset + 500));
+            query = effectiveAttributionWindow === "account_default"
+              ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : query.eq("attribution_window", effectiveAttributionWindow);
+            const { error } = await query;
+            if (error) throw new Error(`reconciliação de ações da conta ${account.name}: ${error.message}`);
+          }
+        }
+
         // Reconcile rows that disappeared from the completed Meta response
         // only after all current rows are safely stored. The attribution
         // predicate is mandatory: another attribution window is a separate
@@ -1116,10 +1202,16 @@ Deno.serve(async (req) => {
             // Delete only explicitly identified stale IDs. The old `not.in`
             // filter was serialized by PostgREST in a way that matched the
             // incoming IDs too, removing every newly upserted fact for the day.
-            const actionDelete = supabaseAdmin.from("insight_actions").delete()
-              .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
-            const insightDelete = supabaseAdmin.from("insights").delete()
-              .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("attribution_window", effectiveAttributionWindow).eq("date", date);
+            let actionDelete = supabaseAdmin.from("insight_actions").delete()
+              .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("date", date);
+            actionDelete = effectiveAttributionWindow === "account_default"
+              ? actionDelete.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : actionDelete.eq("attribution_window", effectiveAttributionWindow);
+            let insightDelete = supabaseAdmin.from("insights").delete()
+              .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("date", date);
+            insightDelete = effectiveAttributionWindow === "account_default"
+              ? insightDelete.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : insightDelete.eq("attribution_window", effectiveAttributionWindow);
             const { error: actionDeleteError } = await actionDelete;
             if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
             const { error: insightDeleteError } = await insightDelete;
@@ -1152,14 +1244,17 @@ Deno.serve(async (req) => {
             }
             if (!data || data.length < 1000) break;
           }
-          for (let page = 0; actionRows.length > 0; page += 1) {
-            const { data, error } = await supabaseAdmin.from("insight_actions")
+          for (let page = 0; ; page += 1) {
+            let query = supabaseAdmin.from("insight_actions")
               .select("ad_id,date,action_type")
               .eq("ad_account_id", account.id)
-              .eq("attribution_window", effectiveAttributionWindow)
               .in("ad_id", adChunk)
               .gte("date", startDate).lte("date", endDate)
               .range(page * 1000, page * 1000 + 999);
+            query = effectiveAttributionWindow === "account_default"
+              ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
+              : query.eq("attribution_window", effectiveAttributionWindow);
+            const { data, error } = await query;
             if (error) throw new Error(`verificação final das ações da conta ${account.name}: ${error.message}`);
             for (const row of data || []) finalActionKeys.add(`${row.ad_id}|${row.date}|${row.action_type}`);
             if (!data || data.length < 1000) break;
@@ -1167,9 +1262,10 @@ Deno.serve(async (req) => {
         }
         const missingAfterReconciliation = [...expectedInsightKeys].filter((key) => !finalInsightKeys.has(key));
         const missingActionsAfterReconciliation = [...expectedActionKeys].filter((key) => !finalActionKeys.has(key));
+        const staleActionsStillPresent = staleActionFacts.filter((row) => finalActionKeys.has(`${row.ad_id}|${row.date}|${row.action_type}`));
         const finalSpend = [...expectedInsightKeys].reduce((sum, key) => sum + (finalSpendByKey.get(key) || 0), 0);
-        if (missingAfterReconciliation.length || missingActionsAfterReconciliation.length || Math.abs(finalSpend - requestedSpend) > 0.01) {
-          throw new Error(`snapshot Meta da conta ${account.name} foi alterado após reconciliação: ${missingAfterReconciliation.length} insight(s) e ${missingActionsAfterReconciliation.length} ação(ões) ausentes; gasto solicitado ${requestedSpend.toFixed(2)}, relido ${finalSpend.toFixed(2)}.`);
+        if (missingAfterReconciliation.length || missingActionsAfterReconciliation.length || staleActionsStillPresent.length || Math.abs(finalSpend - requestedSpend) > 0.01) {
+          throw new Error(`snapshot Meta da conta ${account.name} foi alterado após reconciliação: ${missingAfterReconciliation.length} insight(s), ${missingActionsAfterReconciliation.length} ação(ões) ausentes e ${staleActionsStillPresent.length} ação(ões) antigas ainda presentes; gasto solicitado ${requestedSpend.toFixed(2)}, relido ${finalSpend.toFixed(2)}.`);
         }
 
         // 5. Buscar breakdowns somente quando explicitamente solicitado. Eles

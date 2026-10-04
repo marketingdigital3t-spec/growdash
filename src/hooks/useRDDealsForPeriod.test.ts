@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeRDDeals, type RDDealLite } from "./useRDDealsForPeriod";
+import { dedupeRDDeals, rdLeadCreatedAtRange, type RDDealLite } from "./useRDDealsForPeriod";
 
 const base = (overrides: Partial<RDDealLite> = {}): RDDealLite => ({
   id: "row-1",
@@ -60,5 +60,21 @@ describe("dedupeRDDeals", () => {
       base({ id: "incomplete-2", rd_deal_id: "" }),
       base({ id: "valid", rd_deal_id: "rd-valid" }),
     ])).toHaveLength(1);
+  });
+});
+
+describe("RD period query bounds", () => {
+  it("uses inclusive São Paulo civil-day bounds, independent of browser UTC", () => {
+    expect(rdLeadCreatedAtRange(
+      new Date("2026-10-04T12:00:00-03:00"),
+      new Date("2026-10-04T12:00:00-03:00"),
+    )).toEqual({
+      start: "2026-10-04T03:00:00.000Z",
+      end: "2026-10-05T02:59:59.999Z",
+    });
+  });
+
+  it("keeps the operational pipeline unbounded when dates are omitted", () => {
+    expect(rdLeadCreatedAtRange()).toBeNull();
   });
 });
