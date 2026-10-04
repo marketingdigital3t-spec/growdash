@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateMetaLeadActionDays, aggregateMetaLeadTargets, resolveMetaActionMetrics, resolveMetaCampaignResult, resolveMetaLeadActions } from "./metaActionMetrics";
+import { aggregateMetaLeadActionDays, aggregateMetaLeadTargets, aggregateScopedMetaLeads, resolveMetaActionMetrics, resolveMetaCampaignResult, resolveMetaLeadActions } from "./metaActionMetrics";
 import { canonicalMetaLeads } from "../../supabase/functions/_shared/metaLeadMetrics";
 
 describe("Meta action metrics", () => {
@@ -84,6 +84,33 @@ describe("Meta action metrics", () => {
     ], Object.entries(actions).map(([action_type, value]) => ({
       ad_id: "ad-1", date: "2026-10-04", action_type, value,
     })), {}).at(0)).toMatchObject({ form_leads: 7, site_leads: 0, conversations: 1, leads: 8 });
+  });
+
+  it("mantém Forms nativo e ignora pixel de site não configurado no total por estado", () => {
+    expect(aggregateScopedMetaLeads([
+      { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", attribution_window: "account_default" },
+    ], [
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "account_default", action_type: "onsite_conversion.lead_grouped", value: 7 },
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "account_default", action_type: "offsite_conversion.fb_pixel_lead", value: 15 },
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "account_default", action_type: "onsite_conversion.messaging_conversation_started_7d", value: 2 },
+    ])).toBe(9);
+  });
+
+  it("conta lead de site somente quando a ação está configurada para a conta", () => {
+    expect(aggregateScopedMetaLeads([
+      { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", attribution_window: "account_default" },
+    ], [
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "account_default", action_type: "onsite_conversion.lead_grouped", value: 7 },
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "account_default", action_type: "custom_site_lead", value: 3 },
+    ], { ca01: "custom_site_lead" })).toBe(10);
+  });
+
+  it("não mistura ação com janela de atribuição diferente do snapshot", () => {
+    expect(aggregateScopedMetaLeads([
+      { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", attribution_window: "account_default" },
+    ], [
+      { ad_id: "ad-1", date: "2026-10-04", attribution_window: "1d_click", action_type: "onsite_conversion.lead_grouped", value: 20 },
+    ])).toBe(0);
   });
 
   it("resolve aliases por anúncio antes do total global entre contas", () => {

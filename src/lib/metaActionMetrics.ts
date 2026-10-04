@@ -51,6 +51,14 @@ export function resolveMetaLeadActions(actionTotals?: Record<string, number>, si
   return resolveMetaLeadParts(actionTotals || {}, siteAction || undefined);
 }
 
+export function aggregateScopedMetaLeads(
+  insightRows: Array<{ ad_id: string; date: string; ad_account_id: string; attribution_window?: string | null }>,
+  actionRows: Array<{ ad_id: string; date: string; action_type: string; value: number | null; attribution_window?: string | null }>,
+  siteActionByAccount: Record<string, string | undefined> = {},
+) {
+  return aggregateMetaLeadTargets(insightRows, actionRows, siteActionByAccount).totals.total;
+}
+
 export type MetaResultType = "leads" | "conversations" | "landing_page_view" | "purchase" | "reach";
 
 /**

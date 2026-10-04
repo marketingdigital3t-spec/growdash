@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toLocalDateString } from "@/lib/dateRange";
-import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { META_ACTION_TYPES, aggregateScopedMetaLeads } from "@/lib/metaActionMetrics";
 
 
 // Map Meta region name (Brazilian state full name) -> UF code
@@ -120,51 +120,56 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
         else for (const c of (camps || []) as any[]) if (c.ad_account_id) accountIds.add(c.ad_account_id);
 
         // 3b. action_type da LP por account
-        const lpActions = new Set<string>();
+        const lpActionByAccount: Record<string, string> = {};
         if (accountIds.size > 0) {
           const { data: lpCfg } = await supabase
             .from("account_lp_config")
             .select("ad_account_id, action_type")
             .in("ad_account_id", Array.from(accountIds));
-          for (const r of (lpCfg || []) as any[]) if (r.action_type) lpActions.add(r.action_type);
+          for (const r of (lpCfg || []) as any[]) if (r.action_type) lpActionByAccount[r.ad_account_id] = r.action_type;
         }
 
         const allowedActions = Array.from(new Set<string>([
-          "onsite_conversion.lead_grouped",
-          "omni_lead",
-          "leadgen_grouped",
-          "offsite_conversion.fb_pixel_lead",
-          "lead",
-          "onsite_conversion.messaging_conversation_started_7d",
-          "onsite_conversion.messaging_conversation_started_28d",
-          "onsite_conversion.messaging_conversation_started",
-          ...lpActions,
+          ...META_ACTION_TYPES.forms,
+          ...META_ACTION_TYPES.conversations,
+          ...Object.values(lpActionByAccount),
         ]));
-        const actionsByAd: Record<string, Record<string, number>> = {};
-
-        // 3c. paginar insight_actions com join via ads->adsets->campaigns
-        for (let from = 0; ; from += PAGE) {
-          let q = supabase
-            .from("insight_actions" as any)
-            .select("value, action_type, ads!inner(adsets!inner(campaigns!inner(id, ad_account_id)))")
-            .in("action_type", allowedActions)
-            .gte("date", start)
-            .lte("date", end);
-          if (adAccountId) q = q.eq("ads.adsets.campaigns.ad_account_id", adAccountId);
-          const { data, error } = await q.range(from, from + PAGE - 1);
-          if (error) break;
-          const rows = (data || []) as any[];
-          for (const r of rows) {
-            const byType = actionsByAd[r.ad_id] || {};
-            byType[r.action_type] = (byType[r.action_type] || 0) + Number(r.value || 0);
-            actionsByAd[r.ad_id] = byType;
+        const metaInsightRows: any[] = [];
+        for (let i = 0; i < scopedCampaignIds.length; i += CHUNK) {
+          const chunk = scopedCampaignIds.slice(i, i + CHUNK);
+          for (let from = 0; ; from += PAGE) {
+            const { data, error } = await supabase.from("insights")
+              .select("ad_id, ad_account_id, date, attribution_window")
+              .in("campaign_id", chunk)
+              .gte("date", start)
+              .lte("date", end)
+              .range(from, from + PAGE - 1);
+            if (error) throw error;
+            const rows = data || [];
+            metaInsightRows.push(...rows);
+            if (rows.length < PAGE) break;
           }
-          if (rows.length < PAGE) break;
         }
-        totalMetaLeads = Object.values(actionsByAd).reduce((sum, actions) => {
-          const resolved = resolveMetaLeadActions(actions);
-          return sum + resolved.forms + resolved.site + resolved.conversations;
-        }, 0);
+
+        const adIds = Array.from(new Set(metaInsightRows.map((row) => String(row.ad_id)).filter(Boolean)));
+        const metaActionRows: any[] = [];
+        for (let i = 0; i < adIds.length; i += CHUNK) {
+          const chunk = adIds.slice(i, i + CHUNK);
+          for (let from = 0; ; from += PAGE) {
+            const { data, error } = await supabase.from("insight_actions" as any)
+              .select("ad_id, date, attribution_window, action_type, value")
+              .in("ad_id", chunk)
+              .in("action_type", allowedActions)
+              .gte("date", start)
+              .lte("date", end)
+              .range(from, from + PAGE - 1);
+            if (error) throw error;
+            const rows = (data || []) as any[];
+            metaActionRows.push(...rows);
+            if (rows.length < PAGE) break;
+          }
+        }
+        totalMetaLeads = aggregateScopedMetaLeads(metaInsightRows, metaActionRows, lpActionByAccount);
       }
       const leadsWithRegion = Object.values(metaByUF).reduce((s, m) => s + m.leads, 0);
 
