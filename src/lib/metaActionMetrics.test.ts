@@ -70,7 +70,7 @@ describe("Meta action metrics", () => {
     })).toEqual({ forms: 7, site: 0, conversations: 0, total: 7 });
   });
 
-  it("reproduz a divergência observada: 13 genéricos não substituem 7 formulários", () => {
+  it("reproduz a divergência: não soma pixel residual de LP sem configuração", () => {
     const actions = {
       "onsite_conversion.lead_grouped": 7,
       lead: 13,
@@ -78,12 +78,12 @@ describe("Meta action metrics", () => {
       "onsite_conversion.messaging_conversation_started_7d": 1,
       "onsite_conversion.total_messaging_connection": 1,
     };
-    expect(resolveMetaLeadActions(actions)).toEqual({ forms: 7, site: 6, conversations: 1, total: 14 });
+    expect(resolveMetaLeadActions(actions)).toEqual({ forms: 7, site: 0, conversations: 1, total: 8 });
     expect(canonicalMetaLeads([
       { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", leads: 0 },
     ], Object.entries(actions).map(([action_type, value]) => ({
       ad_id: "ad-1", date: "2026-10-04", action_type, value,
-    })), {}).at(0)).toMatchObject({ form_leads: 7, site_leads: 6, conversations: 1, leads: 14 });
+    })), {}).at(0)).toMatchObject({ form_leads: 7, site_leads: 0, conversations: 1, leads: 8 });
   });
 
   it("resolve aliases por anúncio antes do total global entre contas", () => {
@@ -131,19 +131,24 @@ describe("Meta action metrics", () => {
       { ad_id: "ad-1", date: "2026-10-04", action_type: "messaging_conversation_started_7d", value: 4 },
     ], {});
 
-    expect(canonical[0]).toMatchObject({ form_leads: 3, site_leads: 2, conversations: 4, leads: 9 });
+    expect(canonical[0]).toMatchObject({ form_leads: 3, site_leads: 0, conversations: 4, leads: 7 });
     expect(resolveMetaLeadActions({
       "leadgen.other": 3,
       "onsite_conversion.lead": 3,
       "offsite_conversion.fb_pixel_lead": 2,
       "onsite_conversion.messaging_conversation_started_7d_click": 4,
       "messaging_conversation_started_7d": 4,
-    })).toEqual({ forms: 3, site: 2, conversations: 4, total: 9 });
+    })).toEqual({ forms: 3, site: 0, conversations: 4, total: 7 });
   });
 
-  it("classifica lead de site retornado pelo pixel separadamente sem duplicar aliases", () => {
+  it("ignora lead de site retornado por pixel não configurado", () => {
     expect(resolveMetaLeadActions({ "offsite_conversion.fb_pixel_lead": 50, lead: 50 }))
-      .toEqual({ forms: 0, site: 50, conversations: 0, total: 50 });
+      .toEqual({ forms: 0, site: 0, conversations: 0, total: 0 });
+  });
+
+  it("conta site somente quando o evento está explicitamente configurado", () => {
+    expect(resolveMetaLeadActions({ "offsite_conversion.fb_pixel_lead": 15 }, "offsite_conversion.fb_pixel_lead"))
+      .toEqual({ forms: 0, site: 15, conversations: 0, total: 15 });
   });
 
   it("soma formulário, site e conversa somente uma vez cada", () => {
@@ -153,7 +158,7 @@ describe("Meta action metrics", () => {
       "offsite_conversion.fb_pixel_lead": 4,
       "onsite_conversion.messaging_conversation_started_7d": 7,
       "onsite_conversion.messaging_conversation_started": 9,
-    })).toEqual({ forms: 12, site: 4, conversations: 7, total: 23 });
+    })).toEqual({ forms: 12, site: 0, conversations: 7, total: 19 });
   });
 
   it("resolve site sem misturar com formulário ou lead auxiliar", () => {
@@ -186,7 +191,7 @@ describe("Meta action metrics", () => {
       ],
     );
 
-    expect(result.dailyByAccount["account-1"]["2026-10-04"]).toEqual({ forms: 7, site: 2, conversations: 1, total: 10 });
+    expect(result.dailyByAccount["account-1"]["2026-10-04"]).toEqual({ forms: 7, site: 0, conversations: 1, total: 8 });
   });
 
   it("does not use another day's attribution scope or orphan action rows", () => {
@@ -224,7 +229,7 @@ describe("Meta action metrics", () => {
       "onsite_conversion.lead_grouped": 4,
       "offsite_conversion.fb_pixel_lead": 9,
       "onsite_conversion.messaging_conversation_started_7d": 12,
-    })).toEqual({ resultType: "leads", value: 13 });
+    })).toEqual({ resultType: "leads", value: 4 });
     expect(resolveMetaCampaignResult("OUTCOME_ENGAGEMENT", "CONVERSATIONS", {
       "onsite_conversion.messaging_conversation_started_7d": 12,
       "onsite_conversion.messaging_conversation_started": 20,

@@ -4,7 +4,7 @@ import { resolveAccountMetaLeadReconciliation } from "./metaLeadReconciliation";
 describe("Meta lead reconciliation", () => {
   const insight = { ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-04", attribution_window: "account_default" };
 
-  it("soma formulário, site e conversas, sem substituir 7 formulários por alias genérico 13", () => {
+  it("ignora pixel de site não configurado e não substitui 7 formulários por alias genérico 13", () => {
     const result = resolveAccountMetaLeadReconciliation("account-1", [insight], [
       { ad_id: "ad-1", date: insight.date, action_type: "onsite_conversion.lead_grouped", value: 7, attribution_window: "account_default" },
       { ad_id: "ad-1", date: insight.date, action_type: "lead", value: 13, attribution_window: "account_default" },
@@ -12,7 +12,7 @@ describe("Meta lead reconciliation", () => {
       { ad_id: "ad-1", date: insight.date, action_type: "onsite_conversion.messaging_conversation_started_7d", value: 2, attribution_window: "account_default" },
     ]);
 
-    expect(result).toMatchObject({ forms: 7, site: 2, conversations: 2, total: 11, available: true });
+    expect(result).toMatchObject({ forms: 7, site: 0, conversations: 2, total: 9, available: true });
   });
 
   it("não conta fatos de outra janela de atribuição e diferencia falta de ações de zero confirmado", () => {
@@ -33,6 +33,14 @@ describe("Meta lead reconciliation", () => {
       available: false,
       reason: "Nenhum snapshot de Insights neste período.",
     });
+  });
+
+  it("não considera lead ambíguo confirmado quando só há pixel de site não configurado", () => {
+    const result = resolveAccountMetaLeadReconciliation("account-1", [insight], [
+      { ad_id: "ad-1", date: insight.date, action_type: "lead", value: 15, attribution_window: "account_default" },
+      { ad_id: "ad-1", date: insight.date, action_type: "offsite_conversion.fb_pixel_lead", value: 15, attribution_window: "account_default" },
+    ]);
+    expect(result).toMatchObject({ forms: 0, site: 0, total: 0, available: false, leadActionFactCount: 0 });
   });
 
   it("mantém a regra global independente para cada conta conectada", () => {

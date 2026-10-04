@@ -60,7 +60,7 @@ describe("Meta traffic metrics", () => {
       totalsByAd: {
         "ad-1": { omni_lead: 3, leadgen_grouped: 3, "offsite_conversion.fb_pixel_lead": 2, "onsite_conversion.messaging_conversation_started_7d": 1 },
       },
-    })).toEqual({ forms: 3, site: 2, conversations: 1, total: 6 });
+    })).toEqual({ forms: 3, site: 0, conversations: 1, total: 4 });
   });
 
   it("mantém métricas zeradas quando não há impressões, cliques ou leads", () => {
@@ -140,6 +140,7 @@ describe("Meta traffic metrics", () => {
       { ad_id: "ad-1", ad_account_id: "acc-1", spend: 10, impressions: 100, reach: 80, clicks: 5 },
     ], {
       metaLeadActions: { forms: 2, site: 3, conversations: 4, total: 9 },
+      leadBreakdownByAd: { "ad-1": { forms: 2, site: 3, conversations: 4, total: 9 } },
       totalsByAd: { "ad-1": { omni_lead: 2, "offsite_conversion.fb_pixel_lead": 3, "onsite_conversion.messaging_conversation_started_7d": 4 } },
       dailyMetaLeadByAccount: { "acc-1": { "2026-09-30": { forms: 2, site: 3, conversations: 4, total: 9 } } },
     }, "2026-09-30T12:00:00.000Z", [], Date.parse("2026-09-30T12:01:00.000Z"));

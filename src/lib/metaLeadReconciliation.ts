@@ -55,12 +55,13 @@ export function resolveAccountMetaLeadReconciliation(
   const configuredSiteIsCanonical = Boolean(configuredSiteAction)
     && !(FORM_ACTION_TYPES as readonly string[]).includes(configuredSiteAction || "")
     && configuredSiteAction !== "lead";
-  const siteTypes = configuredSiteIsCanonical ? [configuredSiteAction!] : [...SITE_ACTION_TYPES];
+  const siteTypes = configuredSiteIsCanonical ? [configuredSiteAction!] : [];
   const leadActionFactCount = Array.from(typesByAdDate.values()).filter((actionTypes) => {
     const hasForm = FORM_ACTION_TYPES.some((type) => actionTypes.has(type));
     const hasSite = siteTypes.some((type) => actionTypes.has(type));
+    const hasUnconfiguredSiteSignal = SITE_ACTION_TYPES.some((type) => actionTypes.has(type));
     const hasConversation = CONVERSATION_ACTION_TYPES.some((type) => actionTypes.has(type));
-    return hasForm || hasSite || hasConversation || (actionTypes.has("lead") && !hasForm && !hasSite && !hasConversation);
+    return hasForm || hasSite || hasConversation || (actionTypes.has("lead") && !hasForm && !hasSite && !hasUnconfiguredSiteSignal && !hasConversation);
   }).length;
 
   return {

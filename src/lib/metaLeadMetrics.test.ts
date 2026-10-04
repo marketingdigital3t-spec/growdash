@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../../supabase/functions/_shared/metaLeadMetrics";
 
 describe("canonicalMetaLeads (AI/RAG evidence)", () => {
-  it("sums the three lead groups and applies canonical priority to aliases", () => {
+  it("requires explicit site-event configuration and applies canonical priority to aliases", () => {
     const result = canonicalMetaLeads(
       [{ ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-02", leads: 999 }],
       [
@@ -16,8 +16,8 @@ describe("canonicalMetaLeads (AI/RAG evidence)", () => {
       ],
       {},
     );
-    expect(result[0].leads).toBe(10);
-    expect(result[0]).toMatchObject({ form_leads: 5, site_leads: 3, conversations: 2 });
+    expect(result[0].leads).toBe(7);
+    expect(result[0]).toMatchObject({ form_leads: 5, site_leads: 0, conversations: 2 });
   });
 
   it("uses the configured site event per account and never falls back to insights.leads", () => {
@@ -32,6 +32,6 @@ describe("canonicalMetaLeads (AI/RAG evidence)", () => {
       ],
       { "account-1": "custom_site_lead" },
     );
-    expect(result.map((row) => row.leads)).toEqual([6, 2]);
+    expect(result.map((row) => row.leads)).toEqual([6, 0]);
   });
 });

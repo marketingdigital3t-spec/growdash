@@ -30,13 +30,16 @@ export function resolveMetaLeadParts(
   values: Record<string, number>,
   configuredSiteAction?: string,
 ) {
+  // Pixel events may be residual on native-form campaigns. A site lead is
+  // countable only when its conversion event is explicitly configured per account.
   const siteAliases = configuredSiteAction
     && !FORM_ACTION_TYPES.includes(configuredSiteAction as typeof FORM_ACTION_TYPES[number])
     && configuredSiteAction !== "lead"
     ? [configuredSiteAction]
-    : SITE_ACTION_TYPES;
+    : [];
   const formAction = FORM_ACTION_TYPES.find((type) => Object.prototype.hasOwnProperty.call(values, type));
   const hasSite = siteAliases.some((type) => Object.prototype.hasOwnProperty.call(values, type));
+  const hasUnconfiguredSiteSignal = SITE_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
   const hasConversation = CONVERSATION_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
   // These action types are alternate representations of the same result, not
   // additive events. Use the first canonical event present (including zero),
@@ -44,7 +47,7 @@ export function resolveMetaLeadParts(
   // grouped Instant Form result shown by Ads Manager.
   const forms = formAction
     ? Math.max(0, Number(values[formAction] || 0))
-    : hasSite || hasConversation
+    : hasSite || hasUnconfiguredSiteSignal || hasConversation
       ? 0
       // Very old accounts can return only this ambiguous aggregate. Use it
       // solely as a last-resort fallback when no other lead mechanism exists.

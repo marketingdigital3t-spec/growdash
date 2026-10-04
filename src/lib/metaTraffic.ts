@@ -109,6 +109,8 @@ type ActionData = {
   leadActionFactCount?: number;
   actionsErrorReason?: string | null;
   metaLeadActions?: { forms: number; site: number; conversations: number; total: number };
+  /** Per-ad breakdown already resolved with the owning account's site-event configuration. */
+  leadBreakdownByAd?: Record<string, { forms: number; site: number; conversations: number; total: number }>;
   totalsByAd?: Record<string, Record<string, number>>;
   valueTotalsByAd?: Record<string, Record<string, number>>;
   dailyMetaLeadByAccount?: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }> >;
@@ -169,7 +171,7 @@ export function aggregateMetaTrafficMetrics(
   }
   const leadBreakdownByAd: MetaTrafficMetrics["leadBreakdownByAd"] = {};
   for (const [adId, actionTotals] of Object.entries(actions?.totalsByAd || {})) {
-    const resolved = resolveMetaLeadActions(actionTotals);
+    const resolved = actions?.leadBreakdownByAd?.[adId] || resolveMetaLeadActions(actionTotals);
     leadBreakdownByAd[adId] = { formLeads: resolved.forms, siteLeads: resolved.site, conversations: resolved.conversations, totalLeads: resolved.total };
   }
   const seenResultAds = new Set<string>();
