@@ -30,17 +30,21 @@ Deno.serve(async (req) => {
     const body: Body = await req.json().catch(() => ({}));
     const days = Math.min(Math.max(body.days ?? 7, 1), 90);
 
-    let q = admin.from("ad_accounts").select("id, name, account_id, access_token, timezone_name, attribution_window").eq("user_id", user.id);
+    let q = admin.from("ad_accounts").select("id, name, account_id, access_token, timezone_name, attribution_window").eq("user_id", user.id).eq("connection_status", "connected");
     if (body.adAccountId) q = q.eq("id", body.adAccountId);
     const { data: accounts, error } = await q;
     if (error) throw error;
 
-    const results: any[] = [];
-    for (const acc of accounts || []) {
+    const accountList = accounts || [];
+    const results: any[] = new Array(accountList.length);
+    let cursor = 0;
+    const processAccount = async (acc: NonNullable<typeof accountList>[number]) => {
+      try {
       const timezone = acc.timezone_name || "America/Sao_Paulo";
       const endDate = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
       const [year, month, day] = endDate.split("-").map(Number);
-      const startDate = new Date(Date.UTC(year, month - 1, day - (days - 1))).toISOString().slice(0, 10);
+      const start = new Date(Date.UTC(year, month - 1, day - (days - 1), 12));
+      const startDate = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}-${String(start.getUTCDate()).padStart(2, "0")}`;
       const attributionWindows = acc.attribution_window && acc.attribution_window !== "account_default"
         ? String(acc.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
         : [];
@@ -60,7 +64,7 @@ Deno.serve(async (req) => {
       const metaRows: any[] = [];
       let metaError: string | null = null;
       while (nextUrl) {
-        const response = await fetch(nextUrl);
+        const response = await fetch(nextUrl, { signal: AbortSignal.timeout(15_000) });
         const payload = await response.json();
         if (!response.ok || payload.error) {
           metaError = payload.error?.message || `Meta Graph API HTTP ${response.status}`;
@@ -70,8 +74,7 @@ Deno.serve(async (req) => {
         nextUrl = payload.paging?.next || null;
       }
       if (metaError) {
-        results.push({ accountId: acc.id, name: acc.name, timezone, attributionWindow, startDate, endDate, error: metaError });
-        continue;
+        return { accountId: acc.id, name: acc.name, timezone, attributionWindow, startDate, endDate, error: metaError };
       }
       const { data: lpConfig } = await admin.from("account_lp_config")
         .select("action_type").eq("ad_account_id", acc.id).maybeSingle();
@@ -134,7 +137,7 @@ Deno.serve(async (req) => {
       const dbLeads = localLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
 
       const pctDiff = (a: number, b: number) => (b === 0 ? (a === 0 ? 0 : 100) : ((a - b) / b) * 100);
-      results.push({
+      return {
         accountId: acc.id,
         name: acc.name,
         timezone,
@@ -152,10 +155,26 @@ Deno.serve(async (req) => {
           clicksPct: pctDiff(dbClicks, metaClicks),
           impressionsPct: pctDiff(dbImp, metaImpressions),
         },
-      });
-    }
+      };
+      } catch (error) {
+        return {
+          accountId: acc.id,
+          name: acc.name,
+          timezone: acc.timezone_name || "America/Sao_Paulo",
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    };
 
-    return new Response(JSON.stringify({ ok: true, startDate, endDate, results }), {
+    const worker = async () => {
+      while (cursor < accountList.length) {
+        const index = cursor++;
+        results[index] = await processAccount(accountList[index]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, accountList.length) }, () => worker()));
+
+    return new Response(JSON.stringify({ ok: true, days, accounts: results.length, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

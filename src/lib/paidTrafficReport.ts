@@ -30,6 +30,7 @@ export type PaidTrafficSaleRow = {
 export type PaidTrafficMetrics = {
   spend: number;
   formLeads: number;
+  siteLeads: number;
   conversations: number;
   leads: number;
   impressions: number;
@@ -149,6 +150,7 @@ function calculateMetrics(
   insights: PaidTrafficInsightRow[],
   deals: PaidTrafficDealRow[],
   sales: PaidTrafficSaleRow[],
+  metaLeadPartsByDate: Record<string, { forms: number; site: number; conversations: number; total: number }>,
   conversationsByDate: Record<string, number>,
   from: string,
   to: string,
@@ -157,9 +159,16 @@ function calculateMetrics(
   const scopedDeals = deals.filter((row) => inRange(dateOnly(row.lead_created_at), from, to));
   const scopedSales = sales.filter((row) => inRange(dateOnly(row.sale_date), from, to));
   const spend = scopedInsights.reduce((sum, row) => sum + number(row.spend), 0);
-  const formLeads = scopedInsights.reduce((sum, row) => sum + number(row.leads), 0);
-  const conversations = Object.entries(conversationsByDate).reduce((sum, [date, value]) => sum + (inRange(date, from, to) ? number(value) : 0), 0);
-  const leads = formLeads;
+  const scopedLeadParts = Object.entries(metaLeadPartsByDate).filter(([date]) => inRange(date, from, to)).map(([, value]) => value);
+  const hasCanonicalParts = scopedLeadParts.length > 0;
+  const formLeads = scopedLeadParts.reduce((sum, parts) => sum + number(parts.forms), 0);
+  const siteLeads = scopedLeadParts.reduce((sum, parts) => sum + number(parts.site), 0);
+  const conversations = hasCanonicalParts
+    ? scopedLeadParts.reduce((sum, parts) => sum + number(parts.conversations), 0)
+    : Object.entries(conversationsByDate).reduce((sum, [date, value]) => sum + (inRange(date, from, to) ? number(value) : 0), 0);
+  // Never read the legacy `insights.leads` total here. Meta leads share the
+  // global contract: canonical forms + configured site event + conversations.
+  const leads = formLeads + siteLeads + conversations;
   const impressions = scopedInsights.reduce((sum, row) => sum + number(row.impressions), 0);
   const reach = scopedInsights.reduce((sum, row) => sum + number(row.reach), 0);
   const clicks = scopedInsights.reduce((sum, row) => sum + number(row.clicks), 0);
@@ -169,6 +178,7 @@ function calculateMetrics(
   return {
     spend: round(spend),
     formLeads: round(formLeads),
+    siteLeads: round(siteLeads),
     conversations: round(conversations),
     leads: round(leads),
     impressions: round(impressions, 0),
@@ -197,10 +207,12 @@ function monthPerformance(
   insights: PaidTrafficInsightRow[],
   deals: PaidTrafficDealRow[],
   sales: PaidTrafficSaleRow[],
+  metaLeadPartsByDate: Record<string, { forms: number; site: number; conversations: number; total: number }>,
   conversationsByDate: Record<string, number>,
 ): MonthlyPerformance {
   const dataDates = new Set<string>();
   insights.forEach((row) => { const date = dateOnly(row.date); if (inRange(date, from, to)) dataDates.add(date); });
+  Object.keys(metaLeadPartsByDate).forEach((date) => { if (inRange(date, from, to)) dataDates.add(date); });
   Object.keys(conversationsByDate).forEach((date) => { if (inRange(date, from, to)) dataDates.add(date); });
   return {
     label,
@@ -209,7 +221,7 @@ function monthPerformance(
     daysInPeriod: daysBetween(from, to),
     daysWithData: dataDates.size,
     isPartial: to === analysisTo && to !== dateToString(endOfMonth(new Date(`${to}T12:00:00`))),
-    metrics: calculateMetrics(insights, deals, sales, conversationsByDate, from, to),
+    metrics: calculateMetrics(insights, deals, sales, metaLeadPartsByDate, conversationsByDate, from, to),
   };
 }
 
@@ -220,14 +232,16 @@ function weeklyPerformance(
   insights: PaidTrafficInsightRow[],
   deals: PaidTrafficDealRow[],
   sales: PaidTrafficSaleRow[],
+  metaLeadPartsByDate: Record<string, { forms: number; site: number; conversations: number; total: number }>,
   conversationsByDate: Record<string, number>,
 ): WeeklyPerformance {
   const from = dateToString(week);
   const weekEnd = dateToString(addDays(week, 6));
   const to = weekEnd < analysisTo ? weekEnd : analysisTo;
-  const metrics = calculateMetrics(insights, deals, sales, conversationsByDate, from, to);
+  const metrics = calculateMetrics(insights, deals, sales, metaLeadPartsByDate, conversationsByDate, from, to);
   const days = new Set<string>();
   insights.forEach((row) => { const date = dateOnly(row.date); if (inRange(date, from, to)) days.add(date); });
+  Object.keys(metaLeadPartsByDate).forEach((date) => { if (inRange(date, from, to)) days.add(date); });
   Object.keys(conversationsByDate).forEach((date) => { if (inRange(date, from, to)) days.add(date); });
   return {
     week: from,
@@ -320,6 +334,7 @@ export function buildTwoMonthAnalysis({
   insights,
   deals,
   sales,
+  metaLeadPartsByDate,
   conversationsByDate,
 }: {
   analysisFrom: Date;
@@ -327,6 +342,7 @@ export function buildTwoMonthAnalysis({
   insights: PaidTrafficInsightRow[];
   deals: PaidTrafficDealRow[];
   sales: PaidTrafficSaleRow[];
+  metaLeadPartsByDate?: Record<string, { forms: number; site: number; conversations: number; total: number }>;
   conversationsByDate?: Record<string, number>;
 }): TwoMonthAnalysis {
   const fromDate = startOfMonth(analysisFrom);
@@ -341,8 +357,9 @@ export function buildTwoMonthAnalysis({
   const previousFrom = dateToString(previousStart);
   const previousTo = dateToString(previousEnd);
   const conversations = conversationsByDate || {};
-  const currentMonth = monthPerformance("Mês atual", currentFrom, currentTo, to, insights, deals, sales, conversations);
-  const previousMonth = monthPerformance("Mês anterior", previousFrom, previousTo, to, insights, deals, sales, conversations);
+  const leadParts = metaLeadPartsByDate || {};
+  const currentMonth = monthPerformance("Mês atual", currentFrom, currentTo, to, insights, deals, sales, leadParts, conversations);
+  const previousMonth = monthPerformance("Mês anterior", previousFrom, previousTo, to, insights, deals, sales, leadParts, conversations);
   const metricComparisons = comparisonMetrics.map(({ id, label, lowerIsBetter = false }) => {
     const current = currentMonth.metrics[id];
     const previous = previousMonth.metrics[id];
@@ -357,7 +374,7 @@ export function buildTwoMonthAnalysis({
   const lastWeek = startOfWeek(new Date(`${to}T12:00:00`), { weekStartsOn: 1 });
   const weeks: WeeklyPerformance[] = [];
   for (let week = firstWeek; week <= lastWeek; week = addDays(week, 7)) {
-    const row = weeklyPerformance(week, currentFrom, to, insights, deals, sales, conversations);
+    const row = weeklyPerformance(week, currentFrom, to, insights, deals, sales, leadParts, conversations);
     if (row.metrics.spend || row.metrics.leads || row.metrics.rd || row.metrics.sales || row.metrics.conversations) weeks.push(row);
   }
   const recommendations = buildRecommendations(currentMonth, previousMonth, metricComparisons);

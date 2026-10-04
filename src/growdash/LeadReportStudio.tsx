@@ -18,7 +18,6 @@ import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useSales } from "@/hooks/useSales";
 import { buildTwoMonthAnalysis, type TwoMonthAnalysis } from "@/lib/paidTrafficReport";
 import { audienceBreakdowns, type AudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
-import { resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 
 export type MetricId = "spend" | "leads" | "conversations" | "cpl" | "impressions" | "reach" | "frequency" | "clicks" | "cpc" | "ctr" | "cpm" | "conversionRate" | "rd" | "sales" | "revenue" | "cac" | "roas" | "profit" | "coverage";
 export type ReportTotals = Record<MetricId, number>;
@@ -106,12 +105,8 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const analysisAdIds = useMemo(() => Array.from(new Set(analysisInsights.map((row) => row.ad_id).filter(Boolean))), [analysisInsights]);
   const analysisAdAccountByAdId = useMemo(() => Object.fromEntries(analysisInsights.map((row) => [row.ad_id, row.ad_account_id])), [analysisInsights]);
   const { data: analysisActionData, isLoading: loadingAnalysisActions } = useActionTotalsByAds(analysisAdIds, analysisFromDate, endDate, analysisAdAccountByAdId, { adAccountIds: [accountId] });
-  const analysisConversationsByDate = useMemo(() => {
-    const scoped = analysisActionData?.dailyByAccount?.[accountId];
-    if (!scoped) return {};
-    return Object.fromEntries(Object.entries(scoped).map(([date, actions]) => [date, resolveMetaLeadActions(actions).conversations]));
-  }, [accountId, analysisActionData?.dailyByAccount]);
-  const analysis = useMemo(() => analysisEnabled ? buildTwoMonthAnalysis({ analysisFrom: analysisFromDate, analysisTo: endDate, insights: analysisInsights, deals: analysisDeals, sales: analysisSales, conversationsByDate: analysisConversationsByDate }) : undefined, [analysisConversationsByDate, analysisDeals, analysisEnabled, analysisFromDate, analysisInsights, analysisSales, endDate]);
+  const analysisMetaLeadPartsByDate = useMemo(() => analysisActionData?.dailyMetaLeadByAccount?.[accountId] || {}, [accountId, analysisActionData?.dailyMetaLeadByAccount]);
+  const analysis = useMemo(() => analysisEnabled ? buildTwoMonthAnalysis({ analysisFrom: analysisFromDate, analysisTo: endDate, insights: analysisInsights, deals: analysisDeals, sales: analysisSales, metaLeadPartsByDate: analysisMetaLeadPartsByDate }) : undefined, [analysisDeals, analysisEnabled, analysisFromDate, analysisInsights, analysisMetaLeadPartsByDate, analysisSales, endDate]);
   const analysisLoading = analysisEnabled && (loadingAnalysisInsights || loadingAnalysisDeals || loadingAnalysisSales || (analysisAdIds.length > 0 && loadingAnalysisActions));
   const snapshot = useMemo<ReportSnapshot>(() => ({ title: `Relatório de performance — ${accountName || "Conta selecionada"}`, accountName: accountName || "Conta selecionada", branding: { name: workspace?.name || "Growdash", signature: `${workspace?.name || "Growdash"} · Operação monitorada pela Torre de Controle` }, dateFrom: reportFrom, dateTo: reportTo, metrics: selected, banner, totals, daily, weekly, analysis, audience }), [accountName, analysis, audience, banner, daily, reportFrom, reportTo, selected, totals, weekly, workspace?.name]);
 
