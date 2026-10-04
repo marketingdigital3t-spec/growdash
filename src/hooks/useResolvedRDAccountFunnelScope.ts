@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID, resolveLinkedRDFunnelIds } from "@/lib/rdAccountScope";
 
 type Params = {
@@ -28,12 +29,13 @@ export function useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, fun
   // confirmed empty RD day.
   const unresolvedSentinel = explicitFunnelIds.length === 1 && explicitFunnelIds[0] === NO_LINKED_RD_FUNNEL_SCOPE_ID;
   const needsResolution = (explicitFunnelIds.length === 0 || unresolvedSentinel) && accountIds.length > 0;
+  const workspace = useWorkspace();
   const accounts = useAdAccounts();
-  const connections = useRDAccountConnections();
+  const connections = useRDAccountConnections(workspace.data?.id);
   const funnels = useRDFunnels(undefined, needsResolution);
 
-  const loading = needsResolution && (accounts.isLoading || connections.isLoading || funnels.isLoading);
-  const error = needsResolution ? accounts.error || connections.error || funnels.error : null;
+  const loading = needsResolution && (workspace.isLoading || !workspace.data?.id || accounts.isLoading || connections.isLoading || funnels.isLoading);
+  const error = needsResolution ? workspace.error || accounts.error || connections.error || funnels.error : null;
   const resolvedFunnelIds = useMemo(() => {
     if (explicitFunnelIds.length && !unresolvedSentinel) return explicitFunnelIds;
     if (!accountIds.length || loading || error) return accountIds.length ? [] : undefined;

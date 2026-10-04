@@ -7,6 +7,15 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const GRAPH_BASE = `https://graph.facebook.com/${Deno.env.get("META_GRAPH_API_VERSION") || "v25.0"}`;
 
+function normalizeAttributionWindow(value: unknown) {
+  return String(value || "account_default")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .sort()
+    .join(",") || "account_default";
+}
+
 interface Body { adAccountId?: string; days?: number }
 
 Deno.serve(async (req) => {
@@ -30,7 +39,9 @@ Deno.serve(async (req) => {
     const body: Body = await req.json().catch(() => ({}));
     const days = Math.min(Math.max(body.days ?? 7, 1), 90);
 
-    let q = admin.from("ad_accounts").select("id, name, account_id, access_token, timezone_name, attribution_window").eq("user_id", user.id).eq("connection_status", "connected");
+    // Include temporarily errored/expired accounts in the audit instead of
+    // silently shrinking the global comparison to only currently healthy rows.
+    let q = admin.from("ad_accounts").select("id, name, account_id, access_token, timezone_name, attribution_window, connection_status").eq("user_id", user.id).neq("connection_status", "disconnected");
     if (body.adAccountId) q = q.eq("id", body.adAccountId);
     const { data: accounts, error } = await q;
     if (error) throw error;
@@ -124,7 +135,7 @@ Deno.serve(async (req) => {
           .lte("date", endDate)
           .range(page * pageSize, page * pageSize + pageSize - 1);
         if (insightsError) throw insightsError;
-        const scopedRows = (rows || []).filter((row: any) => (row.attribution_window || "account_default") === attributionWindow);
+        const scopedRows = (rows || []).filter((row: any) => normalizeAttributionWindow(row.attribution_window) === normalizeAttributionWindow(attributionWindow));
         localInsights.push(...scopedRows);
         for (const r of scopedRows) {
           dbSpend += Number(r.spend || 0);
@@ -142,12 +153,12 @@ Deno.serve(async (req) => {
           let actionQuery = admin.from("insight_actions")
             .select("ad_id,date,action_type,value,attribution_window")
             .in("ad_id", chunk).gte("date", startDate).lte("date", endDate);
-          actionQuery = attributionWindow === "account_default"
+          actionQuery = normalizeAttributionWindow(attributionWindow) === "account_default"
             ? actionQuery.or("attribution_window.eq.account_default,attribution_window.is.null")
-            : actionQuery.eq("attribution_window", attributionWindow);
+            : actionQuery;
           const { data: actions, error: actionsError } = await actionQuery.range(page * pageSize, page * pageSize + pageSize - 1);
           if (actionsError) throw actionsError;
-          localActionRows.push(...(actions || []));
+          localActionRows.push(...(actions || []).filter((row: any) => normalizeAttributionWindow(row.attribution_window) === normalizeAttributionWindow(attributionWindow)));
           if ((actions || []).length < pageSize) break;
         }
       }
@@ -168,6 +179,7 @@ Deno.serve(async (req) => {
       return {
         accountId: acc.id,
         name: acc.name,
+        connectionStatus: acc.connection_status,
         timezone,
         attributionWindow,
         startDate,

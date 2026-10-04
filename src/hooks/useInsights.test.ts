@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { dedupeDailyInsights, filterInsightsByCampaignScope } from "./useInsights";
+import { canonicalInsightLeads, dedupeDailyInsights, filterInsightsByCampaignScope } from "./useInsights";
 import { matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 describe("daily insight scope", () => {
+  it("calculates Meta leads only from forms, site and conversations, ignoring legacy leads aggregate", () => {
+    expect(canonicalInsightLeads({ form_leads: 7, site_leads: 0, conversations: 1, leads: 13 } as any))
+      .toEqual({ forms: 7, site: 0, conversations: 1, total: 8 });
+  });
+
+  it("does not use a legacy aggregate when canonical action fields are absent", () => {
+    expect(canonicalInsightLeads({ leads: 13 } as any))
+      .toEqual({ forms: 0, site: 0, conversations: 0, total: 0 });
+  });
+
   it("deduplicates retries without collapsing different attribution windows", () => {
     const rows: any[] = [
       { ad_id: "ad-1", date: "2026-09-30", attribution_window: "7d_click", spend: 10 },

@@ -14,6 +14,7 @@ interface Row {
   attributionWindow?: string;
   startDate?: string;
   endDate?: string;
+  connectionStatus?: string;
   metaRows?: number;
   metaPages?: number;
   localRows?: number;
@@ -81,6 +82,7 @@ export function MetaValidationCard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="1">Hoje</SelectItem>
               <SelectItem value="7">7 dias</SelectItem>
               <SelectItem value="14">14 dias</SelectItem>
               <SelectItem value="30">30 dias</SelectItem>
@@ -104,7 +106,10 @@ export function MetaValidationCard() {
                 <div key={r.accountId} className="rounded-md border border-border/60 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-medium">{r.name}</span>
-                    {r.error && <Badge variant="destructive" className="text-[10px]">{r.error}</Badge>}
+                    <div className="flex items-center gap-2">
+                      {r.connectionStatus && r.connectionStatus !== "connected" && <Badge variant="destructive" className="text-[10px]">{r.connectionStatus}</Badge>}
+                      {r.error && <Badge variant="destructive" className="text-[10px]">{r.error}</Badge>}
+                    </div>
                   </div>
                   <p className="mb-2 text-[10px] text-muted-foreground">Janela {r.startDate} → {r.endDate} · {r.timezone || "timezone da conta"} · atribuição {r.attributionWindow || "padrão da conta"}{typeof r.metaRows === "number" ? ` · ${r.metaPages ?? 0} páginas Meta / ${r.metaRows} linhas Meta / ${r.localRows ?? 0} locais / ${r.localActionRows ?? 0} ações` : ""}</p>
                   {r.meta && r.db && r.drift && (

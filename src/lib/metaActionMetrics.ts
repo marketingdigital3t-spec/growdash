@@ -120,21 +120,37 @@ export function aggregateMetaLeadActionDays(
  * a missing campaign or adset must not hide a valid Meta conversion.
  */
 export function aggregateMetaLeadTargets(
-  insightRows: Array<{ ad_id: string; ad_account_id?: string | null; attribution_window?: string | null }>,
+  insightRows: Array<{ ad_id: string; ad_account_id?: string | null; date: string; attribution_window?: string | null }>,
   actionRows: Array<{ ad_id: string; date: string; action_type: string; value: number | null; attribution_window?: string | null }>,
   siteActionByAccount: Record<string, string | undefined> = {},
 ) {
   const accountByAd: Record<string, string | null> = {};
-  const attributionByAd: Record<string, string> = {};
+  const attributionByAdDate = new Map<string, string>();
+  const ambiguousInsightScopes = new Set<string>();
+  const snapshotKeys = new Set<string>();
   for (const row of insightRows) {
     accountByAd[row.ad_id] = row.ad_account_id || null;
-    attributionByAd[row.ad_id] = normalizeMetaAttributionWindow(row.attribution_window);
+    const key = `${row.ad_account_id || ""}|${row.ad_id}|${row.date}`;
+    const attribution = normalizeMetaAttributionWindow(row.attribution_window);
+    const existing = attributionByAdDate.get(key);
+    // The same ad/day in two attribution windows is ambiguous unless callers
+    // first scope the rows to the account's configured window. Fail closed;
+    // silently choosing whichever row happened to arrive last mixes totals.
+    if (existing && existing !== attribution) ambiguousInsightScopes.add(key);
+    else attributionByAdDate.set(key, attribution);
+    snapshotKeys.add(key);
   }
 
   const facts = new Map<string, typeof actionRows[number]>();
   for (const row of actionRows) {
     const accountId = accountByAd[row.ad_id];
-    if (!accountId || !matchesMetaAttributionWindow(row.attribution_window, attributionByAd[row.ad_id])) continue;
+    const scopeKey = `${accountId || ""}|${row.ad_id}|${row.date}`;
+    const insightAttribution = attributionByAdDate.get(scopeKey);
+    if (!accountId
+      || !snapshotKeys.has(scopeKey)
+      || ambiguousInsightScopes.has(scopeKey)
+      || !insightAttribution
+      || !matchesMetaAttributionWindow(row.attribution_window, insightAttribution)) continue;
     const key = `${row.ad_id}|${row.date}|${row.action_type}`;
     const previous = facts.get(key);
     // Legacy NULL and explicit account_default rows describe the same fact.

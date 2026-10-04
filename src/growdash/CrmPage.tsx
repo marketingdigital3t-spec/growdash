@@ -615,9 +615,9 @@ export default function CrmPage() {
           <div className="gd-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <CrmMetricCard
               source="RD Station CRM"
-              label="Negociações no funil"
+              label="Negociações criadas no período"
               value={number.format(stats.total)}
-              description={`${number.format(stats.active)} ativas · ${number.format(stats.won)} ganhas`}
+              description={`${number.format(stats.active)} ativas · ${number.format(stats.won)} ganhas no período selecionado`}
               icon={<Columns3 className="h-4 w-4" />}
               tone="rd"
             />

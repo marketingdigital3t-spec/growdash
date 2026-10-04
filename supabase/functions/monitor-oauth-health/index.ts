@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { resolveMetaPermissionStatus } from "../_shared/metaPermissions.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,14 +44,14 @@ async function checkMetaToken(token: string, appId?: string, appSecret?: string)
 
   const data = payload?.data ?? {};
   const permissions = Array.isArray(data.scopes) ? data.scopes.map(String) : [];
-  // A healthy connection must be able to read both delivery metrics and the
-  // lead/conversation events used by Growdash reports.
-  const missing = ["ads_read", "leads_retrieval"].filter((permission) => !permissions.includes(permission));
+  // Aggregate insights/actions need ads_read. leads_retrieval is only needed
+  // for person-level form submissions and must not block aggregate metrics.
+  const permissionStatus = resolveMetaPermissionStatus(permissions);
   const tokenExpiresAt = Number(data.expires_at) > 0 ? Number(data.expires_at) * 1000 : null;
   const status: HealthStatus = data.is_valid !== true
     ? "expired"
-    : missing.length > 0
-      ? "permission_removed"
+    : permissionStatus.status === "permission_removed"
+      ? permissionStatus.status
       : tokenExpiresAt && tokenExpiresAt < Date.now() + 30 * 86_400_000
         ? "expiring"
       : "healthy";
@@ -63,7 +64,8 @@ async function checkMetaToken(token: string, appId?: string, appSecret?: string)
       expires_at: data.expires_at ?? null,
       data_access_expires_at: data.data_access_expiration_time ?? null,
       issued_at: data.issued_at ?? null,
-      missing_permissions: missing,
+      missing_permissions: permissionStatus.missingPermissions,
+      optional_missing_permissions: permissionStatus.optionalMissingPermissions,
     },
   };
 }
@@ -131,7 +133,7 @@ Deno.serve(async (req) => {
 
     let accountsQuery = admin
       .from("ad_accounts")
-      .select("id, user_id, workspace_id, account_id, access_token, connection_status, oauth_health_status, oauth_checked_at, token_expires_at, token_issued_at");
+      .select("id, user_id, workspace_id, account_id, access_token, connection_status, oauth_health_status, oauth_checked_at, token_expires_at, token_issued_at, last_sync_error, last_sync_error_code");
     if (requestedUserId) accountsQuery = accountsQuery.eq("user_id", requestedUserId);
     const { data: accounts, error: accountsError } = await accountsQuery;
     if (accountsError) throw accountsError;
@@ -142,6 +144,10 @@ Deno.serve(async (req) => {
         ? await checkMetaToken(String(account.access_token), appId, appSecret)
         : { status: baseStatus === "error" ? "error" : "unchecked" as HealthStatus, permissions: [], details: { reason: "Token ausente" } };
       const checkedAt = new Date().toISOString();
+      const recoverPermissionBlock = ["healthy", "expiring"].includes(check.status)
+        && account.connection_status === "blocked"
+        && Number(account.last_sync_error_code) === 200
+        && account.last_sync_error === "Permissões Meta insuficientes para leitura de anúncios/leads";
       // Health checks may refresh diagnostic columns for every account, but a
       // manual disconnect is authoritative and must never be changed to
       // `blocked` by an automated permission check.
@@ -157,6 +163,9 @@ Deno.serve(async (req) => {
           : (typeof check.details.issued_at === "string" ? check.details.issued_at : account.token_issued_at),
         token_refreshed_at: checkedAt,
         token_refresh_source: "health_check",
+        ...(recoverPermissionBlock
+          ? { connection_status: "connected", last_sync_error: null, last_sync_error_code: null }
+          : {}),
       };
       let accountUpdate = admin.from("ad_accounts").update(healthUpdate).eq("id", account.id);
       if (requestedUserId) accountUpdate = accountUpdate.eq("user_id", requestedUserId);
@@ -179,7 +188,14 @@ Deno.serve(async (req) => {
         missing_permissions: check.details.missing_permissions ?? [],
         details: check.details,
       });
-      results.push({ id: account.id, provider: "meta_ads", status: check.status, missing_permissions: check.details.missing_permissions ?? [] });
+      results.push({
+        id: account.id,
+        provider: "meta_ads",
+        status: check.status,
+        missing_permissions: check.details.missing_permissions ?? [],
+        optional_missing_permissions: check.details.optional_missing_permissions ?? [],
+        ...(recoverPermissionBlock ? { connection_restored: true } : {}),
+      });
     }
 
     let integrationsQuery = admin

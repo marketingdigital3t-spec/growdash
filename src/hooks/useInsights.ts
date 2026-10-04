@@ -53,18 +53,22 @@ export interface InsightRow {
   attribution_window?: string | null;
 }
 
-function canonicalInsightLeads(row: any) {
+export function canonicalInsightLeads(row: {
+  form_leads?: number | null;
+  site_leads?: number | null;
+  conversations?: number | null;
+}) {
   const forms = Number(row.form_leads ?? 0);
   const site = Number(row.site_leads ?? 0);
   const conversations = Number(row.conversations ?? 0);
-  const hasCanonicalFields = row.form_leads !== null && row.form_leads !== undefined
-    || row.site_leads !== null && row.site_leads !== undefined
-    || row.conversations !== null && row.conversations !== undefined;
   return {
     forms,
     site,
     conversations,
-    total: hasCanonicalFields ? forms + site + conversations : Number(row.leads ?? 0),
+    // Always use the three disjoint canonical facts. `insights.leads` is a
+    // legacy aggregate that can include broad Meta aliases and must never be
+    // a fallback for a global lead KPI.
+    total: forms + site + conversations,
   };
 }
 

@@ -1,11 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { listAuthorizedRDConnections } from "../_shared/rdConnection.ts";
+import { resolveMetaLookbackDateRange } from "../_shared/metaLookbackWindow.ts";
+import { markDeferredMetaAccountCoverage, selectMetaAccountSyncBatch } from "../_shared/metaSyncBatch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
+const META_ACCOUNT_BATCH_SIZE = 8;
+const META_ACCOUNT_CONCURRENCY = 4;
 
 type FunctionResult = {
   ok: boolean;
@@ -52,10 +56,9 @@ function incrementalWindow(now: Date, previousEnd?: string | null): SyncWindow {
   // Re-read a small overlap so a provider that updates a record at the edge of
   // a window cannot leave a gap. The upserts/deduplication make this safe.
   const parsedPrevious = previousEnd ? new Date(previousEnd) : null;
-  // A stale successful run must never make the next five-minute cycle scan
-  // days of history. Partial runs still advance the watermark for the
-  // sources that completed; their explicit status remains visible to the UI
-  // and unresolved records are retried by webhook/manual reconciliation.
+  // This short run window bounds run telemetry and RD incremental
+  // reconciliation. Meta uses a separate per-account attribution lookback
+  // below because timestamp overlap alone cannot correct late conversions.
   const previousIsRecent = parsedPrevious && Number.isFinite(parsedPrevious.getTime())
     ? end.getTime() - parsedPrevious.getTime() <= 5 * 60_000
     : false;
@@ -148,7 +151,7 @@ function applyReportedFailure(result: FunctionResult, critical = true): Function
 }
 
 function aggregateMetaResults(
-  results: Array<{ account_id: string; insights: FunctionResult; leads: FunctionResult; hourly: FunctionResult }>,
+  results: Array<{ account_id: string; timezone: string; attribution_window: string; start_date: string; end_date: string; insights: FunctionResult; leads: FunctionResult; hourly: FunctionResult }>,
   key: "insights" | "leads" | "hourly",
 ): FunctionResult {
   const selected = results.map((result) => result[key]);
@@ -167,7 +170,19 @@ function aggregateMetaResults(
       accounts: results.length,
       failed_accounts: failed.length,
       errors: errors.length ? errors : undefined,
-      account_results: results.map((result) => ({ account_id: result.account_id, ok: result[key].ok, status: result[key].body?.status, error: result[key].body?.error || result[key].body?.errors })),
+      account_results: results.map((result) => ({
+        account_id: result.account_id,
+        requested_scope: {
+          start_date: result.start_date,
+          end_date: result.end_date,
+          timezone: result.timezone,
+          attribution_window: result.attribution_window,
+        },
+        ok: result[key].ok,
+        status: result[key].body?.status,
+        duration_ms: result[key].durationMs,
+        error: result[key].body?.error || result[key].body?.errors,
+      })),
     },
   };
 }
@@ -291,26 +306,35 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Meta facts are synchronized account-by-account and in dependency order.
-    // Running Insights, lead records and hourly facts for every account in
-    // parallel caused hourly rows to observe an incomplete daily snapshot and
-    // made a slow account affect the watermark of all others.
-    const { data: metaAccounts, error: metaAccountsError } = await admin
+    // Process a rotating, bounded batch of authorized live connections. The
+    // old all-accounts fan-out retried blocked/read-only rows, hit Edge rate
+    // limits, and repeatedly timed out before later accounts got their leads.
+    const { data: allConnectedMetaAccounts, error: metaAccountsError } = await admin
       .from("ad_accounts")
-      .select("id,timezone_name,attribution_window,connection_status")
-      .neq("connection_status", "disconnected");
+      .select("id,timezone_name,attribution_window,connection_status,last_sync_attempt_at,last_sync_success_at")
+      .eq("connection_status", "connected");
     if (metaAccountsError) throw metaAccountsError;
 
-    const metaAccountResults: Array<{ account_id: string; timezone: string; attribution_window: string; insights: FunctionResult; leads: FunctionResult; hourly: FunctionResult }> = [];
-    for (const account of (metaAccounts || []) as any[]) {
+    const metaAccountBatch = selectMetaAccountSyncBatch(
+      (allConnectedMetaAccounts || []) as any[],
+      META_ACCOUNT_BATCH_SIZE,
+    );
+    const metaAccounts = metaAccountBatch.selected;
+    const metaAccountResults = await mapWithConcurrency(metaAccounts, META_ACCOUNT_CONCURRENCY, async (account: any) => {
       const timezone = String(account.timezone_name || "America/Sao_Paulo");
       const attributionWindow = String(account.attribution_window || "account_default");
+      // The short worker watermark is not a Meta attribution window: provider
+      // results can be revised days after delivery. Re-read each account's
+      // inclusive civil dates covered by its configured attribution window.
+      const accountDateRange = syncWindow.mode === "incremental"
+        ? resolveMetaLookbackDateRange(now, timezone, attributionWindow)
+        : { startDate: syncWindow.startDate, endDate: syncWindow.endDate };
       const campaignScope = "all-campaigns";
       const scopePayload = {
         ad_account_id: account.id,
         campaign_scope: campaignScope,
-        start_date: syncWindow.startDate,
-        end_date: syncWindow.endDate,
+        start_date: accountDateRange.startDate,
+        end_date: accountDateRange.endDate,
         timezone,
         attribution_window: attributionWindow,
         status: "running",
@@ -326,8 +350,8 @@ Deno.serve(async (req) => {
       const accountScope = { adAccountIds: [account.id] };
       const insights = applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-insights", {
         ...accountScope,
-        startDate: syncWindow.startDate,
-        endDate: syncWindow.endDate,
+        startDate: accountDateRange.startDate,
+        endDate: accountDateRange.endDate,
         timezone,
         attributionWindow,
         incremental: true,
@@ -337,16 +361,16 @@ Deno.serve(async (req) => {
       const leads = insights.ok
         ? applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-leads", {
           ...accountScope,
-          startDate: syncWindow.startDate,
-          endDate: syncWindow.endDate,
+          startDate: accountDateRange.startDate,
+          endDate: accountDateRange.endDate,
           triggerSource: "five_minute_incremental",
         }), false)
         : { ok: false, status: 0, durationMs: 0, body: { error: "Insights parcial; leads preservados do último snapshot válido." } };
       const hourly = insights.ok
         ? applyReportedFailure(await callFunction(supabaseUrl, serviceKey, "sync-meta-hourly", {
           ...accountScope,
-          startDate: syncWindow.startDate,
-          endDate: syncWindow.endDate,
+          startDate: accountDateRange.startDate,
+          endDate: accountDateRange.endDate,
           timezone,
           attributionWindow,
           triggerSource: "five_minute_incremental",
@@ -365,13 +389,17 @@ Deno.serve(async (req) => {
         covered: accountOk,
         updated_at: finished,
       }).eq("ad_account_id", account.id).eq("campaign_scope", campaignScope)
-        .eq("start_date", syncWindow.startDate).eq("end_date", syncWindow.endDate)
+        .eq("start_date", accountDateRange.startDate).eq("end_date", accountDateRange.endDate)
         .eq("timezone", timezone).eq("attribution_window", attributionWindow);
-      metaAccountResults.push({ account_id: account.id, timezone, attribution_window: attributionWindow, insights, leads, hourly });
-    }
+      return { account_id: account.id, timezone, attribution_window: attributionWindow, start_date: accountDateRange.startDate, end_date: accountDateRange.endDate, insights, leads, hourly };
+    });
     const metaInsights = aggregateMetaResults(metaAccountResults, "insights");
     const metaLeads = aggregateMetaResults(metaAccountResults, "leads");
     const metaHourly = aggregateMetaResults(metaAccountResults, "hourly");
+    const connectedAccountsTotal = allConnectedMetaAccounts?.length || 0;
+    const metaInsightsWithCoverage = markDeferredMetaAccountCoverage(metaInsights, connectedAccountsTotal, metaAccounts.length, metaAccountBatch.deferred.length);
+    const metaLeadsWithCoverage = markDeferredMetaAccountCoverage(metaLeads, connectedAccountsTotal, metaAccounts.length, metaAccountBatch.deferred.length);
+    const metaHourlyWithCoverage = markDeferredMetaAccountCoverage(metaHourly, connectedAccountsTotal, metaAccounts.length, metaAccountBatch.deferred.length);
 
     const rdConnections = await listAuthorizedRDConnections(admin);
     const ownerIds = Array.from(new Set(rdConnections.map((row) => String(row.user_id))));
@@ -475,7 +503,7 @@ Deno.serve(async (req) => {
     // Insights is the primary KPI snapshot. Leads/forms and hourly remain
     // observable auxiliary blocks and are retried without downgrading valid
     // daily investment/delivery data to a global partial state.
-    const allOk = metaInsights.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
+    const allOk = metaInsightsWithCoverage.ok && rdResync.ok && rdMetricReconciliation.ok && rdFailed.length === 0 && duplicateMappingCount === 0;
     const status = allOk ? "success" : "partial";
     const finishedAt = new Date().toISOString();
 
@@ -491,9 +519,9 @@ Deno.serve(async (req) => {
       .update({
         status,
         finished_at: finishedAt,
-        meta_insights: metaInsights,
-        meta_leads: metaLeads,
-        meta_hourly: metaHourly,
+        meta_insights: metaInsightsWithCoverage,
+        meta_leads: metaLeadsWithCoverage,
+        meta_hourly: metaHourlyWithCoverage,
         rd: rdSummary,
         rd_metric_reconciliation: rdMetricReconciliation,
         rd_resync: rdResync,
@@ -514,8 +542,8 @@ Deno.serve(async (req) => {
         syncMode: syncWindow.mode,
         timezone: "America/Sao_Paulo",
         historicalDataPreserved: true,
-        meta: { insights: metaInsights, leads: metaLeads },
-        hourly: metaHourly,
+        meta: { insights: metaInsightsWithCoverage, leads: metaLeadsWithCoverage },
+        hourly: metaHourlyWithCoverage,
         rd: rdSummary,
         rdMetricReconciliation: rdMetricReconciliation,
         rdResync,

@@ -53,11 +53,11 @@ function readStored() {
 }
 
 export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
-  const { data: workspace } = useWorkspace();
+  const { data: workspace, isLoading: loadingWorkspace } = useWorkspace();
   const { data: rdFunnels = [], isLoading: loadingRDFunnels } = useRDFunnels(undefined, true);
-  const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections();
+  const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections(workspace?.id);
   const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
-  const accountScopeReady = !loadingRDFunnels && !loadingRDConnections && !loadingAdAccounts;
+  const accountScopeReady = !loadingWorkspace && !!workspace?.id && !loadingRDFunnels && !loadingRDConnections && !loadingAdAccounts;
   const stored = typeof window === "undefined" ? null : readStored();
   const [adAccountIds, setAdAccountIds] = useState<string[]>(() => stored?.adAccountIds?.length ? stored.adAccountIds : stored?.adAccountId && stored.adAccountId !== "all" ? [stored.adAccountId] : []);
   const [storedFunnelIds, setStoredFunnelIds] = useState<string[]>(() => stored?.funnelIds ?? []);
@@ -138,7 +138,7 @@ export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
     setSegment,
     workspaceId: workspace?.id,
     businessUnitId,
-  }), [adAccountId, setAdAccountId, adAccountIds, funnelIds, preset, setCustomRange, customRange, dates.startDate, dates.endDate, segment, workspace?.id, businessUnitId]);
+  }), [adAccountId, setAdAccountId, adAccountIds, funnelIds, setFunnelIds, preset, setCustomRange, customRange, dates.startDate, dates.endDate, segment, workspace?.id, businessUnitId]);
 
   return <GlobalFiltersContext.Provider value={value}>{children}</GlobalFiltersContext.Provider>;
 }

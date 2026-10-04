@@ -9,11 +9,14 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Inbox, RefreshCw } from "lucide-react";
 import { businessDateKey } from "@/lib/businessDate";
 import { resolveAccountMetaLeadReconciliation } from "@/lib/metaLeadReconciliation";
+import { normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../../../supabase/functions/_shared/metaLeadMetrics";
+import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
 
 interface AccountRow {
   id: string;
   name: string;
+  connectionStatus: string;
   timezone_name: string | null;
   startDate: string;
   endDate: string;
@@ -21,8 +24,10 @@ interface AccountRow {
   site: number;
   conversations: number;
   total: number;
+  hasValues: boolean;
   available: boolean;
   reason?: string;
+  status: string;
 }
 
 const PAGE_SIZE = 1000;
@@ -40,8 +45,10 @@ function useReconciliation(days: number) {
     queryFn: async (): Promise<AccountRow[]> => {
       const { data: accounts, error: accountError } = await supabase
         .from("ad_accounts")
-        .select("id, name, timezone_name")
-        .eq("connection_status", "connected");
+        .select("id, name, timezone_name, attribution_window, connection_status")
+        // Keep accounts with temporary API/token errors visible for diagnosis.
+        // Only an explicit user disconnect removes the account from this global view.
+        .neq("connection_status", "disconnected");
       if (accountError) throw accountError;
       if (!accounts?.length) return [];
 
@@ -54,6 +61,15 @@ function useReconciliation(days: number) {
       const accountIds = accountScopes.map((account) => account.id);
       const minStart = accountScopes.map((account) => account.startDate).sort()[0];
       const maxEnd = accountScopes.map((account) => account.endDate).sort().at(-1)!;
+
+      const { data: coverageRows, error: coverageError } = await (supabase as any)
+        .from("meta_sync_scope_state")
+        .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,last_error,error_code,last_finished_at,updated_at")
+        .in("ad_account_id", accountIds)
+        .lte("start_date", maxEnd)
+        .gte("end_date", minStart);
+      if (coverageError) throw coverageError;
+      const syncCoverageRows = (coverageRows || []) as MetaSyncCoverageRow[];
 
       const { data: lpConfigs, error: configError } = await supabase
         .from("account_lp_config")
@@ -101,13 +117,31 @@ function useReconciliation(days: number) {
       }
 
       return accountScopes.map((account) => {
-        const scopedInsights = insightRows.filter((row) => row.ad_account_id === account.id && row.date >= account.startDate && row.date <= account.endDate);
+        const expectedAttribution = normalizeMetaAttributionWindow(account.attribution_window);
+        const scopedInsights = insightRows.filter((row) => row.ad_account_id === account.id
+          && row.date >= account.startDate
+          && row.date <= account.endDate
+          && normalizeMetaAttributionWindow(row.attribution_window) === expectedAttribution);
         const scopedAdIds = new Set(scopedInsights.map((row) => row.ad_id));
-        const scopedActions = actionRows.filter((row) => scopedAdIds.has(row.ad_id) && row.date >= account.startDate && row.date <= account.endDate);
+        const scopedInsightDates = new Set(scopedInsights.map((row) => `${row.ad_id}|${row.date}`));
+        const scopedActions = actionRows.filter((row) => scopedAdIds.has(row.ad_id)
+          && scopedInsightDates.has(`${row.ad_id}|${row.date}`)
+          && row.date >= account.startDate
+          && row.date <= account.endDate);
         const result = resolveAccountMetaLeadReconciliation(account.id, scopedInsights, scopedActions, siteActionByAccount[account.id]);
+        const accountScope = {
+          accountId: account.id,
+          timezone: account.timezone_name || "America/Sao_Paulo",
+          attributionWindow: account.attribution_window || "account_default",
+        };
+        const confirmedActions = findMetaSyncCoverage(syncCoverageRows, accountScope, account.startDate, account.endDate, [], "actions");
+        const syncIssue = findMetaSyncIssue(syncCoverageRows, accountScope, account.startDate, account.endDate, [], "actions");
+        const isConfirmed = Boolean(confirmedActions);
+        const isConnectionError = account.connection_status !== "connected";
         return {
           id: account.id,
           name: account.name,
+          connectionStatus: account.connection_status,
           timezone_name: account.timezone_name,
           startDate: account.startDate,
           endDate: account.endDate,
@@ -115,8 +149,15 @@ function useReconciliation(days: number) {
           site: result.site,
           conversations: result.conversations,
           total: result.total,
-          available: result.available,
-          reason: result.reason,
+          hasValues: result.available || isConfirmed,
+          available: isConfirmed,
+          reason: syncIssue?.last_error || (isConnectionError ? `Estado da conexão Meta: ${account.connection_status}` : result.reason),
+          status: isConnectionError
+            ? isConfirmed ? "Erro · último snapshot" : "Erro de sincronização"
+            : isConfirmed
+              ? result.leadActionFactCount > 0 ? "Disponível" : "Zero confirmado"
+              : result.available ? "Snapshot não confirmado"
+                : result.reason?.startsWith("Nenhum snapshot") ? "Sem snapshot" : "Aguardando ações",
         };
       }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
     },
@@ -178,7 +219,14 @@ export function MetaLeadsReconciliationCard() {
     }
   };
 
-  const availableCount = useMemo(() => (rows || []).filter((row) => row.available).length, [rows]);
+  const connectionCounts = useMemo(() => {
+    const connected = (rows || []).filter((row) => row.connectionStatus === "connected");
+    return {
+      connected: connected.length,
+      confirmed: connected.filter((row) => row.available).length,
+      withConnectionIssue: (rows || []).filter((row) => row.connectionStatus !== "connected").length,
+    };
+  }, [rows]);
 
   return (
     <Card>
@@ -217,7 +265,7 @@ export function MetaLeadsReconciliationCard() {
           <p className="text-sm text-muted-foreground">Nenhuma conta Meta conectada.</p>
         ) : (
           <>
-            <p className="mb-3 text-xs text-muted-foreground">Ações confirmadas em {availableCount} de {rows.length} contas · datas civis no timezone de cada conta.</p>
+            <p className="mb-3 text-xs text-muted-foreground">Ações confirmadas em {connectionCounts.confirmed} de {connectionCounts.connected} contas conectadas{connectionCounts.withConnectionIssue ? ` · ${connectionCounts.withConnectionIssue} contas ativas com erro/status diferente de conectado` : ""} · datas civis no timezone de cada conta.</p>
             {syncProgress && <p className="mb-3 text-xs text-amber-600" role="status">Sincronizando conta {syncProgress.completed + (syncProgress.completed < syncProgress.total ? 1 : 0)} de {syncProgress.total}: {syncProgress.accountName}</p>}
             <div className="space-y-2">
               <div className="grid grid-cols-12 gap-2 border-b border-border/40 px-2 pb-2 text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -235,13 +283,13 @@ export function MetaLeadsReconciliationCard() {
                     <div className="truncate font-medium">{row.name}</div>
                     <div className="text-[10px] text-muted-foreground">{row.startDate} → {row.endDate} · {row.timezone_name || "America/Sao_Paulo"}</div>
                   </div>
-                  <div className="col-span-1 text-right tabular-nums">{formatCount(row.forms, row.available)}</div>
-                  <div className="col-span-1 text-right tabular-nums">{formatCount(row.site, row.available)}</div>
-                  <div className="col-span-1 text-right tabular-nums">{formatCount(row.conversations, row.available)}</div>
-                  <div className="col-span-2 text-right font-semibold tabular-nums">{formatCount(row.total, row.available)}</div>
+                  <div className="col-span-1 text-right tabular-nums">{formatCount(row.forms, row.hasValues)}</div>
+                  <div className="col-span-1 text-right tabular-nums">{formatCount(row.site, row.hasValues)}</div>
+                  <div className="col-span-1 text-right tabular-nums">{formatCount(row.conversations, row.hasValues)}</div>
+                  <div className="col-span-2 text-right font-semibold tabular-nums">{formatCount(row.total, row.hasValues)}</div>
                   <div className="col-span-2 flex justify-end" title={row.reason}>
-                    <Badge variant={row.available ? "default" : "secondary"} className="max-w-full truncate text-[10px]">
-                      {row.available ? "Disponível" : row.reason?.startsWith("Nenhum snapshot") ? "Sem snapshot" : "Aguardando ações"}
+                    <Badge variant={row.connectionStatus === "connected" && row.available ? "default" : row.connectionStatus === "connected" ? "secondary" : "destructive"} className="max-w-full truncate text-[10px]">
+                      {row.status}
                     </Badge>
                   </div>
                   <div className="col-span-1 flex justify-end">

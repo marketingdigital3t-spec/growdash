@@ -176,7 +176,7 @@ describe("Meta action metrics", () => {
 
   it("soma os três grupos Meta sem exigir catálogo de campanha e mantém o escopo de atribuição", () => {
     const result = aggregateMetaLeadTargets(
-      [{ ad_id: "ad-1", ad_account_id: "account-1", attribution_window: "account_default" }],
+      [{ ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-04", attribution_window: "account_default" }],
       [
         { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 7, attribution_window: null },
         { ad_id: "ad-1", date: "2026-10-04", action_type: "lead", value: 13, attribution_window: "account_default" },
@@ -187,6 +187,36 @@ describe("Meta action metrics", () => {
     );
 
     expect(result.dailyByAccount["account-1"]["2026-10-04"]).toEqual({ forms: 7, site: 2, conversations: 1, total: 10 });
+  });
+
+  it("does not use another day's attribution scope or orphan action rows", () => {
+    const result = aggregateMetaLeadTargets(
+      [
+        { ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-03", attribution_window: "7d_click" },
+        { ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-04", attribution_window: "account_default" },
+      ],
+      [
+        { ad_id: "ad-1", date: "2026-10-03", action_type: "onsite_conversion.lead_grouped", value: 5, attribution_window: "7d_click" },
+        { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 7, attribution_window: "7d_click" },
+        { ad_id: "ad-1", date: "2026-10-02", action_type: "onsite_conversion.lead_grouped", value: 99, attribution_window: "account_default" },
+      ],
+    );
+
+    expect(result.dailyByAccount["account-1"]).toEqual({
+      "2026-10-03": { forms: 5, site: 0, conversations: 0, total: 5 },
+    });
+  });
+
+  it("fails closed when an ad/day has snapshots in multiple attribution windows", () => {
+    const result = aggregateMetaLeadTargets(
+      [
+        { ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-04", attribution_window: "7d_click" },
+        { ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-04", attribution_window: "account_default" },
+      ],
+      [{ ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 13, attribution_window: "account_default" }],
+    );
+
+    expect(result.dailyByAccount["account-1"]).toBeUndefined();
   });
 
   it("resolve o resultado oficial por objetivo sem somar mecanismos diferentes", () => {
