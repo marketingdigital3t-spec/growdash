@@ -13,7 +13,7 @@ const base: MetaSyncCoverageRow = {
   status: "fresh",
   block_status: {
     insights: { status: "fresh", rowsPersisted: 2 },
-    actions: { status: "fresh", rowsPersisted: 1, sourceInsightRows: 2 },
+    actions: { status: "fresh", rowsPersisted: 1, leadRowsPersisted: 1, sourceInsightRows: 2 },
   },
   updated_at: "2026-10-03T12:00:00Z",
 };
@@ -36,6 +36,8 @@ describe("Meta sync coverage", () => {
   it("rejects old fresh watermarks without evidence that rows were persisted", () => {
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh" }, actions: { status: "fresh" } } }], account, "2026-10-02", "2026-10-02", [], "insights")).toBeNull();
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh", rowsPersisted: 2 }, actions: { status: "fresh", rowsPersisted: 0 } } }], account, "2026-10-02", "2026-10-02", [], "actions")).toBeNull();
+    expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh", rowsPersisted: 2 }, actions: { status: "fresh", rowsPersisted: 0, sourceInsightRows: 2 } } }], account, "2026-10-02", "2026-10-02", [], "actions")).toBeNull();
+    expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { status: "fresh", rowsPersisted: 2 }, actions: { status: "fresh", rowsPersisted: 18, sourceInsightRows: 2 } } }], account, "2026-10-02", "2026-10-02", [], "actions")).toBeNull();
   });
 
   it("accepts an all-campaign snapshot or an explicit superset, never a different campaign", () => {

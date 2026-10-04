@@ -30,14 +30,20 @@ function blockStatus(row: MetaSyncCoverageRow, block: string) {
 function hasPersistedBlockEvidence(row: MetaSyncCoverageRow, block: string) {
   const value = row.block_status?.[block];
   if (!value || typeof value !== "object") return false;
-  const evidence = value as { rowsPersisted?: unknown; sourceInsightRows?: unknown };
+  const evidence = value as { rowsPersisted?: unknown; sourceInsightRows?: unknown; leadRowsPersisted?: unknown };
   if (block === "insights") {
     return typeof evidence.rowsPersisted === "number" && evidence.rowsPersisted > 0;
   }
   if (block === "actions") {
     return typeof evidence.sourceInsightRows === "number"
       && evidence.sourceInsightRows > 0
-      && typeof evidence.rowsPersisted === "number";
+      // An empty actions array is not proof of a confirmed zero. Meta omits
+      // action facts when it has no reportable result (and can also omit them
+      // transiently); only persisted action rows confirm this block.
+      // Legacy `rowsPersisted` counted every action (including clicks), so
+      // only this explicit field can confirm a canonical lead action snapshot.
+      && typeof evidence.leadRowsPersisted === "number"
+      && evidence.leadRowsPersisted > 0;
   }
   return true;
 }

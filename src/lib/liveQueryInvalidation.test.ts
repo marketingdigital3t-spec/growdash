@@ -6,6 +6,10 @@ describe("live query invalidation", () => {
     expect(shouldInvalidateLiveQuery(["meta-action-sync-coverage", ["account-1"]])).toBe(true);
   });
 
+  it("refreshes canonical lead actions after the selected Meta sync completes", () => {
+    expect(shouldInvalidateLiveQuery(["action-totals-by-ads", "ad-1", "account-1"])).toBe(true);
+  });
+
   it("does not invalidate unrelated cached module data", () => {
     expect(shouldInvalidateLiveQuery(["agent-office-directors", "workspace-1"])).toBe(false);
   });

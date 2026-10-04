@@ -22,3 +22,5 @@
 - Dia sem fatos confirmados, sincronização pendente e zero legítimo são estados distintos. Falha de fonte não pode ser convertida em zero.
 - A cobertura RD de métricas analíticas é confirmada por `rd_sync_scope_state`, vinculada a funil, intervalo civil e timezone. Um snapshot anterior válido continua utilizável durante uma nova tentativa; uma linha vazia só confirma zero depois que o período exato foi sincronizado com sucesso.
 - Agentes/RAG/MCP são consumidores analíticos e não alimentam os cards do Growdash Flow. O Flow consulta os snapshots canônicos diretamente; diferenças ou indisponibilidade precisam ser corrigidas no pipeline Meta/RD, não mascaradas na camada de IA.
+- Os action types e a resolução de aliases Meta de formulário/site/conversa têm fonte compartilhada em `supabase/functions/_shared/metaLeadMetrics.ts`; frontend importa essa mesma regra. Sincronizador, MCP e `ask-ai` não devem manter listas locais divergentes.
+- Os readers MCP/IA consultam snapshots e watermarks; eles não substituem o sync Meta/RD nem validam igualdade com as plataformas de origem.

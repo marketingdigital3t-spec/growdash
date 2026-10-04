@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { datesSafeToReconcile, staleAdIdsForDailySnapshot } from "../_shared/metaInsightReconciliation.ts";
+import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,14 +16,9 @@ function connectionStatusForMetaError(errorCode: number | undefined, retryable: 
   return "error";
 }
 
-const FORM_ACTIONS = ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"];
-const SITE_ACTIONS = ["offsite_conversion.fb_pixel_lead", "offsite_conversion.lead"];
-const CONVERSATION_ACTIONS = [
-  "onsite_conversion.messaging_conversation_started_7d",
-  "onsite_conversion.messaging_conversation_started_28d",
-  "onsite_conversion.messaging_conversation_started",
-  "onsite_conversion.total_messaging_connection",
-];
+const FORM_ACTIONS = [...FORM_ACTION_TYPES];
+const SITE_ACTIONS = [...SITE_ACTION_TYPES];
+const CONVERSATION_ACTIONS = [...CONVERSATION_ACTION_TYPES];
 const PURCHASE_ACTIONS = ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"];
 
 function preferredAction(actions: any[], aliases: string[]) {
@@ -34,17 +30,12 @@ function preferredAction(actions: any[], aliases: string[]) {
 }
 
 function canonicalLeadParts(actions: any[], lpAction: string | null) {
-  const hasForm = FORM_ACTIONS.some((type) => actions.some((item: any) => item.action_type === type));
-  const hasConversation = CONVERSATION_ACTIONS.some((type) => actions.some((item: any) => item.action_type === type));
-  const forms = hasForm
-    ? preferredAction(actions, FORM_ACTIONS)
-    : hasConversation || SITE_ACTIONS.some((type) => actions.some((item: any) => item.action_type === type))
-      ? 0
-      : preferredAction(actions, ["lead"]);
-  const siteAliases = lpAction && !FORM_ACTIONS.includes(lpAction) && lpAction !== "lead" ? [lpAction] : SITE_ACTIONS;
-  const site = preferredAction(actions, siteAliases);
-  const conversations = preferredAction(actions, CONVERSATION_ACTIONS);
-  return { forms, site, conversations };
+  const values: Record<string, number> = {};
+  for (const action of actions) {
+    const type = String(action.action_type || "");
+    values[type] = Math.max(Number(values[type] || 0), Math.max(0, Number(action.value || 0)));
+  }
+  return resolveMetaLeadParts(values, lpAction || undefined);
 }
 
 function canonicalResult(objective: string | null, optimizationGoal: string | null, actions: any[], lpAction: string | null) {
@@ -727,26 +718,6 @@ Deno.serve(async (req) => {
           if (lpCfg?.action_type) lpAction = lpCfg.action_type;
         } catch (_) { /* ignore */ }
 
-        const nativeFormValue = (actions: any[]): number => {
-          const valueOf = (type: string) => Number(actions.find((item: any) => item.action_type === type)?.value || 0);
-          const canonical = [
-            valueOf("onsite_conversion.lead_grouped"),
-            valueOf("omni_lead"),
-            valueOf("leadgen_grouped"),
-            valueOf("offsite_conversion.fb_pixel_lead"),
-          ];
-          // Meta sometimes exposes only `lead` for older form accounts. It is
-          // a fallback, never an additive alias: on messaging campaigns it can
-          // be an auxiliary action and must not inflate forms.
-          const hasConversation = [
-            "onsite_conversion.messaging_conversation_started_7d",
-            "onsite_conversion.messaging_conversation_started_28d",
-            "onsite_conversion.messaging_conversation_started",
-            "onsite_conversion.total_messaging_connection",
-          ].some((type) => actions.some((item: any) => item.action_type === type));
-          return canonical.some((value) => value > 0) ? Math.max(...canonical) : hasConversation ? 0 : valueOf("lead");
-        };
-
         // 4.3 Persistir TODOS os action_types em insight_actions
         const actionRows: any[] = [];
         for (const insight of allInsights) {
@@ -775,6 +746,14 @@ Deno.serve(async (req) => {
           if (aErr) throw new Error(`ações da conta ${account.name}: ${aErr.message}`);
         }
         if (actionRows.length > 0) console.log(`insight_actions: ${actionRows.length} rows`);
+        const leadActionTypes = new Set<string>([
+          ...FORM_ACTIONS,
+          ...SITE_ACTIONS,
+          ...CONVERSATION_ACTIONS,
+          "lead",
+          ...(lpAction ? [lpAction] : []),
+        ]);
+        const persistedLeadActionRows = actionRows.filter((row) => leadActionTypes.has(row.action_type));
 
         const campaignById = new Map((campaigns || []).map((campaign: any) => [String(campaign.id), campaign]));
         const adsetById = new Map((adsetsList || []).map((adset: any) => [String(adset.id), adset]));
@@ -1027,27 +1006,11 @@ Deno.serve(async (req) => {
               .filter((r: any) => r.campaign_id && r[breakdown.type])
               .map((r: any) => {
                 const actions = r.actions || [];
-                const findVal = (type: string): number => {
-                  const a = actions.find((x: any) => x.action_type === type);
-                  return a ? Number(a.value || 0) : 0;
-                };
                 // Reuse the canonical acquisition rules for every campaign
                 // type: native forms, configured landing pages, and click-to-
                 // message campaigns. Do not drop message campaigns from the
                 // audience report simply because they have no form action.
-                const nLeads = nativeFormValue(actions);
-                const lLeads = lpAction && !["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped", "offsite_conversion.fb_pixel_lead", "lead"].includes(lpAction) ? findVal(lpAction) : 0;
-                // Meta varies the messaging action name by objective/API
-                // version. Count every known conversation-start action so
-                // click-to-message campaigns also populate the audience
-                // breakdowns (without double-counting the same action type).
-                const messagingActions = [
-                  "onsite_conversion.messaging_conversation_started_7d",
-                  "onsite_conversion.messaging_conversation_started",
-                  "onsite_conversion.messaging_conversation_started_28d",
-                  "onsite_conversion.total_messaging_connection",
-                ];
-                const conversations = Math.max(...messagingActions.map(findVal));
+                const parts = canonicalLeadParts(actions, lpAction);
                 return {
                   campaign_id: r.campaign_id,
                   date: r.date_start,
@@ -1059,7 +1022,7 @@ Deno.serve(async (req) => {
                   spend: Number(r.spend || 0),
                   impressions: Number(r.impressions || 0),
                   clicks: Number(r.clicks || 0),
-                  leads: nLeads + lLeads + conversations,
+                  leads: parts.forms + parts.site + parts.conversations,
                 };
               });
             for (let i = 0; i < bRows.length; i += 200) {
@@ -1115,7 +1078,15 @@ Deno.serve(async (req) => {
               rowsPersisted: insightRows.length,
               spendPersisted: insightRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0),
             },
-            actions: { status: "fresh", sourceInsightRows: insightRows.length, rowsPersisted: actionRows.length },
+            actions: {
+              status: persistedLeadActionRows.length > 0 ? "fresh" : "partial",
+              sourceInsightRows: insightRows.length,
+              rowsPersisted: persistedLeadActionRows.length,
+              leadRowsPersisted: persistedLeadActionRows.length,
+              evidenceVersion: 2,
+              allActionRowsPersisted: actionRows.length,
+              ...(persistedLeadActionRows.length === 0 ? { reason: "Meta não retornou linhas de ações de leads, site ou conversas para confirmar este período." } : {}),
+            },
             hourly: { status: "pending" },
             breakdowns: { status: auxiliaryErrors.length ? "partial" : "pending", errorMessage: auxiliaryErrors.join("; ") || null },
           },

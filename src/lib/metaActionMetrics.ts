@@ -1,3 +1,5 @@
+import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../../supabase/functions/_shared/metaLeadMetrics";
+
 export const META_ACTION_TYPES = {
   // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
   // native form events and only use it as a fallback when none is present.
@@ -5,12 +7,12 @@ export const META_ACTION_TYPES = {
   // Website conversions stay in the separate `site` group below.
   // Resolve them as aliases (max, never additive) so one submission is not
   // counted twice when Meta returns more than one representation.
-  forms: ["onsite_conversion.lead_grouped", "omni_lead", "leadgen_grouped"],
-  site: ["offsite_conversion.fb_pixel_lead", "offsite_conversion.lead"],
+  forms: FORM_ACTION_TYPES,
+  site: SITE_ACTION_TYPES,
   // Older Meta accounts expose the same result as total_messaging_connection.
   // It is a fallback alias only; preferredValue() prevents additive counting
   // when a started-conversation alias is present in the same ad.
-  conversations: ["onsite_conversion.messaging_conversation_started_7d", "onsite_conversion.messaging_conversation_started_28d", "onsite_conversion.messaging_conversation_started", "onsite_conversion.total_messaging_connection"],
+  conversations: CONVERSATION_ACTION_TYPES,
   linkClick: ["link_click"],
   landingPageView: ["landing_page_view"],
   checkout: [
@@ -45,23 +47,9 @@ export function resolveMetaActionMetrics(
 }
 
 export function resolveMetaLeadActions(actionTotals?: Record<string, number>, siteAction?: string | null) {
-  const nativeAliases = META_ACTION_TYPES.forms;
-  const hasNativeAlias = nativeAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
-  const hasConversationAlias = META_ACTION_TYPES.conversations.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
-  const configuredSiteAliases = siteAction && !nativeAliases.includes(siteAction as any) && siteAction !== "lead" ? [siteAction] : [];
-  const siteAliases = configuredSiteAliases.length ? configuredSiteAliases : META_ACTION_TYPES.site;
-  const hasSiteAlias = siteAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals || {}, alias));
-  const site = preferredValue(actionTotals, siteAliases);
-  const forms = hasNativeAlias ? preferredValue(actionTotals, nativeAliases) : hasConversationAlias || hasSiteAlias ? 0 : preferredValue(actionTotals, ["lead"]);
-  const conversations = preferredValue(actionTotals, META_ACTION_TYPES.conversations);
-  return {
-    forms,
-    site,
-    conversations,
-    // The Ads Manager's overall Results column combines lead submissions and
-    // initiated conversations; the component fields keep both sources visible.
-    total: forms + site + conversations,
-  };
+  // The shared pure resolver is also used by Meta ingestion, MCP and AI/RAG.
+  // Equivalent aliases are max-resolved, while the three canonical groups sum.
+  return resolveMetaLeadParts(actionTotals || {}, siteAction || undefined);
 }
 
 export type MetaResultType = "leads" | "conversations" | "landing_page_view" | "purchase" | "reach";

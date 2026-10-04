@@ -24,7 +24,6 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useInsights } from "@/hooks/useInsights";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { useRDWonDealsForPeriod, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
-import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
@@ -68,7 +67,6 @@ import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate } from
 function FlowDataScopePanel() {
   const { adAccountIds, funnelIds, startDate, endDate } = useGlobalFilters();
   const accounts = useAdAccounts();
-  const connections = useRDAccountConnections();
   const selectedAccounts = useMemo(() => accounts.data || [], [accounts.data]);
   const allAccountIds = useMemo(() => selectedAccounts.map((account) => account.id), [selectedAccounts]);
   const effectiveAccountIds = useMemo(() => resolveGrowdashFlowAccountIds(adAccountIds, allAccountIds), [adAccountIds, allAccountIds]);
@@ -198,16 +196,8 @@ function FlowDataScopePanel() {
     };
   }, [rdConfirmed, rdEndDate, rdScopeCoverage.isError, rdScopeCoverage.isLoading, rdScopeEnabled, rdScopeRows, rdStartDate, queryClient, sortedFunnelIds]);
 
-  const accountByExternalId = new Map<string, string>();
-  selectedAccounts.forEach((account) => {
-    accountByExternalId.set(String(account.account_id || "").replace(/^act_/i, ""), account.id);
-  });
-  const relevantConnections = (connections.data || []).filter((connection) => {
-    const external = String(connection.external_account_id || "").replace(/^act_/i, "");
-    return effectiveAccountIds.some((id) => accountByExternalId.get(external) === id);
-  });
-  const rdSyncing = connections.isLoading || rdCreated.isLoading || rdWon.isLoading || rdScopeCoverage.isLoading || rdSyncRequestInFlight || rdScopeRows.some((row) => row.status === "syncing") || accounts.isLoading;
-  const rdError = connections.isError || rdCreated.isError || rdWon.isError || rdScopeCoverage.isError;
+  const rdSyncing = resolvedRDScope.loading || rdCreated.isLoading || rdWon.isLoading || rdScopeCoverage.isLoading || rdSyncRequestInFlight || rdScopeRows.some((row) => row.status === "syncing") || accounts.isLoading;
+  const rdError = Boolean(resolvedRDScope.error || rdCreated.isError || rdWon.isError || rdScopeCoverage.isError);
   const rdDataAvailable = isGrowdashFlowRDDataAvailable({ scopeEnabled: rdScopeEnabled && sortedFunnelIds.length > 0, confirmed: rdConfirmed });
   const periodLabel = `${businessDateKey(startDate)} — ${businessDateKey(endDate)}`;
   const money = (value: number | null | undefined) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
@@ -221,7 +211,10 @@ function FlowDataScopePanel() {
   const rdDeals = rdCreated.data || [];
   const wonDeals = rdWon.data || [];
   const rdMetrics = summarizeGrowdashFlowRD(rdDeals, wonDeals);
-  const latestRDSync = relevantConnections.map((connection) => connection.last_success_at).filter(Boolean).sort().at(-1);
+  // This timestamp is from the exact selected funnel/date coverage. A
+  // connection-level timestamp can refer to another funnel or period and
+  // incorrectly make this snapshot look fresher than it is.
+  const latestRDSync = scopedRDSyncRows.map((row) => row.last_success_at).filter(Boolean).sort()[0] || null;
 
   return (
     <section aria-label="Métricas da conta e do período selecionados" className="gd-panel mb-4 p-4 sm:p-5">
@@ -265,6 +258,7 @@ function FlowDataScopePanel() {
           {latestRDSync
             ? <p className="mt-2 text-[10px] text-muted-foreground">Última sincronização RD: {new Date(latestRDSync).toLocaleString("pt-BR")}</p>
             : rdDataAvailable && <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Leitura do snapshot RD confirmada; a conexão não registra data da última sincronização.</p>}
+          {rdSyncing && rdDataAvailable && <p role="status" className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Mostrando o último snapshot RD confirmado para este funil e período enquanto a atualização termina.</p>}
           {rdSyncRequestError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Sincronização RD: {rdSyncRequestError}</p>}
           {hasNoResolvedRDFunnel && !rdSyncing && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">A conta selecionada não tem um funil RD vinculado.</p>}
           {rdError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Não foi possível confirmar os dados do RD nesta seleção.</p>}
