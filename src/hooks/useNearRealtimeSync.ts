@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { businessDateKey } from "@/lib/businessDate";
 import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
+import { withInFlightScope } from "@/lib/inFlightByScope";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -51,7 +52,7 @@ interface Params {
  */
 export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, funnelIds, timezone, attributionWindow, startDate, endDate, enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
-  const inFlight = useRef<Promise<void> | null>(null);
+  const inFlight = useRef(new Map<string, Promise<void>>());
   const initialGlobalSync = useRef(true);
   const invalidateTimer = useRef<number | null>(null);
   const [state, setState] = useState<SyncState>("idle");
@@ -61,6 +62,8 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const startDateKey = startDate ? businessDateKey(startDate, timezone || undefined) : "today";
   const endDateKey = endDate ? businessDateKey(endDate, timezone || undefined) : "today";
   const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDateKey}:${endDateKey}:${timezone || "account"}:${attributionWindow || "account_default"}`;
+  const activeScope = useRef(scope);
+  activeScope.current = scope;
 
   const invalidateLiveQueries = useCallback(() => {
     if (invalidateTimer.current) window.clearTimeout(invalidateTimer.current);
@@ -76,95 +79,97 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
 
   const refresh = useCallback(async (force = false) => {
     if (!enabled || !navigator.onLine || document.visibilityState === "hidden") return;
-    if (inFlight.current) return inFlight.current;
+    const isCurrentScope = () => activeScope.current === scope;
 
     const storageKey = `${STORAGE_PREFIX}:${scope}`;
     const previousAttempt = Number(window.localStorage.getItem(storageKey) || 0);
     if (!force && Date.now() - previousAttempt < LOCAL_DEDUP_WINDOW_MS) return;
     window.localStorage.setItem(storageKey, String(Date.now()));
 
-    const task = (async () => {
-      setState("refreshing");
-      // The selected slice must be refreshed first. A global reconciliation
-      // can include many accounts/funnels and may legitimately outlive the
-      // browser request timeout; it must never prevent the selected cards
-      // from being populated. Once the selected slice returns, start the
-      // global pass in the background on the first entry.
-      const global = initialGlobalSync.current;
-      initialGlobalSync.current = false;
-      const selectedBody = {
-        adAccountId,
-        adAccountIds,
-        campaignIds,
-        funnelIds,
-        startDate: startDate ? startDateKey : undefined,
-        endDate: endDate ? endDateKey : undefined,
-        timezone,
-        attributionWindow,
-        includeMeta: true,
-        includeRD: false,
-        includeBalance: false,
-        fast: true,
-        realtime: true,
-        force,
-      };
-      const { data, error } = await supabase.functions.invoke("controlled-realtime-sync", {
-        body: selectedBody,
-      });
-      const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
-      if (error || data?.error || ["failed", "error"].includes(metaStatus)) {
-        throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
-      }
-      // The controlled endpoint aggregates Meta, RD and balance for audit
-      // purposes. A pending RD page or balance refresh must not mark the Meta
-      // KPI snapshot as failed; use the provider-specific status instead.
-      const auxiliaryWarnings = Array.isArray(data?.warnings)
-        ? data.warnings.map((warning: unknown) => String(warning)).join(" · ")
-        : "";
-      setSyncError(auxiliaryWarnings || null);
-      if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
-      setLastUpdatedAt(new Date());
-      setState(metaStatus === "partial" ? "partial" : ["failed", "error"].includes(metaStatus) ? "error" : "fresh");
-      if (["failed", "partial", "error"].includes(metaStatus)) {
-        setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
-      }
-      invalidateLiveQueries();
-
-      if (global) {
-        // Do not await this request. It is deliberately global and is only
-        // responsible for warming every account/funnel for the next visit.
-        // The selected response above remains the source of the current UI.
-        void supabase.functions.invoke("controlled-realtime-sync", {
-          body: {
-            ...selectedBody,
-            adAccountId: undefined,
-            adAccountIds: undefined,
-            funnelIds: undefined,
-            includeRD: true,
-            includeBalance: true,
-            fast: false,
-          },
-        }).then(({ data: globalData, error: globalError }) => {
-          if (globalError || globalData?.error) {
-            console.warn("[near-realtime-sync] global reconciliation", globalError || globalData?.error);
-            return;
-          }
-          invalidateLiveQueries();
-        }).catch((globalError) => {
-          console.warn("[near-realtime-sync] global reconciliation", globalError);
+    const task = withInFlightScope(inFlight.current, scope, async () => {
+      try {
+        if (isCurrentScope()) setState("refreshing");
+        // The selected slice must be refreshed first. A global reconciliation
+        // can include many accounts/funnels and may legitimately outlive the
+        // browser request timeout; it must never prevent the selected cards
+        // from being populated. Once the selected slice returns, start the
+        // global pass in the background on the first entry.
+        const global = initialGlobalSync.current;
+        initialGlobalSync.current = false;
+        const selectedBody = {
+          adAccountId,
+          adAccountIds,
+          campaignIds,
+          funnelIds,
+          startDate: startDate ? startDateKey : undefined,
+          endDate: endDate ? endDateKey : undefined,
+          timezone,
+          attributionWindow,
+          includeMeta: true,
+          includeRD: false,
+          includeBalance: false,
+          fast: true,
+          realtime: true,
+          force,
+        };
+        const { data, error } = await supabase.functions.invoke("controlled-realtime-sync", {
+          body: selectedBody,
         });
-      }
-    })().catch((error) => {
-      // Falha silenciosa: o histórico armazenado permanece visível e uma nova
-      // tentativa ocorrerá ao recuperar foco ou no próximo ciclo.
-      console.warn("[near-realtime-sync]", error);
-      setSyncError(error instanceof Error ? error.message : String(error));
-      setState("error");
-    }).finally(() => {
-      inFlight.current = null;
-    });
+        const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
+        if (error || data?.error || ["failed", "error"].includes(metaStatus)) {
+          throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
+        }
+        // The controlled endpoint aggregates Meta, RD and balance for audit
+        // purposes. A pending RD page or balance refresh must not mark the Meta
+        // KPI snapshot as failed; use the provider-specific status instead.
+        const auxiliaryWarnings = Array.isArray(data?.warnings)
+          ? data.warnings.map((warning: unknown) => String(warning)).join(" · ")
+          : "";
+        if (isCurrentScope()) {
+          setSyncError(auxiliaryWarnings || null);
+          if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
+          setLastUpdatedAt(new Date());
+          setState(metaStatus === "partial" ? "partial" : ["failed", "error"].includes(metaStatus) ? "error" : "fresh");
+          if (["failed", "partial", "error"].includes(metaStatus)) {
+            setSyncError("Sincronização parcial dos KPIs principais; o último snapshot válido foi preservado.");
+          }
+        }
+        invalidateLiveQueries();
 
-    inFlight.current = task;
+        if (global) {
+          // Do not await this request. It is deliberately global and is only
+          // responsible for warming every account/funnel for the next visit.
+          // The selected response above remains the source of the current UI.
+          void supabase.functions.invoke("controlled-realtime-sync", {
+            body: {
+              ...selectedBody,
+              adAccountId: undefined,
+              adAccountIds: undefined,
+              funnelIds: undefined,
+              includeRD: true,
+              includeBalance: true,
+              fast: false,
+            },
+          }).then(({ data: globalData, error: globalError }) => {
+            if (globalError || globalData?.error) {
+              console.warn("[near-realtime-sync] global reconciliation", globalError || globalData?.error);
+              return;
+            }
+            invalidateLiveQueries();
+          }).catch((globalError) => {
+            console.warn("[near-realtime-sync] global reconciliation", globalError);
+          });
+        }
+      } catch (error) {
+        // Falha silenciosa: o histórico armazenado permanece visível e uma nova
+        // tentativa ocorrerá ao recuperar foco ou no próximo ciclo.
+        console.warn("[near-realtime-sync]", error);
+        if (isCurrentScope()) {
+          setSyncError(error instanceof Error ? error.message : String(error));
+          setState("error");
+        }
+      }
+    });
     return task;
   }, [adAccountId, adAccountIds, attributionWindow, campaignIds, endDate, endDateKey, enabled, funnelIds, invalidateLiveQueries, scope, startDate, startDateKey, timezone]);
 
