@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,16 @@ export function MetaValidationCard({ adAccountIds, startDate, endDate }: {
   const [results, setResults] = useState<Row[] | null>(null);
   const startDateKey = businessDateKey(startDate);
   const endDateKey = businessDateKey(endDate);
+  const accountScopeKey = adAccountIds.join(",");
+
+  // A validação é local ao escopo informado no momento do clique. Quando o
+  // usuário troca a conta ou o período, o resultado anterior não pode
+  // continuar visível (por exemplo, mostrar 178 de uma conta enquanto outra
+  // está selecionada). Limpar o snapshot evita atribuir números antigos ao
+  // novo escopo e força uma nova comparação explícita.
+  useEffect(() => {
+    setResults(null);
+  }, [accountScopeKey, endDateKey, startDateKey]);
 
   const run = async () => {
     setRunning(true);
