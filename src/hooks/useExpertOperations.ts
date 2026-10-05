@@ -25,7 +25,7 @@ export type ExpertOperationsData = {
 };
 
 export function useExpertOperations(expertId: string | undefined) {
-  const { startDate, endDate } = useGlobalFilters();
+  const { startDate, endDate, adAccountIds } = useGlobalFilters();
   const expert = useQuery({ queryKey: ["expert-operations-expert", expertId], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("experts").select("nome").eq("id", expertId!).maybeSingle(); if (error) throw error; return data; } });
   const sources = useQuery({
     queryKey: ["expert-operation-sources", expertId], enabled: Boolean(expertId),
@@ -57,7 +57,14 @@ export function useExpertOperations(expertId: string | undefined) {
       return rows.map((row: any) => ({ ...row, participants: byClass.get(row.id) || [] }));
     },
   });
-  const accountIds = useMemo(() => Array.from(new Set((sources.data || []).map((source) => source.ad_account_id).filter(Boolean) as string[])), [sources.data]);
+  const linkedAccountIds = useMemo(() => Array.from(new Set((sources.data || []).map((source) => source.ad_account_id).filter(Boolean) as string[])), [sources.data]);
+  // Prefer the explicit expert-to-account link. During the migration to that
+  // link table, use the account selected in the global toolbar so the expert
+  // panel can still show the same Meta traffic scope as the rest of Growdash.
+  const accountIds = useMemo(
+    () => linkedAccountIds.length ? linkedAccountIds : adAccountIds,
+    [adAccountIds, linkedAccountIds],
+  );
   const attributionWindowsByAccount = useMemo(() => Object.fromEntries((sources.data || []).filter((source) => source.ad_account_id).map((source) => [source.ad_account_id, source.attribution_window || "account_default"])), [sources.data]);
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(expertId && accountIds.length));
   const filteredClasses = useMemo(() => (classes.data || []).filter((item: any) => {
@@ -75,5 +82,5 @@ export function useExpertOperations(expertId: string | undefined) {
     return rankExpertSales(sales.data || [], Object.fromEntries(goals));
   }, [sales.data, sellerGoals.data]);
   const syncStatus = traffic.data.status === "syncing" || sources.isFetching || sales.isFetching ? "syncing" : traffic.data.status;
-  return { expertId, sources: sources.data || [], sales: sales.data || [], classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || classes.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
+  return { expertId, sources: sources.data || [], accountIds, sales: sales.data || [], classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || classes.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
 }

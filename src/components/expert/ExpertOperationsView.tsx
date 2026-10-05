@@ -366,11 +366,8 @@ export function ExpertOperationsView() {
   const conversion = operations.traffic.totalLeads
     ? (operations.sales.length / operations.traffic.totalLeads) * 100
     : null;
-  const accountLabel = operations.sources.length
-    ? operations.sources
-        .map((source) => source.ad_account_id)
-        .filter(Boolean)
-        .join(", ")
+  const accountLabel = operations.accountIds.length
+    ? operations.accountIds.join(", ")
     : "Nenhuma conta Meta vinculada";
   const periodLabel = `${startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
   const dailyRevenue = useMemo(() => {
