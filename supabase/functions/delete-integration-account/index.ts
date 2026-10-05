@@ -34,10 +34,35 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const provider = normalize(body?.provider).toLowerCase();
     const accountId = normalize(body?.account_id);
+    const accountIds = Array.isArray(body?.account_ids)
+      ? body.account_ids.map(normalize).filter(Boolean).slice(0, 200)
+      : [];
     const confirmation = normalize(body?.confirmation);
     const { data: isMaster } = await admin.rpc("is_master", { _user_id: user.id });
 
     if (provider === "meta") {
+      if (accountIds.length) {
+        if (confirmation !== "EXCLUIR CONTAS SELECIONADAS") {
+          return json({ error: "Digite EXCLUIR CONTAS SELECIONADAS para confirmar" }, 400);
+        }
+        const { data: accounts, error: accountsError } = await admin
+          .from("ad_accounts")
+          .select("id, user_id")
+          .in("id", accountIds);
+        if (accountsError) throw accountsError;
+        if (!accounts?.length) return json({ error: "Nenhuma conta Meta selecionada existe mais" }, 404);
+        if (!isMaster && accounts.some((account) => account.user_id !== user.id)) {
+          return json({ error: "Você não pode remover uma ou mais contas selecionadas" }, 403);
+        }
+        const { error: deleteError } = await admin.from("ad_accounts").delete().in("id", accounts.map((account) => account.id));
+        if (deleteError) throw deleteError;
+        return json({
+          ok: true,
+          provider: "meta",
+          deleted_count: accounts.length,
+          message: `${accounts.length} conta${accounts.length === 1 ? " foi" : "s foram"} removida${accounts.length === 1 ? "" : "s"} da Growdash. As contas de anúncios continuam existindo na Meta.`,
+        });
+      }
       // Keep historical campaigns/insights intact, but hide every account
       // imported by this profile from the integration inventory. A future
       // OAuth connection clears this marker when it reuses the account row.
