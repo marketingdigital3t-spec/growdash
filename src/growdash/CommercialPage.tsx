@@ -213,21 +213,26 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
 }) {
   const podiumOrder = ranking.length === 1 ? [ranking[0]] : ranking.length === 2 ? [ranking[0], ranking[1]] : [ranking[1], ranking[0], ranking[2]].filter(Boolean);
   const rowsPerPage = 10;
+  const [focusMode, setFocusMode] = useState(false);
   const remaining = ranking.slice(3);
   const totalPages = Math.max(1, Math.ceil(remaining.length / rowsPerPage));
   const safePage = Math.min(rankingPage, totalPages - 1);
   const pageRows = remaining.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
   const metricLabel = metric === "sales" ? "Vendas" : metric === "goalPercentage" ? "% da meta" : "Caixa gerado";
   const goalProgress = totals.target > 0 ? (totals.revenue / totals.target) * 100 : 0;
-  const requestFullscreen = async () => { try { await document.documentElement.requestFullscreen(); } catch { /* browser may block fullscreen */ } };
-  const exitFullscreen = async () => { if (document.fullscreenElement) await document.exitFullscreen(); };
-  return <section className="relative isolate overflow-hidden rounded-[28px] border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)]">
+  useEffect(() => {
+    if (!focusMode) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [focusMode]);
+  return <section className={`relative isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] ${focusMode ? "fixed inset-0 z-[100] min-h-screen rounded-none" : "rounded-[28px]"}`}>
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(217,169,40,.16),transparent_42%),radial-gradient(ellipse_at_5%_35%,rgba(33,94,176,.14),transparent_38%),linear-gradient(135deg,#081226_0%,#050b18_58%,#0d1830_100%)]" />
     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f6c94c]/75 to-transparent" />
     <div className="relative p-4 sm:p-6 xl:p-8">
       <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0"><div className="flex items-center gap-2 text-[#f6c94c]"><Trophy className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-[.28em]">Ranking Comercial</span></div><h2 className="mt-2 text-2xl font-black tracking-[-.045em] text-white sm:text-3xl">Painel de performance</h2><p className="mt-1 text-xs text-slate-400">Classificação calculada somente com vendas confirmadas no período.</p></div>
-        <div className="flex flex-wrap items-end gap-2"><div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div><button type="button" aria-label="Alternar tela cheia do ranking" onClick={() => document.fullscreenElement ? exitFullscreen() : requestFullscreen()} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{document.fullscreenElement ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
+        <div className="flex flex-wrap items-end gap-2"><div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div><button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={() => setFocusMode((value) => !value)} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
       </header>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><select aria-label="Conta exibida no ranking" value={accountId} onChange={(event) => onAccountChange(event.target.value)} className="h-10 max-w-full rounded-xl border border-white/10 bg-[#0b172c] px-3 text-xs font-bold text-slate-100 outline-none focus:border-[#f6c94c]">{accounts.map((item) => <option key={item.accountId} value={item.accountId}>{item.accountName}</option>)}</select><div className="flex rounded-xl border border-white/10 bg-black/20 p-1">{(["revenue", "sales", "goalPercentage"] as RankingMetric[]).map((item) => <button type="button" key={item} onClick={() => { onMetricChange(item); onRankingPageChange(0); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[.08em] transition ${metric === item ? "bg-[#d9a928] text-[#111728] shadow-lg" : "text-slate-400 hover:text-white"}`}>{item === "revenue" ? "Caixa" : item === "sales" ? "Vendas" : "Meta"}</button>)}</div></div>
       {!account && <div className="mt-6"><EmptyRanking text="Nenhuma conta ou vendedor encontrado para os filtros atuais." /></div>}
