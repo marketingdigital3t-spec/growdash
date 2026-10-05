@@ -11,7 +11,7 @@ import { businessDateKey } from "@/lib/businessDate";
 import { resolveAccountMetaLeadReconciliation } from "@/lib/metaLeadReconciliation";
 import { normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../../../supabase/functions/_shared/metaLeadMetrics";
-import { findMetaLeadSnapshotCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
+import { findMetaLeadSnapshotCoverage, findMetaSyncIssue, getMetaLeadCoverageReason, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
 
 interface AccountRow {
   id: string;
@@ -153,7 +153,7 @@ function useReconciliation(days: number) {
           total: result.total,
           hasValues: result.available || isConfirmed,
           available: isConfirmed,
-          reason: syncIssue?.last_error || (isConnectionError ? `Estado da conexão Meta: ${account.connection_status}` : result.reason),
+          reason: getMetaLeadCoverageReason(isConfirmed, account.connection_status, syncIssue, result.reason),
           status: isConnectionError
             ? isConfirmed ? "Erro · último snapshot" : "Erro de sincronização"
             : isConfirmed

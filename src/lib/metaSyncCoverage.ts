@@ -141,6 +141,19 @@ export function findMetaLeadSnapshotCoverage(
   return insights && actions ? { insights, actions } : null;
 }
 
+/** A completed snapshot supersedes an older retry error for the same scope. */
+export function getMetaLeadCoverageReason(
+  confirmed: boolean,
+  connectionStatus: string,
+  syncIssue: MetaSyncCoverageRow | null,
+  fallbackReason?: string,
+) {
+  if (confirmed && connectionStatus === "connected") return undefined;
+  return syncIssue?.last_error
+    || (connectionStatus !== "connected" ? `Estado da conexão Meta: ${connectionStatus}` : undefined)
+    || fallbackReason;
+}
+
 export function getMetaCoverageGaps(
   rows: MetaSyncCoverageRow[],
   accounts: MetaAccountScope[],

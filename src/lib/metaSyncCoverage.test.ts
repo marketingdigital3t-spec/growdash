@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findMetaLeadSnapshotCoverage, findMetaSyncCoverage, findMetaSyncIssue, getMetaCoverageGaps, type MetaSyncCoverageRow } from "./metaSyncCoverage";
+import { findMetaLeadSnapshotCoverage, findMetaSyncCoverage, findMetaSyncIssue, getMetaCoverageGaps, getMetaLeadCoverageReason, type MetaSyncCoverageRow } from "./metaSyncCoverage";
 
 const base: MetaSyncCoverageRow = {
   ad_account_id: "account-1",
@@ -94,6 +94,13 @@ describe("Meta sync coverage", () => {
     expect(findMetaLeadSnapshotCoverage([
       { ...base, block_status: { insights: zeroInsights, actions: zeroActions } },
     ], account, "2026-10-02", "2026-10-02")).not.toBeNull();
+  });
+
+  it("does not attach a prior retry error to a currently confirmed connected snapshot", () => {
+    const staleIssue = { ...base, last_error: "Nenhum snapshot de Insights neste período." };
+    expect(getMetaLeadCoverageReason(true, "connected", staleIssue, "Nenhum snapshot de Insights neste período.")).toBeUndefined();
+    expect(getMetaLeadCoverageReason(false, "connected", staleIssue)).toBe(staleIssue.last_error);
+    expect(getMetaLeadCoverageReason(true, "expired", staleIssue)).toBe(staleIssue.last_error);
   });
 
   it("accepts an all-campaign snapshot or an explicit superset, never a different campaign", () => {
