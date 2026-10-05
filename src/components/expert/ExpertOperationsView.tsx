@@ -399,49 +399,48 @@ export function ExpertOperationsView() {
   const maxRevenue = Math.max(...dailyRevenue.map(([, value]) => value), 1);
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/[.04] p-4 lg:flex-row lg:items-center">
+      <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/[.04] px-3 py-2.5 lg:flex-row lg:items-center lg:gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.16em] text-primary">
-            <Trophy className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[.14em] text-primary">
+            <Trophy className="h-3 w-3" />
             Operação do Expert
           </div>
-          <h2 className="mt-1 text-xl font-black">Turmas, tráfego e comercial</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {startDate.toLocaleDateString("pt-BR")} a {endDate.toLocaleDateString("pt-BR")} · fonte
-            de vendas: Google Sheets
-          </p>
+          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <h2 className="text-lg font-black leading-tight">Turmas, tráfego e comercial</h2>
+            <p className="text-[11px] text-muted-foreground">
+              {startDate.toLocaleDateString("pt-BR")} a {endDate.toLocaleDateString("pt-BR")} · vendas: Google Sheets
+            </p>
+          </div>
         </div>
-        <Select value={selectedExpertId || ""} onValueChange={setExpertId}>
-          <SelectTrigger className="w-full lg:w-64">
-            <SelectValue placeholder="Selecione o expert" />
-          </SelectTrigger>
-          <SelectContent>
-            {expertOptions.map((expert: any) => (
-              <SelectItem key={expert.id} value={expert.id}>
-                {expert.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-2 text-xs">
-          <span
-            className={`h-2 w-2 rounded-full ${operations.sync.status === "fresh" ? "bg-emerald-500" : operations.sync.status === "syncing" ? "bg-amber-500" : "bg-red-500"}`}
-          />
-          {operations.sync.status === "fresh"
-            ? "Dados atualizados"
-            : operations.sync.status === "syncing"
-              ? "Sincronizando"
-              : "Dados pendentes"}
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => setCreateClassOpen(true)}>
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Nova turma
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => operations.refetch()}>
-            <RefreshCw className="mr-2 h-3.5 w-3.5" />
-            Atualizar
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={selectedExpertId || ""} onValueChange={setExpertId}>
+            <SelectTrigger className="h-9 w-full lg:w-56">
+              <SelectValue placeholder="Selecione o expert" />
+            </SelectTrigger>
+            <SelectContent>
+              {expertOptions.map((expert: any) => (
+                <SelectItem key={expert.id} value={expert.id}>
+                  {expert.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${operations.sync.status === "fresh" ? "bg-emerald-500" : operations.sync.status === "syncing" ? "bg-amber-500" : "bg-red-500"}`}
+            />
+            {operations.sync.status === "fresh" ? "Atualizado" : operations.sync.status === "syncing" ? "Sincronizando" : "Dados pendentes"}
+          </div>
+          <div className="flex gap-1.5">
+            <Button size="sm" className="h-9" onClick={() => setCreateClassOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Nova turma
+            </Button>
+            <Button variant="outline" size="sm" className="h-9" onClick={() => operations.refetch()}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </div>
       <section className="space-y-2">
