@@ -140,7 +140,7 @@ function firstRelation(value: any) {
 function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date, attributionWindow = "account_default") {
   const start = startDate ? formatApiDate(startDate) : null;
   const end = endDate ? formatApiDate(endDate) : null;
-  const totals = { spend: 0, leads: 0, formLeads: 0, siteLeads: 0, conversations: 0, legacyLeads: 0, hasCanonicalLeadParts: false, clicks: 0, impressions: 0, reach: 0 };
+  const totals = { spend: 0, leads: 0, formLeads: 0, siteLeads: 0, conversations: 0, legacyLeads: 0, hasCanonicalLeadParts: true, clicks: 0, impressions: 0, reach: 0 };
 
   for (const ad of ads || []) {
     const scopedInsights = dedupeDailyMetaInsights((ad.insights || [])
@@ -150,19 +150,13 @@ function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date, attribu
       if (start && insight.date < start) continue;
       if (end && insight.date > end) continue;
       totals.spend += insight.spend ?? 0;
-      totals.leads += insight.leads ?? 0;
       const rowForms = Number(insight.form_leads || 0);
       const rowSite = Number(insight.site_leads || 0);
       const rowConversations = Number(insight.conversations || 0);
-      const rowHasCanonicalParts = rowForms + rowSite + rowConversations > 0 || Number(insight.leads || 0) === 0;
-      totals.hasCanonicalLeadParts ||= rowHasCanonicalParts;
-      if (rowHasCanonicalParts) {
-        totals.formLeads += rowForms;
-        totals.siteLeads += rowSite;
-        totals.conversations += rowConversations;
-      } else {
-        totals.legacyLeads += Number(insight.leads || 0);
-      }
+      totals.formLeads += rowForms;
+      totals.siteLeads += rowSite;
+      totals.conversations += rowConversations;
+      totals.leads += rowForms + rowSite + rowConversations;
       totals.clicks += insight.clicks ?? 0;
       totals.impressions += insight.impressions ?? 0;
       totals.reach += insight.reach ?? 0;
@@ -418,8 +412,8 @@ export default function Campaigns() {
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((c: any) => {
-        let spend = 0, leads = 0, formLeads = 0, siteLeads = 0, conversations = 0, legacyLeads = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
-        let hasCanonicalLeadParts = false;
+        let spend = 0, leads = 0, formLeads = 0, siteLeads = 0, conversations = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
+        const hasCanonicalLeadParts = true;
         const adsets = c.adsets || [];
         let adsetBudget = 0;
 
@@ -434,21 +428,13 @@ export default function Campaigns() {
               if (startDate && i.date < businessDateKey(startDate)) continue;
               if (endDate && i.date > businessDateKey(endDate)) continue;
               spend += i.spend ?? 0;
-              leads += i.leads ?? 0;
               const rowForms = Number(i.form_leads || 0);
               const rowSite = Number(i.site_leads || 0);
               const rowConversations = Number(i.conversations || 0);
-              const rowHasCanonicalParts = rowForms + rowSite + rowConversations > 0 || Number(i.leads || 0) === 0;
-              hasCanonicalLeadParts ||= rowHasCanonicalParts;
-              if (rowHasCanonicalParts) {
-                formLeads += rowForms;
-                siteLeads += rowSite;
-                conversations += rowConversations;
-              } else {
-                // Additive columns defaulted to zero for pre-migration rows.
-                // Keep their old total visible but do not invent its category.
-                legacyLeads += Number(i.leads || 0);
-              }
+              formLeads += rowForms;
+              siteLeads += rowSite;
+              conversations += rowConversations;
+              leads += rowForms + rowSite + rowConversations;
               clicks += i.clicks ?? 0;
               linkClicks += i.inline_link_clicks ?? 0;
               uniqueLinkClicks += i.unique_inline_link_clicks ?? 0;
@@ -480,7 +466,7 @@ export default function Campaigns() {
         const uniqueLinkCtr = reach > 0 ? uniqueLinkClicks / reach * 100 : 0;
 
         const budget = Number(c.daily_budget || 0) > 0 ? Number(c.daily_budget) : adsetBudget;
-        return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
+        return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads: 0, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
       });
     },
   });

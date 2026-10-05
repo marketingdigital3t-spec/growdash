@@ -30,24 +30,14 @@ export function getExpertDashboardMetrics(
   sales: Sale[],
   actions: ExpertLeadActions = {},
 ) {
-  const hasCanonicalActions = Object.prototype.hasOwnProperty.call(actions, "total")
-    || Object.prototype.hasOwnProperty.call(actions, "siteLeads");
-  const leadsReportedByMeta = insights.reduce((total, insight) => total + Number(insight.leads ?? 0), 0);
-  // When the canonical action resolver is available, never reconstruct forms
-  // or site leads from insights.leads. That column is a legacy aggregate and
-  // can differ from insight_actions after a partial or delayed sync.
-  const forms = hasCanonicalActions
-    ? Math.max(0, Number(actions.nativeFormLeads ?? 0))
-    : actions.nativeFormLeads == null
-      ? Math.max(0, leadsReportedByMeta)
-      : Math.min(leadsReportedByMeta, Math.max(0, Number(actions.nativeFormLeads)));
-  const siteLeads = hasCanonicalActions
-    ? Math.max(0, Number(actions.siteLeads ?? 0))
-    : Math.max(0, leadsReportedByMeta - forms);
+  // Meta acquisition is resolved exclusively from insight_actions. The
+  // persisted `insights.leads` column is a legacy aggregate and may contain
+  // aliases that Ads Manager does not classify as a lead. Never use it as a
+  // fallback when actions are missing or delayed.
+  const forms = Math.max(0, Number(actions.nativeFormLeads ?? 0));
+  const siteLeads = Math.max(0, Number(actions.siteLeads ?? 0));
   const conversations = Math.max(0, Number(actions.conversations ?? 0));
-  const metaLeads = hasCanonicalActions
-    ? Math.max(0, Number(actions.total ?? forms + siteLeads + conversations))
-    : forms + siteLeads + conversations;
+  const metaLeads = Math.max(0, Number(actions.total ?? forms + siteLeads + conversations));
   const rdLeads = rdDeals.length;
   const confirmedSales = sales.filter((sale) => sale.status === "confirmed");
   const salesCount = confirmedSales.reduce((total, sale) => total + Math.max(1, Number(sale.quantity ?? 1)), 0);

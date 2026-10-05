@@ -53,7 +53,12 @@ export function buildDecisionAlerts({ classes = [], insights = [], analytics, to
     const name = row.campaign_name || "Campanha sem nome";
     const current = byCampaign.get(name) || { spend: 0, leads: 0, days: new Set<string>() };
     current.spend += Number(row.spend || 0);
-    current.leads += Number(row.leads || 0);
+    // Use the canonical Ads Manager components only. `insights.leads` is a
+    // legacy aggregate and may include residual pixel events or aliases that
+    // are not classified as lead results by Meta.
+    current.leads += Math.max(0, Number(row.form_leads || 0))
+      + Math.max(0, Number(row.site_leads || 0))
+      + Math.max(0, Number(row.conversations || 0));
     current.days.add(row.date);
     byCampaign.set(name, current);
   }
