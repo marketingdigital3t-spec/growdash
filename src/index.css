@@ -364,43 +364,30 @@
   }
 }
 
-/* Premium gold is the default brand accent. Saved legacy palettes keep their
-   selection behaviour, but the base experience is no longer neutralized to
-   gray by an old local preference. */
+/* Growdash Mono is the default visual language: black, graphite and white. */
 html,
 html[data-accent="monochrome"] {
-  --primary: 41 62% 56%;
-  --primary-foreground: 214 22% 11%;
-  --primary-soft: 42 100% 92%;
-  --ring: 43 80% 68%;
-  --accent: 39 44% 16%;
-  --accent-foreground: 43 78% 85%;
-  --sidebar-primary: 41 62% 56%;
-  --sidebar-primary-foreground: 214 22% 11%;
-  --sidebar-icon-active: 43 80% 68%;
-    --sidebar-ring: 43 80% 68%;
-    --color-canvas: #0B0D10;
-    --color-surface: #12161C;
-    --color-surface-raised: #181D24;
-    --color-border: #2A313B;
-    --color-text-primary: #F5F7FA;
-    --color-text-secondary: #AAB4C2;
-    --color-text-disabled: #667181;
-    --color-accent: #D5A84A;
-    --color-accent-hover: #E6BF68;
-    --color-accent-soft: #2B2314;
-    --color-success: #35B77A;
-    --color-warning: #E7AE3A;
-    --color-error: #E35D67;
-    --color-info: #5E9CF6;
-    --color-focus: #F0C96A;
-  --brand-black: #0b0d10;
-  --brand-surface: #12161c;
-  --brand-gold: #d5a84a;
-  --brand-gold-light: #e6bf68;
-  --brand-bronze: #8c5c0e;
-  --brand-ivory: #f5f7fa;
-  --brand-accent-rgb: 213, 168, 74;
+  --primary: 0 0% 92%;
+  --primary-foreground: 0 0% 7%;
+  --primary-soft: 0 0% 85%;
+  --ring: 0 0% 100%;
+  --accent: 0 0% 17%;
+  --accent-foreground: 0 0% 98%;
+  --sidebar-primary: 0 0% 92%;
+  --sidebar-primary-foreground: 0 0% 7%;
+  --sidebar-icon-active: 0 0% 100%;
+  --sidebar-ring: 0 0% 100%;
+  --brand-black: #050505;
+  --brand-surface: #111111;
+  --brand-gold: #d7d7d7;
+  --brand-gold-light: #ffffff;
+  --brand-bronze: #4a4a4a;
+  --brand-ivory: #ffffff;
+  --brand-accent-rgb: 226, 226, 226;
+  --color-accent: #d7d7d7;
+  --color-accent-hover: #ffffff;
+  --color-accent-soft: #252525;
+  --color-focus: #ffffff;
 }
 
 /* Opt-in premium material: warm metal on deep onyx. It stays isolated behind
@@ -453,6 +440,44 @@ html[data-accent="metallic-gold"].dark {
   --muted-foreground: 37 12% 64%;
   --border: 37 22% 16%;
   --input: 37 22% 18%;
+}
+
+/* Keep navigation and analytics controls neutral when the monochrome palette
+   is active, including legacy utility classes that used amber for emphasis. */
+html[data-accent="monochrome"] .brand-sidebar,
+html[data-accent="monochrome"] .brand-topbar {
+  --foreground: 0 0% 94%;
+  --muted-foreground: 0 0% 62%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
+  --sidebar-background: 0 0% 2%;
+  --sidebar-foreground: 0 0% 94%;
+  --sidebar-accent: 0 0% 13%;
+  --sidebar-accent-foreground: 0 0% 96%;
+  --sidebar-border: 0 0% 14%;
+}
+
+html[data-accent="monochrome"] .analytics-module {
+  --chart-1: 0 0% 82%;
+  --chart-2: 0 0% 68%;
+  --chart-3: 0 0% 54%;
+  --chart-4: 0 0% 40%;
+  --chart-5: 0 0% 28%;
+}
+
+html[data-accent="monochrome"] :is(.text-amber-400, .text-amber-500, .text-amber-600, .text-amber-700,
+  .text-yellow-400, .text-yellow-500, .text-yellow-600, .text-yellow-700) {
+  color: #d8d8d8 !important;
+}
+
+html[data-accent="monochrome"] :is(.bg-amber-400\/15, .bg-amber-500\/5, .bg-amber-500\/10,
+  .bg-amber-500\/\[\.06\], .bg-yellow-400\/15, .bg-yellow-500\/5, .bg-yellow-500\/10) {
+  background-color: rgba(255, 255, 255, .075) !important;
+}
+
+html[data-accent="monochrome"] :is(.border-amber-500\/20, .border-amber-500\/25, .border-amber-500\/30,
+  .border-yellow-500\/20, .border-yellow-500\/25, .border-yellow-500\/30) {
+  border-color: rgba(255, 255, 255, .18) !important;
 }
 
 html:not(.dark) {
@@ -8322,4 +8347,35 @@ html[data-accent] .gd-date-range-popover button[name="day"].day-range-middle[ari
   background: rgba(255,255,255,.14) !important;
   background-color: rgba(255,255,255,.14) !important;
   color: #f8fafc !important;
+}
+
+/* Final monochrome surface tokens override the generic light/dark defaults. */
+html[data-accent="monochrome"]:not(.dark) {
+  --background: 0 0% 94%;
+  --foreground: 0 0% 8%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 8%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 8%;
+  --secondary: 0 0% 89%;
+  --secondary-foreground: 0 0% 11%;
+  --muted: 0 0% 91%;
+  --muted-foreground: 0 0% 37%;
+  --border: 0 0% 80%;
+  --input: 0 0% 76%;
+}
+
+html[data-accent="monochrome"].dark {
+  --background: 0 0% 3%;
+  --foreground: 0 0% 95%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 95%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 95%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 93%;
+  --muted: 0 0% 13%;
+  --muted-foreground: 0 0% 63%;
+  --border: 0 0% 19%;
+  --input: 0 0% 21%;
 }
