@@ -8270,6 +8270,18 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
   box-shadow: none !important;
 }
 
+/* Preset buttons must keep readable text while the pointer or keyboard focus
+   moves through the list. Some theme tokens map accent-foreground to a dark
+   color, which produced black text on the dark popover. */
+.gd-date-range-popover .gd-date-range-presets button:is(:hover, :focus, :focus-visible, :active),
+.gd-date-range-popover .gd-date-range-presets button:is(:hover, :focus, :focus-visible, :active) > span {
+  color: hsl(var(--foreground)) !important;
+}
+.dark .gd-date-range-popover .gd-date-range-presets button:is(:hover, :focus, :focus-visible, :active),
+.dark .gd-date-range-popover .gd-date-range-presets button:is(:hover, :focus, :focus-visible, :active) > span {
+  color: #f8fafc !important;
+}
+
 /* The shared Button primitive adds `.premium-button` to DayPicker buttons.
    Target the actual `name="day"` element (not the old rdp-day class) so the
    global silver/gold button skin cannot repaint every calendar week. */
