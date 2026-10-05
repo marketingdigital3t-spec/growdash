@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
-import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
+import { canonicalMetaLeadValue, canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../_shared/metaLeadMetrics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       : { data: [], error: null };
     if (lpError) throw lpError;
     const siteActionByAccount = Object.fromEntries((lpConfigs || []).map((config) => [config.ad_account_id, config.action_type || undefined]));
-    const actionsByAd: Record<string, Record<string, number>> = {};
+    const actionRows: any[] = [];
     const actionTypes = Array.from(new Set([...FORM_ACTION_TYPES, ...SITE_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter(Boolean)]));
     const actionScope = new Map<string, { adAccountId: string; window: string; adIds: string[] }>();
     for (const account of accounts || []) {
@@ -126,30 +126,27 @@ Deno.serve(async (req) => {
       for (let idsOffset = 0; idsOffset < group.adIds.length; idsOffset += 200) {
         const ids = group.adIds.slice(idsOffset, idsOffset + 200);
         for (let offset = 0; ; offset += 1000) {
-          let query = admin.from("insight_actions").select("ad_id,date,action_type,value,attribution_window")
+          let query = admin.from("insight_actions").select("ad_account_id,ad_id,date,action_type,value,attribution_window")
+            .eq("ad_account_id", group.adAccountId)
             .in("ad_id", ids).in("action_type", actionTypes).order("date", { ascending: true }).range(offset, offset + 999);
           if (startDate) query = query.gte("date", startDate);
           if (endDate) query = query.lte("date", endDate);
           query = group.window === "account_default" ? query.or("attribution_window.eq.account_default,attribution_window.is.null") : query.eq("attribution_window", group.window);
           const { data, error } = await query;
           if (error) throw error;
-          for (const row of data || []) {
-            const key = `${row.ad_id}|${row.date}`;
-            const totals = actionsByAd[key] || {};
-            totals[row.action_type] = Math.max(totals[row.action_type] || 0, Math.max(0, Number(row.value || 0)));
-            actionsByAd[key] = totals;
-            actionRowCount += 1;
-          }
+          actionRows.push(...(data || []));
+          actionRowCount += (data || []).length;
           if (!data || data.length < 1000) break;
         }
       }
     }
+    const leadsByScope = new Map(canonicalMetaLeads(uniqueInsights, actionRows, siteActionByAccount)
+      .map((row) => [`${row.ad_account_id}|${row.ad_id}|${row.date}`, row]));
     const facts = uniqueInsights.reduce((acc, row) => {
-      const actions = actionsByAd[`${row.ad_id}|${row.date}`] || {};
-      const leads = resolveMetaLeadParts(actions, siteActionByAccount[row.ad_account_id]);
       const key = `${row.ad_account_id}|${row.ad_id}|${row.date}`;
+      const leads = canonicalMetaLeadValue(leadsByScope.get(key));
       if (!acc.counted.has(key)) {
-        acc.leads += leads.total;
+        acc.leads += leads;
         acc.counted.add(key);
       }
       acc.spend += Number(row.spend || 0);

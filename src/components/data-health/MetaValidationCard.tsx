@@ -3,9 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, ShieldCheck } from "lucide-react";
+import { businessDateKey } from "@/lib/businessDate";
 
 interface Row {
   accountId: string;
@@ -23,6 +23,14 @@ interface Row {
   meta?: { spend: number; impressions: number; clicks: number; leads: number; leadParts?: { forms: number; site: number; conversations: number } };
   db?: { spend: number; impressions: number; clicks: number; leads: number; leadParts?: { forms: number; site: number; conversations: number } };
   leadActionTypeTotals?: { meta: Record<string, number>; db: Record<string, number> };
+  metaAccountId?: string;
+  campaignBreakdown?: Array<{
+    campaignId: string;
+    campaignName: string;
+    meta: { spend: number; impressions: number; clicks: number; forms: number; site: number; conversations: number };
+    db: { spend: number; impressions: number; clicks: number; forms: number; site: number; conversations: number };
+    actionTypes: Record<string, number>;
+  }>;
   drift?: { spendPct: number; leadsPct: number; clicksPct: number; impressionsPct: number };
 }
 
@@ -36,15 +44,26 @@ function DriftBadge({ pct }: { pct: number }) {
   return <Badge variant={variant as any} className="text-[10px] tabular-nums">{sign}{pct.toFixed(1)}%</Badge>;
 }
 
-export function MetaValidationCard() {
+export function MetaValidationCard({ adAccountIds, startDate, endDate }: {
+  adAccountIds: string[];
+  startDate: Date;
+  endDate: Date;
+}) {
   const [running, setRunning] = useState(false);
-  const [days, setDays] = useState("7");
   const [results, setResults] = useState<Row[] | null>(null);
+  const startDateKey = businessDateKey(startDate);
+  const endDateKey = businessDateKey(endDate);
 
   const run = async () => {
     setRunning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("validate-meta-totals", { body: { days: Number(days) } });
+      const { data, error } = await supabase.functions.invoke("validate-meta-totals", {
+        body: {
+          ...(adAccountIds.length ? { adAccountIds } : {}),
+          startDate: startDateKey,
+          endDate: endDateKey,
+        },
+      });
       if (error) throw error;
       setResults((data as any).results || []);
       toast({ title: "Validação concluída", description: `${(data as any).results?.length || 0} contas comparadas` });
@@ -77,18 +96,7 @@ export function MetaValidationCard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={days} onValueChange={setDays}>
-            <SelectTrigger className="h-8 w-[110px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">Hoje</SelectItem>
-              <SelectItem value="7">7 dias</SelectItem>
-              <SelectItem value="14">14 dias</SelectItem>
-              <SelectItem value="30">30 dias</SelectItem>
-              <SelectItem value="90">90 dias</SelectItem>
-            </SelectContent>
-          </Select>
+          <span className="text-xs text-muted-foreground">{startDateKey} → {endDateKey}</span>
           <Button size="sm" onClick={run} disabled={running}>
             {running && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Validar
@@ -97,7 +105,7 @@ export function MetaValidationCard() {
       </CardHeader>
       <CardContent>
         {!results && (
-          <p className="text-sm text-muted-foreground">Clique em "Validar" para comparar dashboard ↔ Meta na janela escolhida.</p>
+          <p className="text-sm text-muted-foreground">Clique em “Validar” para comparar Growdash ↔ Graph API na conta selecionada e no mesmo período civil do calendário.</p>
         )}
         {results && (
           <div className="space-y-3">
@@ -111,7 +119,7 @@ export function MetaValidationCard() {
                       {r.error && <Badge variant="destructive" className="text-[10px]">{r.error}</Badge>}
                     </div>
                   </div>
-                  <p className="mb-2 text-[10px] text-muted-foreground">Janela {r.startDate} → {r.endDate} · {r.timezone || "timezone da conta"} · atribuição {r.attributionWindow || "padrão da conta"}{typeof r.metaRows === "number" ? ` · ${r.metaPages ?? 0} páginas Meta / ${r.metaRows} linhas Meta / ${r.localRows ?? 0} locais / ${r.localActionRows ?? 0} ações` : ""}</p>
+                  <p className="mb-2 text-[10px] text-muted-foreground">{r.metaAccountId ? `${r.metaAccountId} · ` : ""}Janela {r.startDate} → {r.endDate} · {r.timezone || "timezone da conta"} · atribuição {r.attributionWindow || "padrão da conta"}{typeof r.metaRows === "number" ? ` · ${r.metaPages ?? 0} páginas Meta / ${r.metaRows} linhas Meta / ${r.localRows ?? 0} locais / ${r.localActionRows ?? 0} ações` : ""}</p>
                   {r.meta && r.db && r.drift && (
                     <>
                     <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 xl:grid-cols-7">
@@ -128,6 +136,18 @@ export function MetaValidationCard() {
                       <div className="mt-1 space-y-1">
                         {Array.from(new Set([...Object.keys(r.leadActionTypeTotals.meta), ...Object.keys(r.leadActionTypeTotals.db)])).sort().map((actionType) => (
                           <p key={actionType} className="break-all"><span className="font-mono">{actionType}</span> · Meta {fmt(r.leadActionTypeTotals!.meta[actionType] || 0)} / banco {fmt(r.leadActionTypeTotals!.db[actionType] || 0)}</p>
+                        ))}
+                      </div>
+                    </details>}
+                    {r.campaignBreakdown && r.campaignBreakdown.length > 0 && <details className="mt-2 text-[10px] text-muted-foreground">
+                      <summary className="cursor-pointer">Ver comparação por campanha (Graph API × banco)</summary>
+                      <div className="mt-2 space-y-2">
+                        {r.campaignBreakdown.map((campaign) => (
+                          <div key={campaign.campaignId} className="rounded border border-border/50 p-2">
+                            <p className="font-medium text-foreground">{campaign.campaignName} <span className="font-mono text-muted-foreground">· {campaign.campaignId}</span></p>
+                            <p>Investimento: Meta {fmtMoney(campaign.meta.spend)} / banco {fmtMoney(campaign.db.spend)} · leads: Meta {fmt(campaign.meta.forms + campaign.meta.site + campaign.meta.conversations)} / banco {fmt(campaign.db.forms + campaign.db.site + campaign.db.conversations)}</p>
+                            <p>Forms: {fmt(campaign.meta.forms)} / {fmt(campaign.db.forms)} · site: {fmt(campaign.meta.site)} / {fmt(campaign.db.site)} · conversas: {fmt(campaign.meta.conversations)} / {fmt(campaign.db.conversations)}</p>
+                          </div>
                         ))}
                       </div>
                     </details>}

@@ -546,7 +546,7 @@ Deno.serve(async (req) => {
           ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: campaignIds }]))}`
           : "";
         const insightsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
+          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
         );
         recordPagination(insightsRes, "insights");
         if (insightsRes.error) {
@@ -659,7 +659,7 @@ Deno.serve(async (req) => {
         // unavailable. This is especially important for the current day.
         if (allInsights.length === 0 && startDate === endDate) {
           const aggregateRes = await fetchMetaPaginated(
-            `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
+            `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
           );
           aggregatePages = aggregateRes.pages || 0;
           recordPagination(aggregateRes, "insights fallback");
@@ -1298,7 +1298,7 @@ Deno.serve(async (req) => {
           }
           for (const breakdown of breakdownRequests) {
             const bRes = await fetchMetaPaginated(
-              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}${attributionParam}&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
             );
             recordPagination(bRes, `breakdown ${breakdown.type}`);
             if (bRes.error) {

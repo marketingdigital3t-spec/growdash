@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { canonicalMetaLeads } from "../_shared/metaLeadMetrics.ts";
+import { parseCivilDateRange } from "../../../src/lib/civilDateRange.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -16,7 +17,13 @@ function normalizeAttributionWindow(value: unknown) {
     .join(",") || "account_default";
 }
 
-interface Body { adAccountId?: string; days?: number }
+interface Body { adAccountId?: string; adAccountIds?: string[]; days?: number; startDate?: string; endDate?: string }
+interface GraphInsightAction { action_type?: string; value?: string | number }
+interface GraphInsightsPage {
+  data?: any[];
+  paging?: { next?: string | null };
+  error?: { message?: string };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -38,11 +45,14 @@ Deno.serve(async (req) => {
 
     const body: Body = await req.json().catch(() => ({}));
     const days = Math.min(Math.max(body.days ?? 7, 1), 90);
+    const explicitRange = body.startDate !== undefined || body.endDate !== undefined;
+    const civilRange = explicitRange ? parseCivilDateRange(body.startDate, body.endDate) : null;
 
     // Include temporarily errored/expired accounts in the audit instead of
     // silently shrinking the global comparison to only currently healthy rows.
     let q = admin.from("ad_accounts").select("id, name, account_id, access_token, timezone_name, attribution_window, connection_status").eq("user_id", user.id).neq("connection_status", "disconnected");
     if (body.adAccountId) q = q.eq("id", body.adAccountId);
+    if (body.adAccountIds?.length) q = q.in("id", Array.from(new Set(body.adAccountIds)));
     const { data: accounts, error } = await q;
     if (error) throw error;
 
@@ -52,10 +62,11 @@ Deno.serve(async (req) => {
     const processAccount = async (acc: NonNullable<typeof accountList>[number]) => {
       try {
       const timezone = acc.timezone_name || "America/Sao_Paulo";
-      const endDate = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-      const [year, month, day] = endDate.split("-").map(Number);
+      const accountToday = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const [year, month, day] = accountToday.split("-").map(Number);
       const start = new Date(Date.UTC(year, month - 1, day - (days - 1), 12));
-      const startDate = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}-${String(start.getUTCDate()).padStart(2, "0")}`;
+      const startDate = civilRange?.startDate || `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}-${String(start.getUTCDate()).padStart(2, "0")}`;
+      const endDate = civilRange?.endDate || accountToday;
       const attributionWindows = acc.attribution_window && acc.attribution_window !== "account_default"
         ? String(acc.attribution_window).split(",").map((value: string) => value.trim()).filter(Boolean)
         : [];
@@ -63,7 +74,7 @@ Deno.serve(async (req) => {
       const rawId = acc.account_id as string;
       const metaId = rawId.startsWith("act_") ? rawId : `act_${rawId}`;
       const params = new URLSearchParams({
-        fields: "ad_id,date_start,spend,impressions,clicks,actions",
+        fields: "ad_id,date_start,campaign_id,campaign_name,spend,impressions,clicks,actions",
         level: "ad",
         time_increment: "1",
         limit: "500",
@@ -73,6 +84,7 @@ Deno.serve(async (req) => {
       if (attributionWindows.length) params.set("action_attribution_windows", JSON.stringify(attributionWindows));
       // Match the production sync contract exactly: Meta resolves the account's
       // unified attribution setting for both media and action facts.
+      params.set("action_report_time", "impression");
       params.set("use_unified_attribution_setting", "true");
       let nextUrl: string | null = `${GRAPH_BASE}/${metaId}/insights?${params.toString()}`;
       const metaRows: any[] = [];
@@ -86,8 +98,8 @@ Deno.serve(async (req) => {
         }
         seenCursors.add(nextUrl);
         metaPages += 1;
-        const response = await fetch(nextUrl, { signal: AbortSignal.timeout(15_000) });
-        const payload = await response.json();
+        const response: Response = await fetch(nextUrl, { signal: AbortSignal.timeout(15_000) });
+        const payload: GraphInsightsPage = await response.json();
         if (!response.ok || payload.error) {
           metaError = payload.error?.message || `Meta Graph API HTTP ${response.status}`;
           break;
@@ -104,9 +116,9 @@ Deno.serve(async (req) => {
       const metaImpressions = metaRows.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
       const metaClicks = metaRows.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
       const metaLeadSnapshot = canonicalMetaLeads(
-        metaRows.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: acc.id, date: String(row.date_start), leads: null })),
+        metaRows.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: acc.id, date: String(row.date_start), campaign_id: String(row.campaign_id || "unknown"), campaign_name: String(row.campaign_name || "Campanha sem nome"), leads: null })),
         metaRows.flatMap((row) => (row.actions || []).map((action: any) => ({
-          ad_id: String(row.ad_id), date: String(row.date_start), action_type: String(action.action_type || ""), value: Number(action.value || 0),
+          ad_account_id: acc.id, ad_id: String(row.ad_id), date: String(row.date_start), action_type: String(action.action_type || ""), value: Number(action.value || 0),
         }))),
         { [acc.id]: lpConfig?.action_type || undefined },
       );
@@ -117,6 +129,34 @@ Deno.serve(async (req) => {
         conversations: sum.conversations + Number(row.conversations || 0),
       }), { forms: 0, site: 0, conversations: 0 });
       const metaLeadParts = sumLeadParts(metaLeadSnapshot);
+      const campaignBreakdown = new Map<string, any>();
+      const ensureCampaign = (id: string, name: string) => {
+        const key = id || "unknown";
+        const existing = campaignBreakdown.get(key) || {
+          campaignId: key,
+          campaignName: name || "Campanha sem nome",
+          meta: { spend: 0, impressions: 0, clicks: 0, forms: 0, site: 0, conversations: 0 },
+          db: { spend: 0, impressions: 0, clicks: 0, forms: 0, site: 0, conversations: 0 },
+          actionTypes: {},
+        };
+        campaignBreakdown.set(key, existing);
+        return existing;
+      };
+      const metaLeadsByAdDate = new Map(metaLeadSnapshot.map((row: any) => [`${row.ad_id}|${row.date}`, row]));
+      for (const row of metaRows) {
+        const campaign = ensureCampaign(String(row.campaign_id || "unknown"), String(row.campaign_name || "Campanha sem nome"));
+        campaign.meta.spend += Number(row.spend || 0);
+        campaign.meta.impressions += Number(row.impressions || 0);
+        campaign.meta.clicks += Number(row.clicks || 0);
+        const lead = metaLeadsByAdDate.get(`${row.ad_id}|${row.date_start}`) as any;
+        campaign.meta.forms += Number(lead?.form_leads || 0);
+        campaign.meta.site += Number(lead?.site_leads || 0);
+        campaign.meta.conversations += Number(lead?.conversations || 0);
+        for (const action of row.actions || []) {
+          const type = String(action.action_type || "unknown");
+          campaign.actionTypes[type] = (campaign.actionTypes[type] || 0) + Number(action.value || 0);
+        }
+      }
       const metaActionTypeTotals = Object.fromEntries(metaRows.flatMap((row) => row.actions || []).reduce((totals: Map<string, number>, action: any) => {
         const actionType = String(action.action_type || "");
         totals.set(actionType, (totals.get(actionType) || 0) + Number(action.value || 0));
@@ -129,7 +169,7 @@ Deno.serve(async (req) => {
       const pageSize = 1_000;
       for (let page = 0; ; page++) {
         const { data: rows, error: insightsError } = await admin.from("insights")
-          .select("ad_id,date,attribution_window,spend,impressions,clicks")
+          .select("ad_id,date,campaign_id,attribution_window,spend,impressions,clicks")
           .eq("ad_account_id", acc.id)
           .gte("date", startDate)
           .lte("date", endDate)
@@ -151,7 +191,8 @@ Deno.serve(async (req) => {
         const chunk = adIds.slice(offset, offset + 200);
         for (let page = 0; ; page++) {
           let actionQuery = admin.from("insight_actions")
-            .select("ad_id,date,action_type,value,attribution_window")
+            .select("ad_account_id,ad_id,date,action_type,value,attribution_window")
+            .eq("ad_account_id", acc.id)
             .in("ad_id", chunk).gte("date", startDate).lte("date", endDate);
           actionQuery = normalizeAttributionWindow(attributionWindow) === "account_default"
             ? actionQuery.or("attribution_window.eq.account_default,attribution_window.is.null")
@@ -164,11 +205,22 @@ Deno.serve(async (req) => {
       }
       const localLeadSnapshot = canonicalMetaLeads(
         localInsights.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: acc.id, date: String(row.date), leads: null })),
-        localActionRows.map((row) => ({ ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: Number(row.value || 0) })),
+        localActionRows.map((row) => ({ ad_account_id: acc.id, ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: Number(row.value || 0) })),
         { [acc.id]: lpConfig?.action_type || undefined },
       );
       const dbLeads = localLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
       const dbLeadParts = sumLeadParts(localLeadSnapshot);
+      const dbLeadsByAdDate = new Map(localLeadSnapshot.map((row: any) => [`${row.ad_id}|${row.date}`, row]));
+      for (const row of localInsights) {
+        const campaign = ensureCampaign(String(row.campaign_id || "unknown"), "Campanha (catálogo local indisponível)");
+        campaign.db.spend += Number(row.spend || 0);
+        campaign.db.impressions += Number(row.impressions || 0);
+        campaign.db.clicks += Number(row.clicks || 0);
+        const lead = dbLeadsByAdDate.get(`${row.ad_id}|${row.date}`) as any;
+        campaign.db.forms += Number(lead?.form_leads || 0);
+        campaign.db.site += Number(lead?.site_leads || 0);
+        campaign.db.conversations += Number(lead?.conversations || 0);
+      }
       const dbActionTypeTotals = Object.fromEntries(localActionRows.reduce((totals: Map<string, number>, action: any) => {
         const actionType = String(action.action_type || "");
         totals.set(actionType, (totals.get(actionType) || 0) + Number(action.value || 0));
@@ -178,6 +230,7 @@ Deno.serve(async (req) => {
       const pctDiff = (a: number, b: number) => (b === 0 ? (a === 0 ? 0 : 100) : ((a - b) / b) * 100);
       return {
         accountId: acc.id,
+        metaAccountId: rawId,
         name: acc.name,
         connectionStatus: acc.connection_status,
         timezone,
@@ -191,6 +244,7 @@ Deno.serve(async (req) => {
         meta: { spend: metaSpend, impressions: metaImpressions, clicks: metaClicks, leads: metaLeads, leadParts: metaLeadParts },
         db: { spend: dbSpend, impressions: dbImp, clicks: dbClicks, leads: dbLeads, leadParts: dbLeadParts },
         leadActionTypeTotals: { meta: metaActionTypeTotals, db: dbActionTypeTotals },
+        campaignBreakdown: Array.from(campaignBreakdown.values()).sort((a, b) => a.campaignName.localeCompare(b.campaignName)),
         drift: {
           spendPct: pctDiff(dbSpend, metaSpend),
           leadsPct: pctDiff(dbLeads, metaLeads),

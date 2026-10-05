@@ -210,7 +210,8 @@ Deno.serve(async (req) => {
       const expectedWindow = account.attribution_window || "account_default";
       for (let offset = 0; ; offset += 1000) {
         let query = admin.from("insight_actions")
-          .select("ad_id, date, action_type, value, attribution_window")
+          .select("ad_account_id, ad_id, date, action_type, value, attribution_window")
+          .eq("ad_account_id", account.id)
           .in("ad_id", accountAdIds)
           .in("action_type", actionTypes)
           .gte("date", dataStartStr).lte("date", endStr);

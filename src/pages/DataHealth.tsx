@@ -144,7 +144,7 @@ function useOperationalAudit(adAccountId: string, startDate: Date, endDate: Date
 }
 
 export default function DataHealth() {
-  const { adAccountId, startDate, endDate } = useGlobalFilters();
+  const { adAccountId, adAccountIds, startDate, endDate } = useGlobalFilters();
   const { data, isLoading, refetch } = useHealth();
   const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, startDate, endDate);
   const [enriching, setEnriching] = useState(false);
@@ -398,7 +398,7 @@ export default function DataHealth() {
 
       <JobRunsCard />
 
-      <MetaValidationCard />
+      <MetaValidationCard adAccountIds={adAccountIds.length ? adAccountIds : adAccountId === "all" ? [] : [adAccountId]} startDate={startDate} endDate={endDate} />
 
 
 

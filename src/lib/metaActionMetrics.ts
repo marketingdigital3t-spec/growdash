@@ -129,16 +129,22 @@ export function aggregateMetaLeadActionDays(
  */
 export function aggregateMetaLeadTargets(
   insightRows: Array<{ ad_id: string; ad_account_id?: string | null; date: string; attribution_window?: string | null }>,
-  actionRows: Array<{ ad_id: string; date: string; action_type: string; value: number | null; attribution_window?: string | null }>,
+  actionRows: Array<{ ad_account_id?: string | null; ad_id: string; date: string; action_type: string; value: number | null; attribution_window?: string | null }>,
   siteActionByAccount: Record<string, string | undefined> = {},
 ) {
-  const accountByAd: Record<string, string | null> = {};
+  const accountByScopedAd: Record<string, string | null> = {};
+  const accountsByAd = new Map<string, Set<string>>();
   const attributionByAdDate = new Map<string, string>();
   const ambiguousInsightScopes = new Set<string>();
   const snapshotKeys = new Set<string>();
   for (const row of insightRows) {
-    accountByAd[row.ad_id] = row.ad_account_id || null;
-    const key = `${row.ad_account_id || ""}|${row.ad_id}|${row.date}`;
+    const accountId = row.ad_account_id || "";
+    const scopedAdKey = `${accountId}|${row.ad_id}`;
+    accountByScopedAd[scopedAdKey] = accountId || null;
+    const adAccounts = accountsByAd.get(row.ad_id) || new Set<string>();
+    if (accountId) adAccounts.add(accountId);
+    accountsByAd.set(row.ad_id, adAccounts);
+    const key = `${accountId}|${row.ad_id}|${row.date}`;
     const attribution = normalizeMetaAttributionWindow(row.attribution_window);
     const existing = attributionByAdDate.get(key);
     // The same ad/day in two attribution windows is ambiguous unless callers
@@ -151,15 +157,19 @@ export function aggregateMetaLeadTargets(
 
   const facts = new Map<string, typeof actionRows[number]>();
   for (const row of actionRows) {
-    const accountId = accountByAd[row.ad_id];
-    const scopeKey = `${accountId || ""}|${row.ad_id}|${row.date}`;
+    const candidateAccounts = accountsByAd.get(row.ad_id);
+    // Legacy fixtures/rows without account UUID remain safe only when this ad
+    // ID maps to exactly one account in the selected Insights scope.
+    const accountId = row.ad_account_id || (candidateAccounts?.size === 1 ? Array.from(candidateAccounts)[0] : null);
+    if (!accountId || !candidateAccounts?.has(accountId)) continue;
+    const scopeKey = `${accountId}|${row.ad_id}|${row.date}`;
     const insightAttribution = attributionByAdDate.get(scopeKey);
     if (!accountId
       || !snapshotKeys.has(scopeKey)
       || ambiguousInsightScopes.has(scopeKey)
       || !insightAttribution
       || !matchesMetaAttributionWindow(row.attribution_window, insightAttribution)) continue;
-    const key = `${row.ad_id}|${row.date}|${row.action_type}`;
+    const key = `${accountId}|${row.ad_id}|${row.date}|${row.action_type}`;
     const previous = facts.get(key);
     // Legacy NULL and explicit account_default rows describe the same fact.
     if (!previous || (!previous.attribution_window && row.attribution_window)) facts.set(key, row);
@@ -167,10 +177,13 @@ export function aggregateMetaLeadTargets(
 
   const dailyByAd: Record<string, Record<string, Record<string, number>>> = {};
   for (const row of facts.values()) {
-    const days = dailyByAd[row.ad_id] || (dailyByAd[row.ad_id] = {});
+    const accountId = row.ad_account_id || (accountsByAd.get(row.ad_id)?.size === 1 ? Array.from(accountsByAd.get(row.ad_id)!)[0] : null);
+    if (!accountId) continue;
+    const scopedAdKey = `${accountId}|${row.ad_id}`;
+    const days = dailyByAd[scopedAdKey] || (dailyByAd[scopedAdKey] = {});
     const actions = days[row.date] || (days[row.date] = {});
     actions[row.action_type] = Math.max(actions[row.action_type] || 0, Math.max(0, Number(row.value || 0)));
   }
 
-  return aggregateMetaLeadActionDays(dailyByAd, accountByAd, siteActionByAccount);
+  return aggregateMetaLeadActionDays(dailyByAd, accountByScopedAd, siteActionByAccount);
 }

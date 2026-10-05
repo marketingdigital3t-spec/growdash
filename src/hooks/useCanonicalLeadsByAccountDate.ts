@@ -7,6 +7,7 @@ import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { aggregateMetaLeadTargets } from "@/lib/metaActionMetrics";
 
 interface ActionRow {
+  ad_account_id: string;
   ad_id: string;
   action_type: string;
   value: number;
@@ -33,21 +34,17 @@ export function useCanonicalLeadsByAccountDate() {
 
   // Scope to ads present in the current dashboard insights (already filtered by account/period).
   const scopedAdIds = useMemo(() => Array.from(new Set(insights.map((r) => r.ad_id))), [insights]);
+  const scopedAccountIds = useMemo(
+    () => Array.from(new Set(insights.map((r) => r.ad_account_id).filter((id): id is string => Boolean(id)))),
+    [insights],
+  );
   const adIdsKey = scopedAdIds.slice().sort().join(",");
-
-  // ad_id -> { campaign_id, ad_account_id }
-  const adMeta = useMemo(() => {
-    const m: Record<string, { campaign_id: string | null; ad_account_id: string | null }> = {};
-    for (const r of insights) {
-      m[r.ad_id] = { campaign_id: r.campaign_id ?? null, ad_account_id: r.ad_account_id ?? null };
-    }
-    return m;
-  }, [insights]);
+  const accountIdsKey = scopedAccountIds.slice().sort().join(",");
 
   // Fetch insight_actions for scoped ads in window
   const actionsQ = useQuery({
-    queryKey: ["canonical-leads-actions", adIdsKey, start, end],
-    enabled: scopedAdIds.length > 0,
+    queryKey: ["canonical-leads-actions", accountIdsKey, adIdsKey, start, end],
+    enabled: scopedAdIds.length > 0 && scopedAccountIds.length > 0,
     queryFn: async (): Promise<ActionRow[]> => {
       const CHUNK = 200;
       const PAGE = 1000;
@@ -57,7 +54,8 @@ export function useCanonicalLeadsByAccountDate() {
         for (let from = 0; ; from += PAGE) {
           const { data, error } = await supabase
             .from("insight_actions" as any)
-            .select("ad_id, action_type, value, date, attribution_window")
+            .select("ad_account_id, ad_id, action_type, value, date, attribution_window")
+            .in("ad_account_id", scopedAccountIds)
             .in("ad_id", chunk)
             .gte("date", start)
             .lte("date", end)

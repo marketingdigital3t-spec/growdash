@@ -97,7 +97,8 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
     const adIds = Array.from(new Set(uniqueInsights.map((row) => row.ad_id).filter(Boolean)));
     let accountActions: any[] = [];
     for (let index = 0; index < adIds.length; index += 200) {
-      let query = admin.from("insight_actions").select("ad_id,date,action_type,value")
+      let query = admin.from("insight_actions").select("ad_account_id,ad_id,date,action_type,value")
+        .eq("ad_account_id", account.id)
         .in("ad_id", adIds.slice(index, index + 200)).in("action_type", actionTypes(siteActionByAccount[account.id] ? [siteActionByAccount[account.id]] : []))
         .gte("date", startDate).lte("date", endDate).order("date", { ascending: true });
       query = attributionWindow === "account_default"

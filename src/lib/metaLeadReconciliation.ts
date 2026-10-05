@@ -10,6 +10,7 @@ export interface ReconciliationInsight {
 }
 
 export interface ReconciliationAction {
+  ad_account_id: string;
   ad_id: string;
   date: string;
   action_type: string;
@@ -25,7 +26,10 @@ export function resolveAccountMetaLeadReconciliation(
 ) {
   const accountInsights = insights.filter((row) => row.ad_account_id === accountId);
   const accountAdIds = new Set(accountInsights.map((row) => row.ad_id));
-  const accountActions = actions.filter((row) => accountAdIds.has(row.ad_id));
+  // Action IDs must always be scoped to the internal account UUID. Meta ad IDs
+  // are expected to be globally unique, but imported/migrated facts can contain
+  // duplicates; falling back to ad_id alone can leak another account's leads.
+  const accountActions = actions.filter((row) => row.ad_account_id === accountId && accountAdIds.has(row.ad_id));
   const result = aggregateMetaLeadTargets(
     accountInsights,
     accountActions,
@@ -33,11 +37,11 @@ export function resolveAccountMetaLeadReconciliation(
   );
 
   const attributionByAdDate = new Map(accountInsights.map((row) => [
-    `${row.ad_id}|${row.date}`,
+    `${row.ad_account_id}|${row.ad_id}|${row.date}`,
     normalizeMetaAttributionWindow(row.attribution_window),
   ]));
   const validActions = accountActions.filter((row) => {
-    const attribution = attributionByAdDate.get(`${row.ad_id}|${row.date}`);
+    const attribution = attributionByAdDate.get(`${row.ad_account_id}|${row.ad_id}|${row.date}`);
     if (!attribution || !matchesMetaAttributionWindow(row.attribution_window, attribution)) return false;
     return row.action_type === "lead"
       || (FORM_ACTION_TYPES as readonly string[]).includes(row.action_type)
@@ -47,7 +51,7 @@ export function resolveAccountMetaLeadReconciliation(
   });
   const typesByAdDate = new Map<string, Set<string>>();
   for (const action of validActions) {
-    const key = `${action.ad_id}|${action.date}`;
+    const key = `${action.ad_account_id}|${action.ad_id}|${action.date}`;
     const actionTypes = typesByAdDate.get(key) || new Set<string>();
     actionTypes.add(action.action_type);
     typesByAdDate.set(key, actionTypes);

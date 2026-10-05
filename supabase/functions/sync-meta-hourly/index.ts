@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
           `&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}` +
           campaignFilter +
           attributionParam +
+          `&action_report_time=impression` +
           `&use_unified_attribution_setting=true` +
           `&access_token=${accessToken}` +
           `&limit=500`;

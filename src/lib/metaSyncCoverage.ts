@@ -127,6 +127,20 @@ export function findMetaSyncCoverage(
     .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")))[0] || null;
 }
 
+/** Leads may be called zero only when both the Insights scope and action scope
+ * carry complete, persisted evidence for the exact same account/date scope. */
+export function findMetaLeadSnapshotCoverage(
+  rows: MetaSyncCoverageRow[],
+  account: MetaAccountScope,
+  startDate: string,
+  endDate: string,
+  campaignIds: string[] = [],
+) {
+  const insights = findMetaSyncCoverage(rows, account, startDate, endDate, campaignIds, "insights");
+  const actions = findMetaSyncCoverage(rows, account, startDate, endDate, campaignIds, "actions");
+  return insights && actions ? { insights, actions } : null;
+}
+
 export function getMetaCoverageGaps(
   rows: MetaSyncCoverageRow[],
   accounts: MetaAccountScope[],

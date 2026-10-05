@@ -146,12 +146,12 @@ export function useActionTotalsByAds(
       // different Meta attribution windows. Query each account/window pair
       // separately; applying one global window silently drops valid actions
       // from every account using another setting.
-      const actionGroups = new Map<string, { window: string; ids: string[] }>();
+      const actionGroups = new Map<string, { accountId: string; window: string; ids: string[] }>();
       for (const id of allowedIds) {
         const accountId = resolvedAccountByAd[id] || "";
         const window = normalizeMetaAttributionWindow(attributionWindowsByAccount[accountId] || attributionWindow);
         const key = `${accountId}::${window}`;
-        const group = actionGroups.get(key) || { window, ids: [] };
+        const group = actionGroups.get(key) || { accountId, window, ids: [] };
         group.ids.push(id);
         actionGroups.set(key, group);
       }
@@ -161,7 +161,8 @@ export function useActionTotalsByAds(
           for (let from = 0; ; from += PAGE) {
           let q = supabase
             .from("insight_actions" as any)
-            .select("ad_id, action_type, value, value_amount, date, attribution_window")
+            .select("ad_account_id, ad_id, action_type, value, value_amount, date, attribution_window")
+            .eq("ad_account_id", group.accountId)
             .in("ad_id", chunk);
           if (start) q = q.gte("date", start);
           if (end) q = q.lte("date", end);

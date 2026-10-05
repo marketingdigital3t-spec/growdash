@@ -76,7 +76,8 @@ Deno.serve(async (req) => {
     const adIds = Array.from(new Set(mediaRows.map((row) => String(row.ad_id || "")).filter(Boolean)));
     for (let offset = 0; offset < adIds.length; offset += 200) {
       for (let page = 0; ; page++) {
-        let query = admin.from("insight_actions").select("ad_id,date,action_type,value,attribution_window")
+        let query = admin.from("insight_actions").select("ad_account_id,ad_id,date,action_type,value,attribution_window")
+          .eq("ad_account_id", accountId)
           .in("ad_id", adIds.slice(offset, offset + 200)).eq("date", date);
         query = attributionWindow === "account_default" ? query.or("attribution_window.eq.account_default,attribution_window.is.null") : query.eq("attribution_window", attributionWindow);
         const { data, error } = await query.range(page * pageSize, page * pageSize + pageSize - 1);
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
     if (lpError) throw lpError;
     const leadsByAd = canonicalMetaLeads(
       mediaRows.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: accountId, date: String(row.date), leads: null })),
-      actionRows.map((row) => ({ ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: number(row.value) })),
+      actionRows.map((row) => ({ ad_account_id: accountId, ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: number(row.value) })),
       { [accountId]: lpConfig?.action_type || undefined },
     );
     const media = {

@@ -11,7 +11,7 @@ import { businessDateKey } from "@/lib/businessDate";
 import { resolveAccountMetaLeadReconciliation } from "@/lib/metaLeadReconciliation";
 import { normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../../../supabase/functions/_shared/metaLeadMetrics";
-import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
+import { findMetaLeadSnapshotCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
 
 interface AccountRow {
   id: string;
@@ -104,8 +104,9 @@ function useReconciliation(days: number) {
         const chunk = adIds.slice(index, index + ID_CHUNK_SIZE);
         for (let offset = 0; ; offset += PAGE_SIZE) {
           const { data, error } = await supabase.from("insight_actions" as any)
-            .select("ad_id, date, action_type, value, attribution_window")
-            .in("ad_id", chunk)
+          .select("ad_account_id, ad_id, date, action_type, value, attribution_window")
+          .in("ad_account_id", accountIds)
+          .in("ad_id", chunk)
             .in("action_type", leadActionTypes)
             .gte("date", minStart)
             .lte("date", maxEnd)
@@ -123,9 +124,10 @@ function useReconciliation(days: number) {
           && row.date <= account.endDate
           && normalizeMetaAttributionWindow(row.attribution_window) === expectedAttribution);
         const scopedAdIds = new Set(scopedInsights.map((row) => row.ad_id));
-        const scopedInsightDates = new Set(scopedInsights.map((row) => `${row.ad_id}|${row.date}`));
+        const scopedInsightDates = new Set(scopedInsights.map((row) => `${row.ad_account_id}|${row.ad_id}|${row.date}`));
         const scopedActions = actionRows.filter((row) => scopedAdIds.has(row.ad_id)
-          && scopedInsightDates.has(`${row.ad_id}|${row.date}`)
+          && row.ad_account_id === account.id
+          && scopedInsightDates.has(`${row.ad_account_id}|${row.ad_id}|${row.date}`)
           && row.date >= account.startDate
           && row.date <= account.endDate);
         const result = resolveAccountMetaLeadReconciliation(account.id, scopedInsights, scopedActions, siteActionByAccount[account.id]);
@@ -134,9 +136,9 @@ function useReconciliation(days: number) {
           timezone: account.timezone_name || "America/Sao_Paulo",
           attributionWindow: account.attribution_window || "account_default",
         };
-        const confirmedActions = findMetaSyncCoverage(syncCoverageRows, accountScope, account.startDate, account.endDate, [], "actions");
+        const confirmedSnapshot = findMetaLeadSnapshotCoverage(syncCoverageRows, accountScope, account.startDate, account.endDate);
         const syncIssue = findMetaSyncIssue(syncCoverageRows, accountScope, account.startDate, account.endDate, [], "actions");
-        const isConfirmed = Boolean(confirmedActions);
+        const isConfirmed = Boolean(confirmedSnapshot);
         const isConnectionError = account.connection_status !== "connected";
         return {
           id: account.id,

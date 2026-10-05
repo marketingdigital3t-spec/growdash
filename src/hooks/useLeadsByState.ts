@@ -157,7 +157,8 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
           const chunk = adIds.slice(i, i + CHUNK);
           for (let from = 0; ; from += PAGE) {
             const { data, error } = await supabase.from("insight_actions" as any)
-              .select("ad_id, date, attribution_window, action_type, value")
+              .select("ad_account_id, ad_id, date, attribution_window, action_type, value")
+              .in("ad_account_id", Array.from(accountIds))
               .in("ad_id", chunk)
               .in("action_type", allowedActions)
               .gte("date", start)

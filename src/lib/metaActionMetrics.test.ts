@@ -82,7 +82,7 @@ describe("Meta action metrics", () => {
     expect(canonicalMetaLeads([
       { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", leads: 0 },
     ], Object.entries(actions).map(([action_type, value]) => ({
-      ad_id: "ad-1", date: "2026-10-04", action_type, value,
+      ad_account_id: "ca01", ad_id: "ad-1", date: "2026-10-04", action_type, value,
     })), {}).at(0)).toMatchObject({ form_leads: 7, site_leads: 0, conversations: 1, leads: 8 });
   });
 
@@ -118,14 +118,42 @@ describe("Meta action metrics", () => {
       { ad_id: "ad-1", ad_account_id: "ca01", date: "2026-10-04", leads: 0 },
       { ad_id: "ad-2", ad_account_id: "ca02", date: "2026-10-04", leads: 0 },
     ], [
-      { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 7 },
-      { ad_id: "ad-1", date: "2026-10-04", action_type: "lead", value: 13 },
-      { ad_id: "ad-2", date: "2026-10-04", action_type: "leadgen_grouped", value: 2 },
-      { ad_id: "ad-2", date: "2026-10-04", action_type: "lead", value: 5 },
+      { ad_account_id: "ca01", ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 7 },
+      { ad_account_id: "ca01", ad_id: "ad-1", date: "2026-10-04", action_type: "lead", value: 13 },
+      { ad_account_id: "ca02", ad_id: "ad-2", date: "2026-10-04", action_type: "leadgen_grouped", value: 2 },
+      { ad_account_id: "ca02", ad_id: "ad-2", date: "2026-10-04", action_type: "lead", value: 5 },
     ], {});
 
     expect(rows.map((row) => row.form_leads)).toEqual([7, 2]);
     expect(rows.reduce((sum, row) => sum + row.leads, 0)).toBe(9);
+  });
+
+  it("isola fatos de mesmo ad_id por UUID interno de conta no agregado global", () => {
+    const result = aggregateMetaLeadTargets(
+      [
+        { ad_id: "duplicated-ad", ad_account_id: "account-1", date: "2026-10-04", attribution_window: "account_default" },
+        { ad_id: "duplicated-ad", ad_account_id: "account-2", date: "2026-10-04", attribution_window: "account_default" },
+      ],
+      [
+        { ad_account_id: "account-1", ad_id: "duplicated-ad", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 7, attribution_window: "account_default" },
+        { ad_account_id: "account-2", ad_id: "duplicated-ad", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 15, attribution_window: "account_default" },
+      ],
+    );
+
+    expect(result.dailyByAccount["account-1"]["2026-10-04"].total).toBe(7);
+    expect(result.dailyByAccount["account-2"]["2026-10-04"].total).toBe(15);
+    expect(result.totals.total).toBe(22);
+  });
+
+  it("não infere conta para ação sem UUID quando o mesmo ad_id aparece em duas contas", () => {
+    const result = aggregateMetaLeadTargets(
+      [
+        { ad_id: "duplicated-ad", ad_account_id: "account-1", date: "2026-10-04", attribution_window: "account_default" },
+        { ad_id: "duplicated-ad", ad_account_id: "account-2", date: "2026-10-04", attribution_window: "account_default" },
+      ],
+      [{ ad_id: "duplicated-ad", date: "2026-10-04", action_type: "onsite_conversion.lead_grouped", value: 15, attribution_window: "account_default" }],
+    );
+    expect(result.totals.total).toBe(0);
   });
 
   it("não trata lead auxiliar de campanha de mensagem como formulário", () => {
@@ -151,11 +179,11 @@ describe("Meta action metrics", () => {
     const canonical = canonicalMetaLeads([
       { ad_id: "ad-1", ad_account_id: "account-1", date: "2026-10-04", leads: 0 },
     ], [
-      { ad_id: "ad-1", date: "2026-10-04", action_type: "leadgen.other", value: 3 },
-      { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead", value: 3 },
-      { ad_id: "ad-1", date: "2026-10-04", action_type: "offsite_conversion.fb_pixel_lead", value: 2 },
-      { ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.messaging_conversation_started_7d_click", value: 4 },
-      { ad_id: "ad-1", date: "2026-10-04", action_type: "messaging_conversation_started_7d", value: 4 },
+      { ad_account_id: "account-1", ad_id: "ad-1", date: "2026-10-04", action_type: "leadgen.other", value: 3 },
+      { ad_account_id: "account-1", ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.lead", value: 3 },
+      { ad_account_id: "account-1", ad_id: "ad-1", date: "2026-10-04", action_type: "offsite_conversion.fb_pixel_lead", value: 2 },
+      { ad_account_id: "account-1", ad_id: "ad-1", date: "2026-10-04", action_type: "onsite_conversion.messaging_conversation_started_7d_click", value: 4 },
+      { ad_account_id: "account-1", ad_id: "ad-1", date: "2026-10-04", action_type: "messaging_conversation_started_7d", value: 4 },
     ], {});
 
     expect(canonical[0]).toMatchObject({ form_leads: 3, site_leads: 0, conversations: 4, leads: 7 });

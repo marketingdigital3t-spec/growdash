@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findMetaSyncCoverage, findMetaSyncIssue, getMetaCoverageGaps, type MetaSyncCoverageRow } from "./metaSyncCoverage";
+import { findMetaLeadSnapshotCoverage, findMetaSyncCoverage, findMetaSyncIssue, getMetaCoverageGaps, type MetaSyncCoverageRow } from "./metaSyncCoverage";
 
 const base: MetaSyncCoverageRow = {
   ad_account_id: "account-1",
@@ -76,6 +76,24 @@ describe("Meta sync coverage", () => {
     };
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: confirmedZero } }], account, "2026-10-02", "2026-10-02", [], "insights")).not.toBeNull();
     expect(findMetaSyncCoverage([{ ...base, block_status: { insights: { ...confirmedZero, responseComplete: false } } }], account, "2026-10-02", "2026-10-02", [], "insights")).toBeNull();
+  });
+
+  it("does not confirm a lead zero from action coverage when Insights has no confirmed snapshot", () => {
+    const zeroInsights = {
+      status: "fresh", rowsPersisted: 0, evidenceVersion: 2,
+      responseComplete: true, persistenceVerified: true, zeroResultConfirmed: true,
+    };
+    const zeroActions = {
+      status: "fresh", sourceInsightRows: 0, rowsPersisted: 0, leadRowsPersisted: 0,
+      allActionRowsPersisted: 0, allActionRowsExpected: 0, evidenceVersion: 2,
+      responseComplete: true, persistenceVerified: true, zeroResultConfirmed: true,
+    };
+    expect(findMetaLeadSnapshotCoverage([
+      { ...base, block_status: { insights: zeroInsights } },
+    ], account, "2026-10-02", "2026-10-02")).toBeNull();
+    expect(findMetaLeadSnapshotCoverage([
+      { ...base, block_status: { insights: zeroInsights, actions: zeroActions } },
+    ], account, "2026-10-02", "2026-10-02")).not.toBeNull();
   });
 
   it("accepts an all-campaign snapshot or an explicit superset, never a different campaign", () => {

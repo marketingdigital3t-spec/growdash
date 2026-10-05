@@ -65,31 +65,38 @@ export type MetaLeadInsight = {
 };
 
 export type MetaLeadAction = {
+	ad_account_id: string;
   ad_id: string;
   date: string;
   action_type: string;
   value: number | null;
 };
 
+/** Read a resolved lead total without allowing missing/non-finite data into aggregates. */
+export function canonicalMetaLeadValue(row: { leads: number | null } | null | undefined) {
+  const value = Number(row?.leads);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
 /**
  * Resolve Meta lead actions per account/ad/day. Equivalent event aliases are
  * alternatives, not additive facts; the account's configured site event wins
  * when present. The legacy `insights.leads` aggregate is deliberately ignored.
  */
-export function canonicalMetaLeads<T extends MetaLeadInsight>(
+export function canonicalMetaLeads<T extends Omit<MetaLeadInsight, "leads"> & { leads: number | null }>(
   rows: T[],
   actions: MetaLeadAction[],
   siteActionByAccount: Record<string, string | undefined>,
-) {
+): Array<Omit<T, "leads"> & { form_leads: number; site_leads: number; conversations: number; leads: number }> {
   const byAdDate = new Map<string, Record<string, number>>();
   for (const row of actions) {
-    const key = `${row.ad_id}|${row.date}`;
+    const key = `${row.ad_account_id}|${row.ad_id}|${row.date}`;
     const values = byAdDate.get(key) || {};
     values[row.action_type] = Math.max(values[row.action_type] || 0, Math.max(0, Number(row.value || 0)));
     byAdDate.set(key, values);
   }
   return rows.map((row) => {
-    const values = byAdDate.get(`${row.ad_id}|${row.date}`) || {};
+    const values = byAdDate.get(`${row.ad_account_id}|${row.ad_id}|${row.date}`) || {};
     const parts = resolveMetaLeadParts(values, siteActionByAccount[row.ad_account_id]);
     return {
       ...row,
