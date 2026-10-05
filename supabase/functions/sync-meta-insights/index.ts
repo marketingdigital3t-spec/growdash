@@ -19,8 +19,8 @@ function connectionStatusForMetaError(errorCode: number | undefined, retryable: 
 
 const FORM_ACTIONS = [...FORM_ACTION_TYPES];
 const SITE_ACTIONS = [...SITE_ACTION_TYPES];
-// Persist all canonical lead parts plus auxiliary messaging actions for audit.
-// Only CONVERSATION_ACTION_TYPES contribute to the started-conversation KPI.
+// Persist only canonical form, site and started-conversation actions. Auxiliary
+// connections and replies stay out of the lead evidence set.
 const TRACKED_META_LEAD_ACTIONS = [...META_LEAD_ACTION_TYPES];
 const PURCHASE_ACTIONS = ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"];
 
@@ -985,7 +985,6 @@ Deno.serve(async (req) => {
           ...FORM_ACTIONS,
           ...SITE_ACTIONS,
           ...TRACKED_META_LEAD_ACTIONS,
-          "lead",
           ...(lpAction ? [lpAction] : []),
         ]);
         const persistedLeadActionRows = actionRows.filter((row) => leadActionTypes.has(row.action_type));

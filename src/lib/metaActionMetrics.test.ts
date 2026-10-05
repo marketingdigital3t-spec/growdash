@@ -215,7 +215,7 @@ describe("Meta action metrics", () => {
       "onsite_conversion.lead": 4,
       "onsite_conversion.messaging_conversation_started_7d_click": 2,
       "messaging_conversation_started_7d": 2,
-    }, undefined, false, true)).toEqual({ forms: 4, site: 0, conversations: 2, total: 6 });
+    }, undefined, false, true)).toEqual({ forms: 0, site: 0, conversations: 2, total: 2 });
   });
 
   it("mantém a mesma regra de formulário, site e conversa no snapshot usado por MCP e IA", () => {
@@ -229,14 +229,14 @@ describe("Meta action metrics", () => {
       { ad_account_id: "account-1", ad_id: "ad-1", date: "2026-10-04", action_type: "messaging_conversation_started_7d", value: 4 },
     ], {}, undefined, new Set(["account-1|ad-1"]));
 
-    expect(canonical[0]).toMatchObject({ form_leads: 3, site_leads: 0, conversations: 4, leads: 7 });
+    expect(canonical[0]).toMatchObject({ form_leads: 0, site_leads: 0, conversations: 4, leads: 4 });
     expect(resolveMetaLeadActions({
       "leadgen.other": 3,
       "onsite_conversion.lead": 3,
       "offsite_conversion.fb_pixel_lead": 2,
       "onsite_conversion.messaging_conversation_started_7d_click": 4,
       "messaging_conversation_started_7d": 4,
-    }, undefined, false, true)).toEqual({ forms: 3, site: 0, conversations: 4, total: 7 });
+    }, undefined, false, true)).toEqual({ forms: 0, site: 0, conversations: 4, total: 4 });
   });
 
   it("ignora lead de site retornado por pixel não configurado", () => {

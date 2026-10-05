@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
     // aliases plus each account's configured LP event, and never source leads
     // from the legacy insights.leads aggregate.
     const actionRows: ActionRow[] = [];
-    const actionTypes = Array.from(new Set([...META_LEAD_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter((value): value is string => !!value)]));
+    const actionTypes = Array.from(new Set([...META_LEAD_ACTION_TYPES, ...Object.values(siteActionByAccount).filter((value): value is string => !!value)]));
     for (const account of accounts || []) {
       const accountAdIds = Array.from(new Set(uniqueScopedInsights.filter((row) => row.ad_account_id === account.id).map((row) => row.ad_id)));
       if (!accountAdIds.length) continue;

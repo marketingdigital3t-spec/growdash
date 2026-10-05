@@ -24,7 +24,7 @@ function validDate(value: unknown): value is string {
 }
 
 function actionTypes(siteActions: string[]) {
-  return Array.from(new Set([...META_LEAD_ACTION_TYPES, "lead", ...siteActions]));
+  return Array.from(new Set([...META_LEAD_ACTION_TYPES, ...siteActions]));
 }
 
 type AccountCoverage = {

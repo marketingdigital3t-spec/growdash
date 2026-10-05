@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     if (lpError) throw lpError;
     const siteActionByAccount = Object.fromEntries((lpConfigs || []).map((config) => [config.ad_account_id, config.action_type || undefined]));
     const actionRows: any[] = [];
-    const actionTypes = Array.from(new Set([...META_LEAD_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter(Boolean)]));
+    const actionTypes = Array.from(new Set([...META_LEAD_ACTION_TYPES, ...Object.values(siteActionByAccount).filter(Boolean)]));
     const actionScope = new Map<string, { adAccountId: string; window: string; adIds: string[] }>();
     for (const account of accounts || []) {
       const adIds = Array.from(new Set(uniqueInsights.filter((row) => row.ad_account_id === account.id).map((row) => row.ad_id).filter(Boolean)));

@@ -5,8 +5,6 @@ export const FORM_ACTION_TYPES = [
   // events and cannot be classified as native forms without more evidence.
   "onsite_conversion.lead_grouped",
   "leadgen_grouped",
-  "onsite_conversion.lead",
-  "leadgen.other",
 ] as const;
 export const SITE_ACTION_TYPES = ["offsite_conversion.fb_pixel_lead", "offsite_conversion.lead"] as const;
 export const CONVERSATION_ACTION_TYPES = [
@@ -33,7 +31,6 @@ export const META_LEAD_ACTION_TYPES = [
   ...FORM_ACTION_TYPES,
   ...SITE_ACTION_TYPES,
   ...CONVERSATION_ACTION_TYPES,
-  ...MESSAGING_AUXILIARY_ACTION_TYPES,
 ] as const;
 
 function firstAliasValue(values: Record<string, number>, aliases: readonly string[]) {
