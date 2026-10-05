@@ -677,7 +677,7 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+            <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
               <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
               <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} /></HelpBlock>
             </div>

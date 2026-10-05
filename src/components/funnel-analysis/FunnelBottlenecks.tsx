@@ -26,7 +26,7 @@ export function FunnelBottlenecks({ a }: { a: FunnelAnalytics }) {
           <div className="text-xs text-muted-foreground">Sem dados de transição entre etapas.</div>
         )}
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2">
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-center">
             <Clock className="h-4 w-4 text-amber-400 mx-auto mb-1" />
             <div className="text-xl font-semibold">{a.agingBuckets.gt3}</div>
