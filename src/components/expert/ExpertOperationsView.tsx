@@ -346,7 +346,6 @@ export function ExpertOperationsView() {
       const { data, error } = await (supabase as any)
         .from("experts")
         .select("id,nome")
-        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data || [];
