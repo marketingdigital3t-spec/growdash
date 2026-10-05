@@ -13,7 +13,7 @@ export function SpendNoLeadsCard() {
       const rows: any[] = [];
       for (let offset = 0; ; offset += 1000) {
         const { data, error } = await supabase.from("insights")
-          .select("spend, leads, ads!inner(adsets!inner(campaigns!inner(id, name, objective)))")
+          .select("spend, form_leads, site_leads, conversations, ads!inner(adsets!inner(campaigns!inner(id, name, objective)))")
           .gte("date", since).gt("spend", 0)
           .range(offset, offset + 999);
         if (error) throw error;
@@ -27,7 +27,11 @@ export function SpendNoLeadsCard() {
         if (!c) continue;
         const cur = byCampaign.get(c.id) || { name: c.name, objective: c.objective || "—", spend: 0, leads: 0 };
         cur.spend += Number(r.spend || 0);
-        cur.leads += Number(r.leads || 0);
+        // The legacy insights.leads aggregate is intentionally excluded. This
+        // diagnostic must match the Ads Manager lead contract exactly.
+        cur.leads += Math.max(0, Number(r.form_leads || 0))
+          + Math.max(0, Number(r.site_leads || 0))
+          + Math.max(0, Number(r.conversations || 0));
         byCampaign.set(c.id, cur);
       }
 
