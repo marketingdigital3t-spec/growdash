@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useExpertOperations } from "@/hooks/useExpertOperations";
+import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -338,6 +339,7 @@ function ClassCard({
 
 export function ExpertOperationsView() {
   const { startDate, endDate } = useGlobalFilters();
+  const adAccounts = useAdAccounts();
   const experts = useQuery({
     queryKey: ["expert-operations-experts"],
     queryFn: async () => {
@@ -356,6 +358,21 @@ export function ExpertOperationsView() {
   const selectedExpertName =
     (experts.data || []).find((expert: any) => expert.id === selectedExpertId)?.nome || "";
   const operations = useExpertOperations(selectedExpertId);
+  const expertOptions = useMemo(() => {
+    if (experts.data?.length) return experts.data;
+    const seen = new Set<string>();
+    return operations.classes.reduce((items: Array<{ id: string; nome: string }>, item: any) => {
+      const id = String(item.expert_id || "").trim();
+      const nome = String(item.expert_name || "").trim();
+      if (!id || seen.has(id)) return items;
+      seen.add(id);
+      items.push({ id, nome: nome || "Expert" });
+      return items;
+    }, []);
+  }, [experts.data, operations.classes]);
+  useEffect(() => {
+    if (!expertId && expertOptions[0]?.id) setExpertId(expertOptions[0].id);
+  }, [expertId, expertOptions]);
   const [slide, setSlide] = useState(0);
   const visibleClasses = useMemo(
     () => operations.classes.slice(slide, slide + 4),
@@ -367,7 +384,7 @@ export function ExpertOperationsView() {
     ? (operations.sales.length / operations.traffic.totalLeads) * 100
     : null;
   const accountLabel = operations.accountIds.length
-    ? operations.accountIds.join(", ")
+    ? operations.accountIds.map((id) => adAccounts.data?.find((account) => account.id === id)?.name || id).join(", ")
     : "Nenhuma conta Meta vinculada";
   const periodLabel = `${startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
   const dailyRevenue = useMemo(() => {
@@ -400,7 +417,7 @@ export function ExpertOperationsView() {
             <SelectValue placeholder="Selecione o expert" />
           </SelectTrigger>
           <SelectContent>
-            {(experts.data || []).map((expert: any) => (
+            {expertOptions.map((expert: any) => (
               <SelectItem key={expert.id} value={expert.id}>
                 {expert.nome}
               </SelectItem>
