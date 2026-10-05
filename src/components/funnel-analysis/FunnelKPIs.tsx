@@ -30,7 +30,12 @@ const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = false, trafficSpend, metaLeads, metaLeadsAvailable = false, metaLeadsLoading = false, trafficLoading = false, trafficUnavailable = false, trafficReason, cpl, rdCpl, metaCplLoading = false, cac, roas, salesConversionRate, previousAvgDaysToConvert }: Props) {
-  const timeChange = previousAvgDaysToConvert && previousAvgDaysToConvert > 0 ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100 : null;
+  // A tiny/empty comparison base produces misleading values such as
+  // 2.213.930%. Only show a change when the previous period has a meaningful
+  // measured average; otherwise keep the card honest and comparable.
+  const timeChange = previousAvgDaysToConvert != null && previousAvgDaysToConvert >= 1
+    ? ((a.avgDaysToConvert - previousAvgDaysToConvert) / previousAvgDaysToConvert) * 100
+    : null;
   const rdLeadValue = rdLeadsError ? null : rdLeadsLoading ? null : rdLeads;
   const cards = [
     { label: "Investimento em anúncio", value: trafficSpend, icon: DollarSign, color: "text-foreground", format: "brl" as const, unavailable: trafficLoading || trafficUnavailable, detail: trafficReason || "Investimento atribuído pela Meta Ads no período selecionado." },

@@ -100,7 +100,11 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     ].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)),
     [accounts.error, actions.error, breakdowns.error, insights.error, syncCoverage.data?.issues, syncCoverage.error],
   );
-  const isLoading = insights.isLoading || actions.isLoading || accounts.isLoading || breakdowns.isLoading || syncCoverage.isLoading;
+  // Background polling keeps `isFetching` true while the last confirmed
+  // snapshot is still usable. Treat only the first pending request as loading;
+  // otherwise the funnel remains stuck on "Sincronizando" forever whenever a
+  // coverage gap is being retried.
+  const isLoading = insights.isPending || actions.isPending || accounts.isPending || breakdowns.isPending || syncCoverage.isPending;
   const coverageComplete = accounts.isSuccess
     && scopedAccounts.length > 0
     && scopedAccounts.length === effectiveAccountIds.length
@@ -135,5 +139,5 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     return isLoading ? { ...base, status: "syncing" as const } : base;
   }, [actionCoverageReason, actions.data, actions.error, actions.isError, actions.isLoading, attributionWindow, breakdowns.data, coverageComplete, coverageReason, errors, insightCoverageComplete, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
   const metrics = useMemo(() => metaMetricContract(data), [data]);
-  return { data, metrics, isLoading, insightsLoading: insights.isLoading || accounts.isLoading, actionsLoading: actions.isLoading || syncCoverage.isLoading, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError || syncCoverage.isError), error: insights.error || actions.error || accounts.error || breakdowns.error || syncCoverage.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); await syncCoverage.refetch(); } };
+  return { data, metrics, isLoading, insightsLoading: insights.isPending || accounts.isPending, actionsLoading: actions.isPending || syncCoverage.isPending, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError || syncCoverage.isError), error: insights.error || actions.error || accounts.error || breakdowns.error || syncCoverage.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); await syncCoverage.refetch(); } };
 }
