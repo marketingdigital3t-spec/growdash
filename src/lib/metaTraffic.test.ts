@@ -85,16 +85,16 @@ describe("Meta traffic metrics", () => {
     expect(result.metricAvailability.leads.available).toBe(false);
   });
 
-  it("mantém linhas locais visíveis, mas sem confirmar a cobertura quando falta watermark", () => {
+  it("não expõe linhas locais quando falta watermark do período", () => {
     const result = aggregateMetaTrafficMetrics([
       { ad_id: "ad-stale", ad_account_id: "acc-1", spend: 999, impressions: 100, clicks: 5 },
     ], { actionsAvailable: false }, "2026-09-28T12:00:00.000Z", [], Date.parse("2026-09-28T12:01:00.000Z"), { scopeConfirmed: false });
-    expect(result.available).toBe(true);
-    expect(result.metricAvailability.spend.available).toBe(true);
+    expect(result.available).toBe(false);
+    expect(result.metricAvailability.spend.available).toBe(false);
     expect(result.metricAvailability.leads.available).toBe(false);
   });
 
-  it("mantém o último snapshot confirmado visível durante uma cobertura parcial", () => {
+  it("não mantém o último snapshot durante uma cobertura parcial", () => {
     const result = aggregateMetaTrafficMetrics([
       { ad_id: "ad-last-valid", ad_account_id: "acc-1", spend: 132.05, impressions: 1000, clicks: 20 },
     ], {
@@ -103,12 +103,12 @@ describe("Meta traffic metrics", () => {
     }, "2026-10-03T23:29:00.000Z", [], Date.parse("2026-10-03T23:30:00.000Z"), { scopeConfirmed: false });
     expect(result.spend).toBe(132.05);
     expect(result.totalLeads).toBe(5);
-    expect(result.available).toBe(true);
-    expect(result.metricAvailability.leads.available).toBe(true);
-    expect(result.status).toBe("partial");
+    expect(result.available).toBe(false);
+    expect(result.metricAvailability.leads.available).toBe(false);
+    expect(result.status).toBe("stale");
   });
 
-  it("explica cobertura incompleta sem esconder métricas do snapshot válido", () => {
+  it("explica cobertura incompleta sem expor métricas do snapshot antigo", () => {
     const result = aggregateMetaTrafficMetrics([
       { ad_id: "ad-1", ad_account_id: "acc-1", spend: 25, impressions: 100, clicks: 5 },
     ], { actionsAvailable: true, metaLeadActions: { forms: 2, site: 1, conversations: 0, total: 3 } }, "2026-10-04T11:00:00.000Z", [], Date.parse("2026-10-04T11:01:00.000Z"), {
@@ -116,8 +116,8 @@ describe("Meta traffic metrics", () => {
       coverageReason: "Insights sem sincronização confirmada para: Conta B.",
     });
 
-    expect(result.status).toBe("partial");
-    expect(result.metricAvailability.spend.available).toBe(true);
+    expect(result.status).toBe("stale");
+    expect(result.metricAvailability.spend.available).toBe(false);
     expect(result.metricAvailability.spend.reason).toContain("Conta B");
     expect(result.coverageReason).toContain("Conta B");
   });

@@ -201,14 +201,18 @@ export function aggregateMetaTrafficMetrics(
   const results = resultBreakdown.reduce((sum, item) => sum + item.value, 0);
   const freshnessSeconds = syncedAt ? Math.max(0, Math.floor((now - new Date(syncedAt).getTime()) / 1000)) : null;
   // When the caller provides a synchronization scope, only its persisted
-  // watermark can confirm the period. Rows may belong to an old/partial run.
-  // Rows are already scoped by internal account, civil date and attribution.
-  // Keep this last persisted snapshot visible even if its latest watermark is
-  // partial; the status below communicates freshness separately from value.
-  const available = context?.scopeConfirmed === true || rows.length > 0;
+  // watermark can confirm the period. Rows may belong to an old/partial run
+  // (for example, a historical snapshot that missed late Meta delivery).
+  // Never expose that unverified spend as the selected period's value: the
+  // caller must refresh the exact scope first.
+  const available = context
+    ? context.scopeConfirmed === true
+    : rows.length > 0;
   const unavailableReason = available
     ? null
-    : errors[0] || "Nenhum snapshot Meta encontrado no período e escopo selecionados.";
+    : context?.coverageReason ||
+      errors[0] ||
+      "Nenhum snapshot Meta encontrado no período e escopo selecionados.";
   const status = errors.length
     ? rows.length ? "partial" : "error"
     : !available || freshnessSeconds === null || freshnessSeconds > 300 ? "stale"
