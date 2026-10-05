@@ -468,7 +468,14 @@ export function ExpertOperationsView() {
           </div>
         </div>
         <div className="grid items-stretch gap-3 pb-2 sm:grid-cols-2 lg:grid-cols-4">
-          {visibleClasses.length ? (
+          {operations.isLoading && operations.classes.length === 0 ? (
+            <Card className="w-full border-dashed sm:col-span-2 lg:col-span-4">
+              <CardContent className="flex items-center gap-3 p-8 text-sm text-muted-foreground">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+                Carregando grade de turmas…
+              </CardContent>
+            </Card>
+          ) : visibleClasses.length ? (
             visibleClasses.map((eventClass: any) => (
               <div
                 className="min-w-0 h-full"
