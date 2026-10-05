@@ -60,7 +60,7 @@ export function useCampaignDiagnostics() {
               id, name, status,
               ads(
                 id, name, thumbnail_url, status,
-                insights(spend, leads, clicks, impressions, ctr, cpl, frequency, date)
+                insights(spend, form_leads, site_leads, conversations, clicks, impressions, ctr, cpl, frequency, date)
               )
             )
           `),
@@ -135,16 +135,17 @@ export function useCampaignDiagnostics() {
             for (const i of ad.insights || []) {
               if (cycleStartDate && i.date && i.date < cycleStartDate) continue;
               spend += i.spend ?? 0;
-              leads += i.leads ?? 0;
+              const canonicalLeads = Number(i.form_leads || 0) + Number(i.site_leads || 0) + Number(i.conversations || 0);
+              leads += canonicalLeads;
               clicks += i.clicks ?? 0;
               impressions += i.impressions ?? 0;
               ctrSum += i.ctr ?? 0;
               freqSum += i.frequency ?? 0;
               count++;
               aSpend += i.spend ?? 0;
-              aLeads += i.leads ?? 0;
+              aLeads += canonicalLeads;
               const d = dailyAgg.get(i.date) || { spend: 0, leads: 0 };
-              d.spend += i.spend ?? 0; d.leads += i.leads ?? 0;
+              d.spend += i.spend ?? 0; d.leads += canonicalLeads;
               dailyAgg.set(i.date, d);
             }
             asSpend += aSpend; asLeads += aLeads;

@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot } from "../_shared/metaInsightReconciliation.ts";
-import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
+import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, META_LEAD_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
+import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,7 +19,9 @@ function connectionStatusForMetaError(errorCode: number | undefined, retryable: 
 
 const FORM_ACTIONS = [...FORM_ACTION_TYPES];
 const SITE_ACTIONS = [...SITE_ACTION_TYPES];
-const CONVERSATION_ACTIONS = [...CONVERSATION_ACTION_TYPES];
+// Persist all canonical lead parts plus auxiliary messaging actions for audit.
+// Only CONVERSATION_ACTION_TYPES contribute to the started-conversation KPI.
+const TRACKED_META_LEAD_ACTIONS = [...META_LEAD_ACTION_TYPES];
 const PURCHASE_ACTIONS = ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"];
 
 function preferredAction(actions: any[], aliases: string[]) {
@@ -29,19 +32,20 @@ function preferredAction(actions: any[], aliases: string[]) {
   return values.length ? Math.max(...values) : 0;
 }
 
-function canonicalLeadParts(actions: any[], lpAction: string | null) {
+function canonicalLeadParts(actions: any[], lpAction: string | null, destinationType?: string | null) {
   const values: Record<string, number> = {};
   for (const action of actions) {
     const type = String(action.action_type || "");
     values[type] = Math.max(Number(values[type] || 0), Math.max(0, Number(action.value || 0)));
   }
-  return resolveMetaLeadParts(values, lpAction || undefined);
+  const siteDestinationConfirmed = String(destinationType || "").toUpperCase() === "WEBSITE";
+  return resolveMetaLeadParts(values, lpAction || undefined, siteDestinationConfirmed, isMetaMessagingDestination(destinationType));
 }
 
-function canonicalResult(objective: string | null, optimizationGoal: string | null, actions: any[], lpAction: string | null) {
+function canonicalResult(objective: string | null, optimizationGoal: string | null, actions: any[], lpAction: string | null, destinationType?: string | null) {
   const objectiveKey = String(objective || "").toUpperCase();
   const goalKey = String(optimizationGoal || "").toUpperCase();
-  const leads = canonicalLeadParts(actions, lpAction);
+  const leads = canonicalLeadParts(actions, lpAction, destinationType);
   if (objectiveKey.includes("SALES") || objectiveKey.includes("CONVERSION") || goalKey.includes("PURCHASE")) {
     return { type: "purchase", value: preferredAction(actions, PURCHASE_ACTIONS) };
   }
@@ -900,7 +904,7 @@ Deno.serve(async (req) => {
             for (const adId of missingAdIds) {
               try {
                 const detail = await fetchMeta(
-                  `${graphBase}/${adId}?fields=id,name,effective_status,creative{id,thumbnail_url,image_url},adset{id,name,campaign_id,effective_status,daily_budget},campaign{id,name,objective,effective_status}&access_token=${accessToken}`
+                  `${graphBase}/${adId}?fields=id,name,effective_status,creative{id,thumbnail_url,image_url},adset{id,name,campaign_id,effective_status,daily_budget,destination_type,optimization_goal},campaign{id,name,objective,effective_status}&access_token=${accessToken}`
                 );
                 if (detail.error || !detail.id) continue;
                 const camp = detail.campaign;
@@ -916,6 +920,8 @@ Deno.serve(async (req) => {
                     id: aset.id, name: aset.name, campaign_id: aset.campaign_id || camp?.id,
                     daily_budget: aset.daily_budget ? Number(aset.daily_budget) / 100 : null,
                     status: aset.effective_status || null,
+                    destination_type: aset.destination_type || null,
+                    optimization_goal: aset.optimization_goal || null,
                   });
                 }
                 newAds.set(detail.id, {
@@ -978,14 +984,50 @@ Deno.serve(async (req) => {
         const leadActionTypes = new Set<string>([
           ...FORM_ACTIONS,
           ...SITE_ACTIONS,
-          ...CONVERSATION_ACTIONS,
+          ...TRACKED_META_LEAD_ACTIONS,
           "lead",
           ...(lpAction ? [lpAction] : []),
         ]);
         const persistedLeadActionRows = actionRows.filter((row) => leadActionTypes.has(row.action_type));
 
         const campaignById = new Map((campaigns || []).map((campaign: any) => [String(campaign.id), campaign]));
-        const adsetById = new Map((adsetsList || []).map((adset: any) => [String(adset.id), adset]));
+        const insightAdsetIds = [...new Set(allInsights.map((row: any) => String(row.adset_id || "")).filter(Boolean))];
+        let persistedAdsets: any[] = [];
+        if (insightAdsetIds.length) {
+          const { data, error } = await supabaseAdmin.from("adsets").select("id,campaign_id,destination_type,optimization_goal").in("id", insightAdsetIds);
+          if (error) {
+            const message = `Conta ${account.name} classificação de destino dos conjuntos: ${error.message}`;
+            errors.push(message);
+            auxiliaryErrors.push(message);
+          } else persistedAdsets = data || [];
+        }
+        const adsetById = new Map<string, any>();
+        for (const adset of [...(adsetsList || []), ...persistedAdsets]) adsetById.set(String(adset.id), adset);
+        const websiteOnlyCampaignIds = new Set<string>();
+        const messagingOnlyCampaignIds = new Set<string>();
+        const destinationTypesByCampaign = new Map<string, string[]>();
+        for (const adset of adsetById.values()) {
+          const campaignId = String(adset.campaign_id || "");
+          if (!campaignId) continue;
+          const types = destinationTypesByCampaign.get(campaignId) || [];
+          types.push(String(adset.destination_type || "").toUpperCase());
+          destinationTypesByCampaign.set(campaignId, types);
+        }
+        for (const [campaignId, types] of destinationTypesByCampaign) {
+          if (types.length > 0 && types.every((type) => type === "WEBSITE")) websiteOnlyCampaignIds.add(campaignId);
+          if (types.length > 0 && types.every((type) => isMetaMessagingDestination(type))) messagingOnlyCampaignIds.add(campaignId);
+        }
+        const destinationClassificationComplete = allInsights.every((insight: any) => {
+          const actions = Array.isArray(insight.actions) ? insight.actions : [];
+          const hasConversationResult = actions.some((action: any) => CONVERSATION_ACTION_TYPES.includes(String(action.action_type) as any));
+          const hasConfiguredSiteResult = Boolean(lpAction) && actions.some((action: any) => String(action.action_type) === lpAction);
+          if (!hasConversationResult && !hasConfiguredSiteResult) return true;
+          const adset = adsetById.get(String(insight.adset_id || ""));
+          return Boolean(adset?.destination_type);
+        });
+        if (!destinationClassificationComplete) {
+          auxiliaryErrors.push(`Conta ${account.name}: Leads Meta preservados como snapshot anterior; destino Website não foi confirmado para todos os anúncios.`);
+        }
 
         // Batch upsert insights (chunks of 100)
         const insightRows = allInsights.map((insight: any) => {
@@ -1000,14 +1042,14 @@ Deno.serve(async (req) => {
           const frequency = Number(insight.frequency || 0);
 
           const actions = insight.actions || [];
-          // Leads = Formulário Instantâneo + LP configurada. Algumas contas/API
-          // antigas retornam apenas `lead` (sem `lead_grouped`); nesse caso ele
-          // é o único resultado de formulário disponível e não pode ser perdido.
+          // Leads use only explicitly classified form, configured-site, and
+          // started-conversation actions. Generic `lead`/`omni_lead` aggregates
+          // are ambiguous and must never be inferred as native forms.
           const campaign = campaignById.get(String(insight.campaign_id || ""));
           const adset = adsetById.get(String(insight.adset_id || ""));
-          const parts = canonicalLeadParts(actions, lpAction);
+          const parts = canonicalLeadParts(actions, lpAction, adset?.destination_type);
           const leads = parts.forms + parts.site + parts.conversations;
-          const result = canonicalResult(campaign?.objective || null, adset?.optimization_goal || null, actions, lpAction);
+          const result = canonicalResult(campaign?.objective || null, adset?.optimization_goal || null, actions, lpAction, adset?.destination_type);
           const cpl = leads > 0 ? spend / leads : 0;
           const conversionRate = clicks > 0 ? (leads / clicks) * 100 : 0;
           const efficiencyRate = impressions > 0 ? (leads / impressions) * 100 : 0;
@@ -1026,16 +1068,19 @@ Deno.serve(async (req) => {
             inline_link_clicks: inlineLinkClicks,
             unique_inline_link_clicks: uniqueInlineLinkClicks,
             ctr, cpm, frequency,
-            leads, cpl, conversion_rate: conversionRate,
-            efficiency_rate: efficiencyRate, health_score: healthScore,
+            ...(!destinationClassificationComplete ? {} : {
+              leads, cpl, conversion_rate: conversionRate,
+              efficiency_rate: efficiencyRate,
+              form_leads: parts.forms,
+              site_leads: parts.site,
+              conversations: parts.conversations,
+            }),
+            health_score: healthScore,
             attribution_window: effectiveAttributionWindow,
             timezone: effectiveTimezone,
             optimization_goal: adset?.optimization_goal || null,
             result_type: result.type,
             result_value: result.type === "reach" ? reach : result.value,
-            form_leads: parts.forms,
-            site_leads: parts.site,
-            conversations: parts.conversations,
           };
         });
 
@@ -1316,7 +1361,11 @@ Deno.serve(async (req) => {
                 // type: native forms, configured landing pages, and click-to-
                 // message campaigns. Do not drop message campaigns from the
                 // audience report simply because they have no form action.
-                const parts = canonicalLeadParts(actions, lpAction);
+                const campaignId = String(r.campaign_id);
+                const campaignDestination = websiteOnlyCampaignIds.has(campaignId)
+                  ? "WEBSITE"
+                  : messagingOnlyCampaignIds.has(campaignId) ? "WHATSAPP" : undefined;
+                const parts = canonicalLeadParts(actions, lpAction, campaignDestination);
                 return {
                   campaign_id: r.campaign_id,
                   date: r.date_start,
@@ -1390,7 +1439,8 @@ Deno.serve(async (req) => {
             actions: {
               // Empty canonical lead actions are a confirmed zero only after
               // complete Insights pagination and read-back of every action row.
-              status: "fresh",
+              status: destinationClassificationComplete ? "fresh" : "partial",
+              ...(destinationClassificationComplete ? {} : { errorMessage: "Destino do anúncio não confirmado; última classificação de Leads Meta preservada." }),
               sourceInsightRows: insightRows.length,
               rowsPersisted: persistedLeadActionRows.length,
               leadRowsPersisted: persistedLeadActionRows.length,
@@ -1399,7 +1449,7 @@ Deno.serve(async (req) => {
               evidenceVersion: 2,
               responseComplete: true,
               persistenceVerified: true,
-              zeroResultConfirmed: persistedLeadActionRows.length === 0,
+              zeroResultConfirmed: destinationClassificationComplete && persistedLeadActionRows.length === 0,
             },
             hourly: { status: "pending" },
             breakdowns: { status: auxiliaryErrors.length ? "partial" : "pending", errorMessage: auxiliaryErrors.join("; ") || null },

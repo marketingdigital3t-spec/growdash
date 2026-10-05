@@ -4,6 +4,7 @@ import { aggregateMetaLeadActionDays, META_ACTION_TYPES, resolveMetaLeadActions 
 import { normalizeMetaAttributionWindow, matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 import { businessDateKey } from "@/lib/businessDate";
 import { isSameQueryScope } from "@/lib/queryScope";
+import { buildConversationEligibleMetaAdScopes } from "@/lib/metaLeadScope";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -124,20 +125,34 @@ export function useActionTotalsByAds(
       }
       const adsetIds = Array.from(new Set(Object.values(adsetByAd)));
       const campaignByAdset: Record<string, string> = {};
+      const destinationTypeByAdset: Record<string, string | null> = {};
       for (let i = 0; i < adsetIds.length; i += CHUNK_IDS) {
         const chunk = adsetIds.slice(i, i + CHUNK_IDS);
         const { data, error } = await supabase
           .from("adsets")
-          .select("id, campaign_id")
+          .select("id, campaign_id, destination_type")
           .in("id", chunk);
         if (error) throw error;
-        for (const r of (data || []) as any[]) campaignByAdset[r.id] = r.campaign_id;
+        for (const r of (data || []) as any[]) {
+          campaignByAdset[r.id] = r.campaign_id;
+          destinationTypeByAdset[r.id] = r.destination_type || null;
+        }
       }
       const campaignIds = Array.from(new Set(Object.values(campaignByAdset)));
       // Historical Meta results remain valid even when the parent campaign is
       // archived/deleted. Never discard those action rows by current status.
       const allowedIds = resolvedSortedIds;
       const excludedAdCount = 0;
+      const siteEligibleAdScopes = new Set(allowedIds
+        .filter((adId) => {
+          const adsetId = adsetByAd[adId];
+          return adsetId && String(destinationTypeByAdset[adsetId] || "").toUpperCase() === "WEBSITE";
+        })
+        .map((adId) => `${resolvedAccountByAd[adId] || ""}|${adId}`));
+      const conversationEligibleAdScopes = buildConversationEligibleMetaAdScopes(
+        allowedIds.map((adId) => ({ ad_account_id: resolvedAccountByAd[adId] || "", ad_id: adId, adset_id: adsetByAd[adId] || null })),
+        destinationTypeByAdset,
+      );
 
       // === Sum insight_actions only for allowed ads ===
       const CHUNK = 200;
@@ -206,14 +221,16 @@ export function useActionTotalsByAds(
           if (config.action_type) lpByAccount[config.ad_account_id] = config.action_type;
         }
       }
-      const canonicalDaily = aggregateMetaLeadActionDays(dailyByAd, resolvedAccountByAd, lpByAccount);
+      const canonicalDaily = aggregateMetaLeadActionDays(dailyByAd, resolvedAccountByAd, lpByAccount, siteEligibleAdScopes, conversationEligibleAdScopes);
       Object.assign(metaLeadActions, canonicalDaily.totals);
       Object.assign(dailyMetaLeadByAccount, canonicalDaily.dailyByAccount);
       for (const [adId, dates] of Object.entries(dailyByAd)) {
         const accountId = resolvedAccountByAd[adId];
         const aggregate = { forms: 0, site: 0, conversations: 0, total: 0 };
         for (const dailyActions of Object.values(dates)) {
-          const resolved = resolveMetaLeadActions(dailyActions, accountId ? lpByAccount[accountId] : undefined);
+          const scopeKey = `${accountId || ""}|${adId}`;
+          const siteAction = siteEligibleAdScopes.has(scopeKey) && accountId ? lpByAccount[accountId] : undefined;
+          const resolved = resolveMetaLeadActions(dailyActions, siteAction, siteEligibleAdScopes.has(scopeKey), conversationEligibleAdScopes.has(scopeKey));
           aggregate.forms += resolved.forms;
           aggregate.site += resolved.site;
           aggregate.conversations += resolved.conversations;
@@ -223,14 +240,15 @@ export function useActionTotalsByAds(
       }
       const leadActionAliases = new Set<string>([
         ...META_ACTION_TYPES.forms,
-        ...META_ACTION_TYPES.site,
         ...META_ACTION_TYPES.conversations,
-        "lead",
-        ...Object.values(lpByAccount).filter(Boolean),
       ]);
-      const leadActionFactCount = Object.values(dailyByAd).reduce((count, days) => count + Object.values(days).filter((dayActions) =>
-        Object.keys(dayActions).some((actionType) => leadActionAliases.has(actionType)),
-      ).length, 0);
+      const leadActionFactCount = Object.entries(dailyByAd).reduce((count, [adId, days]) => {
+        const accountId = resolvedAccountByAd[adId] || "";
+        const siteAction = siteEligibleAdScopes.has(`${accountId}|${adId}`) ? lpByAccount[accountId] : undefined;
+        return count + Object.values(days).filter((dayActions) =>
+          Object.keys(dayActions).some((actionType) => leadActionAliases.has(actionType) || actionType === siteAction),
+        ).length;
+      }, 0);
       return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount };
     },
     staleTime: 120_000,

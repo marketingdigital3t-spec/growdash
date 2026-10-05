@@ -1,12 +1,12 @@
 export const FORM_ACTION_TYPES = [
   // `lead_grouped` is the official Ads Manager result for Instant Forms.
-  // Other action types are legacy/aggregate aliases; prefer this exact event
-  // whenever Meta returns it so an inflated alias cannot replace its count.
+  // These events identify an on-Meta Lead Ads conversion. Generic `lead` and
+  // `omni_lead` are intentionally excluded because they can aggregate site
+  // events and cannot be classified as native forms without more evidence.
   "onsite_conversion.lead_grouped",
   "leadgen_grouped",
   "onsite_conversion.lead",
   "leadgen.other",
-  "omni_lead",
 ] as const;
 export const SITE_ACTION_TYPES = ["offsite_conversion.fb_pixel_lead", "offsite_conversion.lead"] as const;
 export const CONVERSATION_ACTION_TYPES = [
@@ -17,8 +17,23 @@ export const CONVERSATION_ACTION_TYPES = [
   "onsite_conversion.messaging_conversation_started",
   "messaging_conversation_started_7d",
   "messaging_conversation_started",
+] as const;
+
+// Keep these actions available to diagnostics and to prevent ambiguous legacy
+// `lead` totals from being mistaken for form leads on messaging campaigns.
+// They are not evidence of a newly started conversation and never contribute
+// to the canonical Meta Leads KPI.
+export const MESSAGING_AUXILIARY_ACTION_TYPES = [
   "onsite_conversion.total_messaging_connection",
   "total_messaging_connection",
+  "onsite_conversion.messaging_conversation_replied_7d",
+] as const;
+
+export const META_LEAD_ACTION_TYPES = [
+  ...FORM_ACTION_TYPES,
+  ...SITE_ACTION_TYPES,
+  ...CONVERSATION_ACTION_TYPES,
+  ...MESSAGING_AUXILIARY_ACTION_TYPES,
 ] as const;
 
 function firstAliasValue(values: Record<string, number>, aliases: readonly string[]) {
@@ -29,31 +44,23 @@ function firstAliasValue(values: Record<string, number>, aliases: readonly strin
 export function resolveMetaLeadParts(
   values: Record<string, number>,
   configuredSiteAction?: string,
+  siteDestinationConfirmed = false,
+  conversationDestinationConfirmed = false,
 ) {
   // Pixel events may be residual on native-form campaigns. A site lead is
-  // countable only when its conversion event is explicitly configured per account.
-  const siteAliases = configuredSiteAction
+  // countable only when its conversion event is configured and the caller
+  // confirmed this ad's destination is WEBSITE.
+  const siteAliases = siteDestinationConfirmed && configuredSiteAction
     && !FORM_ACTION_TYPES.includes(configuredSiteAction as typeof FORM_ACTION_TYPES[number])
     && configuredSiteAction !== "lead"
     ? [configuredSiteAction]
     : [];
-  const formAction = FORM_ACTION_TYPES.find((type) => Object.prototype.hasOwnProperty.call(values, type));
-  const hasSite = siteAliases.some((type) => Object.prototype.hasOwnProperty.call(values, type));
-  const hasUnconfiguredSiteSignal = SITE_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
-  const hasConversation = CONVERSATION_ACTION_TYPES.some((type) => Object.prototype.hasOwnProperty.call(values, type));
-  // These action types are alternate representations of the same result, not
-  // additive events. Use the first canonical event present (including zero),
-  // never the largest alias: broad `omni_lead`/`lead` values can exceed the
-  // grouped Instant Form result shown by Ads Manager.
-  const forms = formAction
-    ? Math.max(0, Number(values[formAction] || 0))
-    : hasSite || hasUnconfiguredSiteSignal || hasConversation
-      ? 0
-      // Very old accounts can return only this ambiguous aggregate. Use it
-      // solely as a last-resort fallback when no other lead mechanism exists.
-      : Math.max(0, Number(values.lead || 0));
+  // Aliases are alternate representations, not additive facts. Select the
+  // first explicitly classified event by canonical priority; never infer a
+  // form from generic `lead`/`omni_lead` aggregates.
+  const forms = firstAliasValue(values, FORM_ACTION_TYPES);
   const site = firstAliasValue(values, siteAliases);
-  const conversations = firstAliasValue(values, CONVERSATION_ACTION_TYPES);
+  const conversations = conversationDestinationConfirmed ? firstAliasValue(values, CONVERSATION_ACTION_TYPES) : 0;
   return { forms, site, conversations, total: forms + site + conversations };
 }
 
@@ -80,13 +87,16 @@ export function canonicalMetaLeadValue(row: { leads: number | null } | null | un
 
 /**
  * Resolve Meta lead actions per account/ad/day. Equivalent event aliases are
- * alternatives, not additive facts; the account's configured site event wins
- * when present. The legacy `insights.leads` aggregate is deliberately ignored.
+ * alternatives, not additive facts. A configured site event is counted only
+ * when the caller proves that this ad's destination is WEBSITE. The legacy
+ * `insights.leads` aggregate is deliberately ignored.
  */
 export function canonicalMetaLeads<T extends Omit<MetaLeadInsight, "leads"> & { leads: number | null }>(
   rows: T[],
   actions: MetaLeadAction[],
   siteActionByAccount: Record<string, string | undefined>,
+  siteEligibleAdScopes?: ReadonlySet<string>,
+  conversationEligibleAdScopes?: ReadonlySet<string>,
 ): Array<Omit<T, "leads"> & { form_leads: number; site_leads: number; conversations: number; leads: number }> {
   const byAdDate = new Map<string, Record<string, number>>();
   for (const row of actions) {
@@ -97,7 +107,10 @@ export function canonicalMetaLeads<T extends Omit<MetaLeadInsight, "leads"> & { 
   }
   return rows.map((row) => {
     const values = byAdDate.get(`${row.ad_account_id}|${row.ad_id}|${row.date}`) || {};
-    const parts = resolveMetaLeadParts(values, siteActionByAccount[row.ad_account_id]);
+    const scopeKey = `${row.ad_account_id}|${row.ad_id}`;
+    const siteDestinationConfirmed = Boolean(siteEligibleAdScopes?.has(scopeKey));
+    const conversationDestinationConfirmed = Boolean(conversationEligibleAdScopes?.has(scopeKey));
+    const parts = resolveMetaLeadParts(values, siteActionByAccount[row.ad_account_id], siteDestinationConfirmed, conversationDestinationConfirmed);
     return {
       ...row,
       form_leads: parts.forms,

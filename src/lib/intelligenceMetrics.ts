@@ -79,7 +79,8 @@ export function aggregateUnifiedMetrics(insights: InsightRow[], deals: RDDealLit
     impressions: acc.impressions + safe(row.impressions),
     reach: acc.reach + safe(row.reach),
     clicks: acc.clicks + safe(row.clicks),
-    leads: acc.leads + safe(row.leads),
+    // Never allow the legacy aggregate to inflate intelligence/RAG metrics.
+    leads: acc.leads + safe(row.form_leads) + safe(row.site_leads) + safe(row.conversations),
   }), { spend: 0, impressions: 0, reach: 0, clicks: 0, leads: 0 });
   const validSales = salesRows.filter((sale) => sale.status === "confirmed");
   const sales = validSales.reduce((sum, sale) => sum + Math.max(0, safe(sale.quantity)), 0);

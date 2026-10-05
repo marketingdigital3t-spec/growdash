@@ -70,7 +70,7 @@ function useHealth() {
       const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
       const { data: ins } = await supabase
         .from("insights")
-        .select("date, spend, leads")
+        .select("date, spend, form_leads, site_leads, conversations")
         .gte("date", since)
         .gt("spend", 0)
         .limit(5000);
@@ -78,7 +78,7 @@ function useHealth() {
       for (const r of (ins || []) as any[]) {
         const cur = byDate.get(r.date) || { spend: 0, leads: 0 };
         cur.spend += Number(r.spend || 0);
-        cur.leads += Number(r.leads || 0);
+        cur.leads += Number(r.form_leads || 0) + Number(r.site_leads || 0) + Number(r.conversations || 0);
         byDate.set(r.date, cur);
       }
       const daysSpendNoLeads = Array.from(byDate.values()).filter((v) => v.spend > 0 && v.leads === 0).length;

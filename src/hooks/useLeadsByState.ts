@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toLocalDateString } from "@/lib/dateRange";
 import { META_ACTION_TYPES, aggregateScopedMetaLeads } from "@/lib/metaActionMetrics";
+import { buildConversationEligibleMetaAdScopes, buildSiteEligibleMetaAdScopes } from "@/lib/metaLeadScope";
+import { normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 
 // Map Meta region name (Brazilian state full name) -> UF code
@@ -139,7 +141,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
           const chunk = scopedCampaignIds.slice(i, i + CHUNK);
           for (let from = 0; ; from += PAGE) {
             const { data, error } = await supabase.from("insights")
-              .select("ad_id, ad_account_id, date, attribution_window")
+              .select("ad_id, ad_account_id, adset_id, date, attribution_window")
               .in("campaign_id", chunk)
               .gte("date", start)
               .lte("date", end)
@@ -151,7 +153,30 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
           }
         }
 
-        const adIds = Array.from(new Set(metaInsightRows.map((row) => String(row.ad_id)).filter(Boolean)));
+        const accountWindowById: Record<string, string> = {};
+        const scopedAccountIds = Array.from(accountIds);
+        if (scopedAccountIds.length) {
+          const { data: accountRows, error: accountError } = await supabase.from("ad_accounts")
+            .select("id,attribution_window")
+            .in("id", scopedAccountIds);
+          if (accountError) throw accountError;
+          for (const account of accountRows || []) accountWindowById[account.id] = account.attribution_window || "account_default";
+        }
+        const scopedMetaInsightRows = metaInsightRows.filter((row) =>
+          normalizeMetaAttributionWindow(row.attribution_window) === normalizeMetaAttributionWindow(accountWindowById[row.ad_account_id] || "account_default"));
+        const adsetIds = Array.from(new Set(scopedMetaInsightRows.map((row) => row.adset_id).filter(Boolean)));
+        const destinationTypeByAdset: Record<string, string | null> = {};
+        for (let offset = 0; offset < adsetIds.length; offset += CHUNK) {
+          const { data: adsets, error: adsetError } = await supabase.from("adsets")
+            .select("id,destination_type")
+            .in("id", adsetIds.slice(offset, offset + CHUNK));
+          if (adsetError) throw adsetError;
+          for (const adset of adsets || []) destinationTypeByAdset[adset.id] = adset.destination_type || null;
+        }
+        const siteEligibleScopes = buildSiteEligibleMetaAdScopes(scopedMetaInsightRows, destinationTypeByAdset);
+        const conversationEligibleScopes = buildConversationEligibleMetaAdScopes(scopedMetaInsightRows, destinationTypeByAdset);
+
+        const adIds = Array.from(new Set(scopedMetaInsightRows.map((row) => String(row.ad_id)).filter(Boolean)));
         const metaActionRows: any[] = [];
         for (let i = 0; i < adIds.length; i += CHUNK) {
           const chunk = adIds.slice(i, i + CHUNK);
@@ -170,7 +195,7 @@ export function useLeadsByState({ adAccountId, campaignIds, startDate, endDate }
             if (rows.length < PAGE) break;
           }
         }
-        totalMetaLeads = aggregateScopedMetaLeads(metaInsightRows, metaActionRows, lpActionByAccount);
+        totalMetaLeads = aggregateScopedMetaLeads(scopedMetaInsightRows, metaActionRows, lpActionByAccount, siteEligibleScopes, conversationEligibleScopes);
       }
       const leadsWithRegion = Object.values(metaByUF).reduce((s, m) => s + m.leads, 0);
 

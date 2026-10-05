@@ -16,10 +16,10 @@ describe("resolveCampaignResults", () => {
     });
   });
 
-  it("usa o evento de lead quando o insight ainda não trouxe o total", () => {
+  it("não infere formulário de um evento genérico lead sem classificação Meta", () => {
     expect(resolveCampaignResults(0, { lead: 3, landing_page_view: 100 })).toMatchObject({
-      total: 3,
-      leadCount: 3,
+      total: 0,
+      leadCount: 0,
       conversations: 0,
     });
   });
@@ -70,7 +70,7 @@ describe("resolveCampaignResults", () => {
   });
 
   it("usa o evento configurado de site e não o lead auxiliar", () => {
-    expect(resolveCampaignResults(99, { lead: 9, landing_page_view: 10, offsite_registration: 4 }, "offsite_registration"))
+    expect(resolveCampaignResults(99, { lead: 9, landing_page_view: 10, offsite_registration: 4 }, "offsite_registration", { siteDestinationConfirmed: true }))
       .toMatchObject({ total: 4, leadCount: 4, conversations: 0 });
   });
 

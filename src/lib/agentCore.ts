@@ -174,7 +174,9 @@ export function buildCoreAccountSummaries(area: CoreAreaId, input: CoreSummaryIn
     const impressions = insightRows.reduce((sum, row) => sum + number(row.impressions), 0);
     const reach = insightRows.reduce((sum, row) => sum + number(row.reach), 0);
     const clicks = insightRows.reduce((sum, row) => sum + number(row.clicks), 0);
-    const leads = insightRows.reduce((sum, row) => sum + number(row.leads), 0);
+    // `insights.leads` is a legacy aggregate. Use only the disjoint
+    // acquisition facts normalized at the useInsights boundary.
+    const leads = insightRows.reduce((sum, row) => sum + number(row.form_leads) + number(row.site_leads) + number(row.conversations), 0);
     const cpl = leads > 0 ? spend / leads : 0;
     const ctr = impressions > 0 ? clicks / impressions * 100 : 0;
     const confirmedSales = saleRows.filter((sale) => sale.status === "confirmed");

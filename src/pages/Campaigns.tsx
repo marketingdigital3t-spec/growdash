@@ -80,6 +80,9 @@ import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
 import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
+import { useMetaCampaignLeadRollup } from "@/hooks/useMetaCampaignLeadRollup";
+import { isMetaMessagingDestination } from "@/lib/metaLeadScope";
+import { addInsightOnlyCampaignRows } from "@/lib/metaCampaignLeadRollup";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -318,6 +321,15 @@ export default function Campaigns() {
     () => Object.fromEntries(visibleAdAccounts.map((account) => [account.id, account.attribution_window || "account_default"])),
     [visibleAdAccounts],
   );
+  const leadScopeAccountIds = selectedAccount !== "all"
+    ? [selectedAccount]
+    : selectedAccountIds.length ? selectedAccountIds : visibleAdAccounts.map((account) => account.id);
+  const { data: canonicalLeadRollup } = useMetaCampaignLeadRollup(
+    leadScopeAccountIds,
+    startDate,
+    endDate,
+    attributionWindowsByAccount,
+  );
 
   useEffect(() => {
     const requestedAccount = searchParams.get("conta");
@@ -481,7 +493,11 @@ export default function Campaigns() {
     adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : [selectedAccount],
     attributionWindowsByAccount,
   });
-  const campaigns = useMemo(() => campaignBaseRows.map((campaign: any) => {
+  const campaignRowsWithInsights = useMemo(
+    () => addInsightOnlyCampaignRows(campaignBaseRows, canonicalLeadRollup?.deliveryByCampaign || {}),
+    [campaignBaseRows, canonicalLeadRollup?.deliveryByCampaign],
+  );
+  const campaigns = useMemo(() => campaignRowsWithInsights.map((campaign: any) => {
     const actionMetrics = { linkClicks: 0, landingPageViews: 0, checkouts: 0, purchases: 0, purchaseValue: 0 };
     const actionEventTotals: Record<string, number> = {};
     for (const currentAdset of campaign.adsets || []) {
@@ -499,11 +515,23 @@ export default function Campaigns() {
     }
 
     const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
-    const results = resolveCampaignResults(campaign.leads, actionEventTotals, lpConfigs[campaign.ad_account_id]?.action_type, campaign.hasCanonicalLeadParts || campaign.legacyLeads > 0 ? {
+    const canonicalCampaignLeads = canonicalLeadRollup?.byCampaign[String(campaign.id)];
+    const results = canonicalCampaignLeads
+      ? {
+        total: canonicalCampaignLeads.total,
+        leadCount: canonicalCampaignLeads.forms + canonicalCampaignLeads.site,
+        conversations: canonicalCampaignLeads.conversations,
+        breakdown: [
+          ...(canonicalCampaignLeads.forms + canonicalCampaignLeads.site > 0 ? [{ label: "Leads Meta", value: canonicalCampaignLeads.forms + canonicalCampaignLeads.site }] : []),
+          ...(canonicalCampaignLeads.conversations > 0 ? [{ label: "Conversas iniciadas", value: canonicalCampaignLeads.conversations }] : []),
+        ],
+      }
+      : resolveCampaignResults(campaign.leads, actionEventTotals, lpConfigs[campaign.ad_account_id]?.action_type, campaign.hasCanonicalLeadParts || campaign.legacyLeads > 0 ? {
       forms: campaign.formLeads,
       site: campaign.siteLeads,
       conversations: campaign.conversations,
       legacyLeads: campaign.legacyLeads,
+      conversationDestinationConfirmed: false,
     } : undefined);
     const primaryResult = resolveCampaignPrimaryResult(campaign.objective, results).value;
     return {
@@ -530,7 +558,7 @@ export default function Campaigns() {
       primaryResult,
       costPerResult: primaryResult > 0 ? campaign.spend / primaryResult : 0,
     };
-  }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignBaseRows, lpConfigs]);
+  }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignRowsWithInsights, canonicalLeadRollup, lpConfigs]);
 
   // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
   // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
@@ -721,7 +749,7 @@ export default function Campaigns() {
 
   const totals = useMemo(() => filtered.reduce(
     (acc: any, c: any) => ({
-      budget: acc.budget + c.budget,
+      budget: acc.budget + (Number(c.budget) || 0),
       spend: acc.spend + c.spend,
       // Lead de aquisição inclui formulário/site e conversas iniciadas. A tabela
       // continua mostrando o resultado principal de cada campanha individual.
@@ -739,10 +767,40 @@ export default function Campaigns() {
     }),
     { budget: 0, spend: 0, leads: 0, formLeads: 0, conversations: 0, results: 0, salesCount: 0, revenue: 0, profit: 0, impressions: 0, clicks: 0, reach: 0, linkClicks: 0, uniqueLinkClicks: 0, landingPageViews: 0, checkouts: 0, metaPurchases: 0, metaPurchaseValue: 0 }
   ), [filtered]);
+  const hasUnavailableBudgets = filtered.some((campaign: any) => campaign.catalogMissing);
+  const hasCampaignMetricFilters = Boolean(search.trim()) || statusFilter !== "all" || healthFilter !== "all"
+    || Object.values(columnFilters).some((value) => value.trim().length > 0);
+  const filteredCanonicalLeadTotals = hasCampaignMetricFilters && canonicalLeadRollup
+    ? filtered.reduce((sum, campaign: any) => {
+      const parts = canonicalLeadRollup.byCampaign[String(campaign.id)];
+      if (!parts) return sum;
+      sum.forms += parts.forms;
+      sum.site += parts.site;
+      sum.conversations += parts.conversations;
+      sum.total += parts.total;
+      return sum;
+    }, { forms: 0, site: 0, conversations: 0, total: 0 })
+    : undefined;
+  const displayedLeadTotals = canonicalLeadRollup
+    ? filteredCanonicalLeadTotals || canonicalLeadRollup.totals
+    : { forms: totals.formLeads, site: 0, conversations: totals.conversations, total: totals.results };
+  const displayedTotals = {
+    ...totals,
+    leads: displayedLeadTotals.total,
+    results: displayedLeadTotals.total,
+    formLeads: displayedLeadTotals.forms + displayedLeadTotals.site,
+    siteLeads: displayedLeadTotals.site,
+    conversations: displayedLeadTotals.conversations,
+  };
+  const leadPartsLabel = [
+    displayedLeadTotals.forms > 0 ? `${displayedLeadTotals.forms.toLocaleString("pt-BR")} formulários` : null,
+    displayedLeadTotals.site > 0 ? `${displayedLeadTotals.site.toLocaleString("pt-BR")} site` : null,
+    displayedLeadTotals.conversations > 0 ? `${displayedLeadTotals.conversations.toLocaleString("pt-BR")} conversas iniciadas` : null,
+  ].filter(Boolean).join(" · ") || "Sem resultados Meta";
   const totalCtr = totals.impressions > 0 ? totals.clicks / totals.impressions * 100 : 0;
   const totalCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
   const totalCpm = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : 0;
-  const totalCpl = totals.results > 0 ? totals.spend / totals.results : 0;
+  const totalCpl = displayedLeadTotals.total > 0 ? totals.spend / displayedLeadTotals.total : 0;
   const totalRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
   const totalLinkCpc = totals.linkClicks > 0 ? totals.spend / totals.linkClicks : 0;
   const totalUniqueLinkCtr = totals.reach > 0 ? totals.uniqueLinkClicks / totals.reach * 100 : 0;
@@ -750,7 +808,7 @@ export default function Campaigns() {
   const totalCostPerCheckout = totals.checkouts > 0 ? totals.spend / totals.checkouts : 0;
   const totalMetaCostPerPurchase = totals.metaPurchases > 0 ? totals.spend / totals.metaPurchases : 0;
   const totalMetaPurchaseRoas = totals.spend > 0 ? totals.metaPurchaseValue / totals.spend : 0;
-  const totalResultRate = totals.clicks > 0 ? totals.results / totals.clicks * 100 : 0;
+  const totalResultRate = totals.clicks > 0 ? displayedTotals.results / totals.clicks * 100 : 0;
   const intelligenceSeries = useMemo(() => {
     const byDate = new Map<string, { date: string; spend: number; impressions: number; clicks: number; leads: number; hasData: boolean }>();
     const lastDate = formatApiDate(endDate);
@@ -761,11 +819,9 @@ export default function Campaigns() {
     for (const campaign of filtered) {
       for (const currentAdset of campaign.adsets || []) {
         for (const currentAd of currentAdset.ads || []) {
-          const insightsByDate = new Map<string, any>();
           for (const insight of currentAd.insights || []) {
             if (!insight.date) continue;
             if (insight.date < formatApiDate(startDate) || insight.date > formatApiDate(endDate)) continue;
-            insightsByDate.set(insight.date, insight);
             const current = byDate.get(insight.date) ?? { date: insight.date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
             current.spend += Number(insight.spend || 0);
             current.impressions += Number(insight.impressions || 0);
@@ -773,27 +829,17 @@ export default function Campaigns() {
             current.hasData = true;
             byDate.set(insight.date, current);
           }
-
-          const actionDays = actionData?.dailyByAd?.[currentAd.id] || {};
-          const dates = new Set([...insightsByDate.keys(), ...Object.keys(actionDays)]);
-          for (const date of dates) {
-            const insight = insightsByDate.get(date);
-            const current = byDate.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
-            const rowForms = Number(insight?.form_leads || 0);
-            const rowSite = Number(insight?.site_leads || 0);
-            const rowConversations = Number(insight?.conversations || 0);
-            const hasCanonicalParts = Boolean(insight && (rowForms + rowSite + rowConversations > 0 || Number(insight.leads || 0) === 0));
-            const dailyResults = resolveCampaignResults(Number(insight?.leads || 0), actionDays[date] || {}, lpConfigs[campaign.ad_account_id]?.action_type, insight ? {
-              forms: hasCanonicalParts ? rowForms : 0,
-              site: hasCanonicalParts ? rowSite : 0,
-              conversations: hasCanonicalParts ? rowConversations : 0,
-              legacyLeads: hasCanonicalParts ? 0 : Number(insight.leads || 0),
-            } : undefined);
-            current.leads += dailyResults.total;
-            current.hasData = true;
-            byDate.set(date, current);
-          }
         }
+      }
+    }
+    const selectedCampaignIds = new Set(filtered.map((campaign: any) => String(campaign.id)));
+    for (const [campaignId, days] of Object.entries(canonicalLeadRollup?.dailyByCampaign || {})) {
+      if (hasCampaignMetricFilters && !selectedCampaignIds.has(campaignId)) continue;
+      for (const [date, leadParts] of Object.entries(days)) {
+        const current = byDate.get(date) ?? { date, spend: 0, impressions: 0, clicks: 0, leads: 0, hasData: false };
+        current.leads += leadParts.total;
+        current.hasData = true;
+        byDate.set(date, current);
       }
     }
     return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date)).map((item) => ({
@@ -805,12 +851,13 @@ export default function Campaigns() {
       cpl: item.leads > 0 ? item.spend / item.leads : 0,
       resultRate: item.clicks > 0 ? item.leads / item.clicks * 100 : 0,
     }));
-  }, [actionData?.dailyByAd, endDate, filtered, lpConfigs, startDate]);
+  }, [canonicalLeadRollup?.dailyByCampaign, endDate, filtered, hasCampaignMetricFilters, startDate]);
 
   const selectedCampaign = useMemo(() => {
     if (selectedIds.size !== 1) return null;
     const id = Array.from(selectedIds)[0];
-    return campaigns.find((campaign: any) => campaign.id === id) ?? null;
+    const campaign = campaigns.find((item: any) => item.id === id) ?? null;
+    return campaign?.catalogMissing ? null : campaign;
   }, [campaigns, selectedIds]);
 
   const levelCampaigns = useMemo(() => {
@@ -890,6 +937,7 @@ export default function Campaigns() {
           site: metrics.siteLeads,
           conversations: metrics.conversations,
           legacyLeads: metrics.legacyLeads,
+          conversationDestinationConfirmed: isMetaMessagingDestination(currentAdset?.destination_type),
         } : undefined);
         const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results);
         const saleMetrics = salesForAd.get(currentAd.id) ?? { count: 0, revenue: 0 };
@@ -1114,7 +1162,7 @@ export default function Campaigns() {
 
           {activeTab === "campaigns" && analysisPanel === "intelligence" && (
             <CampaignIntelligence
-              totals={totals}
+              totals={displayedTotals}
               totalCtr={totalCtr}
               totalCpc={totalCpc}
               totalCpm={totalCpm}
@@ -1145,7 +1193,7 @@ export default function Campaigns() {
                   : "md:h-[clamp(300px,calc(100dvh-30rem),640px)] md:min-h-0",
               )} style={analysisMode ? undefined : { height: "clamp(300px, calc(100vh - 30rem), 640px)" }}>
                 <div className="space-y-2 p-2 md:hidden">
-                  {visibleCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => toggleSelect(campaign.id)} onOpen={() => setDetailCampaignId(campaign.id)} onEdit={() => setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
+                  {visibleCampaigns.map((campaign: any) => <CampaignMobileCard key={campaign.id} campaign={campaign} selected={selectedIds.has(campaign.id)} health={getCampaignHealth(campaign, averageCpl, targetByCampaign.get(campaign.id))} onSelect={() => !campaign.catalogMissing && toggleSelect(campaign.id)} onOpen={() => !campaign.catalogMissing && setDetailCampaignId(campaign.id)} onEdit={() => !campaign.catalogMissing && setEditingEntity({ type: "campaign", id: campaign.id, name: campaign.name, status: campaign.status, dailyBudget: campaign.daily_budget ?? campaign.budget })} />)}
                 </div>
                 <div
                   ref={campaignTableScrollRef}
@@ -1205,14 +1253,15 @@ export default function Campaigns() {
                             key={c.id}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className={`group h-11 cursor-pointer border-b border-border transition-colors hover:bg-muted/60 [&>td]:px-3 [&>td]:py-1 dark:border-[#242424] dark:hover:bg-[#181818] ${selectedIds.has(c.id) ? "bg-muted/70" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
-                            onClick={() => setDetailCampaignId(c.id)}
+                            className={`group h-11 ${c.catalogMissing ? "cursor-default" : "cursor-pointer"} border-b border-border transition-colors hover:bg-muted/60 [&>td]:px-3 [&>td]:py-1 dark:border-[#242424] dark:hover:bg-[#181818] ${selectedIds.has(c.id) ? "bg-muted/70" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
+                            onClick={() => !c.catalogMissing && setDetailCampaignId(c.id)}
                           >
                             <TableCell style={{ ...cellW("check"), left: 0 }} className={cn("sticky z-20 transition-colors group-hover:bg-muted", stickySurface)} onClick={(e) => e.stopPropagation()}>
-                              <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
+                              <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.has(c.id)} disabled={c.catalogMissing} aria-label={c.catalogMissing ? "Campanha somente leitura: catálogo Meta indisponível" : `Selecionar ${c.name}`} onCheckedChange={() => toggleSelect(c.id)} />
                             </TableCell>
                             <TableCell style={{ ...cellW("delivery"), left: camp.colWidths.check }} className={cn("sticky z-20 transition-colors group-hover:bg-muted", stickySurface)} onClick={(event) => event.stopPropagation()}>
                               <div className="flex items-center gap-2 text-xs font-semibold">
+                                {c.catalogMissing ? <span className="text-muted-foreground">—</span> : <>
                                 <button
                                   type="button"
                                   onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget })}
@@ -1222,20 +1271,21 @@ export default function Campaigns() {
                                       ? "border-emerald-600/70 bg-emerald-500"
                                       : "border-border bg-muted",
                                   )}
-                                  title="Editar status na Meta Ads"
+                                  title={c.catalogMissing ? "Status indisponível: campanha ausente do catálogo Meta" : "Editar status na Meta Ads"}
                                 >
                                   <span className={cn(
                                     "absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-all",
                                     normalizeStatus(c.status) === "ACTIVE" ? "left-[17px]" : "left-0.5",
                                   )} />
                                 </button>
+                                </>}
                               </div>
                             </TableCell>
                             <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] transition-colors group-hover:bg-muted", stickySurface)}>
-                              <span className="block truncate font-medium text-foreground" title={c.name}>{c.name}</span>
+                              <span className="block truncate font-medium text-foreground" title={c.catalogMissing ? `${c.name} · somente Insights; metadados de catálogo indisponíveis` : c.name}>{c.name}{c.catalogMissing && <span className="ml-2 text-[9px] font-normal text-amber-600">Somente Insights · catálogo indisponível</span>}</span>
                             </TableCell>
-                            {showColumn("deliveryStatus") && <TableCell style={cellW("deliveryStatus")} className="text-xs"><span className="inline-flex items-center gap-2"><StatusDot status={c.status} />{getStatusBadge(c.status).label}</span></TableCell>}
-                            {showColumn("actions") && <TableCell style={cellW("actions")} onClick={(event) => event.stopPropagation()}><Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget })}><Pencil className="mr-1 h-3 w-3" />Editar</Button></TableCell>}
+                            {showColumn("deliveryStatus") && <TableCell style={cellW("deliveryStatus")} className="text-xs">{c.catalogMissing ? <span className="text-muted-foreground">Indisponível</span> : <span className="inline-flex items-center gap-2"><StatusDot status={c.status} />{getStatusBadge(c.status).label}</span>}</TableCell>}
+                            {showColumn("actions") && <TableCell style={cellW("actions")} onClick={(event) => event.stopPropagation()}>{!c.catalogMissing && <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget })}><Pencil className="mr-1 h-3 w-3" />Editar</Button>}</TableCell>}
                             {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
                             {showColumn("impressions") && <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>}
                             {showColumn("frequency") && <TableCell style={cellW("frequency")} className={cn("text-right tabular-nums text-sm", sortBg("frequency"))}><AnimatedNumber value={c.frequency} decimals={2} /></TableCell>}
@@ -1243,17 +1293,17 @@ export default function Campaigns() {
                             {showColumn("linkCpc") && <TableCell style={cellW("linkCpc")} className={cn("text-right tabular-nums text-sm", sortBg("linkCpc"))}><AnimatedNumber value={c.linkCpc} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("uniqueLinkCtr") && <TableCell style={cellW("uniqueLinkCtr")} className={cn("text-right tabular-nums text-sm", sortBg("uniqueLinkCtr"))}><AnimatedNumber value={c.uniqueLinkCtr} suffix="%" decimals={2} /></TableCell>}
                             {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))} onClick={(event) => event.stopPropagation()}><CampaignResultCell campaign={c} onOpen={() => setDetailCampaignId(c.id)} /></TableCell>}
+                            {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}>{c.catalogMissing ? <span className="text-muted-foreground" title="Orçamento não consta no snapshot de Insights">Indisponível</span> : <AnimatedNumber value={c.budget} prefix="R$ " decimals={2} />}</TableCell>}
+                            {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))} onClick={(event) => event.stopPropagation()}><CampaignResultCell campaign={c} onOpen={() => !c.catalogMissing && setDetailCampaignId(c.id)} /></TableCell>}
                             {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.costPerResult ?? c.cpl} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("landingPageViews") && <TableCell style={cellW("landingPageViews")} className={cn("text-right tabular-nums text-sm", sortBg("landingPageViews"))}><AnimatedNumber value={c.landingPageViews} decimals={0} /></TableCell>}
-                            {showColumn("costPerLandingPageView") && <TableCell style={cellW("costPerLandingPageView")} className={cn("text-right tabular-nums text-sm", sortBg("costPerLandingPageView"))}><AnimatedNumber value={c.costPerLandingPageView} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("checkouts") && <TableCell style={cellW("checkouts")} className={cn("text-right tabular-nums text-sm", sortBg("checkouts"))}><AnimatedNumber value={c.checkouts} decimals={0} /></TableCell>}
-                            {showColumn("costPerCheckout") && <TableCell style={cellW("costPerCheckout")} className={cn("text-right tabular-nums text-sm", sortBg("costPerCheckout"))}><AnimatedNumber value={c.costPerCheckout} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("metaPurchases") && <TableCell style={cellW("metaPurchases")} className={cn("text-right tabular-nums text-sm", sortBg("metaPurchases"))}><AnimatedNumber value={c.metaPurchases} decimals={0} /></TableCell>}
-                            {showColumn("metaCostPerPurchase") && <TableCell style={cellW("metaCostPerPurchase")} className={cn("text-right tabular-nums text-sm", sortBg("metaCostPerPurchase"))}><AnimatedNumber value={c.metaCostPerPurchase} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("metaPurchaseRoas") && <TableCell style={cellW("metaPurchaseRoas")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.metaPurchaseRoas), sortBg("metaPurchaseRoas"))}><AnimatedNumber value={c.metaPurchaseRoas} suffix="x" decimals={2} /></TableCell>}
+                            {showColumn("landingPageViews") && <TableCell style={cellW("landingPageViews")} className={cn("text-right tabular-nums text-sm", sortBg("landingPageViews"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.landingPageViews} decimals={0} />}</TableCell>}
+                            {showColumn("costPerLandingPageView") && <TableCell style={cellW("costPerLandingPageView")} className={cn("text-right tabular-nums text-sm", sortBg("costPerLandingPageView"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.costPerLandingPageView} prefix="R$ " decimals={2} />}</TableCell>}
+                            {showColumn("checkouts") && <TableCell style={cellW("checkouts")} className={cn("text-right tabular-nums text-sm", sortBg("checkouts"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.checkouts} decimals={0} />}</TableCell>}
+                            {showColumn("costPerCheckout") && <TableCell style={cellW("costPerCheckout")} className={cn("text-right tabular-nums text-sm", sortBg("costPerCheckout"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.costPerCheckout} prefix="R$ " decimals={2} />}</TableCell>}
+                            {showColumn("metaPurchases") && <TableCell style={cellW("metaPurchases")} className={cn("text-right tabular-nums text-sm", sortBg("metaPurchases"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.metaPurchases} decimals={0} />}</TableCell>}
+                            {showColumn("metaCostPerPurchase") && <TableCell style={cellW("metaCostPerPurchase")} className={cn("text-right tabular-nums text-sm", sortBg("metaCostPerPurchase"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.metaCostPerPurchase} prefix="R$ " decimals={2} />}</TableCell>}
+                            {showColumn("metaPurchaseRoas") && <TableCell style={cellW("metaPurchaseRoas")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.metaPurchaseRoas), sortBg("metaPurchaseRoas"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.metaPurchaseRoas} suffix="x" decimals={2} />}</TableCell>}
                             {showColumn("objective") && <TableCell style={cellW("objective")} className="truncate text-xs text-muted-foreground" title={c.objective || "Não informado"}>{c.objective || "—"}</TableCell>}
                             {showColumn("clicks") && <TableCell style={cellW("clicks")} className={cn("text-right tabular-nums text-sm", sortBg("clicks"))}><AnimatedNumber value={c.clicks} decimals={0} /></TableCell>}
                             {showColumn("cpc") && <TableCell style={cellW("cpc")} className={cn("text-right tabular-nums text-sm", sortBg("cpc"))}><AnimatedNumber value={c.cpc} prefix="R$ " decimals={2} /></TableCell>}
@@ -1292,8 +1342,8 @@ export default function Campaigns() {
                         {showColumn("linkCpc") && <CampaignTotalCell width={camp.colWidths.linkCpc} value={totalLinkCpc.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por clique no link" />}
                         {showColumn("uniqueLinkCtr") && <CampaignTotalCell width={camp.colWidths.uniqueLinkCtr} value={`${totalUniqueLinkCtr.toFixed(2).replace(".", ",")}%`} label="Taxa total" />}
                         {showColumn("cpm") && <CampaignTotalCell width={camp.colWidths.cpm} value={totalCpm.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por 1.000 impressões" />}
-                        {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Orçamento somado" />}
-                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={totals.results.toLocaleString("pt-BR")} label={`${totals.conversations.toLocaleString("pt-BR")} conversas · ${totals.formLeads.toLocaleString("pt-BR")} forms/site`} />}
+                        {showColumn("budget") && <CampaignTotalCell width={camp.colWidths.budget} value={totals.budget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label={hasUnavailableBudgets ? "Orçamentos disponíveis · alguns indisponíveis" : "Orçamento somado"} />}
+                        {showColumn("leads") && <CampaignTotalCell width={camp.colWidths.leads} value={displayedTotals.results.toLocaleString("pt-BR")} label={leadPartsLabel} />}
                         {showColumn("cpl") && <CampaignTotalCell width={camp.colWidths.cpl} value={totalCpl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Por resultado" />}
                         {showColumn("spend") && <CampaignTotalCell width={camp.colWidths.spend} value={totals.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} label="Total usado" />}
                         {showColumn("landingPageViews") && <CampaignTotalCell width={camp.colWidths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}
@@ -1337,7 +1387,7 @@ export default function Campaigns() {
                         widths={camp.colWidths}
                         visibleColumns={visibleColumns}
                         count={filtered.length}
-                        totals={totals}
+                        totals={displayedTotals}
                         totalCpm={totalCpm}
                         totalCpl={totalCpl}
                         totalCpc={totalCpc}
@@ -1350,6 +1400,7 @@ export default function Campaigns() {
                         totalMetaCostPerPurchase={totalMetaCostPerPurchase}
                         totalMetaPurchaseRoas={totalMetaPurchaseRoas}
                         totalResultRate={totalResultRate}
+                        leadPartsLabel={leadPartsLabel}
                       />
                     </TableBody>
                   </Table>
@@ -1810,14 +1861,14 @@ function CampaignTotalCell({ width, value, label, align = "right", stickyLeft, s
   </TableCell>;
 }
 
-function CampaignTotalsRow({ widths, visibleColumns, count, totals, totalCpm, totalCpl, totalCpc, totalCtr, totalRoas, totalLinkCpc, totalUniqueLinkCtr, totalCostPerLandingPageView, totalCostPerCheckout, totalMetaCostPerPurchase, totalMetaPurchaseRoas, totalResultRate }: any) {
+function CampaignTotalsRow({ widths, visibleColumns, count, totals, totalCpm, totalCpl, totalCpc, totalCtr, totalRoas, totalLinkCpc, totalUniqueLinkCtr, totalCostPerLandingPageView, totalCostPerCheckout, totalMetaCostPerPurchase, totalMetaPurchaseRoas, totalResultRate, leadPartsLabel }: any) {
   const show = (key: CampaignColumnKey) => visibleColumns.has(key);
   const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const decimal = (value: number, suffix = "") => `${value.toFixed(2).replace(".", ",")}${suffix}`;
   return <TableRow data-campaign-totals className="h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
     <CampaignTotalCell width={widths.check} stickyLeft={0} /><CampaignTotalCell width={widths.delivery} stickyLeft={widths.check} /><CampaignTotalCell width={widths.name} value={`Resultados de ${count} campanhas`} label="Totais do período e filtros selecionados" align="left" stickyLeft={widths.check + widths.delivery} strongDivider />
     {show("deliveryStatus") && <CampaignTotalCell width={widths.deliveryStatus} value="—" />}{show("actions") && <CampaignTotalCell width={widths.actions} value="—" />}{show("reach") && <CampaignTotalCell width={widths.reach} value={totals.reach.toLocaleString("pt-BR")} label="Total" />}{show("impressions") && <CampaignTotalCell width={widths.impressions} value={totals.impressions.toLocaleString("pt-BR")} label="Total" />}{show("frequency") && <CampaignTotalCell width={widths.frequency} value={totals.reach ? decimal(totals.impressions / totals.reach) : "0,00"} label="Média" />}{show("linkClicks") && <CampaignTotalCell width={widths.linkClicks} value={totals.linkClicks.toLocaleString("pt-BR")} label="Total" />}{show("linkCpc") && <CampaignTotalCell width={widths.linkCpc} value={money(totalLinkCpc)} label="Por clique no link" />}{show("uniqueLinkCtr") && <CampaignTotalCell width={widths.uniqueLinkCtr} value={decimal(totalUniqueLinkCtr, "%")} label="Taxa total" />}{show("cpm") && <CampaignTotalCell width={widths.cpm} value={money(totalCpm)} label="Por 1.000 impressões" />}{show("budget") && <CampaignTotalCell width={widths.budget} value={money(totals.budget)} label="Orçamento somado" />}
-    {show("leads") && <CampaignTotalCell width={widths.leads} value={totals.results.toLocaleString("pt-BR")} label={`${totals.conversations.toLocaleString("pt-BR")} conversas · ${totals.formLeads.toLocaleString("pt-BR")} forms/site`} />}{show("cpl") && <CampaignTotalCell width={widths.cpl} value={money(totalCpl)} label="Por resultado" />}{show("spend") && <CampaignTotalCell width={widths.spend} value={money(totals.spend)} label="Total usado" />}{show("landingPageViews") && <CampaignTotalCell width={widths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}{show("costPerLandingPageView") && <CampaignTotalCell width={widths.costPerLandingPageView} value={money(totalCostPerLandingPageView)} label="Por visualização" />}{show("checkouts") && <CampaignTotalCell width={widths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} label="Total" />}{show("costPerCheckout") && <CampaignTotalCell width={widths.costPerCheckout} value={money(totalCostPerCheckout)} label="Por finalização" />}{show("metaPurchases") && <CampaignTotalCell width={widths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} label="Total" />}{show("metaCostPerPurchase") && <CampaignTotalCell width={widths.metaCostPerPurchase} value={money(totalMetaCostPerPurchase)} label="Por compra" />}{show("metaPurchaseRoas") && <CampaignTotalCell width={widths.metaPurchaseRoas} value={decimal(totalMetaPurchaseRoas, "x")} label="Retorno total" />}
+    {show("leads") && <CampaignTotalCell width={widths.leads} value={totals.results.toLocaleString("pt-BR")} label={leadPartsLabel} />}{show("cpl") && <CampaignTotalCell width={widths.cpl} value={money(totalCpl)} label="Por resultado" />}{show("spend") && <CampaignTotalCell width={widths.spend} value={money(totals.spend)} label="Total usado" />}{show("landingPageViews") && <CampaignTotalCell width={widths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}{show("costPerLandingPageView") && <CampaignTotalCell width={widths.costPerLandingPageView} value={money(totalCostPerLandingPageView)} label="Por visualização" />}{show("checkouts") && <CampaignTotalCell width={widths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} label="Total" />}{show("costPerCheckout") && <CampaignTotalCell width={widths.costPerCheckout} value={money(totalCostPerCheckout)} label="Por finalização" />}{show("metaPurchases") && <CampaignTotalCell width={widths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} label="Total" />}{show("metaCostPerPurchase") && <CampaignTotalCell width={widths.metaCostPerPurchase} value={money(totalMetaCostPerPurchase)} label="Por compra" />}{show("metaPurchaseRoas") && <CampaignTotalCell width={widths.metaPurchaseRoas} value={decimal(totalMetaPurchaseRoas, "x")} label="Retorno total" />}
     {show("objective") && <CampaignTotalCell width={widths.objective} value="—" />}{show("clicks") && <CampaignTotalCell width={widths.clicks} value={totals.clicks.toLocaleString("pt-BR")} label="Total" />}{show("cpc") && <CampaignTotalCell width={widths.cpc} value={money(totalCpc)} label="Por clique" />}{show("ctr") && <CampaignTotalCell width={widths.ctr} value={decimal(totalCtr, "%")} label="Taxa total" />}{show("conversion") && <CampaignTotalCell width={widths.conversion} value={decimal(totalResultRate, "%")} label="Taxa total" />}{show("sales") && <CampaignTotalCell width={widths.sales} value={totals.salesCount.toLocaleString("pt-BR")} label="Total" />}{show("cpa") && <CampaignTotalCell width={widths.cpa} value={money(totals.salesCount ? totals.spend / totals.salesCount : 0)} label="Por venda" />}{show("revenue") && <CampaignTotalCell width={widths.revenue} value={money(totals.revenue)} label="Valor total" />}{show("roas") && <CampaignTotalCell width={widths.roas} value={decimal(totalRoas, "x")} label="Retorno total" />}{show("profit") && <CampaignTotalCell width={widths.profit} value={money(totals.profit)} label="Total" />}{show("roi") && <CampaignTotalCell width={widths.roi} value={decimal(totals.spend ? totals.profit / totals.spend * 100 : 0, "%")} label="Retorno total" />}{show("videoViews") && <CampaignTotalCell width={widths.videoViews} value="—" label="Não sincronizado" />}
   </TableRow>;
 }
@@ -1858,10 +1909,14 @@ function IssueMetric({ label, value }: { label: string; value: string }) {
   return <div><span className="block text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</span><strong className="mt-1 block tabular-nums">{value}</strong></div>;
 }
 
+function UnavailableMetric() {
+  return <span className="text-[10px] text-muted-foreground" title="Essa métrica não está coberta pelos fatos de Insights disponíveis">Indisponível</span>;
+}
+
 function CampaignMobileCard({ campaign, selected, health, onSelect, onOpen, onEdit }: { campaign: any; selected: boolean; health: CampaignHealth; onSelect: () => void; onOpen: () => void; onEdit: () => void }) {
   const healthOption = HEALTH_OPTIONS.find((item) => item.id === health)!;
   const primary = campaignPrimaryResult(campaign);
-  return <article className={cn("rounded-xl border bg-card p-3", selected ? "border-primary bg-primary/5" : "border-border")}><div className="flex items-start gap-3"><Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`Selecionar ${campaign.name}`} /><button type="button" onClick={onOpen} className="min-w-0 grow text-left"><span className="block truncate text-sm font-black">{campaign.name}</span><span className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase text-muted-foreground"><span className={cn("h-2 w-2 rounded-full", healthOption.dot)} />{healthOption.label} · {getStatusBadge(campaign.status).label}</span></button><Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onEdit}><Pencil className="h-4 w-4" /></Button></div><button type="button" onClick={onOpen} className="mt-3 grid w-full grid-cols-2 gap-2 text-left"><IssueMetric label="Investimento" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label={primary.label} value={primary.value.toLocaleString("pt-BR")} /><IssueMetric label="Custo / resultado" value={(campaign.costPerResult ?? campaign.cpl).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></button></article>;
+  return <article className={cn("rounded-xl border bg-card p-3", selected ? "border-primary bg-primary/5" : "border-border")}><div className="flex items-start gap-3"><Checkbox checked={selected} disabled={campaign.catalogMissing} onCheckedChange={onSelect} aria-label={`Selecionar ${campaign.name}`} /><button type="button" onClick={onOpen} disabled={campaign.catalogMissing} className="min-w-0 grow text-left disabled:cursor-default disabled:opacity-100"><span className="block truncate text-sm font-black">{campaign.name}</span><span className="mt-1 flex items-center gap-1 text-[9px] font-bold uppercase text-muted-foreground"><span className={cn("h-2 w-2 rounded-full", healthOption.dot)} />{healthOption.label} · {campaign.catalogMissing ? "Catálogo indisponível" : getStatusBadge(campaign.status).label}</span>{campaign.catalogMissing && <span className="mt-1 block text-[9px] text-amber-600">Somente Insights · status e orçamento indisponíveis</span>}</button>{!campaign.catalogMissing && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onEdit}><Pencil className="h-4 w-4" /></Button>}</div><button type="button" onClick={onOpen} disabled={campaign.catalogMissing} className="mt-3 grid w-full grid-cols-2 gap-2 text-left disabled:cursor-default"><IssueMetric label="Investimento" value={campaign.spend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label={primary.label} value={primary.value.toLocaleString("pt-BR")} /><IssueMetric label="Custo / resultado" value={(campaign.costPerResult ?? campaign.cpl).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><IssueMetric label="CTR" value={`${campaign.ctr.toFixed(2).replace(".", ",")}%`} /></button></article>;
 }
 
 function LevelMobileCard({ entity, onOpen }: { entity: MetaDetailEntity; onOpen: () => void }) {

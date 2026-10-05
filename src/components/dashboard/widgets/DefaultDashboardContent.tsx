@@ -37,6 +37,7 @@ import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { useAccountAdsets } from "@/hooks/useAccountAdsets";
 import { GeoOriginWidget } from "@/components/dashboard/widgets/GeoOriginWidget";
 import { META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
+import { isMetaMessagingDestination } from "@/lib/metaLeadScope";
 
 // Mapeamento destination_type (Meta) -> aba
 const DEST_NATIVE = new Set(["ON_AD"]);
@@ -321,14 +322,6 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     return accTotals[NATIVE_LEAD_GROUPED] || 0;
   };
 
-  // Returns the action_types used by the active tab for daily-series accumulation.
-  const tabEventsForAccount = (acc: string): string[] => {
-    if (objective === "messages") return [...MESSAGE_EVENTS];
-    if (objective === "native_form") return nativeEventsForAccount(acc);
-    if (objective === "landing_page") return lpEventsForAccount(acc);
-    return Array.from(new Set([...nativeEventsForAccount(acc), ...lpEventsForAccount(acc), ...MESSAGE_EVENTS]));
-  };
-
   // Compute totals — separa contagem por classificação para evitar dupla contagem
   // (ex.: campanhas de FORMS nativo que disparam pixel_lead também contariam como LP).
   let tabLeads = 0;
@@ -424,27 +417,30 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       e.impressions += r.impressions;
       map.set(r.date, e);
     }
-    // Add link_clicks + leads per day from insight_actions, scoped per account.
-    for (const acc of Object.keys(actionData.dailyByAccount)) {
-      const evts = tabEventsForAccount(acc);
-      const byDate = actionData.dailyByAccount[acc];
-      for (const date of Object.keys(byDate)) {
-        const e = map.get(date);
-        if (!e) continue; // only days that exist in insights (i.e., had spend/impressions)
-        const byAction = byDate[date];
-        e.link_clicks += byAction["link_click"] || 0;
-        // Native usa SOMENTE lead_grouped (bate com Meta — `lead` é inflado)
-        const native = byAction[NATIVE_LEAD_GROUPED] || 0;
-        if (objective === "messages") e.leads += byAction[MESSAGE_EVENT] || 0;
-        else if (objective === "native_form") e.leads += native;
-        else if (objective === "landing_page") {
-          for (const evt of lpEventsForAccount(acc)) e.leads += byAction[evt] || 0;
-        } else {
-          e.leads += native;
-          for (const evt of lpEventsForAccount(acc)) e.leads += byAction[evt] || 0;
-          e.leads += byAction[MESSAGE_EVENT] || 0;
-        }
-      }
+    // Add link clicks and canonical lead parts only for ads in this tab's
+    // selected campaign scope. Account-wide daily totals leaked events from
+    // other objectives and summing aliases inflated the graph.
+    const seenAdDates = new Set<string>();
+    for (const insight of objectiveInsights) {
+      const date = insight.date;
+      const e = map.get(date);
+      if (!e) continue;
+      const accountId = insight.ad_account_id;
+      const byAction = actionData.dailyByAd[insight.ad_id]?.[date] || {};
+      const adDateKey = `${accountId || ""}|${insight.ad_id}|${date}`;
+      if (seenAdDates.has(adDateKey)) continue;
+      seenAdDates.add(adDateKey);
+      e.link_clicks += Number(byAction["link_click"] || 0);
+      const leadParts = resolveMetaLeadActions(
+        byAction,
+        accountId ? lpConfigs[accountId]?.action_type : undefined,
+        String(insight.adset_destination_type || "").toUpperCase() === "WEBSITE",
+        isMetaMessagingDestination(insight.adset_destination_type),
+      );
+      if (objective === "messages") e.leads += leadParts.conversations;
+      else if (objective === "native_form") e.leads += leadParts.forms;
+      else if (objective === "landing_page") e.leads += leadParts.site;
+      else e.leads += leadParts.total;
     }
     return Array.from(map.values())
       .sort((a, b) => (a.date < b.date ? -1 : 1))
@@ -457,8 +453,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
           conversion: ref > 0 ? (d.leads / ref) * 100 : 0,
         };
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [objectiveInsights, actionData.dailyByAccount, lpConfigs, objective]);
+  }, [objectiveInsights, actionData.dailyByAd, lpConfigs, objective]);
 
   // ============================================================
   // KPIs by tab

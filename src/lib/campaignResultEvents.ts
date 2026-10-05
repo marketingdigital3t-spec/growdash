@@ -10,18 +10,25 @@ export function resolveCampaignResults(
   insightLeads: number,
   actionTotals: Record<string, number>,
   siteAction?: string | null,
-  insightParts?: { forms?: number | null; site?: number | null; conversations?: number | null; legacyLeads?: number | null },
+  insightParts?: { forms?: number | null; site?: number | null; conversations?: number | null; legacyLeads?: number | null; siteDestinationConfirmed?: boolean; conversationDestinationConfirmed?: boolean },
 ) {
   // Kept in the signature for callers migrating from the old contract; the
   // legacy aggregate is intentionally ignored.
   void insightLeads;
-  const actionLeads = resolveMetaLeadActions(actionTotals, siteAction);
+  const actionLeads = resolveMetaLeadActions(
+    actionTotals,
+    siteAction,
+    insightParts?.siteDestinationConfirmed === true,
+    insightParts?.conversationDestinationConfirmed !== false,
+  );
   const siteAliases = siteAction && !META_ACTION_TYPES.forms.includes(siteAction as any) && siteAction !== "lead"
     ? [siteAction]
     : [...META_ACTION_TYPES.site];
   const hasFormEvents = META_ACTION_TYPES.forms.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
-  const hasSiteEvents = siteAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
-  const hasConversationEvents = META_ACTION_TYPES.conversations.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
+  const hasSiteEvents = insightParts?.siteDestinationConfirmed === true
+    && siteAliases.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
+  const hasConversationEvents = insightParts?.conversationDestinationConfirmed !== false
+    && META_ACTION_TYPES.conversations.some((alias) => Object.prototype.hasOwnProperty.call(actionTotals, alias));
   const hasGenericLead = Object.prototype.hasOwnProperty.call(actionTotals, "lead") && !hasFormEvents && !hasSiteEvents && !hasConversationEvents;
   // Each component is resolved independently: a forms event cannot suppress a
   // persisted conversation count when the Meta action response is incomplete.
@@ -36,7 +43,9 @@ export function resolveCampaignResults(
     : hasPersistedParts ? Math.max(0, Number(insightParts?.site || 0)) : 0;
   const conversations = hasConversationEvents
     ? actionLeads.conversations
-    : hasPersistedParts ? Math.max(0, Number(insightParts?.conversations || 0)) : 0;
+    : hasPersistedParts && insightParts?.conversationDestinationConfirmed !== false
+      ? Math.max(0, Number(insightParts?.conversations || 0))
+      : 0;
   const leadCount = forms + site;
   const breakdown: CampaignResultBreakdown[] = [];
 

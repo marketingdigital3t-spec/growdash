@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, type MetaLeadAction, type MetaLeadInsight } from "../_shared/metaLeadMetrics.ts";
+import { canonicalMetaLeads, META_LEAD_ACTION_TYPES, type MetaLeadAction, type MetaLeadInsight } from "../_shared/metaLeadMetrics.ts";
+import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
+import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -173,7 +175,7 @@ Deno.serve(async (req) => {
     const allInsights: Insight[] = [];
     for (let offset = 0; ; offset += 1000) {
       const { data: page, error: insightError } = await admin.from("insights")
-        .select("ad_id, ad_account_id, campaign_id, attribution_window, date, spend, impressions, reach, clicks, leads, frequency")
+        .select("ad_id, ad_account_id, adset_id, campaign_id, attribution_window, date, spend, impressions, reach, clicks, leads, frequency")
         .gte("date", dataStartStr).lte("date", endStr)
         .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
         .order("date", { ascending: true }).order("ad_id", { ascending: true })
@@ -191,7 +193,7 @@ Deno.serve(async (req) => {
     const scopedInsights = allInsights.filter((row) => {
       const account = accounts?.find((item) => item.id === row.ad_account_id);
       const expectedWindow = account?.attribution_window || "account_default";
-      if ((row.attribution_window || "account_default") !== expectedWindow) return false;
+      if (normalizeMetaAttributionWindow(row.attribution_window) !== normalizeMetaAttributionWindow(expectedWindow)) return false;
       // Apply the requested campaign scope to the fact row itself. Requiring
       // the ad to exist in today's catalog silently dropped valid historical
       // Insights for archived/deleted ads and made RAG totals disagree with
@@ -203,7 +205,7 @@ Deno.serve(async (req) => {
     // aliases plus each account's configured LP event, and never source leads
     // from the legacy insights.leads aggregate.
     const actionRows: ActionRow[] = [];
-    const actionTypes = Array.from(new Set([...FORM_ACTION_TYPES, ...SITE_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter((value): value is string => !!value)]));
+    const actionTypes = Array.from(new Set([...META_LEAD_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter((value): value is string => !!value)]));
     for (const account of accounts || []) {
       const accountAdIds = Array.from(new Set(uniqueScopedInsights.filter((row) => row.ad_account_id === account.id).map((row) => row.ad_id)));
       if (!accountAdIds.length) continue;
@@ -226,7 +228,8 @@ Deno.serve(async (req) => {
         if (!page || page.length < 1000) break;
       }
     }
-    const canonicalInsights = canonicalMetaLeads(uniqueScopedInsights, actionRows, siteActionByAccount);
+    const siteScope = await loadSiteEligibleMetaAdScopes(admin, uniqueScopedInsights);
+    const canonicalInsights = canonicalMetaLeads(uniqueScopedInsights, actionRows, siteActionByAccount, siteScope.scopes, siteScope.conversationScopes);
     const currentInsights = canonicalInsights.filter((row) => row.date >= startStr && row.date <= endStr);
     const previousInsights = canonicalInsights.filter((row) => row.date >= previousStartStr && row.date <= previousEndStr);
     const currentActionCoverageGaps = coverageGaps(startStr, endStr);
@@ -234,8 +237,9 @@ Deno.serve(async (req) => {
     const currentInsightCoverageGaps = coverageGaps(startStr, endStr, "insights");
     const previousInsightCoverageGaps = coverageGaps(previousStartStr, previousEndStr, "insights");
     const currentMetaSnapshotAvailable = accountIds.length > 0 && currentInsightCoverageGaps.length === 0;
-    const currentActionsAvailable = accountIds.length > 0 && currentActionCoverageGaps.length === 0;
-    const previousActionsAvailable = accountIds.length > 0 && previousActionCoverageGaps.length === 0;
+    const siteScopeAvailable = siteScope.complete && !siteScope.error;
+    const currentActionsAvailable = accountIds.length > 0 && currentActionCoverageGaps.length === 0 && siteScopeAvailable;
+    const previousActionsAvailable = accountIds.length > 0 && previousActionCoverageGaps.length === 0 && siteScopeAvailable;
 
     const allSales: Array<Record<string, any>> = [];
     for (let offset = 0; ; offset += 1000) {

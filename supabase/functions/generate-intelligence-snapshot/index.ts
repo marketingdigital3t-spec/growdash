@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { canonicalMetaLeads } from "../_shared/metaLeadMetrics.ts";
+import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
     const pageSize = 1000;
     const rows: any[] = [];
     for (let page = 0; ; page++) {
-      let query = admin.from("insights").select("ad_account_id,ad_id,date,attribution_window,spend,impressions,reach,clicks")
+      let query = admin.from("insights").select("ad_account_id,ad_id,adset_id,date,attribution_window,spend,impressions,reach,clicks")
         .eq("ad_account_id", accountId).eq("date", date);
       query = attributionWindow === "account_default" ? query.or("attribution_window.eq.account_default,attribution_window.is.null") : query.eq("attribution_window", attributionWindow);
       const { data, error } = await query.range(page * pageSize, page * pageSize + pageSize - 1);
@@ -89,19 +90,23 @@ Deno.serve(async (req) => {
     const { data: lpConfig, error: lpError } = await admin.from("account_lp_config")
       .select("action_type").eq("ad_account_id", accountId).maybeSingle();
     if (lpError) throw lpError;
+    const siteScope = await loadSiteEligibleMetaAdScopes(admin, mediaRows as Array<{ ad_account_id: string; ad_id: string }>);
     const leadsByAd = canonicalMetaLeads(
-      mediaRows.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: accountId, date: String(row.date), leads: null })),
-      actionRows.map((row) => ({ ad_account_id: accountId, ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: number(row.value) })),
+      mediaRows.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: accountId, date: String(row.date), attribution_window: row.attribution_window as string | null, leads: null })),
+      actionRows.map((row) => ({ ad_account_id: accountId, ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: number(row.value), attribution_window: row.attribution_window as string | null })),
       { [accountId]: lpConfig?.action_type || undefined },
+      siteScope.scopes,
+      siteScope.conversationScopes,
     );
+    const leadsAvailable = actionsConfirmed && siteScope.complete && !siteScope.error;
     const media = {
       spend: insightsConfirmed ? sums.spend : null,
       impressions: insightsConfirmed ? sums.impressions : null,
       reach: insightsConfirmed ? sums.reach : null,
       clicks: insightsConfirmed ? sums.clicks : null,
-      leads: actionsConfirmed ? leadsByAd.reduce((sum, row) => sum + Number(row.leads || 0), 0) : null,
-      leads_status: actionsConfirmed ? "confirmed" : "unavailable",
-      leads_reason: actionsConfirmed ? undefined : "Ações Meta sem cobertura confirmada para esta conta, data e atribuição.",
+      leads: leadsAvailable ? leadsByAd.reduce((sum, row) => sum + Number(row.leads || 0), 0) : null,
+      leads_status: leadsAvailable ? "confirmed" : "unavailable",
+      leads_reason: leadsAvailable ? undefined : siteScope.error || (lpConfig?.action_type && !siteScope.complete ? "Catálogo Meta sem destino confirmado para todos os anúncios do recorte." : "Ações Meta sem cobertura confirmada para esta conta, data e atribuição."),
     };
     const { count: rdLeads } = await admin.from("rd_deals").select("id", { count: "exact", head: true }).eq("ad_account_id", accountId).gte("lead_created_at", zonedBoundary(date, timezone)).lte("lead_created_at", zonedBoundary(date, timezone, true));
     const { data: sales } = await admin.from("sales").select("net_revenue, quantity").eq("ad_account_id", accountId).eq("sale_date", date).in("status", ["confirmed", "pending"]);

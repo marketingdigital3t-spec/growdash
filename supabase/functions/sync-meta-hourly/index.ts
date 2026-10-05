@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
+import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -121,7 +122,7 @@ Deno.serve(async (req) => {
           `?level=ad` +
           `&time_increment=1` +
           `&breakdowns=hourly_stats_aggregated_by_audience_time_zone` +
-          `&fields=ad_id,campaign_id,spend,clicks,actions` +
+          `&fields=ad_id,adset_id,campaign_id,spend,clicks,actions` +
           `&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}` +
           campaignFilter +
           attributionParam +
@@ -143,6 +144,14 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        const adsetIds = [...new Set(res.data.map((row: any) => String(row.adset_id || "")).filter(Boolean))];
+        const destinationTypeByAdset: Record<string, string | null> = {};
+        for (let offset = 0; offset < adsetIds.length; offset += 500) {
+          const { data, error } = await supabaseAdmin.from("adsets").select("id,destination_type").in("id", adsetIds.slice(offset, offset + 500));
+          if (error) errors.push(`Conta ${account.name}: destino dos conjuntos não pôde ser confirmado; leads de site serão omitidos.`);
+          for (const adset of data || []) destinationTypeByAdset[adset.id] = adset.destination_type || null;
+        }
+
         // Aggregate by (ad_id, date, hour) to dedupe within the page set.
         type Row = { ad_account_id: string; campaign_id: string | null; ad_id: string; date: string; hour: number; leads: number; clicks: number; spend: number };
         const map = new Map<string, Row>();
@@ -159,7 +168,8 @@ Deno.serve(async (req) => {
             const type = String(action.action_type || "");
             actionValues[type] = Math.max(actionValues[type] || 0, Math.max(0, Number(action.value || 0)));
           }
-          const leads = resolveMetaLeadParts(actionValues, lpAction || undefined).total;
+          const destinationType = String(destinationTypeByAdset[String(r.adset_id || "")] || "").toUpperCase();
+          const leads = resolveMetaLeadParts(actionValues, lpAction || undefined, destinationType === "WEBSITE", isMetaMessagingDestination(destinationType)).total;
 
           const key = `${r.ad_id}|${r.date_start}|${hour}`;
           const prev = map.get(key);

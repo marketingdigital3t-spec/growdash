@@ -10,7 +10,7 @@ describe("Meta lead reconciliation", () => {
       { ad_account_id: "account-1", ad_id: "ad-1", date: insight.date, action_type: "lead", value: 13, attribution_window: "account_default" },
       { ad_account_id: "account-1", ad_id: "ad-1", date: insight.date, action_type: "offsite_conversion.fb_pixel_lead", value: 2, attribution_window: "account_default" },
       { ad_account_id: "account-1", ad_id: "ad-1", date: insight.date, action_type: "onsite_conversion.messaging_conversation_started_7d", value: 2, attribution_window: "account_default" },
-    ]);
+    ], undefined, undefined, true, new Set(["account-1|ad-1"]));
 
     expect(result).toMatchObject({ forms: 7, site: 0, conversations: 2, total: 9, available: true });
   });
@@ -43,6 +43,29 @@ describe("Meta lead reconciliation", () => {
     expect(result).toMatchObject({ forms: 0, site: 0, total: 0, available: false, leadActionFactCount: 0 });
   });
 
+  it("não marca como disponível quando o único evento é o lead genérico ignorado", () => {
+    const result = resolveAccountMetaLeadReconciliation("account-1", [insight], [
+      { ad_account_id: "account-1", ad_id: "ad-1", date: insight.date, action_type: "lead", value: 15, attribution_window: "account_default" },
+    ]);
+    expect(result).toMatchObject({ forms: 0, site: 0, conversations: 0, total: 0, available: false, leadActionFactCount: 0 });
+  });
+
+  it("não conta pixel residual como lead de site em conjunto não Website", () => {
+    const result = resolveAccountMetaLeadReconciliation("account-1", [insight], [
+      { ad_account_id: "account-1", ad_id: "ad-1", date: insight.date, action_type: "offsite_conversion.fb_pixel_lead", value: 15, attribution_window: "account_default" },
+    ], "offsite_conversion.fb_pixel_lead", new Set(), true);
+
+    expect(result).toMatchObject({ forms: 0, site: 0, total: 0, available: false });
+  });
+
+  it("deixa Leads Meta indisponível se falta classificar destinos com pixel configurado", () => {
+    const result = resolveAccountMetaLeadReconciliation("account-1", [insight], [
+      { ad_account_id: "account-1", ad_id: "ad-1", date: insight.date, action_type: "offsite_conversion.fb_pixel_lead", value: 15, attribution_window: "account_default" },
+    ], "offsite_conversion.fb_pixel_lead", new Set(), false);
+
+    expect(result).toMatchObject({ total: 0, available: false, reason: "Destino do anúncio sem confirmação; Leads Meta indisponíveis neste recorte." });
+  });
+
   it("mantém a regra global independente para cada conta conectada", () => {
     const otherAccount = { ad_id: "ad-2", ad_account_id: "account-2", date: insight.date, attribution_window: "account_default" };
     const actions = [
@@ -50,8 +73,8 @@ describe("Meta lead reconciliation", () => {
       { ad_account_id: "account-1", ad_id: "ad-1", date: insight.date, action_type: "lead", value: 13, attribution_window: "account_default" },
       { ad_account_id: "account-2", ad_id: "ad-2", date: insight.date, action_type: "onsite_conversion.messaging_conversation_started_7d", value: 2, attribution_window: "account_default" },
     ];
-    const account1 = resolveAccountMetaLeadReconciliation("account-1", [insight, otherAccount], actions);
-    const account2 = resolveAccountMetaLeadReconciliation("account-2", [insight, otherAccount], actions);
+    const account1 = resolveAccountMetaLeadReconciliation("account-1", [insight, otherAccount], actions, undefined, undefined, true, new Set(["account-1|ad-1"]));
+    const account2 = resolveAccountMetaLeadReconciliation("account-2", [insight, otherAccount], actions, undefined, undefined, true, new Set(["account-2|ad-2"]));
 
     expect(account1.total).toBe(7);
     expect(account2.total).toBe(2);

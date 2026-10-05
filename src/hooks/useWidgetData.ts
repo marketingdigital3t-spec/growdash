@@ -6,6 +6,7 @@ import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import type { RDRevenueDeal } from "@/lib/revenueAggregation";
 import { format, parseISO } from "date-fns";
 import type { CanonicalMetaLeadBreakdown } from "@/lib/metaTraffic";
+import { canonicalInsightLeads } from "@/hooks/useInsights";
 
 export function computeKpi(
   metric: WidgetMetric,
@@ -14,13 +15,14 @@ export function computeKpi(
   rdDeals: RDRevenueDeal[] = [],
   leadBreakdown?: CanonicalMetaLeadBreakdown,
 ): { value: number; prefix?: string; suffix?: string; decimals: number } {
-  const ad = aggregateMetrics(insights, leadBreakdown ? { totalLeads: leadBreakdown.total } : undefined);
+  const canonicalInsights = insights.map((row) => ({ ...row, leads: canonicalInsightLeads(row).total }));
+  const ad = aggregateMetrics(canonicalInsights, leadBreakdown ? { totalLeads: leadBreakdown.total } : undefined);
   const s = aggregateRevenueSources(sales, rdDeals);
   switch (metric) {
     case "spend":
       return { value: ad.totalSpend, prefix: "R$ ", decimals: 2 };
     case "leads":
-      return { value: ad.totalLeads, decimals: 0 };
+      return { value: leadBreakdown?.total ?? ad.totalLeads, decimals: 0 };
     case "cpl":
       return { value: ad.avgCPL, prefix: "R$ ", decimals: 2 };
     case "ctr":
@@ -82,7 +84,7 @@ function metricFromInsight(metric: WidgetMetric, row: any): number {
     case "spend":
       return row.spend ?? 0;
     case "leads":
-      return row.leads ?? 0;
+      return canonicalInsightLeads(row).total;
     case "cpl":
       return row.cpl ?? 0;
     case "ctr":

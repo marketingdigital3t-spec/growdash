@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
-import { canonicalMetaLeadValue, canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../_shared/metaLeadMetrics.ts";
+import { canonicalMetaLeadValue, canonicalMetaLeads, META_LEAD_ACTION_TYPES } from "../_shared/metaLeadMetrics.ts";
+import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
+import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -94,7 +96,7 @@ Deno.serve(async (req) => {
     const history = await admin.from("agent_office_messages").select("role,content").eq("conversation_id", conversationId).eq("workspace_id", workspace.id).eq("agent_id", agent.id).order("created_at", { ascending: false }).limit(12);
     const insightRows: any[] = [];
     for (let offset = 0; accountIds.length; offset += 1000) {
-      let query = admin.from("insights").select("ad_account_id,ad_id,campaign_id,attribution_window,spend,impressions,clicks,date")
+      let query = admin.from("insights").select("ad_account_id,ad_id,adset_id,campaign_id,attribution_window,spend,impressions,clicks,date")
         .in("ad_account_id", accountIds).order("date", { ascending: true }).order("ad_id", { ascending: true }).range(offset, offset + 999);
       if (startDate) query = query.gte("date", startDate);
       if (endDate) query = query.lte("date", endDate);
@@ -105,7 +107,7 @@ Deno.serve(async (req) => {
     }
     const accountById = new Map((accounts || []).map((account) => [account.id, account]));
     const uniqueInsights = Array.from(new Map(insightRows
-      .filter((row) => (row.attribution_window || "account_default") === (accountById.get(row.ad_account_id)?.attribution_window || "account_default"))
+      .filter((row) => normalizeMetaAttributionWindow(row.attribution_window) === normalizeMetaAttributionWindow(accountById.get(row.ad_account_id)?.attribution_window))
       .map((row) => [`${row.ad_account_id}|${row.ad_id}|${row.date}|${row.attribution_window || "account_default"}`, row])).values());
     const { data: lpConfigs, error: lpError } = accountIds.length
       ? await admin.from("account_lp_config").select("ad_account_id,action_type").in("ad_account_id", accountIds)
@@ -113,7 +115,7 @@ Deno.serve(async (req) => {
     if (lpError) throw lpError;
     const siteActionByAccount = Object.fromEntries((lpConfigs || []).map((config) => [config.ad_account_id, config.action_type || undefined]));
     const actionRows: any[] = [];
-    const actionTypes = Array.from(new Set([...FORM_ACTION_TYPES, ...SITE_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter(Boolean)]));
+    const actionTypes = Array.from(new Set([...META_LEAD_ACTION_TYPES, "lead", ...Object.values(siteActionByAccount).filter(Boolean)]));
     const actionScope = new Map<string, { adAccountId: string; window: string; adIds: string[] }>();
     for (const account of accounts || []) {
       const adIds = Array.from(new Set(uniqueInsights.filter((row) => row.ad_account_id === account.id).map((row) => row.ad_id).filter(Boolean)));
@@ -140,7 +142,8 @@ Deno.serve(async (req) => {
         }
       }
     }
-    const leadsByScope = new Map(canonicalMetaLeads(uniqueInsights, actionRows, siteActionByAccount)
+    const siteScope = await loadSiteEligibleMetaAdScopes(admin, uniqueInsights);
+    const leadsByScope = new Map(canonicalMetaLeads(uniqueInsights, actionRows, siteActionByAccount, siteScope.scopes, siteScope.conversationScopes)
       .map((row) => [`${row.ad_account_id}|${row.ad_id}|${row.date}`, row]));
     const facts = uniqueInsights.reduce((acc, row) => {
       const key = `${row.ad_account_id}|${row.ad_id}|${row.date}`;
@@ -155,7 +158,8 @@ Deno.serve(async (req) => {
       acc.rows += 1;
       return acc;
     }, { spend: 0, impressions: 0, clicks: 0, leads: 0, rows: 0, counted: new Set<string>() });
-    const leadActionSnapshotAvailable = actionsConfirmed;
+    const leadActionSnapshotAvailable = actionsConfirmed
+      && siteScope.complete && !siteScope.error;
     const factsForModel = {
       spend: insightsConfirmed ? facts.spend : null,
       impressions: insightsConfirmed ? facts.impressions : null,

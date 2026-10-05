@@ -60,7 +60,7 @@ describe("Meta traffic metrics", () => {
       totalsByAd: {
         "ad-1": { omni_lead: 3, leadgen_grouped: 3, "offsite_conversion.fb_pixel_lead": 2, "onsite_conversion.messaging_conversation_started_7d": 1 },
       },
-    })).toEqual({ forms: 3, site: 0, conversations: 1, total: 4 });
+    })).toEqual({ forms: 3, site: 0, conversations: 0, total: 3 });
   });
 
   it("mantém métricas zeradas quando não há impressões, cliques ou leads", () => {

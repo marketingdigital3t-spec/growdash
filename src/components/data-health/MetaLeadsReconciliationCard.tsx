@@ -10,7 +10,8 @@ import { Loader2, Inbox, RefreshCw } from "lucide-react";
 import { businessDateKey } from "@/lib/businessDate";
 import { resolveAccountMetaLeadReconciliation } from "@/lib/metaLeadReconciliation";
 import { normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
-import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../../../supabase/functions/_shared/metaLeadMetrics";
+import { CONVERSATION_ACTION_TYPES } from "../../../supabase/functions/_shared/metaLeadMetrics";
+import { buildConversationEligibleMetaAdScopes, buildSiteEligibleMetaAdScopes } from "@/lib/metaLeadScope";
 import { findMetaLeadSnapshotCoverage, findMetaSyncIssue, getMetaLeadCoverageReason, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
 
 interface AccountRow {
@@ -78,9 +79,7 @@ function useReconciliation(days: number) {
       if (configError) throw configError;
       const siteActionByAccount = Object.fromEntries((lpConfigs || []).map((config) => [config.ad_account_id, config.action_type]));
       const leadActionTypes = Array.from(new Set([
-        ...FORM_ACTION_TYPES,
-        ...SITE_ACTION_TYPES,
-        ...CONVERSATION_ACTION_TYPES,
+        ...META_LEAD_ACTION_TYPES,
         "lead",
         ...Object.values(siteActionByAccount).filter((value): value is string => Boolean(value)),
       ]));
@@ -99,6 +98,33 @@ function useReconciliation(days: number) {
       }
 
       const adIds = Array.from(new Set(insightRows.map((row) => String(row.ad_id)).filter(Boolean)));
+      const adsById = new Map<string, string | null>();
+      const destinationByAdset: Record<string, string | null> = {};
+      let catalogComplete = true;
+      for (let index = 0; index < adIds.length; index += ID_CHUNK_SIZE) {
+        const { data, error } = await supabase.from("ads").select("id,adset_id").in("id", adIds.slice(index, index + ID_CHUNK_SIZE));
+        if (error) { catalogComplete = false; break; }
+        for (const row of data || []) adsById.set(row.id, row.adset_id || null);
+      }
+      const adsetIds = [...new Set([...adsById.values()].filter((id): id is string => Boolean(id)))];
+      if (catalogComplete) {
+        for (let index = 0; index < adsetIds.length; index += ID_CHUNK_SIZE) {
+          const { data, error } = await supabase.from("adsets").select("id,destination_type").in("id", adsetIds.slice(index, index + ID_CHUNK_SIZE));
+          if (error) { catalogComplete = false; break; }
+          for (const row of data || []) destinationByAdset[row.id] = row.destination_type || null;
+        }
+      }
+      const destinationResolvedAdScopes = new Set([...adsById.entries()]
+        .filter(([, adsetId]) => adsetId && destinationByAdset[adsetId])
+        .map(([adId]) => adId));
+      const siteEligibleAdScopes = buildSiteEligibleMetaAdScopes(
+        insightRows.map((row) => ({ ...row, adset_id: adsById.get(row.ad_id) || null })),
+        destinationByAdset,
+      );
+      const conversationEligibleAdScopes = buildConversationEligibleMetaAdScopes(
+        insightRows.map((row) => ({ ...row, adset_id: adsById.get(row.ad_id) || null })),
+        destinationByAdset,
+      );
       const actionRows: any[] = [];
       for (let index = 0; index < adIds.length; index += ID_CHUNK_SIZE) {
         const chunk = adIds.slice(index, index + ID_CHUNK_SIZE);
@@ -130,7 +156,10 @@ function useReconciliation(days: number) {
           && scopedInsightDates.has(`${row.ad_account_id}|${row.ad_id}|${row.date}`)
           && row.date >= account.startDate
           && row.date <= account.endDate);
-        const result = resolveAccountMetaLeadReconciliation(account.id, scopedInsights, scopedActions, siteActionByAccount[account.id]);
+        const accountSiteScopes = new Set([...siteEligibleAdScopes].filter((scope) => scope.startsWith(`${account.id}|`)));
+        const accountConversationScopes = new Set([...conversationEligibleAdScopes].filter((scope) => scope.startsWith(`${account.id}|`)));
+        const accountCatalogComplete = catalogComplete && scopedInsights.every((row) => destinationResolvedAdScopes.has(row.ad_id));
+        const result = resolveAccountMetaLeadReconciliation(account.id, scopedInsights, scopedActions, siteActionByAccount[account.id], accountSiteScopes, accountCatalogComplete, accountConversationScopes);
         const accountScope = {
           accountId: account.id,
           timezone: account.timezone_name || "America/Sao_Paulo",
@@ -138,7 +167,10 @@ function useReconciliation(days: number) {
         };
         const confirmedSnapshot = findMetaLeadSnapshotCoverage(syncCoverageRows, accountScope, account.startDate, account.endDate);
         const syncIssue = findMetaSyncIssue(syncCoverageRows, accountScope, account.startDate, account.endDate, [], "actions");
-        const isConfirmed = Boolean(confirmedSnapshot);
+        const requiresDestinationClassification = Boolean(siteActionByAccount[account.id])
+          || scopedActions.some((row) => (CONVERSATION_ACTION_TYPES as readonly string[]).includes(row.action_type));
+        const isConfirmed = Boolean(confirmedSnapshot)
+          && (!requiresDestinationClassification || accountCatalogComplete);
         const isConnectionError = account.connection_status !== "connected";
         return {
           id: account.id,

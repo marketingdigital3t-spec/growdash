@@ -44,16 +44,18 @@ export function computeFunnelMediaMetrics(
       acc.impressions += Number(row.impressions) || 0;
       acc.reach += Number(row.reach) || 0;
       acc.clicks += Number(row.clicks) || 0;
-      acc.metaLeads += Number(row.leads) || 0;
+      // Persisted insights.leads may contain ambiguous Meta aliases.
+      acc.metaLeads += Number(row.form_leads || 0) + Number(row.site_leads || 0);
       return acc;
     },
     { spend: 0, impressions: 0, reach: 0, clicks: 0, metaLeads: 0 },
   );
   const safeConversations = Math.max(0, Number(conversations) || 0);
-  // Prefer the canonical Meta action event when available. The daily
-  // `insights.leads` column can be stale after an account is resynced and was
-  // the source of under-counts (e.g. 7 shown vs 13 forms in Ads Manager).
-  const formLeads = formLeadsOverride == null ? totals.metaLeads : Math.max(0, Number(formLeadsOverride) || 0);
+  // The daily `insights.leads` aggregate is deliberately excluded because it
+  // may combine ambiguous aliases or stale legacy values.
+  const formLeads = formLeadsOverride == null
+    ? Math.max(0, insights.reduce((sum, row) => sum + Number(row.form_leads || 0), 0))
+    : Math.max(0, Number(formLeadsOverride) || 0);
   const siteLeads = siteLeadsOverride == null ? 0 : Math.max(0, Number(siteLeadsOverride) || 0);
   const metaLeads = formLeads + siteLeads + safeConversations;
 

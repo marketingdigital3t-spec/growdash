@@ -1,4 +1,5 @@
 import type { InsightRow } from "@/hooks/useInsights";
+import { canonicalInsightLeads } from "@/hooks/useInsights";
 
 export interface CanonicalMetricLeads {
   totalLeads?: number;
@@ -9,7 +10,7 @@ export interface CanonicalMetricLeads {
 
 export function aggregateMetrics(rows: InsightRow[], canonicalLeads?: CanonicalMetricLeads) {
   const totalSpend = rows.reduce((s, r) => s + r.spend, 0);
-  const totalLeads = canonicalLeads?.totalLeads ?? rows.reduce((s, r) => s + r.leads, 0);
+  const totalLeads = canonicalLeads?.totalLeads ?? rows.reduce((s, r) => s + canonicalInsightLeads(r).total, 0);
   const totalClicks = rows.reduce((s, r) => s + r.clicks, 0);
   const totalImpressions = rows.reduce((s, r) => s + r.impressions, 0);
 
@@ -64,7 +65,7 @@ export function groupByDate(rows: InsightRow[]) {
   for (const r of rows) {
     const existing = map.get(r.date) || { date: r.date, spend: 0, leads: 0, cpl: 0, clicks: 0, impressions: 0, ctr: 0 };
     existing.spend += r.spend;
-    existing.leads += r.leads;
+    existing.leads += canonicalInsightLeads(r).total;
     existing.clicks += r.clicks;
     existing.impressions += r.impressions;
     map.set(r.date, existing);

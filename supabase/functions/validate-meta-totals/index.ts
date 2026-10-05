@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { canonicalMetaLeads } from "../_shared/metaLeadMetrics.ts";
+import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { parseCivilDateRange } from "../../../src/lib/civilDateRange.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
       const rawId = acc.account_id as string;
       const metaId = rawId.startsWith("act_") ? rawId : `act_${rawId}`;
       const params = new URLSearchParams({
-        fields: "ad_id,date_start,campaign_id,campaign_name,spend,impressions,clicks,actions",
+        fields: "ad_id,adset_id,date_start,campaign_id,campaign_name,spend,impressions,clicks,actions",
         level: "ad",
         time_increment: "1",
         limit: "500",
@@ -115,12 +116,19 @@ Deno.serve(async (req) => {
       const metaSpend = metaRows.reduce((sum, row) => sum + Number(row.spend || 0), 0);
       const metaImpressions = metaRows.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
       const metaClicks = metaRows.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
+      const metaSiteScope = await loadSiteEligibleMetaAdScopes(admin, metaRows.map((row) => ({
+        ad_account_id: acc.id,
+        ad_id: String(row.ad_id),
+        adset_id: row.adset_id ? String(row.adset_id) : null,
+      })));
       const metaLeadSnapshot = canonicalMetaLeads(
         metaRows.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: acc.id, date: String(row.date_start), campaign_id: String(row.campaign_id || "unknown"), campaign_name: String(row.campaign_name || "Campanha sem nome"), leads: null })),
         metaRows.flatMap((row) => (row.actions || []).map((action: any) => ({
           ad_account_id: acc.id, ad_id: String(row.ad_id), date: String(row.date_start), action_type: String(action.action_type || ""), value: Number(action.value || 0),
         }))),
         { [acc.id]: lpConfig?.action_type || undefined },
+        metaSiteScope.scopes,
+        metaSiteScope.conversationScopes,
       );
       const metaLeads = metaLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
       const sumLeadParts = (rows: any[]) => rows.reduce((sum, row) => ({
@@ -203,10 +211,16 @@ Deno.serve(async (req) => {
           if ((actions || []).length < pageSize) break;
         }
       }
+      const dbSiteScope = await loadSiteEligibleMetaAdScopes(admin, localInsights.map((row) => ({
+        ad_account_id: acc.id,
+        ad_id: String(row.ad_id),
+      })));
       const localLeadSnapshot = canonicalMetaLeads(
         localInsights.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: acc.id, date: String(row.date), leads: null })),
         localActionRows.map((row) => ({ ad_account_id: acc.id, ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: Number(row.value || 0) })),
         { [acc.id]: lpConfig?.action_type || undefined },
+        dbSiteScope.scopes,
+        dbSiteScope.conversationScopes,
       );
       const dbLeads = localLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
       const dbLeadParts = sumLeadParts(localLeadSnapshot);
@@ -243,6 +257,11 @@ Deno.serve(async (req) => {
         localActionRows: localActionRows.length,
         meta: { spend: metaSpend, impressions: metaImpressions, clicks: metaClicks, leads: metaLeads, leadParts: metaLeadParts },
         db: { spend: dbSpend, impressions: dbImp, clicks: dbClicks, leads: dbLeads, leadParts: dbLeadParts },
+        siteDestinationCoverage: {
+          actionConfigured: Boolean(lpConfig?.action_type),
+          meta: { complete: metaSiteScope.complete, error: metaSiteScope.error, websiteAds: metaSiteScope.scopes.size },
+          db: { complete: dbSiteScope.complete, error: dbSiteScope.error, websiteAds: dbSiteScope.scopes.size },
+        },
         leadActionTypeTotals: { meta: metaActionTypeTotals, db: dbActionTypeTotals },
         campaignBreakdown: Array.from(campaignBreakdown.values()).sort((a, b) => a.campaignName.localeCompare(b.campaignName)),
         drift: {

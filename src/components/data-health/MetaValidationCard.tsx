@@ -22,6 +22,11 @@ interface Row {
   error?: string;
   meta?: { spend: number; impressions: number; clicks: number; leads: number; leadParts?: { forms: number; site: number; conversations: number } };
   db?: { spend: number; impressions: number; clicks: number; leads: number; leadParts?: { forms: number; site: number; conversations: number } };
+  siteDestinationCoverage?: {
+    actionConfigured: boolean;
+    meta: { complete: boolean; error: string | null; websiteAds: number };
+    db: { complete: boolean; error: string | null; websiteAds: number };
+  };
   leadActionTypeTotals?: { meta: Record<string, number>; db: Record<string, number> };
   metaAccountId?: string;
   campaignBreakdown?: Array<{
@@ -110,8 +115,10 @@ export function MetaValidationCard({ adAccountIds, startDate, endDate }: {
         {results && (
           <div className="space-y-3">
             <div className="space-y-3">
-              {results.map((r) => (
-                <div key={r.accountId} className="rounded-md border border-border/60 p-3">
+              {results.map((r) => {
+                const leadScopeComplete = !r.siteDestinationCoverage?.actionConfigured
+                  || (r.siteDestinationCoverage.meta.complete && r.siteDestinationCoverage.db.complete);
+                return <div key={r.accountId} className="rounded-md border border-border/60 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-medium">{r.name}</span>
                     <div className="flex items-center gap-2">
@@ -120,13 +127,14 @@ export function MetaValidationCard({ adAccountIds, startDate, endDate }: {
                     </div>
                   </div>
                   <p className="mb-2 text-[10px] text-muted-foreground">{r.metaAccountId ? `${r.metaAccountId} · ` : ""}Janela {r.startDate} → {r.endDate} · {r.timezone || "timezone da conta"} · atribuição {r.attributionWindow || "padrão da conta"}{typeof r.metaRows === "number" ? ` · ${r.metaPages ?? 0} páginas Meta / ${r.metaRows} linhas Meta / ${r.localRows ?? 0} locais / ${r.localActionRows ?? 0} ações` : ""}</p>
+                  {r.siteDestinationCoverage && <p className="mb-2 text-[10px] text-muted-foreground">Destino Website confirmado: Meta {r.siteDestinationCoverage.meta.websiteAds} anúncios ({r.siteDestinationCoverage.meta.complete ? "completo" : `parcial${r.siteDestinationCoverage.meta.error ? ` · ${r.siteDestinationCoverage.meta.error}` : ""}`}) · banco {r.siteDestinationCoverage.db.websiteAds} anúncios ({r.siteDestinationCoverage.db.complete ? "completo" : `parcial${r.siteDestinationCoverage.db.error ? ` · ${r.siteDestinationCoverage.db.error}` : ""}`}).</p>}
                   {r.meta && r.db && r.drift && (
                     <>
                     <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 xl:grid-cols-7">
                       <Metric label="Spend" db={fmtMoney(r.db.spend)} meta={fmtMoney(r.meta.spend)} pct={r.drift.spendPct} />
-                      <Metric label="Leads" db={fmt(r.db.leads)} meta={fmt(r.meta.leads)} pct={r.drift.leadsPct} />
+                      <Metric label="Leads" db={leadScopeComplete ? fmt(r.db.leads) : "Indisponível"} meta={leadScopeComplete ? fmt(r.meta.leads) : "Indisponível"} pct={leadScopeComplete ? r.drift.leadsPct : undefined} />
                       <Metric label="Formulários" db={fmt(r.db.leadParts?.forms ?? 0)} meta={fmt(r.meta.leadParts?.forms ?? 0)} />
-                      <Metric label="Site" db={fmt(r.db.leadParts?.site ?? 0)} meta={fmt(r.meta.leadParts?.site ?? 0)} />
+                      <Metric label="Site" db={leadScopeComplete ? fmt(r.db.leadParts?.site ?? 0) : "Indisponível"} meta={leadScopeComplete ? fmt(r.meta.leadParts?.site ?? 0) : "Indisponível"} />
                       <Metric label="Conversas" db={fmt(r.db.leadParts?.conversations ?? 0)} meta={fmt(r.meta.leadParts?.conversations ?? 0)} />
                       <Metric label="Clicks" db={fmt(r.db.clicks)} meta={fmt(r.meta.clicks)} pct={r.drift.clicksPct} />
                       <Metric label="Impressões" db={fmt(r.db.impressions)} meta={fmt(r.meta.impressions)} pct={r.drift.impressionsPct} />
@@ -145,16 +153,16 @@ export function MetaValidationCard({ adAccountIds, startDate, endDate }: {
                         {r.campaignBreakdown.map((campaign) => (
                           <div key={campaign.campaignId} className="rounded border border-border/50 p-2">
                             <p className="font-medium text-foreground">{campaign.campaignName} <span className="font-mono text-muted-foreground">· {campaign.campaignId}</span></p>
-                            <p>Investimento: Meta {fmtMoney(campaign.meta.spend)} / banco {fmtMoney(campaign.db.spend)} · leads: Meta {fmt(campaign.meta.forms + campaign.meta.site + campaign.meta.conversations)} / banco {fmt(campaign.db.forms + campaign.db.site + campaign.db.conversations)}</p>
-                            <p>Forms: {fmt(campaign.meta.forms)} / {fmt(campaign.db.forms)} · site: {fmt(campaign.meta.site)} / {fmt(campaign.db.site)} · conversas: {fmt(campaign.meta.conversations)} / {fmt(campaign.db.conversations)}</p>
+                            <p>Investimento: Meta {fmtMoney(campaign.meta.spend)} / banco {fmtMoney(campaign.db.spend)} · leads: {leadScopeComplete ? `Meta ${fmt(campaign.meta.forms + campaign.meta.site + campaign.meta.conversations)} / banco ${fmt(campaign.db.forms + campaign.db.site + campaign.db.conversations)}` : "Indisponível até confirmar o destino dos anúncios"}</p>
+                            <p>Forms: {fmt(campaign.meta.forms)} / {fmt(campaign.db.forms)} · site: {leadScopeComplete ? `${fmt(campaign.meta.site)} / ${fmt(campaign.db.site)}` : "Indisponível"} · conversas: {fmt(campaign.meta.conversations)} / {fmt(campaign.db.conversations)}</p>
                           </div>
                         ))}
                       </div>
                     </details>}
                     </>
                   )}
-                </div>
-              ))}
+                </div>;
+              })}
             </div>
           </div>
         )}

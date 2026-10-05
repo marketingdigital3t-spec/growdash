@@ -26,8 +26,8 @@ const row = (partial: Partial<InsightRow>): InsightRow => ({
 describe("computeFunnelMediaMetrics", () => {
   it("soma leads e conversas da Meta para o total de aquisição", () => {
     const result = computeFunnelMediaMetrics([
-      row({ spend: 100, impressions: 10_000, reach: 8_000, clicks: 200, leads: 20 }),
-      row({ ad_id: "ad-2", spend: 50, impressions: 5_000, reach: 4_000, clicks: 100, leads: 10 }),
+      row({ spend: 100, impressions: 10_000, reach: 8_000, clicks: 200, leads: 20, form_leads: 20 }),
+      row({ ad_id: "ad-2", spend: 50, impressions: 5_000, reach: 4_000, clicks: 100, leads: 10, form_leads: 10 }),
     ], 7, 27, 3, 1_200);
 
     expect(result.spend).toBe(150);
@@ -58,7 +58,8 @@ describe("computeFunnelMediaMetrics", () => {
 
   it("calcula conversão de venda pela população Meta exibida", () => {
     const result = computeFunnelMediaMetrics([row({ leads: 664 })], 0, 24, 9, 0);
-    expect(result.salesConversionRate).toBeCloseTo(1.3554216867, 8);
+    expect(result.metaLeads).toBe(0);
+    expect(result.salesConversionRate).toBeNull();
   });
 
   it("usa formulários, site e conversas canônicos e ignora o agregado legado de leads", () => {

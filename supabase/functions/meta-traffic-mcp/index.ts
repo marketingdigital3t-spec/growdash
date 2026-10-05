@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { canonicalMetaLeads, CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES } from "../_shared/metaLeadMetrics.ts";
+import { canonicalMetaLeads, META_LEAD_ACTION_TYPES } from "../_shared/metaLeadMetrics.ts";
+import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
+import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,7 +24,7 @@ function validDate(value: unknown): value is string {
 }
 
 function actionTypes(siteActions: string[]) {
-  return Array.from(new Set([...FORM_ACTION_TYPES, ...SITE_ACTION_TYPES, ...CONVERSATION_ACTION_TYPES, "lead", ...siteActions]));
+  return Array.from(new Set([...META_LEAD_ACTION_TYPES, "lead", ...siteActions]));
 }
 
 type AccountCoverage = {
@@ -80,12 +82,12 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
   for (const account of accounts || []) {
     const attributionWindow = account.attribution_window || "account_default";
     let insightQuery = admin.from("insights")
-      .select("ad_account_id,ad_id,campaign_id,date,attribution_window,spend,impressions,reach,clicks")
+      .select("ad_account_id,ad_id,adset_id,campaign_id,date,attribution_window,spend,impressions,reach,clicks")
       .eq("ad_account_id", account.id).gte("date", startDate).lte("date", endDate)
       .order("date", { ascending: true }).order("ad_id", { ascending: true });
     if (campaignIds.length) insightQuery = insightQuery.in("campaign_id", campaignIds);
     const accountInsights = await readPages(insightQuery);
-    const correctInsights = accountInsights.filter((row) => (row.attribution_window || "account_default") === attributionWindow);
+    const correctInsights = accountInsights.filter((row) => normalizeMetaAttributionWindow(row.attribution_window) === normalizeMetaAttributionWindow(attributionWindow));
     const uniqueInsights = Array.from(new Map(correctInsights.map((row) => [`${row.ad_account_id}|${row.ad_id}|${row.date}|${row.attribution_window || "account_default"}`, row])).values());
     insights.push(...uniqueInsights);
     const accountScope = { accountId: account.id, timezone: account.timezone_name || "America/Sao_Paulo", attributionWindow };
@@ -97,7 +99,7 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
     const adIds = Array.from(new Set(uniqueInsights.map((row) => row.ad_id).filter(Boolean)));
     let accountActions: any[] = [];
     for (let index = 0; index < adIds.length; index += 200) {
-      let query = admin.from("insight_actions").select("ad_account_id,ad_id,date,action_type,value")
+      let query = admin.from("insight_actions").select("ad_account_id,ad_id,date,action_type,value,attribution_window")
         .eq("ad_account_id", account.id)
         .in("ad_id", adIds.slice(index, index + 200)).in("action_type", actionTypes(siteActionByAccount[account.id] ? [siteActionByAccount[account.id]] : []))
         .gte("date", startDate).lte("date", endDate).order("date", { ascending: true });
@@ -108,7 +110,8 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
     }
     actions.push(...accountActions);
 
-    const canonical = canonicalMetaLeads(uniqueInsights, accountActions, { [account.id]: siteActionByAccount[account.id] });
+    const siteScope = await loadSiteEligibleMetaAdScopes(admin, uniqueInsights);
+    const canonical = canonicalMetaLeads(uniqueInsights, accountActions, { [account.id]: siteActionByAccount[account.id] }, siteScope.scopes, siteScope.conversationScopes);
     const spend = uniqueInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
     const impressions = uniqueInsights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
     const reach = uniqueInsights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
@@ -118,7 +121,8 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
     const conversations = canonical.reduce((sum, row) => sum + row.conversations, 0);
     // A row may be stale, partial, or left over from another attempt. Only the
     // persisted scope watermark confirms the requested period (including a real zero).
-    const hasActionSnapshot = actionScopeConfirmed;
+    const siteScopeComplete = siteScope.complete && !siteScope.error;
+    const hasActionSnapshot = actionScopeConfirmed && siteScopeComplete;
     const hasInsightSnapshot = insightScopeConfirmed;
     accountCoverage[account.id] = {
       account_name: account.name,
@@ -146,21 +150,23 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
         cpm: { value: hasInsightSnapshot && impressions > 0 ? spend / impressions * 1000 : null, available: hasInsightSnapshot && impressions > 0 },
         cpc: { value: hasInsightSnapshot && clicks > 0 ? spend / clicks : null, available: hasInsightSnapshot && clicks > 0 },
         form_leads: { value: hasActionSnapshot ? forms : null, available: hasActionSnapshot },
-        site_leads: { value: hasActionSnapshot ? site : null, available: hasActionSnapshot },
+        site_leads: { value: hasActionSnapshot ? site : null, available: hasActionSnapshot, reason: siteActionByAccount[account.id] && !siteScopeComplete ? siteScope.error || "Catálogo Meta sem destino confirmado para todos os anúncios do recorte." : undefined },
         conversations: { value: hasActionSnapshot ? conversations : null, available: hasActionSnapshot },
-        total_leads: { value: hasActionSnapshot ? forms + site + conversations : null, available: hasActionSnapshot, reason: hasActionSnapshot ? undefined : actionIssue?.last_error || "Ações de lead ainda não confirmadas neste recorte." },
+        total_leads: { value: hasActionSnapshot ? forms + site + conversations : null, available: hasActionSnapshot, reason: hasActionSnapshot ? undefined : siteScope.error || (siteActionByAccount[account.id] && !siteScope.complete ? "Catálogo Meta sem destino confirmado para todos os anúncios do recorte." : actionIssue?.last_error) || "Ações de lead ainda não confirmadas neste recorte." },
         cpl: { value: hasInsightSnapshot && hasActionSnapshot && forms + site + conversations > 0 ? spend / (forms + site + conversations) : null, available: hasInsightSnapshot && hasActionSnapshot && forms + site + conversations > 0 },
       },
     };
   }
 
-  const canonical = canonicalMetaLeads(insights, actions, siteActionByAccount);
+  const siteScope = await loadSiteEligibleMetaAdScopes(admin, insights);
+  const canonical = canonicalMetaLeads(insights, actions, siteActionByAccount, siteScope.scopes, siteScope.conversationScopes);
   const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
   const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
   const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const allInsightsConfirmed = accountIds.length > 0 && Object.values(accountCoverage).every((coverage) => coverage.blocks.insights === "confirmed");
-  const allActionsConfirmed = accountIds.length > 0 && Object.values(accountCoverage).every((coverage) => coverage.blocks.actions === "confirmed");
+  const allActionsConfirmed = accountIds.length > 0 && Object.values(accountCoverage).every((coverage) => coverage.blocks.actions === "confirmed")
+    && siteScope.complete && !siteScope.error;
     const forms = canonical.reduce((sum, row) => sum + Number(row.form_leads || 0), 0);
     const site = canonical.reduce((sum, row) => sum + Number(row.site_leads || 0), 0);
     const conversations = canonical.reduce((sum, row) => sum + Number(row.conversations || 0), 0);

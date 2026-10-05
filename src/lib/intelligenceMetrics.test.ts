@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { aggregateUnifiedMetrics, buildForecastScenarios, calculateBudgetPacing, detectAnomalies, resolveDataState } from "./intelligenceMetrics";
 import type { InsightRow } from "@/hooks/useInsights";
 
-const row = (date: string, values: Partial<InsightRow>): InsightRow => ({ ad_id: "ad-1", date, spend: 100, impressions: 10_000, reach: 8_000, clicks: 200, ctr: 2, cpm: 10, frequency: 1.25, leads: 10, cpl: 10, conversion_rate: 0, efficiency_rate: 0, health_score: 80, ad_name: "Criativo", adset_name: "Conjunto", campaign_name: "Campanha", ...values });
+const row = (date: string, values: Partial<InsightRow>): InsightRow => ({ ad_id: "ad-1", date, spend: 100, impressions: 10_000, reach: 8_000, clicks: 200, ctr: 2, cpm: 10, frequency: 1.25, leads: 10, form_leads: 10, cpl: 10, conversion_rate: 0, efficiency_rate: 0, health_score: 80, ad_name: "Criativo", adset_name: "Conjunto", campaign_name: "Campanha", ...values });
 
 describe("contrato unificado de métricas", () => {
   it("calcula métricas Meta, RD e vendas sem divergência de fórmula", () => {
@@ -16,11 +16,17 @@ describe("contrato unificado de métricas", () => {
 
   it("usa leads Meta como base da conversão em venda", () => {
     const metrics = aggregateUnifiedMetrics(
-      [row("2026-07-18", { leads: 664 })],
+      [row("2026-07-18", { leads: 664, form_leads: 664 })],
       Array.from({ length: 24 }, () => ({ win: false, stage_bucket: "lead" } as any)),
       [{ status: "confirmed", quantity: 9, net_revenue: 900 } as any],
     );
     expect(metrics.conversionRate).toBeCloseTo(9 / 664 * 100, 8);
+  });
+
+  it("ignora o agregado legado em métricas consumidas pelo centro de inteligência", () => {
+    const metrics = aggregateUnifiedMetrics([row("2026-07-18", { leads: 999, form_leads: 7, site_leads: 0, conversations: 1 })], [], []);
+    expect(metrics.leads).toBe(8);
+    expect(metrics.cpl).toBe(12.5);
   });
 
   it("detecta deterioração de CPL e CTR", () => {

@@ -2,15 +2,15 @@ import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, SITE_ACTION_TYPES, resolv
 import { matchesMetaAttributionWindow, normalizeMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 export const META_ACTION_TYPES = {
-  // `lead` is an ambiguous auxiliary action on messaging campaigns. Prefer
-  // native form events and only use it as a fallback when none is present.
+  // `lead` is an ambiguous auxiliary action on messaging campaigns and is
+  // never used as a canonical form/site fallback.
   // Lead Ads and older Lead Ads aliases are exposed by Meta as result actions.
   // Website conversions stay in the separate `site` group below.
   // Resolve them by canonical provider priority, never by maximum alias value.
   forms: FORM_ACTION_TYPES,
   site: SITE_ACTION_TYPES,
-  // Older Meta accounts expose the same result as total_messaging_connection.
-  // It is a fallback alias only; shared provider priority selects one event.
+  // Only explicit started-conversation actions are canonical. Total
+  // connections/replies remain diagnostic events, not acquired leads.
   conversations: CONVERSATION_ACTION_TYPES,
   linkClick: ["link_click"],
   landingPageView: ["landing_page_view"],
@@ -45,18 +45,20 @@ export function resolveMetaActionMetrics(
   };
 }
 
-export function resolveMetaLeadActions(actionTotals?: Record<string, number>, siteAction?: string | null) {
+export function resolveMetaLeadActions(actionTotals?: Record<string, number>, siteAction?: string | null, siteDestinationConfirmed = false, conversationDestinationConfirmed = false) {
   // The shared pure resolver is also used by Meta ingestion, MCP and AI/RAG.
   // Aliases use shared provider precedence; only the three distinct groups sum.
-  return resolveMetaLeadParts(actionTotals || {}, siteAction || undefined);
+  return resolveMetaLeadParts(actionTotals || {}, siteAction || undefined, siteDestinationConfirmed, conversationDestinationConfirmed);
 }
 
 export function aggregateScopedMetaLeads(
   insightRows: Array<{ ad_id: string; date: string; ad_account_id: string; attribution_window?: string | null }>,
   actionRows: Array<{ ad_id: string; date: string; action_type: string; value: number | null; attribution_window?: string | null }>,
   siteActionByAccount: Record<string, string | undefined> = {},
+  siteEligibleAdScopes?: ReadonlySet<string>,
+  conversationEligibleAdScopes?: ReadonlySet<string>,
 ) {
-  return aggregateMetaLeadTargets(insightRows, actionRows, siteActionByAccount).totals.total;
+  return aggregateMetaLeadTargets(insightRows, actionRows, siteActionByAccount, siteEligibleAdScopes, conversationEligibleAdScopes).totals.total;
 }
 
 export type MetaResultType = "leads" | "conversations" | "landing_page_view" | "purchase" | "reach";
@@ -74,11 +76,12 @@ export function resolveMetaCampaignResult(
   const objectiveKey = String(objective || "").toUpperCase();
   const goalKey = String(optimizationGoal || "").toUpperCase();
   const value = (aliases: readonly string[]) => preferredValue(actionTotals, aliases);
-  const conversations = resolveMetaLeadActions(actionTotals).conversations;
+  const conversationDestinationConfirmed = objectiveKey.includes("MESSAG") || goalKey.includes("CONVERSATION") || goalKey.includes("MESSAGE");
+  const conversations = resolveMetaLeadActions(actionTotals, undefined, false, conversationDestinationConfirmed).conversations;
   const purchases = value(META_ACTION_TYPES.purchase);
   const landingPageViews = value(META_ACTION_TYPES.landingPageView);
   const linkClicks = value(META_ACTION_TYPES.linkClick);
-  const leadActions = resolveMetaLeadActions(actionTotals);
+  const leadActions = resolveMetaLeadActions(actionTotals, undefined, false, conversationDestinationConfirmed);
 
   if (objectiveKey.includes("SALES") || objectiveKey.includes("CONVERSION") || goalKey.includes("PURCHASE")) {
     return { resultType: "purchase" as const, value: purchases };
@@ -99,13 +102,21 @@ export function aggregateMetaLeadActionDays(
   dailyActionsByAd: Record<string, Record<string, Record<string, number>>>,
   accountByAd: Record<string, string | null | undefined>,
   siteActionByAccount: Record<string, string | undefined> = {},
+  siteEligibleAdScopes?: ReadonlySet<string>,
+  conversationEligibleAdScopes?: ReadonlySet<string>,
 ) {
   const totals = { forms: 0, site: 0, conversations: 0, total: 0 };
   const dailyByAccount: Record<string, Record<string, { forms: number; site: number; conversations: number; total: number }>> = {};
   for (const [adId, dates] of Object.entries(dailyActionsByAd)) {
     const accountId = accountByAd[adId];
     for (const [date, actions] of Object.entries(dates)) {
-      const resolved = resolveMetaLeadActions(actions, accountId ? siteActionByAccount[accountId] : undefined);
+      const scopeKey = accountId
+        ? adId.startsWith(`${accountId}|`) ? adId : `${accountId}|${adId}`
+        : adId;
+      const siteDestinationConfirmed = Boolean(siteEligibleAdScopes?.has(scopeKey));
+      const conversationDestinationConfirmed = Boolean(conversationEligibleAdScopes?.has(scopeKey));
+      const siteAction = accountId ? siteActionByAccount[accountId] : undefined;
+      const resolved = resolveMetaLeadActions(actions, siteAction, siteDestinationConfirmed, conversationDestinationConfirmed);
       totals.forms += resolved.forms;
       totals.site += resolved.site;
       totals.conversations += resolved.conversations;
@@ -124,13 +135,16 @@ export function aggregateMetaLeadActionDays(
 
 /**
  * Resolve the global Meta lead contract per account/day from persisted action
- * facts. Campaign destination/catalog metadata is deliberately not consulted:
- * a missing campaign or adset must not hide a valid Meta conversion.
+ * facts. When a caller supplies a site-eligible scope, site actions are only
+ * admitted for ad sets explicitly classified as WEBSITE; absent metadata then
+ * fails closed for the site component without hiding forms or conversations.
  */
 export function aggregateMetaLeadTargets(
   insightRows: Array<{ ad_id: string; ad_account_id?: string | null; date: string; attribution_window?: string | null }>,
   actionRows: Array<{ ad_account_id?: string | null; ad_id: string; date: string; action_type: string; value: number | null; attribution_window?: string | null }>,
   siteActionByAccount: Record<string, string | undefined> = {},
+  siteEligibleAdScopes?: ReadonlySet<string>,
+  conversationEligibleAdScopes?: ReadonlySet<string>,
 ) {
   const accountByScopedAd: Record<string, string | null> = {};
   const accountsByAd = new Map<string, Set<string>>();
@@ -185,5 +199,5 @@ export function aggregateMetaLeadTargets(
     actions[row.action_type] = Math.max(actions[row.action_type] || 0, Math.max(0, Number(row.value || 0)));
   }
 
-  return aggregateMetaLeadActionDays(dailyByAd, accountByScopedAd, siteActionByAccount);
+  return aggregateMetaLeadActionDays(dailyByAd, accountByScopedAd, siteActionByAccount, siteEligibleAdScopes, conversationEligibleAdScopes);
 }

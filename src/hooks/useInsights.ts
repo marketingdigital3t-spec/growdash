@@ -20,6 +20,8 @@ interface UseInsightsParams {
 
 export interface InsightRow {
   ad_id: string;
+  adset_id?: string | null;
+  adset_destination_type?: string | null;
   campaign_id?: string | null;
   date: string;
   spend: number;
@@ -48,7 +50,6 @@ export interface InsightRow {
   ad_status?: string | null;
   adset_status?: string | null;
   campaign_status?: string | null;
-  campaign_id?: string | null;
   ad_account_id?: string | null;
   attribution_window?: string | null;
 }
@@ -154,7 +155,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
           const adsetCatalog = new Map<string, any>();
           const campaignIdsFromAds: string[] = [];
           if (adsetIds.length) {
-            const { data: adsets } = await withRequestTimeout((supabase as any).from("adsets").select("id,name,campaign_id").in("id", Array.from(new Set(adsetIds))), 15_000);
+            const { data: adsets } = await withRequestTimeout((supabase as any).from("adsets").select("id,name,campaign_id,destination_type").in("id", Array.from(new Set(adsetIds))), 15_000);
             for (const adset of adsets || []) {
               adsetCatalog.set(String(adset.id), adset);
               if (adset.campaign_id) campaignIdsFromAds.push(String(adset.campaign_id));
@@ -187,6 +188,8 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
               const campaign = campaignCatalog.get(String(adset.campaign_id)) || {};
               return {
                 ad_id: row.ad_id,
+                adset_id: ad.adset_id ?? null,
+                adset_destination_type: adset.destination_type ?? null,
                 date: row.date,
                 attribution_window: row.attribution_window ?? null,
                 spend: row.spend ?? 0,
@@ -239,7 +242,7 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
       if (campaignIdSet.size === 0) return [];
 
       const { data: adsetRows, error: adsetsError } = await withRequestTimeout(
-        supabase.from("adsets").select("id,name,status,campaign_id").in("campaign_id", Array.from(campaignIdSet)),
+        supabase.from("adsets").select("id,name,status,campaign_id,destination_type").in("campaign_id", Array.from(campaignIdSet)),
         15_000,
       );
       if (adsetsError) throw adsetsError;
@@ -308,6 +311,8 @@ export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds
         const campaign = adset.campaigns || {};
         return {
         ad_id: row.ad_id,
+        adset_id: ad.adset_id ?? null,
+        adset_destination_type: adset.destination_type ?? null,
         date: row.date,
         attribution_window: row.attribution_window ?? null,
         spend: row.spend ?? 0,

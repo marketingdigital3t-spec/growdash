@@ -13,6 +13,7 @@ const row = (values: Partial<InsightRow>): InsightRow => ({
   cpm: 10,
   frequency: 1.25,
   leads: 10,
+  form_leads: 10,
   cpl: 10,
   conversion_rate: 5,
   efficiency_rate: 0.1,
@@ -33,5 +34,11 @@ describe("aggregateMetrics", () => {
     expect(metrics.avgCPM).toBeCloseTo(10, 8);
     expect(metrics.avgCTR).toBeCloseTo(1, 8);
     expect(metrics.avgCPL).toBeCloseTo(5, 8);
+  });
+
+  it("ignora leads legado e agrega somente os fatos canônicos", () => {
+    const metrics = aggregateMetrics([row({ leads: 999, form_leads: 7, site_leads: 0, conversations: 1 })]);
+    expect(metrics.totalLeads).toBe(8);
+    expect(metrics.avgCPL).toBe(12.5);
   });
 });

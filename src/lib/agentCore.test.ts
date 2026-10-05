@@ -13,6 +13,7 @@ const insight = {
   cpm: 20,
   frequency: 1.6,
   leads: 25,
+  form_leads: 25,
   cpl: 40,
   conversion_rate: 2,
   efficiency_rate: 80,
@@ -41,11 +42,20 @@ describe("buildCoreAccountSummaries", () => {
   it("flags media spend without leads as a conversion recovery strategy", () => {
     const [summary] = buildCoreAccountSummaries("traffic", {
       accounts: [account],
-      insights: [{ ...insight, leads: 0, spend: 180 }],
+      insights: [{ ...insight, leads: 0, form_leads: 0, spend: 180 }],
     });
 
     expect(summary.health).toBe("critical");
     expect(summary.strategy).toBe("Recuperação de conversão");
+  });
+
+  it("ignores the legacy lead aggregate when canonical action fields disagree", () => {
+    const [summary] = buildCoreAccountSummaries("traffic", {
+      accounts: [account],
+      insights: [{ ...insight, leads: 999, form_leads: 7, site_leads: 0, conversations: 1 }],
+    });
+    expect(summary.leads).toBe(8);
+    expect(summary.cpl).toBe(125);
   });
 
   it("reconciles finance and commercial data without inventing sellers", () => {

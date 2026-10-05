@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { aggregateMetaLeadTargets } from "@/lib/metaActionMetrics";
+import { buildConversationEligibleMetaAdScopes } from "@/lib/metaLeadScope";
 
 interface ActionRow {
   ad_account_id: string;
@@ -75,7 +76,14 @@ export function useCanonicalLeadsByAccountDate() {
     const siteActionByAccount = Object.fromEntries(
       Object.entries(lpConfigs as Record<string, { action_type?: string | null }>).map(([accountId, config]) => [accountId, config?.action_type || undefined]),
     );
-    const canonical = aggregateMetaLeadTargets(insights, actionsQ.data || [], siteActionByAccount);
+    const siteEligibleAdScopes = new Set(insights
+      .filter((row) => String(row.adset_destination_type || "").toUpperCase() === "WEBSITE" && row.ad_account_id)
+      .map((row) => `${row.ad_account_id}|${row.ad_id}`));
+    const conversationEligibleAdScopes = buildConversationEligibleMetaAdScopes(
+      insights.map((row) => ({ ad_account_id: row.ad_account_id || "", ad_id: row.ad_id, adset_id: row.adset_id || null })),
+      Object.fromEntries(insights.map((row) => [row.adset_id || "", row.adset_destination_type || null])),
+    );
+    const canonical = aggregateMetaLeadTargets(insights, actionsQ.data || [], siteActionByAccount, siteEligibleAdScopes, conversationEligibleAdScopes);
     for (const [accountId, days] of Object.entries(canonical.dailyByAccount)) {
       for (const [date, metrics] of Object.entries(days)) {
         if (metrics.total > 0) targetByAccountDate.set(`${accountId}|${date}`, metrics.total);
