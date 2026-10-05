@@ -1,8 +1,8 @@
-import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, FolderOpen, Instagram, Mail, MessageCircle, RefreshCw, Search, Sparkles, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, FolderOpen, Instagram, Mail, MessageCircle, RefreshCw, Search, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
@@ -35,8 +35,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGoogleWorkspaceOAuth } from "@/hooks/useGoogleWorkspaceOAuth";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
 import { MetaManualConnectionCard } from "@/components/settings/MetaManualConnectionCard";
 import { useRDAccountConnections } from "@/hooks/useRDAccountConnections";
@@ -118,8 +116,6 @@ function IntegrationsContent() {
   const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
   const [search, setSearch] = useState("");
   const [accountOrder, setAccountOrder] = useState<"name-asc" | "name-desc" | "status">("name-asc");
-  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(new Set());
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
   const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
   const { data: rdIntegration, isLoading: loadingRD, isError: rdLoadFailed, error: rdLoadError, refetch: refetchRD } = useRDIntegration();
@@ -178,35 +174,6 @@ function IntegrationsContent() {
     const query = search.trim().toLocaleLowerCase();
     return [...rawAdAccounts].filter((account) => !query || `${account.name} ${account.account_id}`.toLocaleLowerCase().includes(query)).sort((a, b) => accountOrder === "name-desc" ? b.name.localeCompare(a.name, "pt-BR") : accountOrder === "status" ? Number(b.connection_status !== "disconnected") - Number(a.connection_status !== "disconnected") || a.name.localeCompare(b.name, "pt-BR") : a.name.localeCompare(b.name, "pt-BR"));
   }, [accountOrder, rawAdAccounts, search]);
-  const selectedVisibleCount = adAccounts.reduce((count, account) => count + (selectedAccountIds.has(account.id) ? 1 : 0), 0);
-  const allVisibleSelected = adAccounts.length > 0 && selectedVisibleCount === adAccounts.length;
-  const selectedAccountNames = rawAdAccounts.filter((account) => selectedAccountIds.has(account.id)).map((account) => account.name);
-  const updateAccountSelection = (id: string, checked: boolean) => {
-    setSelectedAccountIds((current) => {
-      const next = new Set(current);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  };
-  const updateVisibleSelection = (checked: boolean) => {
-    setSelectedAccountIds((current) => {
-      const next = new Set(current);
-      adAccounts.forEach((account) => {
-        if (checked) next.add(account.id);
-        else next.delete(account.id);
-      });
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    const validIds = new Set(rawAdAccounts.map((account) => account.id));
-    setSelectedAccountIds((current) => {
-      const next = new Set([...current].filter((id) => validIds.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [rawAdAccounts]);
   const rdFunnels = useMemo(
     () => (Array.isArray(rdFunnelsData) ? rdFunnelsData.filter(isPresent) : []),
     [rdFunnelsData],
@@ -311,26 +278,6 @@ function IntegrationsContent() {
     onError: (error: Error) => toast({ title: "Não foi possível alterar a conta", description: error.message, variant: "destructive" }),
   });
 
-  const bulkDeleteMetaAccounts = useMutation({
-    mutationFn: async () => {
-      const accountIds = [...selectedAccountIds];
-      if (!accountIds.length) throw new Error("Selecione ao menos uma conta Meta.");
-      const { data, error } = await supabase.functions.invoke("delete-integration-account", {
-        body: { provider: "meta", account_ids: accountIds, confirmation: "EXCLUIR CONTAS SELECIONADAS" },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: (data) => {
-      setSelectedAccountIds(new Set());
-      setBulkDeleteOpen(false);
-      void queryClient.invalidateQueries();
-      toast({ title: "Contas removidas da Growdash", description: data?.message || "As contas selecionadas foram removidas da integração." });
-    },
-    onError: (error: Error) => toast({ title: "Não foi possível excluir as contas", description: error.message, variant: "destructive" }),
-  });
-
   const disconnectMeta = useMutation({
     mutationFn: async () => {
       const response = await supabase.functions.invoke("delete-integration-account", {
@@ -392,7 +339,7 @@ function IntegrationsContent() {
 
         <TabsContent value="paid" className="space-y-4">
           <IntegrationPanelGuard name="Meta Ads e atribuição">
-          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="Conecte seu perfil Meta uma única vez e ative somente as contas de anúncio que deseja usar na Growdash." status={loadingMeta ? "Verificando" : metaConnected ? "Perfil conectado" : "Disponível"} connected={metaConnected} /><div className="flex flex-wrap items-center justify-between gap-3 border-y border-border bg-muted/10 px-4 py-3"><label className="flex items-center gap-2 text-xs font-semibold"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => updateVisibleSelection(checked === true)} disabled={loadingMeta || !adAccounts.length} aria-label="Selecionar todas as contas visíveis" />Selecionar contas visíveis</label><Button type="button" variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)} disabled={!selectedAccountIds.size || bulkDeleteMetaAccounts.isPending}><Trash2 className="mr-2 h-4 w-4" />Excluir selecionadas{selectedAccountIds.size ? ` (${selectedAccountIds.size})` : ""}</Button></div><div className="growdash-scrollbar max-h-[420px] overflow-y-auto p-3"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => { const active = account.connection_status !== "disconnected"; const unhealthy = account.connection_status === "error" || account.connection_status === "expired"; return <div key={account.id} className={cn("rounded-lg border p-3 transition", selectedAccountIds.has(account.id) ? "border-destructive/60 bg-destructive/5" : active ? "border-primary/30 bg-muted/20" : "border-border bg-muted/10 opacity-75")}><div className="flex items-start gap-2"><Checkbox checked={selectedAccountIds.has(account.id)} onCheckedChange={(checked) => updateAccountSelection(account.id, checked === true)} aria-label={`Selecionar ${account.name}`} /><div className="min-w-0 grow"><b className="block truncate text-sm">{account.name}</b><p className="truncate text-[10px] text-muted-foreground">{account.account_id}</p></div>{unhealthy ? <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" /> : <CheckCircle2 className={cn("h-4 w-4 shrink-0", active ? "text-emerald-500" : "text-muted-foreground")} />}<Switch checked={active} disabled={toggleMetaAccount.isPending} onCheckedChange={(checked) => toggleMetaAccount.mutate({ id: account.id, active: checked })} aria-label={`${active ? "Desativar" : "Ativar"} ${account.name}`} /></div><div className="mt-2">{active ? <AccountConnectionStatus status={account.connection_status} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} tokenExpiresAt={account.token_expires_at} onReconnect={() => reconnectStoredMetaToken.mutate({ id: account.id, name: account.name })} /> : <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">Desativada</span>{account.last_sync_success_at && <span>Última sync preservada</span>}</div>}</div><p className="mt-2 text-[10px] text-muted-foreground">{active ? "Ativa nos módulos e sincronizações" : "Desativada nos módulos; perfil Meta permanece conectado"}</p></div>; })}{!loadingMeta && !adAccounts.length && <EmptyState text="Nenhuma conta Meta disponível para este perfil." />}</div></div><div className="p-4"><MetaManualConnectionCard onConnected={() => queryClient.invalidateQueries({ queryKey: ["ad_accounts"] })} /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Conectar / atualizar perfil Meta"}</Button><Button type="button" variant="outline" onClick={() => disconnectMeta.mutate()} disabled={disconnectMeta.isPending || !adAccounts.length}>{disconnectMeta.isPending ? "Desconectando…" : "Desconectar perfil Meta"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Última sincronização: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
+          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="Conecte seu perfil Meta uma única vez e ative somente as contas de anúncio que deseja usar na Growdash." status={loadingMeta ? "Verificando" : metaConnected ? "Perfil conectado" : "Disponível"} connected={metaConnected} /><div className="growdash-scrollbar max-h-[420px] overflow-y-auto p-3"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => { const active = account.connection_status !== "disconnected"; const unhealthy = account.connection_status === "error" || account.connection_status === "expired"; return <div key={account.id} className={cn("rounded-lg border p-3 transition", active ? "border-primary/30 bg-muted/20" : "border-border bg-muted/10 opacity-75")}><div className="flex items-start gap-2"><div className="min-w-0 grow"><b className="block truncate text-sm">{account.name}</b><p className="truncate text-[10px] text-muted-foreground">{account.account_id}</p></div>{unhealthy ? <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" /> : <CheckCircle2 className={cn("h-4 w-4 shrink-0", active ? "text-emerald-500" : "text-muted-foreground")} />}<Switch checked={active} disabled={toggleMetaAccount.isPending} onCheckedChange={(checked) => toggleMetaAccount.mutate({ id: account.id, active: checked })} aria-label={`${active ? "Desativar" : "Ativar"} ${account.name}`} /></div><div className="mt-2">{active ? <AccountConnectionStatus status={account.connection_status} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} tokenExpiresAt={account.token_expires_at} onReconnect={() => reconnectStoredMetaToken.mutate({ id: account.id, name: account.name })} /> : <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">Desativada</span>{account.last_sync_success_at && <span>Última sync preservada</span>}</div>}</div><p className="mt-2 text-[10px] text-muted-foreground">{active ? "Ativa nos módulos e sincronizações" : "Desativada nos módulos; perfil Meta permanece conectado"}</p></div>; })}{!loadingMeta && !adAccounts.length && <EmptyState text="Nenhuma conta Meta disponível para este perfil." />}</div></div><div className="p-4"><MetaManualConnectionCard onConnected={() => queryClient.invalidateQueries({ queryKey: ["ad_accounts"] })} /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Conectar / atualizar perfil Meta"}</Button><Button type="button" variant="outline" onClick={() => disconnectMeta.mutate()} disabled={disconnectMeta.isPending || !adAccounts.length}>{disconnectMeta.isPending ? "Desconectando…" : "Desconectar perfil Meta"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Última sincronização: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
           <div className="grid gap-4 md:grid-cols-2">{providerFilter("Google Ads") && <ProviderCard name="Google Ads" description="Pesquisa, Performance Max, vídeo, conversões e orçamento." status="Preparar OAuth" />}{providerFilter("TikTok Ads") && <ProviderCard name="TikTok Ads" description="Campanhas, criativos, conversões e custo por resultado." status="Preparar OAuth" />}</div>
           <IntegrationAccordion title="Padrão de UTMs" description="Padronize a identificação de campanhas e origens." defaultOpen={false}><IntegrationPanelGuard name="Padrão de UTMs"><UTMConventionCard /></IntegrationPanelGuard></IntegrationAccordion>
           <IntegrationAccordion title="Mapeamento de UTMs" description="Revise como os parâmetros são associados aos dados." defaultOpen={false}><IntegrationPanelGuard name="Mapeamento de UTMs"><UTMMappingCard /></IntegrationPanelGuard></IntegrationAccordion>
@@ -432,16 +379,6 @@ function IntegrationsContent() {
       </Tabs>
 
       <Dialog open={googleDialogOpen} onOpenChange={setGoogleDialogOpen}><DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>Google Drive e Gmail</DialogTitle></DialogHeader><GoogleWorkspaceManager /></DialogContent></Dialog>
-      <DestructiveConfirmationDialog
-        open={bulkDeleteOpen}
-        onOpenChange={setBulkDeleteOpen}
-        title={`Excluir ${selectedAccountIds.size} conta${selectedAccountIds.size === 1 ? "" : "s"} Meta`}
-        description={`A ação remove as contas selecionadas e os dados sincronizados delas da Growdash. As contas e campanhas continuam existindo na Meta. ${selectedAccountNames.slice(0, 6).join(", ")}${selectedAccountNames.length > 6 ? ` e mais ${selectedAccountNames.length - 6}` : ""}.`}
-        confirmation="EXCLUIR CONTAS SELECIONADAS"
-        confirmLabel="Excluir contas selecionadas"
-        pending={bulkDeleteMetaAccounts.isPending}
-        onConfirm={() => bulkDeleteMetaAccounts.mutate()}
-      />
     </div>
   );
 }
