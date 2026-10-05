@@ -67,6 +67,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
                 <div className={`gd-funnel-kpi-value ${c.color} dark:text-white`}>
                   {c.format === "int" && c.label === "Leads Meta" && (("unavailable" in c && c.unavailable) ? (metaLeadsLoading ? "Sincronizando…" : "Indisponível") : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
                   {c.format === "int" && c.label === "Lead" && (rdLeadsLoading ? "Carregando…" : rdLeadsError ? "Indisponível" : <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />)}
+                  {c.format === "int" && c.label === "Conversões / Vendas" && <AnimatedNumber value={Math.round(c.value ?? 0)} decimals={0} />}
                   {c.format === "pct" && ("unavailable" in c && c.unavailable ? "Indisponível" : <><AnimatedNumber value={c.value ?? 0} decimals={c.decimals ?? 1} />%</>)}
                   {c.format === "days" && <><AnimatedNumber value={c.value} decimals={1} /> <span className="text-sm text-muted-foreground">dias</span></>}
                   {c.format === "brl" && (("unavailable" in c && c.unavailable) ? "Aguardando sincronização" : fmtBRL(c.value))}
