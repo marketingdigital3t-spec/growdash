@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
       const pageSize = 1_000;
       for (let page = 0; ; page++) {
         const { data: rows, error: insightsError } = await admin.from("insights")
-          .select("ad_id,date,campaign_id,attribution_window,spend,impressions,clicks,form_leads,site_leads,conversations")
+          .select("ad_id,adset_id,date,campaign_id,attribution_window,spend,impressions,clicks,form_leads,site_leads,conversations")
           .eq("ad_account_id", acc.id)
           .gte("date", startDate)
           .lte("date", endDate)
@@ -227,6 +227,7 @@ Deno.serve(async (req) => {
       // Meta revises attribution for an ad/day.
       const localLeadSnapshot = canonicalMetaLeads(localInsights.map((row: any) => ({
         ad_id: String(row.ad_id),
+        adset_id: row.adset_id ? String(row.adset_id) : null,
         ad_account_id: acc.id,
         date: String(row.date),
         leads: null,
