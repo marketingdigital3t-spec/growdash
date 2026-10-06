@@ -52,7 +52,7 @@ export function useExpertOperations(
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "all", scopedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: true,
+    queryKey: ["expert-operation-classes", expertId || "none", scopedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId),
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
       if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
