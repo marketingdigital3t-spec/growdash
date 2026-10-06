@@ -441,8 +441,8 @@ export function ExpertOperationsView() {
   const maxRevenue = Math.max(...dailyRevenue.map(([, value]) => value), 1);
   useEffect(() => setSlide(0), [classTab]);
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/[.04] px-3 py-2.5 lg:flex-row lg:items-center lg:gap-3">
+    <div className="expert-operations-view space-y-3">
+      <div className="expert-operations-toolbar flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/[.04] px-3 py-2 lg:flex-row lg:items-center lg:gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[.14em] text-primary">
             <Trophy className="h-3 w-3" />
@@ -487,7 +487,7 @@ export function ExpertOperationsView() {
           </div>
         </div>
       </div>
-      <section className="space-y-2">
+      <section className="expert-classes-section space-y-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[.16em] text-muted-foreground">

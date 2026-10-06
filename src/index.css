@@ -3352,6 +3352,39 @@ html:not(.dark) {
   }
 }
 
+/* Expert operations density: keep the same controls and information while
+   removing the empty vertical bands between the page header, tabs and class
+   controls. */
+.expert-dashboard {
+  row-gap: .75rem !important;
+}
+.expert-dashboard > .expert-dashboard-tabs {
+  margin-top: 0 !important;
+}
+.expert-dashboard .expert-operations-view {
+  row-gap: .75rem !important;
+}
+.expert-dashboard .expert-operations-toolbar {
+  padding-block: .45rem !important;
+}
+.expert-dashboard .expert-operations-toolbar h2 {
+  font-size: 1rem !important;
+}
+.expert-dashboard .expert-operations-toolbar .text-muted-foreground {
+  line-height: 1.15 !important;
+}
+.expert-dashboard .expert-classes-section > div:first-child {
+  align-items: center !important;
+}
+.expert-dashboard .expert-classes-section .grid {
+  margin-top: .15rem;
+}
+@media (max-width: 900px) {
+  .expert-dashboard .expert-operations-toolbar {
+    padding-block: .6rem !important;
+  }
+}
+
 /* Growdash visual contract (final layer)
    The application chrome is intentionally invariant; theme switching applies
    only to the content canvas. These tokens supersede legacy Terra/accent
