@@ -24,13 +24,15 @@ export type ExpertOperationsData = {
   sync: { status: "fresh" | "syncing" | "stale" | "partial" | "error"; syncedAt: string | null; errors: string[] };
 };
 
-export function useExpertOperations(expertId: string | undefined) {
-  const { startDate, endDate, adAccountIds } = useGlobalFilters();
+export function useExpertOperations(expertId: string | undefined, scopedAccountIds: string[] = []) {
+  const { startDate, endDate } = useGlobalFilters();
   const expert = useQuery({ queryKey: ["expert-operations-expert", expertId], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("experts").select("nome").eq("id", expertId!).maybeSingle(); if (error) throw error; return data; } });
   const sources = useQuery({
-    queryKey: ["expert-operation-sources", expertId], enabled: Boolean(expertId),
+    queryKey: ["expert-operation-sources", expertId, scopedAccountIds], enabled: Boolean(expertId),
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("expert_operation_sources").select("*").eq("expert_id", expertId!);
+      let query = (supabase as any).from("expert_operation_sources").select("*").eq("expert_id", expertId!);
+      if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as ExpertOperationSource[];
     },
@@ -44,9 +46,11 @@ export function useExpertOperations(expertId: string | undefined) {
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "all", businessDateKey(startDate), businessDateKey(endDate)], enabled: true,
+    queryKey: ["expert-operation-classes", expertId || "all", scopedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: true,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
+      let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
+      if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
+      const { data, error } = await query;
       if (error) throw error;
       const rows = data || [];
       if (!rows.length) return [];
@@ -61,10 +65,11 @@ export function useExpertOperations(expertId: string | undefined) {
   // Prefer the explicit expert-to-account link. During the migration to that
   // link table, use the account selected in the global toolbar so the expert
   // panel can still show the same Meta traffic scope as the rest of Growdash.
-  const accountIds = useMemo(
-    () => linkedAccountIds.length ? linkedAccountIds : adAccountIds,
-    [adAccountIds, linkedAccountIds],
-  );
+  const accountIds = useMemo(() => {
+    if (!scopedAccountIds.length) return linkedAccountIds;
+    if (!linkedAccountIds.length) return scopedAccountIds;
+    return scopedAccountIds.filter((id) => linkedAccountIds.includes(id));
+  }, [linkedAccountIds, scopedAccountIds]);
   const attributionWindowsByAccount = useMemo(() => Object.fromEntries((sources.data || []).filter((source) => source.ad_account_id).map((source) => [source.ad_account_id, source.attribution_window || "account_default"])), [sources.data]);
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(accountIds.length));
   const filteredClasses = useMemo(() => (classes.data || []).filter((item: any) => {
@@ -75,7 +80,7 @@ export function useExpertOperations(expertId: string | undefined) {
     // continua filtrando tráfego e vendas, mas não deve esconder turmas
     // futuras ou históricas do calendário.
     return true;
-  }), [classes.data, expertId, expert.data?.nome, startDate, endDate]);
+  }), [classes.data, expertId, expert.data?.nome]);
   const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, businessDateKey(startDate).slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${businessDateKey(startDate).slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));

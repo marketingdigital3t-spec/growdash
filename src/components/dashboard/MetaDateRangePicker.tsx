@@ -96,22 +96,25 @@ export function MetaDateRangePicker({
     }
   };
 
-  const handleCalendarSelect = (range: DateRange | undefined, selectedDay?: Date) => {
-    if (pendingRange.from && pendingRange.to && selectedDay) {
-      setPendingRange({ from: selectedDay, to: undefined });
-      setCalendarMonth(selectedDay);
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    if (!range?.from) return;
+
+    // A completed range starts a new draft on the next click. Keeping `to`
+    // empty makes the first selected day visible before the interval ends.
+    if (pendingRange.from && pendingRange.to) {
+      setPendingRange({ from: range.from, to: undefined });
+      setCalendarMonth(range.from);
       setPendingPreset("custom");
       return;
     }
 
-    if (range?.from) {
-      // Preserve `to` as undefined while the user starts a new selection.
-      // This lets a completed interval become either a single day (Apply now)
-      // or a new interval (click a second day).
-      setPendingRange(range);
-      if (range.from) setCalendarMonth(range.from);
-      setPendingPreset("custom");
-    }
+    // DayPicker can return an inverted range when the second click is before
+    // the first one. Normalize it so every consumer receives from <= to.
+    const from = range.to && range.to < range.from ? range.to : range.from;
+    const to = range.to && range.to < range.from ? range.from : range.to;
+    setPendingRange({ from, to });
+    setCalendarMonth(from);
+    setPendingPreset("custom");
   };
 
   const handleApply = () => {

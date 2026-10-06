@@ -369,40 +369,52 @@ function ClassCard({
 }
 
 export function ExpertOperationsView() {
-  const { startDate, endDate } = useGlobalFilters();
+  const { startDate, endDate, adAccountIds } = useGlobalFilters();
   const adAccounts = useAdAccounts();
   const experts = useQuery({
-    queryKey: ["expert-operations-experts"],
+    queryKey: ["expert-operations-experts", adAccountIds],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data: expertRows, error } = await (supabase as any)
         .from("experts")
-        .select("id,nome")
+        .select("id,nome,ativo")
+        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
-      return data || [];
+      const { data: sourceRows, error: sourceError } = await (supabase as any)
+        .from("expert_operation_sources")
+        .select("expert_id,ad_account_id");
+      if (sourceError) throw sourceError;
+      let classQuery = (supabase as any)
+        .from("event_classes")
+        .select("expert_id,ad_account_id")
+        .not("expert_id", "is", null);
+      if (adAccountIds.length) classQuery = classQuery.in("ad_account_id", adAccountIds);
+      const { data: classRows, error: classError } = await classQuery;
+      if (classError) throw classError;
+      const scopedIds = new Set<string>();
+      (sourceRows || []).forEach((row: any) => {
+        if (!adAccountIds.length || adAccountIds.includes(row.ad_account_id)) scopedIds.add(String(row.expert_id));
+      });
+      (classRows || []).forEach((row: any) => scopedIds.add(String(row.expert_id)));
+      return (expertRows || []).filter((row: any) => scopedIds.has(String(row.id)));
     },
   });
   const [expertId, setExpertId] = useState("");
   const [createClassOpen, setCreateClassOpen] = useState(false);
   const [classTab, setClassTab] = useState<"open" | "upcoming" | "past">("open");
-  const selectedExpertId = expertId || experts.data?.[0]?.id;
+  const expertOptions = useMemo(() => experts.data || [], [experts.data]);
+  const selectedExpertId = expertOptions.some((expert: any) => expert.id === expertId)
+    ? expertId
+    : expertOptions[0]?.id;
   const selectedExpertName =
     (experts.data || []).find((expert: any) => expert.id === selectedExpertId)?.nome || "";
-  const operations = useExpertOperations(selectedExpertId);
-  const expertOptions = useMemo(() => {
-    if (experts.data?.length) return experts.data;
-    const seen = new Set<string>();
-    return operations.classes.reduce((items: Array<{ id: string; nome: string }>, item: any) => {
-      const id = String(item.expert_id || "").trim();
-      const nome = String(item.expert_name || "").trim();
-      if (!id || seen.has(id)) return items;
-      seen.add(id);
-      items.push({ id, nome: nome || "Expert" });
-      return items;
-    }, []);
-  }, [experts.data, operations.classes]);
+  const operations = useExpertOperations(selectedExpertId, adAccountIds);
   useEffect(() => {
-    if (!expertId && expertOptions[0]?.id) setExpertId(expertOptions[0].id);
+    if (!expertOptions.length) {
+      if (expertId) setExpertId("");
+      return;
+    }
+    if (!expertOptions.some((expert: any) => expert.id === expertId)) setExpertId(expertOptions[0].id);
   }, [expertId, expertOptions]);
   const [slide, setSlide] = useState(0);
   const tabClasses = useMemo(() => operations.classes.filter((eventClass: any) => classBucket(eventClass) === classTab), [classTab, operations.classes]);
@@ -444,18 +456,19 @@ export function ExpertOperationsView() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={selectedExpertId || ""} onValueChange={setExpertId}>
-            <SelectTrigger className="h-9 w-full lg:w-56">
-              <SelectValue placeholder="Selecione o expert" />
-            </SelectTrigger>
+            <Select value={selectedExpertId || ""} onValueChange={setExpertId} disabled={!expertOptions.length}>
+              <SelectTrigger className="h-9 w-full lg:w-56">
+                <SelectValue placeholder="Selecione o expert" />
+              </SelectTrigger>
             <SelectContent>
               {expertOptions.map((expert: any) => (
                 <SelectItem key={expert.id} value={expert.id}>
                   {expert.nome}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
+              </SelectContent>
+            </Select>
+          {!experts.isLoading && !expertOptions.length && <span className="text-[10px] text-muted-foreground">Nenhum expert vinculado a esta conta.</span>}
           <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
             <span
               className={`h-1.5 w-1.5 rounded-full ${operations.sync.status === "fresh" ? "bg-emerald-500" : operations.sync.status === "syncing" ? "bg-amber-500" : "bg-red-500"}`}
