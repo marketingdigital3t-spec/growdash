@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -20,12 +21,13 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: integration } = await admin.from("integrations").select("id,api_token,token_expires_at,provider_account_id").eq("user_id", user.id).eq("provider", "google_workspace").eq("is_active", true).maybeSingle();
     if (!integration) return json({ error: "Conecte uma conta Google antes de enviar e-mails." }, 409);
-    const credential = JSON.parse(String(integration.api_token || "{}"));
-    if (!credential.access_token || !integration.token_expires_at || new Date(integration.token_expires_at).getTime() <= Date.now() + 60_000) return json({ error: "A autorização Google precisa ser renovada. Conecte a conta novamente antes de enviar." }, 401);
+    let token = (await getFreshGoogleToken(admin, integration)).accessToken;
     const raw = [`To: ${to}`, `Subject: ${subject}`, "MIME-Version: 1.0", "Content-Type: text/html; charset=UTF-8", "", html].join("\r\n");
-    const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${credential.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: b64url(raw) }) });
+    const request = () => fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw: b64url(raw) }) });
+    let response = await request();
+    if (response.status === 401) { token = (await getFreshGoogleToken(admin, integration, "api_request", true)).accessToken; response = await request(); }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload?.error?.message || "O Gmail recusou o envio.");
     return json({ ok: true, id: payload.id, from: integration.provider_account_id });
-  } catch (error) { return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500); }
+  } catch (error) { const failure = googleTokenFailure(error); return json({ error: failure.message, status: failure.status, error_code: failure.errorCode }, failure.status === "reauthorization_required" ? 401 : 500); }
 });

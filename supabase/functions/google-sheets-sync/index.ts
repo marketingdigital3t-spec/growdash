@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -29,19 +30,6 @@ const mapped = (raw: Record<string, unknown>, mapping: Record<string, unknown>, 
 const boolValue = (value: unknown) => /^(1|true|sim|yes|ok|assinado|confirmado)$/i.test(String(value ?? "").trim());
 const integerValue = (value: unknown) => { const match = String(value ?? "").match(/\d+/); return match ? Number(match[0]) : null; };
 
-async function freshToken(admin: ReturnType<typeof createClient>, integration: any) {
-  const saved = JSON.parse(String(integration.api_token || "{}"));
-  if (integration.token_expires_at && new Date(integration.token_expires_at).getTime() > Date.now() + 60_000) return saved.access_token;
-  if (!saved.refresh_token) throw new Error("A autorização Google expirou. Conecte a conta novamente.");
-  const body = new URLSearchParams({ client_id: Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") ?? "", client_secret: Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") ?? "", refresh_token: saved.refresh_token, grant_type: "refresh_token" });
-  const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
-  const next = await response.json().catch(() => ({}));
-  if (!response.ok || !next.access_token) throw new Error("O Google recusou a renovação da autorização.");
-  saved.access_token = next.access_token;
-  await admin.from("integrations").update({ api_token: JSON.stringify(saved), token_expires_at: new Date(Date.now() + Number(next.expires_in ?? 3600) * 1000).toISOString() }).eq("id", integration.id);
-  return saved.access_token;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -60,12 +48,13 @@ Deno.serve(async (req) => {
     if (!membership && expert?.workspace_id) return json({ error: "Sem permissão para este expert." }, 403);
     const { data: integration } = await admin.from("integrations").select("id,api_token,token_expires_at").eq("user_id", user.id).eq("provider", "google_workspace").eq("is_active", true).maybeSingle();
     if (!integration) return json({ error: "Conecte uma conta Google antes de sincronizar a planilha." }, 409);
-    const token = await freshToken(admin, integration);
+    let token = (await getFreshGoogleToken(admin, integration)).accessToken;
     const run = await admin.from("expert_sales_sync_runs").insert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, status: "partial" }).select("id").single();
     const runId = run.data?.id;
     await admin.from("expert_sheet_connections").update({ status: "syncing", last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
     const range = encodeURIComponent(`${connection.worksheet_name}!A:ZZ`);
-    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } });
+    let response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (response.status === 401) { token = (await getFreshGoogleToken(admin, integration, "api_request", true)).accessToken; response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } }); }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload?.error?.message || "Não foi possível ler a planilha Google Sheets.");
     const values = Array.isArray(payload.values) ? payload.values : [];
@@ -117,6 +106,7 @@ Deno.serve(async (req) => {
     return json({ success: true, status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, synced_at: finished });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao sincronizar planilha.";
-    return json({ success: false, status: "error", error: message }, 500);
+    const failure = googleTokenFailure(error);
+    return json({ success: false, status: failure.status, error: message, error_code: failure.errorCode }, failure.status === "reauthorization_required" ? 401 : 500);
   }
 });

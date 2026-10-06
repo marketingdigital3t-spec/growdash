@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveMetaPermissionStatus } from "../_shared/metaPermissions.ts";
+import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type HealthStatus = "healthy" | "expiring" | "expired" | "permission_removed" | "error" | "unchecked";
+type HealthStatus = "healthy" | "expiring" | "expired" | "permission_removed" | "error" | "reauthorization_required" | "unchecked";
 type TokenCheck = { status: HealthStatus; permissions: string[]; details: Record<string, unknown> };
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -213,11 +214,25 @@ Deno.serve(async (req) => {
         check = await checkInstagramToken(String(integration.api_token), graphVersion);
         if (check.status === "healthy" && baseStatus === "expiring") check.status = "expiring";
       }
+      if (provider === "google_workspace") {
+        try {
+          const token = await getFreshGoogleToken(admin, integration, "health_check");
+          const expiresAt = integration.token_expires_at ? new Date(integration.token_expires_at).getTime() : 0;
+          check = {
+            status: token.refreshed || !expiresAt || expiresAt >= Date.now() + 7 * 86_400_000 ? "healthy" : "expiring",
+            permissions: [],
+            details: { refreshed: token.refreshed, token_expires_at: integration.token_expires_at ?? null },
+          };
+        } catch (error) {
+          const failure = googleTokenFailure(error);
+          check = { status: failure.status, permissions: [], details: { error_code: failure.errorCode, reason: failure.message } };
+        }
+      }
       const checkedAt = new Date().toISOString();
       let integrationUpdate = admin.from("integrations").update({
         permission_health: check.status,
         last_permission_check_at: checkedAt,
-        last_health_error: check.status === "error" ? "Falha ao validar o token" : null,
+        last_health_error: ["error", "reauthorization_required"].includes(check.status) ? String(check.details.reason || "Falha ao validar a autorização") : null,
       }).eq("id", integration.id);
       if (requestedUserId) integrationUpdate = integrationUpdate.eq("user_id", requestedUserId);
       await integrationUpdate;

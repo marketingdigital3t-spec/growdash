@@ -36,6 +36,9 @@ export function useGoogleWorkspaceOAuth() {
       if (event.data.status === "success") {
         toast({ title: "Google Workspace conectado", description: event.data.message });
         queryClient.invalidateQueries({ queryKey: ["google_workspace_integration"] });
+        void supabase.functions.invoke("monitor-oauth-health", { body: {} }).finally(() => {
+          void queryClient.invalidateQueries({ queryKey: ["google_workspace_integration"] });
+        });
       } else toast({ title: "Conexão não concluída", description: event.data.message, variant: "destructive" });
     };
     window.addEventListener("message", receive);
