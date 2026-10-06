@@ -31,7 +31,69 @@ export function FunnelSalesAttribution({ sales, insights = [], deals = [] }: { s
       ad_id: sale.ad_id || deal.meta_ad_id || deal.utm_id,
     };
   });
-  const attribution = attributeSalesToAds(enrichedSales, insights);
+  // RD is the source of truth for a realized sale. Older syncs can have the
+  // won deal in `rd_deals` before the financial snapshot is created in
+  // `sales`; create a local attribution row in that case so the campaign,
+  // ad set and creative are still visible here. It is never persisted and is
+  // keyed by rd_deal_id, so it cannot duplicate a financial sale.
+  const saleDealIds = new Set(enrichedSales.map((sale) => sale.rd_deal_id).filter(Boolean));
+  const rdWonRows = deals
+    .filter((deal) => (deal.stage_bucket === "client" || deal.win) && !saleDealIds.has(deal.rd_deal_id))
+    .map((deal) => ({
+      id: `rd:${deal.rd_deal_id}`,
+      user_id: "",
+      product_id: null,
+      ad_account_id: deal.ad_account_id,
+      campaign_ids: [],
+      sale_date: String(deal.closed_at || deal.stage_updated_at || deal.lead_created_at || "").slice(0, 10),
+      gross_revenue: Number(deal.amount_total || 0),
+      net_revenue: Number(deal.amount_total || 0),
+      tax_amount: 0,
+      refund_amount: 0,
+      chargeback_amount: 0,
+      payment_method: "outros",
+      status: "confirmed",
+      quantity: 1,
+      notes: null,
+      lead_state: deal.lead_state,
+      lead_formation: null,
+      contact_name: deal.contact_name || null,
+      contact_phone: deal.contact_phone || null,
+      contact_email: deal.contact_email || null,
+      lead_city: deal.lead_city || null,
+      lead_entry_date: deal.lead_created_at,
+      adset_id: deal.meta_adset_id || null,
+      ad_id: deal.meta_ad_id || deal.utm_id || null,
+      rd_deal_id: deal.rd_deal_id,
+      rd_campaign_name: null,
+      rd_product_name: deal.rd_product_name,
+      rd_funnel_id: deal.rd_funnel_id,
+      utm_source: deal.utm_source,
+      utm_medium: deal.utm_medium,
+      utm_campaign: deal.utm_campaign,
+      utm_term: deal.utm_term,
+      utm_content: deal.utm_content,
+      manual_platform: null,
+      matched_campaign_id: deal.meta_campaign_id || null,
+      match_method: "rd_won_deal",
+      manual_campaign_id: null,
+      manual_adset_id: null,
+      manual_ad_id: null,
+      manual_override: false,
+      workspace_id: null,
+      business_unit_id: null,
+      source_provider: "rd_station",
+      source_record_id: deal.rd_deal_id,
+      source_closed_at: deal.closed_at,
+      attribution_confidence: null,
+      attribution_reason: "RD venda ganha",
+      meta_lead_id: deal.meta_lead_id || null,
+      meta_form_id: deal.meta_form_id || null,
+      meta_attribution_method: deal.meta_attribution_method || null,
+      created_at: deal.updated_at || new Date().toISOString(),
+      updated_at: deal.updated_at || new Date().toISOString(),
+    } as Sale));
+  const attribution = attributeSalesToAds([...enrichedSales, ...rdWonRows], insights);
   const insightByAd = new Map(insights.map((row) => [row.ad_id, row]));
   const insightByCampaign = new Map<string, InsightRow>();
   for (const row of insights) if (row.campaign_id && !insightByCampaign.has(row.campaign_id)) insightByCampaign.set(row.campaign_id, row);
@@ -57,7 +119,7 @@ export function FunnelSalesAttribution({ sales, insights = [], deals = [] }: { s
   const totalSales = rows.reduce((total, row) => total + row.sales, 0);
   const trackingScore = totalSales > 0 ? (attributedSales / totalSales) * 100 : 0;
   const opportunityRows = attributeRDOpportunities(deals, insights);
-  const salesByDeal = new Map(enrichedSales.filter((sale) => sale.status === "confirmed" && sale.rd_deal_id).map((sale) => [sale.rd_deal_id!, sale]));
+  const salesByDeal = new Map([...enrichedSales, ...rdWonRows].filter((sale) => sale.status === "confirmed" && sale.rd_deal_id).map((sale) => [sale.rd_deal_id!, sale]));
   const opportunityMap = new Map<string, { campaign: string; adset: string; creative: string; opportunities: number; leads: number; sales: number; revenue: number; pipeline: number; statuses: Set<string> }>();
   for (const item of opportunityRows) {
     const key = `${item.campaignName}\u0000${item.adsetName}\u0000${item.adName}`;

@@ -233,6 +233,7 @@ Deno.serve(async (req) => {
       const utm_campaign = pick("campaign", ["utmcampaign", "campaign", "campanha"]) || null;
       const utm_term     = pick("term",     ["utmterm", "term", "termo"]) || null;
       const utm_content  = pick("content",  ["utmcontent", "content", "conteudo"]) || null;
+      const utm_id       = pick("id",       ["utmid", "utm_id", "adid", "ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]) || null;
 
       const won = isWon(deal);
       const lost = deal.win === false || (deal.deal_lost_reason != null && !won);
@@ -261,7 +262,7 @@ Deno.serve(async (req) => {
         win: won,
         lost_reason: deal.deal_lost_reason?.name || deal.deal_lost_reason || null,
         amount_total: amountTotal,
-        utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+        utm_source, utm_medium, utm_campaign, utm_content, utm_term, utm_id,
         contact_name: contactName,
         contact_email: contactEmail,
         lead_state: contactState,
@@ -287,6 +288,7 @@ Deno.serve(async (req) => {
         utm_campaign: preserve(sale.utm_campaign, utm_campaign),
         utm_term: preserve(sale.utm_term, utm_term),
         utm_content: preserve(sale.utm_content, utm_content),
+        ad_id: preserve(sale.ad_id, utm_id),
         rd_funnel_id: sale.rd_funnel_id || funnel.id,
       };
       // Recalcula sale_date só se ela bater com a regra antiga (UTC) — opcional; deixamos quieto.

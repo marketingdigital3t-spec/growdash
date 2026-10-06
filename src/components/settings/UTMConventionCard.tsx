@@ -24,23 +24,24 @@ export function UTMConventionCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5" /> Padrão de UTMs</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5" /> Rastreamento de vendas RD por UTM</CardTitle>
         <CardDescription>
-          Cole esta string no campo <strong>"Parâmetros de URL"</strong> de TODAS as suas campanhas Meta. Ela é o que permite a conciliação automática venda↔anúncio (Custo por Venda, atribuição, drill-down).
+          Cole esta string no campo <strong>"Parâmetros de URL"</strong> de cada anúncio Meta que leva ao formulário, site ou WhatsApp. O RD precisa preservar os parâmetros no contato e no negócio até a etapa de venda realizada.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <pre className="rounded-md bg-muted p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">{META_UTM_TEMPLATE}</pre>
         <Button variant="outline" size="sm" onClick={copy}>
-          <Copy className="h-4 w-4 mr-2" /> Copiar UTM padrão
+          <Copy className="h-4 w-4 mr-2" /> Copiar UTM para rastrear venda
         </Button>
         <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
           <p><strong>Onde colar no Meta:</strong> Gerenciador de Anúncios → editar Anúncio → seção "URL do site" → "Parâmetros de URL".</p>
           <p><strong>O que cada campo faz:</strong></p>
           <ul className="list-disc pl-4 space-y-0.5">
             <li><code>utm_source=meta</code> — identifica a plataforma</li>
-            <li><code>utm_campaign / term / content</code> — casamento textual com nome da campanha/conjunto/anúncio</li>
+            <li><code>utm_campaign / term / content</code> — campanha, conjunto e criativo dinâmicos</li>
             <li><code>utm_id={'{{ad.id}}'}</code> — ID nativo do anúncio (match exato e mais confiável)</li>
+            <li>O <code>utm_id</code> tem prioridade e permite identificar o criativo mesmo quando o nome foi alterado.</li>
           </ul>
         </div>
 
