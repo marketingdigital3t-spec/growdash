@@ -17,6 +17,12 @@ describe("date filter maximum history", () => {
     expect(businessDateKey(today.startDate)).toBe("2026-10-04");
   });
 
+  it("uses the seven previous complete São Paulo days for Últimos 7 dias", () => {
+    const range = resolvePreset("7days", { from: new Date("2026-10-01"), to: new Date("2026-10-01") }, new Date("2026-10-06T12:00:00-03:00"));
+    expect(businessDateKey(range.startDate)).toBe("2026-09-29");
+    expect(businessDateKey(range.endDate)).toBe("2026-10-05");
+  });
+
   it("keeps both custom range boundaries inclusive", () => {
     const range = resolvePreset("custom", {
       from: new Date(2026, 7, 10, 15, 30),

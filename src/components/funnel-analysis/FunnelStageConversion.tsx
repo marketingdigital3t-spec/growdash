@@ -17,7 +17,13 @@ export function FunnelStageConversion({ a }: Props) {
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">3. Taxa de avanço entre etapas</CardTitle>
-        <p className="text-xs text-muted-foreground">Transições reais registradas no histórico do RD.</p>
+        <p className="text-xs text-muted-foreground">
+          {a.stageConversionMode === "history"
+            ? "Transições reais registradas no histórico do RD."
+            : a.stageConversionMode === "estimated"
+              ? "Estimativa calculada pela etapa atual de cada lead; o histórico do RD não está completo."
+              : "Sem histórico ou sequência suficiente para calcular o avanço entre etapas."}
+        </p>
       </CardHeader>
       <CardContent className="pt-2">
         {data.length === 0 ? (

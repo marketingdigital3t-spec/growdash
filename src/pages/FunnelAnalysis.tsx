@@ -48,7 +48,7 @@ import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpp
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
   distribution: ["Distribuição por etapa do funil", "Mostra quantos leads estão em cada etapa do RD, sua participação, tempo médio e valor em negociação."],
-  conversion: ["Taxa de avanço entre etapas", "Exige histórico de movimentações do RD. Enquanto a integração fornecer apenas a etapa atual, este bloco não estima conversões ou perdas."],
+  conversion: ["Taxa de avanço entre etapas", "Usa movimentações reais do RD quando disponíveis e sinaliza quando a taxa é estimada pela etapa atual."],
   evolution: ["Evolução do funil", "Exibe a variação diária de leads, oportunidades e vendas no período selecionado."],
   bottlenecks: ["Gargalos do funil", "Mostra somente negócios atualmente parados por faixa de tempo. Não infere perdas entre etapas sem o histórico de movimentações do RD."],
   sources: ["Origem dos leads", "Compara volume, vendas, conversão e receita por origem para revelar os canais de maior qualidade."],
@@ -97,7 +97,7 @@ export default function FunnelAnalysis() {
       timezone: timezones.length === 1 ? timezones[0] : "account",
     };
   }, [selectedAccountIdSet, selectedAccountIds.length, visibleAccounts]);
-  const { data: funnels = [], isLoading: loadingFunnels } = useRDFunnels();
+  const { data: funnels = [], isLoading: loadingFunnels, isFetched: funnelsFetched } = useRDFunnels();
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const selectedCampaign = selectedCampaigns.length === 1 ? selectedCampaigns[0] : "all";
@@ -153,8 +153,8 @@ export default function FunnelAnalysis() {
   // causando o piscar relatado. A conta efetiva é usada apenas para reconciliar
   // a análise detalhada com o funil encontrado, sem mudar a escolha do usuário.
 
-  const { data: stages = [], isLoading: loadingStages } = useFunnelStagesForIds(funnelScopeIds);
-  const { data: deals = [], isLoading, refetch } = useRDDeals({
+  const { data: stages = [], isFetched: stagesFetched } = useFunnelStagesForIds(funnelScopeIds);
+  const { data: deals = [], isFetched: dealsFetched, refetch } = useRDDeals({
     funnelIds: funnelScopeIds,
     startDate,
     endDate,
@@ -593,7 +593,13 @@ export default function FunnelAnalysis() {
     }
   }
 
-  const noStages = !loadingStages && operationalStages.length === 0;
+  // `isLoading` can briefly become true during a background refetch. The
+  // current snapshot must remain on screen in that case; only the first fetch
+  // for the active scope should replace the page with the loading state.
+  const initialDataLoading = !funnelsFetched
+    || (funnelScopeIds.length > 0 && !stagesFetched)
+    || (funnelScopeIds.length > 0 && !dealsFetched);
+  const noStages = !initialDataLoading && operationalStages.length === 0;
 
   return (
     <MotionPage className="gd-module-shell gd-funnel-analysis mx-auto max-w-[1700px] space-y-5">
@@ -626,7 +632,7 @@ export default function FunnelAnalysis() {
         </div>
       </MotionItem>
 
-      {loadingFunnels || isLoading || loadingStages ? (
+      {initialDataLoading ? (
         <MotionItem>
           <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">Carregando…</div>
         </MotionItem>

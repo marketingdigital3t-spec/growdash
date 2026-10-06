@@ -71,6 +71,7 @@ export function MetaDateRangePicker({
     from: businessCalendarDate(startDate),
     to: businessCalendarDate(endDate),
   });
+  const [calendarMonth, setCalendarMonth] = useState<Date>(businessCalendarDate(startDate));
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [comparePreset, setComparePreset] = useState<DatePreset>("yesterday");
 
@@ -78,6 +79,7 @@ export function MetaDateRangePicker({
     if (open) {
       setPendingPreset(preset);
       setPendingRange({ from: businessCalendarDate(startDate), to: businessCalendarDate(endDate) });
+      setCalendarMonth(businessCalendarDate(startDate));
     }
   }, [open, preset, startDate, endDate]);
 
@@ -85,7 +87,8 @@ export function MetaDateRangePicker({
     setPendingPreset(p);
     if (p !== "custom") {
       const resolved = resolvePreset(p, customRange);
-      setPendingRange({ from: resolved.startDate, to: resolved.endDate });
+      setPendingRange({ from: businessCalendarDate(resolved.startDate), to: businessCalendarDate(resolved.endDate) });
+      setCalendarMonth(businessCalendarDate(resolved.startDate));
       if (applyPresetOnClick) {
         onPresetChange(p);
         setOpen(false);
@@ -96,6 +99,7 @@ export function MetaDateRangePicker({
   const handleCalendarSelect = (range: DateRange | undefined, selectedDay?: Date) => {
     if (pendingRange.from && pendingRange.to && selectedDay) {
       setPendingRange({ from: selectedDay, to: undefined });
+      setCalendarMonth(selectedDay);
       setPendingPreset("custom");
       return;
     }
@@ -105,6 +109,7 @@ export function MetaDateRangePicker({
       // This lets a completed interval become either a single day (Apply now)
       // or a new interval (click a second day).
       setPendingRange(range);
+      if (range.from) setCalendarMonth(range.from);
       setPendingPreset("custom");
     }
   };
@@ -178,12 +183,15 @@ export function MetaDateRangePicker({
               mode="range"
               numberOfMonths={typeof window !== "undefined" && window.innerWidth < 768 ? 1 : 2}
               captionLayout="dropdown"
+              month={calendarMonth}
+              onMonthChange={setCalendarMonth}
               fromYear={2020}
               toYear={new Date().getFullYear() + 1}
               selected={pendingRange}
               onSelect={handleCalendarSelect}
               locale={ptBR}
               weekStartsOn={1}
+              classNames={{ caption_label: "sr-only" }}
               className="gd-date-range-calendar pointer-events-auto p-3"
             />
 

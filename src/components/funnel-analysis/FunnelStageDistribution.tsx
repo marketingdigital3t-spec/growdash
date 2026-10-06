@@ -39,14 +39,14 @@ export function FunnelStageDistribution({ a }: Props) {
         <CardTitle className="text-base">2. Distribuição por etapa do funil (RD)</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="relative h-72">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+          <div className="relative mx-auto h-56 w-full max-w-[240px]">
             <ResponsiveContainer>
               <PieChart>
                 <Pie
                   data={data}
-                  innerRadius={70}
-                  outerRadius={110}
+                  innerRadius={56}
+                  outerRadius={88}
                   paddingAngle={2}
                   dataKey="value"
                   stroke="hsl(var(--background))"
@@ -67,20 +67,20 @@ export function FunnelStageDistribution({ a }: Props) {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-xs">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="text-muted-foreground">
                 <tr className="border-b border-border/40">
-                  <th className="text-left py-2 font-medium">Etapa</th>
-                  <th className="text-right py-2 font-medium">Leads</th>
-                  <th className="text-right py-2 font-medium">% total</th>
-                  <th className="text-right py-2 font-medium">Tempo médio</th>
-                  <th className="text-right py-2 font-medium">Em negociação</th>
+                  <th className="py-2.5 text-left font-semibold">Etapa</th>
+                  <th className="py-2.5 text-right font-semibold">Leads</th>
+                  <th className="py-2.5 text-right font-semibold">% total</th>
+                  <th className="py-2.5 text-right text-xs font-medium">Tempo médio</th>
+                  <th className="py-2.5 text-right text-xs font-medium">Em negociação</th>
                 </tr>
               </thead>
               <tbody>
                 {a.stages.map((s, i) => (
                   <tr key={s.rd_stage_id} className="border-b border-border/20">
-                    <td className="py-2 flex items-center gap-2">
+                    <td className="flex items-center gap-2 py-2.5 font-medium">
                       {!s.is_lost && (
                         <span
                           className="inline-block w-2 h-2 rounded-full"
@@ -93,12 +93,12 @@ export function FunnelStageDistribution({ a }: Props) {
                       {s.is_won && <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">ganho</Badge>}
                       {s.is_lost && <Badge variant="outline" className="text-[10px] border-red-500/40 text-red-400">perda</Badge>}
                     </td>
-                    <td className="py-2 text-right tabular-nums">{s.count}</td>
-                    <td className="py-2 text-right tabular-nums text-muted-foreground">{s.pct.toFixed(1)}%</td>
-                    <td className="py-2 text-right tabular-nums text-muted-foreground">
+                    <td className="py-2.5 text-right text-base font-bold tabular-nums">{s.count}</td>
+                    <td className="py-2.5 text-right text-base font-bold tabular-nums text-foreground">{s.pct.toFixed(1)}%</td>
+                    <td className="py-2.5 text-right text-xs tabular-nums text-muted-foreground">
                       {s.avgDaysInStage > 0 ? `${s.avgDaysInStage.toFixed(1)} d` : "—"}
                     </td>
-                    <td className="py-2 text-right tabular-nums text-muted-foreground">
+                    <td className="py-2.5 text-right text-xs tabular-nums text-muted-foreground">
                       {s.valueInNegotiation > 0 ? fmtBRL(s.valueInNegotiation) : "—"}
                     </td>
                   </tr>

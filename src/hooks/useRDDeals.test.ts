@@ -44,7 +44,8 @@ describe("RD deals date scope", () => {
     expect(analytics.totalLeads).toBe(1);
     expect(analytics.stages).toHaveLength(1);
     expect(analytics.stages[0]).toMatchObject({ rd_stage_id: "stage-contact", name: "Em contato", count: 1, pct: 100 });
-    // A current-stage snapshot is not proof of a historical stage transition.
+    // A single snapshot stage cannot establish an adjacent transition.
+    expect(analytics.stageConversionMode).toBe("unavailable");
     expect(analytics.stageConversion).toEqual([]);
 
     const withoutStageId = computeFunnelAnalytics([{ ...deal, id: "snapshot-2", rd_deal_id: "rd-deal-2", rd_stage_id: null }], []);
@@ -75,7 +76,11 @@ describe("RD deals date scope", () => {
       ["Novos leads", 2],
       ["Vendas ganhas", 2],
     ]);
-    expect(analytics.stageConversion).toEqual([]);
+    expect(analytics.stageConversionMode).toBe("estimated");
+    expect(analytics.stageConversion.map((item) => item.label)).toEqual([
+      "Lead Novo → Venda Realizada",
+      "Leads novos → Venda Realizada",
+    ]);
 
     const consolidated = consolidateFunnelStages(stages);
     expect(consolidated.sourceToCanonicalId.get("a-lead")).toBe("new-leads");
@@ -133,7 +138,13 @@ describe("RD deals date scope", () => {
       deal("a-1", "a", "a-contact", "Em atendimento"),
       deal("b-1", "b", "b-opportunity", "Oportunidade"),
     ], stages);
-    expect(analytics.stageConversion).toEqual([]);
+    expect(analytics.stageConversionMode).toBe("estimated");
+    expect(analytics.stageConversion.map((item) => item.label)).toEqual([
+      "Lead novo → Em atendimento",
+      "Lead novo → Oportunidade",
+      "Em atendimento → Venda realizada",
+      "Oportunidade → Venda realizada",
+    ]);
   });
 
   it("keeps advancement pairs in the RD stage order instead of alphabetical label order", () => {
@@ -156,7 +167,13 @@ describe("RD deals date scope", () => {
       deal("four", "won"),
     ], stages);
 
-    expect(analytics.stageConversion).toEqual([]);
+    expect(analytics.stageConversionMode).toBe("estimated");
+    expect(analytics.stageConversion[0]).toMatchObject({
+      from: "Novos leads",
+      to: "Em atendimento",
+      rate: 75,
+      lost: 1,
+    });
   });
 
   it("separates Stand By reasons from lost-deal reasons", () => {

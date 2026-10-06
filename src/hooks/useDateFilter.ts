@@ -80,13 +80,16 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
     case "yesterday":
       return { startDate: subDays(today, 1), endDate: subDays(today, 1) };
     case "7days":
-      return { startDate: subDays(today, 6), endDate: endToday };
+      // Rolling presets represent the last complete calendar days. Today is
+      // intentionally excluded so the range is stable while the day is in
+      // progress (for example, on 06/10 this is 29/09–05/10).
+      return { startDate: subDays(today, 7), endDate: businessBoundary(subDays(today, 1), true) };
     case "last_14_days":
-      return { startDate: subDays(today, 13), endDate: endToday };
+      return { startDate: subDays(today, 14), endDate: businessBoundary(subDays(today, 1), true) };
     case "last_28_days":
-      return { startDate: subDays(today, 27), endDate: endToday };
+      return { startDate: subDays(today, 28), endDate: businessBoundary(subDays(today, 1), true) };
     case "30days":
-      return { startDate: subDays(today, 29), endDate: endToday };
+      return { startDate: subDays(today, 30), endDate: businessBoundary(subDays(today, 1), true) };
     case "this_week":
       return { startDate: startOfWeek(today, { weekStartsOn: 1 }), endDate: endToday };
     case "last_week": {

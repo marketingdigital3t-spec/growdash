@@ -430,6 +430,7 @@ export interface FunnelAnalytics {
     lossPct: number;
     isBottleneck: boolean;
   }[];
+  stageConversionMode: "history" | "estimated" | "unavailable";
   evolution: { date: string; leads: number; opportunities: number; conversions: number }[];
   agingBuckets: { gt3: number; gt7: number; gt15: number };
   bottleneck: { from: string; to: string; lossPct: number } | null;
@@ -599,38 +600,40 @@ export function computeFunnelAnalytics(
     dealsByFunnel.set(deal.rd_funnel_id, list);
   }
   for (const [funnelId, funnelDeals] of dealsByFunnel) {
+    // Use native RD stage IDs for this fallback. The consolidated IDs used by
+    // the distribution view can intentionally merge equal labels from
+    // different funnels and therefore cannot locate a deal in its own
+    // funnel's sequence reliably.
     const funnelSequence = (stagesByFunnel.get(funnelId) || [])
       .filter((stage) => !stage.is_lost)
-      .sort((a, b) => a.order - b.order)
-      .map((stage) => consolidatedCRMStage({
-        id: stage.rd_stage_id,
-        name: stage.name,
-        order: stage.order,
-        won: stage.is_won,
-        lost: stage.is_lost,
-      }).id)
-      .filter((stageId, index, list) => list.indexOf(stageId) === index);
+      .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR"));
     if (!funnelSequence.length) continue;
-    const stageIndex = new Map(funnelSequence.map((stageId, index) => [stageId, index]));
+    const stageIndex = new Map(funnelSequence.map((stage, index) => [stage.rd_stage_id, index]));
     for (const deal of funnelDeals) {
-      const index = stageIndex.get(canonicalDealStageId(deal));
+      const index = stageIndex.get(dealStageId(deal));
       if (index == null) {
-        if (deal.stage_bucket === "lost") cumulativeByCanonicalStage.set(funnelSequence[0], (cumulativeByCanonicalStage.get(funnelSequence[0]) || 0) + 1);
+        if (deal.stage_bucket === "lost") {
+          const first = consolidatedCRMStage({ id: funnelSequence[0].rd_stage_id, name: funnelSequence[0].name, order: funnelSequence[0].order }).id;
+          cumulativeByCanonicalStage.set(first, (cumulativeByCanonicalStage.get(first) || 0) + 1);
+        }
         continue;
       }
       for (let position = 0; position <= index; position++) {
-        const stageId = funnelSequence[position];
+        const stageId = consolidatedCRMStage({
+          id: funnelSequence[position].rd_stage_id,
+          name: funnelSequence[position].name,
+          order: funnelSequence[position].order,
+          won: funnelSequence[position].is_won,
+          lost: funnelSequence[position].is_lost,
+        }).id;
         cumulativeByCanonicalStage.set(stageId, (cumulativeByCanonicalStage.get(stageId) || 0) + 1);
       }
       for (let position = 0; position < funnelSequence.length - 1; position++) {
         if (index < position) continue;
         const fromStage = funnelSequence[position];
         const toStage = funnelSequence[position + 1];
-        const fromDefinition = sortedStages.find((stage) => stage.rd_stage_id === fromStage);
-        const toDefinition = sortedStages.find((stage) => stage.rd_stage_id === toStage);
-        if (!fromDefinition || !toDefinition) continue;
-        const key = `${fromStage}:${toStage}`;
-        const current = pairCounts.get(key) || { from: fromDefinition.name, to: toDefinition.name, fromCount: 0, toCount: 0, order: position };
+        const key = `${funnelId}:${fromStage.rd_stage_id}:${toStage.rd_stage_id}`;
+        const current = pairCounts.get(key) || { from: fromStage.name, to: toStage.name, fromCount: 0, toCount: 0, order: position };
         // The same canonical pair can exist in more than one RD funnel. Keep
         // its earliest native position so the aggregated view preserves the
         // RD sequence instead of falling back to alphabetical label order.
@@ -689,11 +692,20 @@ export function computeFunnelAnalytics(
     pair.order = Math.min(pair.order, order);
     historyPairs.set(key, pair);
   }
-  const conversionPairs = stageHistory.length > 0
-    ? Array.from(historyPairs.values()).map((pair) => ({ from: pair.from, to: pair.to, fromCount: pair.fromCount.size, toCount: pair.toCount.size, order: pair.order }))
-    : Array.from(pairCounts.values());
-  // Sem histórico real, não estimamos avanço pela etapa atual.
-  for (const pair of (stageHistory.length > 0 ? conversionPairs : [] ).sort((a, b) => a.order - b.order || a.from.localeCompare(b.from, "pt-BR") || a.to.localeCompare(b.to, "pt-BR"))) {
+  const historicalPairs = Array.from(historyPairs.values()).map((pair) => ({
+    from: pair.from,
+    to: pair.to,
+    fromCount: pair.fromCount.size,
+    toCount: pair.toCount.size,
+    order: pair.order,
+  }));
+  const conversionPairs = historicalPairs.length > 0 ? historicalPairs : Array.from(pairCounts.values());
+  const stageConversionMode: FunnelAnalytics["stageConversionMode"] = historicalPairs.length > 0
+    ? "history"
+    : conversionPairs.length > 0
+      ? "estimated"
+      : "unavailable";
+  for (const pair of conversionPairs.sort((a, b) => a.order - b.order || a.from.localeCompare(b.from, "pt-BR") || a.to.localeCompare(b.to, "pt-BR"))) {
     const rate = pair.fromCount > 0 ? (pair.toCount / pair.fromCount) * 100 : 0;
     const lost = Math.max(0, pair.fromCount - pair.toCount);
     const lossPct = pair.fromCount > 0 ? (lost / pair.fromCount) * 100 : 0;
@@ -970,6 +982,7 @@ export function computeFunnelAnalytics(
     revenue,
     stages: stagesOut,
     stageConversion,
+    stageConversionMode,
     evolution,
     agingBuckets,
     bottleneck: (() => {
