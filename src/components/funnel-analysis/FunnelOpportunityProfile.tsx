@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { RDDeal } from "@/hooks/useRDDeals";
+import { isWonRDStageName } from "@/lib/rdDealStatus";
 import type { InsightRow } from "@/hooks/useInsights";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { filterMetaBreakdownsByAttribution } from "@/lib/metaBreakdownScope";
@@ -33,7 +34,7 @@ export function FunnelOpportunityProfile({ deals, insights = [], campaignIds = [
   // Include won RD clients alongside open opportunities. This makes the
   // profile answer the business question (who actually buys) even when the
   // funnel has already moved the deal out of the Opportunity stage.
-  const opportunities = useMemo(() => deals.filter((deal) => deal.stage_bucket === "opportunity" || deal.stage_bucket === "client" || deal.win), [deals]);
+  const opportunities = useMemo(() => deals.filter((deal) => deal.stage_bucket === "opportunity" || deal.stage_bucket === "client" || deal.win || isWonRDStageName(deal.rd_stage_name)), [deals]);
   const accountIds = useMemo(() => Array.from(new Set(opportunities.map((deal) => deal.ad_account_id).filter(Boolean))), [opportunities]);
   const campaignAccount = useMemo(() => new Map(insights.filter((row) => row.campaign_id && row.ad_account_id).map((row) => [String(row.campaign_id), String(row.ad_account_id)])), [insights]);
   const opportunityKey = useMemo(() => opportunities.map((deal) => `${deal.rd_deal_id}:${deal.updated_at || deal.stage_updated_at || ""}`).sort().join(","), [opportunities]);
