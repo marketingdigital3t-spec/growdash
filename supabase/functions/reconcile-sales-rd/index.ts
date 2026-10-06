@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
     // Localiza vendas com rd_deal_id e faz anti-join client-side com rd_deals
     const { data: sales, error: salesErr } = await admin
       .from("sales")
-      .select("id, rd_deal_id, ad_account_id, rd_funnel_id, lead_state, lead_city, contact_name, contact_phone, contact_email, utm_source, utm_medium, utm_campaign, utm_term, utm_content, sale_date")
+      .select("id, rd_deal_id, ad_account_id, rd_funnel_id, lead_state, lead_city, contact_name, contact_phone, contact_email, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, sale_date")
       .eq("user_id", userId)
       .eq("status", "confirmed")
       .not("rd_deal_id", "is", null)
@@ -140,10 +140,42 @@ Deno.serve(async (req) => {
         for (const r of existing || []) existingSet.add(String(r.rd_deal_id));
       }
     }
+
+    // Existing rd_deals can already contain the UTM hierarchy while the
+    // linked sale still has an older empty attribution snapshot.
+    const localDealsById = new Map<string, any>();
+    for (let i = 0; i < dealIds.length; i += 200) {
+      const slice = dealIds.slice(i, i + 200);
+      const { data: localDeals, error: localDealsError } = await admin
+        .from("rd_deals")
+        .select("rd_deal_id, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, meta_ad_id")
+        .in("rd_deal_id", slice);
+      if (localDealsError) throw localDealsError;
+      for (const deal of localDeals || []) localDealsById.set(String(deal.rd_deal_id), deal);
+    }
+    let linkedAttributionUpdated = 0;
+    const preserve = (current: any, incoming: any) => current != null && current !== "" ? current : (incoming ?? null);
+    for (const sale of sales || []) {
+      const localDeal = sale.rd_deal_id ? localDealsById.get(String(sale.rd_deal_id)) : null;
+      if (!localDeal) continue;
+      const update = {
+        utm_source: preserve(sale.utm_source, localDeal.utm_source),
+        utm_medium: preserve(sale.utm_medium, localDeal.utm_medium),
+        utm_campaign: preserve(sale.utm_campaign, localDeal.utm_campaign),
+        utm_term: preserve(sale.utm_term, localDeal.utm_term),
+        utm_content: preserve(sale.utm_content, localDeal.utm_content),
+        ad_id: preserve(sale.ad_id, localDeal.meta_ad_id || localDeal.utm_id),
+      };
+      const changed = Object.entries(update).some(([key, value]) => value && value !== (sale as any)[key]);
+      if (!changed) continue;
+      const { error: linkedUpdateError } = await admin.from("sales").update(update).eq("id", sale.id);
+      if (linkedUpdateError) throw linkedUpdateError;
+      linkedAttributionUpdated += 1;
+    }
     const orphans = (sales || []).filter((s) => !existingSet.has(String(s.rd_deal_id))).slice(0, limit);
 
     if (dryRun) {
-      return new Response(JSON.stringify({ ok: true, dry_run: true, orphans_total: orphans.length }), {
+      return new Response(JSON.stringify({ ok: true, dry_run: true, orphans_total: orphans.length, linked_attribution_candidates: linkedAttributionUpdated }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -274,6 +306,7 @@ Deno.serve(async (req) => {
       deals_fetched: dealsFetched,
       deals_upserted: dealsCreated,
       sales_updated: salesUpdated,
+      linked_attribution_updated: linkedAttributionUpdated,
       not_found: notFound,
       errors,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });

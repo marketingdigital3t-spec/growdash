@@ -13,7 +13,25 @@ const money = (value: number) => value.toLocaleString("pt-BR", { style: "currenc
 /** Shows the closed-loop sale attribution for exactly the account and period
  * selected in Funnel Analysis. UTMs are intentionally shown, not inferred. */
 export function FunnelSalesAttribution({ sales, insights = [], deals = [] }: { sales: Sale[]; insights?: InsightRow[]; deals?: RDDeal[] }) {
-  const attribution = attributeSalesToAds(sales, insights);
+  // A venda pode ter sido criada antes do último sync do RD. Nesse caso os
+  // UTMs já estão no negócio relacionado, identificado pelo rd_deal_id.
+  // Completar o snapshot aqui evita exibir "Não atribuída" enquanto a
+  // reconciliação persistida ainda não terminou.
+  const dealById = new Map(deals.map((deal) => [deal.rd_deal_id, deal]));
+  const enrichedSales = sales.map((sale) => {
+    const deal = sale.rd_deal_id ? dealById.get(sale.rd_deal_id) : undefined;
+    if (!deal) return sale;
+    return {
+      ...sale,
+      utm_source: sale.utm_source || deal.utm_source,
+      utm_medium: sale.utm_medium || deal.utm_medium,
+      utm_campaign: sale.utm_campaign || deal.utm_campaign,
+      utm_term: sale.utm_term || deal.utm_term,
+      utm_content: sale.utm_content || deal.utm_content,
+      ad_id: sale.ad_id || deal.meta_ad_id || deal.utm_id,
+    };
+  });
+  const attribution = attributeSalesToAds(enrichedSales, insights);
   const insightByAd = new Map(insights.map((row) => [row.ad_id, row]));
   const insightByCampaign = new Map<string, InsightRow>();
   for (const row of insights) if (row.campaign_id && !insightByCampaign.has(row.campaign_id)) insightByCampaign.set(row.campaign_id, row);
@@ -39,7 +57,7 @@ export function FunnelSalesAttribution({ sales, insights = [], deals = [] }: { s
   const totalSales = rows.reduce((total, row) => total + row.sales, 0);
   const trackingScore = totalSales > 0 ? (attributedSales / totalSales) * 100 : 0;
   const opportunityRows = attributeRDOpportunities(deals, insights);
-  const salesByDeal = new Map(sales.filter((sale) => sale.status === "confirmed" && sale.rd_deal_id).map((sale) => [sale.rd_deal_id!, sale]));
+  const salesByDeal = new Map(enrichedSales.filter((sale) => sale.status === "confirmed" && sale.rd_deal_id).map((sale) => [sale.rd_deal_id!, sale]));
   const opportunityMap = new Map<string, { campaign: string; adset: string; creative: string; opportunities: number; leads: number; sales: number; revenue: number; pipeline: number; statuses: Set<string> }>();
   for (const item of opportunityRows) {
     const key = `${item.campaignName}\u0000${item.adsetName}\u0000${item.adName}`;
