@@ -8726,3 +8726,36 @@ html:not(.dark) .brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.g
   background: rgba(255, 255, 255, .54) !important;
   box-shadow: 0 14px 34px rgba(15, 23, 42, .12), inset 0 1px rgba(255, 255, 255, .78) !important;
 }
+
+/* Funnel analysis owns a solid content canvas. The spatial scene is hidden
+   only on this route so the top chrome stays dark while the working area is
+   white in light mode and black in dark mode. */
+.brand-shell[data-funnel-scene="true"] {
+  background: #080808 !important;
+  background-image: none !important;
+}
+.brand-shell[data-funnel-scene="true"] .space-phase-bg {
+  display: none !important;
+}
+.brand-shell[data-funnel-scene="true"] .growdash-main,
+.brand-shell[data-funnel-scene="true"] .growdash-content-shell,
+.brand-shell[data-funnel-scene="true"] .growdash-content-frame,
+.brand-shell[data-funnel-scene="true"] .gd-funnel-analysis {
+  width: 100% !important;
+  max-width: none !important;
+  background-image: none !important;
+}
+.dark .brand-shell[data-funnel-scene="true"] .growdash-main,
+.dark .brand-shell[data-funnel-scene="true"] .growdash-content-shell,
+.dark .brand-shell[data-funnel-scene="true"] .growdash-content-frame,
+.dark .brand-shell[data-funnel-scene="true"] .gd-funnel-analysis {
+  background-color: #080808 !important;
+  color: #f5f5f5 !important;
+}
+html:not(.dark) .brand-shell[data-funnel-scene="true"] .growdash-main,
+html:not(.dark) .brand-shell[data-funnel-scene="true"] .growdash-content-shell,
+html:not(.dark) .brand-shell[data-funnel-scene="true"] .growdash-content-frame,
+html:not(.dark) .brand-shell[data-funnel-scene="true"] .gd-funnel-analysis {
+  background-color: #ffffff !important;
+  color: #171717 !important;
+}
