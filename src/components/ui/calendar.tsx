@@ -36,15 +36,15 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         // the shared `premium-button` variant here: its global metallic skin
         // paints every day in the range and creates the large blue/white bars.
         day: "inline-flex h-8 w-8 items-center justify-center rounded-none border-0 bg-transparent p-0 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-selected:opacity-100",
-        day_range_start: "rounded-full",
-        day_range_end: "rounded-full",
+        day_range_start: "rdp-day_range_start day-range-start rounded-full",
+        day_range_end: "rdp-day_range_end day-range-end rounded-full",
         day_selected:
           "rounded-full bg-white text-black hover:bg-white hover:text-black focus:bg-white focus:text-black dark:bg-white dark:text-black",
-        day_today: "font-bold underline decoration-white/60 underline-offset-4",
+        day_today: "rdp-day_today day-today font-bold underline decoration-white/60 underline-offset-4",
         day_outside:
-          "day-outside text-muted-foreground opacity-100 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
+          "rdp-day_outside day-outside text-muted-foreground opacity-100 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
         day_disabled: "text-muted-foreground opacity-50",
-        day_range_middle: "rounded-none bg-white/10 text-foreground aria-selected:bg-white/10 aria-selected:text-foreground",
+        day_range_middle: "rdp-day_range_middle day-range-middle rounded-none bg-white/10 text-foreground aria-selected:bg-white/10 aria-selected:text-foreground",
         day_hidden: "invisible",
         ...classNames,
       }}
