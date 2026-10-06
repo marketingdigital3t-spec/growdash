@@ -77,7 +77,13 @@ Deno.serve(async (req) => {
       const params = new URLSearchParams({
         fields: "ad_id,adset_id,date_start,campaign_id,campaign_name,spend,impressions,clicks,actions",
         level: "ad",
-        time_increment: "1",
+        // The audit compares totals for the selected civil window. Asking the
+        // Graph API for one row per day makes long historical windows exceed
+        // the Edge Function time budget (especially on accounts with many
+        // ads). Aggregate each ad across the requested window instead; the
+        // canonical resolver still classifies the returned action values with
+        // the same destination and attribution rules used by sync.
+        time_increment: "all_days",
         limit: "500",
         time_range: JSON.stringify({ since: startDate, until: endDate }),
         access_token: acc.access_token,
@@ -215,21 +221,26 @@ Deno.serve(async (req) => {
         ad_account_id: acc.id,
         ad_id: String(row.ad_id),
       })));
-      // `insights` stores the canonical lead contract used by the Dashboard.
-      // Raw action rows remain available below for diagnostics, but rebuilding
-      // KPI totals from every historical action alias can disagree with the
-      // persisted snapshot after Meta revises attribution values.
-      const localLeadSnapshot = localInsights.map((row: any) => ({
+      // Resolve the local side through the same persisted action facts and
+      // destination scopes used by the Dashboard. This repairs the audit when
+      // an older insight row still carries a stale conversation column after
+      // Meta revises attribution for an ad/day.
+      const localLeadSnapshot = canonicalMetaLeads(localInsights.map((row: any) => ({
         ad_id: String(row.ad_id),
         ad_account_id: acc.id,
         date: String(row.date),
-        form_leads: Math.max(0, Number(row.form_leads || 0)),
-        site_leads: Math.max(0, Number(row.site_leads || 0)),
-        conversations: Math.max(0, Number(row.conversations || 0)),
-        leads: Math.max(0, Number(row.form_leads || 0))
-          + Math.max(0, Number(row.site_leads || 0))
-          + Math.max(0, Number(row.conversations || 0)),
-      }));
+        leads: null,
+      })), localActionRows.map((row: any) => ({
+        ad_account_id: acc.id,
+        ad_id: String(row.ad_id),
+        date: String(row.date),
+        action_type: String(row.action_type || ""),
+        value: Number(row.value || 0),
+      })),
+      { [acc.id]: lpConfig?.action_type || undefined },
+      dbSiteScope.scopes,
+      dbSiteScope.conversationScopes,
+      ).map((row: any) => ({ ...row, leads: Number(row.form_leads || 0) + Number(row.site_leads || 0) + Number(row.conversations || 0) }));
       const dbLeads = localLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
       const dbLeadParts = sumLeadParts(localLeadSnapshot);
       const dbLeadsByAdDate = new Map(localLeadSnapshot.map((row: any) => [`${row.ad_id}|${row.date}`, row]));
