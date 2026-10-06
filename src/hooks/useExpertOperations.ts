@@ -84,7 +84,7 @@ export function useExpertOperations(
     // continua filtrando tráfego e vendas, mas não deve esconder turmas
     // futuras ou históricas do calendário.
     return true;
-  }), [classes.data, expertId, expert.data?.nome]);
+  }), [classes.data, expertId]);
   const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, businessDateKey(startDate).slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${businessDateKey(startDate).slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));

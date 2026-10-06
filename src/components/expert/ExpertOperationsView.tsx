@@ -387,10 +387,28 @@ export function ExpertOperationsView() {
         .select("expert_id,ad_account_id,attribution_window,timezone")
         .not("ad_account_id", "is", null);
       if (sourceError) throw sourceError;
+      const { data: classRows, error: classError } = await (supabase as any)
+        .from("event_classes")
+        .select("expert_id,ad_account_id")
+        .not("expert_id", "is", null)
+        .not("ad_account_id", "is", null);
+      if (classError) throw classError;
       const sourcesByExpert = new Map<string, any[]>();
       (sourceRows || []).forEach((source: any) => {
         const key = String(source.expert_id);
         sourcesByExpert.set(key, [...(sourcesByExpert.get(key) || []), source]);
+      });
+      // During rollout, a class with both explicit IDs is a safe fallback for
+      // experts whose operation source row has not been created yet.
+      (classRows || []).forEach((row: any) => {
+        const key = String(row.expert_id);
+        if (sourcesByExpert.has(key)) return;
+        sourcesByExpert.set(key, [{
+          expert_id: row.expert_id,
+          ad_account_id: row.ad_account_id,
+          attribution_window: "account_default",
+          timezone: "America/Sao_Paulo",
+        }]);
       });
       return (expertRows || [])
         .filter((row: any) => sourcesByExpert.has(String(row.id)))
