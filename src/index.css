@@ -8657,3 +8657,39 @@ html:not(.dark) .dashboard-scope-sync {
 @media (prefers-reduced-motion: reduce) {
   .brand-shell[data-dashboard-scene="true"] .space-phase-meteors { display: none; }
 }
+
+/* Final Dashboard canvas rule: no enclosing black or violet slab. The fixed
+   scene supplies the background and widgets remain the only surfaces. */
+.brand-shell[data-dashboard-scene="true"] .space-phase-bg,
+.brand-shell[data-dashboard-scene="true"] .space-phase-nebula,
+.brand-shell[data-dashboard-scene="true"] .dashboard-page::before {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+.brand-shell[data-dashboard-scene="true"] .dashboard-page::before {
+  display: none !important;
+}
+
+.brand-shell[data-dashboard-scene="true"] .space-phase-nebula {
+  opacity: 0 !important;
+}
+
+.brand-shell[data-dashboard-scene="true"] .space-phase-planet {
+  right: clamp(-4rem, 2vw, 3rem) !important;
+  top: clamp(3.5rem, 7vh, 6rem) !important;
+  width: min(92vw, 1450px) !important;
+  opacity: .86 !important;
+  filter: brightness(.9) saturate(1.18) contrast(1.08) !important;
+}
+
+.brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar) {
+  background: rgba(8, 13, 20, .46) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .16), inset 0 1px rgba(255, 255, 255, .08) !important;
+  backdrop-filter: blur(10px) saturate(1.08) !important;
+}
+
+html:not(.dark) .brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar) {
+  background: rgba(255, 255, 255, .54) !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .12), inset 0 1px rgba(255, 255, 255, .78) !important;
+}
