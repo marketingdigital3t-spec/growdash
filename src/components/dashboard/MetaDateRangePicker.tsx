@@ -96,22 +96,21 @@ export function MetaDateRangePicker({
     }
   };
 
-  const handleCalendarSelect = (range: DateRange | undefined) => {
-    if (!range?.from) return;
-
-    // A completed range starts a new draft on the next click. Keeping `to`
-    // empty makes the first selected day visible before the interval ends.
+  const handleCalendarDayClick = (day: Date) => {
+    // Use the actual day click instead of DayPicker's derived range. When an
+    // existing range is controlled through `selected`, DayPicker can return
+    // the old start date for a click inside that range (for example, clicking
+    // 29/09 while 01–30/09 is selected). That made a new selection start on
+    // the old 01/09 and silently produced the wrong scope.
     if (pendingRange.from && pendingRange.to) {
-      setPendingRange({ from: range.from, to: undefined });
-      setCalendarMonth(range.from);
+      setPendingRange({ from: day, to: undefined });
+      setCalendarMonth(day);
       setPendingPreset("custom");
       return;
     }
 
-    // DayPicker can return an inverted range when the second click is before
-    // the first one. Normalize it so every consumer receives from <= to.
-    const from = range.to && range.to < range.from ? range.to : range.from;
-    const to = range.to && range.to < range.from ? range.from : range.to;
+    const from = pendingRange.from && day < pendingRange.from ? day : pendingRange.from || day;
+    const to = pendingRange.from && day < pendingRange.from ? pendingRange.from : day;
     setPendingRange({ from, to });
     setCalendarMonth(from);
     setPendingPreset("custom");
@@ -191,7 +190,7 @@ export function MetaDateRangePicker({
               fromYear={2020}
               toYear={new Date().getFullYear() + 1}
               selected={pendingRange}
-              onSelect={handleCalendarSelect}
+              onDayClick={handleCalendarDayClick}
               locale={ptBR}
               weekStartsOn={1}
               classNames={{ caption_label: "sr-only" }}
