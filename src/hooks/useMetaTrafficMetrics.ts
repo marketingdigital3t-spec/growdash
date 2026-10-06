@@ -115,6 +115,13 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     && scopedAccounts.length === effectiveAccountIds.length
     && !syncCoverage.isError
     && (syncCoverage.data?.insightGaps.length === 0);
+  // A completed watermark is preferred, but an already persisted, scoped
+  // Insights snapshot plus canonical Meta action facts is also sufficient to
+  // render the exact same numbers used by Dashboard and Expert. This covers a
+  // delayed watermark write without falling back to the legacy insights.leads
+  // aggregate or hiding valid data on only one sidebar route.
+  const persistedCanonicalScope = rows.length > 0 && (actions.data?.leadActionFactCount || 0) > 0;
+  const effectiveInsightScopeConfirmed = insightCoverageComplete || persistedCanonicalScope;
   const actionCoverageReason = syncCoverage.isError
     ? (syncCoverage.error instanceof Error ? syncCoverage.error.message : String(syncCoverage.error))
     : syncCoverage.data?.actionGaps.length
@@ -135,9 +142,9 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
       actionsAvailable: !actions.isLoading && !actions.isError && (coverageComplete || (actions.data?.leadActionFactCount || 0) > 0),
       actionsErrorReason: actions.error instanceof Error ? actions.error.message : actions.error ? String(actions.error) : actionCoverageReason,
       breakdowns: breakdowns.data,
-    }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null, scopeConfirmed: insightCoverageComplete, coverageReason });
+    }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null, scopeConfirmed: effectiveInsightScopeConfirmed, coverageReason });
     return isLoading ? { ...base, status: "syncing" as const } : base;
-  }, [actionCoverageReason, actions.data, actions.error, actions.isError, actions.isLoading, attributionWindow, breakdowns.data, coverageComplete, coverageReason, errors, insightCoverageComplete, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
+  }, [actionCoverageReason, actions.data, actions.error, actions.isError, actions.isLoading, attributionWindow, breakdowns.data, coverageComplete, coverageReason, effectiveInsightScopeConfirmed, errors, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
   const metrics = useMemo(() => metaMetricContract(data), [data]);
   return { data, metrics, isLoading, insightsLoading: insights.isPending || accounts.isPending, actionsLoading: actions.isPending || syncCoverage.isPending, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError || syncCoverage.isError), error: insights.error || actions.error || accounts.error || breakdowns.error || syncCoverage.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); await syncCoverage.refetch(); } };
 }
