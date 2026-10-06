@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
         check = await checkInstagramToken(String(integration.api_token), graphVersion);
         if (check.status === "healthy" && baseStatus === "expiring") check.status = "expiring";
       }
-      if (provider === "google_workspace") {
+      if (provider === "google_workspace" && integration.is_active) {
         try {
           const token = await getFreshGoogleToken(admin, integration, "health_check");
           const expiresAt = integration.token_expires_at ? new Date(integration.token_expires_at).getTime() : 0;
