@@ -20,6 +20,14 @@ const dateValue = (value: unknown) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 };
 const hashRow = async (value: unknown) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+const mapped = (raw: Record<string, unknown>, mapping: Record<string, unknown>, field: string, aliases: string[] = []) => {
+  const configured = mapping[field];
+  if (typeof configured === "string" && configured.trim()) return raw[norm(configured)] ?? "";
+  for (const alias of aliases) if (raw[norm(alias)] !== undefined) return raw[norm(alias)];
+  return "";
+};
+const boolValue = (value: unknown) => /^(1|true|sim|yes|ok|assinado|confirmado)$/i.test(String(value ?? "").trim());
+const integerValue = (value: unknown) => { const match = String(value ?? "").match(/\d+/); return match ? Number(match[0]) : null; };
 
 async function freshToken(admin: ReturnType<typeof createClient>, integration: any) {
   const saved = JSON.parse(String(integration.api_token || "{}"));
@@ -56,7 +64,7 @@ Deno.serve(async (req) => {
     const run = await admin.from("expert_sales_sync_runs").insert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, status: "partial" }).select("id").single();
     const runId = run.data?.id;
     await admin.from("expert_sheet_connections").update({ status: "syncing", last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
-    const range = encodeURIComponent(`${connection.worksheet_name}!A:Z`);
+    const range = encodeURIComponent(`${connection.worksheet_name}!A:ZZ`);
     const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(connection.spreadsheet_id)}/values/${range}`, { headers: { Authorization: `Bearer ${token}` } });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload?.error?.message || "Não foi possível ler a planilha Google Sheets.");
@@ -74,28 +82,37 @@ Deno.serve(async (req) => {
       if (!key) continue;
       classByName.set(key, [...(classByName.get(key) || []), item]);
     }
+    const mapping = connection.column_mapping && typeof connection.column_mapping === "object" ? connection.column_mapping : {};
     let upserted = 0;
+    const seenKeys: string[] = [];
     const syncErrors: string[] = [];
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index] as unknown[];
       const raw = Object.fromEntries(headers.map((header, column) => [header || `coluna_${column + 1}`, row[column] ?? ""]));
-      const name = String(raw.nome || raw.aluna || raw.aluno || raw.paciente || "").trim();
+      const name = String(mapped(raw, mapping, "name", ["nome", "aluna", "aluno", "paciente"])).trim();
       if (!name) continue;
-      const rowHash = await hashRow(raw);
-      const sourceClassId = rawClassId(raw);
-      const className = String(raw.turma || raw.nome_da_turma || "").trim() || null;
+      const cpf = String(mapped(raw, mapping, "cpf", ["cpf", "cpf_aluna"])).replace(/\D/g, "") || null;
+      const phone = String(mapped(raw, mapping, "phone", ["telefone", "celular", "whatsapp"])).trim() || null;
+      const saleDate = dateValue(mapped(raw, mapping, "sale_date", ["data_pgto", "data_pagamento", "data_venda", "data"]));
+      const classDate = dateValue(mapped(raw, mapping, "class_date", ["data_turma_presencial", "data_turma"]));
+      const sourceClassId = String(mapped(raw, mapping, "turma_id", ["turma_id", "id_turma", "class_id"]) || input.source_class_id || "").trim() || null;
+      const className = String(mapped(raw, mapping, "class_name", ["turma", "nome_da_turma"])).trim() || null;
       const direct = sourceClassId ? classById.get(sourceClassId) : null;
       const named = className ? classByName.get(norm(className)) || [] : [];
       const matchedClass = direct || (named.length === 1 ? named[0] : null);
       const classMatchStatus = matchedClass ? "matched" : (named.length > 1 ? "ambiguous" : "unmatched");
       if (!matchedClass && (sourceClassId || className)) syncErrors.push(`Linha ${index + 2}: turma ${className || sourceClassId} não foi vinculada (${classMatchStatus}).`);
-      const { error } = await admin.from("expert_sales").upsert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, participant_type: connection.participant_type, source_row_hash: rowHash, source_row_number: index + 2, name, sale_date: dateValue(raw.data_venda || raw.data || raw.data_de_venda), source_class_id: sourceClassId, event_class_id: matchedClass?.id || null, class_name: className, class_match_status: classMatchStatus, gross_amount_cents: cents(raw.valor_bruto || raw.valor || raw.valor_total), cash_received_cents: cents(raw.valor_recebido || raw.caixa_real || raw.valor_pago), status: String(raw.status || "confirmed").trim() || "confirmed", seller_name: String(raw.vendedor || raw.responsavel || "").trim() || null, payment_method: String(raw.forma_pagamento || raw.pagamento || "").trim() || null, utm_campaign: String(raw.utm_campaign || raw.campanha || "").trim() || null, utm_content: String(raw.utm_content || raw.criativo || "").trim() || null, notes: String(raw.observacoes || raw.obs || "").trim() || null, raw_row: raw, source_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "sheet_connection_id,source_row_hash" });
+      const sourceRowKey = cpf || `${norm(name)}|${sourceClassId || norm(className || "")}|${saleDate || ""}`;
+      const rowHash = await hashRow(raw);
+      seenKeys.push(sourceRowKey);
+      const { error } = await admin.from("expert_sales").upsert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, participant_type: connection.source_type === "sales" ? "student" : connection.participant_type, source_row_hash: rowHash, source_row_key: sourceRowKey, source_row_number: index + 2, name, cpf, phone, sale_date: saleDate, paid_at: saleDate, class_date: classDate, source_class_id: sourceClassId, event_class_id: matchedClass?.id || null, class_name: className, class_match_status: classMatchStatus, gross_amount_cents: cents(mapped(raw, mapping, "gross_amount", ["valor_bruto", "valor_da_venda", "valor", "valor_total"])), cash_received_cents: cents(mapped(raw, mapping, "cash_received", ["valor_recebido", "caixa_real_entrada", "caixa_real", "valor_pago", "pago"])), future_revenue_cents: cents(mapped(raw, mapping, "future_revenue", ["faturamento_futuro", "faturamento_futuro_e_estorno"])), installment_number: integerValue(mapped(raw, mapping, "installment_number", ["parcela", "parcelas"])), installment_condition: String(mapped(raw, mapping, "installment_condition", ["condicao", "condição"])).trim() || null, reconciliation_status: String(mapped(raw, mapping, "reconciliation_status", ["conciliacao_financeira", "conciliação_financeira"])).trim() || null, product: String(mapped(raw, mapping, "product", ["produto"])).trim() || null, contract_signed: boolValue(mapped(raw, mapping, "contract_signed", ["contrato_assinado"])), status: String(mapped(raw, mapping, "status", ["status"] ) || "confirmed").trim() || "confirmed", seller_name: String(mapped(raw, mapping, "seller_name", ["vendedor", "responsavel"])).trim() || null, payment_method: String(mapped(raw, mapping, "payment_method", ["forma_pagamento", "pagamento", "cartao_pix_boleto"])).trim() || null, utm_campaign: String(mapped(raw, mapping, "utm_campaign", ["utm_campaign", "campanha"])).trim() || null, utm_content: String(mapped(raw, mapping, "utm_content", ["utm_content", "criativo"])).trim() || null, notes: String(mapped(raw, mapping, "notes", ["observacoes", "obs"])).trim() || null, source_active: true, last_seen_at: new Date().toISOString(), raw_row: raw, source_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "sheet_connection_id,source_row_key" });
       if (error) throw error;
       upserted += 1;
     }
+    if (seenKeys.length) await admin.from("expert_sales").update({ source_active: false }).eq("sheet_connection_id", connection.id).not("source_row_key", "in", `(${seenKeys.map((key) => `"${key.replaceAll('"', '""')}"`).join(",")})`);
     const finished = new Date().toISOString();
     const finalStatus = syncErrors.length ? "partial" : "success";
-    await admin.from("expert_sheet_connections").update({ status: "fresh", last_sync_at: finished, last_valid_snapshot_at: finished, last_error: syncErrors.length ? syncErrors.slice(0, 20).join(" ") : null, updated_at: finished }).eq("id", connection.id);
+    await admin.from("expert_sheet_connections").update({ status: "fresh", last_sync_at: finished, last_valid_snapshot_at: finished, last_error: syncErrors.length ? syncErrors.slice(0, 20).join(" ") : null, last_header_signature: await hashRow(headers), updated_at: finished }).eq("id", connection.id);
     await admin.from("expert_sales_sync_runs").update({ status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, finished_at: finished }).eq("id", runId);
     return json({ success: true, status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, synced_at: finished });
   } catch (error) {

@@ -11,7 +11,7 @@ const norm = normalizeClassName;
 export type ExpertOperationSale = {
   id: string; expert_id: string; event_class_id: string | null; participant_type: "student" | "model_patient";
   name: string; sale_date: string | null; class_name: string | null; gross_amount_cents: number; cash_received_cents: number;
-  status: string; source_class_id: string | null; class_match_status: "matched" | "unmatched" | "ambiguous"; seller_name: string | null; payment_method: string | null; utm_campaign: string | null; utm_content: string | null;
+  status: string; source_class_id: string | null; class_match_status: "matched" | "unmatched" | "ambiguous"; seller_name: string | null; payment_method: string | null; utm_campaign: string | null; utm_content: string | null; cpf?: string | null; phone?: string | null; future_revenue_cents?: number; installment_number?: number | null; installment_condition?: string | null; reconciliation_status?: string | null; product?: string | null; class_date?: string | null; contract_signed?: boolean | null;
 };
 export type ExpertOperationSource = { expert_id: string; ad_account_id: string | null; attribution_window: string; timezone: string };
 export type ExpertOperationsData = {
@@ -38,7 +38,7 @@ export function useExpertOperations(expertId: string | undefined) {
   const sales = useQuery({
     queryKey: ["expert-sales", expertId, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId),
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("expert_sales").select("id,expert_id,event_class_id,participant_type,name,sale_date,class_name,source_class_id,class_match_status,gross_amount_cents,cash_received_cents,status,seller_name,payment_method,utm_campaign,utm_content").eq("expert_id", expertId!).gte("sale_date", businessDateKey(startDate)).lte("sale_date", businessDateKey(endDate)).order("sale_date", { ascending: true });
+      const { data, error } = await (supabase as any).from("expert_sales").select("id,expert_id,event_class_id,participant_type,name,sale_date,class_name,source_class_id,class_match_status,gross_amount_cents,cash_received_cents,future_revenue_cents,installment_number,installment_condition,reconciliation_status,product,class_date,contract_signed,cpf,phone,status,seller_name,payment_method,utm_campaign,utm_content,source_active").eq("expert_id", expertId!).eq("source_active", true).gte("sale_date", businessDateKey(startDate)).lte("sale_date", businessDateKey(endDate)).order("sale_date", { ascending: true });
       if (error) throw error;
       return ((data || []) as ExpertOperationSale[]).filter((row) => isPaidOperationStatus(row.status));
     },

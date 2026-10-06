@@ -10,6 +10,8 @@ import {
   Link2,
   Plus,
   RefreshCw,
+  RotateCcw,
+  Trash2,
   Trophy,
   Users,
   WalletCards,
@@ -18,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useExpertOperations } from "@/hooks/useExpertOperations";
+import { useArchiveEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +44,12 @@ const brl = (cents: number | null | undefined) =>
     : (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateLabel = (value: string | null | undefined) =>
   value ? new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR") : "—";
+const todayKey = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+const classBucket = (eventClass: any): "open" | "upcoming" | "past" => {
+  if (eventClass.archived_at || eventClass.status === "finished" || String(eventClass.date_end || eventClass.date_start) < todayKey()) return "past";
+  if (eventClass.status === "open") return "open";
+  return "upcoming";
+};
 
 function ParticipantRows({
   rows,
@@ -104,6 +113,8 @@ function ClassCard({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [membersType, setMembersType] = useState<"student" | "model_patient">("student");
   const [membersOpen, setMembersOpen] = useState(false);
+  const archive = useArchiveEventClass();
+  const restore = useRestoreEventClass();
   const openMembers = (type: "student" | "model_patient") => {
     setMembersType(type);
     setMembersOpen(true);
@@ -182,6 +193,16 @@ function ClassCard({
           : eventClass.status === "upcoming"
             ? "Em breve"
             : "Aberta";
+  const archived = Boolean(eventClass.archived_at);
+  const handleArchive = async () => {
+    if (!window.confirm(`Arquivar a turma "${eventClass.title}"? Ela ficará em Turmas passadas e os dados financeiros serão preservados.`)) return;
+    await archive.mutateAsync({ id: eventClass.id, reason: "Arquivada pela Agenda & Turmas." });
+    onRefresh();
+  };
+  const handleRestore = async () => {
+    await restore.mutateAsync({ id: eventClass.id });
+    onRefresh();
+  };
   return (
     <>
       <Card className="flex h-full w-full flex-col overflow-hidden border-border/80 bg-card/95 shadow-lg">
@@ -191,14 +212,14 @@ function ClassCard({
               <Badge
                 className="text-[10px]"
                 variant={
-                  eventClass.status === "cancelled"
+                  archived || eventClass.status === "cancelled"
                     ? "destructive"
                     : eventClass.status === "sold_out"
                       ? "secondary"
                       : "default"
                 }
               >
-                {statusLabel}
+                {archived ? "Arquivada" : statusLabel}
               </Badge>
               <CardTitle className="mt-1.5 whitespace-normal break-words text-sm leading-tight">
                 {eventClass.title}
@@ -229,6 +250,16 @@ function ClassCard({
                   onClick={() => setSheetOpen(true)}
                 >
                   <Link2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  className="h-7 w-7 shrink-0 rounded-full"
+                  size="icon"
+                  variant="ghost"
+                  aria-label={archived ? "Restaurar turma" : "Arquivar turma"}
+                  disabled={archive.isPending || restore.isPending}
+                  onClick={() => void (archived ? handleRestore() : handleArchive())}
+                >
+                  {archived ? <RotateCcw className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
                 </Button>
               </div>
               <div className="w-full text-right text-[10px] leading-none text-muted-foreground">
@@ -353,6 +384,7 @@ export function ExpertOperationsView() {
   });
   const [expertId, setExpertId] = useState("");
   const [createClassOpen, setCreateClassOpen] = useState(false);
+  const [classTab, setClassTab] = useState<"open" | "upcoming" | "past">("open");
   const selectedExpertId = expertId || experts.data?.[0]?.id;
   const selectedExpertName =
     (experts.data || []).find((expert: any) => expert.id === selectedExpertId)?.nome || "";
@@ -373,10 +405,8 @@ export function ExpertOperationsView() {
     if (!expertId && expertOptions[0]?.id) setExpertId(expertOptions[0].id);
   }, [expertId, expertOptions]);
   const [slide, setSlide] = useState(0);
-  const visibleClasses = useMemo(
-    () => operations.classes.slice(slide, slide + 4),
-    [operations.classes, slide],
-  );
+  const tabClasses = useMemo(() => operations.classes.filter((eventClass: any) => classBucket(eventClass) === classTab), [classTab, operations.classes]);
+  const visibleClasses = useMemo(() => tabClasses.slice(slide, slide + 4), [slide, tabClasses]);
   const gross = operations.sales.reduce((sum, row) => sum + Number(row.gross_amount_cents || 0), 0);
   const cash = operations.sales.reduce((sum, row) => sum + Number(row.cash_received_cents || 0), 0);
   const conversion = operations.traffic.totalLeads
@@ -397,6 +427,7 @@ export function ExpertOperationsView() {
       .slice(-14);
   }, [operations.sales]);
   const maxRevenue = Math.max(...dailyRevenue.map(([, value]) => value), 1);
+  useEffect(() => setSlide(0), [classTab]);
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/[.04] px-3 py-2.5 lg:flex-row lg:items-center lg:gap-3">
@@ -444,7 +475,7 @@ export function ExpertOperationsView() {
         </div>
       </div>
       <section className="space-y-2">
-        <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[.16em] text-muted-foreground">
               Turmas em operação
@@ -454,7 +485,8 @@ export function ExpertOperationsView() {
               Arraste para o lado para ver todas as turmas.
             </p>
           </div>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
+            {([['open', 'Abertas'], ['upcoming', 'Próximas'], ['past', 'Passadas']] as const).map(([value, label]) => <Button key={value} size="sm" variant={classTab === value ? "default" : "outline"} className="h-7 px-2 text-[10px]" onClick={() => setClassTab(value)}>{label} ({operations.classes.filter((item: any) => classBucket(item) === value).length})</Button>)}
             <Button
               className="h-7 w-7"
               size="icon"
@@ -470,9 +502,9 @@ export function ExpertOperationsView() {
               size="icon"
               variant="outline"
               aria-label="Próximas turmas"
-              disabled={slide + 4 >= operations.classes.length}
+              disabled={slide + 4 >= tabClasses.length}
               onClick={() =>
-                setSlide((value) => Math.min(Math.max(operations.classes.length - 4, 0), value + 1))
+                setSlide((value) => Math.min(Math.max(tabClasses.length - 4, 0), value + 1))
               }
             >
               <ArrowRight className="h-3.5 w-3.5" />
@@ -506,7 +538,7 @@ export function ExpertOperationsView() {
             <Card className="w-full border-dashed">
               <CardContent className="flex items-center gap-3 p-8 text-sm text-muted-foreground">
                 <CircleAlert className="h-5 w-5" />
-                Nenhuma turma encontrada para este expert.
+                Nenhuma turma encontrada nesta aba.
               </CardContent>
             </Card>
           )}

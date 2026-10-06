@@ -10,6 +10,7 @@ export interface EventClass {
   max_students: number; max_people: number; max_model_patients: number; status: EventClassStatus; notes: string | null; created_at: string; updated_at: string;
   ad_account_id?: string | null; rd_funnel_id?: string | null; rd_model_patient_funnel_id?: string | null; has_model_patients?: boolean;
   allowed_student_stage_ids?: string[]; allowed_model_patient_stage_ids?: string[];
+  archived_at?: string | null; archived_by?: string | null; archive_reason?: string | null;
 }
 
 export interface EventClassParticipant {
@@ -47,6 +48,47 @@ export function useEventClasses() {
 export function useCreateEventClass() { const qc = useQueryClient(); const { user } = useAuth(); return useMutation({ mutationFn: async (input: ClassInput) => { const { data, error } = await supabase.from("event_classes").insert({ ...input, user_id: user!.id }).select().single(); if (error) throw error; return data as unknown as EventClass; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
 export function useUpdateEventClass() { const qc = useQueryClient(); return useMutation({ mutationFn: async ({ id, ...input }: Partial<ClassInput> & { id: string }) => { const { data, error } = await supabase.from("event_classes").update(input).eq("id", id).select().single(); if (error) throw error; return data as unknown as EventClass; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
 export function useDeleteEventClass() { const qc = useQueryClient(); return useMutation({ mutationFn: async (id: string) => { const { error } = await supabase.from("event_classes").delete().eq("id", id); if (error) throw error; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
+
+export function useArchiveEventClass() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string | null }) => {
+      const { data, error } = await (supabase as any)
+        .from("event_classes")
+        .update({ archived_at: new Date().toISOString(), archived_by: user?.id ?? null, archive_reason: reason?.trim() || null })
+        .eq("id", id)
+        .select("id,title,status,archived_at")
+        .single();
+      if (error) throw error;
+      const { error: historyError } = await (supabase as any).from("event_class_history").insert({
+        event_class_id: id,
+        actor_id: user?.id ?? null,
+        action: "archived",
+        description: reason?.trim() || "Turma arquivada na Agenda & Turmas.",
+        metadata: { archived_at: data.archived_at },
+      });
+      if (historyError) throw historyError;
+      return data as EventClass;
+    },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["event_classes"] }); void qc.invalidateQueries({ queryKey: ["expert-operation-classes"] }); },
+  });
+}
+
+export function useRestoreEventClass() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data, error } = await (supabase as any).from("event_classes").update({ archived_at: null, archived_by: null, archive_reason: null }).eq("id", id).select("id,title,status").single();
+      if (error) throw error;
+      const { error: historyError } = await (supabase as any).from("event_class_history").insert({ event_class_id: id, actor_id: user?.id ?? null, action: "restored", description: "Turma restaurada na Agenda & Turmas.", metadata: { status: data.status } });
+      if (historyError) throw historyError;
+      return data as EventClass;
+    },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["event_classes"] }); void qc.invalidateQueries({ queryKey: ["expert-operation-classes"] }); },
+  });
+}
 
 export function useEventClassParticipants(eventClassId: string | null, type: MemberType) { return useQuery({ queryKey: ["event_class_participants", eventClassId, type], enabled: !!eventClassId, queryFn: async () => { const { data, error } = await supabase.from("event_class_participants").select("*").eq("event_class_id", eventClassId!).eq("participant_type", type).order("created_at", { ascending: true }); if (error) throw error; return (data || []) as unknown as EventClassParticipant[]; } }); }
 export function useCreateEventClassParticipant() { const qc = useQueryClient(); return useMutation({ mutationFn: async (input: { event_class_id: string; participant_type: MemberType; name: string; investment_cents: number; notes?: string | null }) => { const name = input.name.trim(); if (!name) throw new Error("Informe o nome do participante."); const { data, error } = await supabase.from("event_class_participants").insert({ ...input, name }).select().single(); if (error) throw error; return data as unknown as EventClassParticipant; }, onSuccess: (_, vars) => { qc.invalidateQueries({ queryKey: ["event_classes"] }); qc.invalidateQueries({ queryKey: ["event_class_participants", vars.event_class_id] }); } }); }
