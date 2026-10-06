@@ -8759,3 +8759,62 @@ html:not(.dark) .brand-shell[data-funnel-scene="true"] .gd-funnel-analysis {
   background-color: #ffffff !important;
   color: #171717 !important;
 }
+
+/* O shell autenticado usa um canvas de conteúdo sólido. A cena espacial fica
+   desativada em todas as rotas para não cobrir ou competir com os módulos. */
+.brand-shell {
+  background: transparent !important;
+  background-image: none !important;
+}
+.dark .brand-shell,
+html:not(.dark) .brand-shell,
+.dark .brand-shell[data-space-phase],
+html:not(.dark) .brand-shell[data-space-phase] {
+  background: transparent !important;
+  background-image: none !important;
+}
+.brand-shell .space-phase-bg {
+  display: none !important;
+}
+.brand-shell .growdash-content-shell,
+.brand-shell .growdash-main,
+.brand-shell .growdash-content-frame,
+.brand-shell .growdash-content-frame > .gd-page-transition,
+.brand-shell .growdash-content-frame > .gd-page-transition > * {
+  background-image: none !important;
+}
+.dark .brand-shell .growdash-content-shell,
+.dark .brand-shell .growdash-main,
+.dark .brand-shell .growdash-content-shell > .growdash-main,
+.dark .brand-shell .growdash-content-frame,
+.dark .brand-shell .growdash-content-shell .growdash-content-frame,
+.dark .brand-shell .growdash-content-frame > .gd-page-transition,
+.dark .brand-shell .growdash-content-frame > .gd-page-transition > * {
+  background-color: #000000 !important;
+}
+html:not(.dark) .brand-shell .growdash-content-shell,
+html:not(.dark) .brand-shell .growdash-main,
+html:not(.dark) .brand-shell .growdash-content-shell > .growdash-main,
+html:not(.dark) .brand-shell .growdash-content-frame,
+html:not(.dark) .brand-shell .growdash-content-shell .growdash-content-frame,
+html:not(.dark) .brand-shell .growdash-content-frame > .gd-page-transition,
+html:not(.dark) .brand-shell .growdash-content-frame > .gd-page-transition > * {
+  background-color: #ffffff !important;
+}
+html.dark body .brand-shell .growdash-main,
+html.dark body .brand-shell .growdash-content-shell > .growdash-main,
+html.dark body .brand-shell .growdash-content-frame {
+  background-color: #000000 !important;
+}
+html:not(.dark) body .brand-shell .growdash-main,
+html:not(.dark) body .brand-shell .growdash-content-shell > .growdash-main,
+html:not(.dark) body .brand-shell .growdash-content-frame {
+  background-color: #ffffff !important;
+}
+.gd-scope-refresh-status {
+  color: #fbbf24;
+  white-space: nowrap;
+}
+html:not(.dark) .gd-scope-refresh-status {
+  color: #92400e;
+}

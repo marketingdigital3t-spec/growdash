@@ -368,7 +368,6 @@ const Index = () => {
 
       <div className="mx-3">
         <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
-        {(dashboardMeta.isLoading || syncMeta.isPending) && <div className="dashboard-scope-sync" role="status" aria-live="polite"><span className="dashboard-scope-sync-dot" />Atualizando conta e período selecionados…</div>}
       </div>
 
       <div className="mx-3">

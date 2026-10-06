@@ -29,9 +29,9 @@ export function GlobalScopeToolbar({ syncing = false }: { syncing?: boolean }) {
         className="min-h-9 sm:h-9"
       />
       {syncing && (
-        <span role="status" aria-live="polite" className="order-last inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold text-amber-400 sm:order-none">
+        <span role="status" aria-live="polite" className="gd-scope-refresh-status order-last inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold sm:order-none">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" aria-hidden="true" />
-          Sincronizando
+          Atualizando conta/período
         </span>
       )}
       <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">
