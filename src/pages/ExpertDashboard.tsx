@@ -84,8 +84,12 @@ export default function ExpertDashboard() {
     () => Object.fromEntries(permittedInsights.map((insight) => [insight.ad_id, insight.ad_account_id])),
     [permittedInsights],
   );
+  const actionAdIds = useMemo(
+    () => Array.from(new Set(permittedInsights.map((insight) => insight.ad_id).filter(Boolean))),
+    [permittedInsights],
+  );
   const { data: actionData } = useActionTotalsByAds(
-    undefined,
+    actionAdIds,
     startDate,
     endDate,
     actionAccountMap,
