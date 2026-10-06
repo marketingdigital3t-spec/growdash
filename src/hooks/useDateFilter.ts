@@ -9,6 +9,7 @@ import {
   subWeeks,
 } from "date-fns";
 import { businessDateKey } from "@/lib/businessDate";
+import { META_MAX_LOOKBACK_MONTHS } from "@/lib/metaSyncRange";
 
 export { businessDateKey } from "@/lib/businessDate";
 
@@ -102,11 +103,11 @@ export function resolvePreset(preset: DatePreset, customRange: { from: Date; to:
       return { startDate: startOfMonth(lastMonth), endDate: endOfMonth(lastMonth) };
     }
     case "max":
-      // “Máximo” is the complete operational history, not a rolling year.
-      // The actual lower bound is additionally constrained by the oldest
-      // record available in each provider, but the UI must never discard
-      // older RD/Meta data on its own.
-      return { startDate: new Date(2000, 0, 1), endDate: endToday };
+      // Meta Graph API accepts a finite lookback. The previous 2000 lower
+      // bound made RD return a larger history than Meta, so every KPI used a
+      // different interval. One shared bound keeps Meta, RD, MCP and RAG on
+      // the same inclusive calendar scope for every connected account.
+      return { startDate: subMonths(today, META_MAX_LOOKBACK_MONTHS), endDate: endToday };
     case "custom":
       return { startDate: businessBoundary(safeRange.from), endDate: businessBoundary(safeRange.to, true) };
     default:

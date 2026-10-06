@@ -3,9 +3,10 @@ import { normalizeCustomDateRange, resolvePreset } from "./useDateFilter";
 import { businessDateKey } from "@/lib/businessDate";
 
 describe("date filter maximum history", () => {
-  it("does not turn the maximum preset into a rolling one-year window", () => {
-    const range = resolvePreset("max", { from: new Date(2026, 0, 1), to: new Date(2026, 7, 13) });
-    expect(range.startDate).toEqual(new Date(2000, 0, 1));
+  it("uses the same Graph API lookback for the maximum preset", () => {
+    const now = new Date("2026-10-05T12:00:00-03:00");
+    const range = resolvePreset("max", { from: now, to: now }, now);
+    expect(range.startDate).toEqual(new Date("2023-10-05T00:00:00-03:00"));
   });
 
   it("advances the Hoje preset when São Paulo crosses midnight even if the browser is on UTC", () => {

@@ -1384,7 +1384,12 @@ Deno.serve(async (req) => {
             const id = String(item?.id || item?._id || "");
             const profile = existingProfiles.get(id);
             const complete = Boolean(profile?.raw) && Boolean(profile.contact_name || profile.contact_email || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
-            return complete ? { ...item, _storedProfile: profile } : processDeal(item);
+            // A maximum reconciliation must refresh the authoritative RD
+            // amount for won deals even when the local contact snapshot is
+            // already complete. Otherwise revenue stays stuck on an old or
+            // abbreviated list response.
+            const won = isWonDeal(item) || item?.win === true;
+            return complete && !(refresh_amounts && won) ? { ...item, _storedProfile: profile } : processDeal(item);
           }));
           hydratedItems.push(...resolved);
           if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);

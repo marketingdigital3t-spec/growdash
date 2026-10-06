@@ -502,11 +502,18 @@ export default function FunnelAnalysis() {
               // a Edge Function varrer o arquivo inteiro e misturar negócios
               // fora do escopo atual nos KPIs.
               full_history: false,
+              // The RD amount selected in the CRM is the source for
+              // faturamento. On the maximum reconciliation, hydrate won
+              // deals from the authoritative detail endpoint so an older
+              // abbreviated list value cannot remain in the KPI.
+              refresh_amounts: preset === "max",
               start_date: businessDateKey(startDate),
               end_date: businessDateKey(endDate),
               // Manual refresh follows the same bounded recent-sync budget;
               // complete history is handled by the dedicated backfill path.
-              max_pages: 10,
+              // The maximum calendar must mirror every page available in RD;
+              // the normal recent-range refresh remains bounded for speed.
+              ...(preset === "max" ? {} : { max_pages: 10 }),
             },
           });
           if (error) {
