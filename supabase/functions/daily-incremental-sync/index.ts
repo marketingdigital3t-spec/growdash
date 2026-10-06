@@ -311,12 +311,17 @@ Deno.serve(async (req) => {
     // limits, and repeatedly timed out before later accounts got their leads.
     const { data: allConnectedMetaAccounts, error: metaAccountsError } = await admin
       .from("ad_accounts")
-      .select("id,timezone_name,attribution_window,connection_status,last_sync_attempt_at,last_sync_success_at")
-      .eq("connection_status", "connected");
+      .select("id,timezone_name,attribution_window,connection_status,oauth_health_status,last_sync_error_code,last_sync_attempt_at,last_sync_success_at")
+      .in("connection_status", ["connected", "error", "unknown"]);
     if (metaAccountsError) throw metaAccountsError;
+    const recoverableMetaAccounts = (allConnectedMetaAccounts || []).filter((account: any) =>
+      account.connection_status === "connected"
+      || (["healthy", "expiring"].includes(String(account.oauth_health_status || ""))
+        && ![10, 100, 190, 200].includes(Number(account.last_sync_error_code))),
+    );
 
     const metaAccountBatch = selectMetaAccountSyncBatch(
-      (allConnectedMetaAccounts || []) as any[],
+      recoverableMetaAccounts as any[],
       META_ACCOUNT_BATCH_SIZE,
     );
     const metaAccounts = metaAccountBatch.selected;
@@ -396,7 +401,7 @@ Deno.serve(async (req) => {
     const metaInsights = aggregateMetaResults(metaAccountResults, "insights");
     const metaLeads = aggregateMetaResults(metaAccountResults, "leads");
     const metaHourly = aggregateMetaResults(metaAccountResults, "hourly");
-    const connectedAccountsTotal = allConnectedMetaAccounts?.length || 0;
+    const connectedAccountsTotal = recoverableMetaAccounts.length;
     const metaInsightsWithCoverage = markDeferredMetaAccountCoverage(metaInsights, connectedAccountsTotal, metaAccounts.length, metaAccountBatch.deferred.length);
     const metaLeadsWithCoverage = markDeferredMetaAccountCoverage(metaLeads, connectedAccountsTotal, metaAccounts.length, metaAccountBatch.deferred.length);
     const metaHourlyWithCoverage = markDeferredMetaAccountCoverage(metaHourly, connectedAccountsTotal, metaAccounts.length, metaAccountBatch.deferred.length);

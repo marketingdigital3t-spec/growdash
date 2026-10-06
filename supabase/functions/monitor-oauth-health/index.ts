@@ -149,6 +149,13 @@ Deno.serve(async (req) => {
         && account.connection_status === "blocked"
         && Number(account.last_sync_error_code) === 200
         && account.last_sync_error === "Permissões Meta insuficientes para leitura de anúncios/leads";
+      // A transient Graph failure (for example code 1) must not permanently
+      // remove an otherwise valid account from the automatic sync worker.
+      // Token health is checked independently above; only hard authorization
+      // codes remain blocked until the user reconnects the account.
+      const recoverTransientSyncError = ["healthy", "expiring"].includes(check.status)
+        && ["error", "unknown"].includes(String(account.connection_status || ""))
+        && ![10, 100, 190, 200].includes(Number(account.last_sync_error_code));
       // Health checks may refresh diagnostic columns for every account, but a
       // manual disconnect is authoritative and must never be changed to
       // `blocked` by an automated permission check.
@@ -164,7 +171,7 @@ Deno.serve(async (req) => {
           : (typeof check.details.issued_at === "string" ? check.details.issued_at : account.token_issued_at),
         token_refreshed_at: checkedAt,
         token_refresh_source: "health_check",
-        ...(recoverPermissionBlock
+        ...(recoverPermissionBlock || recoverTransientSyncError
           ? { connection_status: "connected", last_sync_error: null, last_sync_error_code: null }
           : {}),
       };
@@ -195,7 +202,7 @@ Deno.serve(async (req) => {
         status: check.status,
         missing_permissions: check.details.missing_permissions ?? [],
         optional_missing_permissions: check.details.optional_missing_permissions ?? [],
-        ...(recoverPermissionBlock ? { connection_restored: true } : {}),
+        ...(recoverPermissionBlock || recoverTransientSyncError ? { connection_restored: true } : {}),
       });
     }
 
