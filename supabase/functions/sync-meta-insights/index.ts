@@ -373,7 +373,7 @@ Deno.serve(async (req) => {
           console.log(`Found ${adsetsList.length} adsets`);
           const ids = adsetsList.map((a: any) => a.id);
           const { data: prev } = await supabaseAdmin
-            .from("adsets").select("id, status, last_activated_at, campaign_id").in("id", ids);
+            .from("adsets").select("id, status, last_activated_at, campaign_id, destination_type, optimization_goal").in("id", ids);
           const prevMap = new Map((prev || []).map((a: any) => [a.id, a]));
           const changes: any[] = [];
           const rows = adsetsList.map((a: any) => {
@@ -391,8 +391,12 @@ Deno.serve(async (req) => {
               id: a.id, name: a.name, campaign_id: a.campaign_id,
               daily_budget: a.daily_budget ? Number(a.daily_budget) / 100 : null,
               status: newStatus, previous_status: prevStatus, last_activated_at,
-              destination_type: a.destination_type ?? null,
-              optimization_goal: a.optimization_goal ?? null,
+              // Meta can omit destination_type/optimization_goal for archived
+              // sets. Preserve the last confirmed catalog value so a partial
+              // catalog response cannot make canonical lead classification
+              // incomplete and leave stale lead totals in place.
+              destination_type: a.destination_type ?? p?.destination_type ?? null,
+              optimization_goal: a.optimization_goal ?? p?.optimization_goal ?? null,
             };
           });
           try {
