@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
       const pageSize = 1_000;
       for (let page = 0; ; page++) {
         const { data: rows, error: insightsError } = await admin.from("insights")
-          .select("ad_id,date,campaign_id,attribution_window,spend,impressions,clicks")
+          .select("ad_id,date,campaign_id,attribution_window,spend,impressions,clicks,form_leads,site_leads,conversations")
           .eq("ad_account_id", acc.id)
           .gte("date", startDate)
           .lte("date", endDate)
@@ -215,13 +215,21 @@ Deno.serve(async (req) => {
         ad_account_id: acc.id,
         ad_id: String(row.ad_id),
       })));
-      const localLeadSnapshot = canonicalMetaLeads(
-        localInsights.map((row) => ({ ad_id: String(row.ad_id), ad_account_id: acc.id, date: String(row.date), leads: null })),
-        localActionRows.map((row) => ({ ad_account_id: acc.id, ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type || ""), value: Number(row.value || 0) })),
-        { [acc.id]: lpConfig?.action_type || undefined },
-        dbSiteScope.scopes,
-        dbSiteScope.conversationScopes,
-      );
+      // `insights` stores the canonical lead contract used by the Dashboard.
+      // Raw action rows remain available below for diagnostics, but rebuilding
+      // KPI totals from every historical action alias can disagree with the
+      // persisted snapshot after Meta revises attribution values.
+      const localLeadSnapshot = localInsights.map((row: any) => ({
+        ad_id: String(row.ad_id),
+        ad_account_id: acc.id,
+        date: String(row.date),
+        form_leads: Math.max(0, Number(row.form_leads || 0)),
+        site_leads: Math.max(0, Number(row.site_leads || 0)),
+        conversations: Math.max(0, Number(row.conversations || 0)),
+        leads: Math.max(0, Number(row.form_leads || 0))
+          + Math.max(0, Number(row.site_leads || 0))
+          + Math.max(0, Number(row.conversations || 0)),
+      }));
       const dbLeads = localLeadSnapshot.reduce((sum, row) => sum + Number(row.leads || 0), 0);
       const dbLeadParts = sumLeadParts(localLeadSnapshot);
       const dbLeadsByAdDate = new Map(localLeadSnapshot.map((row: any) => [`${row.ad_id}|${row.date}`, row]));
