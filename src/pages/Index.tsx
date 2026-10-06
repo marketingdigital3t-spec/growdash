@@ -129,6 +129,15 @@ const Index = () => {
   const { data: eventClasses = [] } = useEventClasses();
   const syncMeta = useSyncMeta();
 
+  const dashboardScopeKey = useMemo(() => {
+    const windows = visibleAccounts
+      .filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id))
+      .map((account) => `${account.id}:${account.attribution_window || "account_default"}`)
+      .sort()
+      .join(",");
+    return `${(selectedAccountIds.length ? selectedAccountIds : scopedAccountIds).slice().sort().join(",")}|${businessDateKey(startDate)}|${businessDateKey(endDate)}|${windows}`;
+  }, [endDate, scopedAccountIds, selectedAccountIds, startDate, visibleAccounts]);
+
   const { data: activeView } = useGlobalView();
   const { canEdit: canEditWorkspace } = usePermissions();
   const saveView = useSaveView();
@@ -234,12 +243,13 @@ const Index = () => {
   // dashboard never settles permanently on a misleading all-zero snapshot.
   const autoSyncKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (loadingAdAccounts || isLoading || syncMeta.isPending || allInsights.length > 0 || selectedAccountIds.length === 0) return;
-    const key = `${selectedAccountIds.slice().sort().join(",")}|${businessDateKey(startDate)}|${businessDateKey(endDate)}`;
-    if (autoSyncKeyRef.current === key) return;
-    autoSyncKeyRef.current = key;
-    handleSync();
-  }, [allInsights.length, endDate, handleSync, isLoading, loadingAdAccounts, selectedAccountIds, startDate, syncMeta.isPending]);
+    if (loadingAdAccounts || isLoading || dashboardMeta.isLoading || syncMeta.isPending || scopedAccountIds.length === 0) return;
+    const scopeNeedsSync = !dashboardMeta.data.available || dashboardMeta.data.status === "stale" || dashboardMeta.data.status === "partial";
+    if (!scopeNeedsSync || autoSyncKeyRef.current === dashboardScopeKey) return;
+    autoSyncKeyRef.current = dashboardScopeKey;
+    const timer = window.setTimeout(() => handleSync(), 180);
+    return () => window.clearTimeout(timer);
+  }, [dashboardMeta.data.available, dashboardMeta.data.status, dashboardMeta.isLoading, dashboardScopeKey, handleSync, isLoading, loadingAdAccounts, scopedAccountIds.length, syncMeta.isPending]);
 
   const cloneView = useCallback((view: DashboardView): DashboardView => ({
     ...view,
@@ -357,11 +367,12 @@ const Index = () => {
       </MotionItem>
 
       <div className="mx-3">
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} unavailableReason={dashboardMeta.data.unavailableReason} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
+        {(dashboardMeta.isLoading || syncMeta.isPending) && <div className="dashboard-scope-sync" role="status" aria-live="polite"><span className="dashboard-scope-sync-dot" />Atualizando conta e período selecionados…</div>}
       </div>
 
       <div className="mx-3">
-        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} unavailableReason={dashboardMeta.data.unavailableReason} />
+        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
       </div>
 
       <div className="mx-3">
