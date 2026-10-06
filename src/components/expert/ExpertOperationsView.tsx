@@ -389,8 +389,7 @@ export function ExpertOperationsView() {
       if (sourceError) throw sourceError;
       const { data: classRows, error: classError } = await (supabase as any)
         .from("event_classes")
-        .select("expert_id,ad_account_id")
-        .not("expert_id", "is", null)
+        .select("expert_id,expert_name,ad_account_id")
         .not("ad_account_id", "is", null);
       if (classError) throw classError;
       const sourcesByExpert = new Map<string, any[]>();
@@ -398,13 +397,19 @@ export function ExpertOperationsView() {
         const key = String(source.expert_id);
         sourcesByExpert.set(key, [...(sourcesByExpert.get(key) || []), source]);
       });
-      // During rollout, a class with both explicit IDs is a safe fallback for
-      // experts whose operation source row has not been created yet.
+      // During rollout, a class with an explicit ad account is a safe fallback
+      // when its operation source row has not been created yet. Legacy classes
+      // may carry expert_name instead of expert_id; the account still gates it.
       (classRows || []).forEach((row: any) => {
-        const key = String(row.expert_id);
+        const normalizedName = String(row.expert_name || "").trim().toLocaleLowerCase();
+        const matchedExpert = row.expert_id
+          ? (expertRows || []).find((expert: any) => String(expert.id) === String(row.expert_id))
+          : (expertRows || []).find((expert: any) => String(expert.nome || "").trim().toLocaleLowerCase() === normalizedName);
+        if (!matchedExpert) return;
+        const key = String(matchedExpert.id);
         if (sourcesByExpert.has(key)) return;
         sourcesByExpert.set(key, [{
-          expert_id: row.expert_id,
+          expert_id: matchedExpert.id,
           ad_account_id: row.ad_account_id,
           attribution_window: "account_default",
           timezone: "America/Sao_Paulo",
