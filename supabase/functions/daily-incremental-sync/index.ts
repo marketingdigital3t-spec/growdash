@@ -316,7 +316,7 @@ Deno.serve(async (req) => {
     if (metaAccountsError) throw metaAccountsError;
     const recoverableMetaAccounts = (allConnectedMetaAccounts || []).filter((account: any) =>
       account.connection_status === "connected"
-      || (["healthy", "expiring"].includes(String(account.oauth_health_status || ""))
+      || (["error", "unknown"].includes(String(account.connection_status || ""))
         && ![10, 100, 190, 200].includes(Number(account.last_sync_error_code))),
     );
 

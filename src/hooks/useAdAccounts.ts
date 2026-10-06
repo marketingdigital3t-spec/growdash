@@ -52,6 +52,9 @@ export function useAdAccounts(includeDisconnected = false) {
     refetchOnReconnect: true,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    // Keep the Integrations status aligned with the server-side health/sync
+    // worker without requiring a manual page reload.
+    refetchInterval: 60_000,
     staleTime: 2 * 60_000,
     queryFn: async () => {
       const { data, error } = await withRequestTimeout(supabase
