@@ -4,9 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
-import { isPaidOperationStatus, normalizeClassName, rankExpertSales } from "@/lib/expertOperations";
-
-const norm = normalizeClassName;
+import { isPaidOperationStatus, rankExpertSales } from "@/lib/expertOperations";
 
 export type ExpertOperationSale = {
   id: string; expert_id: string; event_class_id: string | null; participant_type: "student" | "model_patient";
@@ -24,8 +22,14 @@ export type ExpertOperationsData = {
   sync: { status: "fresh" | "syncing" | "stale" | "partial" | "error"; syncedAt: string | null; errors: string[] };
 };
 
-export function useExpertOperations(expertId: string | undefined, scopedAccountIds: string[] = []) {
-  const { startDate, endDate } = useGlobalFilters();
+export function useExpertOperations(
+  expertId: string | undefined,
+  scopedAccountIds: string[] = [],
+  scope?: { startDate: Date; endDate: Date },
+) {
+  const globalFilters = useGlobalFilters();
+  const startDate = scope?.startDate ?? globalFilters.startDate;
+  const endDate = scope?.endDate ?? globalFilters.endDate;
   const expert = useQuery({ queryKey: ["expert-operations-expert", expertId], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("experts").select("nome").eq("id", expertId!).maybeSingle(); if (error) throw error; return data; } });
   const sources = useQuery({
     queryKey: ["expert-operation-sources", expertId, scopedAccountIds], enabled: Boolean(expertId),
@@ -49,6 +53,7 @@ export function useExpertOperations(expertId: string | undefined, scopedAccountI
     queryKey: ["expert-operation-classes", expertId || "all", scopedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: true,
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
+      if (expertId) query = query.eq("expert_id", expertId);
       if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
       const { data, error } = await query;
       if (error) throw error;
@@ -74,8 +79,7 @@ export function useExpertOperations(expertId: string | undefined, scopedAccountI
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(accountIds.length));
   const filteredClasses = useMemo(() => (classes.data || []).filter((item: any) => {
     if (!expertId) return true;
-    if (item.expert_id && item.expert_id !== expertId) return false;
-    if (!item.expert_id && norm(item.expert_name) !== norm(expert.data?.nome)) return false;
+    if (expertId && item.expert_id !== expertId) return false;
     // O carrossel de turmas é um inventário operacional. O período global
     // continua filtrando tráfego e vendas, mas não deve esconder turmas
     // futuras ou históricas do calendário.

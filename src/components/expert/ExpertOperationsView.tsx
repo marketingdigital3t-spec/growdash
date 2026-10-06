@@ -19,6 +19,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
+import { resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
 import { useExpertOperations } from "@/hooks/useExpertOperations";
 import { useArchiveEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
@@ -369,10 +371,10 @@ function ClassCard({
 }
 
 export function ExpertOperationsView() {
-  const { startDate, endDate, adAccountIds } = useGlobalFilters();
+  const globalFilters = useGlobalFilters();
   const adAccounts = useAdAccounts();
   const experts = useQuery({
-    queryKey: ["expert-operations-experts", adAccountIds],
+    queryKey: ["expert-operations-experts-by-account"],
     queryFn: async () => {
       const { data: expertRows, error } = await (supabase as any)
         .from("experts")
@@ -382,33 +384,39 @@ export function ExpertOperationsView() {
       if (error) throw error;
       const { data: sourceRows, error: sourceError } = await (supabase as any)
         .from("expert_operation_sources")
-        .select("expert_id,ad_account_id");
+        .select("expert_id,ad_account_id,attribution_window,timezone")
+        .not("ad_account_id", "is", null);
       if (sourceError) throw sourceError;
-      let classQuery = (supabase as any)
-        .from("event_classes")
-        .select("expert_id,ad_account_id")
-        .not("expert_id", "is", null);
-      if (adAccountIds.length) classQuery = classQuery.in("ad_account_id", adAccountIds);
-      const { data: classRows, error: classError } = await classQuery;
-      if (classError) throw classError;
-      const scopedIds = new Set<string>();
-      (sourceRows || []).forEach((row: any) => {
-        if (!adAccountIds.length || adAccountIds.includes(row.ad_account_id)) scopedIds.add(String(row.expert_id));
+      const sourcesByExpert = new Map<string, any[]>();
+      (sourceRows || []).forEach((source: any) => {
+        const key = String(source.expert_id);
+        sourcesByExpert.set(key, [...(sourcesByExpert.get(key) || []), source]);
       });
-      (classRows || []).forEach((row: any) => scopedIds.add(String(row.expert_id)));
-      return (expertRows || []).filter((row: any) => scopedIds.has(String(row.id)));
+      return (expertRows || [])
+        .filter((row: any) => sourcesByExpert.has(String(row.id)))
+        .map((row: any) => ({ ...row, operationSources: sourcesByExpert.get(String(row.id)) || [] }));
     },
   });
   const [expertId, setExpertId] = useState("");
   const [createClassOpen, setCreateClassOpen] = useState(false);
   const [classTab, setClassTab] = useState<"open" | "upcoming" | "past">("open");
+  const [operationPreset, setOperationPreset] = useState<DatePreset>(globalFilters.preset);
+  const [operationCustomRange, setOperationCustomRange] = useState(globalFilters.customRange);
+  const operationDates = useMemo(
+    () => resolvePreset(operationPreset, operationCustomRange),
+    [operationPreset, operationCustomRange],
+  );
   const expertOptions = useMemo(() => experts.data || [], [experts.data]);
   const selectedExpertId = expertOptions.some((expert: any) => expert.id === expertId)
     ? expertId
     : expertOptions[0]?.id;
-  const selectedExpertName =
-    (experts.data || []).find((expert: any) => expert.id === selectedExpertId)?.nome || "";
-  const operations = useExpertOperations(selectedExpertId, adAccountIds);
+  const selectedExpert = expertOptions.find((expert: any) => expert.id === selectedExpertId);
+  const selectedExpertAccountIds = useMemo(
+    () => Array.from(new Set((selectedExpert?.operationSources || []).map((source: any) => String(source.ad_account_id)).filter(Boolean))),
+    [selectedExpert],
+  );
+  const selectedExpertName = selectedExpert?.nome || "";
+  const operations = useExpertOperations(selectedExpertId, selectedExpertAccountIds, operationDates);
   useEffect(() => {
     if (!expertOptions.length) {
       if (expertId) setExpertId("");
@@ -427,7 +435,7 @@ export function ExpertOperationsView() {
   const accountLabel = operations.accountIds.length
     ? operations.accountIds.map((id) => adAccounts.data?.find((account) => account.id === id)?.name || id).join(", ")
     : "Nenhuma conta Meta vinculada";
-  const periodLabel = `${startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
+  const periodLabel = `${operationDates.startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${operationDates.endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
   const dailyRevenue = useMemo(() => {
     const days = new Map<string, number>();
     operations.sales.forEach((sale) => {
@@ -451,7 +459,7 @@ export function ExpertOperationsView() {
           <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <h2 className="text-lg font-black leading-tight">Turmas, tráfego e comercial</h2>
             <p className="text-[11px] text-muted-foreground">
-              {startDate.toLocaleDateString("pt-BR")} a {endDate.toLocaleDateString("pt-BR")} · vendas: Google Sheets
+              {operationDates.startDate.toLocaleDateString("pt-BR")} a {operationDates.endDate.toLocaleDateString("pt-BR")} · vendas: Google Sheets
             </p>
           </div>
         </div>
@@ -463,12 +471,22 @@ export function ExpertOperationsView() {
             <SelectContent>
               {expertOptions.map((expert: any) => (
                 <SelectItem key={expert.id} value={expert.id}>
-                  {expert.nome}
+                  {expert.nome} · {(expert.operationSources || []).map((source: any) => adAccounts.data?.find((account) => account.id === source.ad_account_id)?.name || source.ad_account_id).join(", ")}
                 </SelectItem>
               ))}
               </SelectContent>
             </Select>
-          {!experts.isLoading && !expertOptions.length && <span className="text-[10px] text-muted-foreground">Nenhum expert vinculado a esta conta.</span>}
+          {!experts.isLoading && !expertOptions.length && <span className="text-[10px] text-muted-foreground">Nenhum expert vinculado a uma conta de anúncio.</span>}
+          <MetaDateRangePicker
+            preset={operationPreset}
+            onPresetChange={setOperationPreset}
+            customRange={operationCustomRange}
+            onCustomRangeChange={setOperationCustomRange}
+            startDate={operationDates.startDate}
+            endDate={operationDates.endDate}
+            applyPresetOnClick
+            className="h-9"
+          />
           <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
             <span
               className={`h-1.5 w-1.5 rounded-full ${operations.sync.status === "fresh" ? "bg-emerald-500" : operations.sync.status === "syncing" ? "bg-amber-500" : "bg-red-500"}`}

@@ -486,8 +486,9 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
-            {/* Conta Meta e período são escopo global, inclusive na Agenda. */}
-            <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} />
+            {pathname !== "/painel-expert" && pathname !== "/agenda-turmas" && (
+              <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} />
+            )}
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
               <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>
