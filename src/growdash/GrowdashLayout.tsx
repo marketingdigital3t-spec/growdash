@@ -276,7 +276,7 @@ export default function GrowdashLayout() {
   }, [adAccountId, businessUnitId, loadingAdAccounts, setAdAccountId, visibleAccounts]);
 
   return (
-    <div className="brand-shell relative min-h-screen max-w-full overflow-x-clip text-foreground transition-colors" data-space-phase={spacePhase}>
+    <div className="brand-shell relative min-h-screen max-w-full overflow-x-clip text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined}>
       <SpacePhaseBackground phase={spacePhase} dashboardScene={pathname === "/" || pathname === "/analise-de-funis"} />
       <aside
         className={cn(
