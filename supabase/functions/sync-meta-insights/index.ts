@@ -1051,9 +1051,17 @@ Deno.serve(async (req) => {
           // Leads use only explicitly classified form, configured-site, and
           // started-conversation actions. Generic `lead`/`omni_lead` aggregates
           // are ambiguous and must never be inferred as native forms.
-          const campaign = campaignById.get(String(insight.campaign_id || ""));
+          const campaignId = String(insight.campaign_id || "");
+          const campaign = campaignById.get(campaignId);
           const adset = adsetById.get(String(insight.adset_id || ""));
-          const parts = canonicalLeadParts(actions, lpAction, adset?.destination_type);
+          // Prefer the ad-set fact. When Meta omits it for an archived set,
+          // use a campaign whose ad-sets are consistently classified. This
+          // keeps canonical form/conversation facts writable during a partial
+          // catalog response instead of preserving stale lead columns.
+          const destinationType = adset?.destination_type
+            || (websiteOnlyCampaignIds.has(campaignId) ? "WEBSITE" : null)
+            || (messagingOnlyCampaignIds.has(campaignId) ? "MESSAGING" : null);
+          const parts = canonicalLeadParts(actions, lpAction, destinationType);
           const leads = parts.forms + parts.site + parts.conversations;
           const result = canonicalResult(campaign?.objective || null, adset?.optimization_goal || null, actions, lpAction, adset?.destination_type);
           const cpl = leads > 0 ? spend / leads : 0;
@@ -1074,13 +1082,11 @@ Deno.serve(async (req) => {
             inline_link_clicks: inlineLinkClicks,
             unique_inline_link_clicks: uniqueInlineLinkClicks,
             ctr, cpm, frequency,
-            ...(!destinationClassificationComplete ? {} : {
-              leads, cpl, conversion_rate: conversionRate,
-              efficiency_rate: efficiencyRate,
-              form_leads: parts.forms,
-              site_leads: parts.site,
-              conversations: parts.conversations,
-            }),
+            leads, cpl, conversion_rate: conversionRate,
+            efficiency_rate: efficiencyRate,
+            form_leads: parts.forms,
+            site_leads: parts.site,
+            conversations: parts.conversations,
             health_score: healthScore,
             attribution_window: effectiveAttributionWindow,
             timezone: effectiveTimezone,
