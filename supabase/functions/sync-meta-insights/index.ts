@@ -11,10 +11,13 @@ const corsHeaders = {
 
 function connectionStatusForMetaError(errorCode: number | undefined, retryable: boolean) {
   if (errorCode === 190) return "expired";
-  // App/configuration and request/permission errors must remain diagnosable as
-  // errors. They are not proof that the ad account was disconnected.
-  if ([10, 100, 200, 190].includes(Number(errorCode)) || retryable) return "error";
-  return "error";
+  // A retryable Graph failure is an operational sync problem, not proof that
+  // OAuth was revoked. Keep the account eligible for the next worker cycle.
+  if (retryable) return "connected";
+  // Permission and account access errors remain visible as a connection error
+  // and require an explicit correction in Meta.
+  if ([10, 100, 200].includes(Number(errorCode))) return "error";
+  return "connected";
 }
 
 const FORM_ACTIONS = [...FORM_ACTION_TYPES];
@@ -1400,7 +1403,9 @@ Deno.serve(async (req) => {
         await supabaseAdmin
           .from("ad_accounts")
           .update({
-            connection_status: accountHadError ? "error" : "connected",
+            // A failed reconciliation must not turn into a false OAuth
+            // disconnect. Authorization failures are classified earlier.
+            connection_status: needsReauth ? "expired" : "connected",
             last_sync_error: accountHadError ? errors.filter((message) => message.startsWith(`Conta ${account.name}`)).join("; ") : null,
             last_sync_error_code: null,
             last_sync_attempt_at: attemptedAt,
