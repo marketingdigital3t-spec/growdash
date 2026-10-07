@@ -4,9 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
-import { isPaidOperationStatus, normalizeClassName, rankExpertSales } from "@/lib/expertOperations";
-
-const norm = normalizeClassName;
+import { isPaidOperationStatus, rankExpertSales } from "@/lib/expertOperations";
+import { classMonthBounds, filterEventClassesByScope, type ClassMonthScope } from "@/lib/eventClassFilters";
 
 export type ExpertOperationSale = {
   id: string; expert_id: string; event_class_id: string | null; participant_type: "student" | "model_patient";
@@ -24,14 +23,23 @@ export type ExpertOperationsData = {
   sync: { status: "fresh" | "syncing" | "stale" | "partial" | "error"; syncedAt: string | null; errors: string[] };
 };
 
+export interface ExpertOperationsScope {
+  startDate: Date;
+  endDate: Date;
+  classMonth: ClassMonthScope;
+  selectedAccountIds?: string[];
+}
+
 export function useExpertOperations(
   expertId: string | undefined,
   scopedAccountIds: string[] = [],
-  scope?: { startDate: Date; endDate: Date },
+  scope?: ExpertOperationsScope,
 ) {
   const globalFilters = useGlobalFilters();
   const startDate = scope?.startDate ?? globalFilters.startDate;
   const endDate = scope?.endDate ?? globalFilters.endDate;
+  const classMonth = scope?.classMonth;
+  const selectedAccountIds = scope?.selectedAccountIds ?? scopedAccountIds;
   const expert = useQuery({ queryKey: ["expert-operations-expert", expertId], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("experts").select("nome").eq("id", expertId!).maybeSingle(); if (error) throw error; return data; } });
   const sources = useQuery({
     queryKey: ["expert-operation-sources", expertId, scopedAccountIds], enabled: Boolean(expertId),
@@ -52,10 +60,17 @@ export function useExpertOperations(
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "none", scopedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId || scopedAccountIds.length),
+    queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, classMonth?.year, classMonth?.month], enabled: Boolean(expertId || scopedAccountIds.length),
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
-      if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
+      if (selectedAccountIds.length) {
+        const accountList = selectedAccountIds.join(",");
+        query = query.or(`ad_account_id.in.(${accountList}),ad_account_id.is.null`);
+      }
+      if (classMonth) {
+        const bounds = classMonthBounds(classMonth);
+        query = query.gte("date_start", bounds.start).lte("date_start", bounds.end);
+      }
       const { data, error } = await query;
       if (error) throw error;
       const rows = data || [];
@@ -78,15 +93,13 @@ export function useExpertOperations(
   }, [linkedAccountIds, scopedAccountIds]);
   const attributionWindowsByAccount = useMemo(() => Object.fromEntries((sources.data || []).filter((source) => source.ad_account_id).map((source) => [source.ad_account_id, source.attribution_window || "account_default"])), [sources.data]);
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(accountIds.length));
-  const filteredClasses = useMemo(() => (classes.data || []).filter((item: any) => {
-    if (!expertId) return true;
-    if (expertId && item.expert_id && item.expert_id !== expertId) return false;
-    if (expertId && !item.expert_id && norm(item.expert_name) !== norm(expert.data?.nome)) return false;
-    // O carrossel de turmas é um inventário operacional. O período global
-    // continua filtrando tráfego e vendas, mas não deve esconder turmas
-    // futuras ou históricas do calendário.
-    return true;
-  }), [classes.data, expertId, expert.data?.nome]);
+  const filteredClasses = useMemo(() => filterEventClassesByScope(
+    (classes.data || []) as Array<{ date_start: string; ad_account_id?: string | null; expert_id?: string | null; expert_name?: string | null }>,
+    classMonth || { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
+    selectedAccountIds,
+    expertId,
+    expert.data?.nome,
+  ), [classes.data, classMonth, expert.data?.nome, expertId, selectedAccountIds]);
   const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, businessDateKey(startDate).slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${businessDateKey(startDate).slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));
