@@ -337,7 +337,7 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [focusMode]);
   const toggleFocusMode = () => setFocusMode((current) => !current);
-  const leaderboard = <section role={focusMode ? "dialog" : undefined} aria-modal={focusMode ? true : undefined} aria-label={focusMode ? "Ranking Comercial expandido" : undefined} className={`relative isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] ${focusMode ? "fixed inset-0 z-[300] min-h-screen rounded-none" : "rounded-[28px]"}`}>
+  const leaderboard = <section role={focusMode ? "dialog" : undefined} aria-modal={focusMode ? true : undefined} aria-label={focusMode ? "Ranking Comercial expandido" : undefined} className={`isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] ${focusMode ? "fixed inset-0 z-[300] min-h-screen rounded-none" : "relative rounded-[28px]"}`}>
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(217,169,40,.16),transparent_42%),radial-gradient(ellipse_at_5%_35%,rgba(33,94,176,.14),transparent_38%),linear-gradient(135deg,#081226_0%,#050b18_58%,#0d1830_100%)]" />
     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f6c94c]/75 to-transparent" />
     <div className="relative p-4 sm:p-6 xl:p-8">
