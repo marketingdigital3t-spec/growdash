@@ -232,6 +232,11 @@ export default function FunnelAnalysis() {
   const operationalFilterDeals = useMemo(() => filterOperationalRDDeals(filterDeals, activeFunnels), [activeFunnels, filterDeals]);
   const operationalClosedDeals = useMemo(() => filterOperationalRDDeals(closedDeals, activeFunnels), [activeFunnels, closedDeals]);
   const operationalPeriodClosedDeals = useMemo(() => filterOperationalRDDeals(periodClosedDeals, activeFunnels), [activeFunnels, periodClosedDeals]);
+  const operationalPeriodFunnelDeals = useMemo(() => {
+    const byId = new Map<string, (typeof operationalPeriodDeals)[number]>();
+    for (const deal of [...operationalPeriodDeals, ...operationalPeriodClosedDeals]) byId.set(deal.rd_deal_id, deal);
+    return Array.from(byId.values());
+  }, [operationalPeriodClosedDeals, operationalPeriodDeals]);
   const operationalStages = useMemo(() => filterOperationalRDFunnelStages(stages, activeFunnels), [activeFunnels, stages]);
   const excludedDealIds = useMemo(() => excludedOperationalRDDealIds(deals, activeFunnels), [activeFunnels, deals]);
 
@@ -712,18 +717,18 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-              <FunnelAudienceProfile deals={operationalDeals} periodDeals={operationalPeriodDeals} periodDealsLoading={loadingPeriodDeals} periodDealsUnavailable={!!periodDealsError} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : undefined} attributionWindowByCampaign={breakdownAttributionByCampaign} />
+              <FunnelAudienceProfile deals={operationalDeals} periodDeals={operationalPeriodFunnelDeals} periodDealsLoading={loadingPeriodDeals || loadingPeriodClosedDeals} periodDealsUnavailable={!!periodDealsError} campaignIds={audienceCampaignIds} accountIds={allAccountsSelected ? Array.from(integratedAccountIds) : selectedAccountIds} startDate={startDate} endDate={endDate} metaLeads={funnelMeta.data.metricAvailability.leads?.available ? funnelMeta.data.leads : undefined} attributionWindowByCampaign={breakdownAttributionByCampaign} />
             </MotionItem>
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
               <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock>
-              <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} deals={operationalPeriodDeals} insights={[...scopedInsights, ...hierarchyRows]} /></HelpBlock>
+              <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} deals={operationalPeriodFunnelDeals} insights={[...scopedInsights, ...hierarchyRows]} /></HelpBlock>
             </div>
           </MotionItem>
 
           <MotionItem>
-            <FunnelOpportunityProfile deals={operationalPeriodDeals} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} attributionWindowByCampaign={breakdownAttributionByCampaign} />
+            <FunnelOpportunityProfile deals={operationalPeriodFunnelDeals} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} attributionWindowByCampaign={breakdownAttributionByCampaign} />
           </MotionItem>
 
           <MotionItem>
