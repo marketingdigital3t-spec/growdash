@@ -7,6 +7,7 @@ export interface ClassDateRangeScope {
 export interface EventClassFilterRow {
   date_start: string;
   ad_account_id?: string | null;
+  ad_account_ids?: string[];
   expert_id?: string | null;
   expert_name?: string | null;
   archived_at?: string | null;
@@ -77,7 +78,8 @@ export function filterEventClassesByScope<T extends EventClassFilterRow>(
   return rows.filter((row) => {
     if (!classBelongsToDateRange(row, scope)) return false;
     if (!accountIds.length) return true;
-    if (row.ad_account_id) return selectedAccountSet.has(row.ad_account_id);
+    const linkedAccountIds = row.ad_account_ids?.length ? row.ad_account_ids : row.ad_account_id ? [row.ad_account_id] : [];
+    if (linkedAccountIds.length) return linkedAccountIds.some((id) => selectedAccountSet.has(id));
 
     const candidateExpertIds = new Set<string>();
     if (row.expert_id) candidateExpertIds.add(row.expert_id);

@@ -10,7 +10,7 @@ export type MemberType = "student" | "model_patient";
 export interface EventClass {
   id: string; user_id: string; expert_id?: string | null; expert_name: string | null; title: string; date_start: string; date_end: string | null; location: string | null;
   max_students: number; max_people: number; max_model_patients: number; status: EventClassStatus; notes: string | null; created_at: string; updated_at: string;
-  ad_account_id?: string | null; rd_funnel_id?: string | null; rd_model_patient_funnel_id?: string | null; has_model_patients?: boolean;
+  ad_account_id?: string | null; ad_account_ids?: string[]; rd_funnel_id?: string | null; rd_model_patient_funnel_id?: string | null; has_model_patients?: boolean;
   allowed_student_stage_ids?: string[]; allowed_model_patient_stage_ids?: string[];
   archived_at?: string | null; archived_by?: string | null; archive_reason?: string | null;
 }
@@ -24,7 +24,7 @@ export interface EventClassWithCounts extends EventClass {
   manual_student_count: number; manual_model_patient_count: number; has_model_patients: boolean; sources: [];
 }
 
-type ClassInput = Omit<EventClass, "id" | "user_id" | "created_at" | "updated_at">;
+type ClassInput = Omit<EventClass, "id" | "user_id" | "created_at" | "updated_at" | "ad_account_ids"> & { ad_account_ids: string[] };
 
 export function useEventClasses() {
   return useQuery({
@@ -35,13 +35,17 @@ export function useEventClasses() {
       const list = (classes || []) as unknown as EventClass[];
       if (!list.length) return [] as EventClassWithCounts[];
       const ids = list.map((item) => item.id);
+      const { data: accountLinks, error: accountLinkError } = await (supabase as any).from("event_class_accounts").select("event_class_id,ad_account_id").in("event_class_id", ids);
+      if (accountLinkError) throw accountLinkError;
+      const accountsByClass = new Map<string, string[]>();
+      (accountLinks || []).forEach((link: any) => accountsByClass.set(link.event_class_id, [...(accountsByClass.get(link.event_class_id) || []), link.ad_account_id]));
       const { data: participants, error: participantError } = await supabase.from("event_class_participants").select("*").in("event_class_id", ids).order("created_at", { ascending: true });
       if (participantError) throw participantError;
       const byClass = new Map<string, EventClassParticipant[]>();
       ((participants || []) as unknown as EventClassParticipant[]).forEach((participant) => { const current = byClass.get(participant.event_class_id) || []; current.push(participant); byClass.set(participant.event_class_id, current); });
       return list.map((eventClass) => {
         const rows = byClass.get(eventClass.id) || [];
-        return { ...eventClass, participants: rows, studentCount: rows.filter((row) => row.participant_type === "student").length, modelPatientCount: rows.filter((row) => row.participant_type === "model_patient").length, linkedStudentCount: 0 as const, linkedModelPatientCount: 0 as const, manual_student_count: rows.filter((row) => row.participant_type === "student").length, manual_model_patient_count: rows.filter((row) => row.participant_type === "model_patient").length, has_model_patients: Number(eventClass.max_model_patients || 0) > 0, sources: [] as [] };
+        return { ...eventClass, ad_account_ids: accountsByClass.get(eventClass.id) || (eventClass.ad_account_id ? [eventClass.ad_account_id] : []), participants: rows, studentCount: rows.filter((row) => row.participant_type === "student").length, modelPatientCount: rows.filter((row) => row.participant_type === "model_patient").length, linkedStudentCount: 0 as const, linkedModelPatientCount: 0 as const, manual_student_count: rows.filter((row) => row.participant_type === "student").length, manual_model_patient_count: rows.filter((row) => row.participant_type === "model_patient").length, has_model_patients: Number(eventClass.max_model_patients || 0) > 0, sources: [] as [] };
       }) as EventClassWithCounts[];
     },
   });
@@ -82,8 +86,15 @@ export function useBackfillEventClassAccounts(classes: EventClass[] | undefined)
   }, [classes, queryClient]);
 }
 
-export function useCreateEventClass() { const qc = useQueryClient(); const { user } = useAuth(); return useMutation({ mutationFn: async (input: ClassInput) => { const { data, error } = await supabase.from("event_classes").insert({ ...input, user_id: user!.id }).select().single(); if (error) throw error; return data as unknown as EventClass; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
-export function useUpdateEventClass() { const qc = useQueryClient(); return useMutation({ mutationFn: async ({ id, ...input }: Partial<ClassInput> & { id: string }) => { const { data, error } = await supabase.from("event_classes").update(input).eq("id", id).select().single(); if (error) throw error; return data as unknown as EventClass; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
+async function replaceEventClassAccounts(eventClassId: string, accountIds: string[]) {
+  const { error: deleteError } = await (supabase as any).from("event_class_accounts").delete().eq("event_class_id", eventClassId);
+  if (deleteError) throw deleteError;
+  const { error: insertError } = await (supabase as any).from("event_class_accounts").insert(accountIds.map((ad_account_id) => ({ event_class_id: eventClassId, ad_account_id })));
+  if (insertError) throw insertError;
+}
+
+export function useCreateEventClass() { const qc = useQueryClient(); const { user } = useAuth(); return useMutation({ mutationFn: async (input: ClassInput) => { const accountIds = Array.from(new Set(input.ad_account_ids)); const { ad_account_ids: _accountIds, ...eventClassInput } = input; const { data, error } = await supabase.from("event_classes").insert({ ...eventClassInput, ad_account_id: accountIds[0], user_id: user!.id }).select().single(); if (error) throw error; await replaceEventClassAccounts(data.id, accountIds); return data as unknown as EventClass; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
+export function useUpdateEventClass() { const qc = useQueryClient(); return useMutation({ mutationFn: async ({ id, ...input }: Partial<ClassInput> & { id: string }) => { const accountIds = Array.from(new Set(input.ad_account_ids || (input.ad_account_id ? [input.ad_account_id] : []))); const { ad_account_ids: _accountIds, ...eventClassInput } = input as any; if (accountIds.length) eventClassInput.ad_account_id = accountIds[0]; const { data, error } = await supabase.from("event_classes").update(eventClassInput).eq("id", id).select().single(); if (error) throw error; if (accountIds.length) await replaceEventClassAccounts(id, accountIds); return data as unknown as EventClass; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
 export function useDeleteEventClass() { const qc = useQueryClient(); return useMutation({ mutationFn: async (id: string) => { const { error } = await supabase.from("event_classes").delete().eq("id", id); if (error) throw error; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }
 
 export function useArchiveEventClass() {

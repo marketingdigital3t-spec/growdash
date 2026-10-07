@@ -78,20 +78,23 @@ export function useExpertOperations(
     queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, businessDateKey(startDate), businessDateKey(endDate), Object.keys(expertAccountLinks.data?.expertToAccountIds || {}).join(",")], enabled: Boolean(expertId || scopedAccountIds.length),
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
-      if (selectedAccountIds.length) {
-        const accountList = selectedAccountIds.join(",");
-        query = query.or(`ad_account_id.in.(${accountList}),ad_account_id.is.null`);
-      }
+      // Account filtering happens after loading the relationship table so a class
+      // linked to a secondary account is not removed by the primary legacy column.
       query = query.gte("date_start", businessDateKey(startDate)).lte("date_start", businessDateKey(endDate));
       const { data, error } = await query;
       if (error) throw error;
       const rows = data || [];
       if (!rows.length) return [];
-      const { data: participants, error: participantsError } = await (supabase as any).from("event_class_participants").select("*").in("event_class_id", rows.map((row: any) => row.id)).order("created_at", { ascending: true });
+      const classIds = rows.map((row: any) => row.id);
+      const { data: accountLinks, error: accountLinkError } = await (supabase as any).from("event_class_accounts").select("event_class_id,ad_account_id").in("event_class_id", classIds);
+      if (accountLinkError) throw accountLinkError;
+      const accountsByClass = new Map<string, string[]>();
+      (accountLinks || []).forEach((link: any) => accountsByClass.set(link.event_class_id, [...(accountsByClass.get(link.event_class_id) || []), link.ad_account_id]));
+      const { data: participants, error: participantsError } = await (supabase as any).from("event_class_participants").select("*").in("event_class_id", classIds).order("created_at", { ascending: true });
       if (participantsError) throw participantsError;
       const byClass = new Map<string, any[]>();
       (participants || []).forEach((participant: any) => byClass.set(participant.event_class_id, [...(byClass.get(participant.event_class_id) || []), participant]));
-      return rows.map((row: any) => ({ ...row, participants: byClass.get(row.id) || [] }));
+      return rows.map((row: any) => ({ ...row, ad_account_ids: accountsByClass.get(row.id) || (row.ad_account_id ? [row.ad_account_id] : []), participants: byClass.get(row.id) || [] }));
     },
   });
   useBackfillEventClassAccounts(classes.data as any[] | undefined);
@@ -107,7 +110,7 @@ export function useExpertOperations(
   const attributionWindowsByAccount = useMemo(() => Object.fromEntries((sources.data || []).filter((source) => source.ad_account_id).map((source) => [source.ad_account_id, source.attribution_window || "account_default"])), [sources.data]);
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(accountIds.length));
   const filteredClasses = useMemo(() => filterEventClassesByScope(
-    (classes.data || []) as Array<{ date_start: string; ad_account_id?: string | null; expert_id?: string | null; expert_name?: string | null }>,
+    (classes.data || []) as Array<{ date_start: string; ad_account_id?: string | null; ad_account_ids?: string[]; expert_id?: string | null; expert_name?: string | null }>,
     { startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) } satisfies ClassDateRangeScope,
     selectedAccountIds,
     expertId,

@@ -40,6 +40,11 @@ describe("event class global date and account filters", () => {
     expect(filterEventClassesByScope([row("2026-10-04", "ste01", "Sté Andrade")], scope, ["ca01", "ca02"], undefined, undefined, accountScope)).toHaveLength(0);
   });
 
+  it("shows a class linked to multiple accounts when any linked account is selected", () => {
+    const multi = { ...row("2026-10-04", "ca01", "Ranniely"), ad_account_ids: ["ca01", "ca02"] };
+    expect(filterEventClassesByScope([multi], scope, ["ca02"], undefined, undefined, accountScope)).toHaveLength(1);
+  });
+
   it("does not assign an orphan legacy class without a reliable expert", () => {
     expect(filterEventClassesByScope([row("2026-10-02", null, "Outra pessoa")], scope, ["ca01"], undefined, undefined, accountScope)).toHaveLength(0);
   });
