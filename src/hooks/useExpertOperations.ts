@@ -5,7 +5,7 @@ import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { isPaidOperationStatus, rankExpertSales } from "@/lib/expertOperations";
-import { filterEventClassesByScope, type ClassDateRangeScope } from "@/lib/eventClassFilters";
+import { buildExpertAccountScope, filterEventClassesByScope, type ClassDateRangeScope, type ExpertAccountScope } from "@/lib/eventClassFilters";
 import { useBackfillEventClassAccounts } from "@/hooks/useEventClasses";
 
 export type ExpertOperationSale = {
@@ -50,6 +50,22 @@ export function useExpertOperations(
       return (data || []) as ExpertOperationSource[];
     },
   });
+  const expertAccountLinks = useQuery({
+    queryKey: ["expert-operation-account-links", scopedAccountIds],
+    enabled: Boolean(expertId || scopedAccountIds.length),
+    queryFn: async () => {
+      const { data: sourceRows, error: sourceError } = await (supabase as any)
+        .from("expert_operation_sources")
+        .select("expert_id,ad_account_id")
+        .not("ad_account_id", "is", null);
+      if (sourceError) throw sourceError;
+      const { data: expertRows, error: expertError } = await (supabase as any)
+        .from("experts")
+        .select("id,nome");
+      if (expertError) throw expertError;
+      return buildExpertAccountScope(sourceRows || [], expertRows || []);
+    },
+  });
   const sales = useQuery({
     queryKey: ["expert-sales", expertId, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId),
     queryFn: async () => {
@@ -59,7 +75,7 @@ export function useExpertOperations(
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId || scopedAccountIds.length),
+    queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, businessDateKey(startDate), businessDateKey(endDate), Object.keys(expertAccountLinks.data?.expertToAccountIds || {}).join(",")], enabled: Boolean(expertId || scopedAccountIds.length),
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
       if (selectedAccountIds.length) {
@@ -96,12 +112,13 @@ export function useExpertOperations(
     selectedAccountIds,
     expertId,
     expert.data?.nome,
-  ), [classes.data, endDate, expert.data?.nome, expertId, selectedAccountIds, startDate]);
+    expertAccountLinks.data as ExpertAccountScope | undefined,
+  ), [classes.data, endDate, expert.data?.nome, expertId, expertAccountLinks.data, selectedAccountIds, startDate]);
   const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, businessDateKey(startDate).slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${businessDateKey(startDate).slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));
     return rankExpertSales(sales.data || [], Object.fromEntries(goals));
   }, [sales.data, sellerGoals.data]);
   const syncStatus = traffic.data.status === "syncing" || sources.isFetching || sales.isFetching || classes.isFetching ? "syncing" : traffic.data.status;
-  return { expertId, sources: sources.data || [], accountIds, sales: sales.data || [], classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, classes.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || classes.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
+  return { expertId, sources: sources.data || [], accountIds, sales: sales.data || [], classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, classes.error, expertAccountLinks.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || classes.isLoading || expertAccountLinks.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
 }
