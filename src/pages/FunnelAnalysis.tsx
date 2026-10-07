@@ -728,7 +728,7 @@ export default function FunnelAnalysis() {
           </MotionItem>
 
           <MotionItem>
-            <FunnelOpportunityProfile deals={operationalPeriodFunnelDeals} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} attributionWindowByCampaign={breakdownAttributionByCampaign} />
+            <FunnelOpportunityProfile deals={operationalPeriodFunnelDeals.length ? operationalPeriodFunnelDeals : operationalDeals} insights={[...scopedInsights, ...hierarchyRows]} campaignIds={audienceCampaignIds} startDate={startDate} endDate={endDate} attributionWindowByCampaign={breakdownAttributionByCampaign} />
           </MotionItem>
 
           <MotionItem>
