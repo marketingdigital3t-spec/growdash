@@ -30,11 +30,16 @@ import { EventClassFormDialog } from "@/components/event-classes/EventClassFormD
 import { EventClassMembersDialog } from "@/components/event-classes/EventClassMembersDialog";
 import { ExpertClassDetailsDialog } from "@/components/expert/ExpertClassDetailsDialog";
 import { ExpertSheetLinkDialog } from "@/components/expert/ExpertSheetLinkDialog";
+import { buildExpertResultMetrics } from "@/lib/expertResultMetrics";
 
 const brl = (cents: number | null | undefined) =>
   cents == null
     ? "Indisponível"
     : (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brlAmount = (amount: number | null | undefined) =>
+  amount == null
+    ? "Indisponível"
+    : amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateLabel = (value: string | null | undefined) =>
   value ? new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR") : "—";
 const todayKey = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -441,9 +446,14 @@ export function ExpertOperationsView() {
   const visibleClasses = useMemo(() => tabClasses.slice(slide, slide + 4), [slide, tabClasses]);
   const gross = operations.sales.reduce((sum, row) => sum + Number(row.gross_amount_cents || 0), 0);
   const cash = operations.sales.reduce((sum, row) => sum + Number(row.cash_received_cents || 0), 0);
-  const conversion = operations.traffic.totalLeads
-    ? (operations.sales.length / operations.traffic.totalLeads) * 100
-    : null;
+  const resultMetrics = buildExpertResultMetrics(
+    operations.commercialSales,
+    operations.traffic.totalLeads,
+    operations.traffic.metricAvailability.leads?.available ?? false,
+  );
+  const commercialRevenue = operations.commercialSalesAvailable ? resultMetrics.revenue : null;
+  const commercialSalesCount = operations.commercialSalesAvailable ? resultMetrics.sales : null;
+  const conversion = operations.commercialSalesAvailable ? resultMetrics.conversion : null;
   const accountLabel = operations.accountIds.length
     ? operations.accountIds.map((id) => adAccounts.data?.find((account) => account.id === id)?.name || id).join(", ")
     : "Nenhuma conta Meta vinculada";
@@ -453,14 +463,14 @@ export function ExpertOperationsView() {
     : `${operationDates.startDate.toLocaleDateString("pt-BR")} a ${operationDates.endDate.toLocaleDateString("pt-BR")}`;
   const dailyRevenue = useMemo(() => {
     const days = new Map<string, number>();
-    operations.sales.forEach((sale) => {
+    operations.commercialSales.forEach((sale) => {
       const day = sale.sale_date || "";
-      days.set(day, (days.get(day) || 0) + Number(sale.gross_amount_cents || 0));
+      days.set(day, (days.get(day) || 0) + Number(sale.net_revenue || 0));
     });
     return Array.from(days.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-14);
-  }, [operations.sales]);
+  }, [operations.commercialSales]);
   const maxRevenue = Math.max(...dailyRevenue.map(([, value]) => value), 1);
   useEffect(() => setSlide(0), [classTab, globalFilters.adAccountIds, globalFilters.endDate, globalFilters.startDate]);
   return (
@@ -474,7 +484,7 @@ export function ExpertOperationsView() {
           <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <h2 className="text-lg font-black leading-tight">Turmas, tráfego e comercial</h2>
             <p className="text-[11px] text-muted-foreground">
-              {operationDates.startDate.toLocaleDateString("pt-BR")} a {operationDates.endDate.toLocaleDateString("pt-BR")} · vendas: Google Sheets
+              {operationDates.startDate.toLocaleDateString("pt-BR")} a {operationDates.endDate.toLocaleDateString("pt-BR")} · resultado: Comercial
             </p>
           </div>
         </div>
@@ -662,7 +672,7 @@ export function ExpertOperationsView() {
                       <div
                         className="w-full rounded-t bg-foreground/80"
                         style={{ height: `${Math.max(8, (value / maxRevenue) * 90)}%` }}
-                        title={brl(value)}
+                        title={brlAmount(value)}
                       />
                       <span className="text-[9px] text-muted-foreground">{day.slice(8, 10)}</span>
                     </div>
@@ -683,34 +693,49 @@ export function ExpertOperationsView() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Funil de conversão</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Leads qualificados por etapa · RD Station
+                Leads Meta até vendas confirmadas · mesma conta e período selecionados
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                ["Leads captados", operations.traffic.totalLeads, "bg-emerald-400"],
-                ["Vendas confirmadas", operations.sales.length || null, "bg-foreground"],
-              ].map(([label, value, color]) => (
-                <div key={String(label)}>
-                  <div className="flex justify-between text-sm">
-                    <span>{label}</span>
-                    <span className="text-muted-foreground">
-                      {value == null ? "Indisponível" : value}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full ${color}`}
-                      style={{
-                        width:
-                          value == null
-                            ? "0%"
-                            : `${Math.min(100, (Number(value) / Math.max(Number(operations.traffic.totalLeads) || 1, 1)) * 100)}%`,
-                      }}
-                    />
-                  </div>
+              <div className="rounded-xl border border-border/70 bg-background/40 p-3">
+                <svg
+                  className="h-44 w-full"
+                  viewBox="0 0 520 220"
+                  role="img"
+                  aria-label={`Funil de conversão com ${operations.traffic.totalLeads} leads Meta e ${commercialSalesCount ?? "vendas indisponíveis"} vendas confirmadas`}
+                >
+                  <defs>
+                    <linearGradient id="expert-funnel-leads" x1="0" x2="1">
+                      <stop offset="0%" stopColor="#34d399" stopOpacity="0.9" />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity="0.55" />
+                    </linearGradient>
+                    <linearGradient id="expert-funnel-sales" x1="0" x2="1">
+                      <stop offset="0%" stopColor="#d8b65c" stopOpacity="0.95" />
+                      <stop offset="100%" stopColor="#a87920" stopOpacity="0.7" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M36 22 H484 L346 112 H174 Z" fill="url(#expert-funnel-leads)" />
+                  <path d="M174 122 H346 L312 198 H208 Z" fill="url(#expert-funnel-sales)" />
+                  <text x="260" y="66" textAnchor="middle" fill="white" fontSize="16" fontWeight="800">
+                    Leads captados
+                  </text>
+                  <text x="260" y="91" textAnchor="middle" fill="white" fontSize="24" fontWeight="900">
+                    {operations.traffic.metricAvailability.leads?.available ? operations.traffic.totalLeads.toLocaleString("pt-BR") : "Indisponível"}
+                  </text>
+                  <text x="260" y="153" textAnchor="middle" fill="white" fontSize="15" fontWeight="800">
+                    Vendas confirmadas
+                  </text>
+                  <text x="260" y="179" textAnchor="middle" fill="white" fontSize="22" fontWeight="900">
+                    {operations.commercialSalesLoading ? "Carregando" : commercialSalesCount == null ? "Indisponível" : commercialSalesCount.toLocaleString("pt-BR")}
+                  </text>
+                </svg>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>Fonte dos leads: Meta Ads</span>
+                  <span className="font-bold text-foreground">
+                    Conversão: {conversion == null ? "Indisponível" : `${conversion.toFixed(1)}%`}
+                  </span>
                 </div>
-              ))}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -724,10 +749,22 @@ export function ExpertOperationsView() {
             ],
             [
               "Faturamento",
-              brl(gross),
+              operations.commercialSalesLoading
+                ? "Carregando"
+                : commercialRevenue == null ? "Indisponível" : brlAmount(commercialRevenue),
             ],
-            ["Leads", operations.traffic.totalLeads ?? "Indisponível"],
-            ["Vendas", operations.sales.length],
+            [
+              "Leads",
+              operations.traffic.metricAvailability.leads?.available
+                ? operations.traffic.totalLeads
+                : "Indisponível",
+            ],
+            [
+              "Vendas",
+              operations.commercialSalesLoading
+                ? "Carregando"
+                : commercialSalesCount == null ? "Indisponível" : commercialSalesCount,
+            ],
             ["Conversão", conversion == null ? "Indisponível" : `${conversion.toFixed(1)}%`],
           ].map(([label, value]) => (
             <Card key={String(label)}>

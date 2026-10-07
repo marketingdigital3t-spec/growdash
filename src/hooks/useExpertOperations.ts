@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { useSales, type Sale } from "@/hooks/useSales";
 import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { isPaidOperationStatus, rankExpertSales } from "@/lib/expertOperations";
@@ -18,6 +19,10 @@ export type ExpertOperationsData = {
   expertId?: string;
   sources: ExpertOperationSource[];
   sales: ExpertOperationSale[];
+  commercialSales: Sale[];
+  commercialSalesLoading: boolean;
+  commercialSalesAvailable: boolean;
+  commercialSalesError: unknown;
   classes: any[];
   traffic: ReturnType<typeof useMetaTrafficMetrics>["data"];
   sellers: Array<{ name: string; sales: number; grossRevenue: number; cashReceived: number; goal: number; progress: number; ticket: number; collectionRate: number }>;
@@ -77,6 +82,12 @@ export function useExpertOperations(
       return ((data || []) as ExpertOperationSale[]).filter((row) => isPaidOperationStatus(row.status));
     },
   });
+  const commercialSales = useSales({
+    adAccountIds: scopedAccountIds,
+    startDate,
+    endDate,
+    enabled: scopedAccountIds.length > 0,
+  });
   const classes = useQuery({
     queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, businessDateKey(startDate), classEndDate, includeFutureClasses, Object.keys(expertAccountLinks.data?.expertToAccountIds || {}).join(",")], enabled: Boolean(expertId || scopedAccountIds.length),
     queryFn: async () => {
@@ -126,6 +137,6 @@ export function useExpertOperations(
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));
     return rankExpertSales(sales.data || [], Object.fromEntries(goals));
   }, [sales.data, sellerGoals.data]);
-  const syncStatus = traffic.data.status === "syncing" || sources.isFetching || sales.isFetching || classes.isFetching ? "syncing" : traffic.data.status;
-  return { expertId, sources: sources.data || [], accountIds, sales: sales.data || [], classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, classes.error, expertAccountLinks.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || classes.isLoading || expertAccountLinks.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
+  const syncStatus = traffic.data.status === "syncing" || sources.isFetching || sales.isFetching || classes.isFetching || commercialSales.isFetching ? "syncing" : traffic.data.status;
+  return { expertId, sources: sources.data || [], accountIds, sales: sales.data || [], commercialSales: commercialSales.data || [], commercialSalesLoading: commercialSales.isLoading, commercialSalesAvailable: commercialSales.isSuccess, commercialSalesError: commercialSales.error, classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, commercialSales.error, classes.error, expertAccountLinks.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || commercialSales.isLoading || classes.isLoading || expertAccountLinks.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void commercialSales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
 }
