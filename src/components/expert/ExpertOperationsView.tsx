@@ -717,18 +717,16 @@ export function ExpertOperationsView() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
             [
-              "Investimento em anúncio",
+              "Investimento em tráfego",
               operations.traffic.spend == null
                 ? "Indisponível"
                 : brl(Math.round(operations.traffic.spend * 100)),
             ],
-            ["Leads Meta", operations.traffic.totalLeads ?? "Indisponível"],
             [
-              "CPL",
-              operations.traffic.cpl == null
-                ? "Indisponível"
-                : brl(Math.round(operations.traffic.cpl * 100)),
+              "Faturamento",
+              brl(gross),
             ],
+            ["Leads", operations.traffic.totalLeads ?? "Indisponível"],
             ["Vendas", operations.sales.length],
             ["Conversão", conversion == null ? "Indisponível" : `${conversion.toFixed(1)}%`],
           ].map(([label, value]) => (
