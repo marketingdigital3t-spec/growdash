@@ -6,12 +6,12 @@ interface PaymentChartProps {
   byPayment: { pix: number; cartao: number; boleto: number; outros: number };
 }
 
-const COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--primary) / .78)",
-  "hsl(var(--primary) / .56)",
-  "hsl(var(--primary) / .34)",
-];
+const COLORS: Record<string, string> = {
+  pix: "#16a34a",
+  cartao: "#2563eb",
+  boleto: "#f59e0b",
+  outros: "#8b5cf6",
+};
 
 const LABELS: Record<string, string> = {
   pix: "Pix",
@@ -22,7 +22,7 @@ const LABELS: Record<string, string> = {
 
 export function PaymentChart({ byPayment }: PaymentChartProps) {
   const data = Object.entries(byPayment)
-    .map(([key, value]) => ({ name: LABELS[key], value }))
+    .map(([key, value]) => ({ key, name: LABELS[key], value }))
     .filter((d) => d.value > 0);
 
   const total = data.reduce((s, d) => s + d.value, 0);
@@ -58,11 +58,11 @@ export function PaymentChart({ byPayment }: PaymentChartProps) {
                 paddingAngle={3}
                 dataKey="value"
               >
-                {data.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                {data.map((row) => (
+                  <Cell key={row.key} fill={COLORS[row.key] || COLORS.outros} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
+              <Tooltip formatter={(v: number) => `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
             </PieChart>
           </ResponsiveContainer>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -75,9 +75,9 @@ export function PaymentChart({ byPayment }: PaymentChartProps) {
           </div>
         </div>
         <div className="flex flex-wrap gap-3 mt-2 justify-center">
-          {data.map((d, i) => (
+          {data.map((d) => (
             <div key={d.name} className="flex items-center gap-1.5 text-xs">
-              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[d.key] || COLORS.outros }} />
               <span>{d.name}</span>
             </div>
           ))}

@@ -30,7 +30,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from "recharts";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { usePlatformRules } from "@/hooks/usePlatformRules";
-import { inferPlatform, inferPlatformWithDealFallback, PLATFORM_LABELS, type TopPlatform } from "@/lib/platformInference";
+import { PLATFORM_LABELS, type TopPlatform } from "@/lib/platformInference";
 import { PlatformDrilldownSheet } from "@/components/dashboard/PlatformDrilldownSheet";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
@@ -38,6 +38,8 @@ import { useAccountAdsets } from "@/hooks/useAccountAdsets";
 import { GeoOriginWidget } from "@/components/dashboard/widgets/GeoOriginWidget";
 import { META_ACTION_TYPES, resolveMetaLeadActions } from "@/lib/metaActionMetrics";
 import { isMetaMessagingDestination } from "@/lib/metaLeadScope";
+import { PLATFORM_COLORS } from "@/lib/platformColors";
+import { buildPlatformBreakdown } from "@/lib/platformBreakdown";
 
 // Mapeamento destination_type (Meta) -> aba
 const DEST_NATIVE = new Set(["ON_AD"]);
@@ -283,13 +285,6 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
   const confirmedCount = salesMetrics.confirmedSalesCount;
   const ticketMedio = confirmedCount > 0 ? salesMetrics.totalNet / confirmedCount : 0;
 
-  const PLATFORM_COLORS: Record<TopPlatform, string> = {
-    meta: "hsl(var(--primary))",
-    google: "hsl(var(--primary) / .66)",
-    organic: "hsl(var(--primary) / .42)",
-    unknown: "hsl(var(--muted-foreground))",
-  };
-
   // ============================================================
   // Per-tab metrics from raw action totals
   // ============================================================
@@ -356,40 +351,12 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
   //   - leads do Meta vêm de insight_actions (mesma fonte do KPI "Leads" = tabLeads).
   //   - leads de Google / Orgânico / Não encontrado vêm do CRM (rdDeals).
   //   - vendas e receita vêm de `sales`.
-  const platformBreakdown = useMemo(() => {
-    const acc: Record<TopPlatform, { leads: number; sales: number; revenue: number }> = {
-      meta: { leads: tabLeads, sales: 0, revenue: 0 },
-      google: { leads: 0, sales: 0, revenue: 0 },
-      organic: { leads: 0, sales: 0, revenue: 0 },
-      unknown: { leads: 0, sales: 0, revenue: 0 },
-    };
-    const dealsByRdId = new Map<string, any>();
-    rdDeals.forEach((d: any) => {
-      if (d.rd_deal_id) dealsByRdId.set(d.rd_deal_id, d);
-    });
-    rdDeals.forEach((d) => {
-      const p = inferPlatform(d, platformRules).platform;
-      // Meta já vem de tabLeads (insight_actions); deals sem plataforma identificada
-      // ("unknown") são geralmente leads do Meta sem UTM — não contar para evitar dupla contagem.
-      if (p === "meta" || p === "unknown") return;
-      acc[p].leads += 1;
-    });
-    sales.forEach((s) => {
-      if (s.status !== "confirmed") return;
-      const p = inferPlatformWithDealFallback(s, dealsByRdId, platformRules).platform;
-      acc[p].sales += 1;
-      acc[p].revenue += s.net_revenue;
-    });
-    return (Object.keys(acc) as TopPlatform[])
-      .map((k) => {
-        const a = acc[k];
-        const conv = a.leads > 0 ? (a.sales / a.leads) * 100 : 0;
-        return { key: k, name: PLATFORM_LABELS[k], ...a, conv };
-      })
-      // Sempre esconder bucket "Não encontrado" no breakdown de leads (evita confusão com Meta sem UTM)
-      .filter((p) => p.key !== "unknown" || p.sales > 0 || p.revenue > 0)
-      .sort((a, b) => (b.revenue - a.revenue) || (b.leads - a.leads));
-  }, [rdDeals, sales, platformRules, tabLeads]);
+  const platformBreakdown = useMemo(() => buildPlatformBreakdown({
+    metaLeads: tabLeads,
+    rdDeals,
+    sales,
+    platformRules,
+  }), [platformRules, rdDeals, sales, tabLeads]);
 
 
   const totalPlatformRev = platformBreakdown.reduce((s, p) => s + p.revenue, 0);

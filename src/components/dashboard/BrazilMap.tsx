@@ -32,9 +32,7 @@ const STATE_NAMES: Record<string, string> = {
 // Choropleth ramps (light → dark)
 const RAMPS = {
   brand: [
-    "hsl(var(--primary) / .10)", "hsl(var(--primary) / .20)",
-    "hsl(var(--primary) / .34)", "hsl(var(--primary) / .50)",
-    "hsl(var(--primary) / .66)", "hsl(var(--primary) / .82)", "hsl(var(--primary))",
+    "#eef2ff", "#dbeafe", "#bfdbfe", "#93c5fd", "#60a5fa", "#6366f1", "#4338ca",
   ],
   blue: ["#eff4ff", "#dbe6ff", "#b8ccff", "#8aaaff", "#5b86f7", "#3b6fe8", "#1d4ed8"],
   green: ["#ecfdf5", "#d1fae5", "#a7f3d0", "#6ee7b7", "#34d399", "#10b981", "#047857"],

@@ -7,25 +7,13 @@ import { PaymentChart } from "@/components/dashboard/PaymentChart";
 import { PlatformDrilldownSheet } from "@/components/dashboard/PlatformDrilldownSheet";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { usePlatformRules } from "@/hooks/usePlatformRules";
-import { inferPlatform, inferPlatformWithDealFallback, PLATFORM_LABELS, type TopPlatform } from "@/lib/platformInference";
+import { type TopPlatform } from "@/lib/platformInference";
 import { aggregateSales } from "@/hooks/useSales";
 import { aggregateMetrics } from "@/lib/metrics";
+import { PLATFORM_COLORS } from "@/lib/platformColors";
+import { buildPlatformBreakdown, type PlatformBreakdownRow } from "@/lib/platformBreakdown";
 
-const PLATFORM_COLORS: Record<TopPlatform, string> = {
-  meta: "hsl(var(--primary))",
-  google: "hsl(var(--primary) / .66)",
-  organic: "hsl(var(--primary) / .42)",
-  unknown: "hsl(var(--muted-foreground))",
-};
-
-type PlatformRow = {
-  key: TopPlatform;
-  name: string;
-  leads: number;
-  sales: number;
-  revenue: number;
-  conv: number;
-};
+type PlatformRow = PlatformBreakdownRow;
 
 /** A standalone widget so payment and attribution blocks can be edited independently. */
 export function PaymentChartWidget() {
@@ -43,38 +31,12 @@ export function PlatformDistributionWidget() {
   const [drilldown, setDrilldown] = useState<TopPlatform | null>(null);
   const [platformView, setPlatformView] = useState<"leads" | "revenue" | "conv">("leads");
 
-  const platformBreakdown = useMemo<PlatformRow[]>(() => {
-    const rows: Record<TopPlatform, Omit<PlatformRow, "key" | "name" | "conv">> = {
-      // The acquisition source for paid-ad insights is Meta. The normal
-      // dashboard provides a richer lead breakdown, while the Expert panel
-      // supplies raw insights; both must show the same generated lead total.
-      meta: { leads: leadBreakdown?.total ?? aggregateMetrics(insights).totalLeads, sales: 0, revenue: 0 },
-      google: { leads: 0, sales: 0, revenue: 0 },
-      organic: { leads: 0, sales: 0, revenue: 0 },
-      unknown: { leads: 0, sales: 0, revenue: 0 },
-    };
-    const dealsByRdId = new Map(rdDeals.map((deal) => [deal.rd_deal_id, deal]));
-    rdDeals.forEach((deal) => {
-      const platform = inferPlatform(deal, platformRules).platform;
-      if (platform === "meta" || platform === "unknown") return;
-      rows[platform].leads += 1;
-    });
-    sales.forEach((sale) => {
-      if (sale.status !== "confirmed") return;
-      const platform = inferPlatformWithDealFallback(sale, dealsByRdId, platformRules).platform;
-      rows[platform].sales += 1;
-      rows[platform].revenue += sale.net_revenue;
-    });
-    return (Object.keys(rows) as TopPlatform[])
-      .map((key) => ({
-        key,
-        name: PLATFORM_LABELS[key],
-        ...rows[key],
-        conv: rows[key].leads > 0 ? (rows[key].sales / rows[key].leads) * 100 : 0,
-      }))
-      .filter((row) => row.key !== "unknown" || row.sales > 0 || row.revenue > 0)
-      .sort((a, b) => (b.revenue - a.revenue) || (b.leads - a.leads));
-  }, [insights, leadBreakdown?.total, platformRules, rdDeals, sales]);
+  const platformBreakdown = useMemo<PlatformRow[]>(() => buildPlatformBreakdown({
+    metaLeads: leadBreakdown?.total ?? aggregateMetrics(insights).totalLeads,
+    rdDeals,
+    sales,
+    platformRules,
+  }), [insights, leadBreakdown?.total, platformRules, rdDeals, sales]);
 
   const totalSales = platformBreakdown.reduce((sum, row) => sum + row.sales, 0);
   const totalRevenue = platformBreakdown.reduce((sum, row) => sum + row.revenue, 0);

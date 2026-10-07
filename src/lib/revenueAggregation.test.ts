@@ -45,4 +45,14 @@ describe("aggregateRevenueSources", () => {
     ]);
     expect(result.confirmedSalesCount).toBe(2);
   });
+  it("normaliza métodos de pagamento e não duplica snapshots da mesma venda", () => {
+    const result = aggregateRevenueSources([
+      sale({ id: "sale-a", payment_method: "credit_card", net_revenue: 100 }),
+      sale({ id: "sale-a", payment_method: "cartao", net_revenue: 999, updated_at: "2026-08-02T12:00:00Z" }),
+      sale({ id: "sale-b", payment_method: "bank_slip", net_revenue: 50 }),
+    ], []);
+    expect(result.byPayment.cartao).toBe(999);
+    expect(result.byPayment.boleto).toBe(50);
+    expect(result.totalNet).toBe(1049);
+  });
 });
