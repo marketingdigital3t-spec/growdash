@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveUniqueEventClassAccount } from "@/lib/eventClassAccountLinking";
 
 export type EventClassStatus = "open" | "sold_out" | "upcoming" | "cancelled" | "finished";
 export type MemberType = "student" | "model_patient";
@@ -43,6 +45,41 @@ export function useEventClasses() {
       }) as EventClassWithCounts[];
     },
   });
+}
+
+
+/** Associates legacy classes only when the expert has exactly one linked ad account. */
+export function useBackfillEventClassAccounts(classes: EventClass[] | undefined) {
+  const queryClient = useQueryClient();
+  const processed = useRef<string>("");
+  useEffect(() => {
+    const legacy = (classes || []).filter((eventClass) => !eventClass.ad_account_id);
+    if (!legacy.length) return;
+    const key = legacy.map((eventClass) => eventClass.id).sort().join(",");
+    if (processed.current === key) return;
+    processed.current = key;
+    let cancelled = false;
+    void (async () => {
+      const { data: links, error: linksError } = await (supabase as any)
+        .from("expert_operation_sources")
+        .select("expert_id,ad_account_id")
+        .not("ad_account_id", "is", null);
+      if (cancelled || linksError) return;
+      const { data: experts, error: expertsError } = await (supabase as any)
+        .from("experts")
+        .select("id,nome");
+      if (cancelled || expertsError) return;
+      let changed = false;
+      for (const eventClass of legacy) {
+        const accountId = resolveUniqueEventClassAccount(eventClass, links || [], experts || []);
+        if (!accountId) continue;
+        const { error } = await (supabase as any).from("event_classes").update({ ad_account_id: accountId }).eq("id", eventClass.id).is("ad_account_id", null);
+        if (!error) changed = true;
+      }
+      if (changed && !cancelled) void queryClient.invalidateQueries({ queryKey: ["event_classes"] });
+    })();
+    return () => { cancelled = true; };
+  }, [classes, queryClient]);
 }
 
 export function useCreateEventClass() { const qc = useQueryClient(); const { user } = useAuth(); return useMutation({ mutationFn: async (input: ClassInput) => { const { data, error } = await supabase.from("event_classes").insert({ ...input, user_id: user!.id }).select().single(); if (error) throw error; return data as unknown as EventClass; }, onSuccess: () => qc.invalidateQueries({ queryKey: ["event_classes"] }) }); }

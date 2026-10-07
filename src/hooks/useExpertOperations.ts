@@ -6,6 +6,7 @@ import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { isPaidOperationStatus, rankExpertSales } from "@/lib/expertOperations";
 import { filterEventClassesByScope, type ClassDateRangeScope } from "@/lib/eventClassFilters";
+import { useBackfillEventClassAccounts } from "@/hooks/useEventClasses";
 
 export type ExpertOperationSale = {
   id: string; expert_id: string; event_class_id: string | null; participant_type: "student" | "model_patient";
@@ -77,6 +78,7 @@ export function useExpertOperations(
       return rows.map((row: any) => ({ ...row, participants: byClass.get(row.id) || [] }));
     },
   });
+  useBackfillEventClassAccounts(classes.data as any[] | undefined);
   const linkedAccountIds = useMemo(() => Array.from(new Set((sources.data || []).map((source) => source.ad_account_id).filter(Boolean) as string[])), [sources.data]);
   // Prefer the explicit expert-to-account link. During the migration to that
   // link table, use the account selected in the global toolbar so the expert

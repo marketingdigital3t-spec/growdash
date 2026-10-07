@@ -834,6 +834,7 @@ export function ExpertOperationsView() {
           if (!open) operations.refetch();
         }}
         defaultExpertName={selectedExpertName}
+        defaultAccountId={globalFilters.adAccountIds.length === 1 ? globalFilters.adAccountIds[0] : ""}
       />
     </div>
   );
