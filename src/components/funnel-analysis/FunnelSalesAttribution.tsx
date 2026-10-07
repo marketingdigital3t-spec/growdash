@@ -6,6 +6,7 @@ import type { InsightRow } from "@/hooks/useInsights";
 import { attributeSalesToAds } from "@/lib/salesAttribution";
 import { attributeRDOpportunity, attributeRDOpportunities } from "@/lib/opportunityAttribution";
 import type { RDDeal } from "@/hooks/useRDDeals";
+import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -38,7 +39,7 @@ export function FunnelSalesAttribution({ sales, insights = [], deals = [] }: { s
   // keyed by rd_deal_id, so it cannot duplicate a financial sale.
   const saleDealIds = new Set(enrichedSales.map((sale) => sale.rd_deal_id).filter(Boolean));
   const rdWonRows = deals
-    .filter((deal) => (deal.stage_bucket === "client" || deal.win) && !saleDealIds.has(deal.rd_deal_id))
+    .filter((deal) => (deal.stage_bucket === "client" || deal.win || isWonRDStageName(deal.rd_stage_name)) && !saleDealIds.has(deal.rd_deal_id))
     .map((deal) => ({
       id: `rd:${deal.rd_deal_id}`,
       user_id: "",
