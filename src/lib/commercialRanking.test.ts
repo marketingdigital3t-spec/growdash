@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCommercialAccountRankings } from "@/lib/commercialRanking";
+import { buildCommercialAccountRankings, buildCommercialExpertRankings, buildCommercialGlobalRanking } from "@/lib/commercialRanking";
 
 const sale = (id: string, account: string, seller: string, revenue: number, status = "confirmed") => ({
   sale: { id, ad_account_id: account, status, net_revenue: revenue, quantity: 1 } as any,
@@ -40,5 +40,30 @@ describe("buildCommercialAccountRankings", () => {
     });
     expect(account.leader?.performance).toBe(75);
     expect(account.target).toBe(0);
+  });
+
+  it("consolida contas por expert e mantém contas sem vínculo", () => {
+    const accounts = buildCommercialAccountRankings({
+      accounts: [{ id: "a", name: "Conta A" }, { id: "b", name: "Conta B" }, { id: "c", name: "Conta C" }],
+      sales: [sale("1", "a", "Gabi", 100), sale("2", "b", "Gabi", 50), sale("3", "c", "Aline", 25)],
+      deals: [],
+    });
+    const experts = buildCommercialExpertRankings(accounts, [{ expertId: "e1", expertName: "Expert 1", adAccountId: "a" }, { expertId: "e1", expertName: "Expert 1", adAccountId: "b" }]);
+    expect(experts.map((expert) => expert.accountName)).toEqual(["Expert 1", "Sem expert"]);
+    expect(experts[0].totalRevenue).toBe(150);
+    expect(experts[0].leader?.seller).toBe("Gabi");
+    expect(experts[1].leader?.seller).toBe("Aline");
+  });
+
+  it("gera o ranking global com empate determinístico e ignora vendas pendentes", () => {
+    const accounts = buildCommercialAccountRankings({
+      accounts: [{ id: "a", name: "Conta A" }, { id: "b", name: "Conta B" }],
+      sales: [sale("1", "a", "Bia", 100), sale("2", "b", "Ana", 100), sale("3", "b", "Ana", 20, "pending")],
+      deals: [],
+    });
+    const global = buildCommercialGlobalRanking(buildCommercialExpertRankings(accounts, []));
+    expect(global.totalRevenue).toBe(200);
+    expect(global.sellers.map((seller) => seller.seller)).toEqual(["Ana", "Bia"]);
+    expect(global.sellers.find((seller) => seller.seller === "Ana")?.count).toBe(1);
   });
 });
