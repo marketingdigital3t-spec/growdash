@@ -246,14 +246,7 @@ export default function CommercialPage() {
         eyebrow="Performance de vendas"
         title="Ranking Comercial"
         description="Veja os líderes por expert e o ranking global da empresa com base nas vendas confirmadas."
-        actions={(
-          <div className="flex flex-wrap gap-2">
-            <AccountMultiSelect accounts={accountOptions} selectedIds={adAccountIds} onChange={setAdAccountIds} ariaLabel="Selecionar contas do ranking comercial" />
-            <OptionMultiSelect options={expertOptions} selectedIds={selectedExpertIds} onChange={(ids) => { setSelectedExpertIds(ids); setRankingPage(0); }} emptyLabel="Todos os experts" ariaLabel="Selecionar experts do ranking comercial" />
-            <select aria-label="Filtrar por vendedor" className="gd-button min-w-40" value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)}><option value="all">Todos os vendedores</option>{sellers.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
-            <select aria-label="Filtrar por produto" className="gd-button min-w-40" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
-          </div>
-        )}
+        actions={<span className="hidden" aria-hidden="true" />}
       />
 
       {queryErrors.length > 0 && (
@@ -288,6 +281,18 @@ export default function CommercialPage() {
         totals={{ revenue: selectedRevenue, sales: selectedSales, target: selectedTarget, ticket: selectedSales ? selectedRevenue / selectedSales : 0 }}
         series={performanceSeries}
         scope={rankingScope}
+        accountOptions={accountOptions}
+        selectedAccountIds={adAccountIds}
+        onAccountsChange={(ids) => { setAdAccountIds(ids); setRankingPage(0); }}
+        expertOptions={expertOptions}
+        selectedExpertIds={selectedExpertIds}
+        onExpertsChange={(ids) => { setSelectedExpertIds(ids); setRankingPage(0); }}
+        sellerOptions={sellers}
+        sellerFilter={sellerFilter}
+        onSellerFilterChange={(value) => { setSellerFilter(value); setRankingPage(0); }}
+        productOptions={productOptions}
+        productFilter={productFilter}
+        onProductFilterChange={(value) => { setProductFilter(value); setRankingPage(0); }}
         sellerAvatars={new Map((sellerProfiles.data || []).map((profile) => [profile.seller_name, profile.avatar_url || ""]))}
         onSellerAvatarUpload={saveSellerAvatar}
       /></>}
@@ -304,8 +309,8 @@ function DetailFilter({ label, value, onChange, options }: { label: string; valu
   return <label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><select aria-label={`Filtrar vendas por ${label.toLocaleLowerCase("pt-BR")}`} className="h-10 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" value={value} onChange={(event) => onChange(event.target.value)}><option value="all">{label}: todos</option>{options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
 }
 
-function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricChange, accountId, onAccountChange, ranking, rankingPage, onRankingPageChange, periodLabel, totals, series, scope, sellerAvatars, onSellerAvatarUpload }: {
-  account: CommercialAccountRanking | undefined; accounts: CommercialAccountRanking[]; isLoading: boolean; metric: RankingMetric; onMetricChange: (metric: RankingMetric) => void; accountId: string; onAccountChange: (id: string) => void; ranking: CommercialAccountRanking["sellers"]; rankingPage: number; onRankingPageChange: (page: number) => void; periodLabel: string; totals: { revenue: number; sales: number; target: number; ticket: number }; series: Array<{ date: string; revenue: number; sales: number }>; scope: RankingScope; sellerAvatars: Map<string, string>; onSellerAvatarUpload: (sellerName: string, file: File) => Promise<void>;
+function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricChange, accountId, onAccountChange, ranking, rankingPage, onRankingPageChange, periodLabel, totals, series, scope, accountOptions, selectedAccountIds, onAccountsChange, expertOptions, selectedExpertIds, onExpertsChange, sellerOptions, sellerFilter, onSellerFilterChange, productOptions, productFilter, onProductFilterChange, sellerAvatars, onSellerAvatarUpload }: {
+  account: CommercialAccountRanking | undefined; accounts: CommercialAccountRanking[]; isLoading: boolean; metric: RankingMetric; onMetricChange: (metric: RankingMetric) => void; accountId: string; onAccountChange: (id: string) => void; ranking: CommercialAccountRanking["sellers"]; rankingPage: number; onRankingPageChange: (page: number) => void; periodLabel: string; totals: { revenue: number; sales: number; target: number; ticket: number }; series: Array<{ date: string; revenue: number; sales: number }>; scope: RankingScope; accountOptions: Array<{ id: string; name: string }>; selectedAccountIds: string[]; onAccountsChange: (ids: string[]) => void; expertOptions: Array<{ id: string; name: string }>; selectedExpertIds: string[]; onExpertsChange: (ids: string[]) => void; sellerOptions: string[]; sellerFilter: string; onSellerFilterChange: (value: string) => void; productOptions: Array<{ value: string; label: string }>; productFilter: string; onProductFilterChange: (value: string) => void; sellerAvatars: Map<string, string>; onSellerAvatarUpload: (sellerName: string, file: File) => Promise<void>;
 }) {
   const podiumOrder = ranking.length === 1 ? [ranking[0]] : ranking.length === 2 ? [ranking[0], ranking[1]] : [ranking[1], ranking[0], ranking[2]].filter(Boolean);
   const rowsPerPage = 10;
@@ -344,7 +349,14 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
     <div className="relative p-4 sm:p-6 xl:p-8">
       <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0"><div className="flex items-center gap-2 text-[#f6c94c]"><Trophy className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-[.28em]">Ranking Comercial</span></div><h2 className="mt-2 text-2xl font-black tracking-[-.045em] text-white sm:text-3xl">Painel de performance</h2><p className="mt-1 text-xs text-slate-400">Classificação calculada somente com vendas confirmadas no período.</p></div>
-        <div className="flex flex-wrap items-end gap-2"><div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div><button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={() => void toggleFocusMode()} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
+        <div className="flex flex-wrap items-end justify-end gap-2">
+          <AccountMultiSelect accounts={accountOptions} selectedIds={selectedAccountIds} onChange={onAccountsChange} ariaLabel="Selecionar contas do ranking comercial" />
+          <OptionMultiSelect options={expertOptions} selectedIds={selectedExpertIds} onChange={onExpertsChange} emptyLabel="Todos os experts" ariaLabel="Selecionar experts do ranking comercial" />
+          <select aria-label="Filtrar por vendedor" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={sellerFilter} onChange={(event) => onSellerFilterChange(event.target.value)}><option value="all">Todos os vendedores</option>{sellerOptions.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
+          <select aria-label="Filtrar por produto" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={productFilter} onChange={(event) => onProductFilterChange(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
+          <div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div>
+          <button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={() => void toggleFocusMode()} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button>
+        </div>
       </header>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><select aria-label={scope === "global" ? "Ranking global exibido" : "Expert exibido no ranking"} value={accountId} onChange={(event) => onAccountChange(event.target.value)} className="h-10 max-w-full rounded-xl border border-white/10 bg-[#0b172c] px-3 text-xs font-bold text-slate-100 outline-none focus:border-[#f6c94c]">{accounts.map((item) => <option key={item.accountId} value={item.accountId}>{item.accountName}</option>)}</select><div className="flex rounded-xl border border-white/10 bg-black/20 p-1">{(["revenue", "sales", "goalPercentage"] as RankingMetric[]).map((item) => <button type="button" key={item} onClick={() => { onMetricChange(item); onRankingPageChange(0); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[.08em] transition ${metric === item ? "bg-[#d9a928] text-[#111728] shadow-lg" : "text-slate-400 hover:text-white"}`}>{item === "revenue" ? "Caixa" : item === "sales" ? "Vendas" : "Meta"}</button>)}</div></div>
       {!account && <div className="mt-6"><EmptyRanking text="Nenhuma conta ou vendedor encontrado para os filtros atuais." /></div>}
