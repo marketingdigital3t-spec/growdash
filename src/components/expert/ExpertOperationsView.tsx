@@ -433,7 +433,8 @@ export function ExpertOperationsView() {
     startDate: globalFilters.startDate,
     endDate: globalFilters.endDate,
     selectedAccountIds: globalFilters.adAccountIds,
-  }), [globalFilters.adAccountIds, globalFilters.endDate, globalFilters.startDate]);
+    includeFutureClasses: globalFilters.preset === "max",
+  }), [globalFilters.adAccountIds, globalFilters.endDate, globalFilters.preset, globalFilters.startDate]);
   const operations = useExpertOperations(selectedExpertId, accountScopeIds, operationDates);
   const [slide, setSlide] = useState(0);
   const tabClasses = useMemo(() => classTab === "all" ? operations.classes : operations.classes.filter((eventClass: any) => classBucket(eventClass) === classTab), [classTab, operations.classes]);
@@ -447,7 +448,9 @@ export function ExpertOperationsView() {
     ? operations.accountIds.map((id) => adAccounts.data?.find((account) => account.id === id)?.name || id).join(", ")
     : "Nenhuma conta Meta vinculada";
   const periodLabel = `${operationDates.startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${operationDates.endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
-  const classDateRangeLabel = `${operationDates.startDate.toLocaleDateString("pt-BR")} a ${operationDates.endDate.toLocaleDateString("pt-BR")}`;
+  const classDateRangeLabel = operationDates.includeFutureClasses
+    ? `${operationDates.startDate.toLocaleDateString("pt-BR")} em diante (Máximo)`
+    : `${operationDates.startDate.toLocaleDateString("pt-BR")} a ${operationDates.endDate.toLocaleDateString("pt-BR")}`;
   const dailyRevenue = useMemo(() => {
     const days = new Map<string, number>();
     operations.sales.forEach((sale) => {

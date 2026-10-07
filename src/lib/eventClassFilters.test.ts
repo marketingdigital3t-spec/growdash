@@ -18,6 +18,11 @@ describe("event class global date and account filters", () => {
     expect(result.map((item) => item.date_start)).toEqual(["2026-10-01", "2026-10-31"]);
   });
 
+  it("includes a future class when the maximum inventory scope is used", () => {
+    const maximumScope = { startDate: "2026-10-01", endDate: "9999-12-31" };
+    expect(filterEventClassesByScope([row("2026-11-15", "ca02")], maximumScope, ["ca02"])).toHaveLength(1);
+  });
+
   it("shows every account when the account selection is empty", () => {
     expect(filterEventClassesByScope([row("2026-10-02", "ca01"), row("2026-10-03", "ste01"), row("2026-10-04", null)], scope, [])).toHaveLength(3);
   });

@@ -28,6 +28,7 @@ export interface ExpertOperationsScope {
   startDate: Date;
   endDate: Date;
   selectedAccountIds?: string[];
+  includeFutureClasses?: boolean;
 }
 
 export function useExpertOperations(
@@ -39,6 +40,8 @@ export function useExpertOperations(
   const startDate = scope?.startDate ?? globalFilters.startDate;
   const endDate = scope?.endDate ?? globalFilters.endDate;
   const selectedAccountIds = scope?.selectedAccountIds ?? scopedAccountIds;
+  const includeFutureClasses = scope?.includeFutureClasses ?? false;
+  const classEndDate = includeFutureClasses ? "9999-12-31" : businessDateKey(endDate);
   const expert = useQuery({ queryKey: ["expert-operations-expert", expertId], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("experts").select("nome").eq("id", expertId!).maybeSingle(); if (error) throw error; return data; } });
   const sources = useQuery({
     queryKey: ["expert-operation-sources", expertId, scopedAccountIds], enabled: Boolean(expertId),
@@ -75,12 +78,13 @@ export function useExpertOperations(
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, businessDateKey(startDate), businessDateKey(endDate), Object.keys(expertAccountLinks.data?.expertToAccountIds || {}).join(",")], enabled: Boolean(expertId || scopedAccountIds.length),
+    queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, businessDateKey(startDate), classEndDate, includeFutureClasses, Object.keys(expertAccountLinks.data?.expertToAccountIds || {}).join(",")], enabled: Boolean(expertId || scopedAccountIds.length),
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
       // Account filtering happens after loading the relationship table so a class
       // linked to a secondary account is not removed by the primary legacy column.
-      query = query.gte("date_start", businessDateKey(startDate)).lte("date_start", businessDateKey(endDate));
+      query = query.gte("date_start", businessDateKey(startDate));
+      if (!includeFutureClasses) query = query.lte("date_start", businessDateKey(endDate));
       const { data, error } = await query;
       if (error) throw error;
       const rows = data || [];
@@ -111,12 +115,12 @@ export function useExpertOperations(
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(accountIds.length));
   const filteredClasses = useMemo(() => filterEventClassesByScope(
     (classes.data || []) as Array<{ date_start: string; ad_account_id?: string | null; ad_account_ids?: string[]; expert_id?: string | null; expert_name?: string | null }>,
-    { startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) } satisfies ClassDateRangeScope,
+    { startDate: businessDateKey(startDate), endDate: classEndDate } satisfies ClassDateRangeScope,
     selectedAccountIds,
     expertId,
     expert.data?.nome,
     expertAccountLinks.data as ExpertAccountScope | undefined,
-  ), [classes.data, endDate, expert.data?.nome, expertId, expertAccountLinks.data, selectedAccountIds, startDate]);
+  ), [classes.data, classEndDate, expert.data?.nome, expertId, expertAccountLinks.data, selectedAccountIds, startDate]);
   const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, businessDateKey(startDate).slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${businessDateKey(startDate).slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));
