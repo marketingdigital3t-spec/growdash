@@ -1,6 +1,7 @@
-export interface ClassMonthScope {
-  year: number;
-  month: number;
+/** Global date scope used by the event-class inventory. Dates are YYYY-MM-DD business dates. */
+export interface ClassDateRangeScope {
+  startDate: string;
+  endDate: string;
 }
 
 export interface EventClassFilterRow {
@@ -11,35 +12,14 @@ export interface EventClassFilterRow {
   archived_at?: string | null;
 }
 
-export function currentClassMonth(now = new Date()): ClassMonthScope {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric", month: "numeric" }).formatToParts(now);
-  return { year: Number(parts.find((part) => part.type === "year")?.value), month: Number(parts.find((part) => part.type === "month")?.value) };
+export function classBelongsToDateRange(row: EventClassFilterRow, scope: ClassDateRangeScope) {
+  return row.date_start >= scope.startDate && row.date_start <= scope.endDate;
 }
 
-export function classMonthBounds(scope: ClassMonthScope) {
-  const start = `${scope.year}-${String(scope.month).padStart(2, "0")}-01`;
-  const lastDay = new Date(Date.UTC(scope.year, scope.month, 0)).getUTCDate();
-  return { start, end: `${scope.year}-${String(scope.month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}` };
-}
-
-export function normalizeClassMonth(scope: ClassMonthScope): ClassMonthScope {
-  const date = new Date(Date.UTC(scope.year, scope.month - 1, 1));
-  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
-}
-
-export function shiftClassMonth(scope: ClassMonthScope, delta: number): ClassMonthScope {
-  return normalizeClassMonth({ year: scope.year, month: scope.month + delta });
-}
-
-export function classBelongsToMonth(row: EventClassFilterRow, scope: ClassMonthScope) {
-  const { start, end } = classMonthBounds(scope);
-  return row.date_start >= start && row.date_start <= end;
-}
-
-export function filterEventClassesByScope<T extends EventClassFilterRow>(rows: T[], scope: ClassMonthScope, accountIds: string[], expertId?: string, expertName?: string) {
+export function filterEventClassesByScope<T extends EventClassFilterRow>(rows: T[], scope: ClassDateRangeScope, accountIds: string[], expertId?: string, expertName?: string) {
   const normalizedExpertName = expertName?.trim().toLocaleLowerCase("pt-BR");
   return rows.filter((row) => {
-    if (!classBelongsToMonth(row, scope)) return false;
+    if (!classBelongsToDateRange(row, scope)) return false;
     if (accountIds.length && row.ad_account_id && !accountIds.includes(row.ad_account_id)) return false;
     if (accountIds.length && !row.ad_account_id) {
       if (!expertId && !normalizedExpertName) return false;

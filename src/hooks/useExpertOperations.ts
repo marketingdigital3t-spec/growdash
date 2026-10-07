@@ -5,7 +5,7 @@ import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { businessDateKey } from "@/lib/businessDate";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { isPaidOperationStatus, rankExpertSales } from "@/lib/expertOperations";
-import { classMonthBounds, filterEventClassesByScope, type ClassMonthScope } from "@/lib/eventClassFilters";
+import { filterEventClassesByScope, type ClassDateRangeScope } from "@/lib/eventClassFilters";
 
 export type ExpertOperationSale = {
   id: string; expert_id: string; event_class_id: string | null; participant_type: "student" | "model_patient";
@@ -26,7 +26,6 @@ export type ExpertOperationsData = {
 export interface ExpertOperationsScope {
   startDate: Date;
   endDate: Date;
-  classMonth: ClassMonthScope;
   selectedAccountIds?: string[];
 }
 
@@ -38,7 +37,6 @@ export function useExpertOperations(
   const globalFilters = useGlobalFilters();
   const startDate = scope?.startDate ?? globalFilters.startDate;
   const endDate = scope?.endDate ?? globalFilters.endDate;
-  const classMonth = scope?.classMonth;
   const selectedAccountIds = scope?.selectedAccountIds ?? scopedAccountIds;
   const expert = useQuery({ queryKey: ["expert-operations-expert", expertId], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("experts").select("nome").eq("id", expertId!).maybeSingle(); if (error) throw error; return data; } });
   const sources = useQuery({
@@ -60,17 +58,14 @@ export function useExpertOperations(
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, classMonth?.year, classMonth?.month], enabled: Boolean(expertId || scopedAccountIds.length),
+    queryKey: ["expert-operation-classes", expertId || "none", selectedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId || scopedAccountIds.length),
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
       if (selectedAccountIds.length) {
         const accountList = selectedAccountIds.join(",");
         query = query.or(`ad_account_id.in.(${accountList}),ad_account_id.is.null`);
       }
-      if (classMonth) {
-        const bounds = classMonthBounds(classMonth);
-        query = query.gte("date_start", bounds.start).lte("date_start", bounds.end);
-      }
+      query = query.gte("date_start", businessDateKey(startDate)).lte("date_start", businessDateKey(endDate));
       const { data, error } = await query;
       if (error) throw error;
       const rows = data || [];
@@ -95,11 +90,11 @@ export function useExpertOperations(
   const traffic = useMetaTrafficMetrics({ adAccountIds: accountIds, campaignIds: [], startDate: businessDateKey(startDate), endDate: businessDateKey(endDate), timezone: sources.data?.[0]?.timezone || "America/Sao_Paulo", attributionWindow: sources.data?.length === 1 ? sources.data[0].attribution_window : undefined }, Boolean(accountIds.length));
   const filteredClasses = useMemo(() => filterEventClassesByScope(
     (classes.data || []) as Array<{ date_start: string; ad_account_id?: string | null; expert_id?: string | null; expert_name?: string | null }>,
-    classMonth || { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
+    { startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) } satisfies ClassDateRangeScope,
     selectedAccountIds,
     expertId,
     expert.data?.nome,
-  ), [classes.data, classMonth, expert.data?.nome, expertId, selectedAccountIds]);
+  ), [classes.data, endDate, expert.data?.nome, expertId, selectedAccountIds, startDate]);
   const sellerGoals = useQuery({ queryKey: ["expert-sales-goals", expertId, businessDateKey(startDate).slice(0, 7)], enabled: Boolean(expertId), queryFn: async () => { const { data, error } = await (supabase as any).from("expert_sales_goals").select("seller_name,target_cents").eq("expert_id", expertId!).eq("goal_month", `${businessDateKey(startDate).slice(0, 7)}-01`); if (error) throw error; return data || []; } });
   const sellers = useMemo(() => {
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));

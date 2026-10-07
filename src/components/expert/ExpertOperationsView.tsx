@@ -19,9 +19,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
-import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { useExpertOperations } from "@/hooks/useExpertOperations";
-import { currentClassMonth, shiftClassMonth, type ClassMonthScope } from "@/lib/eventClassFilters";
 import { useArchiveEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { Button } from "@/components/ui/button";
@@ -431,13 +429,11 @@ export function ExpertOperationsView() {
   const selectedExpert = globalFilters.adAccountIds.length === 1 && expertOptions.length === 1 ? expertOptions[0] : undefined;
   const selectedExpertId = selectedExpert?.id;
   const selectedExpertName = selectedExpert?.nome || "";
-  const [classMonth, setClassMonth] = useState<ClassMonthScope>(() => currentClassMonth());
   const operationDates = useMemo(() => ({
     startDate: globalFilters.startDate,
     endDate: globalFilters.endDate,
-    classMonth,
     selectedAccountIds: globalFilters.adAccountIds,
-  }), [classMonth, globalFilters.adAccountIds, globalFilters.endDate, globalFilters.startDate]);
+  }), [globalFilters.adAccountIds, globalFilters.endDate, globalFilters.startDate]);
   const operations = useExpertOperations(selectedExpertId, accountScopeIds, operationDates);
   const [slide, setSlide] = useState(0);
   const tabClasses = useMemo(() => classTab === "all" ? operations.classes : operations.classes.filter((eventClass: any) => classBucket(eventClass) === classTab), [classTab, operations.classes]);
@@ -451,7 +447,7 @@ export function ExpertOperationsView() {
     ? operations.accountIds.map((id) => adAccounts.data?.find((account) => account.id === id)?.name || id).join(", ")
     : "Nenhuma conta Meta vinculada";
   const periodLabel = `${operationDates.startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${operationDates.endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
-  const classMonthLabel = new Date(classMonth.year, classMonth.month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const classDateRangeLabel = `${operationDates.startDate.toLocaleDateString("pt-BR")} a ${operationDates.endDate.toLocaleDateString("pt-BR")}`;
   const dailyRevenue = useMemo(() => {
     const days = new Map<string, number>();
     operations.sales.forEach((sale) => {
@@ -463,7 +459,7 @@ export function ExpertOperationsView() {
       .slice(-14);
   }, [operations.sales]);
   const maxRevenue = Math.max(...dailyRevenue.map(([, value]) => value), 1);
-  useEffect(() => setSlide(0), [classMonth, classTab, globalFilters.adAccountIds]);
+  useEffect(() => setSlide(0), [classTab, globalFilters.adAccountIds, globalFilters.endDate, globalFilters.startDate]);
   return (
     <div className="expert-operations-view space-y-3">
       <div className="expert-operations-toolbar flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/[.04] px-3 py-2 lg:flex-row lg:items-center lg:gap-3">
@@ -480,20 +476,6 @@ export function ExpertOperationsView() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AccountMultiSelect
-            accounts={(adAccounts.data || []).map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))}
-            selectedIds={globalFilters.adAccountIds}
-            onChange={globalFilters.setAdAccountIds}
-            emptyLabel="Todas as contas"
-            ariaLabel="Selecionar conta de anúncio da operação"
-            className="min-h-9 sm:h-9 lg:min-w-[250px]"
-          />
-          {!experts.isLoading && !accountScopeIds.length && <span className="text-[10px] text-muted-foreground">Nenhuma conta de anúncio autorizada.</span>}
-          <div className="flex h-9 items-center gap-1 rounded-md border border-border bg-background/70 px-1" aria-label="Selecionar mês das turmas">
-            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="Mês anterior" onClick={() => setClassMonth((current) => shiftClassMonth(current, -1))}>‹</Button>
-            <span className="min-w-[126px] text-center text-[11px] font-bold capitalize">{classMonthLabel}</span>
-            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="Próximo mês" onClick={() => setClassMonth((current) => shiftClassMonth(current, 1))}>›</Button>
-          </div>
           <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
             <span
               className={`h-1.5 w-1.5 rounded-full ${operations.sync.status === "fresh" ? "bg-emerald-500" : operations.sync.status === "syncing" ? "bg-amber-500" : "bg-red-500"}`}
@@ -520,7 +502,7 @@ export function ExpertOperationsView() {
             </p>
             <h3 className="text-base font-black">Turmas em operação</h3>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {classMonthLabel} · Arraste para o lado para ver todas as turmas.
+              Período global: {classDateRangeLabel} · Arraste para o lado para ver todas as turmas.
             </p>
           </div>
           <div className="flex flex-wrap gap-1">

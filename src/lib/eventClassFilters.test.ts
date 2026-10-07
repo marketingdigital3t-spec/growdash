@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { classMonthBounds, filterEventClassesByScope, shiftClassMonth } from "@/lib/eventClassFilters";
+import { filterEventClassesByScope } from "@/lib/eventClassFilters";
 
-const scope = { year: 2026, month: 10 };
+const scope = { startDate: "2026-10-01", endDate: "2026-10-31" };
 const row = (date_start: string, ad_account_id: string | null, expert_name = "Ranniely") => ({ id: `${date_start}-${ad_account_id}`, date_start, ad_account_id, expert_name });
 
-describe("event class month and account filters", () => {
-  it("uses the first date month and handles month boundaries", () => {
-    expect(classMonthBounds(scope)).toEqual({ start: "2026-10-01", end: "2026-10-31" });
-    expect(filterEventClassesByScope([row("2026-10-31", "ranniely"), row("2026-11-01", "ranniely")], scope, []).map((item) => item.date_start)).toEqual(["2026-10-31"]);
-    expect(shiftClassMonth(scope, 1)).toEqual({ year: 2026, month: 11 });
+describe("event class global date and account filters", () => {
+  it("uses date_start within the global interval", () => {
+    const result = filterEventClassesByScope([
+      row("2026-09-30", "ranniely"),
+      row("2026-10-01", "ranniely"),
+      row("2026-10-31", "ranniely"),
+      row("2026-11-01", "ranniely"),
+    ], scope, []);
+    expect(result.map((item) => item.date_start)).toEqual(["2026-10-01", "2026-10-31"]);
   });
 
   it("shows every account when the account selection is empty", () => {
@@ -24,6 +28,11 @@ describe("event class month and account filters", () => {
       row("2026-10-05", null, "Sté"),
     ], scope, ["ranniely"], "expert-ranniely", "Ranniely");
     expect(result.map((item) => item.ad_account_id)).toEqual(["ranniely", null]);
+  });
+
+  it("supports multiple selected accounts", () => {
+    const result = filterEventClassesByScope([row("2026-10-02", "ranniely"), row("2026-10-03", "sté"), row("2026-10-04", "jose")], scope, ["ranniely", "sté"]);
+    expect(result.map((item) => item.ad_account_id)).toEqual(["ranniely", "sté"]);
   });
 
   it("does not assign an orphan legacy class when the selected account has no reliable expert", () => {
