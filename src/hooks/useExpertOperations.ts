@@ -15,7 +15,7 @@ export type ExpertOperationSale = {
 };
 export type ExpertOperationSource = { expert_id: string; ad_account_id: string | null; attribution_window: string; timezone: string };
 export type ExpertOperationsData = {
-  expertId: string;
+  expertId?: string;
   sources: ExpertOperationSource[];
   sales: ExpertOperationSale[];
   classes: any[];
@@ -52,7 +52,7 @@ export function useExpertOperations(
     },
   });
   const classes = useQuery({
-    queryKey: ["expert-operation-classes", expertId || "none", scopedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId),
+    queryKey: ["expert-operation-classes", expertId || "none", scopedAccountIds, businessDateKey(startDate), businessDateKey(endDate)], enabled: Boolean(expertId || scopedAccountIds.length),
     queryFn: async () => {
       let query = (supabase as any).from("event_classes").select("*").order("date_start", { ascending: true });
       if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
@@ -92,6 +92,6 @@ export function useExpertOperations(
     const goals = new Map((sellerGoals.data || []).map((row: any) => [String(row.seller_name).trim().toLocaleLowerCase(), Number(row.target_cents || 0)]));
     return rankExpertSales(sales.data || [], Object.fromEntries(goals));
   }, [sales.data, sellerGoals.data]);
-  const syncStatus = traffic.data.status === "syncing" || sources.isFetching || sales.isFetching ? "syncing" : traffic.data.status;
-  return { expertId, sources: sources.data || [], accountIds, sales: sales.data || [], classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || classes.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
+  const syncStatus = traffic.data.status === "syncing" || sources.isFetching || sales.isFetching || classes.isFetching ? "syncing" : traffic.data.status;
+  return { expertId, sources: sources.data || [], accountIds, sales: sales.data || [], classes: filteredClasses, traffic: traffic.data, sellers, sync: { status: syncStatus, syncedAt: traffic.data.syncedAt, errors: [sources.error, sales.error, classes.error, sellerGoals.error, traffic.error].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error)) }, isLoading: sources.isLoading || sales.isLoading || classes.isLoading || sellerGoals.isLoading || traffic.isLoading, refetch: () => { void sources.refetch(); void sales.refetch(); void classes.refetch(); void sellerGoals.refetch(); void traffic.refetch(); } };
 }

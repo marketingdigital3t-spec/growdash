@@ -19,8 +19,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
+import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
-import { resolvePreset, type DatePreset } from "@/hooks/useDateFilter";
 import { useExpertOperations } from "@/hooks/useExpertOperations";
 import { useArchiveEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
@@ -28,13 +28,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
 import { EventClassMembersDialog } from "@/components/event-classes/EventClassMembersDialog";
 import { ExpertClassDetailsDialog } from "@/components/expert/ExpertClassDetailsDialog";
@@ -106,7 +99,7 @@ function ClassCard({
 }: {
   eventClass: any;
   sales: any[];
-  expertId: string;
+  expertId?: string;
   sources: any[];
   onRefresh: () => void;
 }) {
@@ -196,6 +189,7 @@ function ClassCard({
             ? "Em breve"
             : "Aberta";
   const archived = Boolean(eventClass.archived_at);
+  const classExpertId = eventClass.expert_id || expertId || "";
   const handleArchive = async () => {
     if (!window.confirm(`Arquivar a turma "${eventClass.title}"? Ela ficará em Turmas passadas e os dados financeiros serão preservados.`)) return;
     await archive.mutateAsync({ id: eventClass.id, reason: "Arquivada pela Agenda & Turmas." });
@@ -249,6 +243,7 @@ function ClassCard({
                   size="icon"
                   variant="ghost"
                   aria-label="Vincular planilhas"
+                  disabled={!classExpertId}
                   onClick={() => setSheetOpen(true)}
                 >
                   <Link2 className="h-3.5 w-3.5" />
@@ -354,7 +349,7 @@ function ClassCard({
       <ExpertSheetLinkDialog
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        expertId={expertId}
+        expertId={classExpertId}
         eventClass={eventClass}
         onSaved={onRefresh}
       />
@@ -364,7 +359,7 @@ function ClassCard({
         eventClass={eventClass}
         sales={sales}
         sources={sources}
-        expertId={expertId}
+        expertId={classExpertId}
       />
     </>
   );
@@ -420,33 +415,27 @@ export function ExpertOperationsView() {
         .map((row: any) => ({ ...row, operationSources: sourcesByExpert.get(String(row.id)) || [] }));
     },
   });
-  const [expertId, setExpertId] = useState("");
   const [createClassOpen, setCreateClassOpen] = useState(false);
   const [classTab, setClassTab] = useState<"open" | "upcoming" | "past">("open");
-  const [operationPreset, setOperationPreset] = useState<DatePreset>(globalFilters.preset);
-  const [operationCustomRange, setOperationCustomRange] = useState(globalFilters.customRange);
-  const operationDates = useMemo(
-    () => resolvePreset(operationPreset, operationCustomRange),
-    [operationPreset, operationCustomRange],
+  const accountScopeIds = useMemo(
+    () => globalFilters.adAccountIds.length
+      ? globalFilters.adAccountIds
+      : (adAccounts.data || []).map((account) => account.id),
+    [adAccounts.data, globalFilters.adAccountIds],
   );
-  const expertOptions = useMemo(() => experts.data || [], [experts.data]);
-  const selectedExpertId = expertOptions.some((expert: any) => expert.id === expertId)
-    ? expertId
-    : expertOptions[0]?.id;
-  const selectedExpert = expertOptions.find((expert: any) => expert.id === selectedExpertId);
-  const selectedExpertAccountIds = useMemo(
-    () => Array.from(new Set((selectedExpert?.operationSources || []).map((source: any) => String(source.ad_account_id)).filter(Boolean))),
-    [selectedExpert],
-  );
+  const expertOptions = useMemo(() => (experts.data || []).filter((expert: any) =>
+    !accountScopeIds.length || (expert.operationSources || []).some((source: any) => accountScopeIds.includes(String(source.ad_account_id)))), [accountScopeIds, experts.data]);
+  // An account can contain several experts. In that case the account remains
+  // the scope and all its classes are shown; an expert is resolved only when
+  // the account has one unambiguous operation owner.
+  const selectedExpert = expertOptions.length === 1 ? expertOptions[0] : undefined;
+  const selectedExpertId = selectedExpert?.id;
   const selectedExpertName = selectedExpert?.nome || "";
-  const operations = useExpertOperations(selectedExpertId, selectedExpertAccountIds, operationDates);
-  useEffect(() => {
-    if (!expertOptions.length) {
-      if (expertId) setExpertId("");
-      return;
-    }
-    if (!expertOptions.some((expert: any) => expert.id === expertId)) setExpertId(expertOptions[0].id);
-  }, [expertId, expertOptions]);
+  const operationDates = useMemo(
+    () => ({ startDate: globalFilters.startDate, endDate: globalFilters.endDate }),
+    [globalFilters.endDate, globalFilters.startDate],
+  );
+  const operations = useExpertOperations(selectedExpertId, accountScopeIds, operationDates);
   const [slide, setSlide] = useState(0);
   const tabClasses = useMemo(() => operations.classes.filter((eventClass: any) => classBucket(eventClass) === classTab), [classTab, operations.classes]);
   const visibleClasses = useMemo(() => tabClasses.slice(slide, slide + 4), [slide, tabClasses]);
@@ -487,27 +476,22 @@ export function ExpertOperationsView() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-            <Select value={selectedExpertId || ""} onValueChange={setExpertId} disabled={!expertOptions.length}>
-              <SelectTrigger className="h-9 w-full lg:w-56">
-                <SelectValue placeholder="Selecione sua conta de anúncio" />
-              </SelectTrigger>
-            <SelectContent>
-              {expertOptions.map((expert: any) => (
-                <SelectItem key={expert.id} value={expert.id}>
-                  {expert.nome} · {(expert.operationSources || []).map((source: any) => adAccounts.data?.find((account) => account.id === source.ad_account_id)?.name || source.ad_account_id).join(", ")}
-                </SelectItem>
-              ))}
-              </SelectContent>
-            </Select>
-          {!experts.isLoading && !expertOptions.length && <span className="text-[10px] text-muted-foreground">Nenhum expert vinculado a uma conta de anúncio.</span>}
+          <AccountMultiSelect
+            accounts={(adAccounts.data || []).map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))}
+            selectedIds={globalFilters.adAccountIds}
+            onChange={globalFilters.setAdAccountIds}
+            emptyLabel="Todas as contas"
+            ariaLabel="Selecionar conta de anúncio da operação"
+            className="min-h-9 sm:h-9 lg:min-w-[250px]"
+          />
+          {!experts.isLoading && !accountScopeIds.length && <span className="text-[10px] text-muted-foreground">Nenhuma conta de anúncio autorizada.</span>}
           <MetaDateRangePicker
-            preset={operationPreset}
-            onPresetChange={setOperationPreset}
-            customRange={operationCustomRange}
-            onCustomRangeChange={setOperationCustomRange}
-            startDate={operationDates.startDate}
-            endDate={operationDates.endDate}
-            applyPresetOnClick
+            preset={globalFilters.preset}
+            onPresetChange={globalFilters.setPreset}
+            customRange={globalFilters.customRange}
+            onCustomRangeChange={globalFilters.setCustomRange}
+            startDate={globalFilters.startDate}
+            endDate={globalFilters.endDate}
             className="h-9"
           />
           <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
