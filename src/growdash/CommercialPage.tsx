@@ -15,10 +15,13 @@ import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useAuth } from "@/contexts/AuthContext";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { OptionMultiSelect } from "@/components/dashboard/OptionMultiSelect";
+import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { PageHeading } from "./shared";
 import { buildCommercialAccountRankings, buildCommercialExpertRankings, buildCommercialGlobalRanking, type CommercialAccountRanking, type CommercialSaleRow } from "@/lib/commercialRanking";
+import { getExpertAccountIds, validateSellerAvatarFile, type CommercialExpertAccountLink } from "@/lib/commercialFilters";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 type RankingMetric = "revenue" | "sales" | "goalPercentage";
@@ -49,6 +52,10 @@ export default function CommercialPage() {
     setAdAccountIds,
     adAccountIds,
     funnelIds,
+    preset,
+    setPreset,
+    customRange,
+    setCustomRange,
     startDate,
     endDate,
     businessUnitId,
@@ -70,7 +77,7 @@ export default function CommercialPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from("expert_operation_sources").select("expert_id,ad_account_id").not("ad_account_id", "is", null),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from("experts").select("id,nome").order("nome"),
+        (supabase as any).from("experts").select("id,nome").eq("workspace_id", workspaceId!).order("nome"),
       ]);
       if (linksError) throw linksError;
       if (expertsError) throw expertsError;
@@ -88,7 +95,7 @@ export default function CommercialPage() {
     enabled: Boolean(workspaceId),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any).from("experts").select("id,nome").order("nome");
+      const { data, error } = await (supabase as any).from("experts").select("id,nome").eq("workspace_id", workspaceId!).order("nome");
       if (error) throw error;
       return (data || []) as Array<{ id: string; nome: string }>;
     },
@@ -119,18 +126,19 @@ export default function CommercialPage() {
     staleTime: 5 * 60_000,
   });
   const saveSellerAvatar = async (sellerName: string, file: File) => {
-    if (!user || !workspaceId) return;
-    if (!file.type.startsWith("image/")) throw new Error("Escolha uma imagem.");
-    if (file.size > 5 * 1024 * 1024) throw new Error("A foto deve ter no máximo 5 MB.");
+    if (!user || !workspaceId) throw new Error("Sua sessão ainda não está pronta para salvar a foto.");
+    const validationError = validateSellerAvatarFile(file);
+    if (validationError) throw new Error(validationError);
     const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const path = `${user.id}/commercial-sellers/${encodeURIComponent(sellerName)}-${Date.now()}.${extension}`;
     const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type });
     if (uploadError) throw uploadError;
-    const avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    const avatarUrl = `${supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any).from("commercial_seller_profiles").upsert({ workspace_id: workspaceId, seller_name: sellerName, avatar_url: avatarUrl, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,seller_name" });
     if (error) throw error;
-    void sellerProfiles.refetch();
+    await sellerProfiles.refetch();
+    toast.success(`Foto de ${sellerName} atualizada.`);
   };
 
   const accessibleAccounts = useMemo(() => {
@@ -139,19 +147,23 @@ export default function CommercialPage() {
       : adAccounts;
     return accounts;
   }, [adAccounts, businessUnitId, segment]);
-  const selectedGlobalAccountSet = useMemo(() => new Set(adAccountIds), [adAccountIds]);
-  const accountOptions = useMemo(() => accessibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [accessibleAccounts]);
+  const expertLinks = useMemo<CommercialExpertAccountLink[]>(() => expertScope.map((link) => ({ expertId: link.expertId, adAccountId: link.adAccountId })), [expertScope]);
   const expertOptions = useMemo(() => {
     const options = new Map(expertDirectory.map((expert) => [expert.id, { id: expert.id, name: expert.nome }]));
     expertScope.forEach((link) => options.set(link.expertId, { id: link.expertId, name: link.expertName }));
     return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [expertDirectory, expertScope]);
-  const scopedExpertAccountIds = useMemo(() => {
-    if (!selectedExpertIds.length) return null;
-    return new Set(expertScope.filter((link) => selectedExpertIds.includes(link.expertId)).map((link) => link.adAccountId));
-  }, [expertScope, selectedExpertIds]);
-  const visibleAccounts = useMemo(() => accessibleAccounts.filter((account) => (!selectedGlobalAccountSet.size || selectedGlobalAccountSet.has(account.id)) && (!scopedExpertAccountIds || scopedExpertAccountIds.has(account.id))), [accessibleAccounts, scopedExpertAccountIds, selectedGlobalAccountSet]);
+  const scopedExpertAccountIds = useMemo(() => getExpertAccountIds(expertLinks, selectedExpertIds), [expertLinks, selectedExpertIds]);
+  const accountOptions = useMemo(() => accessibleAccounts.filter((account) => !scopedExpertAccountIds || scopedExpertAccountIds.has(account.id)).map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [accessibleAccounts, scopedExpertAccountIds]);
+  const visibleAccounts = useMemo(() => accessibleAccounts.filter((account) => (!adAccountIds.length || adAccountIds.includes(account.id)) && (!scopedExpertAccountIds || scopedExpertAccountIds.has(account.id))), [accessibleAccounts, adAccountIds, scopedExpertAccountIds]);
   const rankingAccountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [visibleAccounts]);
+
+  const handleExpertsChange = (ids: string[]) => {
+    setSelectedExpertIds(ids);
+    const expertAccountIds = getExpertAccountIds(expertLinks, ids);
+    if (expertAccountIds) setAdAccountIds([...expertAccountIds]);
+    setRankingPage(0);
+  };
 
   useEffect(() => {
     if (!accessibleAccounts.length) return;
@@ -180,10 +192,11 @@ export default function CommercialPage() {
       .map((product) => ({ value: `rd:${product}`, label: product })),
   ], [enriched, products]);
   const filtered = useMemo(() => enriched.filter((row) => (
-    (!scopedExpertAccountIds || scopedExpertAccountIds.has(row.sale.ad_account_id || ""))
+    (!adAccountIds.length || adAccountIds.includes(row.sale.ad_account_id || ""))
+    && (!scopedExpertAccountIds || scopedExpertAccountIds.has(row.sale.ad_account_id || ""))
     && (sellerFilter === "all" || row.seller === sellerFilter)
     && (productFilter === "all" || productFilter === `local:${row.sale.product_id}` || (!row.sale.product_id && productFilter === `rd:${row.product}`))
-  )), [enriched, productFilter, scopedExpertAccountIds, sellerFilter]);
+  )), [adAccountIds, enriched, productFilter, scopedExpertAccountIds, sellerFilter]);
   const detailedFiltered = useMemo(() => {
     const term = detailSearch.trim().toLocaleLowerCase("pt-BR");
     return filtered.filter((row) => {
@@ -197,10 +210,10 @@ export default function CommercialPage() {
     });
   }, [detailAccountFilter, detailProductFilter, detailSearch, detailSellerFilter, detailStatusFilter, filtered]);
   const goals = useMemo(() => new Map((goalData?.rows ?? []).map((goal) => [goal.ad_account_id, Number(goal.target_revenue)])), [goalData?.rows]);
-  const rankingDeals = useMemo(() => sellerFilter === "all" ? rdDeals : rdDeals.filter((deal) => deal.deal_owner_name === sellerFilter), [rdDeals, sellerFilter]);
+  const rankingDeals = useMemo(() => rdDeals.filter((deal) => visibleAccounts.some((account) => account.id === deal.ad_account_id) && (sellerFilter === "all" || deal.deal_owner_name === sellerFilter)), [rdDeals, sellerFilter, visibleAccounts]);
   const accountRankings = useMemo(() => buildCommercialAccountRankings({ sales: filtered, deals: rankingDeals, accounts: rankingAccountOptions, goals }), [filtered, goals, rankingAccountOptions, rankingDeals]);
-  const expertLinks = useMemo(() => expertScope.filter((link) => (!adAccountIds.length || adAccountIds.includes(link.adAccountId)) && (!selectedExpertIds.length || selectedExpertIds.includes(link.expertId))), [adAccountIds, expertScope, selectedExpertIds]);
-  const expertRankings = useMemo(() => buildCommercialExpertRankings(accountRankings, expertLinks), [accountRankings, expertLinks]);
+  const filteredExpertLinks = useMemo(() => expertScope.filter((link) => (!adAccountIds.length || adAccountIds.includes(link.adAccountId)) && (!selectedExpertIds.length || selectedExpertIds.includes(link.expertId))), [adAccountIds, expertScope, selectedExpertIds]);
+  const expertRankings = useMemo(() => buildCommercialExpertRankings(accountRankings, filteredExpertLinks), [accountRankings, filteredExpertLinks]);
   const globalRanking = useMemo(() => buildCommercialGlobalRanking(expertRankings), [expertRankings]);
   const rankingGroups = useMemo(() => rankingScope === "global" ? [globalRanking] : expertRankings, [expertRankings, globalRanking, rankingScope]);
   useEffect(() => {
@@ -278,7 +291,13 @@ export default function CommercialPage() {
         ranking={rankedSellers}
         rankingPage={rankingPage}
         onRankingPageChange={setRankingPage}
-        periodLabel={format(startDate, "MMMM yyyy", { locale: ptBR }).toLocaleUpperCase("pt-BR")}
+        periodLabel={`${format(startDate, "dd/MM/yyyy")} – ${format(endDate, "dd/MM/yyyy")}`}
+        preset={preset}
+        onPresetChange={setPreset}
+        customRange={customRange}
+        onCustomRangeChange={setCustomRange}
+        startDate={startDate}
+        endDate={endDate}
         totals={{ revenue: selectedRevenue, sales: selectedSales, target: selectedTarget, ticket: selectedSales ? selectedRevenue / selectedSales : 0 }}
         series={performanceSeries}
         scope={rankingScope}
@@ -287,7 +306,7 @@ export default function CommercialPage() {
         onAccountsChange={(ids) => { setAdAccountIds(ids); setRankingPage(0); }}
         expertOptions={expertOptions}
         selectedExpertIds={selectedExpertIds}
-        onExpertsChange={(ids) => { setSelectedExpertIds(ids); setRankingPage(0); }}
+        onExpertsChange={handleExpertsChange}
         sellerOptions={sellers}
         sellerFilter={sellerFilter}
         onSellerFilterChange={(value) => { setSellerFilter(value); setRankingPage(0); }}
@@ -310,8 +329,8 @@ function DetailFilter({ label, value, onChange, options }: { label: string; valu
   return <label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><select aria-label={`Filtrar vendas por ${label.toLocaleLowerCase("pt-BR")}`} className="h-10 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" value={value} onChange={(event) => onChange(event.target.value)}><option value="all">{label}: todos</option>{options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
 }
 
-function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricChange, accountId, onAccountChange, ranking, rankingPage, onRankingPageChange, periodLabel, totals, series, scope, accountOptions, selectedAccountIds, onAccountsChange, expertOptions, selectedExpertIds, onExpertsChange, sellerOptions, sellerFilter, onSellerFilterChange, productOptions, productFilter, onProductFilterChange, sellerAvatars, onSellerAvatarUpload }: {
-  account: CommercialAccountRanking | undefined; accounts: CommercialAccountRanking[]; isLoading: boolean; metric: RankingMetric; onMetricChange: (metric: RankingMetric) => void; accountId: string; onAccountChange: (id: string) => void; ranking: CommercialAccountRanking["sellers"]; rankingPage: number; onRankingPageChange: (page: number) => void; periodLabel: string; totals: { revenue: number; sales: number; target: number; ticket: number }; series: Array<{ date: string; revenue: number; sales: number }>; scope: RankingScope; accountOptions: Array<{ id: string; name: string }>; selectedAccountIds: string[]; onAccountsChange: (ids: string[]) => void; expertOptions: Array<{ id: string; name: string }>; selectedExpertIds: string[]; onExpertsChange: (ids: string[]) => void; sellerOptions: string[]; sellerFilter: string; onSellerFilterChange: (value: string) => void; productOptions: Array<{ value: string; label: string }>; productFilter: string; onProductFilterChange: (value: string) => void; sellerAvatars: Map<string, string>; onSellerAvatarUpload: (sellerName: string, file: File) => Promise<void>;
+function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricChange, accountId, onAccountChange, ranking, rankingPage, onRankingPageChange, periodLabel, preset, onPresetChange, customRange, onCustomRangeChange, startDate, endDate, totals, series, scope, accountOptions, selectedAccountIds, onAccountsChange, expertOptions, selectedExpertIds, onExpertsChange, sellerOptions, sellerFilter, onSellerFilterChange, productOptions, productFilter, onProductFilterChange, sellerAvatars, onSellerAvatarUpload }: {
+  account: CommercialAccountRanking | undefined; accounts: CommercialAccountRanking[]; isLoading: boolean; metric: RankingMetric; onMetricChange: (metric: RankingMetric) => void; accountId: string; onAccountChange: (id: string) => void; ranking: CommercialAccountRanking["sellers"]; rankingPage: number; onRankingPageChange: (page: number) => void; periodLabel: string; preset: import("@/hooks/useDateFilter").DatePreset; onPresetChange: (preset: import("@/hooks/useDateFilter").DatePreset) => void; customRange: { from: Date; to: Date }; onCustomRangeChange: (range: { from: Date; to: Date }) => void; startDate: Date; endDate: Date; totals: { revenue: number; sales: number; target: number; ticket: number }; series: Array<{ date: string; revenue: number; sales: number }>; scope: RankingScope; accountOptions: Array<{ id: string; name: string }>; selectedAccountIds: string[]; onAccountsChange: (ids: string[]) => void; expertOptions: Array<{ id: string; name: string }>; selectedExpertIds: string[]; onExpertsChange: (ids: string[]) => void; sellerOptions: string[]; sellerFilter: string; onSellerFilterChange: (value: string) => void; productOptions: Array<{ value: string; label: string }>; productFilter: string; onProductFilterChange: (value: string) => void; sellerAvatars: Map<string, string>; onSellerAvatarUpload: (sellerName: string, file: File) => Promise<void>;
 }) {
   const podiumOrder = ranking.length === 1 ? [ranking[0]] : ranking.length === 2 ? [ranking[0], ranking[1]] : [ranking[1], ranking[0], ranking[2]].filter(Boolean);
   const rowsPerPage = 10;
@@ -337,17 +356,18 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [focusMode]);
   const toggleFocusMode = () => setFocusMode((current) => !current);
-  const leaderboard = <section role={focusMode ? "dialog" : undefined} aria-modal={focusMode ? true : undefined} aria-label={focusMode ? "Ranking Comercial expandido" : undefined} className={`isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] ${focusMode ? "fixed inset-0 z-[300] min-h-screen rounded-none" : "relative rounded-[28px]"}`}>
+  const leaderboard = <section role={focusMode ? "dialog" : undefined} aria-modal={focusMode ? true : undefined} aria-label={focusMode ? "Ranking Comercial expandido" : undefined} className={`isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] motion-reduce:animate-none ${focusMode ? "fixed inset-0 z-[300] min-h-screen rounded-none animate-in fade-in-0 zoom-in-95 duration-300" : "relative rounded-[28px]"}`}>
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(217,169,40,.16),transparent_42%),radial-gradient(ellipse_at_5%_35%,rgba(33,94,176,.14),transparent_38%),linear-gradient(135deg,#081226_0%,#050b18_58%,#0d1830_100%)]" />
     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f6c94c]/75 to-transparent" />
     <div className="relative p-4 sm:p-6 xl:p-8">
       <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0"><div className="flex items-center gap-2 text-[#f6c94c]"><Trophy className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-[.28em]">Ranking Comercial</span></div><h2 className="mt-2 text-2xl font-black tracking-[-.045em] text-white sm:text-3xl">Painel de performance</h2><p className="mt-1 text-xs text-slate-400">Classificação calculada somente com vendas confirmadas no período.</p></div>
         <div className="flex flex-wrap items-end justify-end gap-2">
-          <AccountMultiSelect accounts={accountOptions} selectedIds={selectedAccountIds} onChange={onAccountsChange} ariaLabel="Selecionar contas do ranking comercial" />
-          <OptionMultiSelect options={expertOptions} selectedIds={selectedExpertIds} onChange={onExpertsChange} emptyLabel="Todos os experts" ariaLabel="Selecionar experts do ranking comercial" />
+          <AccountMultiSelect accounts={accountOptions} selectedIds={selectedAccountIds} onChange={onAccountsChange} popoverClassName="z-[360]" ariaLabel="Selecionar contas do ranking comercial" />
+          <OptionMultiSelect options={expertOptions} selectedIds={selectedExpertIds} onChange={onExpertsChange} popoverClassName="z-[360]" emptyLabel="Todos os experts" emptyMessage="Este expert não possui contas de anúncio vinculadas." ariaLabel="Selecionar experts do ranking comercial" />
           <select aria-label="Filtrar por vendedor" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={sellerFilter} onChange={(event) => onSellerFilterChange(event.target.value)}><option value="all">Todos os vendedores</option>{sellerOptions.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
           <select aria-label="Filtrar por produto" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={productFilter} onChange={(event) => onProductFilterChange(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
+          {focusMode && <MetaDateRangePicker preset={preset} onPresetChange={onPresetChange} customRange={customRange} onCustomRangeChange={onCustomRangeChange} startDate={startDate} endDate={endDate} popoverClassName="z-[360]" className="border-white/10 bg-white/[.045] text-slate-100" />}
           <div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div>
           <button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={toggleFocusMode} className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button>
         </div>
@@ -371,7 +391,7 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
 function PodiumCard({ seller, place, hasGoal, avatarUrl, onAvatarUpload }: { seller: CommercialAccountRanking["sellers"][number]; place: number; hasGoal: boolean; avatarUrl?: string; onAvatarUpload: (sellerName: string, file: File) => Promise<void> }) {
   const styles = place === 1 ? "border-[#f6c94c]/75 bg-[radial-gradient(circle_at_50%_0%,rgba(246,201,76,.22),transparent_48%),#151b20] shadow-[0_0_42px_-16px_rgba(246,201,76,.8)] sm:-translate-y-3" : place === 2 ? "border-[#d5dae3]/35 bg-[#0e1a2c]" : "border-[#d77a2b]/40 bg-[#1b1520]";
   const accent = place === 1 ? "#f6c94c" : place === 2 ? "#d5dae3" : "#ed8a36";
-  return <article className={`relative min-w-0 rounded-2xl border p-4 text-center transition ${styles}`}><p className="text-[10px] font-black uppercase tracking-[.16em]" style={{ color: accent }}>{place === 1 ? "1º lugar" : `${place}º lugar`}</p>{place === 1 && <Crown className="mx-auto mt-2 h-5 w-5 text-[#f6c94c]" />}<SellerAvatar seller={seller.seller} avatarUrl={avatarUrl} accent={accent} size="lg" onUpload={onAvatarUpload} /><h3 className="mt-3 truncate text-base font-black text-white" title={seller.seller}>{seller.seller}</h3><p className="mt-1 text-xs font-bold text-slate-400">{seller.count} venda(s)</p><p className="mt-4 truncate text-xl font-black tracking-tight text-white" title={brl.format(seller.revenue)}>{brl.format(seller.revenue)}</p><p className="mt-1 text-[10px] uppercase tracking-[.12em] text-slate-500">caixa gerado</p><div className="mt-4 grid grid-cols-2 gap-2 text-left"><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Ticket</p><b className="mt-1 block truncate text-[11px] text-slate-200" title={brl.format(seller.count ? seller.revenue / seller.count : 0)}>{brl.format(seller.count ? seller.revenue / seller.count : 0)}</b></div><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">{hasGoal ? "Meta" : "Participação"}</p><b className="mt-1 block text-[11px]" style={{ color: accent }}>{seller.performance.toFixed(1).replace(".", ",")}%</b></div></div></article>;
+  return <article className={`relative min-w-0 rounded-2xl border p-4 text-center transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_36px_-22px_rgba(246,201,76,.8)] motion-reduce:transform-none animate-in fade-in-0 slide-in-from-bottom-3 ${styles}`}><p className="text-[10px] font-black uppercase tracking-[.16em]" style={{ color: accent }}>{place === 1 ? "1º lugar" : `${place}º lugar`}</p>{place === 1 && <Crown className="mx-auto mt-2 h-5 w-5 text-[#f6c94c]" />}<SellerAvatar seller={seller.seller} avatarUrl={avatarUrl} accent={accent} size="lg" onUpload={onAvatarUpload} /><h3 className="mt-3 truncate text-base font-black text-white" title={seller.seller}>{seller.seller}</h3><p className="mt-1 text-xs font-bold text-slate-400">{seller.count} venda(s)</p><p className="mt-4 truncate text-xl font-black tracking-tight text-white" title={brl.format(seller.revenue)}>{brl.format(seller.revenue)}</p><p className="mt-1 text-[10px] uppercase tracking-[.12em] text-slate-500">caixa gerado</p><div className="mt-4 grid grid-cols-2 gap-2 text-left"><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Ticket</p><b className="mt-1 block truncate text-[11px] text-slate-200" title={brl.format(seller.count ? seller.revenue / seller.count : 0)}>{brl.format(seller.count ? seller.revenue / seller.count : 0)}</b></div><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">{hasGoal ? "Meta" : "Participação"}</p><b className="mt-1 block text-[11px]" style={{ color: accent }}>{seller.performance.toFixed(1).replace(".", ",")}%</b></div></div></article>;
 }
 
 function SellerAvatar({ seller, avatarUrl, accent, size, onUpload }: { seller: string; avatarUrl?: string; accent: string; size: "sm" | "lg"; onUpload: (sellerName: string, file: File) => Promise<void> }) {
@@ -380,13 +400,13 @@ function SellerAvatar({ seller, avatarUrl, accent, size, onUpload }: { seller: s
   return <label htmlFor={inputId} title={`Editar foto de ${seller}`} className={`group relative mx-auto grid cursor-pointer place-items-center overflow-hidden rounded-full border-2 text-lg font-black ${size === "lg" ? "mt-3 h-16 w-16" : "h-9 w-9 text-[10px]"}`} style={{ borderColor: accent, background: `${accent}18`, color: accent }}>
     {avatarUrl ? <img src={avatarUrl} alt={`Foto de ${seller}`} className="h-full w-full object-cover" /> : initials(seller)}
     <span className="absolute inset-0 grid place-items-center bg-black/65 text-white opacity-0 transition group-hover:opacity-100">{saving ? "…" : <Camera className="h-3.5 w-3.5" />}</span>
-    <input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setSaving(true); try { await onUpload(seller, file); } catch { /* the page keeps the previous photo */ } finally { setSaving(false); event.target.value = ""; } }} />
+    <input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setSaving(true); try { await onUpload(seller, file); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível salvar a foto."); } finally { setSaving(false); event.target.value = ""; } }} />
   </label>;
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-white/8 bg-white/[.035] p-3"><p className="text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{label}</p><b className="mt-1 block truncate text-sm font-black text-slate-100" title={value}>{value}</b></div>; }
 
-function RankingRow({ seller, position, hasGoal, avatarUrl, onAvatarUpload }: { seller: CommercialAccountRanking["sellers"][number]; position: number; hasGoal: boolean; avatarUrl?: string; onAvatarUpload: (sellerName: string, file: File) => Promise<void> }) { return <article className="grid grid-cols-[32px_36px_minmax(120px,1fr)_auto] items-center gap-3 rounded-xl border border-white/[.07] bg-white/[.025] p-3 transition hover:border-[#f6c94c]/25 hover:bg-white/[.045] sm:grid-cols-[38px_40px_minmax(150px,1.2fr)_minmax(70px,.55fr)_minmax(100px,.75fr)_minmax(90px,.65fr)]"><b className="text-sm text-slate-500">{position}º</b><SellerAvatar seller={seller.seller} avatarUrl={avatarUrl} accent="#d5dae3" size="sm" onUpload={onAvatarUpload} /><div className="min-w-0"><b className="block truncate text-sm text-white">{seller.seller}</b><span className="text-[10px] text-slate-500">{seller.count} venda(s)</span></div><b className="hidden text-right text-xs text-slate-300 sm:block">{seller.count}</b><b className="hidden text-right text-xs text-slate-200 sm:block">{brl.format(seller.revenue)}</b><div className="text-right"><b className="text-xs text-[#f6c94c]">{seller.performance.toFixed(1).replace(".", ",")}%</b><span className="mt-1 block text-[9px] text-slate-500">{hasGoal ? "da meta" : "participação"}</span></div></article>; }
+function RankingRow({ seller, position, hasGoal, avatarUrl, onAvatarUpload }: { seller: CommercialAccountRanking["sellers"][number]; position: number; hasGoal: boolean; avatarUrl?: string; onAvatarUpload: (sellerName: string, file: File) => Promise<void> }) { return <article className="grid grid-cols-[32px_36px_minmax(120px,1fr)_auto] items-center gap-3 rounded-xl border border-white/[.07] bg-white/[.025] p-3 transition duration-300 hover:-translate-y-0.5 hover:border-[#f6c94c]/25 animate-in fade-in-0 slide-in-from-right-2 motion-reduce:transform-none hover:bg-white/[.045] sm:grid-cols-[38px_40px_minmax(150px,1.2fr)_minmax(70px,.55fr)_minmax(100px,.75fr)_minmax(90px,.65fr)]"><b className="text-sm text-slate-500">{position}º</b><SellerAvatar seller={seller.seller} avatarUrl={avatarUrl} accent="#d5dae3" size="sm" onUpload={onAvatarUpload} /><div className="min-w-0"><b className="block truncate text-sm text-white">{seller.seller}</b><span className="text-[10px] text-slate-500">{seller.count} venda(s)</span></div><b className="hidden text-right text-xs text-slate-300 sm:block">{seller.count}</b><b className="hidden text-right text-xs text-slate-200 sm:block">{brl.format(seller.revenue)}</b><div className="text-right"><b className="text-xs text-[#f6c94c]">{seller.performance.toFixed(1).replace(".", ",")}%</b><span className="mt-1 block text-[9px] text-slate-500">{hasGoal ? "da meta" : "participação"}</span></div></article>; }
 
 function EmptyRanking({ text }: { text: string }) {
   return <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-xs text-white/45"><Users className="mx-auto mb-2 h-5 w-5" />{text}</div>;
