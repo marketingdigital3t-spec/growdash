@@ -31,6 +31,7 @@ export interface ExpertAccountScopeExpert {
 export const normalizeExpertName = (value: unknown) => String(value ?? "")
   .normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-zA-Z0-9\s]/g, " ")
   .trim()
   .replace(/\s+/g, " ")
   .toLocaleLowerCase("pt-BR");
@@ -81,7 +82,11 @@ export function filterEventClassesByScope<T extends EventClassFilterRow>(
     const candidateExpertIds = new Set<string>();
     if (row.expert_id) candidateExpertIds.add(row.expert_id);
     const rowName = normalizeExpertName(row.expert_name);
-    (accountScope?.expertNameToIds[rowName] || []).forEach((id) => candidateExpertIds.add(id));
+    Object.entries(accountScope?.expertNameToIds || {}).forEach(([expertNameKey, ids]) => {
+      if (rowName === expertNameKey || rowName.includes(expertNameKey) || expertNameKey.includes(rowName)) {
+        ids.forEach((id) => candidateExpertIds.add(id));
+      }
+    });
     if (expertId) candidateExpertIds.add(expertId);
     if (normalizedExpertName && accountScope) {
       (accountScope.expertNameToIds[normalizedExpertName] || []).forEach((id) => candidateExpertIds.add(id));

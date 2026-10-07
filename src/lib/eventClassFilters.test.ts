@@ -23,7 +23,7 @@ describe("event class global date and account filters", () => {
   });
 
   it("shows a legacy Ranniely class when both of her accounts are selected", () => {
-    const result = filterEventClassesByScope([row("2026-10-04", null, "RANNÍELY SILVA")], scope, ["ca01", "ca02"], undefined, undefined, accountScope);
+    const result = filterEventClassesByScope([row("2026-10-04", null, "Dra. RANNÍELY Silva")], scope, ["ca01", "ca02"], undefined, undefined, accountScope);
     expect(result).toHaveLength(1);
   });
 
