@@ -67,10 +67,11 @@ export default function CommercialPage() {
   const { data: rdDeals = [], isError: rdIsError, error: rdError } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
   const { data: products = [], isError: productsIsError, error: productsError } = useProducts();
   const { data: adAccounts = [], isError: accountsIsError, error: accountsError } = useAdAccounts();
+  const effectiveWorkspaceId = workspaceId || adAccounts.find((account) => account.workspace_id)?.workspace_id;
   const { data: goalData, isError: goalsIsError, error: goalsError } = useSalesGoals(startDate);
   const { data: expertScope = [], isError: expertScopeIsError, error: expertScopeError } = useQuery({
-    queryKey: ["commercial-expert-scope", workspaceId],
-    enabled: Boolean(workspaceId),
+    queryKey: ["commercial-expert-scope", workspaceId, user?.id],
+    enabled: Boolean(user),
     queryFn: async () => {
       const [{ data: links, error: linksError }, { data: experts, error: expertsError }] = await Promise.all([
         // These tables are newer than the generated database type snapshot.
@@ -90,9 +91,9 @@ export default function CommercialPage() {
     },
     staleTime: 5 * 60_000,
   });
-  const { data: expertDirectory = [] } = useQuery({
-    queryKey: ["commercial-expert-directory", workspaceId],
-    enabled: Boolean(workspaceId),
+  const { data: expertDirectory = [], isError: expertDirectoryIsError, error: expertDirectoryError } = useQuery({
+    queryKey: ["commercial-expert-directory", workspaceId, user?.id],
+    enabled: Boolean(user),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any).from("experts").select("id,nome").order("nome");
@@ -115,18 +116,18 @@ export default function CommercialPage() {
   const [rankingPage, setRankingPage] = useState(0);
   const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>([]);
   const sellerProfiles = useQuery({
-    queryKey: ["commercial-seller-profiles", workspaceId],
-    enabled: Boolean(workspaceId),
+    queryKey: ["commercial-seller-profiles", effectiveWorkspaceId],
+    enabled: Boolean(effectiveWorkspaceId),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any).from("commercial_seller_profiles").select("seller_name,avatar_url").eq("workspace_id", workspaceId!);
+      const { data, error } = await (supabase as any).from("commercial_seller_profiles").select("seller_name,avatar_url").eq("workspace_id", effectiveWorkspaceId!);
       if (error) throw error;
       return (data || []) as Array<{ seller_name: string; avatar_url: string | null }>;
     },
     staleTime: 5 * 60_000,
   });
   const saveSellerAvatar = async (sellerName: string, file: File) => {
-    if (!user || !workspaceId) throw new Error("Sua sessão ainda não está pronta para salvar a foto.");
+    if (!user || !effectiveWorkspaceId) throw new Error("Não foi possível identificar o workspace para salvar a foto.");
     const validationError = validateSellerAvatarFile(file);
     if (validationError) throw new Error(validationError);
     const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
@@ -135,7 +136,7 @@ export default function CommercialPage() {
     if (uploadError) throw uploadError;
     const avatarUrl = `${supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from("commercial_seller_profiles").upsert({ workspace_id: workspaceId, seller_name: sellerName, avatar_url: avatarUrl, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,seller_name" });
+    const { error } = await (supabase as any).from("commercial_seller_profiles").upsert({ workspace_id: effectiveWorkspaceId, seller_name: sellerName, avatar_url: avatarUrl, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,seller_name" });
     if (error) throw error;
     await sellerProfiles.refetch();
     toast.success(`Foto de ${sellerName} atualizada.`);
@@ -252,6 +253,7 @@ export default function CommercialPage() {
     accountsIsError ? accountsError : null,
     goalsIsError ? goalsError : null,
     expertScopeIsError ? expertScopeError : null,
+    expertDirectoryIsError ? expertDirectoryError : null,
   ].filter(Boolean).map((error) => error instanceof Error ? error.message : String(error));
   const salesUnavailable = salesIsError && sales.length === 0;
   return (
