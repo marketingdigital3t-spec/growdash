@@ -82,6 +82,17 @@ export default function CommercialPage() {
     },
     staleTime: 5 * 60_000,
   });
+  const { data: expertDirectory = [] } = useQuery({
+    queryKey: ["commercial-expert-directory", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from("experts").select("id,nome").eq("ativo", true).order("nome");
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; nome: string }>;
+    },
+    staleTime: 5 * 60_000,
+  });
   const [sellerFilter, setSellerFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
   const [detailAccountFilter, setDetailAccountFilter] = useState("all");
@@ -129,7 +140,11 @@ export default function CommercialPage() {
   }, [adAccounts, businessUnitId, segment]);
   const selectedGlobalAccountSet = useMemo(() => new Set(adAccountIds), [adAccountIds]);
   const accountOptions = useMemo(() => accessibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [accessibleAccounts]);
-  const expertOptions = useMemo(() => Array.from(new Map(expertScope.map((link) => [link.expertId, { id: link.expertId, name: link.expertName }])).values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")), [expertScope]);
+  const expertOptions = useMemo(() => {
+    const options = new Map(expertDirectory.map((expert) => [expert.id, { id: expert.id, name: expert.nome }]));
+    expertScope.forEach((link) => options.set(link.expertId, { id: link.expertId, name: link.expertName }));
+    return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [expertDirectory, expertScope]);
   const scopedExpertAccountIds = useMemo(() => {
     if (!selectedExpertIds.length) return null;
     return new Set(expertScope.filter((link) => selectedExpertIds.includes(link.expertId)).map((link) => link.adAccountId));
