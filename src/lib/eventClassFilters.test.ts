@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildExpertAccountScope, filterEventClassesByScope } from "@/lib/eventClassFilters";
+import { buildExpertAccountScope, filterEventClassesByScope, normalizeEventClassDate } from "@/lib/eventClassFilters";
 
 const scope = { startDate: "2026-10-01", endDate: "2026-10-31" };
 const row = (date_start: string, ad_account_id: string | null, expert_name = "Ranniely", expert_id?: string) => ({ id: `${date_start}-${ad_account_id}-${expert_name}`, date_start, ad_account_id, expert_name, expert_id });
@@ -13,6 +13,24 @@ const accountScope = buildExpertAccountScope(
 );
 
 describe("event class global date and account filters", () => {
+  it("normalizes a date column or ISO timestamp to its São Paulo calendar day", () => {
+    expect(normalizeEventClassDate("2026-11-15")).toBe("2026-11-15");
+    expect(normalizeEventClassDate("2026-11-15T00:00:00Z")).toBe("2026-11-15");
+    expect(normalizeEventClassDate("2026-02-30")).toBeNull();
+  });
+
+  it("keeps the selected year when filtering November 2026", () => {
+    const november = { startDate: "2026-11-01", endDate: "2026-11-30" };
+    const result = filterEventClassesByScope([
+      row("2023-11-15", "ca01"),
+      row("2026-10-31", "ca01"),
+      row("2026-11-01T00:00:00Z", "ca01"),
+      row("2026-11-30", "ca01"),
+      row("2026-12-01", "ca01"),
+    ], november, []);
+    expect(result.map((item) => item.date_start)).toEqual(["2026-11-01T00:00:00Z", "2026-11-30"]);
+  });
+
   it("uses date_start within the global interval", () => {
     const result = filterEventClassesByScope([row("2026-09-30", "ca01"), row("2026-10-01", "ca01"), row("2026-10-31", "ca01"), row("2026-11-01", "ca01")], scope, []);
     expect(result.map((item) => item.date_start)).toEqual(["2026-10-01", "2026-10-31"]);

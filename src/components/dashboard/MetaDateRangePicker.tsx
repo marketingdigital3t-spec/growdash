@@ -54,6 +54,10 @@ function formatTrigger(preset: DatePreset, start: Date, end: Date) {
   return `${label}: ${format(calendarStart, "d MMM", { locale: ptBR })} – ${format(calendarEnd, "d MMM yyyy", { locale: ptBR })}`;
 }
 
+function calendarDayAtNoon(day: Date) {
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0, 0);
+}
+
 export function MetaDateRangePicker({
   preset,
   onPresetChange,
@@ -97,20 +101,21 @@ export function MetaDateRangePicker({
   };
 
   const handleCalendarDayClick = (day: Date) => {
+    const selectedDay = calendarDayAtNoon(day);
     // Use the actual day click instead of DayPicker's derived range. When an
     // existing range is controlled through `selected`, DayPicker can return
     // the old start date for a click inside that range (for example, clicking
     // 29/09 while 01–30/09 is selected). That made a new selection start on
     // the old 01/09 and silently produced the wrong scope.
     if (pendingRange.from && pendingRange.to) {
-      setPendingRange({ from: day, to: undefined });
-      setCalendarMonth(day);
+      setPendingRange({ from: selectedDay, to: undefined });
+      setCalendarMonth(selectedDay);
       setPendingPreset("custom");
       return;
     }
 
-    const from = pendingRange.from && day < pendingRange.from ? day : pendingRange.from || day;
-    const to = pendingRange.from && day < pendingRange.from ? pendingRange.from : day;
+    const from = pendingRange.from && selectedDay < pendingRange.from ? selectedDay : pendingRange.from || selectedDay;
+    const to = pendingRange.from && selectedDay < pendingRange.from ? pendingRange.from : selectedDay;
     setPendingRange({ from, to });
     setCalendarMonth(from);
     setPendingPreset("custom");

@@ -32,6 +32,15 @@ describe("date filter maximum history", () => {
     expect(range.endDate).toEqual(new Date(2026, 7, 12, 23, 59, 59, 999));
   });
 
+  it("preserves the selected November 2026 calendar year", () => {
+    const range = resolvePreset("custom", {
+      from: new Date(2026, 10, 1, 12, 0),
+      to: new Date(2026, 10, 30, 12, 0),
+    });
+    expect(businessDateKey(range.startDate)).toBe("2026-11-01");
+    expect(businessDateKey(range.endDate)).toBe("2026-11-30");
+  });
+
   it("falls back safely when a persisted range contains an invalid date", () => {
     const range = resolvePreset("custom", {
       from: new Date("invalid"),

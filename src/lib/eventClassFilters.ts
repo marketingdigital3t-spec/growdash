@@ -61,8 +61,21 @@ export function buildExpertAccountScope(
   return { accountToExpertIds, expertToAccountIds, expertNameToIds };
 }
 
+/** Returns the calendar day from a date column or an ISO timestamp. */
+export function normalizeEventClassDate(value: unknown): string | null {
+  const match = String(value ?? "").trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!match) return null;
+  const [year, month, day] = match[1].split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null;
+  return match[1];
+}
+
 export function classBelongsToDateRange(row: EventClassFilterRow, scope: ClassDateRangeScope) {
-  return row.date_start >= scope.startDate && row.date_start <= scope.endDate;
+  const dateStart = normalizeEventClassDate(row.date_start);
+  const startDate = normalizeEventClassDate(scope.startDate);
+  const endDate = normalizeEventClassDate(scope.endDate);
+  return Boolean(dateStart && startDate && endDate && dateStart >= startDate && dateStart <= endDate);
 }
 
 export function filterEventClassesByScope<T extends EventClassFilterRow>(
