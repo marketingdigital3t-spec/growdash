@@ -69,7 +69,7 @@ export default function CommercialPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from("expert_operation_sources").select("expert_id,ad_account_id").not("ad_account_id", "is", null),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (supabase as any).from("experts").select("id,nome").eq("ativo", true).order("nome"),
+        (supabase as any).from("experts").select("id,nome").order("nome"),
       ]);
       if (linksError) throw linksError;
       if (expertsError) throw expertsError;
@@ -87,7 +87,7 @@ export default function CommercialPage() {
     enabled: Boolean(workspaceId),
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any).from("experts").select("id,nome").eq("ativo", true).order("nome");
+      const { data, error } = await (supabase as any).from("experts").select("id,nome").order("nome");
       if (error) throw error;
       return (data || []) as Array<{ id: string; nome: string }>;
     },
