@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Camera, ChevronDown, ChevronUp, Crown, Expand, Filter, Minimize, Search, TrendingUp, Trophy, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -322,28 +323,21 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
   const metricLabel = metric === "sales" ? "Vendas" : metric === "goalPercentage" ? "% da meta" : "Caixa gerado";
   const goalProgress = totals.target > 0 ? (totals.revenue / totals.target) * 100 : 0;
   useEffect(() => {
-    const onFullscreenChange = () => setFocusMode(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
-  useEffect(() => {
     if (!focusMode) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = previousOverflow; };
   }, [focusMode]);
-  const toggleFocusMode = async () => {
-    if (focusMode) {
-      if (document.fullscreenElement) await document.exitFullscreen?.();
-      setFocusMode(false);
-      return;
-    }
-    setFocusMode(true);
-    if (document.documentElement.requestFullscreen) {
-      try { await document.documentElement.requestFullscreen(); } catch { /* fixed mode still works when fullscreen is blocked */ }
-    }
-  };
-  return <section className={`relative isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] ${focusMode ? "fixed inset-0 z-[100] min-h-screen rounded-none" : "rounded-[28px]"}`}>
+  useEffect(() => {
+    if (!focusMode) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFocusMode(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [focusMode]);
+  const toggleFocusMode = () => setFocusMode((current) => !current);
+  const leaderboard = <section role={focusMode ? "dialog" : undefined} aria-modal={focusMode ? true : undefined} aria-label={focusMode ? "Ranking Comercial expandido" : undefined} className={`relative isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] ${focusMode ? "fixed inset-0 z-[300] min-h-screen rounded-none" : "rounded-[28px]"}`}>
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(217,169,40,.16),transparent_42%),radial-gradient(ellipse_at_5%_35%,rgba(33,94,176,.14),transparent_38%),linear-gradient(135deg,#081226_0%,#050b18_58%,#0d1830_100%)]" />
     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f6c94c]/75 to-transparent" />
     <div className="relative p-4 sm:p-6 xl:p-8">
@@ -355,7 +349,7 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
           <select aria-label="Filtrar por vendedor" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={sellerFilter} onChange={(event) => onSellerFilterChange(event.target.value)}><option value="all">Todos os vendedores</option>{sellerOptions.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
           <select aria-label="Filtrar por produto" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={productFilter} onChange={(event) => onProductFilterChange(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
           <div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div>
-          <button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={() => void toggleFocusMode()} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button>
+          <button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={toggleFocusMode} className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button>
         </div>
       </header>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><select aria-label={scope === "global" ? "Ranking global exibido" : "Expert exibido no ranking"} value={accountId} onChange={(event) => onAccountChange(event.target.value)} className="h-10 max-w-full rounded-xl border border-white/10 bg-[#0b172c] px-3 text-xs font-bold text-slate-100 outline-none focus:border-[#f6c94c]">{accounts.map((item) => <option key={item.accountId} value={item.accountId}>{item.accountName}</option>)}</select><div className="flex rounded-xl border border-white/10 bg-black/20 p-1">{(["revenue", "sales", "goalPercentage"] as RankingMetric[]).map((item) => <button type="button" key={item} onClick={() => { onMetricChange(item); onRankingPageChange(0); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[.08em] transition ${metric === item ? "bg-[#d9a928] text-[#111728] shadow-lg" : "text-slate-400 hover:text-white"}`}>{item === "revenue" ? "Caixa" : item === "sales" ? "Vendas" : "Meta"}</button>)}</div></div>
@@ -371,6 +365,7 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
       {remaining.length > 0 && <section className="mt-4 rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#f6c94c]">Ranking geral</p><p className="mt-1 text-xs text-slate-400">Da 4ª posição em diante · sem limite de vendedores</p></div><p className="text-xs font-bold text-slate-400">{remaining.length} posição(ões)</p></div><div className="mt-4 space-y-2">{pageRows.map((seller, index) => <RankingRow key={seller.seller} seller={seller} position={safePage * rowsPerPage + index + 4} hasGoal={account.target > 0} avatarUrl={sellerAvatars.get(seller.seller)} onAvatarUpload={onSellerAvatarUpload} />)}</div>{totalPages > 1 && <div className="mt-4 flex items-center justify-end gap-2"><button type="button" disabled={safePage === 0} onClick={() => onRankingPageChange(safePage - 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Anterior</button><span className="text-xs text-slate-500">{safePage + 1} / {totalPages}</span><button type="button" disabled={safePage >= totalPages - 1} onClick={() => onRankingPageChange(safePage + 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Próxima</button></div>}</section>}</>}
     </div>
   </section>;
+  return focusMode && typeof document !== "undefined" ? createPortal(leaderboard, document.body) : leaderboard;
 }
 
 function PodiumCard({ seller, place, hasGoal, avatarUrl, onAvatarUpload }: { seller: CommercialAccountRanking["sellers"][number]; place: number; hasGoal: boolean; avatarUrl?: string; onAvatarUpload: (sellerName: string, file: File) => Promise<void> }) {
