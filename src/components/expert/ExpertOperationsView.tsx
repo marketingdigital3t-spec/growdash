@@ -489,7 +489,7 @@ export function ExpertOperationsView() {
         <div className="flex flex-wrap items-center gap-2">
             <Select value={selectedExpertId || ""} onValueChange={setExpertId} disabled={!expertOptions.length}>
               <SelectTrigger className="h-9 w-full lg:w-56">
-                <SelectValue placeholder="Selecione o expert" />
+                <SelectValue placeholder="Selecione sua conta de anúncio" />
               </SelectTrigger>
             <SelectContent>
               {expertOptions.map((expert: any) => (
