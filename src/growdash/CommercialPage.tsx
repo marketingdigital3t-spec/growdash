@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, Crown, Expand, Filter, Minimize, Search, TrendingUp, Trophy, Users, X } from "lucide-react";
+import { Camera, ChevronDown, ChevronUp, Crown, Expand, Filter, Minimize, Search, TrendingUp, Trophy, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { eachDayOfInterval, format, isValid, parseISO } from "date-fns";
@@ -11,6 +11,9 @@ import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useSales, type Sale } from "@/hooks/useSales";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
+import { useAuth } from "@/contexts/AuthContext";
+import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
+import { OptionMultiSelect } from "@/components/dashboard/OptionMultiSelect";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeading } from "./shared";
@@ -38,6 +41,7 @@ function formatSaleDate(value: string | null | undefined) {
 }
 
 export default function CommercialPage() {
+  const { user } = useAuth();
   const {
     adAccountId,
     setAdAccountId,
@@ -90,6 +94,32 @@ export default function CommercialPage() {
   const [rankingScope, setRankingScope] = useState<RankingScope>("expert");
   const [leaderboardAccountId, setLeaderboardAccountId] = useState("");
   const [rankingPage, setRankingPage] = useState(0);
+  const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>([]);
+  const sellerProfiles = useQuery({
+    queryKey: ["commercial-seller-profiles", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from("commercial_seller_profiles").select("seller_name,avatar_url").eq("workspace_id", workspaceId!);
+      if (error) throw error;
+      return (data || []) as Array<{ seller_name: string; avatar_url: string | null }>;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const saveSellerAvatar = async (sellerName: string, file: File) => {
+    if (!user || !workspaceId) return;
+    if (!file.type.startsWith("image/")) throw new Error("Escolha uma imagem.");
+    if (file.size > 5 * 1024 * 1024) throw new Error("A foto deve ter no máximo 5 MB.");
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${user.id}/commercial-sellers/${encodeURIComponent(sellerName)}-${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type });
+    if (uploadError) throw uploadError;
+    const avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("commercial_seller_profiles").upsert({ workspace_id: workspaceId, seller_name: sellerName, avatar_url: avatarUrl, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,seller_name" });
+    if (error) throw error;
+    void sellerProfiles.refetch();
+  };
 
   const accessibleAccounts = useMemo(() => {
     const accounts = businessUnitId
@@ -97,8 +127,14 @@ export default function CommercialPage() {
       : adAccounts;
     return accounts;
   }, [adAccounts, businessUnitId, segment]);
-  const visibleAccounts = useMemo(() => accountFilter ? accessibleAccounts.filter((account) => account.id === accountFilter) : accessibleAccounts, [accessibleAccounts, accountFilter]);
+  const selectedGlobalAccountSet = useMemo(() => new Set(adAccountIds), [adAccountIds]);
   const accountOptions = useMemo(() => accessibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [accessibleAccounts]);
+  const expertOptions = useMemo(() => Array.from(new Map(expertScope.map((link) => [link.expertId, { id: link.expertId, name: link.expertName }])).values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")), [expertScope]);
+  const scopedExpertAccountIds = useMemo(() => {
+    if (!selectedExpertIds.length) return null;
+    return new Set(expertScope.filter((link) => selectedExpertIds.includes(link.expertId)).map((link) => link.adAccountId));
+  }, [expertScope, selectedExpertIds]);
+  const visibleAccounts = useMemo(() => accessibleAccounts.filter((account) => (!selectedGlobalAccountSet.size || selectedGlobalAccountSet.has(account.id)) && (!scopedExpertAccountIds || scopedExpertAccountIds.has(account.id))), [accessibleAccounts, scopedExpertAccountIds, selectedGlobalAccountSet]);
   const rankingAccountOptions = useMemo(() => visibleAccounts.map((account) => ({ id: account.id, name: String(account.name ?? "Conta sem nome") })), [visibleAccounts]);
 
   useEffect(() => {
@@ -128,9 +164,10 @@ export default function CommercialPage() {
       .map((product) => ({ value: `rd:${product}`, label: product })),
   ], [enriched, products]);
   const filtered = useMemo(() => enriched.filter((row) => (
-    (sellerFilter === "all" || row.seller === sellerFilter)
+    (!scopedExpertAccountIds || scopedExpertAccountIds.has(row.sale.ad_account_id || ""))
+    && (sellerFilter === "all" || row.seller === sellerFilter)
     && (productFilter === "all" || productFilter === `local:${row.sale.product_id}` || (!row.sale.product_id && productFilter === `rd:${row.product}`))
-  )), [enriched, productFilter, sellerFilter]);
+  )), [enriched, productFilter, scopedExpertAccountIds, sellerFilter]);
   const detailedFiltered = useMemo(() => {
     const term = detailSearch.trim().toLocaleLowerCase("pt-BR");
     return filtered.filter((row) => {
@@ -146,15 +183,15 @@ export default function CommercialPage() {
   const goals = useMemo(() => new Map((goalData?.rows ?? []).map((goal) => [goal.ad_account_id, Number(goal.target_revenue)])), [goalData?.rows]);
   const rankingDeals = useMemo(() => sellerFilter === "all" ? rdDeals : rdDeals.filter((deal) => deal.deal_owner_name === sellerFilter), [rdDeals, sellerFilter]);
   const accountRankings = useMemo(() => buildCommercialAccountRankings({ sales: filtered, deals: rankingDeals, accounts: rankingAccountOptions, goals }), [filtered, goals, rankingAccountOptions, rankingDeals]);
-  const expertLinks = useMemo(() => expertScope.filter((link) => !accountFilter || link.adAccountId === accountFilter), [accountFilter, expertScope]);
+  const expertLinks = useMemo(() => expertScope.filter((link) => (!adAccountIds.length || adAccountIds.includes(link.adAccountId)) && (!selectedExpertIds.length || selectedExpertIds.includes(link.expertId))), [adAccountIds, expertScope, selectedExpertIds]);
   const expertRankings = useMemo(() => buildCommercialExpertRankings(accountRankings, expertLinks), [accountRankings, expertLinks]);
   const globalRanking = useMemo(() => buildCommercialGlobalRanking(expertRankings), [expertRankings]);
   const rankingGroups = useMemo(() => rankingScope === "global" ? [globalRanking] : expertRankings, [expertRankings, globalRanking, rankingScope]);
   useEffect(() => {
-    const preferred = rankingScope === "global" ? "global" : adAccountId !== "all" ? expertRankings.find((group) => group.accountIds?.includes(adAccountId))?.accountId : expertRankings[0]?.accountId;
+    const preferred = rankingScope === "global" ? "global" : expertRankings.some((group) => group.accountId === leaderboardAccountId) ? leaderboardAccountId : expertRankings[0]?.accountId;
     if (preferred && !rankingGroups.some((account) => account.accountId === leaderboardAccountId)) setLeaderboardAccountId(preferred);
     if (!preferred) setLeaderboardAccountId("");
-  }, [adAccountId, expertRankings, leaderboardAccountId, rankingGroups, rankingScope]);
+  }, [expertRankings, leaderboardAccountId, rankingGroups, rankingScope]);
   const leaderboardAccount = useMemo(() => rankingGroups.find((account) => account.accountId === leaderboardAccountId) || rankingGroups[0], [leaderboardAccountId, rankingGroups]);
   const rankedSellers = useMemo(() => {
     const sellersForAccount = leaderboardAccount?.sellers || [];
@@ -196,6 +233,8 @@ export default function CommercialPage() {
         description="Veja os líderes por expert e o ranking global da empresa com base nas vendas confirmadas."
         actions={(
           <div className="flex flex-wrap gap-2">
+            <AccountMultiSelect accounts={accountOptions} selectedIds={adAccountIds} onChange={setAdAccountIds} ariaLabel="Selecionar contas do ranking comercial" />
+            <OptionMultiSelect options={expertOptions} selectedIds={selectedExpertIds} onChange={(ids) => { setSelectedExpertIds(ids); setRankingPage(0); }} emptyLabel="Todos os experts" ariaLabel="Selecionar experts do ranking comercial" />
             <select aria-label="Filtrar por vendedor" className="gd-button min-w-40" value={sellerFilter} onChange={(event) => setSellerFilter(event.target.value)}><option value="all">Todos os vendedores</option>{sellers.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
             <select aria-label="Filtrar por produto" className="gd-button min-w-40" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
           </div>
@@ -234,6 +273,8 @@ export default function CommercialPage() {
         totals={{ revenue: selectedRevenue, sales: selectedSales, target: selectedTarget, ticket: selectedSales ? selectedRevenue / selectedSales : 0 }}
         series={performanceSeries}
         scope={rankingScope}
+        sellerAvatars={new Map((sellerProfiles.data || []).map((profile) => [profile.seller_name, profile.avatar_url || ""]))}
+        onSellerAvatarUpload={saveSellerAvatar}
       /></>}
 
       {!salesUnavailable && <section className="gd-panel mt-4 overflow-hidden">
@@ -248,8 +289,8 @@ function DetailFilter({ label, value, onChange, options }: { label: string; valu
   return <label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" /><select aria-label={`Filtrar vendas por ${label.toLocaleLowerCase("pt-BR")}`} className="h-10 w-full appearance-none rounded-md border border-input bg-background pl-8 pr-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" value={value} onChange={(event) => onChange(event.target.value)}><option value="all">{label}: todos</option>{options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
 }
 
-function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricChange, accountId, onAccountChange, ranking, rankingPage, onRankingPageChange, periodLabel, totals, series, scope }: {
-  account: CommercialAccountRanking | undefined; accounts: CommercialAccountRanking[]; isLoading: boolean; metric: RankingMetric; onMetricChange: (metric: RankingMetric) => void; accountId: string; onAccountChange: (id: string) => void; ranking: CommercialAccountRanking["sellers"]; rankingPage: number; onRankingPageChange: (page: number) => void; periodLabel: string; totals: { revenue: number; sales: number; target: number; ticket: number }; series: Array<{ date: string; revenue: number; sales: number }>; scope: RankingScope;
+function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricChange, accountId, onAccountChange, ranking, rankingPage, onRankingPageChange, periodLabel, totals, series, scope, sellerAvatars, onSellerAvatarUpload }: {
+  account: CommercialAccountRanking | undefined; accounts: CommercialAccountRanking[]; isLoading: boolean; metric: RankingMetric; onMetricChange: (metric: RankingMetric) => void; accountId: string; onAccountChange: (id: string) => void; ranking: CommercialAccountRanking["sellers"]; rankingPage: number; onRankingPageChange: (page: number) => void; periodLabel: string; totals: { revenue: number; sales: number; target: number; ticket: number }; series: Array<{ date: string; revenue: number; sales: number }>; scope: RankingScope; sellerAvatars: Map<string, string>; onSellerAvatarUpload: (sellerName: string, file: File) => Promise<void>;
 }) {
   const podiumOrder = ranking.length === 1 ? [ranking[0]] : ranking.length === 2 ? [ranking[0], ranking[1]] : [ranking[1], ranking[0], ranking[2]].filter(Boolean);
   const rowsPerPage = 10;
@@ -261,43 +302,69 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
   const metricLabel = metric === "sales" ? "Vendas" : metric === "goalPercentage" ? "% da meta" : "Caixa gerado";
   const goalProgress = totals.target > 0 ? (totals.revenue / totals.target) * 100 : 0;
   useEffect(() => {
+    const onFullscreenChange = () => setFocusMode(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+  useEffect(() => {
     if (!focusMode) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = previousOverflow; };
   }, [focusMode]);
+  const toggleFocusMode = async () => {
+    if (focusMode) {
+      if (document.fullscreenElement) await document.exitFullscreen?.();
+      setFocusMode(false);
+      return;
+    }
+    setFocusMode(true);
+    if (document.documentElement.requestFullscreen) {
+      try { await document.documentElement.requestFullscreen(); } catch { /* fixed mode still works when fullscreen is blocked */ }
+    }
+  };
   return <section className={`relative isolate overflow-auto border border-[#d9a928]/25 bg-[#050b18] text-slate-100 shadow-[0_28px_100px_-35px_rgba(0,0,0,.95)] ${focusMode ? "fixed inset-0 z-[100] min-h-screen rounded-none" : "rounded-[28px]"}`}>
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(217,169,40,.16),transparent_42%),radial-gradient(ellipse_at_5%_35%,rgba(33,94,176,.14),transparent_38%),linear-gradient(135deg,#081226_0%,#050b18_58%,#0d1830_100%)]" />
     <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f6c94c]/75 to-transparent" />
     <div className="relative p-4 sm:p-6 xl:p-8">
       <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0"><div className="flex items-center gap-2 text-[#f6c94c]"><Trophy className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-[.28em]">Ranking Comercial</span></div><h2 className="mt-2 text-2xl font-black tracking-[-.045em] text-white sm:text-3xl">Painel de performance</h2><p className="mt-1 text-xs text-slate-400">Classificação calculada somente com vendas confirmadas no período.</p></div>
-        <div className="flex flex-wrap items-end gap-2"><div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div><button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={() => setFocusMode((value) => !value)} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
+        <div className="flex flex-wrap items-end gap-2"><div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div><button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={() => void toggleFocusMode()} className="grid h-[42px] w-[42px] place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button></div>
       </header>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><select aria-label={scope === "global" ? "Ranking global exibido" : "Expert exibido no ranking"} value={accountId} onChange={(event) => onAccountChange(event.target.value)} className="h-10 max-w-full rounded-xl border border-white/10 bg-[#0b172c] px-3 text-xs font-bold text-slate-100 outline-none focus:border-[#f6c94c]">{accounts.map((item) => <option key={item.accountId} value={item.accountId}>{item.accountName}</option>)}</select><div className="flex rounded-xl border border-white/10 bg-black/20 p-1">{(["revenue", "sales", "goalPercentage"] as RankingMetric[]).map((item) => <button type="button" key={item} onClick={() => { onMetricChange(item); onRankingPageChange(0); }} className={`rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-[.08em] transition ${metric === item ? "bg-[#d9a928] text-[#111728] shadow-lg" : "text-slate-400 hover:text-white"}`}>{item === "revenue" ? "Caixa" : item === "sales" ? "Vendas" : "Meta"}</button>)}</div></div>
       {!account && <div className="mt-6"><EmptyRanking text="Nenhuma conta ou vendedor encontrado para os filtros atuais." /></div>}
       {account && <><div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.38fr)_minmax(320px,.62fr)]">
         <div className="rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#f6c94c]">Elite do período</p><p className="mt-1 text-xs text-slate-400">Critério: <b className="text-slate-200">{metricLabel}</b></p></div><span className="rounded-full border border-[#f6c94c]/20 bg-[#f6c94c]/10 px-3 py-1.5 text-[10px] font-black text-[#f6c94c]">{ranking.length} vendedor(es)</span></div>
-          <div className={`mt-5 grid items-end gap-3 ${podiumOrder.length === 1 ? "mx-auto max-w-sm" : podiumOrder.length === 2 ? "mx-auto max-w-2xl grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>{podiumOrder.map((seller) => <PodiumCard key={seller.seller} seller={seller} place={ranking.findIndex((item) => item.seller === seller.seller) + 1} hasGoal={account.target > 0} />)}</div>
+          <div className={`mt-5 grid items-end gap-3 ${podiumOrder.length === 1 ? "mx-auto max-w-sm" : podiumOrder.length === 2 ? "mx-auto max-w-2xl grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>{podiumOrder.map((seller) => <PodiumCard key={seller.seller} seller={seller} place={ranking.findIndex((item) => item.seller === seller.seller) + 1} hasGoal={account.target > 0} avatarUrl={sellerAvatars.get(seller.seller)} onAvatarUpload={onSellerAvatarUpload} />)}</div>
         </div>
         <aside className="rounded-2xl border border-white/10 bg-[#08152b]/80 p-4 sm:p-5"><p className="text-[10px] font-black uppercase tracking-[.22em] text-slate-500">Resumo geral</p><div className="mt-4 grid grid-cols-2 gap-3"><SummaryMetric label="Vendas" value={isLoading ? "—" : String(totals.sales)} /><SummaryMetric label="Caixa gerado" value={isLoading ? "—" : brl.format(totals.revenue)} /><SummaryMetric label="Meta atingida" value={totals.target ? `${goalProgress.toFixed(1).replace(".", ",")}%` : "Não definida"} /><SummaryMetric label="Ticket médio" value={isLoading ? "—" : brl.format(totals.ticket)} /></div><div className="mt-5 border-t border-white/10 pt-4"><p className="text-[10px] font-black uppercase tracking-[.18em] text-slate-500">Meta da conta</p><div className="mt-2 flex items-end justify-between gap-2"><b className="text-lg text-white">{totals.target ? brl.format(totals.target) : "Não configurada"}</b>{totals.target > 0 && <span className="text-xs font-black text-[#f6c94c]">{Math.min(999, goalProgress).toFixed(1).replace(".", ",")}%</span>}</div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-[#d9a928] to-[#ffe692]" style={{ width: `${Math.min(100, goalProgress)}%` }} /></div></div></aside>
       </div>
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,.92fr)]"><section className="min-h-[260px] rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[#f6c94c]" /><div><p className="text-[10px] font-black uppercase tracking-[.18em] text-[#f6c94c]">Evolução da performance</p><p className="mt-1 text-xs text-slate-400">Caixa gerado por dia</p></div></div><div className="mt-4 h-[185px]">{series.some((item) => item.revenue > 0) ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={series}><defs><linearGradient id="commercialGoldFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f6c94c" stopOpacity={.4}/><stop offset="100%" stopColor="#f6c94c" stopOpacity={0}/></linearGradient></defs><CartesianGrid vertical={false} stroke="rgba(255,255,255,.08)" /><XAxis dataKey="date" tick={{ fontSize: 10, fill: "#7c8aa5" }} axisLine={false} tickLine={false} minTickGap={24} /><YAxis tick={{ fontSize: 10, fill: "#7c8aa5" }} axisLine={false} tickLine={false} width={48} tickFormatter={(value) => value >= 1000 ? `R$${Math.round(value / 1000)}k` : `R$${value}`} /><Tooltip formatter={(value: number) => brl.format(value)} contentStyle={{ background: "#0d1830", border: "1px solid rgba(246,201,76,.25)", borderRadius: 12, color: "#fff" }} /><Area type="monotone" dataKey="revenue" name="Caixa gerado" stroke="#f6c94c" strokeWidth={2.5} fill="url(#commercialGoldFill)" /></AreaChart></ResponsiveContainer> : <div className="grid h-full place-items-center text-center text-xs text-slate-500">Sem vendas confirmadas para formar a evolução deste período.</div>}</div></section>
         <section className="rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><p className="text-[10px] font-black uppercase tracking-[.18em] text-[#f6c94c]">Mensagem do time</p><p className="mt-3 text-xl font-black leading-snug tracking-tight text-white">{ranking[0] ? `“${ranking[0].seller} lidera o período. Cada venda fortalece o próximo nível.”` : "“Todo resultado começa com uma boa conversa.”"}</p><p className="mt-4 text-xs leading-relaxed text-slate-400">Acompanhe o ranking, celebre as evoluções e use os dados para transformar foco em resultado.</p></section></div>
-      {remaining.length > 0 && <section className="mt-4 rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#f6c94c]">Ranking geral</p><p className="mt-1 text-xs text-slate-400">Da 4ª posição em diante · sem limite de vendedores</p></div><p className="text-xs font-bold text-slate-400">{remaining.length} posição(ões)</p></div><div className="mt-4 space-y-2">{pageRows.map((seller, index) => <RankingRow key={seller.seller} seller={seller} position={safePage * rowsPerPage + index + 4} hasGoal={account.target > 0} />)}</div>{totalPages > 1 && <div className="mt-4 flex items-center justify-end gap-2"><button type="button" disabled={safePage === 0} onClick={() => onRankingPageChange(safePage - 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Anterior</button><span className="text-xs text-slate-500">{safePage + 1} / {totalPages}</span><button type="button" disabled={safePage >= totalPages - 1} onClick={() => onRankingPageChange(safePage + 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Próxima</button></div>}</section>}</>}
+      {remaining.length > 0 && <section className="mt-4 rounded-2xl border border-white/10 bg-[#071124]/72 p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-[#f6c94c]">Ranking geral</p><p className="mt-1 text-xs text-slate-400">Da 4ª posição em diante · sem limite de vendedores</p></div><p className="text-xs font-bold text-slate-400">{remaining.length} posição(ões)</p></div><div className="mt-4 space-y-2">{pageRows.map((seller, index) => <RankingRow key={seller.seller} seller={seller} position={safePage * rowsPerPage + index + 4} hasGoal={account.target > 0} avatarUrl={sellerAvatars.get(seller.seller)} onAvatarUpload={onSellerAvatarUpload} />)}</div>{totalPages > 1 && <div className="mt-4 flex items-center justify-end gap-2"><button type="button" disabled={safePage === 0} onClick={() => onRankingPageChange(safePage - 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Anterior</button><span className="text-xs text-slate-500">{safePage + 1} / {totalPages}</span><button type="button" disabled={safePage >= totalPages - 1} onClick={() => onRankingPageChange(safePage + 1)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 disabled:opacity-35">Próxima</button></div>}</section>}</>}
     </div>
   </section>;
 }
 
-function PodiumCard({ seller, place, hasGoal }: { seller: CommercialAccountRanking["sellers"][number]; place: number; hasGoal: boolean }) {
+function PodiumCard({ seller, place, hasGoal, avatarUrl, onAvatarUpload }: { seller: CommercialAccountRanking["sellers"][number]; place: number; hasGoal: boolean; avatarUrl?: string; onAvatarUpload: (sellerName: string, file: File) => Promise<void> }) {
   const styles = place === 1 ? "border-[#f6c94c]/75 bg-[radial-gradient(circle_at_50%_0%,rgba(246,201,76,.22),transparent_48%),#151b20] shadow-[0_0_42px_-16px_rgba(246,201,76,.8)] sm:-translate-y-3" : place === 2 ? "border-[#d5dae3]/35 bg-[#0e1a2c]" : "border-[#d77a2b]/40 bg-[#1b1520]";
   const accent = place === 1 ? "#f6c94c" : place === 2 ? "#d5dae3" : "#ed8a36";
-  return <article className={`relative min-w-0 rounded-2xl border p-4 text-center transition ${styles}`}><p className="text-[10px] font-black uppercase tracking-[.16em]" style={{ color: accent }}>{place === 1 ? "1º lugar" : `${place}º lugar`}</p>{place === 1 && <Crown className="mx-auto mt-2 h-5 w-5 text-[#f6c94c]" />}<div className="mx-auto mt-3 grid h-16 w-16 place-items-center rounded-full border-2 text-lg font-black" style={{ borderColor: accent, background: `${accent}18`, color: accent }}>{initials(seller.seller)}</div><h3 className="mt-3 truncate text-base font-black text-white" title={seller.seller}>{seller.seller}</h3><p className="mt-1 text-xs font-bold text-slate-400">{seller.count} venda(s)</p><p className="mt-4 truncate text-xl font-black tracking-tight text-white" title={brl.format(seller.revenue)}>{brl.format(seller.revenue)}</p><p className="mt-1 text-[10px] uppercase tracking-[.12em] text-slate-500">caixa gerado</p><div className="mt-4 grid grid-cols-2 gap-2 text-left"><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Ticket</p><b className="mt-1 block truncate text-[11px] text-slate-200" title={brl.format(seller.count ? seller.revenue / seller.count : 0)}>{brl.format(seller.count ? seller.revenue / seller.count : 0)}</b></div><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">{hasGoal ? "Meta" : "Participação"}</p><b className="mt-1 block text-[11px]" style={{ color: accent }}>{seller.performance.toFixed(1).replace(".", ",")}%</b></div></div></article>;
+  return <article className={`relative min-w-0 rounded-2xl border p-4 text-center transition ${styles}`}><p className="text-[10px] font-black uppercase tracking-[.16em]" style={{ color: accent }}>{place === 1 ? "1º lugar" : `${place}º lugar`}</p>{place === 1 && <Crown className="mx-auto mt-2 h-5 w-5 text-[#f6c94c]" />}<SellerAvatar seller={seller.seller} avatarUrl={avatarUrl} accent={accent} size="lg" onUpload={onAvatarUpload} /><h3 className="mt-3 truncate text-base font-black text-white" title={seller.seller}>{seller.seller}</h3><p className="mt-1 text-xs font-bold text-slate-400">{seller.count} venda(s)</p><p className="mt-4 truncate text-xl font-black tracking-tight text-white" title={brl.format(seller.revenue)}>{brl.format(seller.revenue)}</p><p className="mt-1 text-[10px] uppercase tracking-[.12em] text-slate-500">caixa gerado</p><div className="mt-4 grid grid-cols-2 gap-2 text-left"><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">Ticket</p><b className="mt-1 block truncate text-[11px] text-slate-200" title={brl.format(seller.count ? seller.revenue / seller.count : 0)}>{brl.format(seller.count ? seller.revenue / seller.count : 0)}</b></div><div className="rounded-lg bg-white/[.045] p-2"><p className="text-[9px] uppercase tracking-wide text-slate-500">{hasGoal ? "Meta" : "Participação"}</p><b className="mt-1 block text-[11px]" style={{ color: accent }}>{seller.performance.toFixed(1).replace(".", ",")}%</b></div></div></article>;
+}
+
+function SellerAvatar({ seller, avatarUrl, accent, size, onUpload }: { seller: string; avatarUrl?: string; accent: string; size: "sm" | "lg"; onUpload: (sellerName: string, file: File) => Promise<void> }) {
+  const [saving, setSaving] = useState(false);
+  const inputId = `seller-avatar-${encodeURIComponent(seller)}`;
+  return <label htmlFor={inputId} title={`Editar foto de ${seller}`} className={`group relative mx-auto grid cursor-pointer place-items-center overflow-hidden rounded-full border-2 text-lg font-black ${size === "lg" ? "mt-3 h-16 w-16" : "h-9 w-9 text-[10px]"}`} style={{ borderColor: accent, background: `${accent}18`, color: accent }}>
+    {avatarUrl ? <img src={avatarUrl} alt={`Foto de ${seller}`} className="h-full w-full object-cover" /> : initials(seller)}
+    <span className="absolute inset-0 grid place-items-center bg-black/65 text-white opacity-0 transition group-hover:opacity-100">{saving ? "…" : <Camera className="h-3.5 w-3.5" />}</span>
+    <input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setSaving(true); try { await onUpload(seller, file); } catch { /* the page keeps the previous photo */ } finally { setSaving(false); event.target.value = ""; } }} />
+  </label>;
 }
 
 function SummaryMetric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-white/8 bg-white/[.035] p-3"><p className="text-[9px] font-bold uppercase tracking-[.12em] text-slate-500">{label}</p><b className="mt-1 block truncate text-sm font-black text-slate-100" title={value}>{value}</b></div>; }
 
-function RankingRow({ seller, position, hasGoal }: { seller: CommercialAccountRanking["sellers"][number]; position: number; hasGoal: boolean }) { return <article className="grid grid-cols-[32px_36px_minmax(120px,1fr)_auto] items-center gap-3 rounded-xl border border-white/[.07] bg-white/[.025] p-3 transition hover:border-[#f6c94c]/25 hover:bg-white/[.045] sm:grid-cols-[38px_40px_minmax(150px,1.2fr)_minmax(70px,.55fr)_minmax(100px,.75fr)_minmax(90px,.65fr)]"><b className="text-sm text-slate-500">{position}º</b><span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-[#12213b] text-[10px] font-black text-[#d5dae3]">{initials(seller.seller)}</span><div className="min-w-0"><b className="block truncate text-sm text-white">{seller.seller}</b><span className="text-[10px] text-slate-500">{seller.count} venda(s)</span></div><b className="hidden text-right text-xs text-slate-300 sm:block">{seller.count}</b><b className="hidden text-right text-xs text-slate-200 sm:block">{brl.format(seller.revenue)}</b><div className="text-right"><b className="text-xs text-[#f6c94c]">{seller.performance.toFixed(1).replace(".", ",")}%</b><span className="mt-1 block text-[9px] text-slate-500">{hasGoal ? "da meta" : "participação"}</span></div></article>; }
+function RankingRow({ seller, position, hasGoal, avatarUrl, onAvatarUpload }: { seller: CommercialAccountRanking["sellers"][number]; position: number; hasGoal: boolean; avatarUrl?: string; onAvatarUpload: (sellerName: string, file: File) => Promise<void> }) { return <article className="grid grid-cols-[32px_36px_minmax(120px,1fr)_auto] items-center gap-3 rounded-xl border border-white/[.07] bg-white/[.025] p-3 transition hover:border-[#f6c94c]/25 hover:bg-white/[.045] sm:grid-cols-[38px_40px_minmax(150px,1.2fr)_minmax(70px,.55fr)_minmax(100px,.75fr)_minmax(90px,.65fr)]"><b className="text-sm text-slate-500">{position}º</b><SellerAvatar seller={seller.seller} avatarUrl={avatarUrl} accent="#d5dae3" size="sm" onUpload={onAvatarUpload} /><div className="min-w-0"><b className="block truncate text-sm text-white">{seller.seller}</b><span className="text-[10px] text-slate-500">{seller.count} venda(s)</span></div><b className="hidden text-right text-xs text-slate-300 sm:block">{seller.count}</b><b className="hidden text-right text-xs text-slate-200 sm:block">{brl.format(seller.revenue)}</b><div className="text-right"><b className="text-xs text-[#f6c94c]">{seller.performance.toFixed(1).replace(".", ",")}%</b><span className="mt-1 block text-[9px] text-slate-500">{hasGoal ? "da meta" : "participação"}</span></div></article>; }
 
 function EmptyRanking({ text }: { text: string }) {
   return <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-xs text-white/45"><Users className="mx-auto mb-2 h-5 w-5" />{text}</div>;
