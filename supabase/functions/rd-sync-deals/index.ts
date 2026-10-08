@@ -63,6 +63,20 @@ function customFieldValue(field: any): string | null {
   return normalized.length ? normalized.join(", ") : null;
 }
 
+function mergeUtmSources(sources: any[]) {
+  return sources.filter(Boolean).reduce((merged, source) => ({ ...merged, ...(source || {}) }), {} as Record<string, unknown>);
+}
+
+function pickTrackingValue(direct: any, merged: Record<string, unknown>, customSources: any[], aliases: string[]) {
+  const directValue = direct;
+  if (directValue != null && String(directValue).trim()) return String(directValue).trim();
+  for (const alias of aliases) {
+    const value = merged[alias] ?? merged[`utm_${alias}`] ?? merged[`gd_${alias}`];
+    if (value != null && String(value).trim()) return String(value).trim();
+  }
+  return findCustomField(customSources, aliases);
+}
+
 /**
  * Retains every RD custom field received with the deal. Keys are readable and
  * stable. When a contact and a deal use the same label, the source is added so
@@ -1163,30 +1177,17 @@ Deno.serve(async (req) => {
         null;
 
       const cfSources = [dealCustomFields, contactCustomFields];
-      const utms =
-        d.utms ||
-        d.utm ||
-        baseContact?.utms ||
-        firstContact?.utms ||
-        d.deal_source ||
-        d.lead_origin ||
-        {};
-      const pickUtm = (name: string, aliases: string[]) =>
-        d[`utm_${name}`] ||
-        utms?.[name] ||
-        utms?.[`utm_${name}`] ||
-        findCustomField(cfSources, aliases);
-
-      const utm_source = pickUtm("source", ["utmsource", "utm_source", "source", "fonte"]) || null;
-      const utm_medium =
-        pickUtm("medium", ["utmmedium", "utm_medium", "medium", "midia", "mídia"]) || null;
-      const utm_campaign =
-        pickUtm("campaign", ["utmcampaign", "utm_campaign", "campaign", "campaign_name", "nome campanha", "nome da campanha", "campanha", "id campanha", "campaign_id"]) || null;
-      const utm_term = pickUtm("term", ["utmterm", "utm_term", "term", "termo"]) || null;
-      const utm_content =
-        pickUtm("content", ["utmcontent", "utm_content", "content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]) ||
-        null;
-      const utm_id = pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]) || null;
+      const trackingSources = mergeUtmSources([d.utms, d.utm, baseContact?.utms, firstContact?.utms, d.deal_source, d.lead_origin]);
+      const pickUtm = (name: string, aliases: string[]) => pickTrackingValue(d[`utm_${name}`], trackingSources, cfSources, aliases);
+      const utm_source = pickUtm("source", ["source", "utmsource", "utm_source", "fonte"]);
+      const utm_medium = pickUtm("medium", ["medium", "utmmedium", "utm_medium", "midia", "mídia"]);
+      const utm_campaign = pickUtm("campaign", ["campaign", "utmcampaign", "utm_campaign", "campaign_name", "nome campanha", "nome da campanha", "campanha"]);
+      const utm_term = pickUtm("term", ["term", "utmterm", "utm_term", "termo"]);
+      const utm_content = pickUtm("content", ["content", "utmcontent", "utm_content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]);
+      const utm_id = pickUtm("id", ["id", "utmid", "utm_id", "adid", "ad_id", "gd_ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]);
+      const meta_campaign_id = pickTrackingValue(d.meta_campaign_id, trackingSources, cfSources, ["campaign_id", "gd_campaign_id", "meta_campaign_id"]);
+      const meta_adset_id = pickTrackingValue(d.meta_adset_id, trackingSources, cfSources, ["adset_id", "gd_adset_id", "meta_adset_id"]);
+      const meta_ad_id = pickTrackingValue(d.meta_ad_id, trackingSources, cfSources, ["ad_id", "gd_ad_id", "meta_ad_id"]) || utm_id;
 
       const leadEntryDate = d.created_at
         ? new Date(d.created_at).toISOString().split("T")[0]
@@ -1229,6 +1230,9 @@ Deno.serve(async (req) => {
             utm_content,
             utm_term,
             utm_id,
+            meta_campaign_id,
+            meta_adset_id,
+            meta_ad_id,
             contact_name: contactName,
             contact_phone: contactPhone,
             contact_email: contactEmail,
@@ -1465,13 +1469,8 @@ Deno.serve(async (req) => {
             [dealFields, contactFields],
             ["city", "cidade", "lead_city", "cidadelead"],
           ) || storedProfile.lead_city || null;
-        const utms = d.utms || d.utm || contact.utms || d.deal_source || d.lead_origin || {};
-        const pickUtm = (name: string, aliases: string[]) =>
-          d[`utm_${name}`] ||
-          utms?.[name] ||
-          utms?.[`utm_${name}`] ||
-          findCustomField(allCfSources, aliases) ||
-          null;
+        const trackingSources = mergeUtmSources([d.utms, d.utm, contact.utms, d.deal_source, d.lead_origin]);
+        const pickUtm = (name: string, aliases: string[]) => pickTrackingValue(d[`utm_${name}`], trackingSources, allCfSources, aliases);
         const row: Record<string, unknown> = {
           user_id: userId!,
           rd_connection_id: funnel!.rd_connection_id || null,
@@ -1495,6 +1494,9 @@ Deno.serve(async (req) => {
           utm_term: pickUtm("term", ["utmterm", "utm_term", "term", "termo"]),
           utm_content: pickUtm("content", ["utmcontent", "utm_content", "content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]),
           utm_id: pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]),
+          meta_campaign_id: pickTrackingValue(d.meta_campaign_id, trackingSources, allCfSources, ["campaign_id", "gd_campaign_id", "meta_campaign_id"]),
+          meta_adset_id: pickTrackingValue(d.meta_adset_id, trackingSources, allCfSources, ["adset_id", "gd_adset_id", "meta_adset_id"]),
+          meta_ad_id: pickTrackingValue(d.meta_ad_id, trackingSources, allCfSources, ["ad_id", "gd_ad_id", "meta_ad_id"]) || pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "gd_ad_id"]),
         };
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;

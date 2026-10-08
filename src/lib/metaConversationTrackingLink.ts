@@ -1,4 +1,4 @@
-export const META_UTM_TEMPLATE = "utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_term={{adset.name}}&utm_content={{ad.name}}&utm_id={{ad.id}}";
+export const META_UTM_TEMPLATE = "utm_source=meta&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_term={{adset.name}}&utm_content={{ad.name}}&utm_id={{ad.id}}&gd_campaign_id={{campaign.id}}&gd_adset_id={{adset.id}}&gd_ad_id={{ad.id}}";
 
 const ATTRIBUTION_MARKER = [
   "gd_source=meta",

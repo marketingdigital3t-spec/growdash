@@ -54,6 +54,9 @@ import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { isDealInRDAccountOrFunnelScope, isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
 import { isCanonicalWonDealInPeriod } from "@/lib/canonicalMetrics";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
+import { useInsights } from "@/hooks/useInsights";
+import { useLeadAttributionCatalog } from "@/hooks/useLeadAttributionCatalog";
+import { resolveLeadAttribution, type LeadAttribution } from "@/lib/leadAttributionResolver";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 
@@ -185,6 +188,7 @@ export default function CrmPage() {
     enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
+  const { data: attributionInsights = [] } = useInsights({ adAccountIds: accountScopeIds, startDate, endDate, enabled: canReadCrm && accountScopeIds.length > 0 });
   const { data: products = [], isLoading: loadingProducts } = useProducts();
   const [view, setView] = useState<CRMView>(() => {
     if (searchParams.get("tab") === "ai") return "ai";
@@ -198,6 +202,9 @@ export default function CrmPage() {
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [stageLimits, setStageLimits] = useState<Record<string, number>>({});
+  const selectedAdIds = useMemo(() => selectedDeal ? [selectedDeal.meta_ad_id, selectedDeal.utm_id].filter((value): value is string => Boolean(value)) : [], [selectedDeal]);
+  const { data: historicalAttributionInsights = [] } = useLeadAttributionCatalog(selectedDeal?.ad_account_id, selectedAdIds);
+  const selectedAttribution = useMemo<LeadAttribution | null>(() => selectedDeal ? resolveLeadAttribution(selectedDeal, [...attributionInsights, ...historicalAttributionInsights]) : null, [attributionInsights, historicalAttributionInsights, selectedDeal]);
 
   useEffect(() => {
     setSelectedFunnelIds((current) => current.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id)));
@@ -691,7 +698,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} userId={user?.id} userName={String(user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário Growdash")} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }); queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }); toast.success("Negociação atualizada na Growdash"); }} />
+      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} userId={user?.id} userName={String(user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário Growdash")} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }); queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }); toast.success("Negociação atualizada na Growdash"); }} />
     </div>
   );
 }
@@ -837,7 +844,7 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, funnelName, userId, userName, getOpportunityAmount, onClose, onSaved }: { deal: RDDealLite | null; funnelName?: string; userId?: string; userName: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onSaved: () => void }) {
+function DealDetails({ deal, attribution, funnelName, userId, userName, getOpportunityAmount, onClose, onSaved }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; userId?: string; userName: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onSaved: () => void }) {
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
   return (
@@ -860,11 +867,12 @@ function DealDetails({ deal, funnelName, userId, userName, getOpportunityAmount,
           <DetailRow icon={<Mail />} label="E-mail" value={deal.contact_email || "Não informado"} />
           <DetailRow icon={<MapPin />} label="Localização" value={[deal.lead_city, deal.lead_state].filter(Boolean).join(" / ") || "Não informada"} />
           <DetailRow icon={<UsersRound />} label="Produto" value={deal.rd_product_name || "Não informado"} />
-          <DetailRow icon={<Target />} label="Origem" value={deal.utm_source || "Não atribuída"} />
-          <DetailRow icon={<Target />} label="Campanha" value={deal.rd_campaign_name || deal.utm_campaign || "Não atribuída"} />
-          <DetailRow icon={<Target />} label="Conjunto (UTM term)" value={deal.utm_term || "Não atribuído"} />
-          <DetailRow icon={<Target />} label="Criativo (UTM content)" value={deal.utm_content || "Não atribuído"} />
-          <DetailRow icon={<Target />} label="ID do anúncio (UTM id)" value={deal.utm_id || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="Origem" value={attribution?.platform || "Sem parâmetros de rastreamento"} />
+          <DetailRow icon={<Target />} label="Campanha" value={attribution?.campaignName || "Não atribuída"} />
+          <DetailRow icon={<Target />} label="Conjunto" value={attribution?.adsetName || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="Criativo" value={attribution?.adName || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="ID do anúncio" value={attribution?.adId || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="Rastreamento" value={attribution?.status === "attributed" ? (attribution.method === "meta_id" ? "Atribuído pelo ID do anúncio" : "Atribuído pelas UTMs") : attribution?.status === "partial" ? "Parâmetros recebidos, anúncio não encontrado" : "Sem parâmetros de rastreamento"} />
           <DetailRow icon={<CalendarClock />} label="Criado em" value={fullDate(deal.lead_created_at)} />
           <DetailRow icon={<Clock3 />} label="Última movimentação" value={fullDate(deal.stage_updated_at || deal.updated_at)} />
           {deal.lost_reason && <DetailRow icon={<XCircle />} label="Motivo da perda" value={deal.lost_reason} danger />}

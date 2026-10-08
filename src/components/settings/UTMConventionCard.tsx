@@ -40,9 +40,11 @@ export function UTMConventionCard() {
           <ul className="list-disc pl-4 space-y-0.5">
             <li><code>utm_source=meta</code> — identifica a plataforma</li>
             <li><code>utm_campaign / term / content</code> — campanha, conjunto e criativo dinâmicos</li>
+            <li><code>gd_campaign_id / gd_adset_id / gd_ad_id</code> — IDs fixos para confirmar a origem mesmo quando o nome mudar</li>
             <li><code>utm_id={'{{ad.id}}'}</code> — ID nativo do anúncio (match exato e mais confiável)</li>
             <li>O <code>utm_id</code> tem prioridade e permite identificar o criativo mesmo quando o nome foi alterado.</li>
           </ul>
+          <p className="pt-1"><strong>Importante:</strong> o site ou formulário precisa manter esses parâmetros na URL e enviá-los ao RD. Se eles forem removidos antes do cadastro, a origem não poderá ser recuperada.</p>
         </div>
 
         <div className="space-y-3 border-t pt-4">
