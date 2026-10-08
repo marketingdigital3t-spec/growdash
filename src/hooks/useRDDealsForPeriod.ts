@@ -89,6 +89,12 @@ interface Params {
   enabled?: boolean;
 }
 
+interface WonDealsParams extends Omit<Params, "startDate" | "endDate"> {
+  startDate?: Date;
+  endDate?: Date;
+  allHistory?: boolean;
+}
+
 export interface RDCRMQueryScope {
   adAccountId?: string;
   adAccountIds?: string[];
@@ -179,17 +185,19 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
  * fechado. Para integrações antigas que ainda não preenchem `closed_at`, a
  * última alteração de etapa é o fallback para não ocultar vendas reais.
  */
-export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
+export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, allHistory = false, enabled = true }: WonDealsParams) {
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
+  const selectedAccountIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean)));
   const query = useQuery({
-    queryKey: ["rd_won_deals_period", businessDateKey(startDate), businessDateKey(endDate), resolvedFunnelIds?.join(",") ?? "all", rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : ""],
+    queryKey: ["rd_won_deals_period", allHistory ? "all-history" : `${businessDateKey(startDate!)}:${businessDateKey(endDate!)}`, resolvedFunnelIds?.join(",") ?? "all", rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : ""],
     enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
-      const bounds = saoPauloDayBounds(startDate, endDate);
-      const rangeStart = bounds.start.toISOString();
-      const rangeEnd = bounds.end.toISOString();
+      if (!allHistory && (!startDate || !endDate)) throw new Error("Informe o período do RD Station.");
+      const bounds = !allHistory && startDate && endDate ? saoPauloDayBounds(startDate, endDate) : null;
+      const rangeStart = bounds?.start.toISOString();
+      const rangeEnd = bounds?.end.toISOString();
       const PAGE = 1000;
       const fetchAll = async (fallbackToStageUpdate: boolean) => {
         let rows: RDDealLite[] = [];
@@ -198,10 +206,24 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
             .from("rd_deals")
             .select(FIELDS)
             .order(fallbackToStageUpdate ? "stage_updated_at" : "closed_at", { ascending: false, nullsFirst: false });
-          query = fallbackToStageUpdate
-            ? query.is("closed_at", null).gte("stage_updated_at", rangeStart).lte("stage_updated_at", rangeEnd)
-            : query.gte("closed_at", rangeStart).lte("closed_at", rangeEnd);
-          if (resolvedFunnelIds?.length) query = query.in("rd_funnel_id", resolvedFunnelIds);
+          if (!allHistory) {
+            query = fallbackToStageUpdate
+              ? query.is("closed_at", null).gte("stage_updated_at", rangeStart!).lte("stage_updated_at", rangeEnd!)
+              : query.gte("closed_at", rangeStart!).lte("closed_at", rangeEnd!);
+          } else if (fallbackToStageUpdate) {
+            query = query.is("closed_at", null);
+          }
+          // RD rows can be linked through a funnel/connection, or directly to
+          // the advertising account. Keep both paths in the same account scope
+          // so a direct CRM import is not lost when its funnel metadata is
+          // missing or still being linked.
+          if (resolvedFunnelIds?.length && resolvedFunnelIds[0] !== "__no_linked_rd_funnels__") {
+            const funnelFilter = `rd_funnel_id.in.(${resolvedFunnelIds.join(",")})`;
+            const accountFilter = selectedAccountIds.length ? `ad_account_id.in.(${selectedAccountIds.join(",")})` : "";
+            query = query.or([funnelFilter, accountFilter].filter(Boolean).join(","));
+          } else if (selectedAccountIds.length) {
+            query = query.in("ad_account_id", selectedAccountIds);
+          }
           const { data, error } = await withRequestTimeout(query.range(page * PAGE, (page + 1) * PAGE - 1), 15_000);
           if (error) throw error;
           const batch = ((data ?? []) as any[]).map((deal): RDDealLite => ({
@@ -219,7 +241,10 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
       const all = (await fetchAll(false)).concat(await fetchAll(true));
       // A won deal without both a close timestamp and a real stage transition
       // has no trustworthy sales date and must remain out of period KPIs.
-      return dedupeRDDeals(all).filter((deal) => isCanonicalWonDealInPeriod(deal, startDate, endDate));
+      const deduped = dedupeRDDeals(all);
+      return allHistory
+        ? deduped.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name))
+        : deduped.filter((deal) => isCanonicalWonDealInPeriod(deal, startDate!, endDate!));
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,

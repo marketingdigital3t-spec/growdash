@@ -1,4 +1,8 @@
-import { aggregateSales, type Sale } from "@/hooks/useSales";
+export type ExpertResultSale = {
+  net_revenue: number;
+  quantity: number;
+  status?: string | null;
+};
 
 export interface ExpertResultMetrics {
   revenue: number;
@@ -12,14 +16,18 @@ export interface ExpertResultMetrics {
  * account and period.
  */
 export function buildExpertResultMetrics(
-  sales: Sale[],
+  sales: ExpertResultSale[],
   leads: number,
   leadsAvailable: boolean,
 ): ExpertResultMetrics {
-  const totals = aggregateSales(sales);
+  // RD won deals arrive already deduplicated and confirmed. Legacy sales rows
+  // still carry a status, so pending/canceled rows remain excluded here.
+  const confirmed = sales.filter((sale) => !sale.status || sale.status === "confirmed");
+  const revenue = confirmed.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0);
+  const quantity = confirmed.reduce((sum, sale) => sum + Number(sale.quantity || 0), 0);
   return {
-    revenue: totals.totalNet,
-    sales: totals.totalQuantity,
-    conversion: !leadsAvailable ? null : leads > 0 ? (totals.totalQuantity / leads) * 100 : 0,
+    revenue,
+    sales: quantity,
+    conversion: !leadsAvailable ? null : leads > 0 ? (quantity / leads) * 100 : 0,
   };
 }

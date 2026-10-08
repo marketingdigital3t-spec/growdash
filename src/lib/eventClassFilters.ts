@@ -117,3 +117,44 @@ export function filterEventClassesByScope<T extends EventClassFilterRow>(
     return false;
   });
 }
+
+/**
+ * Filters the complete class inventory by account. The global calendar is
+ * intentionally not part of this operation: classes belong to an account,
+ * while dates are reserved for Meta/RD metrics.
+ */
+export function filterEventClassesByInventory<T extends EventClassFilterRow>(
+  rows: T[],
+  accountIds: string[],
+  expertId?: string,
+  expertName?: string,
+  accountScope?: ExpertAccountScope,
+) {
+  const normalizedExpertName = normalizeExpertName(expertName);
+  const selectedAccountSet = new Set(accountIds);
+  return rows.filter((row) => {
+    if (!accountIds.length) return true;
+    const linkedAccountIds = row.ad_account_ids?.length ? row.ad_account_ids : row.ad_account_id ? [row.ad_account_id] : [];
+    if (linkedAccountIds.length) return linkedAccountIds.some((id) => selectedAccountSet.has(id));
+
+    const candidateExpertIds = new Set<string>();
+    if (row.expert_id) candidateExpertIds.add(row.expert_id);
+    const rowName = normalizeExpertName(row.expert_name);
+    Object.entries(accountScope?.expertNameToIds || {}).forEach(([expertNameKey, ids]) => {
+      if (rowName === expertNameKey || rowName.includes(expertNameKey) || expertNameKey.includes(rowName)) {
+        ids.forEach((id) => candidateExpertIds.add(id));
+      }
+    });
+    if (expertId) candidateExpertIds.add(expertId);
+    if (normalizedExpertName && accountScope) {
+      (accountScope.expertNameToIds[normalizedExpertName] || []).forEach((id) => candidateExpertIds.add(id));
+    }
+
+    for (const candidateId of candidateExpertIds) {
+      if ((accountScope?.expertToAccountIds[candidateId] || []).some((id) => selectedAccountSet.has(id))) return true;
+    }
+    if (!accountScope && expertId && row.expert_id === expertId) return true;
+    if (!accountScope && normalizedExpertName && normalizeExpertName(row.expert_name) === normalizedExpertName) return true;
+    return false;
+  });
+}

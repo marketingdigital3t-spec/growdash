@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildExpertAccountScope, filterEventClassesByScope, normalizeEventClassDate } from "@/lib/eventClassFilters";
+import { buildExpertAccountScope, filterEventClassesByInventory, filterEventClassesByScope, normalizeEventClassDate } from "@/lib/eventClassFilters";
 
 const scope = { startDate: "2026-10-01", endDate: "2026-10-31" };
 const row = (date_start: string, ad_account_id: string | null, expert_name = "Ranniely", expert_id?: string) => ({ id: `${date_start}-${ad_account_id}-${expert_name}`, date_start, ad_account_id, expert_name, expert_id });
@@ -70,5 +70,32 @@ describe("event class global date and account filters", () => {
 
   it("does not assign an orphan legacy class without a reliable expert", () => {
     expect(filterEventClassesByScope([row("2026-10-02", null, "Outra pessoa")], scope, ["ca01"], undefined, undefined, accountScope)).toHaveLength(0);
+  });
+});
+
+describe("complete event class inventory", () => {
+  it("does not change when the calendar month changes", () => {
+    const classes = [row("2023-11-15", "ca01"), row("2026-11-15", "ca01"), row("2027-05-01", "ca01")];
+    expect(filterEventClassesByInventory(classes, ["ca01"]).map((item) => item.date_start)).toEqual(classes.map((item) => item.date_start));
+  });
+
+  it("keeps past, future and archived classes in the complete inventory", () => {
+    const classes = [
+      { ...row("2023-11-15", "ca01"), archived_at: "2026-01-01T00:00:00Z" },
+      row("2026-11-15", "ca01"),
+      row("2027-05-01", "ca01"),
+    ];
+    expect(filterEventClassesByInventory(classes, ["ca01"])).toHaveLength(3);
+  });
+
+  it("consolidates multiple selected accounts and keeps legacy expert fallback", () => {
+    const classes = [
+      row("2026-11-15", "ca01"),
+      row("2026-12-15", "ca02"),
+      row("2027-01-15", null, "Dra. RANNÍELY Silva"),
+      row("2027-02-15", null, "Sté Andrade"),
+    ];
+    expect(filterEventClassesByInventory(classes, ["ca01", "ca02"], undefined, undefined, accountScope)).toHaveLength(3);
+    expect(filterEventClassesByInventory(classes, ["ste01"], undefined, undefined, accountScope)).toHaveLength(1);
   });
 });

@@ -437,9 +437,8 @@ export function ExpertOperationsView() {
   const operationDates = useMemo(() => ({
     startDate: globalFilters.startDate,
     endDate: globalFilters.endDate,
-    selectedAccountIds: globalFilters.adAccountIds,
-    includeFutureClasses: globalFilters.preset === "max",
-  }), [globalFilters.adAccountIds, globalFilters.endDate, globalFilters.preset, globalFilters.startDate]);
+    selectedAccountIds: accountScopeIds,
+  }), [accountScopeIds, globalFilters.endDate, globalFilters.startDate]);
   const operations = useExpertOperations(selectedExpertId, accountScopeIds, operationDates);
   const [slide, setSlide] = useState(0);
   const tabClasses = useMemo(() => classTab === "all" ? operations.classes : operations.classes.filter((eventClass: any) => classBucket(eventClass) === classTab), [classTab, operations.classes]);
@@ -458,9 +457,9 @@ export function ExpertOperationsView() {
     ? operations.accountIds.map((id) => adAccounts.data?.find((account) => account.id === id)?.name || id).join(", ")
     : "Nenhuma conta Meta vinculada";
   const periodLabel = `${operationDates.startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${operationDates.endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
-  const classDateRangeLabel = operationDates.includeFutureClasses
-    ? `${operationDates.startDate.toLocaleDateString("pt-BR")} em diante (Máximo)`
-    : `${operationDates.startDate.toLocaleDateString("pt-BR")} a ${operationDates.endDate.toLocaleDateString("pt-BR")}`;
+  const classDateRangeLabel = accountScopeIds.length
+    ? (globalFilters.adAccountIds.length ? `Inventário completo · ${accountLabel}` : "Inventário completo · Todas as contas permitidas")
+    : "Inventário completo de turmas";
   const dailyRevenue = useMemo(() => {
     const days = new Map<string, number>();
     operations.commercialSales.forEach((sale) => {
@@ -472,7 +471,7 @@ export function ExpertOperationsView() {
       .slice(-14);
   }, [operations.commercialSales]);
   const maxRevenue = Math.max(...dailyRevenue.map(([, value]) => value), 1);
-  useEffect(() => setSlide(0), [classTab, globalFilters.adAccountIds, globalFilters.endDate, globalFilters.startDate]);
+  useEffect(() => setSlide(0), [classTab, globalFilters.adAccountIds, operations.classes.length]);
   return (
     <div className="expert-operations-view space-y-3">
       <div className="expert-operations-toolbar flex flex-col gap-2 rounded-xl border border-primary/20 bg-primary/[.04] px-3 py-2 lg:flex-row lg:items-center lg:gap-3">
@@ -515,7 +514,7 @@ export function ExpertOperationsView() {
             </p>
             <h3 className="text-base font-black">Turmas em operação</h3>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Período global: {classDateRangeLabel} · Arraste para o lado para ver todas as turmas.
+              {classDateRangeLabel} · O calendário abaixo controla apenas Meta Ads e RD Station.
             </p>
           </div>
           <div className="flex flex-wrap gap-1">
@@ -545,11 +544,18 @@ export function ExpertOperationsView() {
           </div>
         </div>
         <div className="grid items-stretch gap-3 pb-2 sm:grid-cols-2 lg:grid-cols-4">
-          {operations.isLoading && operations.classes.length === 0 ? (
+          {operations.classesLoading && operations.classes.length === 0 ? (
             <Card className="w-full border-dashed sm:col-span-2 lg:col-span-4">
               <CardContent className="flex items-center gap-3 p-8 text-sm text-muted-foreground">
                 <RefreshCw className="h-5 w-5 animate-spin" />
                 Carregando grade de turmas…
+              </CardContent>
+            </Card>
+          ) : operations.classesError ? (
+            <Card className="w-full border-dashed sm:col-span-2 lg:col-span-4">
+              <CardContent className="flex items-center gap-3 p-8 text-sm text-destructive">
+                <CircleAlert className="h-5 w-5" />
+                Não foi possível carregar as turmas. Tente atualizar novamente.
               </CardContent>
             </Card>
           ) : visibleClasses.length ? (
@@ -693,7 +699,7 @@ export function ExpertOperationsView() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Funil de conversão</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Leads Meta até vendas confirmadas · mesma conta e período selecionados
+                Leads Meta no período selecionado · vendas confirmadas do RD Station CRM
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -730,7 +736,7 @@ export function ExpertOperationsView() {
                   </text>
                 </svg>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>Fonte dos leads: Meta Ads</span>
+                  <span>Fontes: leads Meta Ads · vendas RD Station CRM</span>
                   <span className="font-bold text-foreground">
                     Conversão: {conversion == null ? "Indisponível" : `${conversion.toFixed(1)}%`}
                   </span>

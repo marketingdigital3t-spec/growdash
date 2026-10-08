@@ -74,4 +74,12 @@ describe("expert result metrics", () => {
   it("does not infer metrics when the lead source is unavailable", () => {
     expect(buildExpertResultMetrics([sale()] as any, 10, false).conversion).toBeNull();
   });
+
+  it("uses confirmed RD deals as one sale each when the CRM source has no sales status", () => {
+    const result = buildExpertResultMetrics([
+      { net_revenue: 1500, quantity: 1 },
+      { net_revenue: 800, quantity: 1 },
+    ], 10, true);
+    expect(result).toEqual({ revenue: 2300, sales: 2, conversion: 20 });
+  });
 });
