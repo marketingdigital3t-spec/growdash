@@ -53,9 +53,10 @@ export interface RDRevenueDeal {
 }
 
 /**
- * Consolida receita realizada do financeiro e do RD Station sem duplicar a
- * mesma negociação. O RD só fornece o valor total do negócio; por isso taxas,
- * impostos, estornos e chargebacks seguem vindo exclusivamente de `sales`.
+ * Consolida os indicadores oficiais de vendas a partir dos negócios ganhos do
+ * RD Station. A tabela `sales` continua disponível para detalhes financeiros
+ * (taxas, impostos, estornos e forma de pagamento), mas não pode alterar a
+ * quantidade nem o faturamento oficial de negócios ganhos.
  */
 export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenueDeal[] = []) {
   // Quantidade de vendas realizadas é um fato do RD, não da tabela financeira.
@@ -100,14 +101,19 @@ export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenue
     includedDealIds.add(dealKey);
     return true;
   });
+  const rdRevenue = canonicalRDDeals.reduce((total, deal) => total + getRDDealAmount(deal), 0);
   const rdOnlyRevenue = rdOnlyWonDeals.reduce((total, deal) => total + getRDDealAmount(deal), 0);
   const rdOnlyCount = rdOnlyWonDeals.length;
   const rdWonDealsCount = canonicalRDDeals.length;
   return {
     ...salesTotals,
-    totalGross: salesTotals.totalGross + rdOnlyRevenue,
-    totalNet: salesTotals.totalNet + rdOnlyRevenue,
+    // These are the canonical commercial KPIs. They intentionally do not
+    // combine values from `sales`, which can be delayed, duplicated, or
+    // represent a payment record rather than the RD deal amount.
+    totalGross: rdRevenue,
+    totalNet: rdRevenue,
     totalQuantity: rdWonDealsCount,
+    rdRevenue,
     rdOnlyRevenue,
     rdOnlyCount,
     // Deliberadamente não inclui `sales.quantity`: uma venda financeira sem
@@ -116,6 +122,6 @@ export function aggregateRevenueSources(sales: RevenueSale[], rdDeals: RDRevenue
     rdWonDealsCount,
     refundRate,
     chargebackRate,
-    arpu: rdWonDealsCount > 0 ? (salesTotals.totalNet + rdOnlyRevenue) / rdWonDealsCount : 0,
+    arpu: rdWonDealsCount > 0 ? rdRevenue / rdWonDealsCount : 0,
   };
 }

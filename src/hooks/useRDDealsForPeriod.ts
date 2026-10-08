@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
-import { canQueryResolvedRDAccountScope, isRDDealInScopePeriod } from "@/lib/rdQueryScope";
+import { canQueryResolvedRDAccountScope, isDealInRDAccountOrFunnelScope, isRDDealInScopePeriod } from "@/lib/rdQueryScope";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { businessDateKey } from "@/lib/businessDate";
@@ -118,6 +118,7 @@ const FIELDS =
 export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccountIds, funnelIds, enabled = true }: Params) {
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
+  const selectedAccountIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean)));
   const query = useQuery({
     queryKey: [
       "rd_deals_period",
@@ -170,7 +171,7 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
         startDate,
         endDate,
         dateRule: "created_at_for_open_closed_at_for_won",
-      }));
+      }) && (!selectedAccountIds.length || isDealInRDAccountOrFunnelScope(deal, selectedAccountIds, resolvedFunnelIds ?? [])));
       return dedupeRDDeals(scoped);
     },
     staleTime: 5 * 60 * 1000,
@@ -243,9 +244,12 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
       // A won deal without both a close timestamp and a real stage transition
       // has no trustworthy sales date and must remain out of period KPIs.
       const deduped = dedupeRDDeals(all);
+      const scoped = deduped.filter((deal) =>
+        !selectedAccountIds.length || isDealInRDAccountOrFunnelScope(deal, selectedAccountIds, resolvedFunnelIds ?? []),
+      );
       return allHistory
-        ? deduped.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name))
-        : deduped.filter((deal) => isCanonicalWonDealInPeriod(deal, startDate!, endDate!));
+        ? scoped.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name))
+        : scoped.filter((deal) => isCanonicalWonDealInPeriod(deal, startDate!, endDate!));
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,

@@ -7,6 +7,7 @@ import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 import { withRequestTimeout } from "@/lib/resilience";
 import { isSameQueryScope } from "@/lib/queryScope";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
+import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -243,6 +244,7 @@ export function dedupeRDDeals(rows: RDDeal[]) {
 export function useRDDeals(params: Params) {
   const { funnelId, funnelIds, adAccountId, adAccountIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
   const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
+  const accountScopeIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean)));
   return useQuery({
     queryKey: [
       "rd_deals",
@@ -303,7 +305,9 @@ export function useRDDeals(params: Params) {
         all = all.concat(batch);
         if (batch.length < PAGE) break;
       }
-      return dedupeRDDeals(all);
+      return dedupeRDDeals(all).filter((deal) =>
+        !accountScopeIds.length || isDealInRDAccountOrFunnelScope(deal, accountScopeIds, scopeIds),
+      );
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
@@ -321,6 +325,7 @@ export function useRDDeals(params: Params) {
 export function useRDClosedDeals(params: Params) {
   const { funnelId, funnelIds, adAccountId, adAccountIds, startDate, endDate, source, state, campaign, campaigns, owner, product, includeHistory = false, enabled = true } = params;
   const scopeIds = funnelIds?.length ? Array.from(new Set(funnelIds)).sort() : funnelId ? [funnelId] : [];
+  const accountScopeIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean)));
   return useQuery({
     queryKey: [
       "rd_closed_deals",
@@ -367,7 +372,9 @@ export function useRDClosedDeals(params: Params) {
       // Alguns pipelines do RD mantêm a etapa final como “Vendas realizadas”
       // antes de preencher o booleano técnico `win`. Não descartamos essas
       // vendas reais por causa da ordem de sincronização.
-      const won = dedupeRDDeals(all).filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
+      const won = dedupeRDDeals(all)
+        .filter((deal) => !accountScopeIds.length || isDealInRDAccountOrFunnelScope(deal, accountScopeIds, scopeIds))
+        .filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
       if (includeHistory || (!startDate && !endDate)) return won;
       return canonicalWonDealsInPeriod(won, startDate ?? endDate!, endDate ?? startDate!);
     },

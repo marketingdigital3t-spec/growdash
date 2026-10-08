@@ -116,12 +116,14 @@ const Index = () => {
   const { data: rdDeals = [] } = useRDDealsForPeriod({
     startDate,
     endDate,
+    adAccountIds: scopedAccountIds,
     funnelIds: scopedRDfunnelIds,
     enabled: isRDScopeReady,
   });
   const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
     startDate,
     endDate,
+    adAccountIds: scopedAccountIds,
     funnelIds: scopedRDfunnelIds,
     enabled: isRDScopeReady,
   });

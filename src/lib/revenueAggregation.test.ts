@@ -15,7 +15,7 @@ describe("aggregateRevenueSources", () => {
   });
   it("não duplica uma negociação RD já representada em venda confirmada", () => {
     const result = aggregateRevenueSources([sale({ rd_deal_id: "rd-1" })], [deal(), deal({ rd_deal_id: "rd-2", amount_total: 200 })]);
-    expect(result.totalNet).toBe(290);
+    expect(result.totalNet).toBe(1700);
     expect(result.totalTax).toBe(10);
     expect(result.confirmedSalesCount).toBe(2);
   });
@@ -33,7 +33,7 @@ describe("aggregateRevenueSources", () => {
   });
   it("não usa venda financeira sem vínculo RD para inflar o KPI de vendas realizadas", () => {
     const result = aggregateRevenueSources([sale({ rd_deal_id: null })], []);
-    expect(result.totalNet).toBe(90);
+    expect(result.totalNet).toBe(0);
     expect(result.confirmedSalesCount).toBe(0);
     expect(result.rdWonDealsCount).toBe(0);
   });
@@ -53,6 +53,15 @@ describe("aggregateRevenueSources", () => {
     ], []);
     expect(result.byPayment.cartao).toBe(999);
     expect(result.byPayment.boleto).toBe(50);
-    expect(result.totalNet).toBe(1049);
+    expect(result.totalNet).toBe(0);
+  });
+
+  it("usa o valor efetivo do RD antes do valor original e mantém zero como zero", () => {
+    const result = aggregateRevenueSources([], [
+      deal({ rd_deal_id: "effective", amount_total: 1000, amount_total_effective: 2500 }),
+      deal({ rd_deal_id: "zero", amount_total: 0, amount_total_effective: 0 }),
+    ]);
+    expect(result.totalNet).toBe(2500);
+    expect(result.confirmedSalesCount).toBe(2);
   });
 });
