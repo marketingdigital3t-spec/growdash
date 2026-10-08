@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { canQueryResolvedRDAccountScope, isRDDealInScopePeriod } from "@/lib/rdQueryScope";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { withRequestTimeout } from "@/lib/resilience";
 import { businessDateKey } from "@/lib/businessDate";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
@@ -262,9 +263,10 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
 export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, dateScope = "pipeline", enabled = true }: RDCRMQueryScope) {
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });
   const resolvedFunnelIds = rdScope.funnelIds;
+  const selectedAccountIds = Array.from(new Set([...(adAccountIds ?? []), ...(adAccountId ? [adAccountId] : [])].filter(Boolean))).sort();
   const funnelScope = resolvedFunnelIds?.join(",") ?? "all";
   const query = useQuery({
-    queryKey: ["rd_crm_deals", funnelScope, rdScope.accountScoped ? (adAccountIds?.slice().sort().join(",") || adAccountId || "") : "", dateScope, dateScope === "period" && startDate ? businessDateKey(startDate) : null, dateScope === "period" && endDate ? businessDateKey(endDate) : null],
+    queryKey: ["rd_crm_deals", funnelScope, selectedAccountIds.join(","), dateScope, dateScope === "period" && startDate ? businessDateKey(startDate) : null, dateScope === "period" && endDate ? businessDateKey(endDate) : null],
     enabled: enabled && canQueryResolvedRDAccountScope(rdScope.accountScoped, rdScope.loading, resolvedFunnelIds),
     queryFn: async () => {
       if (rdScope.error) throw rdScope.error;
@@ -285,7 +287,14 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
             .gte("lead_created_at", periodBounds.start)
             .lte("lead_created_at", periodBounds.end);
         }
-        if (resolvedFunnelIds?.length) query = query.in("rd_funnel_id", resolvedFunnelIds);
+        const usableFunnelIds = (resolvedFunnelIds ?? []).filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
+        const scopeFilters = [
+          usableFunnelIds.length ? `rd_funnel_id.in.(${usableFunnelIds.join(",")})` : "",
+          selectedAccountIds.length ? `ad_account_id.in.(${selectedAccountIds.join(",")})` : "",
+        ].filter(Boolean);
+        if (scopeFilters.length > 1) query = query.or(scopeFilters.join(","));
+        else if (usableFunnelIds.length) query = query.in("rd_funnel_id", usableFunnelIds);
+        else if (selectedAccountIds.length) query = query.in("ad_account_id", selectedAccountIds);
         const from = page * pageSize;
         const { data, error } = await withRequestTimeout(query.range(from, from + pageSize - 1), 15_000);
         if (error) throw error;

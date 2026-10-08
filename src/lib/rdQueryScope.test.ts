@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canQueryResolvedRDAccountScope, dedupeRDDealsById, isDealInRDQueryScope, isRDDealInScopePeriod, normalizeRDQueryScope } from "./rdQueryScope";
+import { canQueryResolvedRDAccountScope, dedupeRDDealsById, isDealInRDAccountOrFunnelScope, isDealInRDQueryScope, isRDDealInScopePeriod, normalizeRDQueryScope } from "./rdQueryScope";
 
 const scope = normalizeRDQueryScope({
   accountIds: ["account-b", "account-a", "account-a"],
@@ -10,6 +10,12 @@ const scope = normalizeRDQueryScope({
 });
 
 describe("RD query scope", () => {
+  it("includes deals linked directly to a selected account or through its RD funnel", () => {
+    expect(isDealInRDAccountOrFunnelScope({ ad_account_id: "account-a", rd_funnel_id: null }, ["account-a"], ["funnel-a"])).toBe(true);
+    expect(isDealInRDAccountOrFunnelScope({ ad_account_id: null, rd_funnel_id: "funnel-a" }, ["account-a"], ["funnel-a"])).toBe(true);
+    expect(isDealInRDAccountOrFunnelScope({ ad_account_id: "account-b", rd_funnel_id: "funnel-a" }, ["account-a"], ["funnel-a"])).toBe(false);
+    expect(isDealInRDAccountOrFunnelScope({ ad_account_id: "account-b", rd_funnel_id: null }, ["account-a"], ["funnel-a"])).toBe(false);
+  });
   it("does not turn a missing account-to-funnel link into an unscoped query", () => {
     expect(canQueryResolvedRDAccountScope(true, false, [])).toBe(false);
     expect(canQueryResolvedRDAccountScope(true, true, ["funnel"])).toBe(false);

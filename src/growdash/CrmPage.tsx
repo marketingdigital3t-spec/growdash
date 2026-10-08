@@ -49,10 +49,10 @@ import { cn } from "@/lib/utils";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
-import { connectedRDFunnelIds } from "@/lib/crmFunnelScope";
 import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
-import { isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
+import { isDealInRDAccountOrFunnelScope, isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
+import { isCanonicalWonDealInPeriod } from "@/lib/canonicalMetrics";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
@@ -182,7 +182,7 @@ export default function CrmPage() {
     funnelIds: requestedFunnelIds,
     startDate: preset === "max" ? undefined : startDate,
     endDate: preset === "max" ? undefined : endDate,
-    enabled: canReadCrm && requestedFunnelIds.length > 0,
+    enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
   const { data: products = [], isLoading: loadingProducts } = useProducts();
@@ -233,7 +233,6 @@ export default function CrmPage() {
     () => connectedFunnels.map((funnel) => funnel.id),
     [connectedFunnels],
   );
-  const connectedFunnelIdSet = useMemo(() => connectedRDFunnelIds(connectedFunnels), [connectedFunnels]);
   const connectedFunnelNameById = useMemo(
     () => new Map(connectedFunnels.map((funnel) => [funnel.id, funnel.name])),
     [connectedFunnels],
@@ -244,12 +243,10 @@ export default function CrmPage() {
   );
   const scopedDeals = useMemo(
     () => dedupeRDDeals(allDeals.filter((deal) =>
-      (!deal.ad_account_id || accountScopeSet.has(deal.ad_account_id))
-      && !!deal.rd_funnel_id
-      && connectedFunnelIdSet.has(deal.rd_funnel_id)
-      && !isExcludedLegacyRannielyStage(connectedFunnelNameById.get(deal.rd_funnel_id), deal.rd_stage_name),
+      isDealInRDAccountOrFunnelScope(deal, accountScopeIds, funnelScopeIds)
+      && !isExcludedLegacyRannielyStage(connectedFunnelNameById.get(deal.rd_funnel_id || ""), deal.rd_stage_name),
     )),
-    [allDeals, accountScopeSet, connectedFunnelIdSet, connectedFunnelNameById],
+    [allDeals, accountScopeIds, connectedFunnelNameById, funnelScopeIds],
   );
   const scopedSales = useMemo(() => canonicalSales.filter((sale) =>
     !!sale.ad_account_id
@@ -303,8 +300,14 @@ export default function CrmPage() {
   // only the summary KPIs below use the selected period.
   const dealsInPipeline = scopedDeals;
   const dealsInSelectedPeriod = useMemo(
-    () => preset === "max" ? scopedDeals : scopedDeals.filter((deal) => isRDDealInScopePeriod(deal, rdScope)),
+    () => preset === "max" ? scopedDeals : scopedDeals.filter((deal) => isRDDealInScopePeriod(deal, { ...rdScope, accountIds: [], funnelIds: [] })),
     [preset, rdScope, scopedDeals],
+  );
+  const wonDealsInSelectedPeriod = useMemo(
+    () => preset === "max"
+      ? scopedDeals.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name))
+      : scopedDeals.filter((deal) => isCanonicalWonDealInPeriod(deal, startDate, endDate)),
+    [endDate, preset, scopedDeals, startDate],
   );
   const owners = useMemo(
     () => Array.from(new Set(dealsInPipeline.map((deal) => deal.deal_owner_name).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR")),
@@ -338,7 +341,7 @@ export default function CrmPage() {
     // connected Meta accounts and RD funnels.
     // Summary KPIs use the selected period while the Kanban above remains the
     // current RD pipeline, including older negotiations still in progress.
-    const won = dealsInSelectedPeriod.filter((deal) => deal.win || isWonRDStageName(deal.rd_stage_name));
+    const won = wonDealsInSelectedPeriod;
     const lost = dealsInSelectedPeriod.filter((deal) => classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified");
     const active = dealsInSelectedPeriod.filter((deal) => {
       const bucket = classifyLead(deal);
@@ -355,7 +358,7 @@ export default function CrmPage() {
       lost: lost.length,
       conversion: dealsInSelectedPeriod.length ? (won.length / dealsInSelectedPeriod.length) * 100 : 0,
     };
-  }, [dealsInSelectedPeriod, getOpportunityAmount, scopedSales]);
+  }, [dealsInSelectedPeriod, getOpportunityAmount, scopedSales, wonDealsInSelectedPeriod]);
 
   const boardStageModel = useMemo(() => {
     const map = new Map<string, PipelineStage>();

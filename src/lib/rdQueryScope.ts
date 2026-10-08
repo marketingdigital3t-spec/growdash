@@ -45,6 +45,26 @@ export function isDealInRDQueryScope(deal: ScopedDeal, scope: RDQueryScope) {
     && (!normalized.funnelIds.length || normalized.funnelIds.includes(deal.rd_funnel_id || ""));
 }
 
+/**
+ * CRM deal scope supports both existing relationships: direct Meta account
+ * assignment, and RD funnel assignment when the deal has no direct account.
+ * A deal with a direct account must never leak into a different account just
+ * because its funnel happens to be selected too.
+ */
+export function isDealInRDAccountOrFunnelScope(
+  deal: Pick<ScopedDeal, "ad_account_id" | "rd_funnel_id">,
+  accountIds: string[],
+  funnelIds: string[],
+) {
+  const directAccountMatch = Boolean(deal.ad_account_id && accountIds.includes(deal.ad_account_id));
+  const linkedFunnelMatch = Boolean(
+    deal.rd_funnel_id
+    && funnelIds.includes(deal.rd_funnel_id)
+    && (!deal.ad_account_id || directAccountMatch),
+  );
+  return directAccountMatch || linkedFunnelMatch;
+}
+
 function inPeriod(value: string | null | undefined, scope: RDQueryScope) {
   if (!value) return false;
   const timestamp = new Date(value).getTime();
