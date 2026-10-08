@@ -8855,6 +8855,11 @@ body,
 .growdash-app-shell {
   min-height: 100svh;
   isolation: isolate;
+  /* Keep the shell out of the browser's scroll-container chain. The previous
+     horizontal clip on this ancestor made the sticky topbar detach after a
+     long vertical scroll in Chromium. The document-level clip below still
+     prevents horizontal overflow on every route. */
+  overflow: visible;
 }
 
 .growdash-content-shell,
@@ -8867,6 +8872,19 @@ body,
 .analytics-module {
   min-width: 0;
   max-width: 100%;
+}
+
+.growdash-content-shell {
+  position: relative;
+  overflow: visible;
+}
+
+.growdash-global-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 30;
+  align-self: stretch;
+  overflow: visible;
 }
 
 .growdash-main :is(.grid, .flex) > * {
