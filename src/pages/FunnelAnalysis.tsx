@@ -156,6 +156,7 @@ export default function FunnelAnalysis() {
   const { data: stages = [], isFetched: stagesFetched } = useFunnelStagesForIds(funnelScopeIds);
   const { data: deals = [], isFetched: dealsFetched, refetch } = useRDDeals({
     funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -169,6 +170,7 @@ export default function FunnelAnalysis() {
   // O recorte RD usa os funis vinculados à conta selecionada e os filtros do CRM.
   const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError } = useRDDeals({
     funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -184,6 +186,7 @@ export default function FunnelAnalysis() {
   // mesma consulta e não há uma segunda requisição.
   const { data: filterDeals = [], isLoading: loadingFilterDeals } = useRDDeals({
     funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
     // Filtros devem listar todos os valores que existem no pipeline, não só
     // os valores de leads recém-criados.
     includeHistory: true,
@@ -191,6 +194,7 @@ export default function FunnelAnalysis() {
   });
   const { data: closedDeals = [], isLoading: loadingClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -203,6 +207,7 @@ export default function FunnelAnalysis() {
   });
   const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDClosedDeals({
     funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
     startDate,
     endDate,
     source: selectedSource,
@@ -436,10 +441,10 @@ export default function FunnelAnalysis() {
         cac: funnelMeta.data.available && periodAnalytics.conversions > 0
           ? funnelMeta.data.spend / periodAnalytics.conversions
           : null,
-        // ROAS Meta is purchase value attributed by Meta / Meta spend. RD
-        // revenue is shown separately and must not be relabeled as Meta ROAS.
+        // A análise de funil usa vendas e receita confirmadas no RD como
+        // fonte financeira única. O investimento continua vindo da Meta.
         roas: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
-          ? funnelMeta.data.roas
+          ? (funnelMeta.data.spend > 0 ? periodAnalytics.revenue / funnelMeta.data.spend : null)
           : null,
         salesConversionRate: funnelMeta.data.available && funnelMeta.data.metricAvailability.leads?.available
           ? computed.salesConversionRate

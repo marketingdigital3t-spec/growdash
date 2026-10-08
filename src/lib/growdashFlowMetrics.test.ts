@@ -43,4 +43,13 @@ describe("Growdash Flow analytics scope", () => {
       [{ amount_total_effective: 150 }, { amount_total: 50 }],
     )).toEqual({ created: 2, opportunities: 1, won: 2, revenue: 200 });
   });
+
+  it("uses the effective amount, falls back to the RD amount, and keeps real zero", () => {
+    expect(summarizeGrowdashFlowRD([], [
+      { amount_total_effective: 150, amount_total: 900 },
+      { amount_total_effective: null, amount_total: 50 },
+      { amount_total_effective: 0, amount_total: 25 },
+      { amount_total_effective: null, amount_total: 0 },
+    ])).toEqual({ created: 0, opportunities: 0, won: 4, revenue: 225 });
+  });
 });

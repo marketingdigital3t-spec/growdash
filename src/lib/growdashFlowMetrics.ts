@@ -1,3 +1,5 @@
+import { getRDDealAmount } from "@/lib/rdDealAmount";
+
 type FlowDealMetric = {
   stage_bucket?: string | null;
   amount_total_effective?: number | null;
@@ -81,6 +83,6 @@ export function summarizeGrowdashFlowRD(createdDeals: FlowDealMetric[], wonDeals
     created: createdDeals.length,
     opportunities: createdDeals.filter((deal) => deal.stage_bucket === "qualified").length,
     won: wonDeals.length,
-    revenue: wonDeals.reduce((sum, deal) => sum + Number(deal.amount_total_effective ?? deal.amount_total ?? 0), 0),
+    revenue: wonDeals.reduce((sum, deal) => sum + getRDDealAmount(deal), 0),
   };
 }

@@ -233,4 +233,34 @@ describe("RD deals date scope", () => {
     );
     expect(analytics.conversions).toBe(1);
   });
+
+  it("counts a deal created before the period when it was closed inside the period", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "one", rd_stage_id: "won", name: "Venda realizada", order: 1, is_won: true, is_lost: false },
+    ];
+    const deal: RDDeal = {
+      id: "snapshot-3", rd_deal_id: "rd-sale-3", rd_funnel_id: "one", rd_stage_id: "won", rd_stage_name: "Venda realizada", rd_stage_order: 1,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "client", win: true, lost_reason: null, amount_total: 1000,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: null, lead_city: null, lead_created_at: "2026-08-01T12:00:00Z", stage_updated_at: "2026-10-02T12:00:00Z", closed_at: "2026-10-03T12:00:00-03:00",
+    };
+    const analytics = computeFunnelAnalytics(
+      [deal], stages, [],
+      { startDate: new Date("2026-10-01T00:00:00-03:00"), endDate: new Date("2026-10-07T23:59:59-03:00") },
+    );
+    expect(analytics.conversions).toBe(1);
+    expect(analytics.revenue).toBe(1000);
+  });
+
+  it("uses the effective amount for revenue and ticket calculations", () => {
+    const deal: RDDeal = {
+      id: "snapshot-4", rd_deal_id: "rd-sale-4", rd_funnel_id: "one", rd_stage_id: "won", rd_stage_name: "Venda realizada", rd_stage_order: 1,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "client", win: true, lost_reason: null, amount_total: 1000, amount_total_effective: 1250,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: null, lead_city: null, lead_created_at: "2026-10-01T12:00:00Z", stage_updated_at: null, closed_at: "2026-10-02T12:00:00Z",
+    };
+    const analytics = computeFunnelAnalytics([deal], [], [deal]);
+    expect(analytics.revenue).toBe(1250);
+    expect(analytics.avgTicket).toBe(1250);
+  });
 });

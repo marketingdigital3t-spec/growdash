@@ -6,6 +6,7 @@ import { canonicalWonDeals, canonicalWonDate, canonicalWonDealsInPeriod, saoPaul
 import { consolidatedCRMStage } from "@/lib/crmPipelineStages";
 import { withRequestTimeout } from "@/lib/resilience";
 import { isSameQueryScope } from "@/lib/queryScope";
+import { getRDDealAmount } from "@/lib/rdDealAmount";
 
 const NAME_TO_UF: Record<string, string> = {
   "acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM",
@@ -55,6 +56,7 @@ export interface RDDeal {
   win: boolean;
   lost_reason: string | null;
   amount_total: number;
+  amount_total_effective?: number | null;
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
@@ -221,7 +223,7 @@ export function shouldApplyRDDateRange(includeHistory = false) {
 }
 
 const DEAL_FIELDS =
-  "id, rd_connection_id, ad_account_id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_attribution_method, lead_state, lead_city, contact_name, contact_email, contact_phone, custom_fields, lead_created_at, stage_updated_at, closed_at, updated_at";
+  "id, rd_connection_id, ad_account_id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, amount_total_effective, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_attribution_method, lead_state, lead_city, contact_name, contact_email, contact_phone, custom_fields, lead_created_at, stage_updated_at, closed_at, updated_at";
 
 /** Keeps the newest snapshot of a single RD deal when an integration retry
  * left more than one local row. The RD deal ID is global and is the canonical
@@ -265,9 +267,11 @@ export function useRDDeals(params: Params) {
         .from("rd_deals")
         .select(DEAL_FIELDS)
         .order("lead_created_at", { ascending: false });
+      // Leads still use the resolved RD funnel scope. The period date filter
+      // below is also expressed as an OR, so adding a second PostgREST OR for
+      // direct account links would replace the date predicate. Won deals use
+      // the account-or-funnel scope in the closed-deals query below.
       query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
-      if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-      else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
 
       if (shouldApplyRDDateRange(includeHistory) && (startDate || endDate)) {
         // Older RD imports may not have lead_created_at. Keep those leads in
@@ -338,9 +342,12 @@ export function useRDClosedDeals(params: Params) {
         .from("rd_deals")
         .select(DEAL_FIELDS)
         .order("closed_at", { ascending: false, nullsFirst: false });
-      query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
-      if (adAccountId) query = query.eq("ad_account_id", adAccountId);
-      else if (adAccountIds?.length) query = query.in("ad_account_id", adAccountIds);
+      const funnelScope = scopeIds.length === 1 ? `rd_funnel_id.eq.${scopeIds[0]}` : `rd_funnel_id.in.(${scopeIds.join(",")})`;
+      const accountScope = adAccountId
+        ? `ad_account_id.eq.${adAccountId}`
+        : adAccountIds?.length ? `ad_account_id.in.(${adAccountIds.join(",")})` : null;
+      if (accountScope) query = query.or(`${funnelScope},${accountScope}`);
+      else query = scopeIds.length === 1 ? query.eq("rd_funnel_id", scopeIds[0]) : query.in("rd_funnel_id", scopeIds);
 
       if (source && source !== "all") query = query.eq("utm_source", source);
       if (state && state !== "all") query = query.eq("lead_state", state);
@@ -559,14 +566,14 @@ export function computeFunnelAnalytics(
   let qualifiedLeads = 0;
   const conversions = confirmedClosedDeals.length;
   let lostDeals = 0;
-  const revenue = confirmedClosedDeals.reduce((sum, deal) => sum + (deal.amount_total || 0), 0);
-  const wonAmounts: number[] = confirmedClosedDeals.map((deal) => deal.amount_total || 0);
+  const revenue = confirmedClosedDeals.reduce((sum, deal) => sum + getRDDealAmount(deal), 0);
+  const wonAmounts: number[] = confirmedClosedDeals.map((deal) => getRDDealAmount(deal));
 
   const now = Date.now();
   for (const d of deals) {
     const sid = canonicalDealStageId(d);
     currentCount.set(sid, (currentCount.get(sid) || 0) + 1);
-    valueByStage.set(sid, (valueByStage.get(sid) || 0) + (d.amount_total || 0));
+    valueByStage.set(sid, (valueByStage.get(sid) || 0) + getRDDealAmount(d));
 
     if (d.stage_updated_at) {
       const days = (now - new Date(d.stage_updated_at).getTime()) / 86400000;
@@ -821,7 +828,7 @@ export function computeFunnelAnalytics(
     const k = d.utm_source || "Não informado";
     const cur = srcMap.get(k) || { leads: 0, sales: 0, revenue: 0 };
     cur.sales += 1;
-    cur.revenue += d.amount_total || 0;
+    cur.revenue += getRDDealAmount(d);
     srcMap.set(k, cur);
   }
   const sourceBreakdown = Array.from(srcMap.entries())
@@ -902,7 +909,7 @@ export function computeFunnelAnalytics(
     const wd = new Date(wonDate).getDay();
     const cur = wdMap.get(wd)!;
     cur.conversions += 1;
-    cur.revenue += d.amount_total || 0;
+    cur.revenue += getRDDealAmount(d);
   }
   const weekdayBreakdown = Array.from(wdMap.entries()).map(([wd, v]) => ({
     weekday: wd,
@@ -939,7 +946,7 @@ export function computeFunnelAnalytics(
     periodMap.get(p)!.conversions += 1;
     const hv = hourMap.get(h)!;
     hv.conversions += 1;
-    hv.revenue += d.amount_total || 0;
+    hv.revenue += getRDDealAmount(d);
   }
   const hourBreakdown = (["Manhã", "Tarde", "Noite", "Madrugada"] as const).map((p) => {
     const v = periodMap.get(p)!;
