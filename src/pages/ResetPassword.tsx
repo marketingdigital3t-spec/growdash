@@ -46,6 +46,14 @@ export default function ResetPassword() {
       toast({ title: "Erro ao atualizar senha", description: error.message, variant: "destructive" });
       return;
     }
+    // Convites usam o mesmo fluxo de recuperação de senha. Depois que a
+    // pessoa escolhe a senha, o banco transforma o convite em acesso ativo.
+    const { error: activationError } = await (supabase as any).rpc("activate_current_workspace_memberships");
+    if (activationError) {
+      toast({ title: "Senha criada, mas o acesso ainda está pendente", description: "Entre novamente em alguns instantes ou peça ao administrador para reenviar o convite.", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
     toast({ title: "Senha alterada", description: "Faça login com a nova senha." });
     await supabase.auth.signOut();
     navigate("/auth", { replace: true });

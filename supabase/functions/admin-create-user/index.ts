@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const PLATFORM_OWNER_EMAIL = "marketingdigital3t@gmail.com";
-type AccessRole = "admin" | "editor" | "viewer";
+type AccessRole = "admin" | "editor" | "viewer" | "financial" | "analyst";
 const PERMISSION_KEYS = [
   "can_expert_dashboard",
   "can_dashboard",
@@ -71,6 +71,8 @@ Deno.serve(async (req) => {
     const action = String(body?.action ?? "");
     if (action === "list") return listUsers(admin, workspaceId, caller.id);
     if (action === "create") return createUser(admin, workspaceId, body);
+    if (action === "resend_invite") return resendInvite(admin, workspaceId, body);
+    if (action === "cancel_invite") return cancelInvite(admin, workspaceId, body);
     if (action === "update") return updateUser(admin, workspaceId, caller.id, body);
     if (action === "delete") return deleteUser(admin, workspaceId, caller.id, body);
     return json({ error: "Ação inválida." }, 400);
@@ -106,20 +108,37 @@ async function resolveWorkspace(admin: any, callerId: string, requested?: string
 
 function normalizeAccessRole(value: unknown): AccessRole {
   if (value === "admin") return "admin";
+  if (value === "financial") return "financial";
+  if (value === "analyst") return "analyst";
   if (value === "editor" || value === "analyst") return "editor";
   return "viewer";
 }
 
 function toWorkspaceRole(role: AccessRole) {
-  return role === "admin" ? "admin" : role === "editor" ? "analyst" : "member";
+  // O banco usa apenas os papéis estruturais do workspace. O perfil escolhido
+  // na tela fica salvo em access_role; editor/analista usam a estrutura de
+  // analista e os demais perfis comuns usam member.
+  if (role === "admin") return "admin";
+  if (role === "editor" || role === "analyst") return "analyst";
+  if (role === "financial") return "financial";
+  return "member";
 }
 
 function fromWorkspaceRole(role: string): AccessRole {
-  return role === "admin" ? "admin" : role === "analyst" ? "editor" : "viewer";
+  return role === "admin" ? "admin" : role === "analyst" ? "analyst" : role === "financial" ? "financial" : "viewer";
 }
 
+const ROLE_DEFAULTS: Record<AccessRole, Partial<Record<typeof PERMISSION_KEYS[number], boolean>>> = {
+  admin: Object.fromEntries(PERMISSION_KEYS.map((key) => [key, true])),
+  editor: { can_dashboard: true, can_expert_dashboard: true, can_crm: true, can_commercial: true, can_campaigns: true, can_funnels: true, can_flow: true, can_social_media: true, can_classes: true, can_leads: true, can_kanban: true, can_tickets: true, can_alerts: true, can_automations: true, can_finance: true, can_storage: true, can_brands: true, can_products: true, can_integrations: true, can_announcements: true },
+  viewer: { can_dashboard: true, can_expert_dashboard: true, can_commercial: true, can_campaigns: true, can_funnels: true, can_classes: true },
+  financial: { can_dashboard: true, can_expert_dashboard: true, can_commercial: true, can_finance: true },
+  analyst: { can_dashboard: true, can_expert_dashboard: true, can_crm: true, can_commercial: true, can_campaigns: true, can_funnels: true, can_flow: true, can_social_media: true, can_alerts: true, can_data_health: true },
+};
+
 function permissionRecord(body: Record<string, unknown>, role: AccessRole) {
-  return Object.fromEntries(PERMISSION_KEYS.map((key) => [key, role === "admin" || body[key] === true]));
+  const defaults = ROLE_DEFAULTS[role];
+  return Object.fromEntries(PERMISSION_KEYS.map((key) => [key, role === "admin" || (key in body ? body[key] === true : defaults[key] === true)]));
 }
 
 function uuidList(value: unknown) {
@@ -149,6 +168,13 @@ async function saveWorkspaceAccess(
     _rd_funnel_ids: uuidList(body.rd_funnel_ids),
   });
   if (error) throw error;
+
+  const { error: roleError } = await admin
+    .from("workspace_user_permissions")
+    .update({ access_role: role })
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId);
+  if (roleError) throw roleError;
 
   // Never report success before the server confirms every page, account and
   // funnel selected by the administrator. This protects the access screen
@@ -212,10 +238,9 @@ async function assertTargetMember(admin: any, workspaceId: string, targetId: str
 
 async function createUser(admin: any, workspaceId: string, body: Record<string, unknown>) {
   const email = String(body.email ?? "").toLowerCase().trim();
-  const password = String(body.password ?? "");
+  const name = String(body.name ?? "").trim();
   const role = normalizeAccessRole(body.role);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Informe um e-mail válido." }, 400);
-  if (password.length < 6) return json({ error: "A senha precisa ter pelo menos 6 caracteres." }, 400);
 
   let authUser = await findUserByEmail(admin, email);
   const identityAlreadyExisted = !!authUser;
@@ -227,25 +252,57 @@ async function createUser(admin: any, workspaceId: string, body: Record<string, 
       .eq("user_id", authUser.id)
       .maybeSingle();
     if (existingMembership) return json({ error: "Este e-mail já possui acesso ao workspace." }, 409);
-  } else {
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: email.split("@")[0], managed_by_growdash: true },
+  }
+  let invited = false;
+  if (!authUser || (!authUser.email_confirmed_at && !authUser.confirmed_at)) {
+    const { data: invitedUser, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${Deno.env.get("APP_URL") || "https://growdash.com.br"}/reset-password`,
+      data: { full_name: name || email.split("@")[0], managed_by_growdash: true },
     });
-    if (createError || !created.user) return json({ error: createError?.message ?? "Não foi possível criar a identidade." }, 400);
-    authUser = created.user;
+    if (inviteError || !invitedUser.user) return json({ error: inviteError?.message ?? "Não foi possível enviar o convite." }, 400);
+    authUser = invitedUser.user;
+    invited = true;
+  } else if (name) {
+    const { error: updateError } = await admin.auth.admin.updateUserById(authUser.id, { user_metadata: { ...authUser.user_metadata, full_name: name } });
+    if (updateError) return json({ error: updateError.message }, 400);
+  }
+  if (!authUser) {
+    return json({ error: "Não foi possível criar a identidade do usuário." }, 400);
   }
   const userId = authUser.id;
 
   try {
     await saveWorkspaceAccess(admin, workspaceId, userId, email, role, body);
-    return json({ ok: true, user_id: userId });
+    if (invited) {
+      const { error: statusError } = await admin.from("workspace_members").update({ status: "invited" }).eq("workspace_id", workspaceId).eq("user_id", userId);
+      if (statusError) throw statusError;
+    }
+    return json({ ok: true, user_id: userId, status: invited ? "invited" : "active" });
   } catch (error) {
     if (!identityAlreadyExisted) await admin.auth.admin.deleteUser(userId);
     return json({ error: `Cadastro revertido: ${(error as Error).message}` }, 409);
   }
+}
+
+async function resendInvite(admin: any, workspaceId: string, body: Record<string, unknown>) {
+  const targetId = String(body.target_user_id ?? "");
+  await assertTargetMember(admin, workspaceId, targetId);
+  const { data: target, error: userError } = await admin.auth.admin.getUserById(targetId);
+  if (userError || !target.user?.email) return json({ error: "Usuário não encontrado." }, 404);
+  const { error } = await admin.auth.admin.inviteUserByEmail(target.user.email, { redirectTo: `${Deno.env.get("APP_URL") || "https://growdash.com.br"}/reset-password` });
+  if (error) return json({ error: error.message }, 400);
+  const { error: statusError } = await admin.from("workspace_members").update({ status: "invited" }).eq("workspace_id", workspaceId).eq("user_id", targetId);
+  if (statusError) return json({ error: statusError.message }, 400);
+  return json({ ok: true, status: "invited" });
+}
+
+async function cancelInvite(admin: any, workspaceId: string, body: Record<string, unknown>) {
+  const targetId = String(body.target_user_id ?? "");
+  const member = await assertTargetMember(admin, workspaceId, targetId);
+  if (member.status !== "invited") return json({ error: "Este usuário já está ativo." }, 400);
+  const { error } = await admin.from("workspace_members").update({ status: "disabled" }).eq("workspace_id", workspaceId).eq("user_id", targetId);
+  if (error) return json({ error: error.message }, 400);
+  return json({ ok: true, status: "disabled" });
 }
 
 async function updateUser(admin: any, workspaceId: string, callerId: string, body: Record<string, unknown>) {
@@ -333,7 +390,10 @@ async function listUsers(admin: any, workspaceId: string, callerId: string) {
       ...Object.fromEntries(PERMISSION_KEYS.map((key) => [key, permission[key] === true])),
       user_id: member.user_id,
       email: authUser?.email ?? permission.username ?? "",
-      role: fromWorkspaceRole(member.role),
+      name: authUser?.user_metadata?.full_name ?? authUser?.user_metadata?.name ?? "",
+      role: (["admin", "editor", "viewer", "financial", "analyst"] as string[]).includes(permission.access_role)
+        ? permission.access_role
+        : fromWorkspaceRole(member.role),
       status: member.status,
       ad_account_ids: (accounts ?? []).filter((row: any) => row.user_id === member.user_id).map((row: any) => row.ad_account_id),
       rd_funnel_ids: (funnels ?? []).filter((row: any) => row.user_id === member.user_id).map((row: any) => row.rd_funnel_id),

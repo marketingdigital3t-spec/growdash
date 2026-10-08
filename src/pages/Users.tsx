@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Pencil, Users as UsersIcon, KeyRound, Mail, ShieldCheck, FilePenLine, Eye } from "lucide-react";
+import { Plus, Trash2, Pencil, Users as UsersIcon, KeyRound, Mail, ShieldCheck, FilePenLine, Eye, Search, Copy, RefreshCw, Ban } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
@@ -49,9 +49,10 @@ const PAGES = [
 
 type PermissionKey = typeof PAGES[number]["key"];
 type PermissionState = Record<PermissionKey, boolean>;
-type AccessRole = "admin" | "editor" | "viewer";
+type AccessRole = "admin" | "editor" | "viewer" | "financial" | "analyst";
 type UserRow = PermissionState & {
   user_id: string;
+  name: string;
   email: string;
   role: AccessRole;
   status: string;
@@ -64,11 +65,23 @@ const roleLabels: Record<AccessRole, string> = {
   admin: "Administrador",
   editor: "Editor",
   viewer: "Visualizador",
+  financial: "Financeiro",
+  analyst: "Analista",
 };
 const roleDescriptions: Record<AccessRole, string> = {
   admin: "Acesso completo, inclusive gestão de usuários e integrações.",
   editor: "Pode consultar e editar os módulos e contas selecionados.",
   viewer: "Acesso de consulta aos módulos e contas selecionados.",
+  financial: "Acesso inicial ao Financeiro, Comercial e indicadores definidos.",
+  analyst: "Acesso inicial a métricas, tráfego, funis e relatórios.",
+};
+
+const ROLE_DEFAULTS: Record<AccessRole, Partial<PermissionState>> = {
+  admin: Object.fromEntries(PAGES.map(({ key }) => [key, true])),
+  editor: { can_dashboard: true, can_expert_dashboard: true, can_crm: true, can_commercial: true, can_campaigns: true, can_funnels: true, can_flow: true, can_social_media: true, can_classes: true, can_leads: true, can_kanban: true, can_tickets: true, can_alerts: true, can_automations: true, can_finance: true, can_storage: true, can_brands: true, can_products: true, can_integrations: true, can_announcements: true },
+  viewer: { can_dashboard: true, can_expert_dashboard: true, can_commercial: true, can_campaigns: true, can_funnels: true, can_classes: true },
+  financial: { can_dashboard: true, can_expert_dashboard: true, can_commercial: true, can_finance: true },
+  analyst: { can_dashboard: true, can_expert_dashboard: true, can_crm: true, can_commercial: true, can_campaigns: true, can_funnels: true, can_flow: true, can_social_media: true, can_alerts: true, can_data_health: true },
 };
 
 async function readableFunctionError(error: unknown) {
@@ -97,6 +110,7 @@ export default function UsersPage() {
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserRow | null>(null);
   const [form, setForm] = useState({
+    name: "",
     email: "",
     role: "viewer" as AccessRole,
     password: "",
@@ -104,6 +118,8 @@ export default function UsersPage() {
     ad_account_ids: [] as string[],
     rd_funnel_ids: [] as string[],
   });
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const hasAllowedPage = form.role === "admin" || PAGES.some(({ key }) => form[key]);
 
   const { data: users = [], isLoading } = useQuery({
@@ -128,14 +144,13 @@ export default function UsersPage() {
         ...Object.fromEntries(PAGES.map(({ key }) => [key, form[key]])),
         ad_account_ids: form.ad_account_ids,
         rd_funnel_ids: form.rd_funnel_ids,
+        name: form.name,
         email: form.email,
         role: form.role,
       };
       if (editing) {
         body.target_user_id = editing.user_id;
         if (form.password) body.password = form.password;
-      } else {
-        body.password = form.password;
       }
       const { data, error } = await supabase.functions.invoke("admin-create-user", { body });
       if (error) throw new Error(await readableFunctionError(error));
@@ -170,9 +185,20 @@ export default function UsersPage() {
     onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
+  const userAction = useMutation({
+    mutationFn: async ({ action, target_user_id }: { action: "resend_invite" | "cancel_invite"; target_user_id: string }) => {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", { body: { action, workspace_id: workspace!.id, target_user_id } });
+      if (error) throw new Error(await readableFunctionError(error));
+      if ((data as any)?.error) throw new Error((data as any).error);
+    },
+    onSuccess: () => { toast({ title: "Acesso atualizado" }); qc.invalidateQueries({ queryKey: ["managed_users", workspace?.id] }); },
+    onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
   const openNew = () => {
     setEditing(null);
     setForm({
+      name: "",
       email: "",
       role: "viewer",
       password: "",
@@ -187,7 +213,22 @@ export default function UsersPage() {
   const openEdit = (u: UserRow) => {
     setEditing(u);
     setForm({
+      name: u.name,
       email: u.email,
+      role: u.role,
+      password: "",
+      ...(Object.fromEntries(PAGES.map(({ key }) => [key, u[key]])) as PermissionState),
+      ad_account_ids: u.ad_account_ids,
+      rd_funnel_ids: u.rd_funnel_ids,
+    });
+    setDialogOpen(true);
+  };
+
+  const duplicateUser = (u: UserRow) => {
+    setEditing(null);
+    setForm({
+      name: "",
+      email: "",
       role: u.role,
       password: "",
       ...(Object.fromEntries(PAGES.map(({ key }) => [key, u[key]])) as PermissionState),
@@ -201,17 +242,7 @@ export default function UsersPage() {
     arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
 
   const selectRole = (role: AccessRole) => {
-    if (role === "admin") {
-      setForm({
-        ...form,
-        role,
-        ...Object.fromEntries(PAGES.map(({ key }) => [key, true])),
-        ad_account_ids: adAccounts.map((account) => account.id),
-        rd_funnel_ids: rdFunnels.map((funnel) => funnel.id),
-      } as typeof form);
-      return;
-    }
-    setForm({ ...form, role, can_users: false });
+    setForm({ ...form, role, ...blankPermissions(), ...ROLE_DEFAULTS[role], ...(role === "admin" ? { ad_account_ids: adAccounts.map((account) => account.id), rd_funnel_ids: rdFunnels.map((funnel) => funnel.id) } : {}) } as typeof form);
   };
 
   const setAllPages = (selected: boolean) =>
@@ -232,6 +263,11 @@ export default function UsersPage() {
       rd_funnel_ids: selected ? rdFunnels.map((funnel) => funnel.id) : [],
     });
 
+  const visibleUsers = useMemo(() => users.filter((u) => {
+    const text = `${u.name} ${u.email}`.toLocaleLowerCase();
+    return (!query.trim() || text.includes(query.trim().toLocaleLowerCase())) && (statusFilter === "all" || u.status === statusFilter);
+  }), [query, statusFilter, users]);
+
   if (loadingMaster || loadingWorkspace) return null;
   if (!isMaster && !["owner", "admin"].includes(workspace?.role ?? "")) return <Navigate to="/" replace />;
 
@@ -239,11 +275,11 @@ export default function UsersPage() {
     <MotionPage className="space-y-6 max-w-4xl">
       <MotionItem>
         <div className="flex items-center justify-between">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold flex items-center gap-2"><UsersIcon className="h-6 w-6" /> Usuários</h1>
             <p className="text-sm text-muted-foreground mt-1">Crie usuários e defina o que cada um pode acessar</p>
           </div>
-          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo usuário</Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Convidar usuário</Button>
         </div>
       </MotionItem>
 
@@ -254,12 +290,18 @@ export default function UsersPage() {
             {!isLoading && users.length === 0 && (
               <p className="text-sm text-muted-foreground">Nenhum usuário criado ainda.</p>
             )}
-            {users.map((u) => (
+            <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+              <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome ou e-mail" className="pl-9" /></label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm"><option value="all">Todos os status</option><option value="active">Ativos</option><option value="invited">Convites pendentes</option><option value="disabled">Bloqueados</option></select>
+            </div>
+            {!isLoading && users.length > 0 && visibleUsers.length === 0 && <p className="text-sm text-muted-foreground">Nenhum usuário corresponde aos filtros.</p>}
+            {visibleUsers.map((u) => (
               <div key={u.user_id} className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{u.email}</p>
+                    <div><p className="font-medium">{u.name || u.email}</p><p className="text-xs text-muted-foreground">{u.email}</p></div>
                     <Badge variant={u.role === "admin" ? "default" : "outline"}>{roleLabels[u.role]}</Badge>
+                    <Badge variant={u.status === "active" ? "secondary" : u.status === "invited" ? "outline" : "destructive"}>{u.status === "active" ? "Ativo" : u.status === "invited" ? "Convite pendente" : "Bloqueado"}</Badge>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {PAGES.filter((p) => (u as any)[p.key]).map((p) => (
@@ -275,6 +317,8 @@ export default function UsersPage() {
                 </div>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(u)} title={`Editar ${u.email}`} aria-label={`Editar ${u.email}`}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => duplicateUser(u)} title={`Duplicar permissões de ${u.email}`} aria-label={`Duplicar permissões de ${u.email}`}><Copy className="h-4 w-4" /></Button>
+                  {u.status === "invited" && <><Button variant="ghost" size="icon" disabled={userAction.isPending} onClick={() => userAction.mutate({ action: "resend_invite", target_user_id: u.user_id })} title="Reenviar convite" aria-label="Reenviar convite"><RefreshCw className="h-4 w-4" /></Button><Button variant="ghost" size="icon" disabled={userAction.isPending} onClick={() => userAction.mutate({ action: "cancel_invite", target_user_id: u.user_id })} title="Cancelar convite" aria-label="Cancelar convite"><Ban className="h-4 w-4" /></Button></>}
                   <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setUserToDelete(u)} title={`Excluir ${u.email}`} aria-label={`Excluir ${u.email}`}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
@@ -290,6 +334,10 @@ export default function UsersPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
+              <Label className="flex items-center gap-2"><UsersIcon className="h-3 w-3" /> Nome</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome da pessoa" autoComplete="name" />
+            </div>
+            <div>
               <Label className="flex items-center gap-2"><Mail className="h-3 w-3" /> E-mail de acesso</Label>
               <Input
                 type="email"
@@ -299,14 +347,14 @@ export default function UsersPage() {
                 autoComplete="email"
               />
             </div>
-            <div>
+            {editing && <div>
               <Label className="flex items-center gap-2"><KeyRound className="h-3 w-3" /> {editing ? "Nova senha (opcional)" : "Senha"}</Label>
               <PasswordInput
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder={editing ? "Deixe vazio para manter" : "min. 6 caracteres"}
               />
-            </div>
+            </div>}
 
             <div>
               <Label className="mb-2 block">Nível de acesso</Label>
@@ -314,7 +362,7 @@ export default function UsersPage() {
                 {([
                   ["viewer", Eye],
                   ["editor", FilePenLine],
-                  ["admin", ShieldCheck],
+                  ["admin", ShieldCheck], ["financial", FilePenLine], ["analyst", Search],
                 ] as const).map(([role, Icon]) => (
                   <button
                     type="button"
@@ -419,9 +467,9 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => save.mutate()}
-              disabled={save.isPending || !form.email || (!editing && !form.password) || !hasAllowedPage}
+              disabled={save.isPending || !form.email || !hasAllowedPage}
             >
-              {save.isPending ? "Salvando..." : "Salvar"}
+              {save.isPending ? "Salvando..." : editing ? "Salvar alterações" : "Enviar convite"}
             </Button>
           </DialogFooter>
         </DialogContent>
