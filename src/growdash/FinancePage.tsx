@@ -54,6 +54,7 @@ export default function FinancePage() {
     adAccountId,
     adAccountIds,
     funnelIds,
+    preset,
     startDate,
     endDate,
     businessUnitId,
