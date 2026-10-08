@@ -456,7 +456,6 @@ export function ExpertOperationsView() {
   const accountLabel = operations.accountIds.length
     ? operations.accountIds.map((id) => adAccounts.data?.find((account) => account.id === id)?.name || id).join(", ")
     : "Nenhuma conta Meta vinculada";
-  const periodLabel = `${operationDates.startDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${operationDates.endDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
   const classDateRangeLabel = accountScopeIds.length
     ? (globalFilters.adAccountIds.length ? `Inventário completo · ${accountLabel}` : "Inventário completo · Todas as contas permitidas")
     : "Inventário completo de turmas";
@@ -590,77 +589,6 @@ export function ExpertOperationsView() {
           </p>
           <h3 className="text-lg font-black">Tráfego & resultado</h3>
         </div>
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className="grid lg:grid-cols-[1.1fr_2fr]">
-              <div className="border-b border-border p-5 lg:border-b-0 lg:border-r">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-black uppercase tracking-[.16em] text-muted-foreground">
-                    Investimento em tráfego
-                  </p>
-                  <Badge variant="secondary">Meta Ads</Badge>
-                </div>
-                <div className="mt-4 text-3xl font-black">
-                  {operations.traffic.spend == null
-                    ? "Indisponível"
-                    : brl(Math.round(operations.traffic.spend * 100))}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {operations.traffic.spend == null
-                    ? "Conta Meta não conectada neste ambiente"
-                    : "Investimento atribuído pela Meta Ads no período selecionado."}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-5 p-5 sm:grid-cols-4">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    Limite recomendado (10%)
-                  </div>
-                  <div className="mt-2 font-bold">
-                    {operations.traffic.spend == null
-                      ? "Indisponível"
-                      : brl(Math.round(operations.traffic.spend * 0.1 * 100))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    Diferença
-                  </div>
-                  <div className="mt-2 font-bold">
-                    {operations.traffic.spend == null
-                      ? "Indisponível"
-                      : brl(
-                          Math.round(
-                            (operations.traffic.spend - operations.traffic.spend * 0.1) * 100,
-                          ),
-                        )}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    Período
-                  </div>
-                  <div className="mt-2 font-bold">{periodLabel}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    Conta / atualização
-                  </div>
-                  <div className="mt-2 font-bold">
-                    {accountLabel === "Nenhuma conta Meta vinculada"
-                      ? "Indisponível"
-                      : accountLabel}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {operations.traffic.syncedAt
-                      ? new Date(operations.traffic.syncedAt).toLocaleString("pt-BR")
-                      : "Aguardando sincronização"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
         <div className="grid gap-3 lg:grid-cols-2">
           <Card>
             <CardHeader className="pb-2">
