@@ -71,8 +71,6 @@ Deno.serve(async (req) => {
     const action = String(body?.action ?? "");
     if (action === "list") return listUsers(admin, workspaceId, caller.id);
     if (action === "create") return createUser(admin, workspaceId, body);
-    if (action === "resend_invite") return resendInvite(admin, workspaceId, body);
-    if (action === "cancel_invite") return cancelInvite(admin, workspaceId, body);
     if (action === "update") return updateUser(admin, workspaceId, caller.id, body);
     if (action === "delete") return deleteUser(admin, workspaceId, caller.id, body);
     return json({ error: "Ação inválida." }, 400);
@@ -239,8 +237,10 @@ async function assertTargetMember(admin: any, workspaceId: string, targetId: str
 async function createUser(admin: any, workspaceId: string, body: Record<string, unknown>) {
   const email = String(body.email ?? "").toLowerCase().trim();
   const name = String(body.name ?? "").trim();
+  const password = String(body.password ?? "");
   const role = normalizeAccessRole(body.role);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Informe um e-mail válido." }, 400);
+  if (password.length < 6) return json({ error: "A senha precisa ter pelo menos 6 caracteres." }, 400);
 
   let authUser = await findUserByEmail(admin, email);
   const identityAlreadyExisted = !!authUser;
@@ -253,15 +253,25 @@ async function createUser(admin: any, workspaceId: string, body: Record<string, 
       .maybeSingle();
     if (existingMembership) return json({ error: "Este e-mail já possui acesso ao workspace." }, 409);
   }
-  let invited = false;
-  if (!authUser || (!authUser.email_confirmed_at && !authUser.confirmed_at)) {
-    const { data: invitedUser, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${Deno.env.get("APP_URL") || "https://growdash.com.br"}/reset-password`,
-      data: { full_name: name || email.split("@")[0], managed_by_growdash: true },
+  if (!authUser) {
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: name || email.split("@")[0], managed_by_growdash: true },
     });
-    if (inviteError || !invitedUser.user) return json({ error: inviteError?.message ?? "Não foi possível enviar o convite." }, 400);
-    authUser = invitedUser.user;
-    invited = true;
+    if (createError || !created.user) return json({ error: createError?.message ?? "Não foi possível criar o usuário." }, 400);
+    authUser = created.user;
+  } else if (!authUser.email_confirmed_at && !authUser.confirmed_at) {
+    // Compatibilidade com convites antigos: ao informar uma senha manual,
+    // transforma o convite em uma conta ativa sem enviar outro e-mail.
+    const { data: updated, error: updateError } = await admin.auth.admin.updateUserById(authUser.id, {
+      password,
+      email_confirm: true,
+      user_metadata: { ...authUser.user_metadata, full_name: name || authUser.user_metadata?.full_name || email.split("@")[0], managed_by_growdash: true },
+    });
+    if (updateError || !updated.user) return json({ error: updateError?.message ?? "Não foi possível ativar o usuário." }, 400);
+    authUser = updated.user;
   } else if (name) {
     const { error: updateError } = await admin.auth.admin.updateUserById(authUser.id, { user_metadata: { ...authUser.user_metadata, full_name: name } });
     if (updateError) return json({ error: updateError.message }, 400);
@@ -273,36 +283,11 @@ async function createUser(admin: any, workspaceId: string, body: Record<string, 
 
   try {
     await saveWorkspaceAccess(admin, workspaceId, userId, email, role, body);
-    if (invited) {
-      const { error: statusError } = await admin.from("workspace_members").update({ status: "invited" }).eq("workspace_id", workspaceId).eq("user_id", userId);
-      if (statusError) throw statusError;
-    }
-    return json({ ok: true, user_id: userId, status: invited ? "invited" : "active" });
+    return json({ ok: true, user_id: userId, status: "active" });
   } catch (error) {
     if (!identityAlreadyExisted) await admin.auth.admin.deleteUser(userId);
     return json({ error: `Cadastro revertido: ${(error as Error).message}` }, 409);
   }
-}
-
-async function resendInvite(admin: any, workspaceId: string, body: Record<string, unknown>) {
-  const targetId = String(body.target_user_id ?? "");
-  await assertTargetMember(admin, workspaceId, targetId);
-  const { data: target, error: userError } = await admin.auth.admin.getUserById(targetId);
-  if (userError || !target.user?.email) return json({ error: "Usuário não encontrado." }, 404);
-  const { error } = await admin.auth.admin.inviteUserByEmail(target.user.email, { redirectTo: `${Deno.env.get("APP_URL") || "https://growdash.com.br"}/reset-password` });
-  if (error) return json({ error: error.message }, 400);
-  const { error: statusError } = await admin.from("workspace_members").update({ status: "invited" }).eq("workspace_id", workspaceId).eq("user_id", targetId);
-  if (statusError) return json({ error: statusError.message }, 400);
-  return json({ ok: true, status: "invited" });
-}
-
-async function cancelInvite(admin: any, workspaceId: string, body: Record<string, unknown>) {
-  const targetId = String(body.target_user_id ?? "");
-  const member = await assertTargetMember(admin, workspaceId, targetId);
-  if (member.status !== "invited") return json({ error: "Este usuário já está ativo." }, 400);
-  const { error } = await admin.from("workspace_members").update({ status: "disabled" }).eq("workspace_id", workspaceId).eq("user_id", targetId);
-  if (error) return json({ error: error.message }, 400);
-  return json({ ok: true, status: "disabled" });
 }
 
 async function updateUser(admin: any, workspaceId: string, callerId: string, body: Record<string, unknown>) {

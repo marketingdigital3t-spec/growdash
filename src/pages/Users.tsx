@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Pencil, Users as UsersIcon, KeyRound, Mail, ShieldCheck, FilePenLine, Eye, Search, Copy, RefreshCw, Ban } from "lucide-react";
+import { Plus, Trash2, Pencil, Users as UsersIcon, KeyRound, Mail, ShieldCheck, FilePenLine, Eye, Search, Copy, Clipboard } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
@@ -157,7 +157,8 @@ export default function UsersPage() {
       if ((data as any)?.error) throw new Error((data as any).error);
     },
     onSuccess: () => {
-      toast({ title: editing ? "Usuário atualizado" : "Usuário criado" });
+      toast({ title: editing ? "Usuário atualizado" : "Usuário criado", description: editing ? undefined : "Envie o e-mail e a senha manualmente para a pessoa." });
+      setForm((current) => ({ ...current, password: "" }));
       setDialogOpen(false);
       setEditing(null);
       qc.invalidateQueries({ queryKey: ["managed_users", workspace?.id] });
@@ -182,16 +183,6 @@ export default function UsersPage() {
       setUserToDelete(null);
       qc.invalidateQueries({ queryKey: ["managed_users", workspace?.id] });
     },
-    onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
-  });
-
-  const userAction = useMutation({
-    mutationFn: async ({ action, target_user_id }: { action: "resend_invite" | "cancel_invite"; target_user_id: string }) => {
-      const { data, error } = await supabase.functions.invoke("admin-create-user", { body: { action, workspace_id: workspace!.id, target_user_id } });
-      if (error) throw new Error(await readableFunctionError(error));
-      if ((data as any)?.error) throw new Error((data as any).error);
-    },
-    onSuccess: () => { toast({ title: "Acesso atualizado" }); qc.invalidateQueries({ queryKey: ["managed_users", workspace?.id] }); },
     onError: (e: Error) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
@@ -279,7 +270,7 @@ export default function UsersPage() {
             <h1 className="text-2xl font-bold flex items-center gap-2"><UsersIcon className="h-6 w-6" /> Usuários</h1>
             <p className="text-sm text-muted-foreground mt-1">Crie usuários e defina o que cada um pode acessar</p>
           </div>
-          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Convidar usuário</Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo usuário</Button>
         </div>
       </MotionItem>
 
@@ -318,7 +309,6 @@ export default function UsersPage() {
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(u)} title={`Editar ${u.email}`} aria-label={`Editar ${u.email}`}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => duplicateUser(u)} title={`Duplicar permissões de ${u.email}`} aria-label={`Duplicar permissões de ${u.email}`}><Copy className="h-4 w-4" /></Button>
-                  {u.status === "invited" && <><Button variant="ghost" size="icon" disabled={userAction.isPending} onClick={() => userAction.mutate({ action: "resend_invite", target_user_id: u.user_id })} title="Reenviar convite" aria-label="Reenviar convite"><RefreshCw className="h-4 w-4" /></Button><Button variant="ghost" size="icon" disabled={userAction.isPending} onClick={() => userAction.mutate({ action: "cancel_invite", target_user_id: u.user_id })} title="Cancelar convite" aria-label="Cancelar convite"><Ban className="h-4 w-4" /></Button></>}
                   <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setUserToDelete(u)} title={`Excluir ${u.email}`} aria-label={`Excluir ${u.email}`}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
@@ -347,14 +337,19 @@ export default function UsersPage() {
                 autoComplete="email"
               />
             </div>
-            {editing && <div>
-              <Label className="flex items-center gap-2"><KeyRound className="h-3 w-3" /> {editing ? "Nova senha (opcional)" : "Senha"}</Label>
+            <div>
+              <Label className="flex items-center gap-2"><KeyRound className="h-3 w-3" /> {editing ? "Nova senha (opcional)" : "Senha *"}</Label>
               <PasswordInput
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder={editing ? "Deixe vazio para manter" : "min. 6 caracteres"}
               />
-            </div>}
+              {!editing && <p className="mt-1 text-xs text-muted-foreground">O sistema não enviará e-mail. Copie os dados e envie manualmente.</p>}
+              {!editing && <div className="mt-2 flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={!form.email} onClick={() => { void navigator.clipboard.writeText(form.email); toast({ title: "E-mail copiado" }); }}><Clipboard className="mr-1.5 h-3.5 w-3.5" />Copiar e-mail</Button>
+                <Button type="button" variant="outline" size="sm" disabled={!form.password} onClick={() => { void navigator.clipboard.writeText(form.password); toast({ title: "Senha copiada" }); }}><Copy className="mr-1.5 h-3.5 w-3.5" />Copiar senha</Button>
+              </div>}
+            </div>
 
             <div>
               <Label className="mb-2 block">Nível de acesso</Label>
@@ -467,9 +462,9 @@ export default function UsersPage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => save.mutate()}
-              disabled={save.isPending || !form.email || !hasAllowedPage}
+              disabled={save.isPending || !form.email || (!editing && form.password.length < 6) || !hasAllowedPage}
             >
-              {save.isPending ? "Salvando..." : editing ? "Salvar alterações" : "Enviar convite"}
+              {save.isPending ? "Salvando..." : editing ? "Salvar alterações" : "Criar usuário"}
             </Button>
           </DialogFooter>
         </DialogContent>
