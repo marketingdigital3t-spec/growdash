@@ -1091,7 +1091,7 @@ export default function KanbanPage() {
   if (activeBoard) {
     const ViewIcon = viewMode === "kanban" ? List : LayoutGrid;
     return (
-      <div className="gd-module-shell mx-auto max-w-[1700px] space-y-5">
+      <div className="kanban-page gd-module-shell mx-auto max-w-[1700px] space-y-5">
         <PageHeading
           eyebrow="Operação visual"
           title={activeBoard.name}

@@ -8837,3 +8837,319 @@ html:not(.dark) body .brand-shell .growdash-content-frame {
 html:not(.dark) .gd-scope-refresh-status {
   color: #92400e;
 }
+
+/* -------------------------------------------------------------------------
+   Mobile layout contract
+
+   This is the final responsive layer for the authenticated application. It
+   keeps the document itself inside the viewport and gives wide work areas
+   their own scroll surface instead of allowing them to widen every page.
+   ------------------------------------------------------------------------- */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.growdash-app-shell {
+  min-height: 100svh;
+  isolation: isolate;
+}
+
+.growdash-content-shell,
+.growdash-main,
+.growdash-content-frame,
+.gd-page-transition,
+.gd-module-shell,
+.dashboard-page,
+.expert-dashboard,
+.analytics-module {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.growdash-main :is(.grid, .flex) > * {
+  min-width: 0;
+}
+
+.gd-table-scroll,
+.campaign-table-frame,
+[data-campaign-table-scroll] {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --gd-page-gutter: max(12px, env(safe-area-inset-left));
+    --gd-layout-gutter: max(12px, env(safe-area-inset-left));
+    --gd-space-card: 12px;
+    --gd-space-section: 18px;
+    --gd-card-padding: 13px;
+  }
+
+  .growdash-app-shell {
+    min-height: 100svh;
+  }
+
+  .brand-shell .brand-sidebar {
+    width: min(86vw, 320px) !important;
+    max-width: calc(100vw - 24px);
+    height: 100svh;
+    max-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .brand-shell .brand-sidebar > div:first-child {
+    height: 72px;
+    min-height: 72px;
+  }
+
+  .brand-shell .brand-sidebar nav {
+    padding-inline: 10px;
+    padding-top: 12px;
+    padding-bottom: 14px;
+  }
+
+  .brand-shell .brand-sidebar nav a {
+    min-height: 42px;
+  }
+
+  .brand-shell .growdash-content-shell {
+    min-height: 100svh;
+    padding-left: 0 !important;
+  }
+
+  .brand-shell .growdash-global-header {
+    min-height: 0;
+    padding: max(8px, env(safe-area-inset-top)) 12px 10px;
+    gap: 8px;
+  }
+
+  .brand-shell .growdash-global-header > .order-3 {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .brand-shell .growdash-main {
+    min-height: calc(100svh - 96px);
+    padding: 12px max(12px, env(safe-area-inset-left)) calc(18px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .brand-shell .growdash-content-frame {
+    width: 100%;
+  }
+
+  .brand-shell .gd-global-scope-toolbar {
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .brand-shell .gd-global-scope-toolbar > :is(.gd-filter-account, .gd-filter-date, .gd-filter-control) {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .brand-shell .gd-global-scope-toolbar .gd-scope-refresh-status {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+
+  .brand-shell :is(.page-heading, .page-heading-actions) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .brand-shell :is(.page-heading h1, .page-heading h1) {
+    overflow-wrap: anywhere;
+    font-size: clamp(1.35rem, 6vw, 1.8rem);
+  }
+
+  .brand-shell :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) {
+    overflow-x: clip;
+  }
+
+  .brand-shell :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .analytics-module) > * + * {
+    margin-top: var(--gd-space-section) !important;
+  }
+
+  .brand-shell :is(.gd-kpi-grid, .dashboard-primary-kpis, .dashboard-kpi-grid, .dashboard-glass-metrics, .dashboard-daily-charts, .gd-aligned-grid) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: var(--gd-space-card) !important;
+  }
+
+  .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card) {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .brand-shell :is(.flex.flex-wrap, .page-heading-actions > .flex) {
+    row-gap: 8px;
+  }
+
+  .brand-shell :is(.page-heading-actions, .page-heading-actions > *, .page-heading-actions button, .page-heading-actions select) {
+    max-width: 100%;
+  }
+
+  /* Commercial ranking: filters and podium cards become a readable stack. */
+  .commercial-ranking-shell [role="tablist"],
+  .commercial-ranking-shell .commercial-ranking-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .commercial-ranking-shell [data-commercial-ranking] {
+    max-width: 100%;
+  }
+
+  .commercial-ranking-shell [class*="grid-cols-\[minmax(0,1.38fr)"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /* Agenda and expert operation cards keep controls usable with one hand. */
+  .agenda-page :is(.grid, .flex),
+  .event-classes-page :is(.grid, .flex),
+  .expert-dashboard :is(.grid, .flex) {
+    min-width: 0;
+  }
+
+  /* Campaigns: keep its wide data table inside the existing frame. */
+  .campaigns-workspace {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .campaigns-workspace .campaign-tabs-header,
+  .campaigns-workspace .campaign-scope-toolbar {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .campaigns-workspace .campaign-table-frame {
+    max-width: 100%;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 280px;
+  }
+
+  .campaigns-workspace [data-campaign-table-scroll] {
+    max-width: 100%;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+  }
+
+  /* Kanban keeps full columns, but only the board surface scrolls. */
+  .kanban-page {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .kanban-page > :is(.flex, .grid) {
+    min-width: 0;
+  }
+
+  .kanban-page .overflow-x-auto {
+    max-width: 100%;
+    min-height: min(68svh, 620px) !important;
+    padding-bottom: 12px;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kanban-page .overflow-x-auto > * {
+    width: min(84vw, 300px);
+    min-width: min(84vw, 300px);
+  }
+
+  /* WhatsApp becomes a vertical sequence: numbers, conversations, chat,
+     then notes. The desktop four-column grid remains unchanged. */
+  .whatsapp-page {
+    min-width: 0;
+    max-width: 100%;
+    padding: 12px !important;
+  }
+
+  .whatsapp-page > header {
+    align-items: stretch;
+  }
+
+  .whatsapp-page > header > :last-child {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .whatsapp-workspace {
+    display: flex !important;
+    flex-direction: column;
+    min-height: auto !important;
+  }
+
+  .whatsapp-workspace > :is(aside, main) {
+    min-height: 0;
+    max-height: none;
+    width: 100%;
+  }
+
+  .whatsapp-workspace > aside:first-child {
+    max-height: 180px;
+  }
+
+  .whatsapp-workspace > aside:nth-child(2) {
+    max-height: 300px;
+  }
+
+  .whatsapp-workspace > main {
+    min-height: 440px;
+  }
+
+  .whatsapp-workspace > aside:last-child {
+    max-height: none;
+  }
+
+  .whatsapp-workspace > main form {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  /* Strategy, finance, storage and other wide modules: controls wrap rather
+     than creating a page-level horizontal scrollbar. */
+  .brand-shell :is(.strategy-page, .finance-page, .storage-page, .business-page, .integrations-page) :is([class*="grid-cols-["], [class*="minmax(420px"], [class*="w-[260px]"]) {
+    max-width: 100%;
+  }
+
+  .brand-shell :is(table, [role="table"]) {
+    max-width: none;
+  }
+
+  .brand-shell :is(.overflow-x-auto, .overflow-auto) {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .brand-shell .growdash-content-shell {
+    padding-left: 4rem !important;
+  }
+
+  .brand-shell :is(.gd-kpi-grid, .dashboard-primary-kpis, .dashboard-kpi-grid, .gd-aligned-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-shell *,
+  .brand-shell *::before,
+  .brand-shell *::after {
+    scroll-behavior: auto !important;
+  }
+}

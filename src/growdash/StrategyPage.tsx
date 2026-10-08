@@ -108,7 +108,7 @@ export default function StrategyPage() {
   const addPillar = () => setDraft((current) => ({ ...current, content_pillars: [...current.content_pillars, { id: newId(), title: "Novo pilar", purpose: "Qual mudança este conteúdo deve gerar?", formats: "Reels, carrossel, stories" }] }));
   const addIdea = () => setDraft((current) => ({ ...current, ideas: [{ id: newId(), title: "Nova ideia", note: "Contexto, gancho e próximo passo", status: "idea" }, ...current.ideas] }));
 
-  return <div className="mx-auto max-w-[1700px]">
+  return <div className="strategy-page mx-auto max-w-[1700px]">
     <PageHeading eyebrow="Planejamento por marca" title="Estratégia" description="Transforme visão em direção: posicionamento, conteúdo e ideias acionáveis para cada marca." actions={<div className="flex flex-wrap gap-2"><select value={accountId} onChange={(event) => setAccountId(event.target.value)} className="gd-button h-10 max-w-[260px]"><option value="workspace">Estratégia geral do workspace</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select><Button onClick={() => savePlan.mutate()} disabled={savePlan.isPending}><Check className="mr-2 h-4 w-4" />{savePlan.isPending ? "Salvando…" : "Salvar estratégia"}</Button></div>} />
 
     <section className="gd-panel mb-4 overflow-hidden p-5 sm:p-6">
