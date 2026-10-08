@@ -53,7 +53,10 @@ Deno.serve(async (req) => {
     if (result.error) throw result.error;
     await admin.from("sales_webhook_events").update({ processed_at: new Date().toISOString() }).eq("integration_id", integration.id).eq("provider_event_id", recordId);
     return json({ ok: true, sale_status: normalized.status });
-  } catch (error) { console.error("sales-webhook", error); return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500); }
+  } catch (error) {
+    console.error("sales-webhook", error instanceof Error ? error.name : "unknown_error");
+    return json({ error: "Não foi possível processar o evento." }, 500);
+  }
 });
 
 function normalize(payload: any, eventType: string) {

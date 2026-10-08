@@ -1,7 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, authorization, content-type" };
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, x-hub-signature-256, authorization, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
+async function validSignature(rawBody: string, header: string | null) {
+  const secret = Deno.env.get("WHATSAPP_APP_SECRET") ?? Deno.env.get("META_APP_SECRET") ?? "";
+  if (!secret || !header || !/^sha256=[a-f0-9]{64}$/i.test(header)) return false;
+  const expected = new Uint8Array(header.slice(7).match(/.{2}/g)!.map((pair) => Number.parseInt(pair, 16)));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  return await crypto.subtle.verify("HMAC", key, expected, new TextEncoder().encode(rawBody));
+}
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
@@ -13,8 +21,13 @@ Deno.serve(async (req) => {
     return new Response("Forbidden", { status: 403 });
   }
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  const rawBody = await req.text();
+  const signatureSecret = Deno.env.get("WHATSAPP_APP_SECRET") ?? Deno.env.get("META_APP_SECRET") ?? "";
+  if (!(await validSignature(rawBody, req.headers.get("x-hub-signature-256")))) {
+    return json({ error: signatureSecret ? "Assinatura Meta inválida" : "Webhook WhatsApp sem segredo de assinatura configurado" }, signatureSecret ? 401 : 503);
+  }
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const payload = await req.json().catch(() => ({}));
+  const payload = JSON.parse(rawBody || "{}");
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       if (change.field !== "messages") continue;

@@ -7,7 +7,10 @@ const sha256 = async (value: string) => {
 };
 const instagramError = (payload: any, fallback: string) => {
   const message = String(payload?.error_message ?? payload?.error_description ?? payload?.error?.message ?? payload?.message ?? "").trim();
-  return message ? `${fallback}: ${message}` : fallback;
+  // Provider responses are displayed in the OAuth popup. Keep diagnostics
+  // useful while preventing accidental reflection of codes or credentials.
+  const safe = message.replace(/(access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|authorization|code)\s*[:=]\s*[^\s,;]+/gi, "$1: [oculto]").slice(0, 240);
+  return safe ? `${fallback}: ${safe}` : fallback;
 };
 async function fetchProfile(url: URL, token: string) {
   let lastResponse: Response | null = null;
@@ -30,7 +33,8 @@ async function fetchProfile(url: URL, token: string) {
 }
 const page = (status: "success" | "error", message: string, socialAccountId?: string) => {
   const payload = JSON.stringify({ type: "growdash-instagram-oauth", status, message, socialAccountId }).replaceAll("<", "\\u003c");
-  return new Response(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Growdash · Instagram</title><style>body{margin:0;background:#090909;color:#f5f5f5;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}main{max-width:520px;border:1px solid #444;border-radius:20px;background:#141414;padding:32px;text-align:center;box-shadow:0 24px 70px #000a}h1{color:${status === "success" ? "#f5f5f5" : "#ff7474"}}p{color:#c8c8c8;line-height:1.6}button{border:1px solid #f5f5f5;border-radius:11px;background:#f5f5f5;color:#101010;padding:12px 20px;font-weight:800}</style></head><body><main><h1>${status === "success" ? "Instagram conectado" : "Conexão não concluída"}</h1><p>${escapeHtml(message)}</p><button onclick="window.close()">Voltar para a Growdash</button></main><script>try{if(window.opener)window.opener.postMessage(${payload},'*')}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1600)" : ""}</script></body></html>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'" } });
+  const appOrigin = new URL(Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").origin;
+  return new Response(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Growdash · Instagram</title><style>body{margin:0;background:#090909;color:#f5f5f5;font:16px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px;box-sizing:border-box}main{max-width:520px;border:1px solid #444;border-radius:20px;background:#141414;padding:32px;text-align:center;box-shadow:0 24px 70px #000a}h1{color:${status === "success" ? "#f5f5f5" : "#ff7474"}}p{color:#c8c8c8;line-height:1.6}button{border:1px solid #f5f5f5;border-radius:11px;background:#f5f5f5;color:#101010;padding:12px 20px;font-weight:800}</style></head><body><main><h1>${status === "success" ? "Instagram conectado" : "Conexão não concluída"}</h1><p>${escapeHtml(message)}</p><button onclick="window.close()">Voltar para a Growdash</button></main><script>try{if(window.opener)window.opener.postMessage(${payload},${JSON.stringify(appOrigin)})}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1600)" : ""}</script></body></html>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'" } });
 };
 
 Deno.serve(async (req) => {
