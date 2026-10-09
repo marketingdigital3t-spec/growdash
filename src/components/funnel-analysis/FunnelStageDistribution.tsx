@@ -1,10 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 
 interface Props {
   a: FunnelAnalytics;
+  liveState?: "idle" | "refreshing" | "fresh" | "error";
+  lastUpdatedAt?: Date | null;
+  liveError?: string | null;
+  onRefresh?: () => void;
 }
 
 const STAGE_COLORS = [
@@ -21,9 +26,9 @@ const STAGE_COLORS = [
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-export function FunnelStageDistribution({ a }: Props) {
+export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, liveError, onRefresh }: Props) {
   // Include lost and won stages so the distribution reconciles exactly to the
-  // RD deal count for the selected account and period.
+  // current RD deal inventory for the selected account and funnel.
   const stages = a.stages;
   const total = stages.reduce((s, x) => s + x.count, 0);
 
@@ -36,7 +41,25 @@ export function FunnelStageDistribution({ a }: Props) {
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
-        <CardTitle className="text-base">2. Distribuição por etapa do funil (RD)</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">2. Distribuição por etapa do funil (RD)</CardTitle>
+          <span className={`text-[11px] ${liveState === "error" ? "text-destructive" : liveState === "refreshing" ? "text-amber-500" : "text-muted-foreground"}`}>
+            {liveState === "refreshing"
+              ? "Atualizando agora"
+              : liveState === "error"
+                ? "Última atualização não confirmada"
+                : lastUpdatedAt
+                  ? `Atualizado há ${Math.max(0, Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000))}s`
+                  : "Aguardando atualização"}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">Retrato atual das negociações no RD para as contas e funis selecionados.</p>
+        {liveState === "error" && liveError && (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs text-destructive">{liveError}</p>
+            {onRefresh && <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={onRefresh}>Sincronizar agora</Button>}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">

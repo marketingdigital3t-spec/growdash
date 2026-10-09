@@ -20,7 +20,7 @@ const REALTIME_UI_BATCH_MS = 1_000;
 
 const LIVE_TABLES = [
   "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",
-  "rd_deals", "sales", "alerts", "social_media", "social_insights_daily",
+  "rd_deals", "rd_funnel_stages", "rd_deal_stage_history", "sales", "alerts", "social_media", "social_insights_daily",
   "financial_entries", "kanban_boards", "kanban_cards", "workspace_files",
 ] as const;
 

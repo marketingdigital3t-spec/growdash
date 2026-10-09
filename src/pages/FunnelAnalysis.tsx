@@ -107,6 +107,9 @@ export default function FunnelAnalysis() {
   const [syncing, setSyncing] = useState(false);
   const queryClient = useQueryClient();
   const syncMeta = useSyncMeta();
+  const [rdLiveState, setRdLiveState] = useState<"idle" | "refreshing" | "fresh" | "error">("idle");
+  const [rdLastUpdatedAt, setRdLastUpdatedAt] = useState<Date | null>(null);
+  const [rdLiveError, setRdLiveError] = useState<string | null>(null);
 
   // RD é uma fonte independente de Meta. Funis ativos continuam disponíveis
   // mesmo quando ainda não possuem uma conta de anúncios vinculada.
@@ -136,6 +139,8 @@ export default function FunnelAnalysis() {
       : scopedActiveFunnels.map((funnel) => funnel.id),
     [scopedActiveFunnels, selectedFunnelIds],
   );
+  const funnelScopeKey = funnelScopeIds.join(",");
+
   const effectiveAdAccountId = selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined;
   const effectiveAdAccountIds = selectedAccountIds.length > 1 ? selectedAccountIds : undefined;
   const insightScopeAccountIds = useMemo(
@@ -153,7 +158,7 @@ export default function FunnelAnalysis() {
   // causando o piscar relatado. A conta efetiva é usada apenas para reconciliar
   // a análise detalhada com o funil encontrado, sem mudar a escolha do usuário.
 
-  const { data: stages = [], isFetched: stagesFetched } = useFunnelStagesForIds(funnelScopeIds);
+  const { data: stages = [], isFetched: stagesFetched, refetch: refetchStages } = useFunnelStagesForIds(funnelScopeIds);
   const { data: deals = [], isFetched: dealsFetched, refetch } = useRDDeals({
     funnelIds: funnelScopeIds,
     adAccountIds: selectedAccountIds,
@@ -167,6 +172,48 @@ export default function FunnelAnalysis() {
     includeHistory: true,
     enabled: funnelScopeIds.length > 0,
   });
+
+  useEffect(() => {
+    if (!funnelScopeIds.length) return;
+    let disposed = false;
+    let debounceTimer: number | null = null;
+    const refreshDistribution = async () => {
+      if (disposed || document.visibilityState === "hidden") return;
+      setRdLiveState("refreshing");
+      try {
+        const results = await Promise.all([refetch(), refetchStages()]);
+        const failedResult = results.find((result) => result.isError);
+        if (failedResult?.isError) throw failedResult.error || new Error("Não foi possível confirmar a atualização do RD.");
+        if (disposed) return;
+        setRdLastUpdatedAt(new Date());
+        setRdLiveError(null);
+        setRdLiveState("fresh");
+      } catch (error) {
+        if (disposed) return;
+        setRdLiveError(error instanceof Error ? error.message : "Não foi possível atualizar o RD agora.");
+        setRdLiveState("error");
+      }
+    };
+    const queueRefresh = () => {
+      if (debounceTimer) window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => void refreshDistribution(), 500);
+    };
+    const channel = supabase.channel(`funnel-analysis-rd-${funnelScopeIds.slice().sort().join("-")}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, queueRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rd_funnel_stages" }, queueRefresh)
+      .subscribe();
+    const interval = window.setInterval(() => void refreshDistribution(), 10_000);
+    const onVisibility = () => { if (document.visibilityState === "visible") void refreshDistribution(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    void refreshDistribution();
+    return () => {
+      disposed = true;
+      if (debounceTimer) window.clearTimeout(debounceTimer);
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+      void supabase.removeChannel(channel);
+    };
+  }, [funnelScopeKey, refetch, refetchStages]);
   // O recorte RD usa os funis vinculados à conta selecionada e os filtros do CRM.
   const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError } = useRDDeals({
     funnelIds: funnelScopeIds,
@@ -702,7 +749,7 @@ export default function FunnelAnalysis() {
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
               <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} /></HelpBlock>
+              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={analytics} liveState={rdLiveState} lastUpdatedAt={rdLastUpdatedAt} liveError={rdLiveError} onRefresh={() => void handleSync()} /></HelpBlock>
             </div>
           </MotionItem>
 

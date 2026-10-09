@@ -26,25 +26,32 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!connection) return json({ error: "Unauthorized" }, 401);
 
+    const receivedAt = new Date().toISOString();
+    await admin.from("rd_account_connections").update({ last_attempt_at: receivedAt, last_error: null, updated_at: receivedAt }).eq("id", connection.id);
+
     const payload = await req.json().catch(() => null);
     const document = payload?.document || payload?.deal || payload;
     const dealId = document?.id || document?._id;
     // O RD valida a URL ao criar o webhook. Depois da autenticação acima, uma
     // chamada sem negociação deve responder 2xx para concluir essa validação.
-    if (!dealId) return json({ ok: true, validation: true });
+    if (!dealId) {
+      await admin.from("rd_account_connections").update({ last_success_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
+      return json({ ok: true, validation: true });
+    }
 
-    const eventName = String(payload?.event_name || payload?.event || "");
+    const eventName = String(payload?.event_name || payload?.event_type || payload?.event || "");
     if (eventName === "crm_deal_deleted") {
       await admin.from("rd_deals")
         .delete()
         .eq("user_id", connection.user_id)
         .eq("rd_connection_id", connection.id)
         .eq("rd_deal_id", String(dealId));
+      await admin.from("rd_account_connections").update({ last_success_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
       return json({ ok: true, deleted: true });
     }
 
-    const pipeline = document?.deal_pipeline || document?.pipeline || {};
-    const pipelineId = String(pipeline?.id || pipeline?._id || document?.deal_pipeline_id || "");
+    const pipeline = document?.deal_pipeline || document?.pipeline || payload?.deal_pipeline || payload?.pipeline || {};
+    const pipelineId = String(pipeline?.id || pipeline?._id || document?.deal_pipeline_id || document?.pipeline_id || payload?.deal_pipeline_id || payload?.pipeline_id || "");
     const pipelineName = String(pipeline?.name || "");
     let query = admin.from("rd_funnels")
       .select("id,user_id,rd_funnel_id,name")
@@ -67,6 +74,7 @@ Deno.serve(async (req) => {
     if (!funnel) {
       // Responder 2xx impede suspensão do webhook. A reconciliação de 15 min
       // volta a tentar depois que o funil for vinculado na Growdash.
+      await admin.from("rd_account_connections").update({ last_error: "Webhook recebido, mas o funil do negócio ainda não está vinculado na Growdash.", updated_at: new Date().toISOString() }).eq("id", connection.id);
       return json({ ok: true, skipped: true, reason: "pipeline_not_linked" });
     }
 
@@ -88,8 +96,10 @@ Deno.serve(async (req) => {
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
       console.error("rd webhook sync failed", response.status, result);
+      await admin.from("rd_account_connections").update({ last_error: `Falha ao atualizar negócio recebido pelo RD (HTTP ${response.status}).`, updated_at: new Date().toISOString() }).eq("id", connection.id);
       return json({ error: result?.error || "RD deal reconciliation failed" }, 502);
     }
+    await admin.from("rd_account_connections").update({ last_success_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
     let note: { status: string; error?: string } | undefined;
     if (eventName === "crm_deal_created" && isNoteAutomationFunnel(funnel.name)) {
       note = await publishCreationNote(admin, connection, funnel, String(dealId));

@@ -52,6 +52,24 @@ describe("RD deals date scope", () => {
     expect(withoutStageId.stages).toMatchObject([expect.objectContaining({ name: "Em contato", count: 1, pct: 100 })]);
   });
 
+  it("keeps an old deal in the distribution for its current RD stage", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "funnel-1", rd_stage_id: "contact", name: "Em contato", order: 2, is_won: false, is_lost: false },
+    ];
+    const deal: RDDeal = {
+      id: "snapshot-old", rd_deal_id: "rd-deal-old", rd_connection_id: "connection-1", ad_account_id: "account-1",
+      rd_funnel_id: "funnel-1", rd_stage_id: "contact", rd_stage_name: "Em contato", rd_stage_order: 2,
+      deal_owner_name: null, rd_product_name: null, stage_bucket: "lead", win: false, lost_reason: null, amount_total: 0,
+      utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null,
+      lead_state: null, lead_city: null, lead_created_at: "2024-01-15T12:00:00Z", stage_updated_at: "2026-10-09T12:00:00Z", closed_at: null,
+    };
+
+    const analytics = computeFunnelAnalytics([deal], stages);
+
+    expect(analytics.totalLeads).toBe(1);
+    expect(analytics.stages).toMatchObject([{ rd_stage_id: "contact", name: "Em contato", count: 1, pct: 100 }]);
+  });
+
   it("consolidates equal stages from different connected funnels into one pipeline", () => {
     const stages: FunnelStage[] = [
       { rd_funnel_id: "aluna", rd_stage_id: "a-lead", name: "Lead Novo", order: 1, is_won: false, is_lost: false },

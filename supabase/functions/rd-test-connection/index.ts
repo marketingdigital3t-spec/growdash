@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
 
     let webhookWarning: string | undefined;
     const webhookSecret = existing?.webhook_secret || crypto.randomUUID();
+    let savedConnectionId = existing?.id || null;
     if (suppliedToken) {
       const values = {
         api_token: suppliedToken,
@@ -109,13 +110,14 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       };
       const operation = existing?.id
-        ? admin.from("rd_account_connections").update(values).eq("id", existing.id)
+        ? admin.from("rd_account_connections").update(values).eq("id", existing.id).select("id").single()
         : admin.from("rd_account_connections").insert({
             user_id: userId,
             ...values,
-          });
-      const { error } = await operation;
+          }).select("id").single();
+      const { data: saved, error } = await operation;
       if (error) throw error;
+      savedConnectionId = saved.id;
     }
 
     try {
@@ -124,6 +126,16 @@ Deno.serve(async (req) => {
       // O polling incremental de 15 min continua funcionando mesmo quando o
       // plano do RD não permite webhooks ou a API limita a configuração.
       webhookWarning = error instanceof Error ? error.message : "Não foi possível ativar os webhooks do RD.";
+    }
+
+    if (savedConnectionId) {
+      const now = new Date().toISOString();
+      await admin.from("rd_account_connections").update({
+        webhook_secret: webhookSecret,
+        last_attempt_at: now,
+        last_error: webhookWarning || null,
+        updated_at: now,
+      }).eq("id", savedConnectionId).eq("user_id", userId);
     }
 
     return json({
@@ -175,8 +187,8 @@ async function ensureRDWebhooks(token: string, secret: string) {
       },
     );
     if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`RD webhook ${eventType}: HTTP ${response.status}${detail ? ` — ${detail.slice(0, 120)}` : ""}`);
+      await response.text().catch(() => "");
+      throw new Error(`Não foi possível configurar o webhook ${eventType} no RD Station (HTTP ${response.status}).`);
     }
   }
 }
