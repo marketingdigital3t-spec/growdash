@@ -1,4 +1,4 @@
-import { Component, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, formatDistanceToNow, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -115,6 +115,14 @@ function IntegrationsContent() {
   const [params, setParams] = useSearchParams();
   const tab = tabs.some(([value]) => value === params.get("tab")) ? params.get("tab")! : "paid";
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    // Browsers and password managers sometimes autofill an account email into
+    // the first text-like field despite autocomplete="off". This is a filter,
+    // never an identity field, so discard any value injected before hydration.
+    const input = searchInputRef.current;
+    if (input && !search) input.value = "";
+  }, [search]);
   const [accountOrder, setAccountOrder] = useState<"name-asc" | "name-desc" | "status">("name-asc");
   const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
   const { data: adAccountsData, isLoading: loadingMeta, isError: metaLoadFailed, error: metaLoadError, refetch: refetchMeta } = useAdAccounts(true);
@@ -317,6 +325,11 @@ function IntegrationsContent() {
   });
 
   const providerFilter = (name: string) => name.toLowerCase().includes(search.toLowerCase().trim());
+  const changeTab = (value: string) => {
+    setSearch("");
+    if (searchInputRef.current) searchInputRef.current.value = "";
+    setParams({ tab: value });
+  };
 
   return (
     <div className="integrations-page mx-auto max-w-[1500px]">
@@ -328,11 +341,11 @@ function IntegrationsContent() {
       </section>}
 
       <div className="gd-panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-        <div className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar provedor ou recurso" name="integration-search" type="search" autoComplete="off" autoCorrect="off" spellCheck={false} value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Buscar provedor ou recurso…" /></div>
+        <form role="search" autoComplete="off" onSubmit={(event) => event.preventDefault()} className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input ref={searchInputRef} aria-label="Buscar provedor ou recurso" name="integration-resource-filter" type="text" inputMode="search" autoComplete="new-password" autoCorrect="off" spellCheck={false} value={search} onChange={(event) => setSearch(event.target.value)} onFocus={(event) => { if (!search && event.currentTarget.value.includes("@")) event.currentTarget.value = ""; }} className="pl-9" placeholder="Buscar provedor ou recurso…" /></form>
         <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><StatusDot tone="connected" label={`${adAccounts.length} conta(s) Meta`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /><label className="flex items-center gap-2">Ordenar<select aria-label="Ordenar contas de anúncio" value={accountOrder} onChange={(event) => setAccountOrder(event.target.value as typeof accountOrder)} className="h-8 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="name-asc">A–Z</option><option value="name-desc">Z–A</option><option value="status">Ativas</option></select></label></div>
       </div>
 
-      <Tabs value={tab} onValueChange={(value) => setParams({ tab: value })} className="space-y-4">
+      <Tabs value={tab} onValueChange={changeTab} className="space-y-4">
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-muted/70 p-1">
           {tabs.map(([value, label]) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}
         </TabsList>
