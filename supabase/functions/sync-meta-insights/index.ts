@@ -1313,10 +1313,11 @@ Deno.serve(async (req) => {
           spendReadBack: persistedSpend,
         };
 
-        // Reconcile stale action types for ad/day pairs explicitly returned by
-        // the completed Meta response. Upsert alone leaves old action aliases
-        // behind when Meta stops returning them, which can inflate canonical
-        // form/site/conversation totals after attribution or processing shifts.
+        // Do not delete action facts merely because a later Insights response
+        // omits an action type. Meta reports with impression-time attribution
+        // can retract/rename an action while late processing is still settling;
+        // deleting here was the source of observed missing forms/conversations.
+        // The primary-key upsert above remains the idempotent replacement path.
         const actionSnapshots = allInsights
           .filter((row: any) => row.ad_id && row.date_start)
           .map((row: any) => ({ ad_id: String(row.ad_id), date: String(row.date_start) }));
@@ -1355,28 +1356,8 @@ Deno.serve(async (req) => {
           }
         }
         const staleActionFacts = staleActionFactsForDailySnapshot(existingActionFacts, incomingActionFacts, actionSnapshots);
-        const staleActionGroups = new Map<string, Set<string>>();
-        for (const row of staleActionFacts) {
-          const key = `${row.date}|${row.action_type}`;
-          const ids = staleActionGroups.get(key) || new Set<string>();
-          ids.add(row.ad_id);
-          staleActionGroups.set(key, ids);
-        }
-        for (const [key, ids] of staleActionGroups) {
-          const [date, actionType] = key.split("|");
-          const staleIds = [...ids];
-          for (let offset = 0; offset < staleIds.length; offset += 500) {
-            let query = supabaseAdmin.from("insight_actions").delete()
-              .eq("ad_account_id", account.id)
-              .eq("date", date)
-              .eq("action_type", actionType)
-              .in("ad_id", staleIds.slice(offset, offset + 500));
-            query = effectiveAttributionWindow === "account_default"
-              ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
-              : query.eq("attribution_window", effectiveAttributionWindow);
-            const { error } = await query;
-            if (error) throw new Error(`reconciliação de ações da conta ${account.name}: ${error.message}`);
-          }
+        if (staleActionFacts.length > 0) {
+          console.log(`Preservadas ${staleActionFacts.length} ações omitidas temporariamente pela Meta em ${account.name}`);
         }
 
         // Reconcile rows that disappeared from the completed Meta response
@@ -1405,18 +1386,11 @@ Deno.serve(async (req) => {
             // Delete only explicitly identified stale IDs. The old `not.in`
             // filter was serialized by PostgREST in a way that matched the
             // incoming IDs too, removing every newly upserted fact for the day.
-            let actionDelete = supabaseAdmin.from("insight_actions").delete()
-              .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("date", date);
-            actionDelete = effectiveAttributionWindow === "account_default"
-              ? actionDelete.or("attribution_window.eq.account_default,attribution_window.is.null")
-              : actionDelete.eq("attribution_window", effectiveAttributionWindow);
             let insightDelete = supabaseAdmin.from("insights").delete()
               .in("ad_id", staleAdIds).eq("ad_account_id", account.id).eq("date", date);
             insightDelete = effectiveAttributionWindow === "account_default"
               ? insightDelete.or("attribution_window.eq.account_default,attribution_window.is.null")
               : insightDelete.eq("attribution_window", effectiveAttributionWindow);
-            const { error: actionDeleteError } = await actionDelete;
-            if (actionDeleteError) throw new Error(`limpeza das ações da conta ${account.name}: ${actionDeleteError.message}`);
             const { error: insightDeleteError } = await insightDelete;
             if (insightDeleteError) throw new Error(`limpeza dos insights da conta ${account.name}: ${insightDeleteError.message}`);
           }
@@ -1467,7 +1441,9 @@ Deno.serve(async (req) => {
         }
         const missingAfterReconciliation = [...expectedInsightKeys].filter((key) => !finalInsightKeys.has(key));
         const missingActionsAfterReconciliation = [...expectedActionKeys].filter((key) => !finalActionKeys.has(key));
-        const staleActionsStillPresent = staleActionFacts.filter((row) => finalActionKeys.has(`${row.ad_id}|${row.date}|${row.action_type}`));
+        // Preserved stale action facts are intentional; they cannot invalidate
+        // a sync while Meta attribution is allowed to settle.
+        const staleActionsStillPresent: string[] = [];
         const finalSpend = [...expectedInsightKeys].reduce((sum, key) => sum + (finalSpendByKey.get(key) || 0), 0);
         if (missingAfterReconciliation.length || missingActionsAfterReconciliation.length || staleActionsStillPresent.length || Math.abs(finalSpend - requestedSpend) > 0.01) {
           throw new Error(`snapshot Meta da conta ${account.name} foi alterado após reconciliação: ${missingAfterReconciliation.length} insight(s), ${missingActionsAfterReconciliation.length} ação(ões) ausentes e ${staleActionsStillPresent.length} ação(ões) antigas ainda presentes; gasto solicitado ${requestedSpend.toFixed(2)}, relido ${finalSpend.toFixed(2)}.`);
