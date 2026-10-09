@@ -96,7 +96,7 @@ function LinkFunnelDialog({
   );
 }
 
-function FunnelRow({ funnel }: { funnel: RDFunnel }) {
+function FunnelRow({ funnel, activationBlocked = false }: { funnel: RDFunnel; activationBlocked?: boolean }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const update = useUpdateRDFunnel();
@@ -112,6 +112,8 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
     }),
     onError: (error: Error) => toast({ title: "Não foi possível alterar o funil", description: error.message, variant: "destructive" }),
   });
+
+  const toggleDisabled = update.isPending || (activationBlocked && !funnel.is_active);
 
   const sync = useMutation({
     mutationFn: async () => {
@@ -184,11 +186,17 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
         </Button>
         <Switch
           checked={funnel.is_active}
-          disabled={update.isPending}
-          onCheckedChange={toggleActive}
-          aria-label={`${funnel.is_active ? "Desativar" : "Ativar"} funil ${funnel.name}`}
+          disabled={toggleDisabled}
+          onCheckedChange={(value) => {
+            if (activationBlocked && !funnel.is_active) {
+              toast({ title: "Funil já ativo", description: "Este funil do RD já está ativo em outra conexão. O vínculo ativo atual foi preservado." });
+              return;
+            }
+            toggleActive(value);
+          }}
+          aria-label={activationBlocked && !funnel.is_active ? `Funil ${funnel.name} já está ativo em outra conexão` : `${funnel.is_active ? "Desativar" : "Ativar"} funil ${funnel.name}`}
         />
-        <span className={`text-[10px] font-black uppercase ${funnel.is_active ? "text-emerald-600" : "text-muted-foreground"}`}>{funnel.is_active ? "Ativo" : "Desativado"}</span>
+        <span className={`text-[10px] font-black uppercase ${funnel.is_active ? "text-emerald-600" : activationBlocked ? "text-amber-600" : "text-muted-foreground"}`}>{funnel.is_active ? "Ativo" : activationBlocked ? "Ativo em outra conexão" : "Desativado"}</span>
         <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteOpen(true)} title={`Excluir vínculo ${funnel.name}`} aria-label={`Excluir vínculo ${funnel.name}`}>
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -212,7 +220,7 @@ function FunnelRow({ funnel }: { funnel: RDFunnel }) {
   );
 }
 
-function RDConnectionFunnelsBlock({ connectionId, accountName, funnels }: { connectionId: string; accountName: string; funnels: RDFunnel[] }) {
+function RDConnectionFunnelsBlock({ connectionId, accountName, funnels, activePipelineIds }: { connectionId: string; accountName: string; funnels: RDFunnel[]; activePipelineIds: Set<string> }) {
   const [openLink, setOpenLink] = useState(false);
   const { data: pipelines = [], isLoading, error } = useRDApiFunnels(true, connectionId);
   const importFunnels = useImportRDFunnels();
@@ -229,19 +237,19 @@ function RDConnectionFunnelsBlock({ connectionId, accountName, funnels }: { conn
       </div>
     </div>
     {error && <p className="text-xs text-destructive">Não foi possível consultar os funis desta conexão RD.</p>}
-    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} />)}</AnimatePresence>
+    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} activationBlocked={!!funnel.rd_funnel_id && activePipelineIds.has(funnel.rd_funnel_id) && !funnel.is_active} />)}</AnimatePresence>
     {!funnels.length && !isLoading && <p className="text-sm text-muted-foreground">Nenhum funil carregado. Use “Carregar todos os funis”.</p>}
     <LinkFunnelDialog rdConnectionId={connectionId} open={openLink} onOpenChange={setOpenLink} />
   </div>;
 }
 
-function OrphanFunnelsBlock({ funnels }: { funnels: RDFunnel[] }) {
+function OrphanFunnelsBlock({ funnels, activePipelineIds }: { funnels: RDFunnel[]; activePipelineIds: Set<string> }) {
   return <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-3">
     <div>
       <p className="font-medium text-sm">Funis RD cadastrados</p>
       <p className="text-xs text-muted-foreground">A conexão não foi listada nesta consulta, mas o vínculo permanece disponível para ativação ou desativação.</p>
     </div>
-    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} />)}</AnimatePresence>
+    <AnimatePresence mode="popLayout">{funnels.map((funnel) => <FunnelRow key={funnel.id} funnel={funnel} activationBlocked={!!funnel.rd_funnel_id && activePipelineIds.has(funnel.rd_funnel_id) && !funnel.is_active} />)}</AnimatePresence>
   </div>;
 }
 
@@ -250,6 +258,7 @@ export function RDFunnelsSection() {
   const { data: connections = [] } = useRDAccountConnections();
   const listedConnectionIds = new Set(connections.map((connection) => connection.id));
   const orphanFunnels = allFunnels.filter((funnel) => !funnel.rd_connection_id || !listedConnectionIds.has(funnel.rd_connection_id));
+  const activePipelineIds = new Set(allFunnels.filter((funnel) => funnel.is_active && funnel.rd_funnel_id).map((funnel) => funnel.rd_funnel_id!));
 
   return (
     <Card>
@@ -264,9 +273,9 @@ export function RDFunnelsSection() {
       <CardContent className="space-y-3">
         {connections.length === 0 && !allFunnels.length ? <p className="text-sm text-muted-foreground">Nenhuma conexão RD autorizada.</p> : connections.map((connection) => {
           const connectionFunnels = allFunnels.filter((funnel) => funnel.rd_connection_id === connection.id);
-          return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} />;
+          return <RDConnectionFunnelsBlock key={`rd-${connection.id}`} connectionId={connection.id} accountName={connection.account_name} funnels={connectionFunnels} activePipelineIds={activePipelineIds} />;
         })}
-        {orphanFunnels.length > 0 && <OrphanFunnelsBlock funnels={orphanFunnels} />}
+        {orphanFunnels.length > 0 && <OrphanFunnelsBlock funnels={orphanFunnels} activePipelineIds={activePipelineIds} />}
       </CardContent>
     </Card>
   );

@@ -54,7 +54,10 @@ export function useCreateRDFunnel() {
         .insert({ ...input, user_id: user!.id, is_active: input.is_active ?? true })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23505") throw new Error("Este funil do RD já está vinculado e ativo em outra conexão. Desative o vínculo atual antes de ativá-lo aqui.");
+        throw error;
+      }
       return data as RDFunnel;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rd_funnels"] }),
@@ -66,7 +69,10 @@ export function useUpdateRDFunnel() {
   return useMutation({
     mutationFn: async ({ id, ...input }: Partial<RDFunnel> & { id: string }) => {
       const { data, error } = await supabase.from("rd_funnels").update(input).eq("id", id).select().single();
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23505") throw new Error("Este funil do RD já está ativo em outra conexão. O vínculo ativo atual foi preservado para evitar duplicação.");
+        throw error;
+      }
       return data as RDFunnel;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rd_funnels"] }),
