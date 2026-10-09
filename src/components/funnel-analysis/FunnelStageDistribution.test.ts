@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { funnelStageDistributionTotal, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
 
 const stage = (count: number) => ({
   rd_stage_id: `stage-${count}`,
@@ -23,26 +23,30 @@ describe("FunnelStageDistribution", () => {
     expect(funnelStageDistributionTotal(selectedPeriod)).not.toBe(funnelStageDistributionTotal(historical));
   });
 
-  it("scales visual stages proportionally while keeping small stages visible", () => {
-    expect(funnelStageVisualWidth(100, 100)).toBe(100);
-    expect(funnelStageVisualWidth(50, 100)).toBe(50);
-    expect(funnelStageVisualWidth(1, 100)).toBe(32);
-    expect(funnelStageVisualWidth(0, 0)).toBe(32);
+  it("creates a descending funnel width from the first to the last stage", () => {
+    const widths = [0, 1, 2, 3].map((index) => funnelStageVisualWidth(index, 4));
+
+    expect(widths).toEqual([100, 81, 63, 44]);
+    expect(widths).toEqual([...widths].sort((a, b) => b - a));
   });
 
-  it("does not produce an invalid visual width for zero-count stages", () => {
-    const counts = [80, 20, 0];
-    const widths = counts.map((count) => funnelStageVisualWidth(count, Math.max(...counts)));
-
-    expect(widths).toEqual([100, 32, 32]);
-    expect(widths.every((width) => Number.isFinite(width) && width >= 32 && width <= 100)).toBe(true);
+  it("keeps a single or empty funnel stage valid", () => {
+    expect(funnelStageVisualWidth(0, 0)).toBe(100);
+    expect(funnelStageVisualWidth(0, 1)).toBe(100);
+    expect(funnelStageVisualWidth(8, 3)).toBe(44);
   });
 
-  it("keeps the selected-period total independent from stage display widths", () => {
+  it("transitions the visual palette from red through yellow to green", () => {
+    expect(funnelStageVisualColor(0, 3)).toBe("hsl(0 84% 56%)");
+    expect(funnelStageVisualColor(1, 3)).toBe("hsl(71 84% 56%)");
+    expect(funnelStageVisualColor(2, 3)).toBe("hsl(142 84% 56%)");
+  });
+
+  it("keeps the selected-period total independent from the funnel shape", () => {
     const selectedPeriod = { stages: [stage(80), stage(20), stage(0)] };
 
     expect(funnelStageDistributionTotal(selectedPeriod)).toBe(100);
-    expect(funnelStageVisualWidth(80, 80)).toBe(100);
-    expect(funnelStageVisualWidth(20, 80)).toBe(32);
+    expect(funnelStageVisualWidth(0, selectedPeriod.stages.length)).toBe(100);
+    expect(funnelStageVisualWidth(2, selectedPeriod.stages.length)).toBe(44);
   });
 });

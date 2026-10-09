@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
-import { funnelStageDistributionTotal, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
 
 interface Props {
   a: FunnelAnalytics;
@@ -41,7 +41,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
   const stages = a.stages;
   const total = funnelStageDistributionTotal(a);
   const [visualMode, setVisualMode] = useState(false);
-  const maxStageCount = useMemo(() => Math.max(0, ...stages.map((stage) => stage.count)), [stages]);
+  const visualStageCount = stages.length;
 
   const data = stages.map((s, i) => ({
     name: s.name,
@@ -89,8 +89,8 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
           <div className="flex flex-col items-center gap-2 py-2" aria-label="Funil visual por etapa">
             <div className="flex w-full max-w-2xl flex-col items-center gap-1.5">
               {stages.map((stage, index) => {
-                const width = funnelStageVisualWidth(stage.count, maxStageCount);
-                const color = stageColor(stage, index);
+                const width = funnelStageVisualWidth(index, visualStageCount);
+                const color = funnelStageVisualColor(index, visualStageCount);
                 const details = `${stage.name}: ${stage.count} leads (${stage.pct.toFixed(1)}%). Tempo médio: ${stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "indisponível"}. Em negociação: ${stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "nenhum valor"}.`;
                 return (
                   <div
