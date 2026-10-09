@@ -6,6 +6,38 @@ export type MetaDailyInsightKey = {
 export type MetaActionFactKey = { ad_id: string; date: string; action_type: string };
 export type MetaActionDailySnapshot = { ad_id: string; date: string };
 
+/** Civil dates covered by a sync, inclusive, without host-timezone drift. */
+export function datesCoveredBySync(startDate: string, endDate: string): string[] {
+  const cursor = new Date(`${startDate}T00:00:00Z`);
+  const last = new Date(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime()) || startDate > endDate) return [];
+
+  const dates: string[] = [];
+  for (; cursor <= last; cursor.setUTCDate(cursor.getUTCDate() + 1)) dates.push(cursor.toISOString().slice(0, 10));
+  return dates;
+}
+
+/** The selected inclusive period plus the trailing attribution-settlement window. */
+export function syncRangeWithRollingWindow(
+  selectedStart: string,
+  selectedEnd: string,
+  today: string,
+  rollingDays = 3,
+): { startDate: string; endDate: string; daysCovered: string[] } {
+  const start = new Date(`${today}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || !Number.isInteger(rollingDays) || rollingDays < 0) {
+    return { startDate: selectedStart, endDate: selectedEnd, daysCovered: datesCoveredBySync(selectedStart, selectedEnd) };
+  }
+  start.setUTCDate(start.getUTCDate() - rollingDays);
+  const rollingStart = start.toISOString().slice(0, 10);
+  // The supported sync window is contiguous in the existing Insights fetcher.
+  // Use the hull of the selected interval and the trailing window so both are
+  // refreshed by the same complete, paginated snapshot.
+  const endDate = today;
+  const startDate = selectedStart < rollingStart ? selectedStart : rollingStart;
+  return { startDate: startDate > endDate ? endDate : startDate, endDate, daysCovered: datesCoveredBySync(startDate > endDate ? endDate : startDate, endDate) };
+}
+
 /**
  * Action facts are a snapshot per ad/day. When a completed Meta response no
  * longer contains an action type for an ad/day, remove that stale fact after

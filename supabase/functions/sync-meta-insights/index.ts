@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot } from "../_shared/metaInsightReconciliation.ts";
+import { datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../_shared/metaInsightReconciliation.ts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, META_LEAD_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 
@@ -224,12 +224,15 @@ Deno.serve(async (req) => {
         const requestedEnd = typeof requestedEndDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(requestedEndDate)
           ? requestedEndDate
           : accountToday;
-        const endDate = requestedEnd > accountToday ? accountToday : requestedEnd;
-        const startDate = requestedStart > endDate ? endDate : requestedStart;
+        const selectedEndDate = requestedEnd > accountToday ? accountToday : requestedEnd;
+        const selectedStartDate = requestedStart > selectedEndDate ? selectedEndDate : requestedStart;
+        const syncRange = syncRangeWithRollingWindow(selectedStartDate, selectedEndDate, accountToday, 3);
+        const startDate = syncRange.startDate;
+        const endDate = syncRange.endDate;
         // Audience reports multiply Graph API calls. Keep their range scoped
         // to the visible dashboard period, independent from media backfills.
-        const breakdownStartDate = requestedBreakdownStartDate || startDate;
-        const breakdownEndDate = requestedBreakdownEndDate || endDate;
+        const breakdownStartDate = requestedBreakdownStartDate || selectedStartDate;
+        const breakdownEndDate = requestedBreakdownEndDate || selectedEndDate;
         const attributionWindows = requestedAttributionWindow && requestedAttributionWindow !== "account_default"
           ? requestedAttributionWindow.split(",").map((value: string) => value.trim()).filter(Boolean)
           : account.attribution_window && account.attribution_window !== "account_default"
@@ -253,6 +256,7 @@ Deno.serve(async (req) => {
             triggered_by: isCron ? "cron" : "manual",
             period_start: startDate,
             period_end: endDate,
+            days_covered: syncRange.daysCovered,
           })
           .select("id")
           .single();
@@ -285,7 +289,10 @@ Deno.serve(async (req) => {
           p_provider: "meta",
           p_scope_key: accountLockScopeKey,
           p_now: new Date().toISOString(),
-          p_locked_until: new Date(Date.now() + 7 * 60_000).toISOString(),
+          // Meta pagination plus action reconciliation can outlast the old
+          // seven-minute lease. Keep the account exclusive for the full worker
+          // window so a second invocation cannot erase a still-writing snapshot.
+          p_locked_until: new Date(Date.now() + 15 * 60_000).toISOString(),
         });
         if (lockError) throw lockError;
         if (!acquired) {
@@ -1018,14 +1025,21 @@ Deno.serve(async (req) => {
             });
           }
         }
-        for (let i = 0; i < actionRows.length; i += 500) {
-          const chunk = actionRows.slice(i, i + 500);
+        // De-duplicate by the database's actual primary key before sending
+        // each request. The PK makes each request an atomic idempotent upsert;
+        // smaller batches reduce payload/read-after-write pressure.
+        const uniqueActionRows = [...new Map(actionRows.map((row) => [
+          `${row.ad_id}|${row.date}|${row.action_type}|${row.attribution_window}`,
+          row,
+        ])).values()];
+        for (let i = 0; i < uniqueActionRows.length; i += 100) {
+          const chunk = uniqueActionRows.slice(i, i + 100);
           const { error: aErr } = await supabaseAdmin
             .from("insight_actions")
             .upsert(chunk, { onConflict: "ad_id,date,action_type,attribution_window", ignoreDuplicates: false });
           if (aErr) throw new Error(`ações da conta ${account.name}: ${aErr.message}`);
         }
-        if (actionRows.length > 0) console.log(`insight_actions: ${actionRows.length} rows`);
+        if (uniqueActionRows.length > 0) console.log(`insight_actions: ${uniqueActionRows.length} unique rows`);
         const leadActionTypes = new Set<string>([
           ...FORM_ACTIONS,
           ...SITE_ACTIONS,
@@ -1252,6 +1266,7 @@ Deno.serve(async (req) => {
               .eq("attribution_window", effectiveAttributionWindow)
               .in("ad_id", adChunk)
               .gte("date", startDate).lte("date", endDate)
+              .order("ad_id", { ascending: true }).order("date", { ascending: true })
               .range(page * 1000, page * 1000 + 999);
             if (error) throw new Error(`verificação dos insights da conta ${account.name}: ${error.message}`);
             persistedInsightRows.push(...(data || []));
@@ -1263,6 +1278,7 @@ Deno.serve(async (req) => {
               .eq("ad_account_id", account.id)
               .in("ad_id", adChunk)
               .gte("date", startDate).lte("date", endDate)
+              .order("ad_id", { ascending: true }).order("date", { ascending: true }).order("action_type", { ascending: true })
               .range(page * 1000, page * 1000 + 999);
             query = effectiveAttributionWindow === "account_default"
               ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
@@ -1275,7 +1291,7 @@ Deno.serve(async (req) => {
         }
         const persistedInsightKeys = new Set(persistedInsightRows.map((row) => `${row.ad_id}|${row.date}`));
         const missingInsightKeys = [...expectedInsightKeys].filter((key) => !persistedInsightKeys.has(key));
-        const expectedActionKeys = new Set(actionRows.map((row) => `${row.ad_id}|${row.date}|${row.action_type}`));
+        const expectedActionKeys = new Set(uniqueActionRows.map((row) => `${row.ad_id}|${row.date}|${row.action_type}`));
         const persistedActionKeys = new Set(persistedActionRows.map((row) => `${row.ad_id}|${row.date}|${row.action_type}`));
         const missingActionKeys = [...expectedActionKeys].filter((key) => !persistedActionKeys.has(key));
         const persistedSpend = persistedInsightRows
@@ -1304,7 +1320,7 @@ Deno.serve(async (req) => {
         const actionSnapshots = allInsights
           .filter((row: any) => row.ad_id && row.date_start)
           .map((row: any) => ({ ad_id: String(row.ad_id), date: String(row.date_start) }));
-        const incomingActionFacts = actionRows.map((row: any) => ({
+        const incomingActionFacts = uniqueActionRows.map((row: any) => ({
           ad_id: String(row.ad_id), date: String(row.date), action_type: String(row.action_type),
         }));
         const existingActionFacts: Array<{ ad_id: string; date: string; action_type: string }> = [];
@@ -1324,6 +1340,7 @@ Deno.serve(async (req) => {
                 .eq("ad_account_id", account.id)
                 .eq("date", date)
                 .in("ad_id", adChunk)
+                .order("ad_id", { ascending: true }).order("action_type", { ascending: true })
                 .range(page * 1000, page * 1000 + 999);
               query = effectiveAttributionWindow === "account_default"
                 ? query.or("attribution_window.eq.account_default,attribution_window.is.null")
@@ -1421,6 +1438,7 @@ Deno.serve(async (req) => {
               .eq("attribution_window", effectiveAttributionWindow)
               .in("ad_id", adChunk)
               .gte("date", startDate).lte("date", endDate)
+              .order("ad_id", { ascending: true }).order("date", { ascending: true })
               .range(page * 1000, page * 1000 + 999);
             if (error) throw new Error(`verificação final dos insights da conta ${account.name}: ${error.message}`);
             for (const row of data || []) {
@@ -1436,6 +1454,7 @@ Deno.serve(async (req) => {
               .eq("ad_account_id", account.id)
               .in("ad_id", adChunk)
               .gte("date", startDate).lte("date", endDate)
+              .order("ad_id", { ascending: true }).order("date", { ascending: true }).order("action_type", { ascending: true })
               .range(page * 1000, page * 1000 + 999);
             query = effectiveAttributionWindow === "account_default"
               ? query.or("attribution_window.eq.account_default,attribution_window.is.null")

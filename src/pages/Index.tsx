@@ -366,7 +366,7 @@ const Index = () => {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Visão geral financeira e de performance</p>
+            <p className="text-sm text-muted-foreground mt-1">Visão geral financeira e de performance · Meta: última sincronização {dashboardMeta.data.syncedAt ? `às ${new Date(dashboardMeta.data.syncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : "não confirmada"}</p>
           </div>
           <Button onClick={() => { setEditingSale(null); setSalesDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />Registrar Venda

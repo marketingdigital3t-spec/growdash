@@ -1,7 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot } from "../../supabase/functions/_shared/metaInsightReconciliation";
+import { datesCoveredBySync, datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../../supabase/functions/_shared/metaInsightReconciliation";
 
 describe("Meta daily fact reconciliation", () => {
+  it("builds a civil inclusive range that includes the selected period and three trailing days", () => {
+    expect(syncRangeWithRollingWindow("2026-09-01", "2026-09-30", "2026-10-09")).toEqual({
+      startDate: "2026-09-01",
+      endDate: "2026-10-09",
+      daysCovered: datesCoveredBySync("2026-09-01", "2026-10-09"),
+    });
+    expect(datesCoveredBySync("2026-10-07", "2026-10-09")).toEqual(["2026-10-07", "2026-10-08", "2026-10-09"]);
+  });
+
+  it("does not add host-timezone drift or invalid dates to recorded coverage", () => {
+    expect(datesCoveredBySync("invalid", "2026-10-09")).toEqual([]);
+    expect(syncRangeWithRollingWindow("2026-10-10", "2026-10-12", "2026-10-09")).toMatchObject({
+      startDate: "2026-10-06",
+      endDate: "2026-10-09",
+      daysCovered: ["2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"],
+    });
+  });
+
   it("preserves prior snapshot dates omitted by an otherwise non-empty range response", () => {
     expect(datesSafeToReconcile("2026-10-02", "2026-10-04", [
       { date_start: "2026-10-02", ad_id: "ad-1" },

@@ -692,7 +692,7 @@ export default function FunnelAnalysis() {
           <div>
             <h1 className="text-2xl font-bold">Análise de Funis</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Acompanhe a performance completa dos seus leads e funis de conversão com base nos estágios reais do RD.
+              Acompanhe a performance dos leads e funis reais do RD. Meta: última sincronização {funnelMeta.data.syncedAt ? `às ${new Date(funnelMeta.data.syncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : "não confirmada"}; Insights podem atrasar.
             </p>
           </div>
           <div className="flex items-center gap-2">
