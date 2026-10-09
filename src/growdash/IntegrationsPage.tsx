@@ -44,6 +44,20 @@ const tabs = [
   ["payments", "Pagamentos"], ["files", "Arquivos"], ["developers", "API & Webhooks"], ["health", "Saúde & Logs"],
 ] as const;
 
+async function mapWithConcurrency<T, R>(items: T[], limit: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function consume() {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, consume));
+  return results;
+}
+
 function safeText(value: unknown, fallback = "") {
   return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
 }
@@ -229,7 +243,10 @@ function IntegrationsContent() {
           failures.push("RD Station: conecte e ative ao menos um funil para sincronizar negócios.");
         } else {
           let syncedFunnels = 0;
-          for (const funnel of activeRDFunnels) {
+          // Funis diferentes são escopos independentes. Sincronizar dois por
+          // vez reduz o tempo total sem abrir uma rajada ilimitada contra o
+          // mesmo token RD nem sobrecarregar os triggers do Postgres.
+          const funnelResults = await mapWithConcurrency(activeRDFunnels, 2, async (funnel) => {
             try {
               const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
                 body: {
@@ -242,13 +259,14 @@ function IntegrationsContent() {
               });
               if (error) throw new Error(await getEdgeFunctionErrorMessage(error, `Não foi possível sincronizar o funil ${funnel.name}.`));
               if (data?.error || data?.success === false || data?.partial || data?.status === "partial") throw new Error(data?.error || `Snapshot incompleto (${data?.pages_processed ?? 0} páginas processadas).`);
-              syncedFunnels += 1;
+              return { funnel, ok: true, error: null };
             } catch (error) {
-              failures.push(`RD Station (${funnel.name}): ${error instanceof Error ? error.message : "falha na sincronização"}`);
+              return { funnel, ok: false, error: error instanceof Error ? error.message : "falha na sincronização" };
             }
-            // Keep a short gap between full-history requests that share the
-            // same RD token; this avoids turning one click into a burst.
-            if (funnel !== activeRDFunnels.at(-1)) await new Promise((resolve) => setTimeout(resolve, 1_000));
+          });
+          for (const result of funnelResults) {
+            if (result.ok) syncedFunnels += 1;
+            else failures.push(`RD Station (${result.funnel.name}): ${result.error}`);
           }
           if (syncedFunnels) completed.push(`RD Station (${syncedFunnels} funil${syncedFunnels > 1 ? "is" : ""})`);
         }

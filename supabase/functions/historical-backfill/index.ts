@@ -23,6 +23,20 @@ async function invoke(base: string, key: string, name: string, body: Record<stri
   }
 }
 
+async function mapWithConcurrency<T, R>(items: T[], limit: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function consume() {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, consume));
+  return results;
+}
+
 function itemSummary(result: Result) {
   const body = result.body as any;
   return {
@@ -128,9 +142,11 @@ Deno.serve(async (req) => {
           breakdownEndDate: windowEnd,
           triggerSource: "historical_backfill",
         };
-        const insight = await invoke(base, key, "sync-meta-insights", common);
-        const lead = await invoke(base, key, "sync-meta-leads", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" });
-        const hourly = await invoke(base, key, "sync-meta-hourly", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" });
+        const [insight, lead, hourly] = await Promise.all([
+          invoke(base, key, "sync-meta-insights", common),
+          invoke(base, key, "sync-meta-leads", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" }),
+          invoke(base, key, "sync-meta-hourly", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" }),
+        ]);
         const insightSummary = itemSummary(insight);
         const leadSummary = itemSummary(lead);
         const hourlySummary = itemSummary(hourly);
@@ -149,9 +165,12 @@ Deno.serve(async (req) => {
     if (typeof body.funnel_id === "string") funnelsQuery = funnelsQuery.eq("id", body.funnel_id);
     const { data: funnels, error: funnelsError } = await funnelsQuery;
     if (funnelsError) throw funnelsError;
-    for (const funnel of funnels || []) {
+    const funnelResults = await mapWithConcurrency(funnels || [], 2, async (funnel) => {
       const result = await invoke(base, key, "rd-sync-deals", { funnel_id: funnel.id, service_user_id: userId, cron_trigger: true, analytics_mode: true, full_history: true, trigger_source: "historical_backfill" });
       const summary = itemSummary(result);
+      return { funnel, summary };
+    });
+    for (const { funnel, summary } of funnelResults) {
       if (!summary.ok) failures++;
       items.push({ run_id: run.id, user_id: userId, provider: "rd_deals", funnel_id: funnel.id, window_start: historicalStart, window_end: today, status: summary.ok ? "success" : "partial", pages_read: summary.pages, records_read: summary.records, records_upserted: summary.records, duplicates: summary.duplicates, gaps: Array.isArray(summary.gaps) ? summary.gaps : [summary.gaps], details: summary.response, error_message: summary.ok ? null : String(summary.response?.error || "Falha no RD"), finished_at: new Date().toISOString() });
     }
