@@ -9,6 +9,7 @@ import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useAlerts } from "@/hooks/useAlerts";
 import { dedupeCanonicalSales, useSales, type Sale } from "@/hooks/useSales";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
+import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
@@ -131,14 +132,19 @@ const Index = () => {
   const { data: eventClasses = [] } = useEventClasses();
   const syncMeta = useSyncMeta();
 
-  const dashboardScopeKey = useMemo(() => {
-    const windows = visibleAccounts
-      .filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id))
-      .map((account) => `${account.id}:${account.attribution_window || "account_default"}`)
-      .sort()
-      .join(",");
-    return `${(selectedAccountIds.length ? selectedAccountIds : scopedAccountIds).slice().sort().join(",")}|${businessDateKey(startDate)}|${businessDateKey(endDate)}|${windows}`;
-  }, [endDate, scopedAccountIds, selectedAccountIds, startDate, visibleAccounts]);
+  const dashboardAnalyticsScope = useMemo<AnalyticsScope>(() => {
+    const scopedAccounts = visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id));
+    return {
+      adAccountIds: selectedAccountIds.length ? selectedAccountIds : scopedAccountIds,
+      funnelIds: scopedRDfunnelIds,
+      campaignIds: selectedCampaignIds,
+      startDate: businessDateKey(startDate),
+      endDate: businessDateKey(endDate),
+      timezoneByAccount: Object.fromEntries(scopedAccounts.map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
+      attributionWindowByAccount: Object.fromEntries(scopedAccounts.map((account) => [account.id, account.attribution_window || "account_default"])),
+    };
+  }, [endDate, scopedAccountIds, scopedRDfunnelIds, selectedAccountIds, selectedCampaignIds, startDate, visibleAccounts]);
+  const dashboardScopeKey = useMemo(() => analyticsScopeFingerprint(dashboardAnalyticsScope), [dashboardAnalyticsScope]);
 
   const { data: activeView } = useGlobalView();
   const { canEdit: canEditWorkspace } = usePermissions();

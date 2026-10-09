@@ -3,6 +3,7 @@ import { differenceInCalendarDays, format, subDays } from "date-fns";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics, rdDealWonDate } from "@/hooks/useRDDeals";
+import { useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,6 +45,7 @@ import { CampaignMultiSelect } from "@/components/dashboard/CampaignMultiSelect"
 import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpportunityProfile";
+import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -140,6 +142,16 @@ export default function FunnelAnalysis() {
     [scopedActiveFunnels, selectedFunnelIds],
   );
   const funnelScopeKey = funnelScopeIds.join(",");
+  const analyticsScope = useMemo<AnalyticsScope>(() => ({
+    adAccountIds: selectedAccountIds,
+    funnelIds: funnelScopeIds,
+    campaignIds: selectedCampaigns,
+    startDate: businessDateKey(startDate),
+    endDate: businessDateKey(endDate),
+    timezoneByAccount: Object.fromEntries(visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id)).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
+    attributionWindowByAccount: Object.fromEntries(visibleAccounts.filter((account) => !selectedAccountIds.length || selectedAccountIds.includes(account.id)).map((account) => [account.id, account.attribution_window || "account_default"])),
+  }), [endDate, funnelScopeIds, selectedAccountIds, selectedCampaigns, startDate, visibleAccounts]);
+  const analyticsScopeKey = useMemo(() => analyticsScopeFingerprint(analyticsScope), [analyticsScope]);
 
   const effectiveAdAccountId = selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined;
   const effectiveAdAccountIds = selectedAccountIds.length > 1 ? selectedAccountIds : undefined;
@@ -217,7 +229,7 @@ export default function FunnelAnalysis() {
       if (debounceTimer) window.clearTimeout(debounceTimer);
       debounceTimer = window.setTimeout(() => void refreshDistribution(), 500);
     };
-    const channel = supabase.channel(`funnel-analysis-rd-${funnelScopeIds.slice().sort().join("-")}`)
+    const channel = supabase.channel(`funnel-analysis-rd-${analyticsScopeKey.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, queueRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_funnel_stages" }, queueRefresh)
       .subscribe();
@@ -232,7 +244,7 @@ export default function FunnelAnalysis() {
       document.removeEventListener("visibilitychange", onVisibility);
       void supabase.removeChannel(channel);
     };
-  }, [funnelScopeIds, funnelScopeKey, refetch, refetchPeriodDeals, refetchStages]);
+  }, [analyticsScopeKey, funnelScopeIds, funnelScopeKey, refetch, refetchPeriodDeals, refetchStages]);
   // Os filtros precisam vir do conjunto completo do período. Usar `deals`
   // aqui fazia uma opção desaparecer depois que outro filtro era aplicado.
   // Quando todos os filtros estão em "all", o React Query reutiliza esta
@@ -258,16 +270,15 @@ export default function FunnelAnalysis() {
     includeHistory: true,
     enabled: funnelScopeIds.length > 0,
   });
-  const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDClosedDeals({
+  // A mesma consulta canônica usada pelo Dashboard define as vendas do
+  // período. A consulta histórica acima continua disponível para filtros e
+  // contexto, mas não pode gerar um segundo conjunto de vendas com regras
+  // diferentes de data/escopo.
+  const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDWonDealsForPeriod({
     funnelIds: funnelScopeIds,
     adAccountIds: selectedAccountIds,
     startDate,
     endDate,
-    source: selectedSource,
-    campaigns: selectedCampaigns,
-    state: selectedState,
-    owner: selectedOwner,
-    product: selectedProduct,
     enabled: funnelScopeIds.length > 0,
   });
   const { data: stageHistory = [], isLoading: loadingStageHistory } = useRDDealStageHistory({
@@ -288,8 +299,15 @@ export default function FunnelAnalysis() {
   const operationalDeals = useMemo(() => filterOperationalRDDeals(deals, activeFunnels), [activeFunnels, deals]);
   const operationalPeriodDeals = useMemo(() => filterOperationalRDDeals(periodDeals, activeFunnels), [activeFunnels, periodDeals]);
   const operationalFilterDeals = useMemo(() => filterOperationalRDDeals(filterDeals, activeFunnels), [activeFunnels, filterDeals]);
+  const filteredPeriodClosedDeals = useMemo(() => periodClosedDeals.filter((deal) => (
+    (selectedSource === "all" || deal.utm_source === selectedSource)
+      && (!selectedCampaigns.length || selectedCampaigns.includes(deal.utm_campaign || ""))
+      && (selectedState === "all" || deal.lead_state === selectedState)
+      && (selectedOwner === "all" || deal.deal_owner_name === selectedOwner)
+      && (selectedProduct === "all" || deal.rd_product_name === selectedProduct)
+  )), [periodClosedDeals, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState]);
   const operationalClosedDeals = useMemo(() => filterOperationalRDDeals(closedDeals, activeFunnels), [activeFunnels, closedDeals]);
-  const operationalPeriodClosedDeals = useMemo(() => filterOperationalRDDeals(periodClosedDeals, activeFunnels), [activeFunnels, periodClosedDeals]);
+  const operationalPeriodClosedDeals = useMemo(() => filterOperationalRDDeals(filteredPeriodClosedDeals, activeFunnels), [activeFunnels, filteredPeriodClosedDeals]);
   const operationalPeriodFunnelDeals = useMemo(() => {
     const byId = new Map<string, (typeof operationalPeriodDeals)[number]>();
     for (const deal of [...operationalPeriodDeals, ...operationalPeriodClosedDeals]) byId.set(deal.rd_deal_id, deal);
