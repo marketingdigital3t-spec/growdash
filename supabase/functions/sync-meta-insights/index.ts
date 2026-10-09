@@ -189,8 +189,14 @@ Deno.serve(async (req) => {
       const auxiliaryErrors: string[] = [];
       let accountLockScopeKey: string | null = null;
       let accountLockAcquired = false;
+      let metaRunId: string | null = null;
+      let accountPagesProcessed = 0;
+      let contractInsightsWritten = 0;
+      let contractActionsWritten = 0;
+      let contractBreakdownsWritten = 0;
       const recordPagination = (result: { pages?: number; lastCursor?: string; truncated?: boolean; repeatedCursor?: boolean }, label = "consulta") => {
         totalPages += Number(result.pages || 0);
+        accountPagesProcessed += Number(result.pages || 0);
         if (result.lastCursor) lastCursor = result.lastCursor;
         if (result.truncated || result.repeatedCursor) {
           const message = `Conta ${account.name} ${label}: paginação incompleta; o snapshot anterior foi preservado.`;
@@ -237,6 +243,36 @@ Deno.serve(async (req) => {
         const rawAccountId = account.account_id;
         const metaAccountId = rawAccountId.startsWith("act_") ? rawAccountId : `act_${rawAccountId}`;
 
+        // Additive audit record for the canonical contract. Legacy tables and
+        // their writes remain unchanged throughout this rollout.
+        const { data: metaRun, error: metaRunError } = await supabaseAdmin
+          .from("meta_sync_runs")
+          .insert({
+            ad_account_id: String(account.id),
+            status: "running",
+            triggered_by: isCron ? "cron" : "manual",
+            period_start: startDate,
+            period_end: endDate,
+          })
+          .select("id")
+          .single();
+        if (metaRunError) throw new Error(`execução Meta da conta ${account.name}: ${metaRunError.message}`);
+        metaRunId = metaRun?.id || null;
+
+        const updateMetaRun = async (status: "running" | "completed" | "partial" | "failed", errorMessage: string | null = null) => {
+          if (!metaRunId) return;
+          await supabaseAdmin.from("meta_sync_runs").update({
+            status,
+            pages_processed: accountPagesProcessed,
+            insights_written: contractInsightsWritten,
+            actions_written: contractActionsWritten,
+            breakdowns_written: contractBreakdownsWritten,
+            errors_total: auxiliaryErrors.length + (accountHadError ? 1 : 0),
+            error_message: errorMessage,
+            finished_at: status === "running" ? null : new Date().toISOString(),
+          }).eq("id", metaRunId);
+        };
+
         // Every writer (manual, cron or backfill) takes the same per-account
         // lock. The coordinator lock alone is not enough because direct
         // function calls could otherwise write the same facts concurrently.
@@ -254,6 +290,7 @@ Deno.serve(async (req) => {
         if (lockError) throw lockError;
         if (!acquired) {
           errors.push(`Conta ${account.name}: sincronização já está em andamento; snapshot preservado.`);
+          await updateMetaRun("failed", `Conta ${account.name}: sincronização já está em andamento; snapshot preservado.`);
           continue;
         }
         accountLockAcquired = true;
@@ -608,6 +645,7 @@ Deno.serve(async (req) => {
             await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
               .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
           }
+          await updateMetaRun("failed", message);
           accountResults.push({
             internalAccountId: account.id,
             externalAccountId: metaAccountId,
@@ -1035,6 +1073,97 @@ Deno.serve(async (req) => {
           auxiliaryErrors.push(`Conta ${account.name}: Leads Meta preservados como snapshot anterior; destino Website não foi confirmado para todos os anúncios.`);
         }
 
+        // Canonical contract facts are written in addition to the legacy
+        // tables. Ad facts keep the same daily grain as the Graph query;
+        // campaign facts are aggregated from that exact response and period.
+        if (metaRunId) {
+          const contractRows: any[] = [];
+          const campaignDays = new Map<string, any>();
+          for (const insight of allInsights) {
+            const campaignId = String(insight.campaign_id || "");
+            const campaign = campaignById.get(campaignId);
+            const adset = adsetById.get(String(insight.adset_id || ""));
+            const actions = Array.isArray(insight.actions) ? insight.actions : [];
+            const destinationType = adset?.destination_type || null;
+            const result = canonicalResult(campaign?.objective || null, adset?.optimization_goal || null, actions, lpAction, destinationType);
+            const spend = Number(insight.spend || 0);
+            const impressions = Number(insight.impressions || 0);
+            const clicks = Number(insight.clicks || 0);
+            const key = `${campaignId}|${insight.date_start}`;
+            contractRows.push({
+              run_id: metaRunId,
+              ad_account_id: String(account.id),
+              date_start: insight.date_start,
+              date_end: insight.date_start,
+              level: "ad",
+              item_id: String(insight.ad_id),
+              campaign_id: campaignId || null,
+              campaign_name: insight.campaign_name || campaign?.name || null,
+              objective: campaign?.objective || null,
+              optimization_event: null,
+              spend,
+              impressions,
+              reach: Number.isFinite(Number(insight.reach)) ? Number(insight.reach || 0) : null,
+              clicks,
+              ctr: Number(insight.ctr || 0),
+              cpc: clicks > 0 ? spend / clicks : 0,
+              cpm: impressions > 0 ? spend / (impressions / 1000) : 0,
+              results: Number(result.value || 0),
+              result_type: result.type || null,
+              cpa: Number(result.value || 0) > 0 ? spend / Number(result.value || 0) : null,
+              roas: null,
+            });
+            if (!campaignId) continue;
+            const current = campaignDays.get(key) || {
+              campaignId, date: insight.date_start, campaignName: insight.campaign_name || campaign?.name || null,
+              objective: campaign?.objective || null, spend: 0, impressions: 0, clicks: 0, actions: new Map<string, number>(),
+            };
+            current.spend += spend;
+            current.impressions += impressions;
+            current.clicks += clicks;
+            for (const action of actions) {
+              const type = String(action.action_type || "");
+              current.actions.set(type, (current.actions.get(type) || 0) + Number(action.value || 0));
+            }
+            campaignDays.set(key, current);
+          }
+          for (const current of campaignDays.values()) {
+            const actions = [...current.actions.entries()].map(([action_type, value]) => ({ action_type, value }));
+            const result = canonicalResult(current.objective, null, actions, lpAction, null);
+            contractRows.push({
+              run_id: metaRunId,
+              ad_account_id: String(account.id),
+              date_start: current.date,
+              date_end: current.date,
+              level: "campaign",
+              item_id: String(current.campaignId),
+              campaign_id: String(current.campaignId) || null,
+              campaign_name: current.campaignName,
+              objective: current.objective,
+              optimization_event: null,
+              spend: current.spend,
+              impressions: current.impressions,
+              reach: null,
+              clicks: current.clicks,
+              ctr: current.impressions > 0 ? (current.clicks / current.impressions) * 100 : 0,
+              cpc: current.clicks > 0 ? current.spend / current.clicks : 0,
+              cpm: current.impressions > 0 ? current.spend / (current.impressions / 1000) : 0,
+              results: Number(result.value || 0),
+              result_type: result.type || null,
+              cpa: Number(result.value || 0) > 0 ? current.spend / Number(result.value || 0) : null,
+              roas: null,
+            });
+          }
+          for (let i = 0; i < contractRows.length; i += 500) {
+            const { error: contractError } = await supabaseAdmin
+              .from("meta_insights_contract")
+              .upsert(contractRows.slice(i, i + 500), { onConflict: "ad_account_id,date_start,level,item_id" });
+            if (contractError) throw new Error(`contrato Meta da conta ${account.name}: ${contractError.message}`);
+          }
+          contractInsightsWritten = contractRows.length;
+          contractActionsWritten = actionRows.length;
+        }
+
         // Batch upsert insights (chunks of 100)
         const insightRows = allInsights.map((insight: any) => {
           const spend = Number(insight.spend || 0);
@@ -1399,6 +1528,7 @@ Deno.serve(async (req) => {
                 .upsert(chunk, { onConflict: "campaign_id,date,breakdown_type,segment_key,attribution_window", ignoreDuplicates: false });
               if (bErr) throw new Error(`breakdown ${breakdown.type} da conta ${account.name}: ${bErr.message}`);
             }
+            contractBreakdownsWritten += bRows.length;
             console.log(`Breakdown ${breakdown.type}: ${bRows.length} rows`);
           }
         } catch (bErr) {
@@ -1469,6 +1599,7 @@ Deno.serve(async (req) => {
             breakdowns: { status: auxiliaryErrors.length ? "partial" : "pending", errorMessage: auxiliaryErrors.join("; ") || null },
           },
         });
+        await updateMetaRun(accountHadError ? "partial" : "completed", accountHadError ? errors.filter((message) => message.startsWith(`Conta ${account.name}`)).join("; ") : null);
         accountResults.push({
           internalAccountId: account.id,
           externalAccountId: metaAccountId,
@@ -1491,6 +1622,18 @@ Deno.serve(async (req) => {
         failedAccounts++;
         const msg = (e as Error).message;
         errors.push(`Conta ${account.name}: ${msg}`);
+        if (metaRunId) {
+          await supabaseAdmin.from("meta_sync_runs").update({
+            status: "failed",
+            pages_processed: accountPagesProcessed,
+            insights_written: contractInsightsWritten,
+            actions_written: contractActionsWritten,
+            breakdowns_written: contractBreakdownsWritten,
+            errors_total: auxiliaryErrors.length + 1,
+            error_message: msg,
+            finished_at: new Date().toISOString(),
+          }).eq("id", metaRunId);
+        }
         await supabaseAdmin
           .from("ad_accounts")
           .update({
