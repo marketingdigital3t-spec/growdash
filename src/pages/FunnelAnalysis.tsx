@@ -576,7 +576,10 @@ export default function FunnelAnalysis() {
               // complete history is handled by the dedicated backfill path.
               // The maximum calendar must mirror every page available in RD;
               // the normal recent-range refresh remains bounded for speed.
-              ...(preset === "max" ? {} : { max_pages: 10 }),
+              // A consulta interativa fica limitada a três páginas por
+              // segmento (600 negócios). O backfill histórico continua sendo
+              // executado separadamente, sem bloquear a tela nem o Postgres.
+              max_pages: 3,
             },
           });
           if (error) {

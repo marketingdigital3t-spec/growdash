@@ -1514,7 +1514,10 @@ Deno.serve(async (req) => {
       // upsert can exceed the Edge Function CPU/memory budget even though the
       // remote pagination itself succeeded. Micro-batches preserve the full
       // history while bounding peak serialization and PostgREST work.
-      const PERSIST_BATCH_SIZE = 25;
+      // Cada upsert dispara triggers de atribuição/valores em rd_deals.
+      // Lotes grandes estouram o statement_timeout em funis volumosos;
+      // micro-lotes mantêm o mesmo snapshot e reduzem lock/tempo por comando.
+      const PERSIST_BATCH_SIZE = 5;
       for (let offset = 0; offset < rows.length; offset += PERSIST_BATCH_SIZE) {
         const batch = rows.slice(offset, offset + PERSIST_BATCH_SIZE);
         const { error } = await admin
