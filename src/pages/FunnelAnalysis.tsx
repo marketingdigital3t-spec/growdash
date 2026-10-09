@@ -181,12 +181,18 @@ export default function FunnelAnalysis() {
       if (disposed || document.visibilityState === "hidden") return;
       setRdLiveState("refreshing");
       try {
-        const results = await Promise.all([refetch(), refetchStages()]);
-        const failedResult = results.find((result) => result.isError);
-        if (failedResult?.isError) throw failedResult.error || new Error("Não foi possível confirmar a atualização do RD.");
+        const results = await Promise.allSettled([refetch(), refetchStages()]);
+        const dealsResult = results[0];
+        const stagesResult = results[1];
+        if (dealsResult.status === "rejected" || (dealsResult.status === "fulfilled" && dealsResult.value.isError)) {
+          const error = dealsResult.status === "rejected" ? dealsResult.reason : dealsResult.value.error;
+          throw error || new Error("Não foi possível confirmar a atualização das negociações RD.");
+        }
         if (disposed) return;
         setRdLastUpdatedAt(new Date());
-        setRdLiveError(null);
+        setRdLiveError(stagesResult.status === "rejected" || (stagesResult.status === "fulfilled" && stagesResult.value.isError)
+          ? "O catálogo de etapas está indisponível; a distribuição usa a etapa salva em cada negociação."
+          : null);
         setRdLiveState("fresh");
       } catch (error) {
         if (disposed) return;
