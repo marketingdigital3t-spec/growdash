@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip as StageTooltip, TooltipContent as StageTooltipContent, TooltipProvider, TooltipTrigger as StageTooltipTrigger } from "@/components/ui/tooltip";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
 import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
@@ -88,22 +89,35 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
         {visualMode ? (
           <div className="flex flex-col items-center gap-2 py-2" aria-label="Funil visual por etapa">
             <div className="flex w-full max-w-2xl flex-col items-center gap-1.5">
-              {stages.map((stage, index) => {
-                const width = funnelStageVisualWidth(index, visualStageCount);
-                const color = funnelStageVisualColor(index, visualStageCount);
-                const details = `${stage.name}: ${stage.count} leads (${stage.pct.toFixed(1)}%). Tempo médio: ${stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "indisponível"}. Em negociação: ${stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "nenhum valor"}.`;
-                return (
-                  <div
-                    key={stage.rd_stage_id}
-                    className="flex min-h-14 items-center justify-center px-4 text-center text-xs font-semibold text-white shadow-sm transition-[width] duration-300"
-                    style={{ width: `${width}%`, background: color, clipPath: "polygon(4% 0, 96% 0, 100% 100%, 0 100%)" }}
-                    title={details}
-                    aria-label={details}
-                  >
-                    <span className="min-w-0 truncate">{stage.name} · {stage.count} ({stage.pct.toFixed(1)}%)</span>
-                  </div>
-                );
-              })}
+              <TooltipProvider delayDuration={250}>
+                {stages.map((stage, index) => {
+                  const width = funnelStageVisualWidth(index, visualStageCount);
+                  const color = funnelStageVisualColor(index, visualStageCount);
+                  const avgTime = stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "Indisponível";
+                  const negotiationValue = stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Nenhum valor";
+                  const accessibleDescription = `${stage.name}: ${stage.count} leads, ${stage.pct.toFixed(1)}% do total. Tempo médio: ${avgTime}. Valor em negociação: ${negotiationValue}.`;
+                  return (
+                    <StageTooltip key={stage.rd_stage_id}>
+                      <StageTooltipTrigger asChild>
+                        <div
+                          tabIndex={0}
+                          className="flex min-h-14 cursor-help items-center justify-center px-4 text-center text-xs font-semibold text-white shadow-sm outline-none transition-[width,filter] duration-300 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          style={{ width: `${width}%`, background: color, clipPath: "polygon(4% 0, 96% 0, 100% 100%, 0 100%)" }}
+                          aria-label={accessibleDescription}
+                        >
+                          <span className="min-w-0 truncate">{stage.name} · {stage.count} ({stage.pct.toFixed(1)}%)</span>
+                        </div>
+                      </StageTooltipTrigger>
+                      <StageTooltipContent side="top" className="max-w-xs space-y-1.5 px-3 py-2.5 text-xs">
+                        <p className="font-semibold text-foreground">{stage.name}</p>
+                        <p>{stage.count} leads · {stage.pct.toFixed(1)}% do total</p>
+                        <p>Tempo médio: {avgTime}</p>
+                        <p>Valor em negociação: {negotiationValue}</p>
+                      </StageTooltipContent>
+                    </StageTooltip>
+                  );
+                })}
+              </TooltipProvider>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">{unavailable ? "—" : total}</span>
