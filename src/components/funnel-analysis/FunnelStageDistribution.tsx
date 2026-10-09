@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
+import { funnelStageDistributionTotal } from "@/lib/funnelStageDistribution";
 
 interface Props {
   a: FunnelAnalytics;
@@ -30,13 +31,14 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
   // Include lost and won stages so the distribution reconciles exactly to the
   // current RD deal inventory for the selected account and funnel.
   const stages = a.stages;
-  const total = stages.reduce((s, x) => s + x.count, 0);
+  const total = funnelStageDistributionTotal(a);
 
   const data = stages.map((s, i) => ({
     name: s.name,
     value: s.count,
     color: STAGE_COLORS[i % STAGE_COLORS.length],
   }));
+  const unavailable = liveState === "error" && !lastUpdatedAt && total === 0;
 
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
@@ -53,7 +55,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                   : "Aguardando atualização"}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground">Retrato atual das negociações no RD para as contas e funis selecionados.</p>
+        <p className="text-xs text-muted-foreground">Negociações no período selecionado para as contas e funis do RD.</p>
         {liveState === "error" && liveError && (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-destructive">{liveError}</p>
@@ -84,8 +86,8 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-2xl font-semibold">{total}</span>
-              <span className="text-xs text-muted-foreground">leads no funil</span>
+              <span className="text-2xl font-semibold">{unavailable ? "—" : total}</span>
+              <span className="text-xs text-muted-foreground">{unavailable ? "Indisponível" : "leads no funil"}</span>
             </div>
           </div>
 

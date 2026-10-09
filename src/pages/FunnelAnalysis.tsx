@@ -172,6 +172,19 @@ export default function FunnelAnalysis() {
     includeHistory: true,
     enabled: funnelScopeIds.length > 0,
   });
+  // O recorte RD usa os funis vinculados à conta selecionada e os filtros do CRM.
+  const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError, refetch: refetchPeriodDeals } = useRDDeals({
+    funnelIds: funnelScopeIds,
+    adAccountIds: selectedAccountIds,
+    startDate,
+    endDate,
+    source: selectedSource,
+    campaigns: selectedCampaigns,
+    state: selectedState,
+    owner: selectedOwner,
+    product: selectedProduct,
+    enabled: funnelScopeIds.length > 0,
+  });
 
   useEffect(() => {
     if (!funnelScopeIds.length) return;
@@ -181,9 +194,9 @@ export default function FunnelAnalysis() {
       if (disposed || document.visibilityState === "hidden") return;
       setRdLiveState("refreshing");
       try {
-        const results = await Promise.allSettled([refetch(), refetchStages()]);
+        const results = await Promise.allSettled([refetch(), refetchPeriodDeals(), refetchStages()]);
         const dealsResult = results[0];
-        const stagesResult = results[1];
+        const stagesResult = results[2];
         if (dealsResult.status === "rejected" || (dealsResult.status === "fulfilled" && dealsResult.value.isError)) {
           const error = dealsResult.status === "rejected" ? dealsResult.reason : dealsResult.value.error;
           throw error || new Error("Não foi possível confirmar a atualização das negociações RD.");
@@ -219,20 +232,7 @@ export default function FunnelAnalysis() {
       document.removeEventListener("visibilitychange", onVisibility);
       void supabase.removeChannel(channel);
     };
-  }, [funnelScopeKey, refetch, refetchStages]);
-  // O recorte RD usa os funis vinculados à conta selecionada e os filtros do CRM.
-  const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError } = useRDDeals({
-    funnelIds: funnelScopeIds,
-    adAccountIds: selectedAccountIds,
-    startDate,
-    endDate,
-    source: selectedSource,
-    campaigns: selectedCampaigns,
-    state: selectedState,
-    owner: selectedOwner,
-    product: selectedProduct,
-    enabled: funnelScopeIds.length > 0,
-  });
+  }, [funnelScopeIds, funnelScopeKey, refetch, refetchPeriodDeals, refetchStages]);
   // Os filtros precisam vir do conjunto completo do período. Usar `deals`
   // aqui fazia uma opção desaparecer depois que outro filtro era aplicado.
   // Quando todos os filtros estão em "all", o React Query reutiliza esta
@@ -728,7 +728,7 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="mb-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">Escopos separados:</span> a conta e o período selecionados definem a mídia Meta; o filtro Campanhas / UTM RD afeta somente os negócios do CRM e não tenta adivinhar correspondência por nome. {analytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) no histórico RD.
+              <span className="font-semibold text-foreground">Escopos separados:</span> a conta e o período selecionados definem a mídia Meta; o filtro Campanhas / UTM RD afeta somente os negócios do CRM e não tenta adivinhar correspondência por nome. {periodAnalytics.totalLeads.toLocaleString("pt-BR")} negociação(ões) carregada(s) no período selecionado.
             </div>
             <FunnelKPIs
               a={periodAnalytics}
@@ -755,7 +755,7 @@ export default function FunnelAnalysis() {
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
               <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={analytics} liveState={rdLiveState} lastUpdatedAt={rdLastUpdatedAt} liveError={rdLiveError} onRefresh={() => void handleSync()} /></HelpBlock>
+              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} liveState={rdLiveState} lastUpdatedAt={rdLastUpdatedAt} liveError={rdLiveError} onRefresh={() => void handleSync()} /></HelpBlock>
             </div>
           </MotionItem>
 
