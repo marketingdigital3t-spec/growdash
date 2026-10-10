@@ -1,0 +1,171 @@
+/* Growdash Ultraviolet Premium: visual-only design tokens. */
+html[data-accent="ultraviolet"] {
+  --bg-base: #1a0038;
+  --bg-surface: #2a0a52;
+  --bg-card: #3b0f6e;
+  --indigo: #4b0082;
+  --violet: #7b00d4;
+  --accent: #b040ff;
+  --accent-soft: #c084fc;
+  --glow: #e0a0ff;
+  --glow-light: #ead9ff;
+  --grad-primary: linear-gradient(135deg, #8e44ff 0%, #c084fc 100%);
+  --grad-glow: radial-gradient(circle at 50% 0%, #b040ff33, transparent 70%);
+  --text-primary: #ffffff;
+  --text-secondary: #d8c8f0;
+  --text-muted: #9a86c8;
+  --border-glow: #b040ff66;
+  --glass-bg: rgba(75, 0, 130, .35);
+  --glass-blur: blur(14px);
+  --glass-border: 1px solid rgba(224, 160, 255, .18);
+  --shadow-glow: 0 0 20px rgba(176, 64, 255, .35);
+  --background: 270 100% 11%;
+  --foreground: 270 100% 98%;
+  --card: 267 76% 24%;
+  --card-foreground: 270 100% 98%;
+  --popover: 267 76% 24%;
+  --popover-foreground: 270 100% 98%;
+  --secondary: 268 74% 18%;
+  --secondary-foreground: 270 100% 98%;
+  --muted: 268 72% 18%;
+  --muted-foreground: 266 43% 74%;
+  --border: 267 58% 38%;
+  --input: 267 58% 38%;
+  --primary: 267 100% 65%;
+  --primary-foreground: 270 100% 98%;
+  --primary-soft: 269 88% 82%;
+  --accent: 267 100% 65%;
+  --accent-foreground: 270 100% 98%;
+  --ring: 269 100% 81%;
+  --sidebar-background: 270 100% 11%;
+  --sidebar-foreground: 270 100% 98%;
+  --sidebar-primary: 267 100% 65%;
+  --sidebar-primary-foreground: 270 100% 98%;
+  --sidebar-accent: 268 74% 22%;
+  --sidebar-accent-foreground: 270 100% 98%;
+  --sidebar-border: 267 58% 38%;
+  --sidebar-ring: 269 100% 81%;
+  --brand-black: #1a0038;
+  --brand-surface: #2a0a52;
+  --brand-gold: #b040ff;
+  --brand-gold-light: #ead9ff;
+  --brand-bronze: #7b00d4;
+  --brand-ivory: #ffffff;
+  --brand-accent-rgb: 176, 64, 255;
+}
+
+html[data-accent="ultraviolet"]:not(.dark) {
+  --background: 240 11% 96%;
+  --foreground: 0 0% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
+  --secondary: 240 12% 94%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 240 11% 94%;
+  --muted-foreground: 0 0% 33%;
+  --border: 240 8% 88%;
+  --input: 240 8% 86%;
+  --primary-foreground: 0 0% 100%;
+  --accent-foreground: 0 0% 100%;
+}
+
+html[data-accent="ultraviolet"] body {
+  background: var(--bg-base);
+}
+
+html[data-accent="ultraviolet"] .brand-shell {
+  background:
+    radial-gradient(ellipse at 82% -12%, rgba(176, 64, 255, .24), transparent 34rem),
+    radial-gradient(ellipse at 12% 42%, rgba(123, 0, 212, .2), transparent 32rem),
+    linear-gradient(135deg, rgba(26, 0, 56, .96), rgba(59, 15, 110, .54) 48%, rgba(26, 0, 56, .98));
+}
+
+html[data-accent="ultraviolet"] .brand-shell::before {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+  opacity: .1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+}
+
+html[data-accent="ultraviolet"] .brand-shell > * { position: relative; z-index: 1; }
+
+html[data-accent="ultraviolet"] .brand-sidebar,
+html[data-accent="ultraviolet"] .brand-topbar {
+  --foreground: 270 100% 98%;
+  --muted-foreground: 266 43% 78%;
+  --border: 267 58% 38%;
+  --sidebar-background: 270 100% 11%;
+  background: linear-gradient(180deg, rgba(59, 15, 110, .96), rgba(26, 0, 56, .98)) !important;
+  border-color: rgba(176, 64, 255, .34) !important;
+  box-shadow: 0 0 34px rgba(176, 64, 255, .18), inset 0 1px rgba(234, 217, 255, .12);
+}
+
+html[data-accent="ultraviolet"] .brand-topbar {
+  background: linear-gradient(90deg, rgba(42, 10, 82, .98), rgba(26, 0, 56, .96)) !important;
+}
+
+html[data-accent="ultraviolet"] .gd-panel,
+html[data-accent="ultraviolet"] .dashboard-glass-card,
+html[data-accent="ultraviolet"] .gd-metric-card {
+  border-color: rgba(224, 160, 255, .22) !important;
+  background: linear-gradient(145deg, rgba(75, 0, 130, .46), rgba(42, 10, 82, .32)) !important;
+  box-shadow: inset 0 1px rgba(234, 217, 255, .12), 0 18px 52px -34px rgba(176, 64, 255, .7) !important;
+  backdrop-filter: blur(14px);
+}
+
+html[data-accent="ultraviolet"]:not(.dark) .gd-panel,
+html[data-accent="ultraviolet"]:not(.dark) .dashboard-glass-card,
+html[data-accent="ultraviolet"]:not(.dark) .gd-metric-card {
+  border-color: rgba(176, 64, 255, .18) !important;
+  background: rgba(255, 255, 255, .78) !important;
+  box-shadow: 0 14px 34px rgba(67, 24, 110, .1) !important;
+}
+
+html[data-accent="ultraviolet"] .gd-button,
+html[data-accent="ultraviolet"] .gold-action {
+  border-color: rgba(224, 160, 255, .55) !important;
+  background: var(--grad-primary) !important;
+  box-shadow: 0 0 22px rgba(176, 64, 255, .32);
+}
+
+html[data-accent="ultraviolet"] .gd-button:hover:not(:disabled),
+html[data-accent="ultraviolet"] .gold-action:hover:not(:disabled) {
+  filter: saturate(1.15) brightness(1.08);
+  box-shadow: 0 0 30px rgba(176, 64, 255, .52);
+}
+
+html[data-accent="ultraviolet"] .premium-meter,
+html[data-accent="ultraviolet"] .gold-meter { background: var(--grad-primary) !important; }
+
+html[data-accent="ultraviolet"] .brand-sidebar nav a[aria-current="page"],
+html[data-accent="ultraviolet"] .brand-sidebar nav a[data-state="active"] {
+  border-color: rgba(176, 64, 255, .62) !important;
+  background: rgba(176, 64, 255, .18) !important;
+  color: #ead9ff !important;
+  box-shadow: 0 0 22px rgba(176, 64, 255, .22);
+}
+
+html[data-accent="ultraviolet"] :is(button, a, [role="tab"], .gd-filter-control) {
+  transition: color .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+html[data-accent="ultraviolet"] :is(button, a, [role="tab"], .gd-filter-control):hover:not(:disabled) {
+  box-shadow: 0 0 18px rgba(176, 64, 255, .2);
+}
+
+@keyframes ultraviolet-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(176, 64, 255, 0); }
+  50% { box-shadow: 0 0 24px rgba(176, 64, 255, .22); }
+}
+
+html[data-accent="ultraviolet"] .gd-metric-card,
+html[data-accent="ultraviolet"] .gd-glass-metric { animation: ultraviolet-breathe 4s ease-in-out infinite; }
+
+html[data-accent="ultraviolet"] .text-primary { color: #c084fc !important; }
+html[data-accent="ultraviolet"] .border-primary { border-color: rgba(176, 64, 255, .65) !important; }
