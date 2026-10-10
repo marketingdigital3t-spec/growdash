@@ -6051,8 +6051,22 @@ html[data-accent]:not(.dark) .campaigns-workspace :is(.campaign-account-select, 
   border-spacing: 0;
 }
 .campaigns-workspace [data-campaign-table-scroll] :is(th.sticky, td.sticky) {
+  position: sticky !important;
   background-clip: padding-box;
   isolation: isolate;
+  /* Keep the identity surface opaque while metric cells move underneath it. */
+  background-color: hsl(var(--card)) !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td.sticky {
+  background-color: hsl(var(--muted)) !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:hover > td.sticky,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr[data-state="selected"] > td.sticky {
+  background-color: hsl(var(--muted)) !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] :is(th:not(.sticky), td:not(.sticky)) {
+  position: relative;
+  z-index: 0;
 }
 .campaigns-workspace [data-campaign-table-scroll] th.sticky {
   z-index: 60 !important;

@@ -1231,14 +1231,11 @@ export default function Campaigns() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      <AnimatePresence mode="popLayout">
-                        {visibleCampaigns.map((c: any, rowIndex: number) => {
+                      {visibleCampaigns.map((c: any, rowIndex: number) => {
                           const stickySurface = selectedIds.has(c.id) ? "bg-muted dark:bg-[#202020]" : rowIndex % 2 ? "bg-muted dark:bg-[#0c0c0b]" : "bg-card dark:bg-[#070706]";
                           return (
-                          <motion.tr
+                          <tr
                             key={c.id}
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
                             className={`group h-11 ${c.catalogMissing ? "cursor-default" : "cursor-pointer"} border-b border-border transition-colors hover:bg-muted/60 [&>td]:px-3 [&>td]:py-1 dark:border-[#242424] dark:hover:bg-[#181818] ${selectedIds.has(c.id) ? "bg-muted/70" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
                             onClick={() => !c.catalogMissing && setDetailCampaignId(c.id)}
                           >
@@ -1302,9 +1299,8 @@ export default function Campaigns() {
                             {showColumn("profit") && <TableCell style={cellW("profit")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.profit), sortBg("profit"))}><AnimatedNumber value={c.profit} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("roi") && <TableCell style={cellW("roi")} className={cn("text-right tabular-nums text-sm font-semibold", colorClass(c.roi), sortBg("roi"))}><AnimatedNumber value={c.roi} suffix="%" decimals={1} /></TableCell>}
                             {showColumn("videoViews") && <TableCell style={cellW("videoViews")} className="text-right text-sm text-muted-foreground">—<span className="block text-[8px]">não sincronizado</span></TableCell>}
-                          </motion.tr>
+                          </tr>
                         );})}
-                      </AnimatePresence>
                     </TableBody>
                     {activeTab === "legacy-totals" && (() => {
                       const footer = <TableFooter className="sticky bottom-0 z-40">
