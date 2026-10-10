@@ -8808,6 +8808,39 @@ html:not(.dark) .brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.g
   max-width: none !important;
   background-image: none !important;
 }
+
+/* Dashboard alignment contract: the heading, summary strip and grid share
+   the same usable edges. React Grid Layout keeps its own 12px item margin;
+   matching that gutter here prevents the title and columns from drifting at
+   different viewport widths. */
+.brand-shell .dashboard-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1680px !important;
+  margin-inline: auto;
+}
+
+.brand-shell .dashboard-page > .mx-3 {
+  box-sizing: border-box;
+  width: 100%;
+  margin-inline: 0 !important;
+  padding-inline: 12px;
+}
+
+.brand-shell .dashboard-page > .dashboard-grid-container {
+  width: 100%;
+  min-width: 0;
+  margin-inline: 0;
+}
+
+.brand-shell .dashboard-page > .dashboard-grid-container .react-grid-layout {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .brand-shell .dashboard-page > .mx-3 { padding-inline: 8px; }
+}
 .dark .brand-shell[data-funnel-scene="true"] .growdash-main,
 .dark .brand-shell[data-funnel-scene="true"] .growdash-content-shell,
 .dark .brand-shell[data-funnel-scene="true"] .growdash-content-frame,
