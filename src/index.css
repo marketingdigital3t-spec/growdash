@@ -8949,10 +8949,12 @@ body,
 .analytics-module {
   min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
 .growdash-content-shell {
   position: relative;
+  width: 100%;
   overflow: visible;
 }
 
@@ -9014,6 +9016,7 @@ body,
 
   .brand-shell .growdash-content-shell {
     min-height: 100svh;
+    width: 100%;
     padding-left: 0 !important;
   }
 
@@ -9030,6 +9033,7 @@ body,
 
   .brand-shell .growdash-main {
     min-height: calc(100svh - 96px);
+    width: 100%;
     padding: 12px max(12px, env(safe-area-inset-left)) calc(18px + env(safe-area-inset-bottom)) !important;
   }
 
@@ -9260,6 +9264,12 @@ body,
 .brand-shell .gd-layout-canvas {
   width: 100%;
   min-width: 0;
+}
+
+.brand-shell .gd-page-transition {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .brand-shell .gd-page-transition > :where(
