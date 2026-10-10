@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:visual": "playwright test",
-    "test:visual:update": "playwright test --update-snapshots"
+    "test:visual:update": "playwright test --update-snapshots",
+    "traffic-agent": "node scripts/traffic-agent-runner.mjs"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.4.0",

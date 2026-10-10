@@ -111,6 +111,14 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: ["Investimento por conta", "Resultados oficiais", "Entrega e públicos"],
       },
       {
+        label: "Gestor autorizado",
+        path: "/gestor-trafego",
+        icon: ShieldCheck,
+        description: "Receba análises de Meta + RD e aprove cada alteração antes da execução.",
+        metrics: [],
+        highlights: ["Propostas explicadas", "Aprovação obrigatória", "Auditoria de ações"],
+      },
+      {
         label: "Growdash Flow",
         path: "/growdash-flow",
         icon: Workflow,

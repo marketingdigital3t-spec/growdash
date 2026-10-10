@@ -42,6 +42,7 @@ const SocialMediaPage = lazyWithRetry(() => import("@/growdash/SocialMediaPage")
 const AnnouncementsPage = lazyWithRetry(() => import("@/growdash/AnnouncementsPage"), "announcements");
 const ModulePage = lazyWithRetry(() => import("@/growdash/ModulePage"), "module");
 const AgentsOfficePage = lazyWithRetry(() => import("@/growdash/AgentsOfficePage"), "agent-office");
+const TrafficAgentPage = lazyWithRetry(() => import("@/growdash/TrafficAgentPage"), "traffic-agent");
 const BrandDiagnosticPage = lazyWithRetry(() => import("@/growdash/BrandDiagnosticPage"), "brand-diagnostic");
 const IntelligenceCenterPage = lazyWithRetry(() => import("@/growdash/IntelligenceCenterPage"), "intelligence-center");
 const StrategyPage = lazyWithRetry(() => import("@/growdash/StrategyPage"), "strategy");
@@ -314,6 +315,7 @@ export default function App() {
                     {/* Legacy URL: Meta Connect is now the paid tab in the unified integrations center. */}
                     <Route path="meta-connect" element={<RequirePage page="integrations"><Navigate to="/integracoes?tab=paid" replace /></RequirePage>} />
                     <Route path="agentes" element={<RequirePage page="agents"><AgentsOfficePage /></RequirePage>} />
+                    <Route path="gestor-trafego" element={<RequirePage page="agents"><TrafficAgentPage /></RequirePage>} />
                     <Route path="whatsapp" element={<RequirePage page="integrations">{analytics(<WhatsApp />)}</RequirePage>} />
                     <Route path="neural-core" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
                     <Route path="life-sim" element={<RequirePage page="agents"><ModulePage /></RequirePage>} />
