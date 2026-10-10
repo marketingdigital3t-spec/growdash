@@ -4,7 +4,12 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const graphVersion = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
 const admin = createClient(supabaseUrl, serviceKey);
-const headers = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
+const headers = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 
 type Auth = { user: { id: string }; client: ReturnType<typeof createClient> };
