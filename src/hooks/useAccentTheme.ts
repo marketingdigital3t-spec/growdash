@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 
-export type AccentTheme = "ultraviolet" | "monochrome" | "metallic-gold";
+export type AccentTheme = "monochrome" | "metallic-gold";
 const STORAGE_KEY = "growdash:accent-theme";
 
 const ACCENT: Record<AccentTheme, { html: string; color: string }> = {
-  ultraviolet: { html: "ultraviolet", color: "#b040ff" },
   monochrome: { html: "monochrome", color: "#e4e4e4" },
   "metallic-gold": { html: "metallic-gold", color: "#c98a24" },
 };
@@ -14,9 +13,9 @@ function readAccent(): AccentTheme {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     // Versions prior to the selector stored "gold" while still rendering the
     // monochrome palette. Preserve that visual preference on upgrade.
-    return saved === "metallic-gold" || saved === "monochrome" || saved === "ultraviolet" ? saved : "ultraviolet";
+    return saved === "metallic-gold" ? "metallic-gold" : "monochrome";
   } catch {
-    return "ultraviolet";
+    return "monochrome";
   }
 }
 

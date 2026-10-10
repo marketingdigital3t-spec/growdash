@@ -176,10 +176,9 @@ export default function ProfilePage() {
           </div>
           <div className="mt-7 border-t border-border pt-6">
             <h2 className="font-black">Paleta da plataforma</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Escolha entre Ultraviolet Premium, prata e dourado. Todas as paletas preservam leitura e contraste nos modos claro e escuro.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Escolha entre prata e dourado. As duas paletas usam metal escovado, superfícies de leitura neutras e contraste garantido nos modos claro e escuro.</p>
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               {([
-                ["ultraviolet", "Ultraviolet Premium", "Violeta elétrico, glassmorphism e glow sci-fi", "profile-palette-ultraviolet"],
                 ["monochrome", "Prata metálica", "Grafite, cromo escovado e reflexos prateados", "profile-palette-mono"],
                 ["metallic-gold", "Ônix dourado", "Preto profundo, ouro metálico e bordas luminosas", "profile-palette-gold"],
               ] as [AccentTheme, string, string, string][]).map(([value, label, description, previewClass]) => (

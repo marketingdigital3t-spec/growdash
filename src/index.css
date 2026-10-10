@@ -553,15 +553,6 @@ html:not(.dark) {
   .profile-palette-gold .profile-palette-swatch i:nth-child(1) { background: linear-gradient(90deg, #7b4609, #ffe79c 46%, #b56d14); box-shadow: 0 0 11px rgba(245,191,66,.76); }
   .profile-palette-gold .profile-palette-swatch i:nth-child(2) { background: rgba(248,206,110,.65); }
   .profile-palette-gold .profile-palette-swatch i:nth-child(3) { background: rgba(255,240,178,.38); }
-  .profile-palette-ultraviolet .profile-palette-swatch {
-    background: radial-gradient(circle at 72% 18%, rgba(224,160,255,.48), transparent 28%), linear-gradient(135deg, #1a0038, #4b0082 52%, #2a0a52);
-    border-color: rgba(176,64,255,.7);
-    box-shadow: inset 0 1px rgba(234,217,255,.28), 0 10px 28px rgba(123,0,212,.34);
-  }
-  .profile-palette-ultraviolet .profile-palette-swatch::before { border-color: rgba(224,160,255,.72); box-shadow: inset 0 0 10px rgba(176,64,255,.22), 0 0 12px rgba(176,64,255,.24); }
-  .profile-palette-ultraviolet .profile-palette-swatch i:nth-child(1) { background: linear-gradient(90deg, #8e44ff, #ead9ff 46%, #c084fc); box-shadow: 0 0 12px rgba(176,64,255,.9); }
-  .profile-palette-ultraviolet .profile-palette-swatch i:nth-child(2) { background: rgba(192,132,252,.72); }
-  .profile-palette-ultraviolet .profile-palette-swatch i:nth-child(3) { background: rgba(234,217,255,.45); }
 
   .brand-shell {
     background:

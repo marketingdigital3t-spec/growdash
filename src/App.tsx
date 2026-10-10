@@ -179,15 +179,6 @@ function PublicOnlyRoute({ children }: { children: ReactNode }) {
 
 function AccentInitializer({ children }: { children: ReactNode }) {
   useAccentTheme();
-  useEffect(() => {
-    const syncThemeAttribute = () => {
-      document.documentElement.dataset.theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
-    };
-    syncThemeAttribute();
-    const observer = new MutationObserver(syncThemeAttribute);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
   return <>{children}</>;
 }
 
