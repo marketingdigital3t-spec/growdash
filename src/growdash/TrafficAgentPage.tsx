@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Clock3, Computer, ExternalLink, Play, Refr
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeading } from "@/growdash/shared";
 
@@ -11,12 +12,13 @@ type Runtime = { status: string; browser_status: string; computer_name: string |
 
 export default function TrafficAgentPage() {
   const { data: workspace } = useWorkspace();
+  const { adAccountId } = useGlobalFilters();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ["traffic-agent", workspace?.id],
-    enabled: Boolean(workspace?.id),
+    queryKey: ["traffic-agent", workspace?.id, adAccountId],
+    enabled: Boolean(workspace?.id && adAccountId !== "all"),
     refetchInterval: 30_000,
     queryFn: async () => {
       // The new additive tables are generated into Supabase types after the
@@ -25,7 +27,7 @@ export default function TrafficAgentPage() {
       const db = supabase as any;
       const [runtime, proposals] = await Promise.all([
         db.from("traffic_agent_runtime").select("status,browser_status,computer_name,last_heartbeat_at,last_analysis_at,next_analysis_at,last_error").eq("workspace_id", workspace!.id).maybeSingle(),
-        db.from("traffic_action_proposals").select("id,entity_name,entity_type,status,diagnosis,proposed_action,expected_impact,risk,evidence,valid_until,created_at").eq("workspace_id", workspace!.id).in("status", ["awaiting_approval", "approved", "executing", "executed", "failed"]).order("created_at", { ascending: false }).limit(30),
+        db.from("traffic_action_proposals").select("id,entity_name,entity_type,status,diagnosis,proposed_action,expected_impact,risk,evidence,valid_until,created_at").eq("workspace_id", workspace!.id).eq("ad_account_id", adAccountId).in("status", ["awaiting_approval", "approved", "executing", "executed", "failed"]).order("created_at", { ascending: false }).limit(30),
       ]);
       if (runtime.error) throw runtime.error;
       if (proposals.error) throw proposals.error;
@@ -35,11 +37,11 @@ export default function TrafficAgentPage() {
 
   const runAnalysis = async () => {
     setBusy("analysis");
-    const { data, error } = await supabase.functions.invoke("traffic-agent-analyze", { body: { trigger: "manual" } });
+    const { data, error } = await supabase.functions.invoke("traffic-agent-analyze", { body: { trigger: "manual", account_id: adAccountId } });
     setBusy(null);
     if (error || data?.status === "failed") { toast({ title: "Análise não concluída", description: error?.message || "A coleta não pôde ser concluída.", variant: "destructive" }); return; }
     toast({ title: "Análise concluída", description: `${data?.accounts_analyzed || 0} conta(s) analisada(s) e ${data?.proposals_created || 0} proposta(s) criada(s).` });
-    await qc.invalidateQueries({ queryKey: ["traffic-agent", workspace?.id] });
+    await qc.invalidateQueries({ queryKey: ["traffic-agent", workspace?.id, adAccountId] });
   };
 
   const decide = async (proposal: Proposal, decision: "approved" | "rejected" | "revision_requested") => {
@@ -49,7 +51,7 @@ export default function TrafficAgentPage() {
     setBusy(null);
     if (error) { toast({ title: "Decisão não registrada", description: error.message, variant: "destructive" }); return; }
     toast({ title: decision === "approved" ? "Aprovação registrada" : decision === "rejected" ? "Proposta rejeitada" : "Proposta devolvida", description: decision === "approved" ? "O runner local executará somente esta proposta aprovada." : "Nenhuma alteração foi enviada à Meta." });
-    await qc.invalidateQueries({ queryKey: ["traffic-agent", workspace?.id] });
+    await qc.invalidateQueries({ queryKey: ["traffic-agent", workspace?.id, adAccountId] });
   };
 
   const runtime = query.data?.runtime;
@@ -58,7 +60,8 @@ export default function TrafficAgentPage() {
   const online = runtime?.status && runtime.status !== "offline" && runtime.last_heartbeat_at && Date.now() - new Date(runtime.last_heartbeat_at).getTime() < 5 * 60_000;
 
   return <div className="mx-auto max-w-[1500px]">
-    <PageHeading eyebrow="Tráfego pago autônomo" title="Gestor de tráfego" description="Opera com playbooks de performance para estética, prioriza vendas do RD e executa apenas ações dentro dos guardrails configurados." actions={<button type="button" className="gd-button" onClick={runAnalysis} disabled={busy === "analysis"}><Play className={busy === "analysis" ? "h-4 w-4 animate-pulse" : "h-4 w-4"} /> Analisar agora</button>} />
+    <PageHeading eyebrow="Tráfego pago autônomo" title="Gestor de tráfego" description="Opera com playbooks de performance para estética, prioriza vendas do RD e executa apenas ações dentro dos guardrails configurados." actions={<button type="button" className="gd-button" onClick={runAnalysis} disabled={busy === "analysis" || adAccountId === "all"}><Play className={busy === "analysis" ? "h-4 w-4 animate-pulse" : "h-4 w-4"} /> Analisar agora</button>} />
+    {adAccountId === "all" && <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-700">Selecione uma única conta Meta no filtro superior para analisar e visualizar somente o gestor dessa conta.</div>}
     <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Summary icon={<Computer />} label="Computador local" value={online ? "Online" : "Offline"} note={runtime?.computer_name || "Runner não conectado"} tone={online ? "ok" : "warn"} />
       <Summary icon={<ShieldCheck />} label="Modo operacional" value="Aprovação obrigatória" note="Análise autônoma; execução autorizada por você" tone="ok" />
@@ -67,7 +70,7 @@ export default function TrafficAgentPage() {
     </div>
     {runtime?.last_error && <div className="mb-5 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm"><AlertTriangle className="h-4 w-4 text-red-500" />{runtime.last_error}</div>}
     <section className="gd-panel overflow-hidden">
-      <header className="flex flex-col gap-2 border-b border-border/60 p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Solicitações e auditoria</h2><p className="text-xs text-muted-foreground">A fonte comercial é o RD Station; a entrega e o gasto vêm da Meta. O gestor propõe; só sua aprovação libera a execução.</p></div><button type="button" className="gd-button-secondary sm:ml-auto" onClick={() => void qc.invalidateQueries({ queryKey: ["traffic-agent", workspace?.id] })}><RefreshCw className="h-4 w-4" /> Atualizar</button></header>
+      <header className="flex flex-col gap-2 border-b border-border/60 p-4 sm:flex-row sm:items-center"><div><h2 className="font-black">Solicitações e auditoria</h2><p className="text-xs text-muted-foreground">A fonte comercial é o RD Station; a entrega e o gasto vêm da Meta. O gestor propõe; só sua aprovação libera a execução.</p></div><button type="button" className="gd-button-secondary sm:ml-auto" onClick={() => void qc.invalidateQueries({ queryKey: ["traffic-agent", workspace?.id, adAccountId] })}><RefreshCw className="h-4 w-4" /> Atualizar</button></header>
       {!query.data && query.isLoading ? <div className="p-6 text-sm text-muted-foreground">Carregando propostas…</div> : proposals.length === 0 ? <div className="p-6 text-sm text-muted-foreground">Nenhuma proposta aguardando decisão. Execute uma análise para criar recomendações.</div> : <div className="divide-y divide-border/60">{proposals.map((proposal) => <ProposalCard key={proposal.id} proposal={proposal} busy={busy === proposal.id} onDecide={decide} />)}</div>}
     </section>
     <p className="mt-4 text-xs text-muted-foreground">O runner local mantém o computador visível e o heartbeat. Nenhuma alteração é enviada à Meta antes da sua aprovação registrada; sessão, captcha, rate limit ou divergência Meta/RD também bloqueiam a ação.</p>

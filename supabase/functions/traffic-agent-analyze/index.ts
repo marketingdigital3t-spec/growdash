@@ -51,6 +51,8 @@ Deno.serve(async (req) => {
   if (!auth) return json({ error: "Unauthorized" }, 401);
   const { user } = auth;
   const body = await req.json().catch(() => ({}));
+  const selectedAccountId = typeof body.account_id === "string" ? body.account_id : "";
+  if (!selectedAccountId) return json({ error: "ACCOUNT_SELECTION_REQUIRED" }, 400);
   const start = typeof body.start_date === "string" ? body.start_date : day(7);
   const end = typeof body.end_date === "string" ? body.end_date : day(1);
   const trigger = body.trigger === "manual" ? "manual" : "scheduled";
@@ -60,7 +62,7 @@ Deno.serve(async (req) => {
   if (settings?.execution_mode === "paused") return json({ status: "paused", reason: "EXECUTION_PAUSED" });
 
   await admin.from("traffic_agent_runtime").upsert({ workspace_id: workspace.id, status: "analyzing", browser_status: "disconnected", last_heartbeat_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-  const { data: accounts, error: accountsError } = await admin.from("ad_accounts").select("id,account_id,name,access_token,connection_status").eq("user_id", user.id);
+  const { data: accounts, error: accountsError } = await admin.from("ad_accounts").select("id,account_id,name,access_token,connection_status").eq("user_id", user.id).eq("id", selectedAccountId);
   if (accountsError) return json({ status: "failed", error: "ACCOUNT_QUERY_FAILED" }, 500);
 
   const actions: string[] = [];
