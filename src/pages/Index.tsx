@@ -361,8 +361,8 @@ const Index = () => {
   }, [cancelDashboardEdit, draftView, editorItems, isEditing, resetDashboardEdit, saveDashboardEdit, saveView.isPending, setEditor, toggleDashboardWidget]);
 
   return (
-    <MotionPage className="dashboard-page mx-auto w-full min-w-0 max-w-[1680px] space-y-4 px-1 sm:space-y-6 sm:px-2">
-      <MotionItem className="mx-3">
+    <MotionPage className="dashboard-page gd-module-shell mx-auto w-full min-w-0 max-w-[1700px] space-y-5">
+      <MotionItem>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -374,15 +374,15 @@ const Index = () => {
         </div>
       </MotionItem>
 
-      <div className="mx-3">
+      <div>
         <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
       </div>
 
-      <div className="mx-3">
+      <div>
         <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
       </div>
 
-      <div className="mx-3">
+      <div>
         <TrafficClassAlerts classes={eventClasses} insights={dashboardInsights} />
       </div>
 

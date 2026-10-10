@@ -482,7 +482,7 @@ export default function GrowdashLayout() {
           {(pathname === "/" || pathname === "/painel-expert") && <SpaceMissionStrip phase={spacePhase} realized={goalRevenue} target={goalTarget} />}
           <div
             className={cn(
-              "growdash-content-frame mx-auto w-full min-w-0 max-w-[1920px]",
+              "growdash-content-frame gd-layout-canvas mx-auto w-full min-w-0 max-w-[1920px]",
               isCampaignsWorkspace && "md:flex md:h-full md:min-h-0 md:flex-col md:overflow-hidden",
             )}
           >

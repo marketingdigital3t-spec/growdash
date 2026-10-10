@@ -9248,3 +9248,104 @@ body,
     scroll-behavior: auto !important;
   }
 }
+
+/* -------------------------------------------------------------------------
+   Shared page alignment contract
+
+   Funnel Analysis is the reference layout: one centered canvas, one
+   horizontal axis for heading/filters/content, and predictable vertical
+   rhythm. This final layer wins over legacy module-specific widths without
+   touching full-height workspaces or immersive pages.
+   ------------------------------------------------------------------------- */
+.brand-shell .gd-layout-canvas {
+  width: 100%;
+  min-width: 0;
+}
+
+.brand-shell .gd-page-transition > :where(
+  .dashboard-page,
+  .gd-module-shell,
+  .expert-dashboard,
+  .crm-page,
+  .commercial-ranking-shell,
+  .finance-page,
+  .kanban-page,
+  .integrations-page,
+  .strategy-page,
+  .storage-page,
+  .business-page,
+  .whatsapp-page,
+  .event-classes-page,
+  .agenda-page,
+  .analytics-module,
+  .historical-module
+) {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 1700px !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+  padding-inline: 0 !important;
+}
+
+.brand-shell .gd-page-transition > :where(
+  .dashboard-page,
+  .gd-module-shell,
+  .expert-dashboard,
+  .crm-page,
+  .commercial-ranking-shell,
+  .finance-page,
+  .kanban-page,
+  .integrations-page,
+  .strategy-page,
+  .storage-page,
+  .business-page,
+  .whatsapp-page,
+  .event-classes-page,
+  .agenda-page,
+  .analytics-module,
+  .historical-module
+) > * {
+  min-width: 0;
+}
+
+.brand-shell .gd-page-transition > :where(.dashboard-page, .gd-module-shell, .expert-dashboard) {
+  display: flow-root;
+}
+
+.brand-shell .dashboard-page > .dashboard-grid-container,
+.brand-shell .dashboard-page > .dashboard-section,
+.brand-shell .dashboard-page > .gd-page-section {
+  width: 100%;
+  min-width: 0;
+  margin-inline: 0 !important;
+}
+
+.brand-shell .dashboard-page > * + *,
+.brand-shell .gd-module-shell > * + *,
+.brand-shell .expert-dashboard > * + * {
+  margin-top: var(--gd-space-section) !important;
+}
+
+@media (max-width: 767px) {
+  .brand-shell .gd-page-transition > :where(
+    .dashboard-page,
+    .gd-module-shell,
+    .expert-dashboard,
+    .crm-page,
+    .commercial-ranking-shell,
+    .finance-page,
+    .kanban-page,
+    .integrations-page,
+    .strategy-page,
+    .storage-page,
+    .business-page,
+    .whatsapp-page,
+    .event-classes-page,
+    .agenda-page,
+    .analytics-module,
+    .historical-module
+  ) {
+    max-width: none !important;
+  }
+}
