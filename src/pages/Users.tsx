@@ -151,6 +151,8 @@ export default function UsersPage() {
       if (editing) {
         body.target_user_id = editing.user_id;
         if (form.password) body.password = form.password;
+      } else {
+        body.password = form.password;
       }
       const { data, error } = await supabase.functions.invoke("admin-create-user", { body });
       if (error) throw new Error(await readableFunctionError(error));
@@ -343,6 +345,7 @@ export default function UsersPage() {
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder={editing ? "Deixe vazio para manter" : "min. 6 caracteres"}
+                minLength={editing ? undefined : 6}
               />
               {!editing && <p className="mt-1 text-xs text-muted-foreground">O sistema não enviará e-mail. Copie os dados e envie manualmente.</p>}
               {!editing && <div className="mt-2 flex flex-wrap gap-2">
