@@ -123,29 +123,34 @@ export function useWorkspace() {
           throw bootstrapError;
         }
 
-        const { data: workspace, error: workspaceError } = await withRequestTimeout(
-          (supabase as any)
-            .from("workspaces")
-            .select("id, name, currency, timezone")
-            .eq("id", workspaceId)
-            .single(),
-        );
-        const { data: membership, error: memberError } = await withRequestTimeout(
-          (supabase as any)
-            .from("workspace_members")
-            .select("role")
-            .eq("workspace_id", workspaceId)
-            .eq("user_id", user!.id)
-            .single(),
-        );
-        const { data: units, error: unitsError } = await withRequestTimeout(
-          (supabase as any)
-            .from("business_units")
-            .select("id, workspace_id, kind, name, is_active")
-            .eq("workspace_id", workspaceId)
-            .eq("is_active", true)
-            .order("kind"),
-        );
+        // These reads are independent once the workspace id is known. Running
+        // them together avoids making the shell wait for three sequential
+        // network round trips on every cold session.
+        const [{ data: workspace, error: workspaceError }, { data: membership, error: memberError }, { data: units, error: unitsError }] = await Promise.all([
+          withRequestTimeout(
+            (supabase as any)
+              .from("workspaces")
+              .select("id, name, currency, timezone")
+              .eq("id", workspaceId)
+              .single(),
+          ),
+          withRequestTimeout(
+            (supabase as any)
+              .from("workspace_members")
+              .select("role")
+              .eq("workspace_id", workspaceId)
+              .eq("user_id", user!.id)
+              .single(),
+          ),
+          withRequestTimeout(
+            (supabase as any)
+              .from("business_units")
+              .select("id, workspace_id, kind, name, is_active")
+              .eq("workspace_id", workspaceId)
+              .eq("is_active", true)
+              .order("kind"),
+          ),
+        ]);
 
         if (workspaceError) throw workspaceError;
         if (memberError) throw memberError;
