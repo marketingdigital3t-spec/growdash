@@ -96,9 +96,17 @@ export function useExpertOperations(
       return ((data || []) as ExpertOperationSale[]).filter((row) => isPaidOperationStatus(row.status));
     },
   });
+  // Prefer the explicit funnels configured for this expert operation in
+  // addition to the global account-derived scope. Connection-imported RD
+  // deals often have no direct ad_account_id, so omitting these configured
+  // funnels silently removes valid sales and their revenue from this panel.
+  const operationFunnelIds = useMemo(() => Array.from(new Set([
+    ...(globalFilters.funnelIds || []),
+    ...(sources.data || []).flatMap((source: any) => [source.student_funnel_id, source.model_patient_funnel_id]),
+  ].filter((id): id is string => Boolean(id)))), [globalFilters.funnelIds, sources.data]);
   const rdWonDeals = useRDWonDealsForPeriod({
     adAccountIds: selectedAccountIds,
-    funnelIds: globalFilters.funnelIds,
+    funnelIds: operationFunnelIds,
     startDate,
     endDate,
     allHistory: globalFilters.preset === "max",
