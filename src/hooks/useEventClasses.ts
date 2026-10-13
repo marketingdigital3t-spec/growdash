@@ -139,6 +139,35 @@ export function useRestoreEventClass() {
 }
 
 export function useEventClassParticipants(eventClassId: string | null, type: MemberType) { return useQuery({ queryKey: ["event_class_participants", eventClassId, type], enabled: !!eventClassId, queryFn: async () => { const { data, error } = await supabase.from("event_class_participants").select("*").eq("event_class_id", eventClassId!).eq("participant_type", type).order("created_at", { ascending: true }); if (error) throw error; return (data || []) as unknown as EventClassParticipant[]; } }); }
-export function useCreateEventClassParticipant() { const qc = useQueryClient(); return useMutation({ mutationFn: async (input: { event_class_id: string; participant_type: MemberType; name: string; investment_cents: number; notes?: string | null }) => { const name = input.name.trim(); if (!name) throw new Error("Informe o nome do participante."); const { data, error } = await supabase.from("event_class_participants").insert({ ...input, name }).select().single(); if (error) throw error; return data as unknown as EventClassParticipant; }, onSuccess: (_, vars) => { qc.invalidateQueries({ queryKey: ["event_classes"] }); qc.invalidateQueries({ queryKey: ["event_class_participants", vars.event_class_id] }); } }); }
-export function useUpdateEventClassParticipant() { const qc = useQueryClient(); return useMutation({ mutationFn: async ({ id, event_class_id, name, investment_cents, notes }: { id: string; event_class_id: string; name: string; investment_cents: number; notes?: string | null }) => { const { data, error } = await supabase.from("event_class_participants").update({ name: name.trim(), investment_cents, notes: notes || null }).eq("id", id).select().single(); if (error) throw error; return data as unknown as EventClassParticipant; }, onSuccess: (_, vars) => { qc.invalidateQueries({ queryKey: ["event_classes"] }); qc.invalidateQueries({ queryKey: ["event_class_participants", vars.event_class_id] }); } }); }
-export function useDeleteEventClassParticipant() { const qc = useQueryClient(); return useMutation({ mutationFn: async ({ id, eventClassId }: { id: string; eventClassId: string }) => { const { error } = await supabase.from("event_class_participants").delete().eq("id", id); if (error) throw error; }, onSuccess: (_, vars) => { qc.invalidateQueries({ queryKey: ["event_classes"] }); qc.invalidateQueries({ queryKey: ["event_class_participants", vars.eventClassId] }); } }); }
+function updateParticipantCaches(queryClient: ReturnType<typeof useQueryClient>, eventClassId: string, participantType: MemberType, participant: EventClassParticipant, operation: "add" | "update" | "remove") {
+  const participantKey = ["event_class_participants", eventClassId, participantType] as const;
+  queryClient.setQueryData<EventClassParticipant[]>(participantKey, (current = []) => {
+    if (operation === "add") return current.some((row) => row.id === participant.id) ? current : [...current, participant];
+    if (operation === "remove") return current.filter((row) => row.id !== participant.id);
+    return current.map((row) => row.id === participant.id ? participant : row);
+  });
+
+  const updateClass = (current: any[] | undefined) => current?.map((eventClass) => {
+    if (eventClass.id !== eventClassId) return eventClass;
+    const participants = Array.isArray(eventClass.participants) ? eventClass.participants : [];
+    const nextParticipants = operation === "add"
+      ? (participants.some((row: EventClassParticipant) => row.id === participant.id) ? participants : [...participants, participant])
+      : operation === "remove"
+        ? participants.filter((row: EventClassParticipant) => row.id !== participant.id)
+        : participants.map((row: EventClassParticipant) => row.id === participant.id ? participant : row);
+    const studentCount = nextParticipants.filter((row: EventClassParticipant) => row.participant_type === "student").length;
+    const modelPatientCount = nextParticipants.filter((row: EventClassParticipant) => row.participant_type === "model_patient").length;
+    return { ...eventClass, participants: nextParticipants, studentCount, modelPatientCount, manual_student_count: studentCount, manual_model_patient_count: modelPatientCount };
+  });
+
+  queryClient.setQueriesData({ queryKey: ["event_classes"] }, updateClass);
+  queryClient.setQueriesData({ queryKey: ["expert-operation-classes"] }, updateClass);
+  // The cache now reflects the write. Mark aggregate queries stale for the next
+  // screen visit without refetching the full inventory while the dialog is open.
+  void queryClient.invalidateQueries({ queryKey: ["event_classes"], refetchType: "none" });
+  void queryClient.invalidateQueries({ queryKey: ["expert-operation-classes"], refetchType: "none" });
+}
+
+export function useCreateEventClassParticipant() { const qc = useQueryClient(); return useMutation({ mutationFn: async (input: { event_class_id: string; participant_type: MemberType; name: string; investment_cents: number; notes?: string | null }) => { const name = input.name.trim(); if (!name) throw new Error("Informe o nome do participante."); const { data, error } = await supabase.from("event_class_participants").insert({ ...input, name }).select().single(); if (error) throw error; return data as unknown as EventClassParticipant; }, onSuccess: (participant) => { updateParticipantCaches(qc, participant.event_class_id, participant.participant_type, participant, "add"); } }); }
+export function useUpdateEventClassParticipant() { const qc = useQueryClient(); return useMutation({ mutationFn: async ({ id, event_class_id, name, investment_cents, notes }: { id: string; event_class_id: string; name: string; investment_cents: number; notes?: string | null }) => { const { data, error } = await supabase.from("event_class_participants").update({ name: name.trim(), investment_cents, notes: notes || null }).eq("id", id).select().single(); if (error) throw error; return data as unknown as EventClassParticipant; }, onSuccess: (participant) => { updateParticipantCaches(qc, participant.event_class_id, participant.participant_type, participant, "update"); } }); }
+export function useDeleteEventClassParticipant() { const qc = useQueryClient(); return useMutation({ mutationFn: async ({ id, eventClassId }: { id: string; eventClassId: string }) => { const { data, error } = await supabase.from("event_class_participants").delete().eq("id", id).select().single(); if (error) throw error; return { ...data, eventClassId } as unknown as EventClassParticipant & { eventClassId: string }; }, onSuccess: (participant) => { updateParticipantCaches(qc, participant.eventClassId, participant.participant_type, participant, "remove"); } }); }
