@@ -7,7 +7,7 @@ import { useTheme } from "next-themes";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePlans, useWorkspace, useWorkspaceSubscription } from "@/hooks/useWorkspace";
+import { usePlans, useWorkspace, useWorkspaceAccessState, useWorkspaceSubscription } from "@/hooks/useWorkspace";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeading } from "./shared";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,6 +33,7 @@ export default function ProfilePage() {
   const { data: workspace } = useWorkspace();
   const { data: plans = [] } = usePlans();
   const { data: subscription } = useWorkspaceSubscription(workspace?.id);
+  const { data: accessState } = useWorkspaceAccessState(workspace?.id);
   const [form, setForm] = useState({ full_name: "", phone: "", gender: "", job_title: "", avatar_url: "", density: "comfortable" });
   const [email, setEmail] = useState(user?.email ?? "");
   const [password, setPassword] = useState("");
@@ -200,6 +201,8 @@ export default function ProfilePage() {
             <div><p className="text-[10px] font-black uppercase tracking-[.18em] text-primary">Plano atual</p><h2 className="mt-1 text-2xl font-black">{currentPlan?.name ?? "Carregando…"}</h2><p className="text-xs text-muted-foreground">Status: {subscription?.status ?? "—"} · Workspace: {workspace?.name ?? "—"}</p></div>
             {currentPlan && <div className="text-2xl font-black">{brl.format(Number(currentPlan.monthly_price))}<span className="text-xs font-medium text-muted-foreground">/mês</span></div>}
           </div>
+          {accessState && !accessState.access_allowed && <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200"><b>Acesso limitado:</b> {accessState.reason === "trial_expired" ? "seu período de teste terminou." : accessState.reason === "payment_past_due" ? "há um pagamento pendente." : "a assinatura não está ativa."} Regularize o plano para liberar novas operações.</div>}
+          {accessState?.access_allowed && accessState.subscription_status === "trialing" && accessState.trial_ends_at && <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm"><b>Período de teste ativo:</b> termina em {new Date(accessState.trial_ends_at).toLocaleDateString("pt-BR")}.</div>}
           <div className="gd-auto-grid gap-4">
             {plans.map((plan: any) => {
               const current = plan.code === subscription?.plan_code;

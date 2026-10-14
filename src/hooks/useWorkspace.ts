@@ -92,6 +92,17 @@ export interface WorkspaceFoundation {
   units: WorkspaceUnit[];
 }
 
+export interface WorkspaceAccessState {
+  workspace_id: string;
+  plan_code: string;
+  subscription_status: string;
+  access_allowed: boolean;
+  reason: string;
+  trial_ends_at: string | null;
+  current_period_ends_at: string | null;
+  entitlements: Record<string, number>;
+}
+
 export function useWorkspace() {
   const { user } = useAuth();
 
@@ -220,6 +231,28 @@ export function useWorkspaceSubscription(workspaceId?: string) {
           current_period_ends_at: null,
         };
       }
+    },
+  });
+}
+
+/**
+ * Estado efetivo de acesso calculado no banco. Componentes que iniciam uma
+ * operação limitada devem consultar este estado; o catálogo de planos sozinho
+ * não é uma autorização.
+ */
+export function useWorkspaceAccessState(workspaceId?: string) {
+  return useQuery<WorkspaceAccessState | null>({
+    queryKey: ["workspace-access-state", workspaceId],
+    enabled: !!workspaceId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .rpc("get_workspace_access_state", { _workspace_id: workspaceId });
+      if (error) {
+        if (schemaIsPending(error)) return null;
+        throw error;
+      }
+      return Array.isArray(data) ? (data[0] ?? null) : data;
     },
   });
 }
