@@ -102,7 +102,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           timezone,
           attributionWindow,
           includeMeta: true,
-          includeRD: true,
+          includeRD: false,
           includeBalance: false,
           fast: true,
           syncMode: "recent_window" as const,
@@ -133,6 +133,28 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           }
         }
         invalidateLiveQueries();
+
+        // RD is intentionally isolated from the selected Meta response. A
+        // large CRM funnel must never delay or fail the visible ad snapshot;
+        // its recent-window reconciliation still runs silently and Realtime
+        // invalidates the CRM queries when rows arrive.
+        void supabase.functions.invoke("controlled-realtime-sync", {
+          body: {
+            ...selectedBody,
+            includeMeta: false,
+            includeRD: true,
+            includeBalance: false,
+            fast: false,
+          },
+        }).then(({ data: rdData, error: rdError }) => {
+          if (rdError || rdData?.error || rdData?.rd_status === "failed") {
+            console.warn("[near-realtime-sync] RD reconciliation", rdError || rdData?.error);
+            return;
+          }
+          invalidateLiveQueries();
+        }).catch((rdError) => {
+          console.warn("[near-realtime-sync] RD reconciliation", rdError);
+        });
 
       } catch (error) {
         // Falha silenciosa: o histórico armazenado permanece visível e uma nova
