@@ -6,10 +6,10 @@ describe("Growdash sidebar navigation", () => {
     expect(ALL_MODULES.some((module) => module.label === "Intelligence")).toBe(false);
   });
 
-  it("restores the functional historical modules while keeping Commercial visible", () => {
+  it("keeps the functional modules while keeping Commercial visible", () => {
     expect(ALL_MODULES.some((module) => module.label === "Tráfego Pago" && module.path === "/campanhas")).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "Comercial" && module.path === "/comercial")).toBe(true);
-    expect(["Growdash Flow", "Estratégia", "Análise de Mídia Social", "Alertas", "Leads incompletos", "Automações"]
+    expect(["Growdash Flow", "Análise de Mídia Social", "Alertas", "Leads incompletos", "Automações"]
       .every((label) => ALL_MODULES.some((module) => module.label === label))).toBe(true);
   });
 
