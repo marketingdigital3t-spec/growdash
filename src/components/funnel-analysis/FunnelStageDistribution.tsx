@@ -87,8 +87,8 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
       </CardHeader>
       <CardContent>
         {visualMode ? (
-          <div className="flex flex-col items-center gap-2 py-2" aria-label="Funil visual por etapa">
-            <div className="flex w-full max-w-2xl flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-3 py-2" aria-label="Funil visual por etapa">
+            <div className="w-full max-w-5xl rounded-2xl border border-border/50 bg-background/30 px-2 py-4 sm:px-5 sm:py-6">
               <TooltipProvider delayDuration={250}>
                 {stages.map((stage, index) => {
                   const width = funnelStageVisualWidth(index, visualStageCount);
@@ -96,12 +96,17 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                   const avgTime = stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "Indisponível";
                   const negotiationValue = stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Nenhum valor";
                   const accessibleDescription = `${stage.name}: ${stage.count} leads, ${stage.pct.toFixed(1)}% do total. Tempo médio: ${avgTime}. Valor em negociação: ${negotiationValue}.`;
-                  return (
-                    <StageTooltip key={stage.rd_stage_id}>
+                  const stageLabel = <div className={`hidden min-w-0 items-center gap-2 text-xs sm:flex ${index % 2 === 0 ? "justify-end text-right" : "justify-start text-left"}`}>
+                      {index % 2 === 0 ? <><span className="min-w-0"><b className="block truncate text-foreground">{stage.name}</b><span className="text-muted-foreground">{stage.count} leads · {stage.pct.toFixed(1)}%</span></span><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} /></> : <><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} /><span className="min-w-0"><b className="block truncate text-foreground">{stage.name}</b><span className="text-muted-foreground">{stage.count} leads · {stage.pct.toFixed(1)}%</span></span></>}
+                    </div>;
+                    return (
+                    <div key={stage.rd_stage_id} className="grid grid-cols-[minmax(0,1fr)_minmax(180px,2.4fr)_minmax(0,1fr)] items-center gap-2 sm:gap-4">
+                    {index % 2 === 0 ? stageLabel : <span />}
+                    <StageTooltip>
                       <StageTooltipTrigger asChild>
                         <div
                           tabIndex={0}
-                          className="flex min-h-14 cursor-help items-center justify-center px-4 text-center text-xs font-semibold text-white shadow-sm outline-none transition-[width,filter] duration-300 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          className="mx-auto flex min-h-12 cursor-help items-center justify-center px-3 text-center text-[11px] font-semibold text-white shadow-sm outline-none transition-[width,filter] duration-300 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-14 sm:px-4 sm:text-xs"
                           style={{ width: `${width}%`, background: color, clipPath: "polygon(4% 0, 96% 0, 100% 100%, 0 100%)" }}
                           aria-label={accessibleDescription}
                         >
@@ -115,6 +120,8 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                         <p>Valor em negociação: {negotiationValue}</p>
                       </StageTooltipContent>
                     </StageTooltip>
+                    {index % 2 === 1 ? stageLabel : <span />}
+                    </div>
                   );
                 })}
               </TooltipProvider>
