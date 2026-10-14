@@ -8739,6 +8739,20 @@ html:not(.dark) .dashboard-scope-sync {
   filter: brightness(.88) saturate(1.24) contrast(1.08) !important;
 }
 
+/* O menu do Dashboard cabe inteiro na altura disponível. Não transforme a
+   barra lateral em uma segunda área de rolagem nessa rota; outras telas e o
+   menu móvel mantêm o overflow para acomodar listas maiores. */
+@media (min-width: 1024px) {
+  .brand-shell[data-dashboard-scene="true"] .brand-sidebar nav {
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .brand-shell[data-dashboard-scene="true"] .brand-sidebar nav::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Low-density trajectories converge on the Earth area without covering the
    controls. The two Terra meteors are enough to keep the scene alive. */
 .brand-shell[data-dashboard-scene="true"] .space-phase-meteors {
