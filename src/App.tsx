@@ -54,6 +54,7 @@ const PublicBrandDiagnosticForm = lazyWithRetry(() => import("@/pages/PublicBran
 const PublicExpertQuestionnaire = lazyWithRetry(() => import("@/pages/PublicExpertQuestionnaire"), "public-expert-questionnaire");
 const ExpertDashboard = lazyWithRetry(() => import("@/pages/ExpertDashboard"), "expert-dashboard");
 const WhatsApp = lazyWithRetry(() => import("@/pages/WhatsApp"), "whatsapp");
+const LegalPage = lazyWithRetry(() => import("@/pages/LegalPage"), "legal");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -246,6 +247,12 @@ export default function App() {
                 <AppErrorBoundary>
                   <Suspense fallback={<LoadingModule />}>
                     <Routes>
+                  <Route path="/termos" element={<LegalPage />} />
+                  <Route path="/privacidade" element={<LegalPage />} />
+                  <Route path="/cookies" element={<LegalPage />} />
+                  <Route path="/dpa" element={<LegalPage />} />
+                  <Route path="/sla" element={<LegalPage />} />
+                  <Route path="/cancelamento" element={<LegalPage />} />
                   <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/relatorios/:shareToken" element={<SharedLeadReport />} />

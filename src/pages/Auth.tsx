@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { BarChart3, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ export default function Auth() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [remember, setRemember] = useState(true);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -41,6 +42,7 @@ export default function Auth() {
       return;
     }
     if (mode === "register" && password !== confirmPassword) { toast({ title: "As senhas não coincidem", variant: "destructive" }); return; }
+    if (mode === "register" && !legalAccepted) { toast({ title: "Aceite os documentos legais", description: "Leia e aceite os Termos de Uso e a Política de Privacidade para criar sua conta.", variant: "destructive" }); return; }
     setLoading(true);
     if (mode === "login") {
       let error: { status?: number; message?: string } | null = null;
@@ -76,7 +78,10 @@ export default function Auth() {
     const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim() } } });
     setLoading(false);
     if (error) { toast({ title: "Não foi possível criar a conta", description: authErrorMessage(error), variant: "destructive" }); return; }
-    if (data.session) navigate("/", { replace: true });
+    if (data.session) {
+      await (supabase as any).rpc("record_legal_consent", { _terms_version: "1.0", _privacy_version: "1.0" });
+      navigate("/", { replace: true });
+    }
     else toast({ title: "Cadastro realizado", description: "Confirme seu email para acessar a Growdash." });
   }
 
@@ -131,12 +136,14 @@ export default function Auth() {
         <PremiumInput label="E-mail" icon={<Mail />} type="email" value={identifier} onChange={setIdentifier} placeholder="seu@email.com" autoComplete="email" />
         <PremiumInput label="Senha" icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={password} onChange={setPassword} placeholder="••••••••" autoComplete={mode === "login" ? "current-password" : "new-password"} trailing={<button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button>} />
         {mode === "register" && <PremiumInput icon={<LockKeyhole />} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirmar senha" autoComplete="new-password" />}
+        {mode === "register" && <label className="flex items-start gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={legalAccepted} onChange={(event) => setLegalAccepted(event.target.checked)} required className="mt-0.5" /><span>Li e aceito os <Link to="/termos" target="_blank" className="font-bold text-primary hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="font-bold text-primary hover:underline">Política de Privacidade</Link>.</span></label>}
         {mode === "login" && <div className="auth-forgot-row"><label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />Lembrar de mim</label><button type="button" onClick={() => { setForgotOpen((value) => !value); setForgotEmail(identifier.includes("@") ? identifier : ""); }} className="auth-link">Esqueceu a senha?</button></div>}
         {forgotOpen && <div className="auth-recovery-box"><p>Recupere a senha ou entre sem senha por um link enviado ao seu email.</p><div className="auth-recovery-row"><input type="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} placeholder="seu@email.com" /><button type="button" onClick={recover} disabled={loading}>Redefinir senha</button></div><button type="button" onClick={sendAccessLink} disabled={loading} className="auth-link mt-3 w-full text-center">Enviar link de acesso sem senha</button></div>}
         <button type="submit" disabled={loading} className="auth-submit-button">{loading ? "Entrando…" : mode === "login" ? "Entrar" : "Criar conta"}</button>
       </form>
       <div className="auth-divider"><span />ou continue com<span /></div>
       <div className="auth-social-grid"><button type="button" onClick={() => social("google")}><span className="auth-google-mark">G</span>Continuar com Google</button><button type="button" onClick={() => social("apple")}><span className="auth-apple-mark" aria-hidden="true"></span>Continuar com iCloud</button></div>
+      <p className="mt-5 text-center text-xs text-muted-foreground"><Link to="/cookies" className="hover:text-primary hover:underline">Cookies</Link> · <Link to="/cancelamento" className="hover:text-primary hover:underline">Cancelamento e reembolso</Link> · <Link to="/sla" className="hover:text-primary hover:underline">Suporte</Link></p>
     </motion.section>
   </main>;
 }
