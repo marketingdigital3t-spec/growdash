@@ -4,6 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toLocalDateString } from "@/lib/dateRange";
 import { withRequestTimeout } from "@/lib/resilience";
 import { canonicalSaleKey, dedupeCanonicalSales } from "@/lib/canonicalSales";
+import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
+import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 
 
 export interface Sale {
@@ -85,10 +88,18 @@ interface UseSalesParams {
 export { canonicalSaleKey, dedupeCanonicalSales };
 
 export function useSales(params?: UseSalesParams) {
+  const rdScope = useResolvedRDAccountFunnelScope({
+    adAccountId: params?.adAccountId,
+    adAccountIds: params?.adAccountIds,
+    funnelIds: params?.funnelIds,
+  });
+  const selectedAccountIds = Array.from(new Set([...(params?.adAccountIds ?? []), ...(params?.adAccountId ? [params.adAccountId] : [])].filter((id) => id && id !== "all")));
   return useQuery({
-    queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, params?.adAccountId, params?.adAccountIds?.slice().sort().join(","), params?.funnelIds?.slice().sort().join(",")],
-    enabled: params?.enabled !== false,
+    queryKey: ["sales", params?.startDate?.toISOString(), params?.endDate?.toISOString(), params?.productId, selectedAccountIds.slice().sort().join(","), rdScope.funnelIds?.slice().sort().join(",")],
+    enabled: params?.enabled !== false && rdScope.ready,
     queryFn: async () => {
+      if (rdScope.error) throw rdScope.error;
+      const resolvedFunnelIds = rdScope.funnelIds?.filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID) ?? [];
       let query = supabase.from("sales").select("*").order("sale_date", { ascending: false });
 
       if (params?.startDate) {
@@ -101,12 +112,18 @@ export function useSales(params?: UseSalesParams) {
       if (params?.productId && params.productId !== "all") {
         query = query.eq("product_id", params.productId);
       }
-      if (params?.adAccountIds?.length) {
-        query = query.in("ad_account_id", params.adAccountIds);
-      } else if (params?.adAccountId && params.adAccountId !== "all") {
-        query = query.eq("ad_account_id", params.adAccountId);
+      // RD materialization can link a sale through the selected account OR
+      // its resolved funnel. Requiring both columns incorrectly drops sales
+      // imported from a connection, where ad_account_id is legitimately null.
+      if (selectedAccountIds.length) {
+        const scopeFilters = [
+          `ad_account_id.in.(${selectedAccountIds.join(",")})`,
+          ...(resolvedFunnelIds.length ? [`rd_funnel_id.in.(${resolvedFunnelIds.join(",")})`] : []),
+        ];
+        query = query.or(scopeFilters.join(","));
+      } else if (resolvedFunnelIds.length) {
+        query = query.in("rd_funnel_id", resolvedFunnelIds);
       }
-      if (params?.funnelIds?.length) query = query.in("rd_funnel_id", params.funnelIds);
 
       // Paginar para evitar o corte de 1000 linhas do Supabase.
       const PAGE = 1000;
@@ -120,7 +137,10 @@ export function useSales(params?: UseSalesParams) {
         all = all.concat(batch);
         if (batch.length < PAGE) break;
       }
-      return dedupeCanonicalSales(all);
+      const scoped = selectedAccountIds.length
+        ? all.filter((sale) => isDealInRDAccountOrFunnelScope(sale, selectedAccountIds, resolvedFunnelIds))
+        : all;
+      return dedupeCanonicalSales(scoped);
     },
     refetchOnWindowFocus: false,
   });
