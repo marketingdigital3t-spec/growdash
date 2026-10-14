@@ -6046,6 +6046,35 @@ html[data-accent="metallic-gold"]:not(.dark) :is(.gd-panel, .gd-metric-card, .da
   border-color: rgba(121,91,34,.22) !important;
 }
 
+/* Paid-traffic intelligence is content, not chrome. Keep its cards and chart
+   surfaces tied to the active light/dark theme so a theme switch cannot leave
+   black panels with black text behind. */
+html:not(.dark) .campaign-analysis-shell {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background) / .82);
+}
+html:not(.dark) .campaign-analysis-shell .campaign-analysis-header {
+  background: hsl(var(--muted) / .72) !important;
+}
+html:not(.dark) .campaign-analysis-shell .campaign-analysis-card {
+  color: hsl(var(--card-foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+  background: hsl(var(--card)) !important;
+  box-shadow: 0 8px 22px -20px rgba(35,40,47,.24) !important;
+}
+html:not(.dark) .campaign-analysis-shell .campaign-analysis-card :is(h1, h2, h3, h4, p, span, strong, b, label) {
+  color: inherit;
+}
+html:not(.dark) .campaign-analysis-shell .campaign-analysis-card .text-muted-foreground,
+html:not(.dark) .campaign-analysis-shell .campaign-analysis-card [class*="text-muted-foreground"] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+html:not(.dark) .campaign-analysis-shell .campaign-analysis-card .recharts-cartesian-axis-tick-value,
+html:not(.dark) .campaign-analysis-shell .campaign-analysis-card .recharts-legend-item-text {
+  fill: hsl(var(--muted-foreground)) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+
 /* Tráfego Pago: the metal theme owns broad input rules above.  Reassert the
    reading surface last, so changing dark/light cannot leave its filters in
    the previous dark material. */
