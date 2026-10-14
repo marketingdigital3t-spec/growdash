@@ -27,6 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
 import { InvoicePdfStudio } from "@/components/finance/InvoicePdfStudio";
 import { calculateTrafficFundsAdded } from "@/lib/trafficFunding";
+import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
@@ -192,7 +193,16 @@ export default function FinancePage() {
   const roas = adjustedSpend > 0 ? aggregateSales(visibleSales).totalNet / adjustedSpend : 0;
   const isLoading = loadingAccounts || loadingInsights || loadingSales || loadingEntries || loadingTransactions || loadingBalanceEvents || loadingFundingTransactions;
 
-  const rows = useMemo(() => accounts.map((account) => { const as = sales.filter((item) => item.ad_account_id === account.id); const accountSpend = metaTraffic.data.spendByAccount[account.id] ?? 0; const saleTotals = aggregateSales(as); const revenue = saleTotals.totalNet; return { account, spend: accountSpend, balance: Number(account.remaining_balance || 0), leads: metaTraffic.data.leadBreakdownByAccount[account.id]?.totalLeads ?? 0, sales: saleTotals.totalQuantity, revenue, roas: accountSpend > 0 ? revenue / accountSpend : 0 }; }), [accounts, metaTraffic.data.leadBreakdownByAccount, metaTraffic.data.spendByAccount, sales]);
+  const rows = useMemo(() => accounts.map((account) => {
+    // A canonical RD sale may have no direct Meta account when its identity is
+    // carried by the account-linked RD funnel. Keep this table consistent with
+    // the DRE and the main sales query instead of silently showing zero.
+    const as = visibleSales.filter((item) => isDealInRDAccountOrFunnelScope(item, [account.id], funnelIds));
+    const accountSpend = metaTraffic.data.spendByAccount[account.id] ?? 0;
+    const saleTotals = aggregateSales(as);
+    const revenue = saleTotals.totalNet;
+    return { account, spend: accountSpend, balance: Number(account.remaining_balance || 0), leads: metaTraffic.data.leadBreakdownByAccount[account.id]?.totalLeads ?? 0, sales: saleTotals.totalQuantity, revenue, roas: accountSpend > 0 ? revenue / accountSpend : 0 };
+  }), [accounts, funnelIds, metaTraffic.data.leadBreakdownByAccount, metaTraffic.data.spendByAccount, visibleSales]);
 
   const monthlyHistory = useMemo(() => eachMonthOfInterval({ start: twelveMonthsAgo, end: new Date() }).map((month) => { const key = format(month, "yyyy-MM"); const revenue = aggregateSales(historicalSales.filter((sale) => (!sale.ad_account_id || unitAccountIds.has(sale.ad_account_id)) && String(sale.sale_date).startsWith(key))).totalNet + historicalEntries.filter((item) => item.entry_type === "revenue" && item.competence_date.startsWith(key) && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0); const mediaOriginal = historicalInsights.filter((item) => unitAccountIds.has(item.ad_account_id) && String(item.date).startsWith(key)).reduce((sum, item) => sum + Number(item.spend || 0), 0); const media = mediaOriginal * (includeMetaTax ? 1 + metaTaxRate : 1); const operational = historicalEntries.filter((item) => item.entry_type === "expense" && item.competence_date.startsWith(key) && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0); return { key, label: format(month, "MM/yy"), revenue, media, operational, expense: media + operational, result: revenue - media - operational }; }), [historicalEntries, historicalInsights, historicalSales, includeMetaTax, twelveMonthsAgo, unitAccountIds]);
   const avgRevenue = monthlyHistory.reduce((sum, month) => sum + month.revenue, 0) / Math.max(monthlyHistory.length, 1);
