@@ -95,7 +95,7 @@ export const Canvas = memo(function Canvas({
             onPointerDown={(event) => onElementPointerDown(event, element)}
             onDoubleClick={(event) => { event.stopPropagation(); onElementDoubleClick(element); }}
           >
-            <rect x={bounds.x - 8} y={bounds.y - 8} width={Math.max(16, bounds.width + 16)} height={Math.max(16, bounds.height + 16)} fill="transparent" stroke="transparent" />
+            <rect x={bounds.x - 4} y={bounds.y - 4} width={Math.max(8, bounds.width + 8)} height={Math.max(8, bounds.height + 8)} fill="transparent" stroke="transparent" />
             <ShapeRenderer element={element} elements={elements} editing={editingId === element.id} onTextChange={(value) => onTextChange(element.id, value)} onFinishEditing={onFinishEditing} />
             {selected && selectedIds.length === 1 && <rect x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} fill="none" stroke="hsl(var(--primary))" strokeWidth={1 / zoom} strokeDasharray={`${4 / zoom} ${3 / zoom}`} pointerEvents="none" />}
           </g>;

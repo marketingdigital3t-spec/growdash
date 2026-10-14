@@ -22,8 +22,8 @@ export function ShapeRenderer({ element, elements, editing, onTextChange, onFini
     return <image href={element.imageUrl} x={element.x} y={element.y} width={element.width} height={element.height} preserveAspectRatio="xMidYMid slice" />;
   }
   if (element.type === "text" || element.type === "sticky") {
-    const insetX = 10;
-    const insetY = 10;
+    const insetX = 4;
+    const insetY = 4;
     const textWidth = Math.max(40, element.width - insetX * 2);
     const textHeight = Math.max(36, element.height - insetY * 2);
     return <>

@@ -13,12 +13,15 @@ export function normalizeBounds(x: number, y: number, width: number, height: num
 
 // Keep these values aligned with ShapeRenderer. They include the editor's
 // internal padding as well as the foreignObject inset.
-const TEXT_HORIZONTAL_INSET = 32;
-const TEXT_VERTICAL_INSET = 32;
+// Keep selection bounds close to the visible text. The editor itself adds a
+// small foreignObject inset; the old 32px estimate left a large empty frame
+// around short labels such as funnel stages.
+const TEXT_HORIZONTAL_INSET = 16;
+const TEXT_VERTICAL_INSET = 16;
 const TEXT_LINE_HEIGHT = 1.24;
 const TEXT_MIN_WIDTH = 64;
 const STICKY_MIN_WIDTH = 200;
-const TEXT_MIN_HEIGHT = 52;
+const TEXT_MIN_HEIGHT = 40;
 const STICKY_MIN_HEIGHT = 180;
 const TEXT_MAX_AUTO_WIDTH = 360;
 
