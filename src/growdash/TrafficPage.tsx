@@ -15,6 +15,7 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useBudgetAnalysis, type BudgetAnalysisItem } from "@/hooks/useBudgetAnalysis";
 import { useLastTopUp, useNextTopUpEstimate } from "@/hooks/useCampaignTargets";
+import { useSyncBalance } from "@/hooks/useSyncBalance";
 import { useInsights } from "@/hooks/useInsights";
 import { useRDDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { aggregateSales, useSales } from "@/hooks/useSales";
@@ -145,6 +146,7 @@ function BudgetWorkspace({ accountId, selectedAccountIds, accounts, startDate, e
   const { toast } = useToast();
   const [severityFilter, setSeverityFilter] = useState<"all" | BudgetAnalysisItem["severity"]>("all");
   const all = useBudgetAnalysis();
+  const syncBalance = useSyncBalance();
   // The budget analysis hook intentionally returns all authorized BMs. Apply
   // both the business-unit scope and the user's multi-select here so the
   // totals/cards never show unselected accounts.
@@ -164,7 +166,19 @@ function BudgetWorkspace({ accountId, selectedAccountIds, accounts, startDate, e
     projected: sum.projected + item.projectedSpendUntilMonday,
     critical: sum.critical + (item.severity === "critical" ? 1 : 0),
   }), { budget: 0, spend: 0, balance: 0, projected: 0, critical: 0 });
-  const refresh = async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }), queryClient.invalidateQueries({ queryKey: ["daily_spend_by_account"] }), queryClient.invalidateQueries({ queryKey: ["daily_budget_active_by_account"] }), queryClient.invalidateQueries({ queryKey: ["last_top_up"] }), queryClient.invalidateQueries({ queryKey: ["next_top_up_estimate"] })]); toast({ title: "Orçamentos atualizados", description: "Os valores locais foram reconsultados; a data depende da última sincronização Meta." }); };
+  const refresh = async () => {
+    try {
+      await syncBalance.mutateAsync();
+      await queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+      await queryClient.invalidateQueries({ queryKey: ["daily_spend_by_account"] });
+      await queryClient.invalidateQueries({ queryKey: ["daily_budget_active_by_account"] });
+      await queryClient.invalidateQueries({ queryKey: ["last_top_up"] });
+      await queryClient.invalidateQueries({ queryKey: ["next_top_up_estimate"] });
+      toast({ title: "Orçamentos atualizados", description: "Saldo reconsultado diretamente na Meta." });
+    } catch {
+      toast({ title: "Não foi possível atualizar os saldos", description: "A última informação confiável foi preservada.", variant: "destructive" });
+    }
+  };
   const buffer = totals.balance - totals.projected;
   const filters: Array<{ id: "all" | BudgetAnalysisItem["severity"]; label: string; count: number; dot: string; active: string }> = [
     { id: "all", label: "Todas", count: scopedRows.length, dot: "bg-primary", active: "border-primary/60 bg-primary/10 text-primary" },
@@ -212,7 +226,7 @@ function BudgetWorkspace({ accountId, selectedAccountIds, accounts, startDate, e
               );
             })}
           </div>
-          <Button variant="outline" size="sm" className="shrink-0 self-start" onClick={refresh}><RefreshCw className="mr-2 h-4 w-4" />Atualizar saldos</Button>
+          <Button variant="outline" size="sm" className="shrink-0 self-start" onClick={refresh} disabled={syncBalance.isPending}><RefreshCw className={cn("mr-2 h-4 w-4", syncBalance.isPending && "animate-spin")} />{syncBalance.isPending ? "Consultando Meta…" : "Atualizar saldos"}</Button>
         </header>
 
         <div className="flex items-center justify-between gap-3 border-b border-border/70 bg-muted/25 px-4 py-2 text-[10px] text-muted-foreground">
