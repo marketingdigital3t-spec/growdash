@@ -96,6 +96,10 @@ verify_jwt = true
 verify_jwt = true
 [functions.whatsapp-webhook]
 verify_jwt = false
+[functions.hubspot-oauth-start]
+verify_jwt = true
+[functions.hubspot-oauth-callback]
+verify_jwt = false
 [functions.admin-create-user]
 verify_jwt = false
 

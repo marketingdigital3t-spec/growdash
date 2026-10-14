@@ -1,0 +1,25 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+const hash = async (value: string) => { const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(""); };
+const page = (status: "success" | "error", message: string) => { const payload = JSON.stringify({ type: "growdash-hubspot-oauth", status, message }).replaceAll("<", "\\u003c"); const origin = new URL(Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").origin; return new Response(`<!doctype html><meta charset="utf-8"><title>Growdash · HubSpot</title><main style="font:16px system-ui;max-width:560px;margin:15vh auto;padding:32px;border:1px solid #444;border-radius:20px"><h1>${status === "success" ? "HubSpot conectado" : "Conexão não concluída"}</h1><p>${escape(message)}</p><button onclick="window.close()">Voltar</button><script>try{window.opener?.postMessage(${payload},${JSON.stringify(origin)})}catch(e){}${status === "success" ? "setTimeout(()=>window.close(),1200)" : ""}</script></main>`, { status: status === "success" ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'none';style-src 'unsafe-inline';script-src 'unsafe-inline';frame-ancestors 'none'" } }); };
+Deno.serve(async (req) => {
+  if (req.method !== "GET") return page("error", "Método inválido.");
+  const url = new URL(req.url); const rawState = url.searchParams.get("state") || ""; if (!rawState) return page("error", "Estado de segurança ausente.");
+  const clientId = Deno.env.get("HUBSPOT_CLIENT_ID"); const clientSecret = Deno.env.get("HUBSPOT_CLIENT_SECRET"); const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  if (!clientId || !clientSecret) return page("error", "HubSpot não está configurado no servidor.");
+  const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!); const stateHash = await hash(rawState);
+  const { data: oauthState } = await admin.from("hubspot_oauth_states").select("user_id,expires_at").eq("state_hash", stateHash).maybeSingle(); await admin.from("hubspot_oauth_states").delete().eq("state_hash", stateHash);
+  if (!oauthState || new Date(oauthState.expires_at).getTime() < Date.now()) return page("error", "Esta tentativa expirou ou já foi utilizada.");
+  if (url.searchParams.get("error")) return page("error", url.searchParams.get("error_description") || "O HubSpot recusou a autorização.");
+  const code = url.searchParams.get("code"); if (!code) return page("error", "O HubSpot não devolveu o código de autorização.");
+  const redirectUri = Deno.env.get("HUBSPOT_OAUTH_REDIRECT_URI") ?? `${supabaseUrl}/functions/v1/hubspot-oauth-callback`;
+  const tokenResponse = await fetch("https://api.hubapi.com/oauth/v1/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code }) });
+  const token = await tokenResponse.json().catch(() => ({})); if (!tokenResponse.ok || !token.access_token) return page("error", "O HubSpot não aceitou a troca do código. Confira o App ID e a URL de retorno.");
+  const accountResponse = await fetch(`https://api.hubapi.com/oauth/v1/access-tokens/${encodeURIComponent(token.access_token)}`); const account = await accountResponse.json().catch(() => ({}));
+  const accountId = String(account.hub_id || account.user || "").trim(); if (!accountResponse.ok || !accountId) return page("error", "A autorização foi concluída, mas não foi possível identificar a conta HubSpot.");
+  const expiresAt = new Date(Date.now() + Number(token.expires_in || 1800) * 1000).toISOString();
+  const values = { provider_account_id: accountId, api_token: token.access_token, is_active: true, token_expires_at: expiresAt, permission_health: "healthy", last_permission_check_at: new Date().toISOString(), last_health_error: null, updated_at: new Date().toISOString() };
+  const { data: existing } = await admin.from("integrations").select("id").eq("user_id", oauthState.user_id).eq("provider", "hubspot_crm").eq("provider_account_id", accountId).maybeSingle();
+  const operation = existing ? admin.from("integrations").update(values).eq("id", existing.id) : admin.from("integrations").insert({ user_id: oauthState.user_id, provider: "hubspot_crm", ...values }); const { error } = await operation; if (error) return page("error", "Não foi possível salvar a conexão HubSpot.");
+  return page("success", `Conta HubSpot ${accountId} conectada com segurança.`);
+});
