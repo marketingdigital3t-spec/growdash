@@ -107,7 +107,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                         <div
                           tabIndex={0}
                           className="mx-auto flex min-h-12 cursor-help items-center justify-center px-3 text-center text-[11px] font-semibold text-white shadow-sm outline-none transition-[width,filter] duration-300 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-14 sm:px-4 sm:text-xs"
-                          style={{ width: `${width}%`, background: color, clipPath: "polygon(4% 0, 96% 0, 100% 100%, 0 100%)" }}
+                          style={{ width: `${width}%`, background: color, clipPath: "polygon(0 0, 100% 0, 96% 100%, 4% 100%)" }}
                           aria-label={accessibleDescription}
                         >
                         </div>
