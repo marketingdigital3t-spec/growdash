@@ -12,6 +12,14 @@ function statusForMetaError(code: number | null): "expired" | "error" | "unknown
   return "unknown";
 }
 
+function parseMoney(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const match = value.match(/R\$\s*([\d.,]+)/i);
+  if (!match) return null;
+  const parsed = Number(match[1].replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -106,34 +114,36 @@ Deno.serve(async (req) => {
 
         let remainingBalance: number | null = null;
 
-        // Priority 1: Parse funding_source_details.display_string which shows the REAL balance
-        // Format: "Saldo disponível (R$130,94 BRL)" or similar
-        if (data.funding_source_details?.display_string) {
-          const displayStr = data.funding_source_details.display_string;
-          // Extract numeric value: matches patterns like R$130,94 or R$1.130,94
-          const match = displayStr.match(/R\$\s*([\d.,]+)/);
-          if (match) {
-            // Convert Brazilian format (1.234,56) to number
-            const valueStr = match[1].replace(/\./g, '').replace(',', '.');
-            remainingBalance = parseFloat(valueStr);
-            console.log(`${account.name}: parsed from display_string "${displayStr}" = R$ ${remainingBalance}`);
+        // Some Meta responses expose the available amount in the funding
+        // label. Only accept labels that explicitly say "available"/"saldo
+        // disponível"; a generic R$ value can be the payment threshold or
+        // amount due and must never drive a low-balance alert.
+        if (remainingBalance === null && data.funding_source_details?.display_string) {
+          const displayStr = String(data.funding_source_details.display_string);
+          if (/saldo\s+dispon[ií]vel|available\s+balance/i.test(displayStr)) {
+            remainingBalance = parseMoney(displayStr);
+            if (remainingBalance !== null) console.log(`${account.name}: parsed available balance from funding_source_details = ${remainingBalance}`);
           }
         }
 
-        // Fallback: spend_cap - amount_spent
-        if (remainingBalance === null && data.spend_cap && data.amount_spent) {
-          const spendCap = Number(data.spend_cap);
-          const amountSpent = Number(data.amount_spent);
-          if (spendCap > 0) {
-            remainingBalance = (spendCap - amountSpent) / 100;
-            console.log(`${account.name}: using spend_cap - amount_spent = ${remainingBalance}`);
-          }
-        }
-
-        // Last fallback: balance field
-        if (remainingBalance === null && data.balance !== undefined) {
-          remainingBalance = Math.abs(Number(data.balance)) / 100;
-          console.log(`${account.name}: using balance field = ${remainingBalance}`);
+        // Do not persist `balance`: Meta documents it as the bill amount due.
+        // Keeping the last reliable snapshot is safer than replacing it with
+        // a payable amount and falsely declaring the account out of funds.
+        if (remainingBalance === null) {
+          console.log(`${account.name}: no reliable available-balance field; clearing stale snapshot`);
+          await supabaseAdmin
+            .from("ad_accounts")
+            .update({
+              remaining_balance: null,
+              connection_status: "connected",
+              last_sync_error: null,
+              last_sync_error_code: null,
+              last_sync_attempt_at: attemptedAt,
+              last_sync_success_at: attemptedAt,
+            })
+            .eq("id", account.id)
+            .neq("connection_status", "disconnected");
+          continue;
         }
 
         if (remainingBalance !== null) {
