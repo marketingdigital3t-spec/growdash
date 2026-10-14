@@ -600,8 +600,10 @@ Deno.serve(async (req) => {
         const campaignFilter = campaignIds.length
           ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: campaignIds }]))}`
           : "";
-        const insightsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
+        const insightsRes = await fetchMetaInsightsByAdaptiveRange(
+          `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`,
+          startDate,
+          endDate,
         );
         recordPagination(insightsRes, "insights");
         if (insightsRes.error) {
@@ -1818,6 +1820,38 @@ async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINI
   const truncated = Boolean(next);
   if (truncated && Number.isFinite(maxPages)) console.warn(`fetchMetaPaginated hit maxPages=${maxPages}`);
   return { data: all, pages, lastCursor, truncated };
+}
+
+/**
+ * Meta can reject an otherwise valid maximum-lookback Insights request when
+ * its account has too many ad/day facts. Retry only that specific response by
+ * bisecting the civil-date interval; never accept a partial range as complete.
+ */
+async function fetchMetaInsightsByAdaptiveRange(
+  url: string,
+  startDate: string,
+  endDate: string,
+  depth = 0,
+): Promise<Awaited<ReturnType<typeof fetchMetaPaginated>>> {
+  const result = await fetchMetaPaginated(url);
+  const requiresSmallerRange = result.error && /reduce the amount of data|too much data/i.test(result.error);
+  if (!requiresSmallerRange || startDate >= endDate || depth >= 16) return result;
+
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const midpoint = new Date(start.getTime() + Math.floor((end.getTime() - start.getTime()) / 2));
+  const leftEnd = midpoint.toISOString().slice(0, 10);
+  const rightStartDate = new Date(midpoint.getTime() + 86400000).toISOString().slice(0, 10);
+  const withRange = (since: string, until: string) => {
+    const rangedUrl = new URL(url);
+    rangedUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
+    return rangedUrl.toString();
+  };
+  const left = await fetchMetaInsightsByAdaptiveRange(withRange(startDate, leftEnd), startDate, leftEnd, depth + 1);
+  if (left.error || left.truncated || left.repeatedCursor) return left;
+  const right = await fetchMetaInsightsByAdaptiveRange(withRange(rightStartDate, endDate), rightStartDate, endDate, depth + 1);
+  if (right.error || right.truncated || right.repeatedCursor) return { ...right, data: [...left.data, ...right.data], pages: left.pages + right.pages };
+  return { data: [...left.data, ...right.data], pages: left.pages + right.pages };
 }
 
 function sleep(ms: number) {
