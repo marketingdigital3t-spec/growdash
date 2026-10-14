@@ -6,6 +6,32 @@ export type MetaDailyInsightKey = {
 export type MetaActionFactKey = { ad_id: string; date: string; action_type: string };
 export type MetaActionDailySnapshot = { ad_id: string; date: string };
 
+/** Resolve a bounded rolling window in the account timezone. The provider
+ * APIs use civil dates, so the returned dates are the smallest safe date
+ * envelope while startAt/endAt preserve the exact requested window for
+ * timestamp-based resources such as Lead Ads. */
+export function recentWindowForTimezone(
+  now: Date,
+  timezone: string,
+  hours = 5,
+): { startAt: string; endAt: string; startDate: string; endDate: string } {
+  const boundedHours = Math.max(1, Math.min(24, Number(hours) || 5));
+  const start = new Date(now.getTime() - boundedHours * 60 * 60 * 1000);
+  let resolvedTimezone = timezone || "America/Sao_Paulo";
+  try { new Intl.DateTimeFormat("en-CA", { timeZone: resolvedTimezone }).format(now); }
+  catch { resolvedTimezone = "America/Sao_Paulo"; }
+  const date = (instant: Date) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: resolvedTimezone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(instant);
+  return {
+    startAt: start.toISOString(),
+    endAt: now.toISOString(),
+    startDate: date(start),
+    endDate: date(now),
+  };
+}
+
 /** Civil dates covered by a sync, inclusive, without host-timezone drift. */
 export function datesCoveredBySync(startDate: string, endDate: string): string[] {
   const cursor = new Date(`${startDate}T00:00:00Z`);

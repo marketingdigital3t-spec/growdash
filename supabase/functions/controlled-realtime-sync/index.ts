@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { canRunSelectedMetaLeadSync, selectedMetaSyncIsPartial } from "../../../src/lib/controlledMetaSync.ts";
+import { recentWindowForTimezone } from "../_shared/metaInsightReconciliation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,8 @@ type SyncBody = {
   /** Fast entry path: persist daily Insights only; auxiliary blocks continue
    * in the global/background cycle and must not delay the selected snapshot. */
   fast?: boolean;
+  syncMode?: "recent_window" | "selected_period";
+  recentHours?: number;
 };
 
 type RunResult = {
@@ -80,7 +83,14 @@ Deno.serve(async (req) => {
     }
     const accountScope = (body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : []).sort().join(",") || "all";
     const campaignScope = (body.campaignIds || []).slice().sort().join(",") || "all-campaigns";
-    const scopeKey = `${accountScope}:${campaignScope}:${startDate}:${endDate}:${body.attributionWindow || "account_default"}:${body.timezone || "account"}`;
+    const syncMode = body.syncMode === "recent_window" ? "recent_window" : "selected_period";
+    const recentHours = Number.isFinite(Number(body.recentHours)) ? Math.max(1, Math.min(24, Number(body.recentHours))) : 5;
+    const recentWindow = syncMode === "recent_window"
+      ? recentWindowForTimezone(new Date(), body.timezone || "America/Sao_Paulo", recentHours)
+      : null;
+    const syncStartDate = recentWindow?.startDate || startDate;
+    const syncEndDate = recentWindow?.endDate || endDate;
+    const scopeKey = `${accountScope}:${campaignScope}:${syncMode}:${syncStartDate}:${syncEndDate}:${body.attributionWindow || "account_default"}:${body.timezone || "account"}`;
     const includeMeta = body.includeMeta !== false;
     const includeRD = body.includeRD !== false;
     const includeBalance = body.includeBalance !== false;
@@ -117,10 +127,12 @@ Deno.serve(async (req) => {
             adAccountId: body.adAccountId,
             adAccountIds: body.adAccountIds,
             campaignIds: body.campaignIds,
-            startDate,
-            endDate,
+            startDate: syncStartDate,
+            endDate: syncEndDate,
             timezone: body.timezone,
             attributionWindow: body.attributionWindow,
+            syncMode,
+            recentHours,
             // Omitting dates lets sync-meta-insights resolve "today" in each
             incremental: true,
             includeBreakdowns: false,
@@ -130,7 +142,7 @@ Deno.serve(async (req) => {
           // Leads/forms are an auxiliary Meta resource. Run it after the
           // daily snapshot, but do not invalidate daily KPIs when its token,
           // permission or form discovery is temporarily unavailable.
-          if (fast) {
+          if (fast && syncMode !== "recent_window") {
             // Ações/leads alimentam os cards de conversão e CPL. Elas precisam
             // seguir a confirmação do Insights do recorte selecionado, mas o
             // hourly e os breakdowns ficam para a reconciliação global em
@@ -138,8 +150,9 @@ Deno.serve(async (req) => {
             const leads = await invokeFunction(supabaseUrl, authHeader, "sync-meta-leads", {
               adAccountId: body.adAccountId,
               adAccountIds: body.adAccountIds,
-              startDate,
-              endDate,
+              ...(syncMode === "selected_period" ? { startDate: syncStartDate, endDate: syncEndDate } : {}),
+              recentStartAt: recentWindow?.startAt,
+              recentEndAt: recentWindow?.endAt,
               triggerSource: "controlled_realtime_selected",
             });
             const leadStatus = String(leads.data?.status || (leads.error || leads.data?.error ? "error" : "success"));
@@ -168,8 +181,9 @@ Deno.serve(async (req) => {
           const leads = await invokeFunction(supabaseUrl, authHeader, "sync-meta-leads", {
             adAccountId: body.adAccountId,
             adAccountIds: body.adAccountIds,
-            startDate,
-            endDate,
+            ...(syncMode === "selected_period" ? { startDate: syncStartDate, endDate: syncEndDate } : {}),
+            recentStartAt: recentWindow?.startAt,
+            recentEndAt: recentWindow?.endAt,
             triggerSource: "controlled_realtime",
           });
 
@@ -177,8 +191,8 @@ Deno.serve(async (req) => {
             adAccountId: body.adAccountId,
             adAccountIds: body.adAccountIds,
             campaignIds: body.campaignIds,
-            startDate,
-            endDate,
+            startDate: syncStartDate,
+            endDate: syncEndDate,
             timezone: body.timezone,
             attributionWindow: body.attributionWindow,
           });
@@ -227,14 +241,13 @@ Deno.serve(async (req) => {
             admin,
             userId: user.id,
             provider: "rd",
-            scopeKey: `funnel:${funnel.id}:${startDate}:${endDate}:${body.timezone || "America/Sao_Paulo"}`,
+            scopeKey: `funnel:${funnel.id}:${syncMode}:${syncStartDate}:${syncEndDate}:${body.timezone || "America/Sao_Paulo"}`,
             force,
             run: () => invokeFunction(supabaseUrl, authHeader, "rd-sync-deals", {
               funnel_id: funnel.id,
-              start_date: startDate,
-              end_date: endDate,
+              ...(syncMode === "selected_period" ? { start_date: startDate, end_date: endDate } : {}),
               realtime,
-              analytics_mode: realtime,
+              analytics_mode: syncMode === "selected_period" && realtime,
               // No explicit dates: the current RD pipeline is a snapshot of
               // all open/current deals, not a lead-entry report for São Paulo.
               // Analytics mode walks every RD status segment and up to the
@@ -272,7 +285,7 @@ Deno.serve(async (req) => {
       rd_status: results.find((result) => result.provider === "rd")?.status || "skipped",
       balance_status: results.find((result) => result.provider === "balance")?.status || "skipped",
       freshness_seconds: metaResult?.freshness_seconds ?? null,
-      synced_at: metaResult?.synced_at || new Date().toISOString(),
+      synced_at: metaResult?.synced_at || null,
       scope: {
         ad_account_ids: body.adAccountIds?.length ? body.adAccountIds : body.adAccountId ? [body.adAccountId] : [],
         campaign_ids: body.campaignIds || [],
@@ -282,6 +295,11 @@ Deno.serve(async (req) => {
         timezone: body.timezone || "account",
       },
       synchronized_date: endDate,
+      sync_mode: syncMode,
+      recent_window: recentWindow,
+      snapshot_available: results.some((result) => Boolean(result.synced_at)),
+      recent_sync_status: results.some((result) => result.status === "failed") ? "error" : results.some((result) => result.status === "partial") ? "partial" : "updated",
+      last_success_at: results.map((result) => result.synced_at).filter(Boolean).sort().at(-1) || null,
       duration_ms: Date.now() - startedAt,
       warnings: warnings.length ? warnings : undefined,
       results,
@@ -313,7 +331,7 @@ async function runControlled(args: {
   // must never bypass an active lock. Doing so creates concurrent writers and
   // can mix partial snapshots from different runs.
   if (current?.locked_until && new Date(current.locked_until).getTime() > now.getTime()) {
-    return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já em andamento." };
+    return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já em andamento.", synced_at: current.last_success_at || undefined };
   }
 
   const reference = current?.status === "success" ? current.last_success_at : current?.last_started_at;
@@ -326,6 +344,7 @@ async function runControlled(args: {
         scope: scopeKey,
         skipped: true,
         reason: `Dados ainda atuais; próxima atualização em ${Math.ceil((minInterval - elapsed) / 60_000)} min.`,
+        synced_at: current.last_success_at || undefined,
       };
     }
   }
@@ -339,7 +358,7 @@ async function runControlled(args: {
     p_locked_until: lockedUntil,
   });
   if (lockError) throw lockError;
-  if (!acquired) return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já está em andamento." };
+  if (!acquired) return { provider, scope: scopeKey, skipped: true, reason: "Sincronização já está em andamento.", synced_at: current?.last_success_at || undefined };
 
   try {
     const response = await run();

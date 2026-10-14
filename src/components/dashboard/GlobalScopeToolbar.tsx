@@ -4,9 +4,11 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 /** Shared scope controls rendered by the authenticated shell on every module. */
-export function GlobalScopeToolbar({ syncing = false }: { syncing?: boolean }) {
+export function GlobalScopeToolbar({ syncing = false, lastSyncAt = null, syncState = "idle" }: { syncing?: boolean; lastSyncAt?: Date | null; syncState?: string }) {
   const { adAccountIds, setAdAccountIds, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
 
@@ -32,6 +34,16 @@ export function GlobalScopeToolbar({ syncing = false }: { syncing?: boolean }) {
         <span role="status" aria-live="polite" className="gd-scope-refresh-status order-last inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold sm:order-none">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" aria-hidden="true" />
           Atualizando conta/período
+        </span>
+      )}
+      {!syncing && lastSyncAt && (
+        <span role="status" className="gd-scope-refresh-status order-last inline-flex items-center rounded-md px-2 py-1 text-[10px] text-muted-foreground sm:order-none">
+          Último snapshot: {formatDistanceToNow(lastSyncAt, { addSuffix: true, locale: ptBR })} · últimas 5h atualizadas
+        </span>
+      )}
+      {!syncing && syncState === "error" && (
+        <span role="status" className="gd-scope-refresh-status order-last inline-flex items-center rounded-md px-2 py-1 text-[10px] text-amber-700 sm:order-none">
+          Snapshot anterior preservado · nova tentativa automática
         </span>
       )}
       <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">

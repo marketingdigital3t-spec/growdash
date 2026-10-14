@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { datesCoveredBySync, datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../../supabase/functions/_shared/metaInsightReconciliation";
+import { datesCoveredBySync, datesSafeToReconcile, recentWindowForTimezone, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../../supabase/functions/_shared/metaInsightReconciliation";
 
 describe("Meta daily fact reconciliation", () => {
+  it("keeps the recent sync window bounded and resolves its civil dates in the account timezone", () => {
+    const window = recentWindowForTimezone(new Date("2026-10-14T12:00:00.000Z"), "America/Sao_Paulo", 5);
+    expect(window.startAt).toBe("2026-10-14T07:00:00.000Z");
+    expect(window.endAt).toBe("2026-10-14T12:00:00.000Z");
+    expect(window.startDate).toBe("2026-10-14");
+    expect(window.endDate).toBe("2026-10-14");
+  });
+
   it("builds a civil inclusive range that includes the selected period and three trailing days", () => {
     expect(syncRangeWithRollingWindow("2026-09-01", "2026-09-30", "2026-10-09")).toEqual({
       startDate: "2026-09-01",

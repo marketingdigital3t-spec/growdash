@@ -12,6 +12,7 @@ import { withInFlightScope } from "@/lib/inFlightByScope";
 // close to RD without re-running a full historical reconciliation.
 const REFRESH_INTERVAL_MS = 5 * 60_000;
 const LOCAL_DEDUP_WINDOW_MS = 4 * 60_000;
+const RECENT_SYNC_WINDOW_HOURS = 5;
 const STORAGE_PREFIX = "growdash:last-background-sync";
 // A Meta/RD sync can write several related rows in rapid succession. Waiting
 // for a quiet window prevents each write from reloading the same heavy traffic
@@ -53,7 +54,6 @@ interface Params {
 export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, funnelIds, timezone, attributionWindow, startDate, endDate, enabled = true }: Params = {}) {
   const queryClient = useQueryClient();
   const inFlight = useRef(new Map<string, Promise<void>>());
-  const initialGlobalSync = useRef(true);
   const invalidateTimer = useRef<number | null>(null);
   const [state, setState] = useState<SyncState>("idle");
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -89,13 +89,9 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     const task = withInFlightScope(inFlight.current, scope, async () => {
       try {
         if (isCurrentScope()) setState("refreshing");
-        // The selected slice must be refreshed first. A global reconciliation
-        // can include many accounts/funnels and may legitimately outlive the
-        // browser request timeout; it must never prevent the selected cards
-        // from being populated. Once the selected slice returns, start the
-        // global pass in the background on the first entry.
-        const global = initialGlobalSync.current;
-        initialGlobalSync.current = false;
+        // Refresh only the selected scope's recent provider window. The
+        // persisted snapshot remains the source for the selected historical
+        // period; no global or historical reconciliation runs on navigation.
         const selectedBody = {
           adAccountId,
           adAccountIds,
@@ -106,9 +102,11 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           timezone,
           attributionWindow,
           includeMeta: true,
-          includeRD: false,
+          includeRD: true,
           includeBalance: false,
           fast: true,
+          syncMode: "recent_window" as const,
+          recentHours: RECENT_SYNC_WINDOW_HOURS,
           realtime: true,
           force,
         };
@@ -136,30 +134,6 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         }
         invalidateLiveQueries();
 
-        if (global) {
-          // Do not await this request. It is deliberately global and is only
-          // responsible for warming every account/funnel for the next visit.
-          // The selected response above remains the source of the current UI.
-          void supabase.functions.invoke("controlled-realtime-sync", {
-            body: {
-              ...selectedBody,
-              adAccountId: undefined,
-              adAccountIds: undefined,
-              funnelIds: undefined,
-              includeRD: true,
-              includeBalance: true,
-              fast: false,
-            },
-          }).then(({ data: globalData, error: globalError }) => {
-            if (globalError || globalData?.error) {
-              console.warn("[near-realtime-sync] global reconciliation", globalError || globalData?.error);
-              return;
-            }
-            invalidateLiveQueries();
-          }).catch((globalError) => {
-            console.warn("[near-realtime-sync] global reconciliation", globalError);
-          });
-        }
       } catch (error) {
         // Falha silenciosa: o histórico armazenado permanece visível e uma nova
         // tentativa ocorrerá ao recuperar foco ou no próximo ciclo.
@@ -179,7 +153,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     // visível enquanto esta chamada acontece em segundo plano.
     // Cada entrada/recarregamento solicita uma nova tentativa do escopo atual.
     // O lock persistido no backend continua impedindo duplicidade entre abas.
-    const initial = window.setTimeout(() => void refresh(true), 0);
+    const initial = window.setTimeout(() => void refresh(false), 0);
     const interval = window.setInterval(() => void refresh(false), REFRESH_INTERVAL_MS);
     const onFocus = () => void refresh(false);
     const onVisibility = () => {

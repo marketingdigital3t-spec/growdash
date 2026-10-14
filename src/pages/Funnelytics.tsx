@@ -130,6 +130,7 @@ function FlowDataScopePanel() {
   const [rdSyncRequestInFlight, setRdSyncRequestInFlight] = useState(false);
   const [rdSyncRequestError, setRdSyncRequestError] = useState<string | null>(null);
   const rdSyncInFlightRef = useRef(false);
+  const rdRecentSyncAtRef = useRef(0);
   const rdScopeRows = useMemo(() => rdScopeCoverage.data || [], [rdScopeCoverage.data]);
   const scopedRDSyncRows = rdScopeRows.filter((row) => sortedFunnelIds.includes(row.funnel_id));
   const rdConfirmed = rdScopeEnabled
@@ -149,6 +150,8 @@ function FlowDataScopePanel() {
     let active = true;
     const syncRD = async () => {
       if (!active || rdSyncInFlightRef.current || !navigator.onLine || document.visibilityState === "hidden") return;
+      if (Date.now() - rdRecentSyncAtRef.current < 5 * 60_000) return;
+      rdRecentSyncAtRef.current = Date.now();
       rdSyncInFlightRef.current = true;
       setRdSyncRequestInFlight(true);
       setRdSyncRequestError(null);
@@ -164,6 +167,8 @@ function FlowDataScopePanel() {
             includeBalance: false,
             realtime: true,
             fast: false,
+            syncMode: "recent_window",
+            recentHours: 5,
           },
         });
         const rdStatus = String(data?.rd_status || data?.results?.find?.((row: any) => row?.provider === "rd")?.status || "unknown");

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { datesSafeToReconcile, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../_shared/metaInsightReconciliation.ts";
+import { datesSafeToReconcile, recentWindowForTimezone, staleActionFactsForDailySnapshot, staleAdIdsForDailySnapshot, syncRangeWithRollingWindow } from "../_shared/metaInsightReconciliation.ts";
 import { CONVERSATION_ACTION_TYPES, FORM_ACTION_TYPES, META_LEAD_ACTION_TYPES, SITE_ACTION_TYPES, resolveMetaLeadParts } from "../_shared/metaLeadMetrics.ts";
 import { isMetaMessagingDestination } from "../../../src/lib/metaLeadScope.ts";
 
@@ -117,6 +117,8 @@ Deno.serve(async (req) => {
     const requestedBreakdownStartDate = typeof body.breakdownStartDate === "string" ? body.breakdownStartDate : undefined;
     const requestedBreakdownEndDate = typeof body.breakdownEndDate === "string" ? body.breakdownEndDate : undefined;
     const incremental = body.incremental === true;
+    const syncMode = body.syncMode === "recent_window" ? "recent_window" : "selected_period";
+    const recentHours = Number.isFinite(Number(body.recentHours)) ? Math.max(1, Math.min(24, Number(body.recentHours))) : 5;
     // A sincronização sem intervalo é sempre incremental. Backfills continuam
     // enviando startDate/endDate explicitamente e preservam todo o histórico.
     const requestedStartDate = body.startDate;
@@ -226,7 +228,12 @@ Deno.serve(async (req) => {
           : accountToday;
         const selectedEndDate = requestedEnd > accountToday ? accountToday : requestedEnd;
         const selectedStartDate = requestedStart > selectedEndDate ? selectedEndDate : requestedStart;
-        const syncRange = syncRangeWithRollingWindow(selectedStartDate, selectedEndDate, accountToday, 3);
+        const recentWindow = syncMode === "recent_window"
+          ? recentWindowForTimezone(new Date(), effectiveTimezone, recentHours)
+          : null;
+        const syncRange = recentWindow
+          ? { startDate: recentWindow.startDate, endDate: recentWindow.endDate, daysCovered: [recentWindow.startDate, ...(recentWindow.endDate !== recentWindow.startDate ? [recentWindow.endDate] : [])] }
+          : syncRangeWithRollingWindow(selectedStartDate, selectedEndDate, accountToday, 3);
         const startDate = syncRange.startDate;
         const endDate = syncRange.endDate;
         // Audience reports multiply Graph API calls. Keep their range scoped

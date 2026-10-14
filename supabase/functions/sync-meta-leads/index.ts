@@ -249,6 +249,18 @@ function parseExactDateRange(body: Record<string, unknown>): {
   };
 }
 
+function parseRecentTimestampRange(body: Record<string, unknown>): {
+  startEpoch: number;
+  endExclusiveEpoch: number;
+} | null {
+  const start = Date.parse(String(body.recentStartAt ?? body.recent_start_at ?? ""));
+  const end = Date.parse(String(body.recentEndAt ?? body.recent_end_at ?? ""));
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  const maxWindow = 24 * 60 * 60 * 1000;
+  if (end - start > maxWindow) return null;
+  return { startEpoch: Math.floor(start / 1000), endExclusiveEpoch: Math.floor(end / 1000) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -289,9 +301,10 @@ Deno.serve(async (req) => {
       ? (body.ad_account_ids || body.adAccountIds).filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
       : [];
     const exactRange = parseExactDateRange(body);
+    const recentRange = exactRange ? null : parseRecentTimestampRange(body);
     const permissionAudit = body?.permission_audit === true;
     const days: number = Math.max(1, Math.min(90, Number(body.days ?? 7)));
-    const since = exactRange?.startEpoch ??
+    const since = exactRange?.startEpoch ?? recentRange?.startEpoch ??
       Math.floor((Date.now() - days * 86400000) / 1000);
 
     // Explicitly disabled accounts must never be queried or treated as a
@@ -446,11 +459,11 @@ Deno.serve(async (req) => {
               value: since - 1,
             },
           ];
-          if (exactRange) {
+          if (exactRange || recentRange) {
             filters.push({
               field: "time_created",
               operator: "LESS_THAN",
-              value: exactRange.endExclusiveEpoch,
+              value: (exactRange || recentRange)!.endExclusiveEpoch,
             });
           }
           const filtering = encodeURIComponent(JSON.stringify(filters));
@@ -465,14 +478,14 @@ Deno.serve(async (req) => {
           }
           // Meta may occasionally ignore one of the filtering clauses. Enforce the
           // exact closed calendar range locally before persisting any record.
-          const leadsInRange = exactRange
+          const leadsInRange = exactRange || recentRange
             ? r.data.filter((lead: any) => {
               const createdEpoch = Math.floor(
                 Date.parse(String(lead?.created_time ?? "")) / 1000,
               );
               return Number.isFinite(createdEpoch) &&
-                createdEpoch >= exactRange.startEpoch &&
-                createdEpoch < exactRange.endExclusiveEpoch;
+                createdEpoch >= (exactRange || recentRange)!.startEpoch &&
+                createdEpoch < (exactRange || recentRange)!.endExclusiveEpoch;
             })
             : r.data;
           const rows: LeadRow[] = leadsInRange.map((l: any) => {
@@ -587,6 +600,8 @@ Deno.serve(async (req) => {
         accounts: accountResults,
         range: exactRange
           ? { startDate: exactRange.startDate, endDate: exactRange.endDate }
+          : recentRange
+          ? { startAt: new Date(recentRange.startEpoch * 1000).toISOString(), endAt: new Date(recentRange.endExclusiveEpoch * 1000).toISOString() }
           : { days },
       }),
       // `status` carries per-provider outcome; HTTP 200 keeps the structured
