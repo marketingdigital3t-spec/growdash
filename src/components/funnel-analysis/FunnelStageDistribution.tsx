@@ -110,7 +110,6 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                           style={{ width: `${width}%`, background: color, clipPath: "polygon(4% 0, 96% 0, 100% 100%, 0 100%)" }}
                           aria-label={accessibleDescription}
                         >
-                          <span className="min-w-0 truncate">{stage.name} · {stage.count} ({stage.pct.toFixed(1)}%)</span>
                         </div>
                       </StageTooltipTrigger>
                       <StageTooltipContent side="top" className="max-w-xs space-y-1.5 px-3 py-2.5 text-xs">
