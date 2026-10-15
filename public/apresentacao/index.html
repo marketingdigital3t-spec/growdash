@@ -708,6 +708,75 @@
       .reference-footer { padding: 48px 24px 22px; }
       .reference-footer-bottom { flex-direction: column; }
     }
+    @media (max-width: 600px) {
+      .reference-site { padding-top: 64px; overflow-x: hidden; }
+      .reference-header { width: calc(100% - 20px); height: 64px; }
+      .reference-nav { padding: 0 11px; border-radius: 0 0 12px 12px; gap: 10px; }
+      .reference-brand { font-size: 15px; gap: 6px; }
+      .reference-logo { gap: 5px; }
+      .reference-logo svg { width: 27px; height: 24px; }
+      .reference-wordmark { font-size: 13px; }
+      .reference-wordmark::after { width: 39px; margin-top: 3px; }
+      .reference-header .btn { min-height: 34px; padding: 9px 12px; font-size: 10px; white-space: nowrap; }
+      .reference-hero { padding: 40px 0 56px; }
+      .reference-hero-grid { width: calc(100% - 28px); gap: 34px; }
+      .reference-kicker { font-size: 9px; letter-spacing: .1em; }
+      .reference-hero h1 { margin: 15px 0 16px; font-size: clamp(39px, 12vw, 53px); line-height: .94; letter-spacing: -.075em; }
+      .reference-hero-copy p { font-size: 14px; line-height: 1.58; }
+      .reference-actions { flex-wrap: wrap; gap: 14px; margin-top: 22px; }
+      .reference-actions .btn-primary { width: 100%; justify-content: center; }
+      .reference-actions .text-link { margin-left: 2px; }
+      .reference-screen { width: calc(100% - 8px); margin: 0 auto; }
+      .macbook { width: 100%; padding-bottom: 12%; }
+      .macbook-screen { width: 96%; padding: 6px 6px 9px; border-radius: 12px 12px 7px 7px; }
+      .macbook-screen img { border-radius: 5px; }
+      .macbook-base { width: 112%; height: 15px; border-radius: 0 0 12px 12px; }
+      .reference-float { padding: 8px 10px; font-size: 10px; letter-spacing: 0; }
+      .reference-float.one { top: 19%; left: -7px; }
+      .reference-float.two { top: 21%; right: -7px; }
+      .reference-float.three { bottom: 13%; right: -4px; }
+      .reference-features { width: calc(100% - 28px); gap: 11px; }
+      .reference-feature { min-height: 0; padding: 19px 17px 21px; }
+      .reference-feature h3 { margin-top: 14px; font-size: 17px; }
+      .reference-feature p { font-size: 12px; line-height: 1.55; }
+      .reference-feature-thumb { height: 76px; margin: 18px -17px -21px; }
+      .reference-feature-thumb img { object-fit: contain; object-position: center; }
+      .reference-offer, .reference-process-inner, .reference-cta { width: calc(100% - 28px); }
+      .reference-offer { padding: 64px 0 60px; }
+      .reference-offer h2, .reference-process h2 { font-size: clamp(31px, 9vw, 42px); }
+      .reference-offer-grid { grid-template-columns: 1fr; gap: 10px; }
+      .reference-offer-card { min-height: 0; padding: 20px 18px 22px; }
+      .reference-offer-card h3 { margin-top: 20px; }
+      .reference-process { padding: 58px 0 64px; }
+      .reference-process-step { padding: 20px 0 !important; }
+      .reference-process-step h3 { margin-top: 22px; }
+      .reference-cta { padding: 50px 0 60px; }
+      .reference-cta-panel { padding: 26px 20px; gap: 22px; }
+      .reference-cta-panel h2 { font-size: clamp(28px, 8vw, 38px); }
+      .reference-cta-panel .btn { width: 100%; justify-content: center; }
+      .reference-section { width: calc(100% - 28px); padding: 70px 0 58px; }
+      .reference-section h2 { margin-bottom: 34px; font-size: clamp(30px, 8.5vw, 40px); }
+      .reference-benefits { gap: 28px; }
+      .reference-trusted { padding: 48px 0 58px; }
+      .reference-trusted h2 { padding: 0 14px; margin-bottom: 26px; font-size: clamp(27px, 8vw, 38px); }
+      .reference-trusted-row { width: calc(100% - 28px); }
+      .trusted-switcher { justify-content: flex-start; gap: 8px; margin: 0 -2px 18px; padding: 0 2px 8px; scrollbar-width: none; }
+      .trusted-switcher::-webkit-scrollbar { display: none; }
+      .trusted-switcher button { padding: 11px 13px; font-size: 10px; }
+      .trusted-stage { border-radius: 10px; }
+      .trusted-stage img { width: 100%; max-width: 100%; height: auto; object-fit: contain; }
+      .trusted-stage-caption { align-items: flex-start; flex-direction: column; gap: 5px; padding: 12px 13px; text-align: left; }
+      .reference-footer { padding: 42px 20px 20px; }
+      .reference-footer-grid { grid-template-columns: 1fr; gap: 26px; }
+    }
+    @media (max-width: 360px) {
+      .reference-header .btn { padding-inline: 9px; font-size: 9px; }
+      .reference-hero h1 { font-size: 38px; }
+      .reference-float { font-size: 9px; padding: 7px 8px; }
+      .reference-float.one { left: -3px; }
+      .reference-float.two { right: -3px; }
+      .reference-float.three { right: 0; }
+    }
     @media (prefers-reduced-motion: reduce) {
       .macbook, .reference-float, .reference-marquee-track { animation: none !important; }
       .reference-screen, .reference-feature, .reference-offer-card, .reference-offer-card::before, .reference-offer-card::after, .trusted-stage img { transition: none !important; }
