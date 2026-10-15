@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { profileRows, rdProfileField } from "./FunnelOpportunityProfile";
+import { isRDBuyerDeal, isRDOpportunityDeal, profileRows, rdProfileField } from "./FunnelOpportunityProfile";
 
 describe("FunnelOpportunityProfile", () => {
   it("normaliza aliases RD com prefixo de contato e acentos", () => {
@@ -13,5 +13,17 @@ describe("FunnelOpportunityProfile", () => {
       { key: "SP", count: 3 },
       { key: "Não informado", count: 2 },
     ]);
+  });
+
+  it("reconhece oportunidade pelo nome canônico mesmo quando o bucket legado diverge", () => {
+    const deal = { stage_bucket: "sql", rd_stage_name: "Oportunidade", win: false } as any;
+    expect(isRDOpportunityDeal(deal)).toBe(true);
+    expect(isRDBuyerDeal(deal)).toBe(false);
+  });
+
+  it("mantém venda ganha fora do grupo de oportunidades", () => {
+    const deal = { stage_bucket: "opportunity", rd_stage_name: "Venda Realizada", win: true } as any;
+    expect(isRDOpportunityDeal(deal)).toBe(false);
+    expect(isRDBuyerDeal(deal)).toBe(true);
   });
 });
