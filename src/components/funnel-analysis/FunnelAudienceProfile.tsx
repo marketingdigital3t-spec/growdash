@@ -60,7 +60,11 @@ export function resolveRDPeriodDeals(
 export function rdPeriodCountLabel(count: number, loading: boolean, unavailable: boolean) {
   if (loading) return "Sincronizando";
   if (unavailable) return "Indisponível";
-  return `${count.toLocaleString("pt-BR")} cadastros`;
+  // Este conjunto combina negócios criados no período com vendas fechadas no
+  // período, inclusive quando o lead foi criado antes da janela. Não chamar o
+  // total de “cadastros” evita apresentar uma contagem diferente do KPI de
+  // negociações criadas no RD como se fosse a mesma métrica.
+  return `${count.toLocaleString("pt-BR")} negociações no recorte`;
 }
 
 export const audienceBreakdowns: ReadonlyArray<{

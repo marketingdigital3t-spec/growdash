@@ -26,6 +26,6 @@ describe("RD period scope", () => {
   it("does not show a prior period count while syncing or when RD is unavailable", () => {
     expect(rdPeriodCountLabel(333, true, false)).toBe("Sincronizando");
     expect(rdPeriodCountLabel(333, false, true)).toBe("Indisponível");
-    expect(rdPeriodCountLabel(0, false, false)).toBe("0 cadastros");
+    expect(rdPeriodCountLabel(0, false, false)).toBe("0 negociações no recorte");
   });
 });
