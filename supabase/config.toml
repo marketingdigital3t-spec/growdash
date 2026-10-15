@@ -105,3 +105,9 @@ verify_jwt = false
 
 [functions.google-sheets-sync]
 verify_jwt = true
+
+[functions.crm-lead-webhook]
+verify_jwt = false
+
+[functions.crm-lead-webhook-config]
+verify_jwt = true

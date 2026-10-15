@@ -193,6 +193,37 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
   };
 }
 
+async function readCRMLeads(admin: any, userId: string, args: Record<string, unknown>) {
+  const workspaceId = typeof args.workspace_id === "string" ? args.workspace_id : "";
+  if (!workspaceId) throw new Error("workspace_id é obrigatório para consultar leads do CRM.");
+  const { data: membership, error: membershipError } = await admin.from("workspace_members")
+    .select("workspace_id").eq("workspace_id", workspaceId).eq("user_id", userId).eq("status", "active").maybeSingle();
+  if (membershipError) throw membershipError;
+  if (!membership) throw new Error("Workspace não autorizado.");
+  const status = typeof args.status === "string" ? args.status : "";
+  const sourceProvider = typeof args.source_provider === "string" ? args.source_provider : "";
+  const startDate = validDate(args.start_date) ? args.start_date as string : null;
+  const endDate = validDate(args.end_date) ? args.end_date as string : null;
+  if (args.start_date && !startDate || args.end_date && !endDate) throw new Error("start_date/end_date devem ser datas civis válidas (YYYY-MM-DD).");
+  let query = admin.from("crm_leads")
+    .select("id,workspace_id,source_provider,external_id,full_name,email,phone,lead_city,lead_state,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,fbclid,gclid,ttclid,landing_page,referrer,ad_account_id,campaign_id,adset_id,ad_id,first_received_at,last_received_at,created_at,updated_at")
+    .eq("workspace_id", workspaceId).order("first_received_at", { ascending: false });
+  if (status) query = query.eq("status", status);
+  if (sourceProvider) query = query.eq("source_provider", sourceProvider);
+  if (startDate) query = query.gte("first_received_at", `${startDate}T00:00:00.000Z`);
+  if (endDate) query = query.lt("first_received_at", `${endDate}T23:59:59.999Z`);
+  const limit = Math.max(1, Math.min(500, Number(args.limit) || 100));
+  const leads = await readPages(query.limit(limit));
+  return {
+    source: "Growdash CRM leads",
+    scope: { workspace_id: workspaceId, source_provider: sourceProvider || "all", status: status || "all", start_date: startDate, end_date: endDate },
+    status: "available",
+    count: leads.length,
+    truncated: leads.length >= limit,
+    leads,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
@@ -211,22 +242,38 @@ Deno.serve(async (req) => {
     if (rpc.method === "notifications/initialized") return new Response(null, { status: 202, headers: corsHeaders });
     if (rpc.method === "initialize") return json({ jsonrpc: "2.0", id, result: { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "growdash-meta-traffic", version: "1.0.0" } } });
     if (rpc.method === "ping") return json({ jsonrpc: "2.0", id, result: {} });
-    if (rpc.method === "tools/list") return json({ jsonrpc: "2.0", id, result: { tools: [{
-      name: "get_meta_traffic_metrics",
-      description: "Consulta snapshots Meta por UUID interno de conta, campanhas opcionais e intervalo civil inclusivo. Leads = formulários + site + conversas iniciadas, com aliases equivalentes deduplicados. Nunca usa insights.leads.",
-      inputSchema: { type: "object", additionalProperties: false, required: ["account_ids", "start_date", "end_date"], properties: {
-        account_ids: { type: "array", minItems: 1, items: { type: "string", format: "uuid" }, description: "UUIDs internos de ad_accounts que o usuário autenticado pode acessar." },
-        campaign_ids: { type: "array", items: { type: "string" }, description: "IDs de campanha Meta internos/externos conforme persistidos em insights.campaign_id." },
-        start_date: { type: "string", format: "date" },
-        end_date: { type: "string", format: "date" },
-      } },
-    }] } });
+    if (rpc.method === "tools/list") return json({ jsonrpc: "2.0", id, result: { tools: [
+      {
+        name: "get_meta_traffic_metrics",
+        description: "Consulta snapshots Meta por UUID interno de conta, campanhas opcionais e intervalo civil inclusivo. Leads = formulários + site + conversas iniciadas, com aliases equivalentes deduplicados. Nunca usa insights.leads.",
+        inputSchema: { type: "object", additionalProperties: false, required: ["account_ids", "start_date", "end_date"], properties: {
+          account_ids: { type: "array", minItems: 1, items: { type: "string", format: "uuid" }, description: "UUIDs internos de ad_accounts que o usuário autenticado pode acessar." },
+          campaign_ids: { type: "array", items: { type: "string" }, description: "IDs de campanha Meta internos/externos conforme persistidos em insights.campaign_id." },
+          start_date: { type: "string", format: "date" },
+          end_date: { type: "string", format: "date" },
+        } },
+      },
+      {
+        name: "get_crm_leads",
+        description: "Consulta leads normalizados do CRM próprio por workspace, origem, status e período. Não retorna o payload bruto; informa escopo e quantidade para rastreabilidade.",
+        inputSchema: { type: "object", additionalProperties: false, required: ["workspace_id"], properties: {
+          workspace_id: { type: "string", format: "uuid" },
+          source_provider: { type: "string" },
+          status: { type: "string", enum: ["new", "contacted", "qualified", "opportunity", "won", "lost", "archived"] },
+          start_date: { type: "string", format: "date" },
+          end_date: { type: "string", format: "date" },
+          limit: { type: "integer", minimum: 1, maximum: 500 },
+        } },
+      },
+    ] } });
     if (rpc.method === "tools/call") {
       const params = rpc.params || {};
-      if (params.name !== "get_meta_traffic_metrics") return json(rpcError(id, -32602, "Unknown tool"), 400);
+      if (!["get_meta_traffic_metrics", "get_crm_leads"].includes(params.name)) return json(rpcError(id, -32602, "Unknown tool"), 400);
       try {
         const admin = createClient(url, serviceKey);
-        const result = await readMetaMetrics(admin, userData.user.id, params.arguments || {});
+        const result = params.name === "get_crm_leads"
+          ? await readCRMLeads(admin, userData.user.id, params.arguments || {})
+          : await readMetaMetrics(admin, userData.user.id, params.arguments || {});
         return json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result, isError: false } });
       } catch (error) {
         const message = error instanceof Error ? error.message : "META_METRICS_QUERY_FAILED";

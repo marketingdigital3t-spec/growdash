@@ -27,12 +27,13 @@ import {
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { businessDateKey } from "@/lib/businessDate";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useProducts } from "@/hooks/useProducts";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
@@ -52,7 +53,7 @@ import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
 import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { isDealInRDAccountOrFunnelScope, isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
-import { isCanonicalWonDealInPeriod } from "@/lib/canonicalMetrics";
+import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
 import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { useInsights } from "@/hooks/useInsights";
 import { useLeadAttributionCatalog } from "@/hooks/useLeadAttributionCatalog";
@@ -77,6 +78,14 @@ type PipelineStage = {
   rdFunnelId?: string | null;
   rdStageId?: string | null;
 };
+
+type FirstPartyLead = { id: string; status: string | null; source_provider: string | null; first_received_at: string | null; utm_source: string | null; utm_campaign: string | null };
+type FirstPartyLeadQuery = {
+  eq: (column: string, value: unknown) => FirstPartyLeadQuery;
+  order: (column: string, options: { ascending: boolean }) => FirstPartyLeadQuery;
+  limit: (count: number) => Promise<{ data: FirstPartyLead[] | null; error: Error | null }>;
+};
+type FirstPartyLeadTable = { select: (columns: string) => FirstPartyLeadQuery };
 
 // RD stage IDs are only unique within a pipeline. This key is retained for
 // single-account views and as the source key for the consolidated mapping.
@@ -124,6 +133,7 @@ export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { data: workspace } = useWorkspace();
   const {
     adAccountId,
     setAdAccountId,
@@ -189,6 +199,31 @@ export default function CrmPage() {
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
   const { data: attributionInsights = [] } = useInsights({ adAccountIds: accountScopeIds, startDate, endDate, enabled: canReadCrm && accountScopeIds.length > 0 });
+  const { data: firstPartyLeads = [] } = useQuery({
+    queryKey: ["crm_leads", workspace?.id],
+    enabled: !!workspace?.id,
+    queryFn: async () => {
+      const from = supabase.from.bind(supabase) as unknown as (table: string) => FirstPartyLeadTable;
+      const { data, error } = await from("crm_leads")
+        .select("id,status,source_provider,first_received_at,utm_source,utm_campaign")
+        .eq("workspace_id", workspace!.id)
+        .order("first_received_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 30_000,
+  });
+  const firstPartyLeadsInPeriod = useMemo(() => {
+    if (preset === "max") return firstPartyLeads;
+    const bounds = saoPauloDayBounds(startDate, endDate);
+    const start = bounds.start.getTime();
+    const end = bounds.end.getTime();
+    return firstPartyLeads.filter((lead: FirstPartyLead) => {
+      const timestamp = new Date(lead.first_received_at || 0).getTime();
+      return timestamp >= start && timestamp <= end;
+    });
+  }, [endDate, firstPartyLeads, preset, startDate]);
   const { data: products = [], isLoading: loadingProducts } = useProducts();
   const [view, setView] = useState<CRMView>(() => {
     if (searchParams.get("tab") === "ai") return "ai";
@@ -654,6 +689,14 @@ export default function CrmPage() {
               description={`${number.format(stats.won)} ganhas de ${number.format(stats.total)} negociações · ${number.format(stats.lost)} perdidas`}
               icon={<Target className="h-4 w-4" />}
               tone="success"
+            />
+            <CrmMetricCard
+              source="CRM próprio · webhook"
+              label="Leads recebidos"
+              value={number.format(firstPartyLeadsInPeriod.length)}
+              description={`${number.format(firstPartyLeadsInPeriod.filter((lead: { status?: string }) => lead.status === "new").length)} novos · UTMs preservadas na entrada`}
+              icon={<UsersRound className="h-4 w-4" />}
+              tone="meta"
             />
           </div>
         </section>

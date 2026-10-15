@@ -53,7 +53,14 @@ Deno.serve(async (req) => {
     const requestedAccountIds = Array.isArray(body?.scope?.accountIds) ? Array.from(new Set(body.scope.accountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0))) : [];
     const funnelIds = Array.isArray(body?.scope?.funnelIds) ? body.scope.funnelIds.filter((id: unknown) => typeof id === "string") : [];
     const admin = createClient(url, serviceKey);
-    const { data: workspace, error: workspaceError } = await admin.from("workspaces").select("id,name,timezone").eq("owner_id", user.id).order("created_at").limit(1).maybeSingle();
+    // Workspace membership, not ownership, is the source of authorization for
+    // SaaS members. The previous owner-only lookup made permitted analysts and
+    // operators lose the agent context even though RLS granted them access.
+    const { data: membership, error: membershipError } = await admin.from("workspace_members")
+      .select("workspace_id,role,created_at")
+      .eq("user_id", user.id).eq("status", "active").order("created_at").limit(1).maybeSingle();
+    if (membershipError || !membership) return json({ error: "WORKSPACE_NOT_FOUND" }, 404);
+    const { data: workspace, error: workspaceError } = await admin.from("workspaces").select("id,name,timezone").eq("id", membership.workspace_id).maybeSingle();
     if (workspaceError || !workspace) return json({ error: "WORKSPACE_NOT_FOUND" }, 404);
     let accountQuery = admin.from("ad_accounts").select("id,name,attribution_window,timezone_name").eq("user_id", user.id);
     if (requestedAccountIds.length) accountQuery = accountQuery.in("id", requestedAccountIds);
@@ -160,6 +167,22 @@ Deno.serve(async (req) => {
     }, { spend: 0, impressions: 0, clicks: 0, leads: 0, rows: 0, counted: new Set<string>() });
     const leadActionSnapshotAvailable = actionsConfirmed
       && siteScope.complete && !siteScope.error;
+    let crmLeadQuery = admin.from("crm_leads")
+      .select("id,status,source_provider,first_received_at,last_received_at,utm_source,utm_campaign")
+      .eq("workspace_id", workspace.id).order("first_received_at", { ascending: false }).limit(1000);
+    if (startDate) crmLeadQuery = crmLeadQuery.gte("first_received_at", `${startDate}T00:00:00.000Z`);
+    if (endDate) crmLeadQuery = crmLeadQuery.lt("first_received_at", `${endDate}T23:59:59.999Z`);
+    const { data: crmLeads, error: crmLeadError } = await crmLeadQuery;
+    if (crmLeadError) throw crmLeadError;
+    const crmLeadFacts = {
+      source: "Growdash CRM leads",
+      status: "confirmed",
+      rows: crmLeads?.length || 0,
+      by_status: Object.fromEntries(Array.from(new Set((crmLeads || []).map((lead) => lead.status))).map((value) => [value, (crmLeads || []).filter((lead) => lead.status === value).length])),
+      by_source: Object.fromEntries(Array.from(new Set((crmLeads || []).map((lead) => lead.source_provider))).map((value) => [value, (crmLeads || []).filter((lead) => lead.source_provider === value).length])),
+      tracking_rows: (crmLeads || []).filter((lead) => lead.utm_source || lead.utm_campaign).length,
+      period: { start_date: startDate, end_date: endDate },
+    };
     const factsForModel = {
       spend: insightsConfirmed ? facts.spend : null,
       impressions: insightsConfirmed ? facts.impressions : null,
@@ -172,13 +195,15 @@ Deno.serve(async (req) => {
       action_rows: actionRowCount,
       attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),
       timezone_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
+      crm_leads: crmLeadFacts,
     };
     const sourceNote = [
       { type: "meta", reference: "insights", label: insightsConfirmed ? `${facts.rows} linhas confirmadas de entrega Meta` : "Insights Meta sem cobertura confirmada para todas as contas" },
       { type: "meta", reference: "insight_actions", label: leadActionSnapshotAvailable ? `${actionRowCount} linhas de ações Meta canônicas; cobertura confirmada` : "Ações de lead Meta indisponíveis neste recorte" },
+      { type: "crm", reference: "crm_leads", label: `${crmLeadFacts.rows} leads do CRM próprio no período; rastreamento em ${crmLeadFacts.tracking_rows} registro(s)` },
     ];
     const scopeLabel = `${startDate || "período disponível"} a ${endDate || "hoje"}`;
-    const system = `Você é o agente ${agent.name} da Growdash, departamento ${agent.department || role}. Responda em português do Brasil. Escopo: ${scopeLabel}. Conta(s) Meta: ${accountIds.join(", ") || "nenhuma conta selecionada"}. Funil(is) RD: ${funnelIds.join(", ") || "não filtrado"}. Use somente os fatos fornecidos. Se insights_status for unavailable, diga que investimento e entrega Meta estão indisponíveis, não zero; se leads_status for unavailable, diga que Leads Meta e CPL estão indisponíveis, não zero. Nunca use leads legado. Diferencie Meta de RD; não atribua dados de CRM à Meta. Nunca invente zero. Você pode analisar e preparar recomendações, mas não promete executar alterações. Fatos Meta: ${JSON.stringify(factsForModel)}.`;
+    const system = `Você é o agente ${agent.name} da Growdash, departamento ${agent.department || role}. Responda em português do Brasil. Escopo: ${scopeLabel}. Conta(s) Meta: ${accountIds.join(", ") || "nenhuma conta selecionada"}. Funil(is) RD: ${funnelIds.join(", ") || "não filtrado"}. Use somente os fatos fornecidos. Se insights_status for unavailable, diga que investimento e entrega Meta estão indisponíveis, não zero; se leads_status for unavailable, diga que Leads Meta e CPL estão indisponíveis, não zero. Nunca use leads legado. Diferencie Meta, RD e CRM próprio; não atribua dados de CRM à Meta. Nunca invente zero. O histórico da conversa é contexto de linguagem, nunca fonte factual. Você pode analisar e preparar recomendações, mas não promete executar alterações. Fatos recuperados: ${JSON.stringify(factsForModel)}.`;
     const model = await callModel([{ role: "system", content: system }, ...((history.data || []).reverse() as Array<{ role: string; content: string }>), { role: "user", content: question }]);
     const userMessage = await admin.from("agent_office_messages").insert({ workspace_id: workspace.id, agent_id: agent.id, conversation_id: conversationId, role: "user", content: question, sources: [], scope: { accountIds, funnelIds, startDate, endDate } }).select("id").single();
     const agentMessage = await admin.from("agent_office_messages").insert({ workspace_id: workspace.id, agent_id: agent.id, conversation_id: conversationId, role: "agent", content: model.content, sources: sourceNote, scope: { accountIds, funnelIds, startDate, endDate } }).select("id,created_at").single();
