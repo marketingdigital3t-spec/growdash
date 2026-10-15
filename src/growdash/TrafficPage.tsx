@@ -6,7 +6,7 @@ import {
   BarChart3, Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, CreditCard,
   ExternalLink, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
   Network, RefreshCw, Settings2, Smartphone, Sparkles, Target, UsersRound, Video,
-  WalletCards, Wrench, Zap, Presentation, ShieldCheck,
+  WalletCards, Wrench, Zap, Presentation, ShieldCheck, Tag,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 import { FunnelAudienceProfile, useAudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
 import TrafficAgentPage from "@/growdash/TrafficAgentPage";
+import AudienceNamingStandardizer from "@/components/campaigns/AudienceNamingStandardizer";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import CampaignsManager from "@/pages/Campaigns";
@@ -38,13 +39,14 @@ import funnelPilulaAulaGratuita from "@/assets/zntt-funnels/02-pilula-aula-gratu
 import funnelDemandaReprimida from "@/assets/zntt-funnels/03-demanda-reprimida.png";
 import funnelSocialSeller from "@/assets/zntt-funnels/04-social-seller.png";
 
-const validTabs = new Set(["campaigns", "manager", "budget", "ai", "funnels", "presentation", "tools"]);
+const validTabs = new Set(["campaigns", "manager", "budget", "ai", "funnels", "audiences", "presentation", "tools"]);
 const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
   { id: "manager", label: "Gestor autônomo", icon: ShieldCheck },
   { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
   { id: "ai", label: "IA & Relatórios de Leads", icon: Bot },
   { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
+  { id: "audiences", label: "Padronizar públicos", icon: Tag },
   { id: "presentation", label: "Apresentação", icon: Presentation },
   { id: "tools", label: "Ferramentas Meta", icon: Wrench },
 ] as const;
@@ -88,6 +90,7 @@ export default function TrafficPage() {
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
       {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, attribution_window: item.attribution_window }))} />}
       {activeTab === "funnels" && <TrafficFunnels />}
+      {activeTab === "audiences" && <AudienceNamingStandardizer />}
       {activeTab === "presentation" && <PaidTrafficPresentation />}
       {activeTab === "tools" && <MetaToolsWorkspace
         providerAccountId={account?.account_id}
