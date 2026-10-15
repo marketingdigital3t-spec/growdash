@@ -9417,3 +9417,212 @@ body,
   .auth-hero-description svg { margin-right: 7px; }
   .auth-hero-foot { bottom: 5%; font-size: 9px; }
 }
+
+/* -------------------------------------------------------------------------
+   Growdash semantic theme contract (final)
+
+   The rules above contain legacy presentation layers from earlier dashboard
+   experiments. This layer is intentionally last so the content canvas follows
+   the selected theme while the product chrome remains an invariant black
+   surface. No filter/invert tricks are used: text, borders and surfaces each
+   receive an explicit semantic token.
+   ------------------------------------------------------------------------- */
+:root {
+  --gd-content-bg: 220 24% 97%;
+  --gd-content-surface: 0 0% 100%;
+  --gd-content-elevated: 220 24% 99%;
+  --gd-content-text: 222 28% 13%;
+  --gd-content-muted: 215 16% 38%;
+  --gd-content-disabled: 215 12% 58%;
+  --gd-content-border: 214 20% 86%;
+  --gd-content-divider: 214 18% 91%;
+  --gd-content-hover: 220 22% 94%;
+  --gd-content-selection: 217 91% 60%;
+  --gd-content-overlay: 222 28% 13% / .52;
+  --gd-content-tooltip: 222 28% 13%;
+  --gd-content-skeleton: 215 20% 90%;
+  --gd-semantic-primary: 221 83% 48%;
+  --gd-semantic-primary-foreground: 0 0% 100%;
+  --gd-semantic-success: 142 71% 35%;
+  --gd-semantic-warning: 36 92% 40%;
+  --gd-semantic-danger: 0 72% 48%;
+  --gd-semantic-info: 199 89% 42%;
+}
+
+.dark {
+  --gd-content-bg: 222 24% 7%;
+  --gd-content-surface: 220 21% 11%;
+  --gd-content-elevated: 220 20% 14%;
+  --gd-content-text: 218 30% 97%;
+  --gd-content-muted: 216 17% 72%;
+  --gd-content-disabled: 216 12% 52%;
+  --gd-content-border: 216 18% 23%;
+  --gd-content-divider: 216 16% 18%;
+  --gd-content-hover: 220 19% 16%;
+  --gd-content-selection: 217 91% 65%;
+  --gd-content-overlay: 0 0% 0% / .68;
+  --gd-content-tooltip: 218 30% 97%;
+  --gd-content-skeleton: 216 17% 19%;
+  --gd-semantic-primary: 217 91% 65%;
+  --gd-semantic-primary-foreground: 222 35% 10%;
+  --gd-semantic-success: 142 71% 52%;
+  --gd-semantic-warning: 38 92% 58%;
+  --gd-semantic-danger: 0 84% 68%;
+  --gd-semantic-info: 199 89% 65%;
+}
+
+/* Content owns the theme; the shell does not. */
+.brand-shell,
+.brand-shell[data-space-phase] {
+  --background: var(--gd-content-bg) !important;
+  --foreground: var(--gd-content-text) !important;
+  --card: var(--gd-content-surface) !important;
+  --card-foreground: var(--gd-content-text) !important;
+  --popover: var(--gd-content-elevated) !important;
+  --popover-foreground: var(--gd-content-text) !important;
+  --muted: var(--gd-content-hover) !important;
+  --muted-foreground: var(--gd-content-muted) !important;
+  --border: var(--gd-content-border) !important;
+  --input: var(--gd-content-border) !important;
+  --primary: var(--gd-semantic-primary) !important;
+  --primary-foreground: var(--gd-semantic-primary-foreground) !important;
+  --ring: var(--gd-content-selection) !important;
+  background: hsl(var(--gd-content-bg)) !important;
+  color: hsl(var(--gd-content-text)) !important;
+}
+
+/* The global chrome is always black in light and dark mode. */
+.brand-shell .brand-sidebar,
+.brand-shell .brand-topbar,
+.brand-shell .brand-topbar.growdash-global-header,
+.brand-shell[data-space-phase] .brand-sidebar,
+.brand-shell[data-space-phase] .brand-topbar {
+  background: #050505 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, .16) !important;
+}
+
+.brand-shell .brand-sidebar :is(a, button, span, svg),
+.brand-shell .brand-topbar :is(a, button, span, svg) {
+  color: #f8fafc !important;
+}
+
+.brand-shell .brand-sidebar :is(a, button):hover,
+.brand-shell .brand-topbar :is(a, button):hover {
+  background: rgba(255, 255, 255, .09) !important;
+}
+
+.brand-shell .brand-sidebar nav a[aria-current="page"],
+.brand-shell .brand-sidebar nav a[data-state="active"] {
+  background: rgba(255, 255, 255, .15) !important;
+  border-color: rgba(255, 255, 255, .24) !important;
+  color: #ffffff !important;
+}
+
+/* Shared canvas and surfaces. Components can still opt into a purposeful
+   dark visualization by using their own named surface class. */
+.brand-shell .growdash-main,
+.brand-shell[data-space-phase] .growdash-main,
+.brand-shell :is(.dashboard-page, .gd-funnel-analysis, .event-classes-page,
+  .expert-dashboard, .crm-page, .commercial-page, .paid-traffic-page,
+  .agenda-page, .kanban-page, .finance-page, .integrations-page,
+  .strategy-page, .storage-page, .business-page, .whatsapp-page,
+  .analytics-module, .historical-module) {
+  background: hsl(var(--gd-content-bg)) !important;
+  color: hsl(var(--gd-content-text)) !important;
+}
+
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card,
+  .gd-metric-card, .dashboard-video-glass) {
+  background: hsl(var(--gd-content-surface)) !important;
+  color: hsl(var(--gd-content-text)) !important;
+  border-color: hsl(var(--gd-content-border)) !important;
+  box-shadow: 0 12px 30px hsl(222 28% 13% / .07) !important;
+}
+
+.dark .brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card,
+  .gd-metric-card, .dashboard-video-glass) {
+  background: hsl(var(--gd-content-surface)) !important;
+  box-shadow: 0 18px 42px hsl(0 0% 0% / .28) !important;
+}
+
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .gd-metric-card)
+  :is(h1, h2, h3, h4, h5, p, span, strong, label, td, th) {
+  color: hsl(var(--gd-content-text));
+}
+
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .gd-metric-card)
+  .text-muted-foreground,
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .gd-metric-card)
+  [class*="text-white/"] {
+  color: hsl(var(--gd-content-muted)) !important;
+}
+
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .gd-metric-card)
+  :is(input, select, textarea) {
+  background: hsl(var(--gd-content-elevated)) !important;
+  color: hsl(var(--gd-content-text)) !important;
+  border-color: hsl(var(--gd-content-border)) !important;
+}
+
+.brand-shell :is(button, [role="tab"], .gd-filter-control, .gd-filter-account) {
+  border-color: hsl(var(--gd-content-border)) !important;
+}
+
+.brand-shell :is(button, [role="tab"]):hover:not(:disabled) {
+  background: hsl(var(--gd-content-hover)) !important;
+}
+
+.brand-shell :is(button, [role="tab"])[data-state="active"],
+.brand-shell [role="tab"][aria-selected="true"] {
+  background: hsl(var(--gd-content-text)) !important;
+  color: hsl(var(--gd-content-bg)) !important;
+  border-color: hsl(var(--gd-content-text)) !important;
+}
+
+/* Restore semantic primary styling after the legacy monochrome overrides. */
+.brand-shell :is(.text-primary, [class*="text-primary"]) {
+  color: hsl(var(--gd-semantic-primary)) !important;
+}
+
+.brand-shell :is(button.bg-primary, [class~="bg-primary"]) {
+  background: hsl(var(--gd-semantic-primary)) !important;
+  border-color: hsl(var(--gd-semantic-primary)) !important;
+  color: hsl(var(--gd-semantic-primary-foreground)) !important;
+}
+
+.brand-shell :is(button.bg-primary, [class~="bg-primary"]):hover:not(:disabled) {
+  background: hsl(var(--gd-semantic-primary) / .88) !important;
+  border-color: hsl(var(--gd-semantic-primary) / .88) !important;
+  color: hsl(var(--gd-semantic-primary-foreground)) !important;
+}
+
+html:not(.dark) .brand-shell :is(.text-white, [class*="text-white/"]) {
+  color: hsl(var(--gd-content-text)) !important;
+}
+
+html:not(.dark) .brand-shell :is(button.bg-primary, [class~="bg-primary"],
+  .brand-sidebar, .brand-topbar) :is(.text-white, [class*="text-white/"]) {
+  color: inherit !important;
+}
+
+/* Tables, dividers, charts and loading states use the same contract. */
+.brand-shell :is(table, thead, tbody, tr, td, th) {
+  border-color: hsl(var(--gd-content-divider)) !important;
+}
+
+.brand-shell :is(.border-border, .divide-border) { border-color: hsl(var(--gd-content-border)) !important; }
+.brand-shell :is(.bg-muted, .bg-muted\/15, .bg-muted\/60) { background-color: hsl(var(--gd-content-hover)) !important; }
+.brand-shell .recharts-cartesian-grid line { stroke: hsl(var(--gd-content-border)) !important; }
+.brand-shell :is(.skeleton, [data-skeleton="true"]) { background: hsl(var(--gd-content-skeleton)) !important; }
+
+/* Keep the monthly goal track black as part of the topbar; only its fill is
+   data-colored by DashboardGoalProgress.tsx. */
+.brand-shell .brand-topbar [aria-label^="Progresso da meta"] {
+  background: rgba(255, 255, 255, .1) !important;
+  border-color: rgba(255, 255, 255, .16) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-shell .brand-topbar [aria-label^="Progresso da meta"] + div { transition: none !important; }
+}
