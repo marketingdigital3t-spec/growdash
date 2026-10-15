@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { goalColorForPercentage, goalProgress } from "@/lib/monthlyGoal";
+import { goalColorForPercentage, goalPercentage, goalProgress } from "@/lib/monthlyGoal";
 
 describe("monthly goal presentation", () => {
   it("clamps a valid progress value to the visible bar", () => {
     expect(goalProgress(0, 10)).toBe(0);
     expect(goalProgress(5, 10)).toBe(50);
     expect(goalProgress(12, 10)).toBe(100);
+    expect(goalPercentage(12, 10)).toBe(120);
     expect(goalProgress(10, 0)).toBe(0);
   });
 

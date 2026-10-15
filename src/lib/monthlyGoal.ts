@@ -4,9 +4,14 @@ const GOAL_RED: Rgb = { r: 239, g: 68, b: 68 };
 const GOAL_YELLOW: Rgb = { r: 245, g: 158, b: 11 };
 const GOAL_GREEN: Rgb = { r: 34, g: 197, b: 94 };
 
-export function goalProgress(value: number, target: number) {
+export function goalPercentage(value: number, target: number) {
   if (!Number.isFinite(value) || !Number.isFinite(target) || target <= 0) return 0;
-  return Math.min(Math.max(value / target * 100, 0), 100);
+  return Math.max(value / target * 100, 0);
+}
+
+/** Width is capped at the track boundary; the displayed percentage is not. */
+export function goalProgress(value: number, target: number) {
+  return Math.min(goalPercentage(value, target), 100);
 }
 
 function interpolateColor(from: Rgb, to: Rgb, progress: number): Rgb {
