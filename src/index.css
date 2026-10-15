@@ -9597,13 +9597,10 @@ body,
   color: hsl(var(--gd-semantic-primary-foreground)) !important;
 }
 
-html:not(.dark) .brand-shell :is(.text-white, [class*="text-white/"]) {
+html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
+  .dashboard-terra-card, .gd-metric-card, .dashboard-video-glass)
+  :is(.text-white, [class*="text-white/"]) {
   color: hsl(var(--gd-content-text)) !important;
-}
-
-html:not(.dark) .brand-shell :is(button.bg-primary, [class~="bg-primary"],
-  .brand-sidebar, .brand-topbar) :is(.text-white, [class*="text-white/"]) {
-  color: inherit !important;
 }
 
 /* Tables, dividers, charts and loading states use the same contract. */
