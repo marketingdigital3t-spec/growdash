@@ -9408,8 +9408,12 @@ body,
 .auth-hero-description { bottom: 12%; display: block; max-width: min(660px, 82%); margin-inline: auto; line-height: 1.55; text-align: center; text-wrap: balance; }
 .auth-hero-description svg { display: inline-block; margin-right: 11px; vertical-align: middle; }
 .auth-hero-foot { position: absolute; right: 0; bottom: 3%; left: 0; z-index: 3; display: block; margin: 0; color: rgba(255,255,255,.54); font-size: clamp(10px, .9vw, 13px); letter-spacing: .02em; text-align: center; text-transform: none; }
+.auth-hero-copy { transform: translateY(-5vh); }
+.auth-hero-description { bottom: 16%; }
+.auth-hero-foot { bottom: 7%; }
 @media (max-width: 600px) {
-  .auth-hero-description { bottom: 12%; max-width: 92%; line-height: 1.45; }
+  .auth-hero-copy { transform: translateY(-2vh); }
+  .auth-hero-description { bottom: 16%; max-width: 92%; line-height: 1.45; }
   .auth-hero-description svg { margin-right: 7px; }
-  .auth-hero-foot { bottom: 1%; font-size: 9px; }
+  .auth-hero-foot { bottom: 5%; font-size: 9px; }
 }
