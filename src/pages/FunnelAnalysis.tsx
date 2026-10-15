@@ -233,7 +233,10 @@ export default function FunnelAnalysis() {
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, queueRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_funnel_stages" }, queueRefresh)
       .subscribe();
-    const interval = window.setInterval(() => void refreshDistribution(), 10_000);
+    // Realtime events already trigger the refresh immediately. The interval is
+    // only a safety net for missed events, so it must not compete with the
+    // external Meta/RD synchronization every few seconds.
+    const interval = window.setInterval(() => void refreshDistribution(), 60_000);
     const onVisibility = () => { if (document.visibilityState === "visible") void refreshDistribution(); };
     document.addEventListener("visibilitychange", onVisibility);
     void refreshDistribution();
@@ -559,10 +562,11 @@ export default function FunnelAnalysis() {
             adAccountIds: effectiveAdAccountIds,
             startDate: metaSyncRange.startDate,
             endDate: metaSyncRange.endDate,
-            includeBreakdowns: true,
-            breakdownStartDate: businessDateKey(startDate),
-            breakdownEndDate: businessDateKey(endDate),
+            includeBreakdowns: false,
             force: true,
+            syncMode: "recent_window",
+            recentHours: 5,
+            fast: true,
             attributionWindow: selectedMetaScope.attributionWindow,
             timezone: selectedMetaScope.timezone,
           }),
@@ -571,8 +575,7 @@ export default function FunnelAnalysis() {
         metaResult = { status: "rejected", reason };
       }
 
-      const rdResults: PromiseSettledResult<unknown>[] = [];
-      for (const funnel of funnelsToSync) {
+      const rdResults = await Promise.all(funnelsToSync.map(async (funnel): PromiseSettledResult<unknown> => {
         try {
           const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
             body: {
@@ -607,25 +610,23 @@ export default function FunnelAnalysis() {
             const httpStatus = Number((error as any)?.context?.status || (error as any)?.status || 0);
             const errorText = `${(error as any)?.message || ""} ${(error as any)?.context?.body || ""}`;
             if (httpStatus === 409 || /409|already.?running|sincroniza[cç][aã]o.*andamento/i.test(errorText)) {
-              rdResults.push({ status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } });
-              continue;
+              return { status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } };
             }
             const details = await edgeFunctionErrorDetails(error);
             throw new Error(formatEdgeFunctionError(details));
           }
           if (data?.status === "already_running") {
-            rdResults.push({ status: "fulfilled", value: { status: "running", message: data.message } });
-            continue;
+            return { status: "fulfilled", value: { status: "running", message: data.message } };
           }
           if (data?.error || data?.success === false || data?.partial === true || (data?.status && data.status !== "success")) {
             const details = Array.isArray(data?.errors) && data.errors.length ? `: ${data.errors.join(" · ")}` : "";
             throw new Error(`${data?.error || data?.message || "Snapshot RD incompleto."}${details}`);
           }
-          rdResults.push({ status: "fulfilled", value: data });
+          return { status: "fulfilled", value: data };
         } catch (reason) {
-          rdResults.push({ status: "rejected", reason });
+          return { status: "rejected", reason };
         }
-      }
+      }));
 
       const rdFailures = rdResults.filter((result) => result.status === "rejected");
       if (metaResult.status === "rejected" && rdFailures.length === rdResults.length) {

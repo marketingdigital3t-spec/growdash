@@ -15,6 +15,10 @@ interface SyncParams {
   force?: boolean;
   attributionWindow?: string;
   timezone?: string;
+  syncMode?: "recent_window" | "selected_period";
+  recentHours?: number;
+  /** Atualiza somente o snapshot principal; leads e hourly seguem em segundo plano. */
+  fast?: boolean;
 }
 
 type SyncResponse = {
@@ -114,10 +118,30 @@ export function useSyncMeta() {
         force: params.force === true,
         attributionWindow: params.attributionWindow,
         timezone: params.timezone,
+        syncMode: params.syncMode,
+        recentHours: params.recentHours,
+        fast: params.fast === true,
       };
       // Hourly reconciliation reads the daily rows. Running both in parallel
       // caused races, inflated API usage and occasional non-2xx responses.
       const insights = await invokeSyncFunction("sync-meta-insights", body);
+      if (params.fast) {
+        return {
+          ...insights,
+          status: insights.status || "success",
+          success: insights.success !== false,
+          synced: Number(insights.synced ?? 0),
+          errors: insights.errors ?? [],
+          warnings: ["Leads e distribuição horária continuarão em segundo plano."],
+          block_status: {
+            insights: insights.status || "success",
+            leads: "pending",
+            hourly: "pending",
+          },
+          synced_at: insights.synced_at || new Date().toISOString(),
+          scope: insights.scope,
+        };
+      }
       let leads: SyncResponse = {};
       let leadsWarning: string | undefined;
       try {
