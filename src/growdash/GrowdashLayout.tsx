@@ -162,7 +162,7 @@ export default function GrowdashLayout() {
     startDate: startOfMonth(currentMonth),
     endDate: endOfMonth(currentMonth),
   }), [currentMonth]);
-  const { data: monthlySales = [] } = useSales({
+  const { data: monthlySales = [], isError: monthlySalesError, dataUpdatedAt: monthlySalesUpdatedAt } = useSales({
     startDate: monthlyRange.startDate,
     endDate: monthlyRange.endDate,
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
@@ -467,7 +467,7 @@ export default function GrowdashLayout() {
             <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
           </button>
           <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
-            <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} />
+            <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} revenueError={monthlySalesError} revenueSnapshotAvailable={monthlySalesUpdatedAt > 0} />
           </div>
         </header>
         <main
