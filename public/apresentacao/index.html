@@ -885,7 +885,7 @@
   </main>
   <footer><div class="wrap"><span class="brand"><span class="brand-mark">↗</span> growdash</span><span>Inteligência operacional para quem quer crescer.</span><span>© 2026 Growdash</span></div></footer>
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Imagem ampliada"><button type="button" id="lightbox-close" aria-label="Fechar imagem">×</button><img id="lightbox-image" alt=""></div>
-  <script>
+  <script type="text/plain" aria-hidden="true">
     const observer = new IntersectionObserver((entries) => entries.forEach((entry) => { if (entry.isIntersecting) entry.target.classList.add('visible'); }), { threshold: .12 });
     document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
     const progressBar = document.getElementById('scroll-progress');
@@ -1001,5 +1001,6 @@
     });
     try { const saved = JSON.parse(localStorage.getItem('growdash-presentation-copy-v3') || 'null'); if (Array.isArray(saved) && saved.length === editable.length) editable.forEach((el, i) => { el.innerHTML = saved[i]; }); } catch (_) {}
   </script>
+  <script src="app.js"></script>
 </body>
 </html>
