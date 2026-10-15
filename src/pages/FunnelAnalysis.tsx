@@ -593,14 +593,12 @@ export default function FunnelAnalysis() {
               refresh_amounts: preset === "max",
               start_date: businessDateKey(startDate),
               end_date: businessDateKey(endDate),
-              // Manual refresh follows the same bounded recent-sync budget;
-              // complete history is handled by the dedicated backfill path.
-              // The maximum calendar must mirror every page available in RD;
-              // the normal recent-range refresh remains bounded for speed.
-              // A consulta interativa fica limitada a três páginas por
-              // segmento (600 negócios). O backfill histórico continua sendo
-              // executado separadamente, sem bloquear a tela nem o Postgres.
-              max_pages: 3,
+              // Não limitar páginas no recorte selecionado. O RD entrega 200
+              // negócios por página; um teto fixo aqui fazia a sincronização
+              // parar em 600 registros por segmento e deixava a contagem da
+              // Growdash menor que a exibida no RD. A Edge Function encerra
+              // a leitura ao sair do período, respeita o orçamento de runtime
+              // e mantém cursor para continuar uma execução parcial.
             },
           });
           if (error) {
