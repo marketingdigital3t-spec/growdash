@@ -815,6 +815,24 @@
       .reference-feature-thumb { height: auto; aspect-ratio: 16 / 9; margin: 18px -17px -21px; }
       .reference-feature-thumb img { object-fit: cover; }
     }
+    /* Ritmo visual da primeira prova: cards com hierarquia editorial e telas reais em destaque. */
+    .reference-features { padding-top: 22px; padding-bottom: 24px; }
+    .reference-features::after { content: ''; position: absolute; z-index: -1; inset: -80px -4% -70px; pointer-events: none; background: radial-gradient(circle at 50% 25%, rgba(142,215,168,.07), transparent 42%); }
+    .reference-feature { display: flex; flex-direction: column; min-height: 0; padding-top: 21px; background: linear-gradient(145deg, rgba(19,27,38,.97), rgba(10,14,21,.97)); }
+    .reference-feature:nth-child(2) { transform: translateY(-16px); }
+    .reference-feature:nth-child(2):hover { transform: translateY(-23px); }
+    .reference-feature-icon { position: relative; width: 42px; height: 42px; border-radius: 12px; color: #8ed7a8; font-size: 0; }
+    .reference-feature-icon::before { content: '01'; font: 700 10px 'DM Mono', monospace; letter-spacing: .08em; }
+    .reference-feature:nth-child(2) .reference-feature-icon::before { content: '02'; }
+    .reference-feature:nth-child(3) .reference-feature-icon::before { content: '03'; }
+    .reference-feature h3 { margin-top: 17px; font-size: 20px; line-height: 1.05; }
+    .reference-feature p { max-width: 310px; }
+    .reference-feature-thumb { margin-top: 22px; }
+    .reference-feature-thumb img { filter: saturate(.92) contrast(1.04) brightness(1.06); }
+    @media (max-width: 800px) {
+      .reference-features { padding-top: 0; padding-bottom: 0; }
+      .reference-feature:nth-child(2), .reference-feature:nth-child(2):hover { transform: none; }
+    }
   </style>
 </head>
 <body>
