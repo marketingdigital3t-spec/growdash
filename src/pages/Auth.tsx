@@ -122,10 +122,11 @@ export default function Auth() {
       <div className="auth-hero-smoke auth-hero-smoke-a" aria-hidden="true" /><div className="auth-hero-smoke auth-hero-smoke-b" aria-hidden="true" />
       <div className="auth-hero-symbol" aria-hidden="true"><BrandMark /></div>
       <div className="auth-hero-copy">
-        <p className="auth-hero-tagline">Sua Jornada de Crescimento<br />Digital Começa Aqui</p>
+        <p className="auth-hero-tagline">Quem enxerga o negócio inteiro, escala mais rápido.</p>
         <p className="auth-hero-kicker">Growdash Intelligence System</p>
       </div>
-      <p className="auth-hero-description"><BarChart3 />Gestão de tráfego, funis e crescimento em um só lugar</p>
+      <p className="auth-hero-description"><BarChart3 />Leads, vendas, funil e faturamento — tudo em um só lugar. A Growdash mostra o que está gerando lucro na sua empresa.</p>
+      <p className="auth-hero-foot">Transforme dados em decisões. Decisões em crescimento.</p>
     </section>
     <motion.section initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .5, ease: "easeOut" }} className="auth-card-premium">
       <div className="auth-card-symbol" aria-hidden="true"><BrandMark /></div>
