@@ -13,6 +13,20 @@ type NumberRow = { id: string; workspace_id: string; phone_number_id: string; di
 type Conversation = { id: string; whatsapp_number_id: string; contact_name: string | null; contact_phone: string | null; status: string; summary: string | null; unread_count: number; last_message_at: string | null };
 type Message = { id: string; direction: "inbound" | "outbound"; body: string | null; sent_at: string; status: string };
 
+async function edgeFunctionErrorMessage(error: unknown) {
+  const candidate = error as { message?: string; context?: Response } | null;
+  const response = candidate?.context;
+  if (response && typeof response.clone === "function") {
+    try {
+      const payload = await response.clone().json() as { error?: string; message?: string };
+      if (payload?.error || payload?.message) return payload.error || payload.message || "Falha na integração.";
+    } catch {
+      // A resposta pode não ser JSON quando o gateway encerra a função.
+    }
+  }
+  return candidate?.message || "Não foi possível alcançar a função de conexão do WhatsApp.";
+}
+
 export default function WhatsApp() {
   const { data: workspace } = useWorkspace();
   const { user } = useAuth();
@@ -30,7 +44,7 @@ export default function WhatsApp() {
   const messages = useQuery({ queryKey: ["whatsapp_messages", selected?.id], enabled: !!selected?.id, queryFn: async () => { const { data, error } = await (supabase as any).from("whatsapp_messages").select("id,direction,body,sent_at,status").eq("conversation_id", selected!.id).order("sent_at"); if (error) throw error; return (data || []) as Message[]; }, staleTime: 10_000, refetchOnWindowFocus: true });
   const notes = useQuery({ queryKey: ["whatsapp_notes", selected?.id], enabled: !!selected?.id, queryFn: async () => { const { data, error } = await (supabase as any).from("whatsapp_conversation_notes").select("id,body,created_at").eq("conversation_id", selected!.id).order("created_at", { ascending: false }); if (error) throw error; return data || []; } });
   useEffect(() => { if (!workspaceId) return; const channel = supabase.channel(`whatsapp-live-${workspaceId}`).on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_conversations", filter: `workspace_id=eq.${workspaceId}` }, () => { void conversations.refetch(); }).on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_messages", filter: `workspace_id=eq.${workspaceId}` }, () => { void messages.refetch(); void conversations.refetch(); }).subscribe(); return () => { void supabase.removeChannel(channel); }; }, [workspaceId]);
-  const connect = useMutation({ mutationFn: async () => { const { data, error } = await supabase.functions.invoke("whatsapp-connect", { body: { workspace_id: workspaceId, waba_id: form.wabaId, phone_number_id: form.phoneNumberId, access_token: form.accessToken } }); if (error || data?.error) throw new Error(error?.message || data?.error); return data; }, onSuccess: () => { setForm({ wabaId: "", phoneNumberId: "", accessToken: "" }); setShowConnect(false); void numbers.refetch(); } });
+  const connect = useMutation({ mutationFn: async () => { const { data, error } = await supabase.functions.invoke("whatsapp-connect", { body: { workspace_id: workspaceId, waba_id: form.wabaId, phone_number_id: form.phoneNumberId, access_token: form.accessToken } }); if (error) throw new Error(await edgeFunctionErrorMessage(error)); if (data?.error) throw new Error(data.error); return data; }, onSuccess: () => { setForm({ wabaId: "", phoneNumberId: "", accessToken: "" }); setShowConnect(false); void numbers.refetch(); } });
   const send = useMutation({ mutationFn: async () => { const { data, error } = await supabase.functions.invoke("whatsapp-send", { body: { conversation_id: selected?.id, text: message } }); if (error || data?.error) throw new Error(error?.message || data?.error); }, onSuccess: () => { setMessage(""); void messages.refetch(); } });
   const saveNote = useMutation({ mutationFn: async () => { const { error } = await (supabase as any).from("whatsapp_conversation_notes").insert({ workspace_id: workspaceId, conversation_id: selected?.id, user_id: user?.id, body: note.trim() }); if (error) throw error; }, onSuccess: () => { setNote(""); void notes.refetch(); } });
   const selectedNumber = useMemo(() => numbers.data?.find((item) => item.id === selected?.whatsapp_number_id), [numbers.data, selected]);
