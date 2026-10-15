@@ -35,6 +35,22 @@ const closeLightbox = () => { if (lightbox) lightbox.classList.remove('open'); i
 let lightboxReturnFocus;
 const openLightbox = (item) => { lightboxReturnFocus = item; lightboxImage.src = item.dataset.lightbox; lightboxImage.alt = item.querySelector('img').alt; lightbox.classList.add('open'); document.getElementById('lightbox-close').focus(); };
 document.querySelectorAll('.gallery-image').forEach((item) => { item.addEventListener('click', () => openLightbox(item)); item.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openLightbox(item); } }); });
+const trustedStage = document.querySelector('.trusted-stage');
+const openTrustedLightbox = () => {
+  if (!trustedStage || !trustedImage || !lightbox || !lightboxImage) return;
+  lightboxReturnFocus = trustedStage;
+  lightboxImage.src = trustedImage.src;
+  lightboxImage.alt = trustedImage.alt;
+  lightbox.classList.add('open');
+  document.getElementById('lightbox-close')?.focus();
+};
+if (trustedStage) {
+  trustedStage.tabIndex = 0;
+  trustedStage.setAttribute('role', 'button');
+  trustedStage.setAttribute('aria-label', 'Ampliar captura real da plataforma');
+  trustedStage.addEventListener('click', openTrustedLightbox);
+  trustedStage.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openTrustedLightbox(); } });
+}
 document.getElementById('lightbox-close')?.addEventListener('click', closeLightbox);
 lightbox?.addEventListener('click', (event) => { if (event.target === lightbox) closeLightbox(); });
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && lightbox?.classList.contains('open')) { closeLightbox(); lightboxReturnFocus?.focus(); } });
