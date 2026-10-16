@@ -722,7 +722,31 @@ Deno.serve(async (req) => {
       })
       .select("id")
       .single();
-    if (runError) throw runError;
+    if (runError) {
+      // The partial unique index is the authoritative race guard. A manual
+      // refresh that loses the race with realtime must be reported as a
+      // normal in-progress response, not as an opaque HTTP 500.
+      if ((runError as any).code === "23505") {
+        const { data: active } = await admin
+          .from("sync_runs")
+          .select("id")
+          .eq("funnel_id", funnel.id)
+          .eq("status", "running")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return new Response(JSON.stringify({
+          ok: false,
+          status: "already_running",
+          run_id: active?.id || null,
+          message: "Este funil já possui uma sincronização em andamento.",
+        }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw runError;
+    }
     runId = runRow?.id || null;
 
     if (analytics_mode && typeof start_date === "string" && typeof end_date === "string"
@@ -1393,12 +1417,14 @@ Deno.serve(async (req) => {
             const id = String(item?.id || item?._id || "");
             const profile = existingProfiles.get(id);
             const complete = Boolean(profile?.raw) && Boolean(profile.contact_name || profile.contact_email || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
-            // A maximum reconciliation must refresh the authoritative RD
-            // amount for won deals even when the local contact snapshot is
-            // already complete. Otherwise revenue stays stuck on an old or
-            // abbreviated list response.
-            const won = isWonDeal(item) || item?.win === true;
-            return complete && !(refresh_amounts && won) ? { ...item, _storedProfile: profile } : processDeal(item);
+            // A list snapshot with the same provider timestamp/stage/value is
+            // already authoritative for the mirror. Rehydrating every won
+            // deal on every historical pass made two otherwise harmless
+            // syncs compete on the rd_deals triggers and could time out the
+            // whole run before the remaining pages were persisted. Changed
+            // rows (or incomplete local profiles) still go through the detail
+            // endpoint; unchanged rows are reconciled by identity below.
+            return complete ? { ...item, _storedProfile: profile } : processDeal(item);
           }));
           hydratedItems.push(...resolved);
           if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
@@ -1461,7 +1487,13 @@ Deno.serve(async (req) => {
         // returns the same provider timestamp/stage/value. Avoid rewriting
         // hundreds of unchanged deals during a manual reconciliation; the
         // IDs still count towards the complete snapshot through the set above.
-        if (sameProviderSnapshot && (!refresh_amounts || !won)) return null;
+        // Do not issue an UPDATE for an unchanged provider snapshot. Besides
+        // avoiding needless writes, this prevents the canonical sales
+        // triggers from recalculating the same row during a resumable
+        // historical reconciliation. The provider identity is still added
+        // to seenAnalyticsDealIds, so completeness and stale-row removal are
+        // unaffected.
+        if (sameProviderSnapshot) return null;
         const contact = { ...inline, ...firstContact, ...baseContact };
         const contactFields = firstContact.contact_custom_fields || contact.contact_custom_fields || baseContact.contact_custom_fields || [];
         const dealFields = Array.isArray(d.deal_custom_fields || d.custom_fields) ? (d.deal_custom_fields || d.custom_fields) : [];
