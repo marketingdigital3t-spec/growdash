@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
+import { buildPendingRDSyncCursors } from "../_shared/rdSyncCursor.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -790,13 +791,19 @@ Deno.serve(async (req) => {
     // a literal `null` through PostgREST's UUID equality filter (`eq(...,
     // null)` becomes `eq.null` and aborts the whole RD sync).
     let fieldConfigs: FieldConfig[] = [];
+    // Keep the fetched rows available to the field-catalog reconciliation
+    // below.  Declaring this inside the conditional made every funnel linked
+    // to a Meta account fail at the end of an otherwise successful sync with
+    // `fieldConfigsRows is not defined`.
+    let fieldConfigsRows: FieldConfig[] = [];
     if (funnel.ad_account_id) {
-      const { data: fieldConfigsRows, error: fieldConfigsError } = await admin
+      const { data, error: fieldConfigsError } = await admin
         .from("rd_field_configs")
         .select("key, rd_source, rd_field_label, rd_field_aliases, field_type, options")
         .eq("ad_account_id", funnel.ad_account_id);
       if (fieldConfigsError) throw fieldConfigsError;
-      fieldConfigs = (fieldConfigsRows as any[]) || [];
+      fieldConfigsRows = (data as FieldConfig[]) || [];
+      fieldConfigs = fieldConfigsRows;
     }
     // The RD API has no reliable per-pipeline custom-field catalogue. Observe
     // fields while reading every deal and upsert the account catalogue once at
@@ -1668,7 +1675,35 @@ Deno.serve(async (req) => {
         : { data: [] as Array<{ scope_key: string; segment: string; next_page: number }> };
       const cursorBySegment = new Map((storedCursors || []).map((row: any) => [String(row.segment), Number(row.next_page) || 1]));
 
-      segmentLoop: for (const segment of analyticsSegments) {
+      // Persist the current segment and every segment that has not started yet
+      // whenever the invocation budget ends. Without this checkpoint a worker
+      // that processes `won` and then reaches max_pages/runtime before
+      // `ongoing` starts leaves no cursor for the remaining statuses; the next
+      // invocation then restarts at the first segment forever and the RD mirror
+      // never reaches older sales.
+      async function persistPendingCursors(startIndex: number, currentPage: number) {
+        if (!analytics_mode) return;
+        const pending = buildPendingRDSyncCursors(analyticsSegments, startIndex, currentPage);
+        for (const pendingSegment of pending) {
+          const scopeKey = `${cursorPrefix}|${pendingSegment.name}`;
+          const { error } = await admin.from("rd_sync_cursors").upsert({
+            scope_key: scopeKey,
+            funnel_id: funnel.id,
+            rd_connection_id: funnel.rd_connection_id,
+            start_date: start_date || null,
+            end_date: end_date || null,
+            segment: pendingSegment.name,
+            next_page: pendingSegment.nextPage,
+            status: "partial",
+            last_error: null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "scope_key" });
+          if (error) throw error;
+        }
+      }
+
+      segmentLoop: for (let segmentIndex = 0; segmentIndex < analyticsSegments.length; segmentIndex++) {
+        const segment = analyticsSegments[segmentIndex];
         const cursorKey = `${cursorPrefix}|${segment.name}`;
         let page = cursorBySegment.get(segment.name) || 1;
         if (page > 1) resumedFromCursor = true;
@@ -1682,10 +1717,12 @@ Deno.serve(async (req) => {
           // the next invocation.
           if (analytics_mode && Number.isFinite(requestedPages) && requestedPages > 0 && pagesProcessed >= requestedPages) {
             analyticsRangeComplete = false;
+            await persistPendingCursors(segmentIndex, page);
             break segmentLoop;
           }
           if (Date.now() >= runtimeDeadline) {
             analyticsRangeComplete = false;
+            await persistPendingCursors(segmentIndex, page);
             break segmentLoop;
           }
           pagesProcessed++;
@@ -1700,6 +1737,9 @@ Deno.serve(async (req) => {
           const r = await fetchWithRetry(url);
           if (!r.ok) {
             const txt = await r.text();
+            // Keep the exact page that failed so a transient RD/429 response
+            // resumes from this segment instead of replaying an earlier one.
+            await persistPendingCursors(segmentIndex, page);
             await finishRun({
               status: "failed",
               deals: totalDeals,
@@ -1725,6 +1765,10 @@ Deno.serve(async (req) => {
           const deals = payload.deals || payload || [];
           if (!Array.isArray(deals) || deals.length === 0) {
             segmentComplete = true;
+            if (analytics_mode) {
+              const { error } = await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              if (error) throw error;
+            }
             break;
           }
 
@@ -1839,6 +1883,7 @@ Deno.serve(async (req) => {
             }
             if (totalDeals >= maxAnalyticsDeals) {
               analyticsRangeComplete = false;
+              await persistPendingCursors(segmentIndex, page);
               break segmentLoop;
             }
             page++;
