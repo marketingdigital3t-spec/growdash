@@ -5,6 +5,7 @@ import {
   buildPendingRDSyncCursors,
   shouldHydrateRDAnalyticsDeal,
 } from "../_shared/rdSyncCursor.ts";
+import { rdDealStageId, rdDealStageName } from "../_shared/rdDealStage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -304,7 +305,7 @@ function asArray(value: unknown): any[] {
 }
 
 function isWonDeal(d: any): boolean {
-  const stage = (d.deal_stage?.name || "")
+  const stage = (rdDealStageName(d) || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -1016,6 +1017,10 @@ Deno.serve(async (req) => {
     let fullHistoryRequested = false;
     let pagesProcessed = 0;
     const seenAnalyticsDealIds = new Set<string>();
+    // A deal can occur in more than one RD status segment. Deduplicate only
+    // when both occurrences have the same stage; a changed stage must be
+    // persisted so the mirror follows the current RD pipeline column.
+    const seenAnalyticsDealStages = new Map<string, string | null>();
     let snapshotMissingIds: string[] = [];
     let snapshotDuplicateCount = 0;
     let debugLogged = false;
@@ -1109,8 +1114,8 @@ Deno.serve(async (req) => {
     async function persistDeal(d: any) {
       const rdDealId = String(d.id || d._id);
       const amountTotal = parseFloat(d.amount_total || d.amount || "0") || 0;
-      const stageName = d.deal_stage?.name || null;
-      const stageId = d.deal_stage?.id ? String(d.deal_stage.id) : null;
+      const stageName = rdDealStageName(d);
+      const stageId = rdDealStageId(d);
       const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
       // A API do RD envia `win: false` também para negócios ainda abertos.
       // Portanto, perda só pode ser inferida pela etapa de perda ou por um
@@ -1479,8 +1484,8 @@ Deno.serve(async (req) => {
       const rows = operationalItems.map((d) => {
         const rdDealId = String(d.id || d._id);
         seenAnalyticsDealIds.add(rdDealId);
-        const stageName = d.deal_stage?.name || null;
-        const stageId = d.deal_stage?.id ? String(d.deal_stage.id) : null;
+        const stageName = rdDealStageName(d);
+        const stageId = rdDealStageId(d);
         const won = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(d);
         const lost =
           !won && (Boolean(stageId && stageLostMap.get(stageId)) || Boolean(d.deal_lost_reason));
@@ -1787,7 +1792,7 @@ Deno.serve(async (req) => {
             const stageQueryIgnored = Boolean(
               segment.stageId
               && deals.some((deal: any) => {
-                const returnedStageId = deal.deal_stage?.id ? String(deal.deal_stage.id) : "";
+                const returnedStageId = rdDealStageId(deal) || "";
                 return returnedStageId && returnedStageId !== String(segment.stageId);
               }),
             );
@@ -1800,14 +1805,15 @@ Deno.serve(async (req) => {
             const rangedDeals = deals
               .filter((deal: any) => {
                 const rdDealId = String(deal.id || deal._id || "");
-                if (!rdDealId || seenAnalyticsDealIds.has(rdDealId)) return false;
+                const returnedStageId = rdDealStageId(deal);
+                const previousStageId = rdDealId ? seenAnalyticsDealStages.get(rdDealId) : undefined;
+                if (!rdDealId || (previousStageId !== undefined && previousStageId === returnedStageId)) return false;
                 // The RD API may return the same unfiltered page even when a
                 // deal_stage_id query parameter is supplied. Never attribute
                 // that page to the first stage: enforce the stage locally so
                 // each native RD column gets its own records and later
                 // terminal-stage segments can still contribute their deals.
                 if (segment.stageId) {
-                  const returnedStageId = deal.deal_stage?.id ? String(deal.deal_stage.id) : "";
                   if (returnedStageId !== String(segment.stageId)) return false;
                 }
                 // The RD `win=true` segment is not exhaustive: older deals
@@ -1835,7 +1841,7 @@ Deno.serve(async (req) => {
             // later page. Continue pagination until the provider ends it or
             // the selected calendar is completely behind us.
             const timestamps = deals
-              .filter((deal: any) => !segment.stageId || String(deal.deal_stage?.id || "") === String(segment.stageId))
+              .filter((deal: any) => !segment.stageId || String(rdDealStageId(deal) || "") === String(segment.stageId))
               .map((deal: any) => new Date((deal.created_at || deal.updated_at) || 0).getTime())
               .filter((value: number) => Number.isFinite(value) && value > 0);
             const pageBeforeRange = Boolean(
@@ -1862,10 +1868,14 @@ Deno.serve(async (req) => {
             continue;
           }
             await persistAnalyticsBatch(rangedDeals);
+            for (const deal of rangedDeals) {
+              const rdDealId = String(deal.id || deal._id || "");
+              if (rdDealId) seenAnalyticsDealStages.set(rdDealId, rdDealStageId(deal));
+            }
             totalDeals += rangedDeals.length;
 
             const timestamps = deals
-              .filter((deal: any) => !segment.stageId || String(deal.deal_stage?.id || "") === String(segment.stageId))
+              .filter((deal: any) => !segment.stageId || String(rdDealStageId(deal) || "") === String(segment.stageId))
               .map((deal: any) => {
                 return new Date((deal.created_at || deal.updated_at) || 0).getTime();
               })
