@@ -1060,6 +1060,259 @@
     .reference-data-line i { background: linear-gradient(90deg, rgba(183,255,0,.16), rgba(183,255,0,.86)); }
     .reference-marquee span::after { color: #b7ff00 !important; text-shadow: 0 0 10px rgba(183,255,0,.7); }
     .reference-hero h1 em { color: #b7ff00 !important; -webkit-text-fill-color: #b7ff00 !important; text-shadow: 0 0 28px rgba(183,255,0,.2); }
+
+    /* Mobile layout: limites claros, leitura em camadas e capturas sem corte. */
+    @media (max-width: 600px) {
+      .reference-site {
+        overflow-x: clip;
+        background: #050709;
+      }
+
+      .reference-header {
+        width: calc(100% - 24px);
+      }
+
+      .reference-nav {
+        border: 1px solid rgba(197,211,214,.2);
+        border-top: 0;
+        box-shadow: 0 12px 30px rgba(0,0,0,.28);
+      }
+
+      .reference-hero {
+        padding: 28px 12px 48px;
+        border-bottom: 1px solid rgba(197,211,214,.14);
+      }
+
+      .reference-hero-grid {
+        width: min(100%, 620px);
+        gap: 26px;
+      }
+
+      .reference-hero-copy {
+        max-width: none;
+        padding: 20px 17px 19px;
+        border: 1px solid rgba(197,211,214,.18);
+        border-radius: 18px;
+        background: linear-gradient(150deg, rgba(17,25,31,.94), rgba(7,11,15,.98));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 20px 45px rgba(0,0,0,.26);
+      }
+
+      .reference-hero-copy > p { max-width: none; }
+
+      .reference-screen {
+        width: 100%;
+        margin: 0;
+        padding: 10px 7px 4px;
+        border: 1px solid rgba(183,255,0,.34);
+        border-radius: 18px;
+        background: linear-gradient(145deg, rgba(18,27,31,.9), rgba(5,8,11,.96));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 22px 50px rgba(0,0,0,.42), 0 0 28px rgba(183,255,0,.07);
+      }
+
+      .reference-screen::before { inset: 10% 8% -8%; }
+      .macbook { width: 100%; padding-bottom: 10%; }
+      .macbook-screen { width: 98%; padding: 6px 6px 9px; }
+      .macbook-base { width: 104%; height: 15px; }
+      .reference-float { z-index: 3; }
+      .reference-float.one { left: -6px; }
+      .reference-float.two { right: -6px; }
+      .reference-float.three { right: -3px; }
+
+      .reference-features {
+        width: min(calc(100% - 28px), 620px);
+        padding: 20px 0 24px;
+        gap: 12px;
+      }
+
+      .reference-feature {
+        padding: 19px 17px 21px;
+        border: 1px solid rgba(197,211,214,.2);
+        border-radius: 16px;
+        background: linear-gradient(150deg, rgba(19,28,35,.98), rgba(8,12,16,.98));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 16px 34px rgba(0,0,0,.26);
+      }
+
+      .reference-feature-thumb {
+        height: auto;
+        aspect-ratio: 16 / 9;
+        margin: 19px -17px -21px;
+        border-top: 1px solid rgba(197,211,214,.16);
+        background: #070a0d;
+      }
+
+      .reference-feature-thumb img {
+        object-fit: contain;
+        object-position: center;
+        opacity: .94;
+        filter: saturate(.92) contrast(1.04) brightness(1.05);
+      }
+
+      .reference-marquee {
+        border-top: 1px solid rgba(197,211,214,.16);
+        border-bottom: 1px solid rgba(197,211,214,.16);
+      }
+
+      .reference-offer,
+      .reference-section,
+      .reference-cta {
+        width: 100%;
+        margin: 0;
+        box-sizing: border-box;
+        padding-left: 14px;
+        padding-right: 14px;
+        border-top: 1px solid rgba(197,211,214,.14);
+        border-bottom: 1px solid rgba(197,211,214,.1);
+      }
+
+      .reference-offer { padding-top: 58px; padding-bottom: 58px; }
+      .reference-offer-head,
+      .reference-offer-grid,
+      .reference-section > h2,
+      .reference-benefits,
+      .reference-cta-panel {
+        width: min(100%, 620px);
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .reference-offer-head { gap: 16px; margin-bottom: 26px; }
+      .reference-offer h2 { font-size: clamp(30px, 9vw, 40px); }
+      .reference-offer-lead { font-size: 13px; line-height: 1.65; }
+      .reference-offer-grid { gap: 10px; }
+
+      .reference-offer-card {
+        min-height: 0;
+        padding: 19px 17px 21px;
+        border: 1px solid rgba(197,211,214,.2);
+        border-radius: 14px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 14px 30px rgba(0,0,0,.2);
+      }
+
+      .reference-offer-card h3 { margin-top: 19px; font-size: 18px; line-height: 1.12; }
+      .reference-offer-card p { font-size: 12px; line-height: 1.58; }
+
+      .reference-process {
+        padding: 48px 14px 54px;
+        border-top: 1px solid rgba(197,211,214,.14);
+        border-bottom: 1px solid rgba(197,211,214,.1);
+      }
+
+      .reference-process-inner {
+        width: min(100%, 620px);
+        padding: 22px 17px 10px;
+        border: 1px solid rgba(197,211,214,.2);
+        border-radius: 18px;
+        background: linear-gradient(150deg, rgba(15,23,29,.92), rgba(7,11,15,.98));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 18px 38px rgba(0,0,0,.22);
+      }
+
+      .reference-process h2 { margin-bottom: 28px; font-size: clamp(30px, 9vw, 40px); }
+      .reference-process-step,
+      .reference-process-step:not(:first-child) {
+        min-height: 0;
+        padding: 20px 0 !important;
+        border-left: 0;
+        border-top: 1px solid rgba(197,211,214,.14);
+      }
+
+      .reference-process-step:first-child { border-top: 0; }
+      .reference-process-step h3 { margin-top: 18px; font-size: 19px; }
+      .reference-process-step p { max-width: none; font-size: 12px; }
+
+      .reference-section { padding-top: 56px; padding-bottom: 54px; }
+      .reference-section h2 { margin-bottom: 25px; font-size: clamp(29px, 8.5vw, 39px); }
+      .reference-benefits { gap: 10px; }
+      .reference-benefit {
+        padding: 20px 17px 21px;
+        border: 1px solid rgba(197,211,214,.2);
+        border-radius: 15px;
+        background: linear-gradient(150deg, rgba(17,25,31,.94), rgba(8,12,16,.98));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 14px 30px rgba(0,0,0,.22);
+      }
+
+      .reference-benefit h3 { margin-top: 14px; font-size: 18px; }
+      .reference-benefit p { font-size: 12px; }
+
+      .reference-trusted {
+        padding: 48px 14px 56px;
+        border-top: 1px solid rgba(197,211,214,.14);
+        border-bottom: 1px solid rgba(197,211,214,.14);
+      }
+
+      .reference-trusted h2 {
+        max-width: 620px;
+        margin: 0 auto 22px;
+        padding: 0;
+        font-size: clamp(28px, 8.2vw, 38px);
+      }
+
+      .reference-trusted-row { width: min(100%, 620px); }
+      .trusted-switcher {
+        margin: 0 0 14px;
+        padding: 0 0 8px;
+        gap: 7px;
+        border-bottom: 1px solid rgba(197,211,214,.12);
+      }
+
+      .trusted-switcher button {
+        padding: 10px 12px;
+        border: 1px solid rgba(197,211,214,.22);
+        border-radius: 9px;
+        font-size: 10px;
+      }
+
+      .trusted-stage {
+        border: 1px solid rgba(183,255,0,.52);
+        border-radius: 14px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 20px 42px rgba(0,0,0,.4), 0 0 24px rgba(183,255,0,.08);
+      }
+
+      .trusted-stage img { width: 100%; height: auto; max-height: none; object-fit: contain; }
+      .trusted-stage-caption { padding: 12px 13px; border-top: 1px solid rgba(197,211,214,.14); }
+
+      .reference-cta { padding-top: 48px; padding-bottom: 58px; }
+      .reference-cta-panel {
+        padding: 24px 18px;
+        gap: 21px;
+        border: 1px solid rgba(183,255,0,.45);
+        border-radius: 17px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 20px 45px rgba(0,0,0,.3), 0 0 25px rgba(183,255,0,.07);
+      }
+
+      .reference-cta-panel h2 { font-size: clamp(27px, 8vw, 37px); line-height: 1; }
+      .reference-cta-panel p { font-size: 13px; line-height: 1.6; }
+      .reference-cta-panel .btn { width: 100%; min-height: 48px; }
+
+      .reference-footer {
+        padding: 38px 20px 20px;
+        border-top: 1px solid rgba(197,211,214,.16);
+      }
+
+      .reference-footer-grid {
+        width: min(100%, 620px);
+        margin: 0 auto;
+        gap: 24px;
+      }
+
+      .reference-footer-grid > div {
+        padding-top: 17px;
+        border-top: 1px solid rgba(197,211,214,.12);
+      }
+
+      .reference-footer-grid > div:first-child { padding-top: 0; border-top: 0; }
+      .reference-footer-bottom { margin-top: 26px; padding-top: 15px; border-top: 1px solid rgba(197,211,214,.13); }
+    }
+
+    @media (max-width: 360px) {
+      .reference-hero { padding-left: 9px; padding-right: 9px; }
+      .reference-hero-copy { padding-left: 14px; padding-right: 14px; }
+      .reference-screen { padding-left: 5px; padding-right: 5px; }
+      .reference-float { font-size: 8px; padding: 7px 8px; }
+      .reference-float.one { left: -4px; }
+      .reference-float.two { right: -4px; }
+      .reference-offer, .reference-section, .reference-cta, .reference-process, .reference-trusted { padding-left: 10px; padding-right: 10px; }
+      .reference-footer { padding-left: 16px; padding-right: 16px; }
+    }
   </style>
 </head>
 <body>
