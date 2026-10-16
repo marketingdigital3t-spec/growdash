@@ -60,6 +60,7 @@ import { useLeadAttributionCatalog } from "@/hooks/useLeadAttributionCatalog";
 import { resolveLeadAttribution, type LeadAttribution } from "@/lib/leadAttributionResolver";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
+import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const number = new Intl.NumberFormat("pt-BR");
@@ -180,7 +181,19 @@ export default function CrmPage() {
     () => selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id)),
     [availableFunnelIds, selectedFunnelIds],
   );
-  const requestedFunnelIds = selectedFunnelIds.length ? scopedSelectedFunnelIds : availableFunnels.map((funnel) => funnel.id);
+  // An empty funnel filter means "resolve the funnels linked to the selected
+  // Meta accounts". Passing every active local row here used to widen a
+  // single-account view to unrelated RD pipelines and made duplicate local
+  // mappings appear as duplicate Kanban columns.
+  const resolvedRDAccountScope = useResolvedRDAccountFunnelScope({
+    adAccountId: accountFilter,
+    adAccountIds: accountScopeIds,
+    funnelIds: selectedFunnelIds.length ? scopedSelectedFunnelIds : undefined,
+  });
+  const requestedFunnelIds = useMemo(
+    () => selectedFunnelIds.length ? scopedSelectedFunnelIds : (resolvedRDAccountScope.funnelIds ?? []),
+    [resolvedRDAccountScope.funnelIds, scopedSelectedFunnelIds, selectedFunnelIds.length],
+  );
   const {
     data: dealData = [],
     isLoading: loadingDeals,

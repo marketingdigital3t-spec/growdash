@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_LINKED_RD_FUNNEL_SCOPE_ID, resolveLinkedRDFunnelIds } from "./rdAccountScope";
+import { NO_LINKED_RD_FUNNEL_SCOPE_ID, dedupeActiveRDFunnels, resolveLinkedRDFunnelIds } from "./rdAccountScope";
 
 const accounts = [
   { id: "meta-ca02", account_id: "act_1064564169282353" },
@@ -18,6 +18,20 @@ const funnels = [
 ];
 
 describe("resolveLinkedRDFunnelIds", () => {
+  it("collapses duplicate local links to the same provider pipeline", () => {
+    expect(dedupeActiveRDFunnels([
+      { id: "old-link", rd_funnel_id: "same-pipeline", ad_account_id: "other", rd_connection_id: "rd", is_active: true },
+      { id: "selected-link", rd_funnel_id: "same-pipeline", ad_account_id: "meta-ca02", rd_connection_id: "rd", is_active: true },
+    ], ["meta-ca02"]).map((funnel) => funnel.id)).toEqual(["selected-link"]);
+  });
+
+  it("does not return the same provider pipeline twice in an account scope", () => {
+    expect(resolveLinkedRDFunnelIds(["meta-ca02"], accounts, connections, [
+      ...funnels,
+      { id: "duplicate-ranniely", rd_connection_id: "rd-ca02", rd_funnel_id: "f-1", ad_account_id: "meta-ca02", is_active: true },
+    ])).toEqual(["duplicate-ranniely", "ranniely-paciente"]);
+  });
+
   it("uses RD connection external account IDs to scope linked funnels", () => {
     expect(resolveLinkedRDFunnelIds(["meta-ca02"], accounts, connections, funnels)).toEqual([
       "ranniely-aluna",
