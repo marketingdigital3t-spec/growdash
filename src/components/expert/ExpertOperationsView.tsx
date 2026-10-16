@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Archive,
   CalendarDays,
   CheckCircle2,
   CircleAlert,
@@ -20,17 +21,28 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useExpertOperations } from "@/hooks/useExpertOperations";
-import { useArchiveEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
+import { useArchiveEventClass, useDeleteEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EventClassFormDialog } from "@/components/event-classes/EventClassFormDialog";
 import { EventClassMembersDialog } from "@/components/event-classes/EventClassMembersDialog";
 import { ExpertClassDetailsDialog } from "@/components/expert/ExpertClassDetailsDialog";
 import { ExpertSheetLinkDialog } from "@/components/expert/ExpertSheetLinkDialog";
 import { buildExpertResultMetrics } from "@/lib/expertResultMetrics";
+import { toast } from "@/hooks/use-toast";
 
 const brl = (cents: number | null | undefined) =>
   cents == null
@@ -111,7 +123,9 @@ function ClassCard({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [membersType, setMembersType] = useState<"student" | "model_patient">("student");
   const [membersOpen, setMembersOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const archive = useArchiveEventClass();
+  const remove = useDeleteEventClass();
   const restore = useRestoreEventClass();
   const openMembers = (type: "student" | "model_patient") => {
     setMembersType(type);
@@ -202,6 +216,20 @@ function ClassCard({
     await restore.mutateAsync({ id: eventClass.id });
     onRefresh();
   };
+  const handleDelete = async () => {
+    try {
+      await remove.mutateAsync(eventClass.id);
+      setDeleteOpen(false);
+      toast({ title: "Turma excluída", description: `“${eventClass.title}” foi removida da Agenda & Turmas.` });
+      onRefresh();
+    } catch (error: any) {
+      toast({
+        title: "Não foi possível excluir a turma",
+        description: error?.message || "Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
   return (
     <>
       <Card className="flex h-full w-full flex-col overflow-hidden border-border/80 bg-card/95 shadow-lg">
@@ -259,7 +287,17 @@ function ClassCard({
                   disabled={archive.isPending || restore.isPending}
                   onClick={() => void (archived ? handleRestore() : handleArchive())}
                 >
-                  {archived ? <RotateCcw className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
+                  {archived ? <RotateCcw className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                </Button>
+                <Button
+                  className="h-7 w-7 shrink-0 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Excluir turma definitivamente"
+                  disabled={remove.isPending}
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
               <div className="w-full text-right text-[10px] leading-none text-muted-foreground">
@@ -364,6 +402,35 @@ function ClassCard({
         sources={sources}
         expertId={classExpertId}
       />
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (!remove.isPending) setDeleteOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir turma definitivamente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir “{eventClass.title}”. Essa ação não pode ser desfeita e também remove os participantes,
+              vínculos de contas/fontes e o histórico associados a esta turma.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={remove.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+            >
+              {remove.isPending ? "Excluindo…" : "Excluir definitivamente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
