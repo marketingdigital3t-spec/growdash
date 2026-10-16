@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildPendingRDSyncCursors } from "../../supabase/functions/_shared/rdSyncCursor";
+import {
+  buildPendingRDSyncCursors,
+  shouldHydrateRDAnalyticsDeal,
+} from "../../supabase/functions/_shared/rdSyncCursor";
 
 describe("RD resumable sync cursors", () => {
   const segments = [
@@ -23,5 +26,29 @@ describe("RD resumable sync cursors", () => {
 
   it("never persists an invalid page", () => {
     expect(buildPendingRDSyncCursors(segments, 0, 0)[0]).toEqual({ segment: "won", nextPage: 1 });
+  });
+
+  it("does not hydrate every deal during a full-history mirror", () => {
+    expect(shouldHydrateRDAnalyticsDeal({
+      analyticsMode: true,
+      skipEnrichment: false,
+      fullHistoryRequested: true,
+    })).toBe(false);
+  });
+
+  it("keeps bounded analytics enrichment available", () => {
+    expect(shouldHydrateRDAnalyticsDeal({
+      analyticsMode: true,
+      skipEnrichment: false,
+      fullHistoryRequested: false,
+    })).toBe(true);
+  });
+
+  it("honors an explicit enrichment opt-out", () => {
+    expect(shouldHydrateRDAnalyticsDeal({
+      analyticsMode: true,
+      skipEnrichment: true,
+      fullHistoryRequested: false,
+    })).toBe(false);
   });
 });

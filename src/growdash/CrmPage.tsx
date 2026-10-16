@@ -550,10 +550,11 @@ export default function CrmPage() {
           // the current pipeline and must mirror old/open/won/lost deals too.
           realtime: false,
           analytics_mode: true,
-          // A list response from RD can be stale or omit the edited amount.
-          // A manual CRM refresh asks the server to hydrate each deal with
-          // its authoritative detail before updating CRM and Comercial.
-          refresh_amounts: true,
+          // The historical mirror is intentionally list-first. Hydrating each
+          // deal through RD detail/contact endpoints can orphan a large run
+          // before its page cursor is persisted. Existing profiles stay
+          // intact; missing contact fields use a separate bounded path.
+          refresh_amounts: false,
           // "Máximo" is a full RD pipeline reconciliation, not a synthetic
           // date interval beginning in 2000. The RD API's date filter can
           // omit legacy/open negotiations in some accounts.

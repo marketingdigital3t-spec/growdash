@@ -1,7 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
-import { buildPendingRDSyncCursors } from "../_shared/rdSyncCursor.ts";
+import {
+  buildPendingRDSyncCursors,
+  shouldHydrateRDAnalyticsDeal,
+} from "../_shared/rdSyncCursor.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1407,7 +1410,11 @@ Deno.serve(async (req) => {
       // CRM record. The rd_deals trigger then propagates the same amount to
       // canonical sales, which is what Comercial displays.
       const hydratedItems: any[] = [];
-      if (analytics_mode && !skip_enrichment) {
+      if (shouldHydrateRDAnalyticsDeal({
+        analyticsMode: analytics_mode,
+        skipEnrichment: skip_enrichment,
+        fullHistoryRequested,
+      })) {
         // Reuse complete local profiles in incremental cycles. Only new or
         // incomplete deals call the RD detail/contact endpoints.
         const existingProfiles = new Map<string, any>();
