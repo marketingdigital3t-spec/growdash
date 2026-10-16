@@ -1,5 +1,5 @@
 import type { DrawElement, FlowData } from "../types";
-import { bezierPath, connectorPoints, getElementBounds, getSelectionBounds } from "./geometry";
+import { bezierPath, connectorPoints, getElementBounds, getSelectionBounds, readableTextColor } from "./geometry";
 
 function escapeXml(value: string) {
   return value.replace(/[<>&'\"]/g, (character) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[character] || character);
@@ -17,8 +17,10 @@ function elementSvg(element: DrawElement, elements: DrawElement[]) {
   }
   if (element.type === "freehand") return `<polyline points="${(element.points || []).map((point) => `${element.x + point.x},${element.y + point.y}`).join(" ")}" fill="none" ${style}/>`;
   if (element.type === "image") return `<image href="${element.imageUrl || ""}" x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}"/>`;
-  const textColor = element.type === "sticky" ? "#2b2111" : element.strokeColor;
-  return `${element.type === "sticky" ? `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="8" fill="${element.fillColor}" ${style}/>` : ""}<text x="${element.x + 12}" y="${element.y + (element.fontSize || 20) + 10}" fill="${textColor}" font-size="${element.fontSize || 20}" font-family="sans-serif">${escapeXml(element.text || "")}</text>`;
+  const textColor = element.textColor || (element.type === "sticky" ? readableTextColor(element.fillColor, "#1e1e1e") : element.strokeColor);
+  const fontSize = element.fontSize || 20;
+  const text = (element.text || "").split("\n").map((line, index) => `<tspan x="${element.x + 12}" dy="${index === 0 ? 0 : fontSize * 1.24}">${escapeXml(line)}</tspan>`).join("");
+  return `${element.type === "sticky" ? `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="8" fill="${element.fillColor}" ${style}/>` : ""}<text x="${element.x + 12}" y="${element.y + fontSize + 10}" fill="${textColor}" font-size="${fontSize}" font-family="sans-serif">${text}</text>`;
 }
 
 export function flowToSvg(flow: FlowData) {

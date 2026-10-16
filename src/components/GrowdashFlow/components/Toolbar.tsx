@@ -7,6 +7,7 @@ import {
   MousePointer2,
   MoveUpRight,
   Pencil,
+  Repeat2,
   Square,
   StickyNote,
   Type,
@@ -28,7 +29,7 @@ const TOOLS: Array<{ tool: ToolType; label: string; shortcut: string; icon: type
   { tool: "sticky", label: "Nota adesiva", shortcut: "N", icon: StickyNote },
 ];
 
-export function Toolbar({ tool, onToolChange, onImage }: { tool: ToolType; onToolChange: (tool: ToolType) => void; onImage: () => void }) {
+export function Toolbar({ tool, onToolChange, onImage, keepToolActive, onKeepToolActive }: { tool: ToolType; onToolChange: (tool: ToolType) => void; onImage: () => void; keepToolActive: boolean; onKeepToolActive: (value: boolean) => void }) {
   return <div aria-label="Ferramentas de desenho" className="growdash-flow-toolbar growdash-flow-chrome absolute left-1/2 top-16 z-30 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-2xl p-1.5 2xl:top-3 2xl:max-w-[calc(100%-30rem)]">
     {TOOLS.map((item, index) => {
       const Icon = item.icon;
@@ -50,5 +51,10 @@ export function Toolbar({ tool, onToolChange, onImage }: { tool: ToolType; onToo
         <span className="growdash-flow-tooltip pointer-events-none absolute top-11 hidden whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-bold shadow-xl group-hover:block">{item.label} · {item.shortcut}</span>
       </button>;
     })}
+    <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border/70" />
+    <button type="button" title="Manter ferramenta ativa" aria-label="Manter ferramenta ativa" aria-pressed={keepToolActive} onClick={() => onKeepToolActive(!keepToolActive)} className={cn("growdash-flow-control group relative grid h-9 w-9 shrink-0 place-items-center rounded-xl", keepToolActive && "growdash-flow-control-active")}>
+      <Repeat2 className="h-4 w-4" />
+      <span className="growdash-flow-tooltip pointer-events-none absolute top-11 hidden whitespace-nowrap rounded-lg px-2 py-1 text-[10px] font-bold shadow-xl group-hover:block">Manter ferramenta ativa</span>
+    </button>
   </div>;
 }

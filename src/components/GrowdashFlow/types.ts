@@ -29,6 +29,8 @@ export interface DrawElement {
   rotation: number;
   opacity: number;
   fillColor: string;
+  /** Optional explicit text color; sticky notes derive a readable color when omitted. */
+  textColor?: string;
   strokeColor: string;
   strokeWidth: number;
   points?: Point[];

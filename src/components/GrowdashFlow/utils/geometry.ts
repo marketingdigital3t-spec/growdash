@@ -2,6 +2,22 @@ import type { AnchorName, DrawElement, Point } from "../types";
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
+/** Pick a WCAG-friendly foreground for persisted canvas surface colors. */
+export function readableTextColor(background: string, fallback = "#ffffff") {
+  const value = background.trim().toLowerCase();
+  const match = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return fallback;
+  const raw = match[1].length === 3
+    ? match[1].split("").map((part) => `${part}${part}`).join("")
+    : match[1];
+  const channels = [0, 2, 4].map((offset) => Number.parseInt(raw.slice(offset, offset + 2), 16) / 255);
+  const linear = channels.map((channel) => channel <= .03928 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4);
+  const luminance = .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
+  const contrastWithWhite = 1.05 / (luminance + .05);
+  const contrastWithBlack = (luminance + .05) / .05;
+  return contrastWithWhite >= contrastWithBlack ? "#ffffff" : "#1e1e1e";
+}
+
 export function normalizeBounds(x: number, y: number, width: number, height: number): Bounds {
   return {
     x: width < 0 ? x + width : x,

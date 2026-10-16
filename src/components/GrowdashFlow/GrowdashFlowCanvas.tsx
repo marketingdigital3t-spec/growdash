@@ -45,6 +45,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
   const interactionRef = useRef<Interaction | null>(null);
   const textSnapshotRef = useRef<DrawElement[] | null>(null);
   const [tool, setTool] = useState<ToolType>("select");
+  const [keepToolActive, setKeepToolActive] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectionBox, setSelectionBox] = useState<SelectionBox>(null);
@@ -153,9 +154,9 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       setEditingId(element.id);
       textSnapshotRef.current = structuredClone(history.valueRef.current);
       interactionRef.current = null;
-      setTool("select");
+      if (!keepToolActive) setTool("select");
     }
-  }, [canvas.snapToGrid, history, tool, topLayer]);
+  }, [canvas.snapToGrid, history, keepToolActive, tool, topLayer]);
 
   const handleElementPointerDown = useCallback((event: React.PointerEvent<SVGGElement>, element: DrawElement) => {
     event.stopPropagation();
@@ -252,7 +253,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
         const target = findTopElement(point, element.id);
         return target ? { ...element, endBinding: { elementId: target.id, anchor: nearestAnchor(target, point).anchor } } : element;
       }));
-      setTool("select");
+      if (!keepToolActive) setTool("select");
     } else if (interaction.kind === "drag" || interaction.kind === "resize") {
       history.checkpoint(interaction.snapshot);
     } else if (interaction.kind === "select") {
@@ -263,7 +264,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
     }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     interactionRef.current = null;
-  }, [clientToWorld, findTopElement, history]);
+  }, [clientToWorld, findTopElement, history, keepToolActive]);
 
   const handleResizePointerDown = useCallback((event: React.PointerEvent<SVGRectElement>, handle: ResizeHandle) => {
     event.preventDefault();
@@ -382,7 +383,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
     />
 
     <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[25%] items-center gap-2"><div className="growdash-flow-chrome pointer-events-auto flex min-w-0 items-center gap-2 rounded-xl p-1.5 pr-3">{onBack && <Button variant="ghost" size="icon" className="growdash-flow-control h-8 w-8 shrink-0" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>}<div className="hidden min-w-0 xl:block"><span className="block truncate text-[10px] font-black uppercase tracking-[.16em] text-primary">Growdash Flow</span><strong className="block truncate text-xs text-foreground">{title}</strong></div></div></div>
-    <Toolbar tool={tool} onToolChange={setTool} onImage={() => fileInputRef.current?.click()} />
+    <Toolbar tool={tool} onToolChange={setTool} onImage={() => fileInputRef.current?.click()} keepToolActive={keepToolActive} onKeepToolActive={setKeepToolActive} />
     <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onApplyAcquisitionTemplate={() => { const template = createAcquisitionFunnelTemplate(); history.commit(template); setSelectedIds([]); canvas.setZoom(0.72); canvas.setPanOffset({ x: 48, y: 30 }); toast({ title: "Estratégia inserida", description: "O funil de aquisição está pronto para você editar." }); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
     {primarySelected && <PropertiesPanel element={primarySelected} selectionCount={selectedIds.length} onChange={changeSelected} onDuplicate={duplicateSelected} onDelete={deleteSelected} onFront={() => moveLayer("front")} onBack={() => moveLayer("back")} onClose={() => setSelectedIds([])} />}
 

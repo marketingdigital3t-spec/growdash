@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import type { DrawElement } from "../types";
+import { readableTextColor } from "../utils/geometry";
 
 export function PropertiesPanel({ element, selectionCount, onChange, onDuplicate, onDelete, onFront, onBack, onClose }: {
   element: DrawElement;
@@ -22,6 +23,7 @@ export function PropertiesPanel({ element, selectionCount, onChange, onDuplicate
       {(["x", "y", "width", "height"] as const).map((key) => <div key={key} className="space-y-1"><Label className="growdash-flow-label text-[9px] uppercase">{{ x: "X", y: "Y", width: "Largura", height: "Altura" }[key]}</Label><Input type="number" value={Math.round(element[key])} onChange={numberChange(key)} className="growdash-flow-input h-8 text-xs" disabled={selectionCount > 1} /></div>)}
     </div>
     <div className="mt-4 grid grid-cols-2 gap-3"><div className="space-y-1"><Label className="growdash-flow-label text-[9px] uppercase">Preenchimento</Label><input type="color" value={element.fillColor === "transparent" ? "#ffffff" : element.fillColor} onChange={(event) => onChange({ fillColor: event.target.value })} className="growdash-flow-color-input h-9 w-full cursor-pointer rounded-lg p-1" /></div><div className="space-y-1"><Label className="growdash-flow-label text-[9px] uppercase">Borda</Label><input type="color" value={element.strokeColor} onChange={(event) => onChange({ strokeColor: event.target.value })} className="growdash-flow-color-input h-9 w-full cursor-pointer rounded-lg p-1" /></div></div>
+    {(element.type === "text" || element.type === "sticky") && <div className="mt-3 space-y-1"><Label className="growdash-flow-label text-[9px] uppercase">Texto</Label><input type="color" value={element.textColor || (element.type === "sticky" ? readableTextColor(element.fillColor, "#1e1e1e") : element.strokeColor)} onChange={(event) => onChange({ textColor: event.target.value })} className="growdash-flow-color-input h-9 w-full cursor-pointer rounded-lg p-1" aria-label="Cor do texto" /></div>}
     <PropertySlider label={`Espessura · ${element.strokeWidth}px`} value={element.strokeWidth} min={1} max={10} onChange={(value) => onChange({ strokeWidth: value })} />
     <PropertySlider label={`Opacidade · ${Math.round(element.opacity * 100)}%`} value={element.opacity * 100} min={0} max={100} onChange={(value) => onChange({ opacity: value / 100 })} />
     <PropertySlider label={`Rotação · ${Math.round(element.rotation)}°`} value={element.rotation} min={0} max={360} onChange={(value) => onChange({ rotation: value })} />

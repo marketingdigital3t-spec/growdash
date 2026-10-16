@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DrawElement } from "../types";
-import { connectorPoints, fitTextElementToContent, getSelectionBounds, keepTextContentVisible, minimumTextElementHeight, minimumTextElementWidth, normalizeAutoTextElements, snapPoint } from "./geometry";
+import { connectorPoints, fitTextElementToContent, getSelectionBounds, keepTextContentVisible, minimumTextElementHeight, minimumTextElementWidth, normalizeAutoTextElements, readableTextColor, snapPoint } from "./geometry";
 
 function rectangle(id: string, x: number, y: number): DrawElement {
   return { id, type: "rectangle", x, y, width: 100, height: 80, rotation: 0, opacity: 1, fillColor: "#121212", strokeColor: "#F5A623", strokeWidth: 2, layerIndex: 0, locked: false };
@@ -51,5 +51,11 @@ describe("Growdash Flow geometry", () => {
     expect(fitted.height).toBeLessThan(64);
     expect(preserved.width).toBe(210);
     expect(preserved.height).toBe(81);
+  });
+
+  it("chooses readable text colors for light and dark sticky surfaces", () => {
+    expect(readableTextColor("#ffffff")).toBe("#1e1e1e");
+    expect(readableTextColor("#111827")).toBe("#ffffff");
+    expect(readableTextColor("#fbbf24")).toBe("#1e1e1e");
   });
 });
