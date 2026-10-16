@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip as StageTooltip, TooltipContent as StageTooltipContent, TooltipProvider, TooltipTrigger as StageTooltipTrigger } from "@/components/ui/tooltip";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
-import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualTextColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
 
 interface Props {
   a: FunnelAnalytics;
@@ -95,30 +95,30 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                 <TooltipProvider delayDuration={250}>
                   {stages.map((stage, index) => {
                     const width = funnelStageVisualWidth(index, visualStageCount);
-                    const color = funnelStageVisualColor(index, visualStageCount);
-                    const textColor = funnelStageVisualTextColor(index, visualStageCount);
+                    const accentColor = funnelStageVisualColor(index, visualStageCount);
                     const avgTime = stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "Indisponível";
                     const negotiationValue = stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Nenhum valor";
                     const accessibleDescription = `${stage.name}: ${stage.count} leads, ${stage.pct.toFixed(1)}% do total. Tempo médio: ${avgTime}. Valor em negociação: ${negotiationValue}.`;
-                    const isBright = index / Math.max(visualStageCount - 1, 1) >= 0.34;
                     return (
                       <StageTooltip key={stage.rd_stage_id}>
                         <StageTooltipTrigger asChild>
                           <div
                             tabIndex={0}
-                            className="group relative z-10 -mt-px flex min-h-[72px] cursor-help flex-col items-center justify-center px-5 py-2 text-center shadow-[0_8px_20px_-14px_rgba(0,0,0,.9)] outline-none transition-[width,filter,transform] duration-300 first:mt-0 hover:z-20 hover:brightness-110 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[82px] sm:px-8"
+                            className="group relative z-10 -mt-px flex min-h-[52px] cursor-help flex-col items-center justify-center px-4 py-1.5 text-center text-white shadow-[0_8px_18px_-14px_rgba(0,0,0,.95)] outline-none transition-[width,filter,transform] duration-300 first:mt-0 hover:z-20 hover:brightness-110 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[60px] sm:px-6"
                             style={{
-                              width: `max(${width}%, 220px)`,
-                              color: textColor,
-                              background: `linear-gradient(105deg, color-mix(in srgb, ${color} 86%, black), ${color} 52%, color-mix(in srgb, ${color} 82%, white))`,
+                              width: `max(${width}%, 196px)`,
+                              background: "linear-gradient(105deg, #08090b 0%, #4b4f56 14%, #15171b 27%, #050506 53%, #777c84 85%, #17191d 100%)",
                               clipPath: "polygon(4% 0, 96% 0, 91% 100%, 9% 100%)",
                             }}
                             aria-label={accessibleDescription}
                           >
-                            <span className="max-w-full truncate text-[11px] font-bold uppercase tracking-[0.08em] sm:text-xs">{stage.name}</span>
-                            <span className="mt-0.5 text-base font-extrabold tabular-nums sm:text-lg">{stage.count} <span className="text-[10px] font-semibold uppercase tracking-normal opacity-80 sm:text-[11px]">leads</span></span>
-                            <span className="text-[11px] font-semibold tabular-nums opacity-85">{stage.pct.toFixed(1)}% do total</span>
-                            <span className={`mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[10px] font-medium ${isBright ? "text-slate-950/70" : "text-white/80"}`}>
+                            <span className="flex max-w-full items-center justify-center gap-1.5 truncate text-[9px] font-bold uppercase tracking-[0.08em] sm:text-[10px]">
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-white/30" style={{ background: accentColor }} aria-hidden="true" />
+                              <span className="truncate">{stage.name}</span>
+                            </span>
+                            <span className="mt-0.5 text-sm font-extrabold tabular-nums sm:text-base">{stage.count} <span className="text-[9px] font-semibold uppercase tracking-normal text-white/70 sm:text-[10px]">leads</span></span>
+                            <span className="text-[9px] font-semibold tabular-nums text-white/75">{stage.pct.toFixed(1)}% do total</span>
+                            <span className="mt-0.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-0 text-[8px] font-medium text-white/65 sm:text-[9px]">
                               <span>{stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} d médio` : "Tempo indisponível"}</span>
                               <span>{stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Sem valor"}</span>
                             </span>

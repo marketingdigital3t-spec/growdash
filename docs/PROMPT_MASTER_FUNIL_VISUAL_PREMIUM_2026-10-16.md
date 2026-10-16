@@ -14,9 +14,10 @@ Reestruturar a distribuição por etapa da Análise de Funis para que o gráfico
 
 ## Direção visual
 
-- Usar uma sequência vertical de trapézios centralizados, com largura decrescente.
-- Aplicar progressão cromática de vermelho, laranja, amarelo e verde para reforçar o avanço do funil.
-- Garantir contraste adaptativo: texto claro nas etapas escuras e texto escuro nas etapas claras.
+- Usar uma sequência vertical de trapézios centralizados, com largura decrescente e altura compacta.
+- Aproximar o acabamento da referência metálica: superfície grafite, reflexos prateados discretos e separadores sem aparência de cartão colorido.
+- Usar um pequeno ponto de cor por etapa para preservar a leitura do avanço sem transformar o funil em um arco-íris.
+- Garantir contraste alto com tipografia branca sobre a superfície metálica escura.
 - Evitar rótulos externos que obriguem o usuário a cruzar linhas; os dados essenciais ficam dentro do bloco.
 - Manter tooltip, foco por teclado e `aria-label` com o resumo completo da etapa.
 - Em telas estreitas, preservar a leitura com área interna rolável e largura mínima controlada, sem overflow horizontal na página.
@@ -25,12 +26,13 @@ Reestruturar a distribuição por etapa da Análise de Funis para que o gráfico
 
 1. O funil abre no modo visual.
 2. Cada bloco contém nome, quantidade, percentual, tempo médio e valor.
-3. A largura diminui da primeira para a última etapa.
-4. Os números renderizados são os mesmos da tabela e do `FunnelAnalytics`.
-5. O total e o estado de indisponibilidade continuam visíveis.
-6. A tabela pode ser reativada pelo switch.
-7. Modo claro e escuro mantêm contraste, bordas e foco visíveis.
-8. Não há alteração em integrações, sincronização, regras de negócio ou dados.
+3. A largura diminui da primeira para a última etapa e a altura não domina o card.
+4. O acabamento é grafite/metálico, com ponto de cor por etapa.
+5. Os números renderizados são os mesmos da tabela e do `FunnelAnalytics`.
+6. O total e o estado de indisponibilidade continuam visíveis.
+7. A tabela pode ser reativada pelo switch.
+8. Modo claro e escuro mantêm contraste, bordas e foco visíveis.
+9. Não há alteração em integrações, sincronização, regras de negócio ou dados.
 
 ## Execução aplicada
 
