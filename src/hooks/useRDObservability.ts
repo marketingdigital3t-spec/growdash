@@ -119,11 +119,17 @@ export function useRDObservability() {
       }
 
       // ---- Data quality (deals últimos 30d) ----
-      const { data: dealsQ = [] } = await supabase
-        .from("rd_deals")
-        .select("utm_source, utm_medium, utm_campaign, deal_owner_name, win, rd_stage_name, amount_total, updated_at")
-        .gte("updated_at", since30)
-        .limit(5000);
+      const dealsQ: Array<Record<string, unknown>> = [];
+      for (let page = 0; ; page += 1) {
+        const { data: rows, error } = await supabase
+          .from("rd_deals")
+          .select("utm_source, utm_medium, utm_campaign, deal_owner_name, win, rd_stage_name, amount_total, updated_at")
+          .gte("updated_at", since30)
+          .range(page * 1000, page * 1000 + 999);
+        if (error) throw error;
+        dealsQ.push(...((rows ?? []) as Array<Record<string, unknown>>));
+        if (!rows || rows.length < 1000) break;
+      }
 
       const totalDeals30d = dealsQ?.length ?? 0;
       const utmComplete = (dealsQ ?? []).filter(
@@ -190,11 +196,17 @@ export function useRDObservability() {
       };
 
       // ---- Attribution health ----
-      const { data: dealsAttr = [] } = await supabase
-        .from("rd_deals")
-        .select("touch_count, first_touch_utm_campaign")
-        .gte("updated_at", since30)
-        .limit(5000);
+      const dealsAttr: Array<{ touch_count: number | null; first_touch_utm_campaign: string | null }> = [];
+      for (let page = 0; ; page += 1) {
+        const { data: rows, error } = await supabase
+          .from("rd_deals")
+          .select("touch_count, first_touch_utm_campaign")
+          .gte("updated_at", since30)
+          .range(page * 1000, page * 1000 + 999);
+        if (error) throw error;
+        dealsAttr.push(...((rows ?? []) as typeof dealsAttr));
+        if (!rows || rows.length < 1000) break;
+      }
 
       const attrTotal = dealsAttr?.length ?? 0;
       const withTouches = (dealsAttr ?? []).filter((d) => (d.touch_count ?? 0) > 0).length;

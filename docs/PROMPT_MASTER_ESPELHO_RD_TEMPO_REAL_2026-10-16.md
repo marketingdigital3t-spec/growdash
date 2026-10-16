@@ -150,6 +150,9 @@ escopo externo não puder ser confirmado.
   evitando “Nunca sincronizado” causado por um negócio de outra conta.
 - `sync-rd-crm` agora preserva o watermark anterior e responde erro parcial
   quando o sincronizador devolve snapshot incompleto.
+- `useRDObservability` deixou de limitar silenciosamente qualidade e atribuição
+  aos primeiros 1.000 registros do Data API; as duas leituras agora percorrem
+  páginas de 1.000 até uma página curta.
 
 ### Pendência que não deve ser mascarada
 
