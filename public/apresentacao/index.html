@@ -1313,6 +1313,63 @@
       .reference-offer, .reference-section, .reference-cta, .reference-process, .reference-trusted { padding-left: 10px; padding-right: 10px; }
       .reference-footer { padding-left: 16px; padding-right: 16px; }
     }
+
+    /* Footer compact: mantém a hierarquia sem criar uma segunda página de links. */
+    .reference-footer {
+      padding-top: 38px;
+      padding-bottom: 18px;
+    }
+
+    .reference-footer-grid {
+      gap: 24px;
+    }
+
+    .reference-footer strong { margin-bottom: 10px; }
+    .reference-footer a,
+    .reference-footer p { margin-bottom: 6px; }
+    .reference-footer .footer-tagline { margin-top: 10px; line-height: 1.4; }
+    .reference-footer .reference-footer-cta { margin-top: 5px; }
+    .reference-footer-bottom { margin-top: 22px; padding-top: 13px; }
+
+    @media (max-width: 600px) {
+      .reference-footer {
+        padding: 28px 20px 16px;
+      }
+
+      .reference-footer-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 16px;
+        row-gap: 16px;
+      }
+
+      .reference-footer-grid > div {
+        padding-top: 12px;
+      }
+
+      .reference-footer-grid > div:first-child {
+        grid-column: 1 / -1;
+        padding-top: 0;
+      }
+
+      .reference-footer-grid > div:last-child {
+        grid-column: 1 / -1;
+      }
+
+      .reference-footer .footer-brand { font-size: 16px; }
+      .reference-footer .footer-brand svg { width: 24px; height: 22px; }
+      .reference-footer .footer-tagline { max-width: 330px; font-size: 11px; }
+      .reference-footer strong { font-size: 11px; margin-bottom: 8px; }
+      .reference-footer a,
+      .reference-footer p { font-size: 10px; line-height: 1.35; }
+      .reference-footer .reference-footer-cta { font-size: 9px; padding: 8px 10px; }
+      .reference-footer-bottom { gap: 5px; margin-top: 18px; padding-top: 11px; font-size: 9px; }
+    }
+
+    @media (max-width: 360px) {
+      .reference-footer { padding-left: 16px; padding-right: 16px; }
+      .reference-footer-grid { column-gap: 12px; row-gap: 13px; }
+      .reference-footer .footer-tagline { max-width: 275px; }
+    }
   </style>
 </head>
 <body>
