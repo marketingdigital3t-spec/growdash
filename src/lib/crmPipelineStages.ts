@@ -45,6 +45,15 @@ export type RDFunnelStageSource = {
   name: string | null;
 };
 
+function isWonStageLabel(value: string) {
+  return /^(venda|vendas|sale|sales)$/.test(value)
+    || /\b(vendas? realizadas?|vendas? concluidas?|vendas? ganhas?|fechado ganho|ganho|won|cliente)\b/.test(value);
+}
+
+function isLostStageLabel(value: string) {
+  return /\b(perdid[oa]s?|perda|lost|desqualificad[oa]s?)\b/.test(value);
+}
+
 export function normalizedStageName(value: string | null | undefined) {
   return String(value ?? "")
     .normalize("NFD")
@@ -104,8 +113,12 @@ export function consolidatedCRMStage(source: CRMStageSource): CRMConsolidatedSta
   const sourceName = source.name?.trim() || "Sem etapa";
   const key = normalizedStageName(sourceName);
 
-  if (source.won) return { id: "won", name: "Vendas ganhas", order: 900, won: true, lost: false };
-  if (source.lost) return { id: "lost", name: "Perdidas", order: 950, won: false, lost: true };
+  // RD snapshots can disagree on the technical `is_won` flag while retaining
+  // the provider's terminal label. The label is the authoritative fallback:
+  // otherwise one stale stage row becomes a second "Venda Realizada" column
+  // and its deals stop contributing to the same card/KPI.
+  if (source.won || isWonStageLabel(key)) return { id: "won", name: "Vendas ganhas", order: 900, won: true, lost: false };
+  if (source.lost || isLostStageLabel(key)) return { id: "lost", name: "Perdidas", order: 950, won: false, lost: true };
   if (/\b(lead|novo\w*|nova\w*)\b/.test(key)) return { id: "new-leads", name: "Novos leads", order: 10, won: false, lost: false };
   // Pipelines independentes normalmente escrevem a mesma etapa como SDR,
   // pré-venda, oportunidade ou oportunidades. Na visão "Todas as contas"

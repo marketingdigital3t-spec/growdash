@@ -16,6 +16,11 @@ describe("CRM consolidated pipeline", () => {
     expect(consolidatedCRMStage({ name: "Não fechou", lost: true })).toMatchObject({ id: "lost", name: "Perdidas" });
   });
 
+  it("uses terminal RD labels when a stale snapshot omits the won flag", () => {
+    expect(consolidatedCRMStage({ name: "Venda Realizada", won: false })).toMatchObject({ id: "won", won: true });
+    expect(consolidatedCRMStage({ name: "Perdido", lost: false })).toMatchObject({ id: "lost", lost: true });
+  });
+
   it("joins SDR and opportunity variants from different RD funnels", () => {
     const stages = consolidateCRMPipeline([
       { id: "a", name: "SDR", order: 2 },
