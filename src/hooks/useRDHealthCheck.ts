@@ -149,10 +149,10 @@ export function useRDHealthCheck() {
         const lastUpdated = deals7Latest.data?.[0]?.updated_at;
         if (lastUpdated && lastUpdated < since7) {
           checks.push({
-            id: `webhook-${f.id}`,
-            label: `Webhook — ${f.name}`,
+            id: `snapshot-${f.id}`,
+            label: `Atualização do espelho — ${f.name}`,
             status: "warning",
-            detail: `Último evento há mais de 7 dias (${new Date(lastUpdated).toLocaleDateString("pt-BR")}).`,
+            detail: `Último negócio atualizado no snapshot há mais de 7 dias (${new Date(lastUpdated).toLocaleDateString("pt-BR")}); isso não comprova recebimento de webhook.`,
             action: { label: "Sincronizar", kind: "sync-deals", funnelId: f.id },
           });
         }
