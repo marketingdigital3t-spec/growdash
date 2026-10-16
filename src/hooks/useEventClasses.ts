@@ -7,6 +7,19 @@ import { resolveUniqueEventClassAccount } from "@/lib/eventClassAccountLinking";
 export type EventClassStatus = "open" | "sold_out" | "upcoming" | "cancelled" | "finished";
 export type MemberType = "student" | "model_patient";
 
+/** Keep RLS failures actionable without hiding the original authorization boundary. */
+export function describeEventClassPermissionError(error: unknown) {
+  const value = error as { code?: string; status?: number; message?: string } | null;
+  const message = String(value?.message || error || "");
+  if (value?.status === 401 || /unauthorized|jwt|not authenticated/i.test(message)) {
+    return "Sua sessão expirou. Entre novamente para continuar.";
+  }
+  if (value?.status === 403 || value?.code === "42501" || /permission denied|row-level security|forbidden/i.test(message)) {
+    return "Você não tem permissão para alterar esta turma ou a conta Meta vinculada.";
+  }
+  return message || "Não foi possível concluir a operação.";
+}
+
 export interface EventClass {
   id: string; user_id: string; expert_id?: string | null; expert_name: string | null; title: string; date_start: string; date_end: string | null; location: string | null;
   max_students: number; max_people: number; max_model_patients: number; status: EventClassStatus; notes: string | null; created_at: string; updated_at: string;

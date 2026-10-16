@@ -112,7 +112,8 @@ export function usePermissions() {
   const workspaceRole = workspace?.role ?? null;
   const canAdmin = isMaster || workspaceRole === "owner" || workspaceRole === "admin";
   const canEdit = canAdmin || workspaceRole === "analyst" || workspaceRole === "financial";
-  const accessRole = canAdmin ? "admin" : canEdit ? "editor" : "viewer";
+  const configuredAccessRole = data?.perm?.access_role as "admin" | "editor" | "viewer" | "financial" | "analyst" | undefined;
+  const accessRole = canAdmin ? "admin" : configuredAccessRole ?? (canEdit ? "editor" : "viewer");
 
   // A missing permission record is not authority. Keep owners/admins working,
   // but deny members until the workspace permission record can be read.
@@ -127,6 +128,12 @@ export function usePermissions() {
     // only a rendering guard, not a permissive fallback.
     return !!data?.perm?.[key];
   };
+
+  const canClasses = isMaster || fallbackPerm("can_classes");
+  // Page visibility and mutation authority are separate contracts. An
+  // Editor must have the Datas & Turmas page enabled; Analyst, Financial and
+  // Viewer profiles remain read-only even if they can open the page.
+  const canManageClasses = canAdmin || (configuredAccessRole === "editor" && canClasses);
 
   return {
     // Owners/admins already have authority through the workspace membership;
@@ -147,6 +154,7 @@ export function usePermissions() {
     isMaster,
     workspaceRole,
     accessRole: accessRole as "admin" | "editor" | "viewer",
+    configuredAccessRole,
     canAdmin,
     canEdit,
     canDashboard: isMaster || fallbackPerm("can_dashboard"),
@@ -156,7 +164,8 @@ export function usePermissions() {
     canFunnels: isMaster || fallbackPerm("can_funnels"),
     canFlow: isMaster || fallbackPerm("can_flow"),
     canSocialMedia: isMaster || fallbackPerm("can_social_media"),
-    canClasses: isMaster || fallbackPerm("can_classes"),
+    canClasses,
+    canManageClasses,
     canLeads: isMaster || fallbackPerm("can_leads"),
     canKanban: isMaster || fallbackPerm("can_kanban"),
     canTickets: isMaster || fallbackPerm("can_tickets"),

@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateEventClass, useUpdateEventClass, type EventClass, type EventClassStatus } from "@/hooks/useEventClasses";
+import { describeEventClassPermissionError, useCreateEventClass, useUpdateEventClass, type EventClass, type EventClassStatus } from "@/hooks/useEventClasses";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +19,7 @@ const empty = { title: "", expert_name: "", ad_account_id: "", date_start: "", d
 
 export function EventClassFormDialog({ open, onOpenChange, eventClass, defaultExpertName, defaultAccountId }: Props) {
   const create = useCreateEventClass(); const update = useUpdateEventClass();
+  const { canManageClasses } = usePermissions();
   const adAccounts = useAdAccounts();
   const [form, setForm] = useState(empty);
   const [accountIds, setAccountIds] = useState<string[]>([]);
@@ -37,10 +39,10 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass, defaultEx
     if (!form.title.trim() || !form.expert_name.trim() || !accountIds.length || !form.date_start) { toast({ title: "Informe nome, expert, pelo menos uma conta de anúncio e data inicial.", variant: "destructive" }); return; }
     if (form.date_end && form.date_end < form.date_start) { toast({ title: "A data final não pode ser anterior à inicial.", variant: "destructive" }); return; }
     const payload = { ...form, ad_account_ids: accountIds, title: form.title.trim(), expert_name: form.expert_name.trim(), date_end: form.date_end || null, location: form.location.trim() || null, notes: form.notes.trim() || null, max_students: Math.max(0, form.max_students), max_people: Math.max(0, form.max_students), max_model_patients: Math.max(0, form.max_model_patients) };
-    try { if (eventClass) await update.mutateAsync({ id: eventClass.id, ...payload }); else await create.mutateAsync(payload); toast({ title: eventClass ? "Turma atualizada" : "Turma criada" }); onOpenChange(false); } catch (error: any) { toast({ title: "Não foi possível salvar a turma", description: error?.message, variant: "destructive" }); }
+    try { if (eventClass) await update.mutateAsync({ id: eventClass.id, ...payload }); else await create.mutateAsync(payload); toast({ title: eventClass ? "Turma atualizada" : "Turma criada" }); onOpenChange(false); } catch (error: any) { toast({ title: "Não foi possível salvar a turma", description: describeEventClassPermissionError(error), variant: "destructive" }); }
   };
   const pending = create.isPending || update.isPending;
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{eventClass ? "Editar turma" : "Nova turma manual"}</DialogTitle></DialogHeader><div className="grid gap-4 sm:grid-cols-2">
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{eventClass ? "Editar turma" : "Nova turma manual"}</DialogTitle></DialogHeader>{!canManageClasses ? <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-sm text-muted-foreground">Seu perfil tem acesso somente para consulta em Agenda & Turmas.</div> : <div className="grid gap-4 sm:grid-cols-2">
     <div className="sm:col-span-2"><Label>Nome da turma *</Label><Input value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Ex.: Turma Alpha Outubro" /></div>
     <div><Label>Expert *</Label><Input value={form.expert_name} onChange={(e) => set("expert_name", e.target.value)} placeholder="Nome livre do expert" /></div>
     <div><Label>Contas de anúncio *</Label><AccountMultiSelect accounts={adAccounts.data || []} selectedIds={accountIds} onChange={(ids) => { setAccountIds(ids); set("ad_account_id", ids[0] || ""); }} singularLabel="conta" pluralLabel="contas" emptyLabel="Selecione as contas" ariaLabel="Contas de anúncio da turma" /></div>
@@ -50,5 +52,5 @@ export function EventClassFormDialog({ open, onOpenChange, eventClass, defaultEx
     <div><Label>Capacidade de alunas</Label><Input type="number" min={0} value={form.max_students} onChange={(e) => set("max_students", Number(e.target.value) || 0)} /></div>
     <div><Label>Capacidade de pacientes-modelo</Label><Input type="number" min={0} value={form.max_model_patients} onChange={(e) => set("max_model_patients", Number(e.target.value) || 0)} /></div>
     <div className="sm:col-span-2"><Label>Observações</Label><Textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Informações operacionais da turma" /></div>
-  </div><DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button><Button onClick={() => void submit()} disabled={pending}>{pending ? "Salvando…" : "Salvar turma"}</Button></DialogFooter></DialogContent></Dialog>;
+  </div>}<DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>{canManageClasses && <Button onClick={() => void submit()} disabled={pending}>{pending ? "Salvando…" : "Salvar turma"}</Button>}</DialogFooter></DialogContent></Dialog>;
 }

@@ -21,7 +21,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useExpertOperations } from "@/hooks/useExpertOperations";
-import { useArchiveEventClass, useDeleteEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
+import { describeEventClassPermissionError, useArchiveEventClass, useDeleteEventClass, useRestoreEventClass } from "@/hooks/useEventClasses";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,6 +128,7 @@ function ClassCard({
   const archive = useArchiveEventClass();
   const remove = useDeleteEventClass();
   const restore = useRestoreEventClass();
+  const { canManageClasses } = usePermissions();
   const openMembers = (type: "student" | "model_patient") => {
     setMembersType(type);
     setMembersOpen(true);
@@ -225,7 +227,7 @@ function ClassCard({
     } catch (error: any) {
       toast({
         title: "Não foi possível excluir a turma",
-        description: error?.message || "Tente novamente.",
+        description: describeEventClassPermissionError(error),
         variant: "destructive",
       });
     }
@@ -260,7 +262,7 @@ function ClassCard({
             </div>
             <div className="flex min-w-0 flex-col items-end gap-1">
               <div className="flex items-center gap-0.5">
-                <Button
+                {canManageClasses && <Button
                   className="h-7 w-7 shrink-0 rounded-full"
                   size="icon"
                   variant="ghost"
@@ -268,8 +270,8 @@ function ClassCard({
                   onClick={() => setEditOpen(true)}
                 >
                   <Edit className="h-3.5 w-3.5" />
-                </Button>
-                <Button
+                </Button>}
+                {canManageClasses && <Button
                   className="h-7 w-7 shrink-0 rounded-full"
                   size="icon"
                   variant="ghost"
@@ -278,8 +280,8 @@ function ClassCard({
                   onClick={() => setSheetOpen(true)}
                 >
                   <Link2 className="h-3.5 w-3.5" />
-                </Button>
-                <Button
+                </Button>}
+                {canManageClasses && <Button
                   className="h-7 w-7 shrink-0 rounded-full"
                   size="icon"
                   variant="ghost"
@@ -288,8 +290,8 @@ function ClassCard({
                   onClick={() => void (archived ? handleRestore() : handleArchive())}
                 >
                   {archived ? <RotateCcw className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-                </Button>
-                <Button
+                </Button>}
+                {canManageClasses && <Button
                   className="h-7 w-7 shrink-0 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                   size="icon"
                   variant="ghost"
@@ -298,7 +300,7 @@ function ClassCard({
                   onClick={() => setDeleteOpen(true)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                </Button>}
               </div>
               <div className="w-full text-right text-[10px] leading-none text-muted-foreground">
                 <span>{students.length}/{target}</span>
@@ -380,7 +382,7 @@ function ClassCard({
           </div>
         </CardContent>
       </Card>
-      <EventClassFormDialog open={editOpen} onOpenChange={setEditOpen} eventClass={eventClass} />
+      {canManageClasses && <EventClassFormDialog open={editOpen} onOpenChange={setEditOpen} eventClass={eventClass} />}
       <EventClassMembersDialog
         open={membersOpen}
         onOpenChange={setMembersOpen}
@@ -438,6 +440,7 @@ function ClassCard({
 export function ExpertOperationsView() {
   const globalFilters = useGlobalFilters();
   const adAccounts = useAdAccounts();
+  const { canManageClasses } = usePermissions();
   const experts = useQuery({
     queryKey: ["expert-operations-experts-by-account"],
     queryFn: async () => {
@@ -561,10 +564,10 @@ export function ExpertOperationsView() {
             {operations.sync.status === "fresh" ? "Atualizado" : operations.sync.status === "syncing" ? "Sincronizando" : "Dados pendentes"}
           </div>
           <div className="flex gap-1.5">
-            <Button size="sm" className="h-9" onClick={() => setCreateClassOpen(true)}>
+            {canManageClasses && <Button size="sm" className="h-9" onClick={() => setCreateClassOpen(true)}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Nova turma
-            </Button>
+            </Button>}
             <Button variant="outline" size="sm" className="h-9" onClick={() => operations.refetch()}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
               Atualizar
@@ -866,7 +869,7 @@ export function ExpertOperationsView() {
         As contas Meta e planilhas são vinculadas por expert dentro de cada turma. O token Google
         permanece somente no backend.
       </div>
-      <EventClassFormDialog
+      {canManageClasses && <EventClassFormDialog
         open={createClassOpen}
         onOpenChange={(open) => {
           setCreateClassOpen(open);
@@ -874,7 +877,7 @@ export function ExpertOperationsView() {
         }}
         defaultExpertName={selectedExpertName}
         defaultAccountId={globalFilters.adAccountIds.length === 1 ? globalFilters.adAccountIds[0] : ""}
-      />
+      />}
     </div>
   );
 }

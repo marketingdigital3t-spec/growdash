@@ -8,10 +8,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { EventClassWithCounts, EventClassStatus } from "@/hooks/useEventClasses";
-import { useDeleteEventClass } from "@/hooks/useEventClasses";
+import { describeEventClassPermissionError, useDeleteEventClass } from "@/hooks/useEventClasses";
 import { EventClassMembersDialog } from "./EventClassMembersDialog";
 import { EventClassFormDialog } from "./EventClassFormDialog";
 import { toast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const STATUS_LABELS: Record<EventClassStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   open: { label: "Aberta", variant: "default" },
@@ -26,6 +27,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
   const [patientsOpen, setPatientsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const remove = useDeleteEventClass();
+  const { canManageClasses } = usePermissions();
 
   const peopleCap = ec.max_people || ec.max_students || 0;
   const studentPct = peopleCap > 0 ? (ec.studentCount / peopleCap) * 100 : 0;
@@ -46,7 +48,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
       await remove.mutateAsync(ec.id);
       toast({ title: "Turma removida" });
     } catch (e: any) {
-      toast({ title: "Erro", description: e.message, variant: "destructive" });
+      toast({ title: "Erro", description: describeEventClassPermissionError(e), variant: "destructive" });
     }
   };
 
@@ -66,7 +68,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                 {ec.expert_name && <span>Expert: {ec.expert_name}</span>}
               </div>
             </div>
-            <DropdownMenu>
+            {canManageClasses && <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button>
               </DropdownMenuTrigger>
@@ -78,7 +80,7 @@ export function EventClassCard({ ec }: { ec: EventClassWithCounts }) {
                   <Trash2 className="h-3.5 w-3.5 mr-2" /> Remover
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu>}
           </div>
 
           <div className="space-y-3">
