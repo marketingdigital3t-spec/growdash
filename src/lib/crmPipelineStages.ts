@@ -14,6 +14,26 @@ export type CRMConsolidatedStage = {
   lost: boolean;
 };
 
+export type CRMStageIdentitySource = {
+  sourceId: string;
+  funnelId: string | null;
+  stageId: string | null;
+  name: string | null;
+  order: number | null;
+  won: boolean;
+  lost: boolean;
+};
+
+export type CRMStageIdentity = {
+  id: string;
+  name: string;
+  order: number;
+  won: boolean;
+  lost: boolean;
+  funnelId: string | null;
+  stageId: string | null;
+};
+
 export type RDDealStageSource = {
   rd_funnel_id: string | null;
   rd_stage_name: string | null;
@@ -25,7 +45,7 @@ export type RDFunnelStageSource = {
   name: string | null;
 };
 
-function normalized(value: string | null | undefined) {
+export function normalizedStageName(value: string | null | undefined) {
   return String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -82,7 +102,7 @@ export function filterOperationalRDFunnelStages<T extends RDFunnelStageRecord>(s
  */
 export function consolidatedCRMStage(source: CRMStageSource): CRMConsolidatedStage {
   const sourceName = source.name?.trim() || "Sem etapa";
-  const key = normalized(sourceName);
+  const key = normalizedStageName(sourceName);
 
   if (source.won) return { id: "won", name: "Vendas ganhas", order: 900, won: true, lost: false };
   if (source.lost) return { id: "lost", name: "Perdidas", order: 950, won: false, lost: true };
@@ -107,6 +127,47 @@ export function consolidatedCRMStage(source: CRMStageSource): CRMConsolidatedSta
     order: source.order ?? 500,
     won: false,
     lost: false,
+  };
+}
+
+/**
+ * Coalesces duplicate snapshots of a named stage within one RD funnel.
+ *
+ * RD can recreate a stage and keep the old local snapshot around. The two
+ * provider IDs are still mapped back to the same board card, so no deals are
+ * dropped while the CRM mirrors RD's single named column.
+ */
+export function mergeCRMStageSources(sources: CRMStageIdentitySource[]) {
+  const stages = new Map<string, CRMStageIdentity>();
+  const sourceToCanonicalId = new Map<string, string>();
+  const idByFunnelAndName = new Map<string, string>();
+
+  for (const source of sources) {
+    const labelKey = `${source.funnelId || "unassigned-funnel"}:${normalizedStageName(source.name) || "sem etapa"}`;
+    const id = idByFunnelAndName.get(labelKey) || source.sourceId;
+    idByFunnelAndName.set(labelKey, id);
+    sourceToCanonicalId.set(source.sourceId, id);
+    const current = stages.get(id);
+    if (!current) {
+      stages.set(id, {
+        id,
+        name: source.name || "Sem etapa",
+        order: source.order ?? 9_999,
+        won: source.won,
+        lost: source.lost,
+        funnelId: source.funnelId,
+        stageId: source.stageId,
+      });
+      continue;
+    }
+    current.order = Math.min(current.order, source.order ?? 9_999);
+    current.won = current.won || source.won;
+    current.lost = current.lost || source.lost;
+  }
+
+  return {
+    stages: Array.from(stages.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR")),
+    sourceToCanonicalId,
   };
 }
 

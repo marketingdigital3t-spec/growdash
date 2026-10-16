@@ -50,7 +50,7 @@ import { cn } from "@/lib/utils";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { accountOpportunityFallback } from "@/lib/opportunityValueFallback";
 import { crmEmptyState, crmPipelineEnabled } from "@/lib/crmAccess";
-import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage } from "@/lib/crmPipelineStages";
+import { consolidatedCRMStage, excludedOperationalRDDealIds, isExcludedLegacyRannielyStage, mergeCRMStageSources } from "@/lib/crmPipelineStages";
 import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 import { isDealInRDAccountOrFunnelScope, isRDDealInScopePeriod, type RDQueryScope } from "@/lib/rdQueryScope";
 import { isCanonicalWonDealInPeriod, saoPauloDayBounds } from "@/lib/canonicalMetrics";
@@ -450,30 +450,42 @@ export default function CrmPage() {
       };
     }
 
-    for (const stage of visibleStoredStages) {
-      const id = rdPipelineStageKey(stage.rd_funnel_id, stage.rd_stage_id);
-      map.set(id, {
-        id,
+    // RD can retain two local stage snapshots with different provider IDs
+    // after a stage was renamed/recreated. The provider UI exposes these as
+    // one named column, so merge the snapshots while retaining every source
+    // ID for deal placement and stage editing.
+    const merged = mergeCRMStageSources([
+      ...visibleStoredStages.map((stage) => ({
+        sourceId: rdPipelineStageKey(stage.rd_funnel_id, stage.rd_stage_id),
+        funnelId: stage.rd_funnel_id,
+        stageId: stage.rd_stage_id,
         name: stage.name,
         order: stage.order,
         won: stage.is_won,
         lost: stage.is_lost,
-        rdFunnelId: stage.rd_funnel_id,
-        rdStageId: stage.rd_stage_id,
+      })),
+      ...dealsInPipeline.map((deal) => ({
+        sourceId: rdPipelineStageKey(deal.rd_funnel_id, deal.rd_stage_id),
+        funnelId: deal.rd_funnel_id,
+        stageId: deal.rd_stage_id,
+        name: deal.rd_stage_name,
+        order: deal.rd_stage_order,
+        won: classifyLead(deal) === "won",
+        lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified",
+      })),
+    ]);
+    for (const stage of merged.stages) {
+      map.set(stage.id, {
+        id: stage.id,
+        name: stage.name,
+        order: stage.order,
+        won: stage.won,
+        lost: stage.lost,
+        rdFunnelId: stage.funnelId,
+        rdStageId: stage.stageId,
       });
     }
-    for (const deal of dealsInPipeline) {
-      const id = rdPipelineStageKey(deal.rd_funnel_id, deal.rd_stage_id);
-      if (!map.has(id)) {
-        map.set(id, {
-          id,
-          name: deal.rd_stage_name || "Sem etapa",
-          order: deal.rd_stage_order ?? 9_999,
-          won: classifyLead(deal) === "won",
-          lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified",
-        });
-      }
-    }
+    for (const [sourceId, canonicalId] of merged.sourceToCanonicalId) sourceToCanonicalId.set(sourceId, canonicalId);
     return {
       stages: Array.from(map.values()).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "pt-BR")),
       sourceToCanonicalId,
@@ -486,9 +498,8 @@ export default function CrmPage() {
     for (const stage of stages) map.set(stage.id, []);
     for (const deal of deals) {
       const sourceKey = rdPipelineStageKey(deal.rd_funnel_id, deal.rd_stage_id);
-      const stageId = isConsolidatedView
-        ? boardStageModel.sourceToCanonicalId.get(sourceKey) || canonicalStageForDeal(deal).id
-        : sourceKey;
+      const stageId = boardStageModel.sourceToCanonicalId.get(sourceKey)
+        || (isConsolidatedView ? canonicalStageForDeal(deal).id : sourceKey);
       const current = map.get(stageId) || [];
       current.push(deal);
       map.set(stageId, current);

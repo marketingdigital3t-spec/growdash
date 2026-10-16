@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consolidateCRMPipeline, consolidatedCRMStage, excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages, isExcludedLegacyRannielyStage } from "./crmPipelineStages";
+import { consolidateCRMPipeline, consolidatedCRMStage, excludedOperationalRDDealIds, filterOperationalRDDeals, filterOperationalRDFunnelStages, isExcludedLegacyRannielyStage, mergeCRMStageSources } from "./crmPipelineStages";
 
 describe("CRM consolidated pipeline", () => {
   it("puts equivalent new-lead labels in one column", () => {
@@ -28,6 +28,28 @@ describe("CRM consolidated pipeline", () => {
       { id: "sdr", name: "SDR", order: 18, won: false, lost: false },
       { id: "opportunity", name: "Oportunidades", order: 45, won: false, lost: false },
     ]);
+  });
+
+  it("merges duplicate named snapshots inside one RD funnel without losing source mappings", () => {
+    const result = mergeCRMStageSources([
+      { sourceId: "funnel:stage-a", funnelId: "funnel", stageId: "stage-a", name: "Venda Realizada", order: 8, won: true, lost: false },
+      { sourceId: "funnel:stage-b", funnelId: "funnel", stageId: "stage-b", name: "Venda realizada", order: 9, won: false, lost: false },
+      { sourceId: "funnel:stage-c", funnelId: "funnel", stageId: "stage-c", name: "Oportunidade", order: 4, won: false, lost: false },
+    ]);
+
+    expect(result.stages).toHaveLength(2);
+    expect(result.stages.find((stage) => stage.name === "Venda Realizada")).toMatchObject({ id: "funnel:stage-a", won: true });
+    expect(result.sourceToCanonicalId.get("funnel:stage-b")).toBe("funnel:stage-a");
+  });
+
+  it("keeps equal labels separated when they belong to different RD funnels", () => {
+    const result = mergeCRMStageSources([
+      { sourceId: "funnel-a:stage", funnelId: "funnel-a", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+      { sourceId: "funnel-b:stage", funnelId: "funnel-b", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+    ]);
+
+    expect(result.stages).toHaveLength(2);
+    expect(result.sourceToCanonicalId.get("funnel-a:stage")).not.toBe(result.sourceToCanonicalId.get("funnel-b:stage"));
   });
 
   it("does not exclude historical stages from the canonical CRM history", () => {
