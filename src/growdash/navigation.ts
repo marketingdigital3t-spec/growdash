@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Compass,
   Columns3,
+  FileBarChart2,
   GitBranch,
   HardDrive,
   Headphones,
@@ -53,6 +54,14 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Uma visão consolidada das principais métricas da sua operação.",
         metrics: [],
         highlights: [],
+      },
+      {
+        label: "Fechamento do mês",
+        path: "/fechamento-mes",
+        icon: FileBarChart2,
+        description: "Apresente KPIs, eficiência de aquisição e decisões do fechamento mensal.",
+        metrics: [],
+        highlights: ["CPL e CAC", "Comparativo mensal", "Plano operacional"],
       },
       {
         label: "Painel do Expert",

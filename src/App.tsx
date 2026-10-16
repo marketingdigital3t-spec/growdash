@@ -43,6 +43,7 @@ const AnnouncementsPage = lazyWithRetry(() => import("@/growdash/AnnouncementsPa
 const ModulePage = lazyWithRetry(() => import("@/growdash/ModulePage"), "module");
 const AgentsOfficePage = lazyWithRetry(() => import("@/growdash/AgentsOfficePage"), "agent-office");
 const TrafficAgentPage = lazyWithRetry(() => import("@/growdash/TrafficAgentPage"), "traffic-agent");
+const MonthClosingPage = lazyWithRetry(() => import("@/growdash/MonthClosingPage"), "fechamento-mes");
 const BrandDiagnosticPage = lazyWithRetry(() => import("@/growdash/BrandDiagnosticPage"), "brand-diagnostic");
 const IntelligenceCenterPage = lazyWithRetry(() => import("@/growdash/IntelligenceCenterPage"), "intelligence-center");
 const StrategyPage = lazyWithRetry(() => import("@/growdash/StrategyPage"), "strategy");
@@ -261,6 +262,7 @@ export default function App() {
                   <Route path="/questionario-expert/:token" element={<PublicExpertQuestionnaire />} />
                   <Route element={<AuthenticatedLayout />}>
                     <Route index element={<ResilientRoute><RequirePage page="dashboard">{analytics(<FullDashboard />)}</RequirePage></ResilientRoute>} />
+                    <Route path="fechamento-mes" element={<ResilientRoute><RequirePage page="dashboard">{analytics(<MonthClosingPage />)}</RequirePage></ResilientRoute>} />
                     <Route path="painel-expert" element={<ResilientRoute><RequirePage page="expertDashboard">{analytics(<ExpertDashboard />)}</RequirePage></ResilientRoute>} />
                     <Route path="dashboard" element={<Navigate to="/" replace />} />
                     <Route path="dashboard/completo" element={<Navigate to="/" replace />} />
