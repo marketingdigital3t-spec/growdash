@@ -314,7 +314,7 @@ function isWonDeal(d: any): boolean {
     if (/\b(pre|pos) venda\b/.test(stage)) return false;
     return (
       /^(venda|vendas|sale|sales)$/.test(stage) ||
-      /\b(venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(stage)
+      /\b(vendid[oa]s?|venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(stage)
     );
   }
   // Sem etapa no payload, o flag terminal do RD continua sendo o melhor
@@ -337,6 +337,7 @@ function bucketFromStage(
   if (s.includes("perdido") || s.includes("lost")) return "lost";
   if (
     s.includes("venda") ||
+    /\bvendid[oa]s?\b/.test(s) ||
     s.includes("ganho") ||
     s.includes("won") ||
     s.includes("cliente") ||
@@ -863,7 +864,7 @@ Deno.serve(async (req) => {
             Boolean(s?.win ?? s?.is_won ?? s?.won) ||
             lname.includes("ganho") ||
             /^(venda|vendas|sale|sales)$/.test(lname) ||
-            /\b(venda real|venda concl|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(lname);
+            /\b(vendid[oa]s?|venda real|venda concl|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(lname);
           const isLost =
             Boolean(s?.loss ?? s?.is_lost ?? s?.lost) ||
             lname.includes("perdido") ||

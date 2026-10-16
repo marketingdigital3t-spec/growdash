@@ -47,7 +47,7 @@ export type RDFunnelStageSource = {
 
 function isWonStageLabel(value: string) {
   return /^(venda|vendas|sale|sales)$/.test(value)
-    || /\b(vendas? realizadas?|vendas? concluidas?|vendas? ganhas?|fechado ganho|ganho|won|cliente)\b/.test(value);
+    || /\b(vendid[oa]s?|vendas? realizadas?|vendas? concluidas?|vendas? ganhas?|fechado ganho|ganho|won|cliente)\b/.test(value);
 }
 
 function isLostStageLabel(value: string) {

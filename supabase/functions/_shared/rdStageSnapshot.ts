@@ -30,7 +30,7 @@ export function stagesFromRDDealSnapshot(
     if (!id || !name || unique.has(id)) continue;
     const normalized = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const won = Boolean(deal.win) || deal.stage_bucket === "client"
-      || /\b(venda|vendas|venda real|venda concluida|venda ganha|ganho|won|cliente)\b/.test(normalized);
+      || /\b(venda|vendas|vendid[oa]s?|venda real|venda concluida|venda ganha|ganho|won|cliente)\b/.test(normalized);
     const lost = deal.stage_bucket === "lost" || deal.stage_bucket === "disqualified"
       || /\b(perdido|perdida|perda|lost)\b/.test(normalized);
     unique.set(id, {

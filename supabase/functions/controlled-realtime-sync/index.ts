@@ -259,8 +259,12 @@ Deno.serve(async (req) => {
               // reserved for the historical/backfill job; otherwise one
               // large funnel keeps the whole UI in "syncing" and no snapshot
               // is refreshed for any other account.
+              // A realtime cycle must finish inside the Edge runtime budget.
+              // Each deal may require a detail and contact request; allowing
+              // 200 items here left sync_runs orphaned before the snapshot was
+              // committed. Repeated five-minute cycles cover the remainder.
               max_pages: realtime ? 3 : 50,
-              max_deals: realtime ? 200 : 3_000,
+              max_deals: realtime ? 60 : 3_000,
               trigger_source: realtime ? "auto_realtime" : "manual",
             }),
           }));

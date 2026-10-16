@@ -44,14 +44,14 @@ function isWon(d: any) {
   if (d?.win === true) return true;
   const s = (d?.deal_stage?.name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_-]+/g, " ").trim();
   if (!s || /\b(pre|pos) venda\b/.test(s)) return false;
-  return /^(venda|vendas|sale|sales)$/.test(s) || /\b(venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(s);
+  return /^(venda|vendas|sale|sales)$/.test(s) || /\b(vendid[oa]s?|venda realizada|venda concluida|venda ganha|fechado ganho|ganho|won|cliente)\b/.test(s);
 }
 function bucketFromStage(stageName: string | null | undefined, win: boolean, lost: boolean) {
   if (win) return "client";
   if (lost) return "lost";
   const s = (stageName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (s.includes("perdido") || s.includes("lost")) return "lost";
-  if (s.includes("venda") || s.includes("ganho") || s.includes("cliente") || s.includes("fechado")) return "client";
+  if (s.includes("venda") || /\bvendid[oa]s?\b/.test(s) || s.includes("ganho") || s.includes("cliente") || s.includes("fechado")) return "client";
   if (s.includes("oport") || s.includes("negoc") || s.includes("propos")) return "opportunity";
   if (s.includes("sql") || s.includes("qualif")) return "sql";
   if (s.includes("mql")) return "mql";

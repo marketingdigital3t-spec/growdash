@@ -57,12 +57,17 @@ export function isDealInRDAccountOrFunnelScope(
   funnelIds: string[],
 ) {
   const directAccountMatch = Boolean(deal.ad_account_id && accountIds.includes(deal.ad_account_id));
-  const linkedFunnelMatch = Boolean(
-    deal.rd_funnel_id
-    && funnelIds.includes(deal.rd_funnel_id)
-    && (!deal.ad_account_id || directAccountMatch),
-  );
-  return directAccountMatch || linkedFunnelMatch;
+  // When an active RD funnel is resolved, it is the canonical boundary. A
+  // direct Meta-account match must not pull rows left behind by a detached or
+  // duplicated funnel that happens to use the same account. Direct-account
+  // rows are still accepted when they have no funnel identity at all.
+  if (funnelIds.length > 0) {
+    if (deal.rd_funnel_id) {
+      return funnelIds.includes(deal.rd_funnel_id) && (!deal.ad_account_id || directAccountMatch);
+    }
+    return directAccountMatch;
+  }
+  return directAccountMatch;
 }
 
 function inPeriod(value: string | null | undefined, scope: RDQueryScope) {

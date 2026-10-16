@@ -294,7 +294,11 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
         const usableFunnelIds = (resolvedFunnelIds ?? []).filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
         const scopeFilters = [
           usableFunnelIds.length ? `rd_funnel_id.in.(${usableFunnelIds.join(",")})` : "",
-          selectedAccountIds.length ? `ad_account_id.in.(${selectedAccountIds.join(",")})` : "",
+          // Account-only rows are valid only when they have no funnel yet. Do
+          // not reintroduce stale deals from a different local RD pipeline.
+          usableFunnelIds.length && selectedAccountIds.length
+            ? `and(ad_account_id.in.(${selectedAccountIds.join(",")}),rd_funnel_id.is.null)`
+            : selectedAccountIds.length ? `ad_account_id.in.(${selectedAccountIds.join(",")})` : "",
         ].filter(Boolean);
         if (scopeFilters.length > 1) query = query.or(scopeFilters.join(","));
         else if (usableFunnelIds.length) query = query.in("rd_funnel_id", usableFunnelIds);
