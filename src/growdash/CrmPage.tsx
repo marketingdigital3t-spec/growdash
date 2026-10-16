@@ -12,12 +12,8 @@ import {
   List,
   Mail,
   MapPin,
-  MessageSquareText,
-  Pencil,
   RefreshCw,
-  Save,
   Search,
-  Send,
   Target,
   Trophy,
   UserRound,
@@ -40,11 +36,9 @@ import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useFunnelStagesForIds } from "@/hooks/useRDDeals";
 import { classifyLead, dedupeRDDeals, type RDDealLite, useRDCRMDeals } from "@/hooks/useRDDealsForPeriod";
-import { useCreateRDDealNote, useRDDealNotes } from "@/hooks/useRDDealNotes";
 import { useSales } from "@/hooks/useSales";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
@@ -623,24 +617,6 @@ export default function CrmPage() {
     }
   }
 
-  async function renameStage(stage: PipelineStage, name: string) {
-    if (!stage.rdFunnelId || !stage.rdStageId) return false;
-    const trimmed = name.trim();
-    if (!trimmed || trimmed === stage.name) return false;
-    const { error } = await supabase
-      .from("rd_funnel_stages")
-      .update({ name: trimmed })
-      .eq("rd_funnel_id", stage.rdFunnelId)
-      .eq("rd_stage_id", stage.rdStageId);
-    if (error) {
-      toast.error(`Não foi possível renomear a etapa: ${error.message}`);
-      return false;
-    }
-    await queryClient.invalidateQueries({ queryKey: ["rd_funnel_stages"] });
-    toast.success("Etapa renomeada com sucesso.");
-    return true;
-  }
-
   return (
     <div className="crm-page gd-module-shell mx-auto max-w-[1700px] space-y-5">
       <PageHeading
@@ -766,7 +742,6 @@ export default function CrmPage() {
           getOpportunityAmount={getOpportunityAmount}
           onLoadMore={(stageId) => setStageLimits((current) => ({ ...current, [stageId]: (current[stageId] || BOARD_STEP) + BOARD_STEP }))}
           onOpen={setSelectedDeal}
-          onRename={renameStage}
         />
       ) : (
         <DealsList
@@ -787,7 +762,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} userId={user?.id} userName={String(user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário Growdash")} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }); queryClient.invalidateQueries({ queryKey: ["rd_deals_period"] }); toast.success("Negociação atualizada na Growdash"); }} />
+      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} />
     </div>
   );
 }
@@ -799,35 +774,7 @@ function KanbanBoard({ stages, stageDeals, stageLimits, getOpportunityAmount, on
   getOpportunityAmount: (deal: RDDealLite) => number;
   onLoadMore: (stageId: string) => void;
   onOpen: (deal: RDDealLite) => void;
-  onRename: (stage: PipelineStage, name: string) => Promise<boolean>;
 }) {
-  const [editingStageId, setEditingStageId] = useState<string | null>(null);
-  const [editingStageName, setEditingStageName] = useState("");
-  const [savingStageId, setSavingStageId] = useState<string | null>(null);
-
-  const beginRename = (stage: PipelineStage) => {
-    if (!stage.rdFunnelId || !stage.rdStageId) return;
-    setEditingStageId(stage.id);
-    setEditingStageName(stage.name);
-  };
-
-  const cancelRename = () => {
-    if (savingStageId) return;
-    setEditingStageId(null);
-    setEditingStageName("");
-  };
-
-  const commitRename = async (stage: PipelineStage) => {
-    if (!editingStageName.trim() || savingStageId) return;
-    setSavingStageId(stage.id);
-    const saved = await onRename(stage, editingStageName);
-    if (saved) {
-      setEditingStageId(null);
-      setEditingStageName("");
-    }
-    setSavingStageId(null);
-  };
-
   return (
     <section className="gd-panel mt-4 overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -844,7 +791,7 @@ function KanbanBoard({ stages, stageDeals, stageLimits, getOpportunityAmount, on
               <div key={stage.id} className="w-[286px] shrink-0 overflow-hidden rounded-2xl border border-border bg-muted/25">
                 <div className="sticky top-0 z-10 border-b border-border bg-background/95 p-3 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><StageDot won={stage.won} lost={stage.lost} />{editingStageId === stage.id ? <><Input value={editingStageName} onChange={(event) => setEditingStageName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void commitRename(stage); if (event.key === "Escape") cancelRename(); }} aria-label={`Nome da etapa ${stage.name}`} autoFocus disabled={savingStageId === stage.id} className="h-7 min-w-0 px-2 text-xs font-black" /><button type="button" className="rounded p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary" onClick={() => void commitRename(stage)} disabled={savingStageId === stage.id || !editingStageName.trim()} aria-label="Salvar nome da etapa"><Save className="h-3.5 w-3.5" /></button><button type="button" className="rounded p-1 text-muted-foreground hover:bg-muted" onClick={cancelRename} disabled={savingStageId === stage.id} aria-label="Cancelar edição da etapa"><XCircle className="h-3.5 w-3.5" /></button></> : <><h3 className="truncate text-xs font-black" title={stage.name}>{stage.name}</h3>{stage.rdFunnelId && stage.rdStageId && <button type="button" className="rounded p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary" onClick={() => beginRename(stage)} aria-label={`Editar etapa ${stage.name}`} title="Editar nome da etapa"><Pencil className="h-3 w-3" /></button>}</>}</div><p className="mt-1 pl-4 text-[10px] text-muted-foreground">{number.format(deals.length)} negócio(s) · {brl.format(total)}</p></div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><StageDot won={stage.won} lost={stage.lost} /><h3 className="truncate text-xs font-black" title={stage.name}>{stage.name}</h3></div><p className="mt-1 pl-4 text-[10px] text-muted-foreground">{number.format(deals.length)} negócio(s) · {brl.format(total)}</p></div>
                     <span className="rounded-full border border-border bg-background px-2 py-1 text-[10px] font-black">{deals.length}</span>
                   </div>
                 </div>
@@ -933,7 +880,7 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, attribution, funnelName, userId, userName, getOpportunityAmount, onClose, onSaved }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; userId?: string; userName: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onSaved: () => void }) {
+function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void }) {
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
   return (
@@ -949,8 +896,6 @@ function DealDetails({ deal, attribution, funnelName, userId, userName, getOppor
           <DetailMetric icon={<UserRound />} label="Responsável" value={deal.deal_owner_name || "Não informado"} />
           <DetailMetric icon={deal.win ? <Trophy /> : <XCircle />} label="Situação" value={statusLabel(deal)} />
         </div>
-        <DealEditor deal={deal} userId={userId} onSaved={onSaved} />
-        <DealNotes dealId={deal.id} userId={userId} userName={userName} />
         <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
           <DetailRow icon={<Columns3 />} label="Funil" value={funnelName || "Funil RD"} />
           <DetailRow icon={<Mail />} label="E-mail" value={deal.contact_email || "Não informado"} />
@@ -967,12 +912,17 @@ function DealDetails({ deal, attribution, funnelName, userId, userName, getOppor
           {deal.lost_reason && <DetailRow icon={<XCircle />} label="Motivo da perda" value={deal.lost_reason} danger />}
         </div>
         {!!fields.length && <div className="mt-5"><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Campos personalizados do RD</h3><div className="mt-2 divide-y divide-border rounded-2xl border border-border">{fields.map(([key, value]) => <div key={key} className="grid grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)] gap-3 px-4 py-3 text-xs"><span className="break-words text-muted-foreground">{key}</span><b className="break-words text-right">{String(value)}</b></div>)}</div></div>}
-        <div className="mt-5 rounded-xl border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">ID RD: {deal.rd_deal_id}. A Growdash exibe o histórico armazenado imediatamente e atualiza alterações do RD em segundo plano.</div>
+        <div className="mt-5 rounded-xl border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">ID RD: {deal.rd_deal_id}. A Growdash exibe somente o espelho do RD Station: os dados são atualizados pelo sincronizador e não podem ser editados nesta tela.</div>
       </SheetContent>
     </Sheet>
   );
 }
 
+/*
+ * The CRM is intentionally read-only. RD Station is the canonical source;
+ * deal fields, stages and notes must be changed in RD and then synchronized.
+ */
+/*
 function DealNotes({ dealId, userId, userName }: { dealId: string; userId?: string; userName: string }) {
   const [body, setBody] = useState("");
   const { data: notes = [], isLoading, isError } = useRDDealNotes(dealId);
@@ -1063,6 +1013,7 @@ function DealEditor({ deal, userId, onSaved }: { deal: RDDealLite; userId?: stri
 function EditField({ label, value, onChange, type = "text", inputMode }: { label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }) {
   return <label className="grid gap-1.5 text-xs font-bold">{label}<Input type={type} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
+*/
 
 function ViewButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
   return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={cn("inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-black transition", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{<span className="[&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">{icon}</span>}{label}</button>;

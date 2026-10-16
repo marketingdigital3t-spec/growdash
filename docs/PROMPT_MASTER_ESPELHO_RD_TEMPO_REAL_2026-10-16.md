@@ -14,6 +14,9 @@ substituir uma negociação RD exibida nos cards, funil ou CRM.
   vinculados à conexão daquela conta.
 - Um funil local ativo por `rd_funnel_id` de provedor; associações antigas ficam
   inativas para auditoria e nunca criam uma segunda coluna ou contagem.
+- A rota `/crm` é somente leitura: não oferece edição de negócio, etapa, contato,
+  valor, UTM ou anotação como alteração do espelho. Ajustes são feitos no RD e
+  retornam pela sincronização; o botão de atualização apenas reconcilia a fonte.
 - Período é inclusivo em data civil e timezone da conta; negociações abertas do
   pipeline continuam visíveis no CRM, enquanto relatórios usam a regra de data
   declarada pelo componente.
