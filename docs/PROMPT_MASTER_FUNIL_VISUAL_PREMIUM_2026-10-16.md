@@ -14,8 +14,8 @@ Reestruturar a distribuição por etapa da Análise de Funis para que o gráfico
 
 ## Direção visual
 
-- Usar uma sequência vertical de trapézios centralizados, com largura decrescente e altura compacta.
-- Aproximar o acabamento da referência metálica: superfície grafite, reflexos prateados discretos e separadores sem aparência de cartão colorido.
+- Usar uma sequência vertical de trapézios centralizados, com taper forte, largura decrescente e altura compacta.
+- Aproximar o acabamento da referência metálica: superfície grafite, reflexos prateados discretos, separadores definidos e um pequeno acabamento na base.
 - Usar um pequeno ponto de cor por etapa para preservar a leitura do avanço sem transformar o funil em um arco-íris.
 - Garantir contraste alto com tipografia branca sobre a superfície metálica escura.
 - Evitar rótulos externos que obriguem o usuário a cruzar linhas; os dados essenciais ficam dentro do bloco.
@@ -26,7 +26,7 @@ Reestruturar a distribuição por etapa da Análise de Funis para que o gráfico
 
 1. O funil abre no modo visual.
 2. Cada bloco contém nome, quantidade, percentual, tempo médio e valor.
-3. A largura diminui da primeira para a última etapa e a altura não domina o card.
+3. A largura diminui de forma claramente cônica da primeira para a última etapa e a altura não domina o card.
 4. O acabamento é grafite/metálico, com ponto de cor por etapa.
 5. Os números renderizados são os mesmos da tabela e do `FunnelAnalytics`.
 6. O total e o estado de indisponibilidade continuam visíveis.

@@ -26,14 +26,14 @@ describe("FunnelStageDistribution", () => {
   it("creates a descending funnel width from the first to the last stage", () => {
     const widths = [0, 1, 2, 3].map((index) => funnelStageVisualWidth(index, 4));
 
-    expect(widths).toEqual([100, 81, 63, 44]);
+    expect(widths).toEqual([100, 76, 52, 28]);
     expect(widths).toEqual([...widths].sort((a, b) => b - a));
   });
 
   it("keeps a single or empty funnel stage valid", () => {
     expect(funnelStageVisualWidth(0, 0)).toBe(100);
     expect(funnelStageVisualWidth(0, 1)).toBe(100);
-    expect(funnelStageVisualWidth(8, 3)).toBe(44);
+    expect(funnelStageVisualWidth(8, 3)).toBe(28);
   });
 
   it("transitions the visual palette from red through yellow to green", () => {
@@ -53,6 +53,6 @@ describe("FunnelStageDistribution", () => {
 
     expect(funnelStageDistributionTotal(selectedPeriod)).toBe(100);
     expect(funnelStageVisualWidth(0, selectedPeriod.stages.length)).toBe(100);
-    expect(funnelStageVisualWidth(2, selectedPeriod.stages.length)).toBe(44);
+    expect(funnelStageVisualWidth(2, selectedPeriod.stages.length)).toBe(28);
   });
 });

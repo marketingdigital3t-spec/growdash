@@ -7,7 +7,8 @@ export function funnelStageDistributionTotal(a: Pick<FunnelAnalytics, "stages">)
 export function funnelStageVisualWidth(index: number, stageCount: number) {
   if (stageCount <= 1) return 100;
   const progress = Math.max(0, Math.min(1, index / (stageCount - 1)));
-  return Math.round(100 - progress * 56);
+  // Use a stronger taper so a long CRM pipeline still reads as a funnel.
+  return Math.round(100 - progress * 72);
 }
 
 export function funnelStageVisualColor(index: number, stageCount: number) {
