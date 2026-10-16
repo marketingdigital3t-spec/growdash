@@ -92,3 +92,13 @@ escopo externo não puder ser confirmado.
 - O quadro do CRM informa separadamente o total histórico exibido e quantos
   negócios foram criados no período, evitando interpretar o pipeline completo
   como um relatório de criação.
+- A comparação adicional no mesmo funil confirmou `1.179` negócios no histórico
+  completo e `24` na etapa `Venda Realizada` tanto no RD Station quanto na
+  Growdash. No recorte de criação de setembro, ambos retornam `449` negócios;
+  o RD retorna `12` vendas na etapa quando o filtro é por criação. A Growdash
+  mantém a métrica financeira por data de fechamento e encontrou `13` nesse
+  recorte, por isso o card agora deve ser lido como “ganhas no período de
+  fechamento”, não como a contagem da coluna filtrada por criação.
+- A regra compartilhada de venda foi corrigida para usar a etapa atual do RD
+  quando ela existe e só usar `win=true` em registros legados sem etapa. Isso
+  evita contar como venda um negócio reaberto que conserva um flag antigo.

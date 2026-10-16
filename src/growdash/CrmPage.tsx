@@ -684,7 +684,7 @@ export default function CrmPage() {
               source="RD Station CRM"
               label="Negociações criadas no período"
               value={number.format(stats.total)}
-              description={`${number.format(stats.active)} ativas · ${number.format(stats.won)} ganhas no período selecionado`}
+              description={`${number.format(stats.active)} ativas · ${number.format(stats.won)} fechadas como ganhas no período`}
               icon={<Columns3 className="h-4 w-4" />}
               tone="rd"
             />
@@ -700,7 +700,7 @@ export default function CrmPage() {
               source="Comercial · RD"
               label="Faturamento líquido ganho"
               value={brl.format(stats.wonRevenue)}
-              description={`${number.format(stats.won)} negociação(ões) marcada(s) como ganha(s)`}
+              description={`${number.format(stats.won)} fechamento(s) ganho(s) no período`}
               icon={<Trophy className="h-4 w-4" />}
               tone="success"
             />
@@ -708,7 +708,7 @@ export default function CrmPage() {
               source="Conversão · RD"
               label="Taxa de conversão"
               value={`${stats.conversion.toFixed(2)}%`}
-              description={`${number.format(stats.won)} ganhas de ${number.format(stats.total)} negociações · ${number.format(stats.lost)} perdidas`}
+              description={`${number.format(stats.won)} fechamentos ganhos de ${number.format(stats.total)} negociações · ${number.format(stats.lost)} perdidas`}
               icon={<Target className="h-4 w-4" />}
               tone="success"
             />

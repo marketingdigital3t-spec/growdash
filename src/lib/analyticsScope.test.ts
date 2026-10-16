@@ -50,4 +50,17 @@ describe("analyticsScope", () => {
     expect(result.outsidePeriodDealIds).toEqual(["old"]);
     expect(result.financialSaleIdsWithoutRD).toEqual(["sale-without-rd"]);
   });
+
+  it("usa a etapa atual do RD antes do flag win legado", () => {
+    const result = reconcileCanonicalRDDeals({
+      startDate: new Date("2026-10-01T00:00:00-03:00"),
+      endDate: new Date("2026-10-31T23:59:59-03:00"),
+      candidates: [
+        { rd_deal_id: "reopened", win: true, rd_stage_name: "Em conversa", closed_at: "2026-10-10T12:00:00-03:00" },
+        { rd_deal_id: "won", win: false, rd_stage_name: "Venda Realizada", closed_at: "2026-10-10T12:00:00-03:00" },
+      ],
+    });
+    expect(result.includedDealIds).toEqual(["won"]);
+    expect(result.outsidePeriodDealIds).toEqual(["reopened"]);
+  });
 });

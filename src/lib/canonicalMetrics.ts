@@ -48,7 +48,13 @@ export function isCanonicalWonDealInPeriod(
 
 /** A single, shared definition of a won RD deal used by every KPI surface. */
 export function isCanonicalWonDeal(deal: Pick<CanonicalWonDeal, "win" | "rd_stage_name">) {
-  return deal.win === true || isWonRDStageName(deal.rd_stage_name);
+  // The current RD stage is authoritative whenever it is available. A stale
+  // `win` flag can remain true after a deal is reopened or moved to another
+  // stage; trusting it unconditionally makes Growdash count a sale that RD
+  // does not show in its Venda Realizada filter. Only legacy rows without a
+  // stage may fall back to the provider's terminal flag.
+  if (String(deal.rd_stage_name || "").trim()) return isWonRDStageName(deal.rd_stage_name);
+  return deal.win === true;
 }
 /** Deduplicates snapshots by the provider identity, retaining the first row. */
 export function canonicalWonDealIds<T extends CanonicalWonDeal>(deals: T[]) {
