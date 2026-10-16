@@ -473,7 +473,7 @@ export default function CrmPage() {
         won: classifyLead(deal) === "won",
         lost: classifyLead(deal) === "lost" || classifyLead(deal) === "disqualified",
       })),
-    ]);
+    ], { preserveFunnelBoundaries: false });
     for (const stage of merged.stages) {
       map.set(stage.id, {
         id: stage.id,

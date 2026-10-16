@@ -150,13 +150,19 @@ export function consolidatedCRMStage(source: CRMStageSource): CRMConsolidatedSta
  * provider IDs are still mapped back to the same board card, so no deals are
  * dropped while the CRM mirrors RD's single named column.
  */
-export function mergeCRMStageSources(sources: CRMStageIdentitySource[]) {
+export function mergeCRMStageSources(
+  sources: CRMStageIdentitySource[],
+  options: { preserveFunnelBoundaries?: boolean } = {},
+) {
   const stages = new Map<string, CRMStageIdentity>();
   const sourceToCanonicalId = new Map<string, string>();
   const idByFunnelAndName = new Map<string, string>();
+  const preserveFunnelBoundaries = options.preserveFunnelBoundaries ?? true;
 
   for (const source of sources) {
-    const labelKey = `${source.funnelId || "unassigned-funnel"}:${normalizedStageName(source.name) || "sem etapa"}`;
+    const labelKey = preserveFunnelBoundaries
+      ? `${source.funnelId || "unassigned-funnel"}:${normalizedStageName(source.name) || "sem etapa"}`
+      : normalizedStageName(source.name) || "sem etapa";
     const id = idByFunnelAndName.get(labelKey) || source.sourceId;
     idByFunnelAndName.set(labelKey, id);
     sourceToCanonicalId.set(source.sourceId, id);

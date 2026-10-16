@@ -57,6 +57,16 @@ describe("CRM consolidated pipeline", () => {
     expect(result.sourceToCanonicalId.get("funnel-a:stage")).not.toBe(result.sourceToCanonicalId.get("funnel-b:stage"));
   });
 
+  it("can merge equal labels across duplicate funnel snapshots", () => {
+    const result = mergeCRMStageSources([
+      { sourceId: "funnel-a:stage", funnelId: "funnel-a", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+      { sourceId: "funnel-b:stage", funnelId: "funnel-b", stageId: "stage", name: "Venda Realizada", order: 8, won: true, lost: false },
+    ], { preserveFunnelBoundaries: false });
+
+    expect(result.stages).toHaveLength(1);
+    expect(result.sourceToCanonicalId.get("funnel-a:stage")).toBe(result.sourceToCanonicalId.get("funnel-b:stage"));
+  });
+
   it("does not exclude historical stages from the canonical CRM history", () => {
     expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Leads Antigos do Junior")).toBe(false);
     expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Paciente modelo", "Leads antigos do Dr Junior")).toBe(false);
