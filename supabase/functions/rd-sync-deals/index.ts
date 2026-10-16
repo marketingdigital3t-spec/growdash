@@ -1603,7 +1603,10 @@ Deno.serve(async (req) => {
       // archive and frequently times out before persisting the final stages.
       fullHistoryRequested = analytics_mode && full_history === true && !(start_date && end_date);
       const maxPages = fullHistoryRequested
-        ? Number.POSITIVE_INFINITY
+        // Historical backfills pass a small page budget and resume through
+        // rd_sync_cursors. Manual CRM refreshes omit it and still drain the
+        // complete provider history in one request when the runtime allows.
+        ? (Number.isFinite(requestedPages) && requestedPages > 0 ? requestedPages : Number.POSITIVE_INFINITY)
         // Analytics mode is the exact multi-status path. Respect its page
         // budget even when triggered by the near-realtime orchestrator;
         // limiting it to one page silently dropped older deals in every

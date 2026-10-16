@@ -208,7 +208,10 @@ Deno.serve(async (req) => {
     const { data: funnels, error: funnelsError } = await funnelsQuery;
     if (funnelsError) throw funnelsError;
     const funnelResults = await mapWithConcurrency(funnels || [], 2, async (funnel) => {
-      const result = await invoke(base, key, "rd-sync-deals", { funnel_id: funnel.id, service_user_id: userId, cron_trigger: true, analytics_mode: true, full_history: true, trigger_source: "historical_backfill" });
+      // Keep each edge invocation short. rd-sync-deals persists the next page
+      // cursor, so the following backfill tick safely continues the same full
+      // history without waiting for every RD status in one gateway request.
+      const result = await invoke(base, key, "rd-sync-deals", { funnel_id: funnel.id, service_user_id: userId, cron_trigger: true, analytics_mode: true, full_history: true, max_pages: 1, trigger_source: "historical_backfill" });
       const summary = itemSummary(result);
       if (summary.response?.complete === false) incomplete = true;
       return { funnel, summary };
