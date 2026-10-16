@@ -236,7 +236,7 @@ function ClassCard({
     <>
       <Card className="flex h-full w-full flex-col overflow-hidden border-border/80 bg-card/95 shadow-lg">
         <CardHeader className="relative min-h-[148px] space-y-1.5 p-3 pb-2">
-          <div className="grid grid-cols-[minmax(0,1fr)_88px] items-start gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_120px] items-start gap-2">
             <div className="min-w-0">
               <Badge
                 className="text-[10px]"
@@ -261,7 +261,7 @@ function ClassCard({
               </p>
             </div>
             <div className="flex min-w-0 flex-col items-end gap-1">
-              <div className="flex items-center gap-0.5">
+              <div className="flex w-full flex-wrap items-center justify-end gap-0.5">
                 {canManageClasses && <Button
                   className="h-7 w-7 shrink-0 rounded-full"
                   size="icon"
