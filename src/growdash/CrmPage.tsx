@@ -532,8 +532,9 @@ export default function CrmPage() {
         const syncBody = {
           funnel_id: funnel.id,
           // This is an explicit user action, so synchronize every RD status
-          // in the period selected on the screen. The background realtime
-          // job remains deliberately small; it must not redefine history.
+          // in the connected RD pipeline. The calendar selected on the CRM
+          // screen scopes the summary indicators only; the Kanban itself is
+          // the current pipeline and must mirror old/open/won/lost deals too.
           realtime: false,
           analytics_mode: true,
           // A list response from RD can be stale or omit the edited amount.
@@ -544,12 +545,10 @@ export default function CrmPage() {
           // date interval beginning in 2000. The RD API's date filter can
           // omit legacy/open negotiations in some accounts.
           // A manual refresh is explicit user intent: reconcile the entire
-          // RD history instead of truncating at a page/deal ceiling.
+          // RD history instead of truncating at a page/deal ceiling. Do not
+          // send the dashboard calendar here: doing so turns a pipeline
+          // mirror into a period report and silently drops older stages.
           full_history: true,
-          ...(preset === "max" ? {} : {
-            start_date: businessDateKey(startDate),
-            end_date: businessDateKey(endDate),
-          }),
           trigger_source: "crm_history_refresh",
         };
 
