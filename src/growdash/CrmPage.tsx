@@ -641,7 +641,7 @@ export default function CrmPage() {
       <section className="crm-filter-strip gd-panel mb-4 p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
           <Search className="h-4 w-4 text-primary" />
-          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados; o período afeta os indicadores, sem ocultar o pipeline atual.</p></div>
+          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro mantém o histórico completo do pipeline, enquanto os indicadores respeitam o período selecionado.</p></div>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
@@ -659,7 +659,7 @@ export default function CrmPage() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
-          <span>{number.format(deals.length)} negociação(ões) encontrada(s) · {isConsolidatedView ? "pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? `funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? `${funnelScopeIds.length} funis selecionados` : "nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
+          <span>{number.format(deals.length)} negociação(ões) no quadro · {preset === "max" ? "histórico completo" : `${number.format(dealsInSelectedPeriod.length)} criada(s) no período selecionado`}{isConsolidatedView ? " · pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? ` · funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? ` · ${funnelScopeIds.length} funis selecionados` : " · nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
         </div>
       </section>

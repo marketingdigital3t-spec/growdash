@@ -54,22 +54,42 @@ Deno.serve(async (req) => {
     const pipelineId = String(pipeline?.id || pipeline?._id || document?.deal_pipeline_id || document?.pipeline_id || payload?.deal_pipeline_id || payload?.pipeline_id || "");
     const pipelineName = String(pipeline?.name || "");
     let query = admin.from("rd_funnels")
-      .select("id,user_id,rd_funnel_id,name")
+      .select("id,user_id,rd_funnel_id,name,ad_account_id,updated_at")
       .eq("user_id", connection.user_id)
       .eq("rd_connection_id", connection.id)
       .eq("is_active", true);
     if (pipelineId) query = query.eq("rd_funnel_id", pipelineId);
-    const { data: exactFunnels } = await query;
+    const { data: exactFunnels, error: exactFunnelsError } = await query
+      .order("ad_account_id", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false, nullsFirst: false });
+    if (exactFunnelsError) throw exactFunnelsError;
+
+    // Never let an ambiguous local mapping decide where a webhook deal is
+    // written. The provider pipeline id is canonical; duplicate active rows
+    // must be repaired/relinked before accepting new writes.
+    if (pipelineId && (exactFunnels || []).length > 1) {
+      const message = `Webhook ignorado: ${exactFunnels.length} vínculos ativos para o pipeline RD ${pipelineId}.`;
+      await admin.from("rd_account_connections").update({ last_error: message, updated_at: new Date().toISOString() }).eq("id", connection.id);
+      return json({ ok: true, skipped: true, reason: "duplicate_pipeline_mapping" });
+    }
 
     let funnel = exactFunnels?.[0];
     if (!funnel && pipelineName) {
       const { data: candidates } = await admin.from("rd_funnels")
-        .select("id,user_id,rd_funnel_id,name")
+        .select("id,user_id,rd_funnel_id,name,ad_account_id,updated_at")
         .eq("user_id", connection.user_id)
         .eq("rd_connection_id", connection.id)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("ad_account_id", { ascending: false, nullsFirst: false })
+        .order("updated_at", { ascending: false, nullsFirst: false });
       const wanted = normalize(pipelineName);
-      funnel = (candidates || []).find((item: any) => normalize(item.name) === wanted);
+      const namedCandidates = (candidates || []).filter((item: any) => normalize(item.name) === wanted);
+      if (namedCandidates.length > 1) {
+        const message = `Webhook ignorado: ${namedCandidates.length} vínculos ativos com o nome do pipeline RD “${pipelineName}”.`;
+        await admin.from("rd_account_connections").update({ last_error: message, updated_at: new Date().toISOString() }).eq("id", connection.id);
+        return json({ ok: true, skipped: true, reason: "duplicate_pipeline_mapping" });
+      }
+      funnel = namedCandidates[0];
     }
     if (!funnel) {
       // Responder 2xx impede suspensão do webhook. A reconciliação de 15 min

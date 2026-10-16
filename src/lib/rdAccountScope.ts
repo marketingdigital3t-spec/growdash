@@ -69,9 +69,16 @@ export function resolveLinkedRDFunnelIds(
       .filter((connection) => externalIds.has(canonicalExternalAccountId(connection.external_account_id)))
       .map((connection) => connection.id),
   );
-  const linkedFunnels = dedupeActiveRDFunnels(activeFunnels
-    .filter((funnel) => (funnel.ad_account_id && selectedAccountIds.includes(funnel.ad_account_id))
-      || (funnel.rd_connection_id && connectionIds.has(funnel.rd_connection_id))), selectedAccountIds);
+  const directlyLinkedFunnels = activeFunnels.filter((funnel) => funnel.ad_account_id && selectedAccountIds.includes(funnel.ad_account_id));
+  // A direct Meta→pipeline link is the strongest account boundary. Once one
+  // exists for the selected account, do not widen the scope with every
+  // pipeline belonging to the same RD connection. This is important when one
+  // RD token serves several funnels/accounts or when an old connection-only
+  // association was left behind during a relink.
+  const candidateFunnels = directlyLinkedFunnels.length > 0
+    ? directlyLinkedFunnels
+    : activeFunnels.filter((funnel) => funnel.rd_connection_id && connectionIds.has(funnel.rd_connection_id));
+  const linkedFunnels = dedupeActiveRDFunnels(candidateFunnels, selectedAccountIds);
 
   return linkedFunnels.length ? linkedFunnels.map((funnel) => funnel.id) : [NO_LINKED_RD_FUNNEL_SCOPE_ID];
 }

@@ -73,3 +73,22 @@ frontend; depois comparar no navegador autenticado o mesmo funil, conta,
 período e timezone no RD Station e na Growdash. Relatar separadamente local,
 commit/push, Supabase, Cloudflare e produção. Não declarar paridade quando o
 escopo externo não puder ser confirmado.
+
+## Auditoria executada em 16/10/2026
+
+- A comparação autenticada da conta `CA01 - DRA RANNIELY SILVA [GRUPO ZNTT]`,
+  funil `Dra. Ranniely Silva – Paciente Modelo` e período de criação
+  `01/09/2026–30/09/2026` retornou `449` no RD Station e `449` na Growdash.
+- A captura com `205` pertence a outro escopo efetivo de funil; não deve ser
+  comparada com o pipeline de `449`.
+- MCP, RAG e IA não são fontes do espelho RD. Eles recebem fatos já escopados
+  e não podem criar, completar ou substituir negócios.
+- A resolução de conta foi endurecida: um vínculo direto Meta→funil tem
+  precedência sobre vínculos antigos apenas por conexão RD. Isso impede que um
+  token compartilhado reintroduza funis de outra conta.
+- O webhook RD agora falha fechado quando encontra mais de um vínculo ativo
+  para o mesmo pipeline, registra o motivo e aguarda reparo/reconciliação; ele
+  não escolhe uma associação arbitrária.
+- O quadro do CRM informa separadamente o total histórico exibido e quantos
+  negócios foram criados no período, evitando interpretar o pipeline completo
+  como um relatório de criação.

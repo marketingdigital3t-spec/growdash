@@ -25,11 +25,11 @@ describe("resolveLinkedRDFunnelIds", () => {
     ], ["meta-ca02"]).map((funnel) => funnel.id)).toEqual(["selected-link"]);
   });
 
-  it("does not return the same provider pipeline twice in an account scope", () => {
+  it("does not return duplicate provider pipelines and keeps direct account scope", () => {
     expect(resolveLinkedRDFunnelIds(["meta-ca02"], accounts, connections, [
       ...funnels,
       { id: "duplicate-ranniely", rd_connection_id: "rd-ca02", rd_funnel_id: "f-1", ad_account_id: "meta-ca02", is_active: true },
-    ])).toEqual(["duplicate-ranniely", "ranniely-paciente"]);
+    ])).toEqual(["duplicate-ranniely"]);
   });
 
   it("uses RD connection external account IDs to scope linked funnels", () => {
@@ -37,6 +37,13 @@ describe("resolveLinkedRDFunnelIds", () => {
       "ranniely-aluna",
       "ranniely-paciente",
     ]);
+  });
+
+  it("prefers direct Meta links over unrelated connection-only funnels", () => {
+    expect(resolveLinkedRDFunnelIds(["meta-ca02"], accounts, connections, [
+      { id: "direct-patient", ad_account_id: "meta-ca02", rd_connection_id: "rd-ca02", rd_funnel_id: "f-patient", is_active: true },
+      { id: "connection-only-aluna", ad_account_id: null, rd_connection_id: "rd-ca02", rd_funnel_id: "f-aluna", is_active: true },
+    ])).toEqual(["direct-patient"]);
   });
 
   it("keeps a selected account with no RD link empty instead of widening to every funnel", () => {
