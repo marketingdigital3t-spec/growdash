@@ -119,6 +119,14 @@ Deno.serve(async (req) => {
       await admin.from("rd_account_connections").update({ last_error: `Falha ao atualizar negócio recebido pelo RD (HTTP ${response.status}).`, updated_at: new Date().toISOString() }).eq("id", connection.id);
       return json({ error: result?.error || "RD deal reconciliation failed" }, 502);
     }
+    // A 200 from rd-sync-deals can still represent a partial snapshot. Do
+    // not advance the connection watermark as if this webhook was fully
+    // applied; reconciliation/cursor cycles must repair it visibly.
+    if (result?.partial || result?.success === false || result?.ok === false) {
+      const message = result?.error || result?.next_action || "Atualização parcial do negócio recebido pelo RD.";
+      await admin.from("rd_account_connections").update({ last_error: message, updated_at: new Date().toISOString() }).eq("id", connection.id);
+      return json({ error: message, partial: true, result }, 502);
+    }
     await admin.from("rd_account_connections").update({ last_success_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
     let note: { status: string; error?: string } | undefined;
     if (eventName === "crm_deal_created" && isNoteAutomationFunnel(funnel.name)) {

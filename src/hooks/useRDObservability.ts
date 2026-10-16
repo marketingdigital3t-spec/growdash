@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { isCanonicalWonDeal } from "@/lib/canonicalMetrics";
 
 export type HealthLevel = "ok" | "warning" | "error";
 
@@ -30,6 +31,7 @@ export interface WebhookHealth {
   avgPerDay30d: number;
   ratioVsAvg: number; // last 24h vs daily avg
   lastEventAt: string | null;
+  evidence: "deal_snapshot_updated_at";
   level: HealthLevel;
 }
 
@@ -119,7 +121,7 @@ export function useRDObservability() {
       // ---- Data quality (deals últimos 30d) ----
       const { data: dealsQ = [] } = await supabase
         .from("rd_deals")
-        .select("utm_source, utm_medium, utm_campaign, deal_owner_name, win, amount_total, updated_at")
+        .select("utm_source, utm_medium, utm_campaign, deal_owner_name, win, rd_stage_name, amount_total, updated_at")
         .gte("updated_at", since30)
         .limit(5000);
 
@@ -128,7 +130,7 @@ export function useRDObservability() {
         (d) => d.utm_source && d.utm_medium && d.utm_campaign,
       ).length;
       const ownerComplete = (dealsQ ?? []).filter((d) => !!d.deal_owner_name).length;
-      const wins = (dealsQ ?? []).filter((d) => d.win === true);
+      const wins = (dealsQ ?? []).filter((d) => isCanonicalWonDeal(d));
       const winsWithAmount = wins.filter((d) => Number(d.amount_total || 0) > 0).length;
 
       const utmPct = pct(utmComplete, totalDeals30d);
@@ -149,7 +151,7 @@ export function useRDObservability() {
         level: dqLevel,
       };
 
-      // ---- Webhooks (proxy via rd_deals.updated_at) ----
+      // ---- Activity (rd_deals.updated_at is not proof of webhook delivery) ----
       const { count: ev24 } = await supabase
         .from("rd_deals")
         .select("id", { count: "exact", head: true })
@@ -183,6 +185,7 @@ export function useRDObservability() {
         avgPerDay30d,
         ratioVsAvg: ratio,
         lastEventAt: lastEvArr?.[0]?.updated_at ?? null,
+        evidence: "deal_snapshot_updated_at",
         level: whLevel,
       };
 

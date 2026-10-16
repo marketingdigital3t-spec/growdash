@@ -196,10 +196,14 @@ function IntegrationsContent() {
     },
   });
 
-  const { data: latestRDDeal } = useQuery({
-    queryKey: ["rd_latest_sync"], enabled: !!rdIntegration?.is_active,
-    queryFn: async () => { const { data, error } = await supabase.from("rd_deals").select("updated_at").order("updated_at", { ascending: false }).limit(1).maybeSingle(); if (error) throw error; return data; },
-  });
+  const latestRDConnectionSuccess = useMemo(
+    () => rdConnections.map((connection) => connection.last_success_at).filter(Boolean).sort().at(-1) ?? null,
+    [rdConnections],
+  );
+  const latestRDStatusAt = latestRDConnectionSuccess ?? rdIntegration?.last_success_at ?? null;
+  // Kept as a compatibility shape for the compact health/integration markup;
+  // its value is now the scoped connection watermark, never a global deal row.
+  const latestRDDeal = { updated_at: latestRDStatusAt };
 
   // Supabase normally returns arrays for select queries. Normalize at the
   // screen boundary as a final safeguard: a malformed/legacy response must

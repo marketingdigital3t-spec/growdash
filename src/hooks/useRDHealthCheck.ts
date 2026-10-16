@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
 
 export type CheckStatus = "ok" | "warning" | "error";
 
@@ -114,7 +115,11 @@ export function useRDHealthCheck() {
           supabase.from("rd_funnel_stages").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id),
           supabase.from("rd_deals").select("id", { count: "exact", head: true }).eq("rd_funnel_id", f.id).gte("created_at", since30),
           supabase.from("rd_deals").select("updated_at").eq("rd_funnel_id", f.id).order("updated_at", { ascending: false }).limit(1),
-          supabase.from("rd_deals").select("amount_total").eq("rd_funnel_id", f.id).eq("win", true).gte("closed_at", since30),
+          supabase
+            .from("rd_deals")
+            .select("id, rd_deal_id, rd_connection_id, amount_total, rd_stage_name, win, closed_at, stage_updated_at")
+            .eq("rd_funnel_id", f.id)
+            .or(`closed_at.gte.${since30},stage_updated_at.gte.${since30}`),
           // A data oficial de comparação é o fechamento vindo do RD; sale_date
           // só é usada como fallback para registros antigos sem essa origem.
           supabase.from("sales").select("gross_revenue, matched_campaign_id, rd_deal_id, source_closed_at, sale_date, status").eq("rd_funnel_id", f.id),
@@ -153,7 +158,17 @@ export function useRDHealthCheck() {
         }
 
         // Confronto
-        const rdWins = rdWinsAgg.data ?? [];
+        const seenWonIds = new Set<string>();
+        const rdWins = (rdWinsAgg.data ?? []).filter((deal: any) => {
+          if (!isCanonicalWonDeal(deal)) return false;
+          const wonAt = canonicalWonDate(deal);
+          if (!wonAt || new Date(wonAt).getTime() < new Date(since30).getTime()) return false;
+          const providerId = String(deal.rd_deal_id || deal.id || "").trim();
+          const identity = `${deal.rd_connection_id || "legacy"}:${providerId}`;
+          if (!providerId || seenWonIds.has(identity)) return false;
+          seenWonIds.add(identity);
+          return true;
+        });
         const sales = (salesAgg.data ?? []).filter((sale: any) => {
           if (sale.status && sale.status !== "confirmed") return false;
           const rawDate = sale.source_closed_at || sale.sale_date;

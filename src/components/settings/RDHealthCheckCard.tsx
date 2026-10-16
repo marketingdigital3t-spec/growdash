@@ -149,7 +149,7 @@ export function RDHealthCheckCard() {
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-muted-foreground">Vendas RD (win)</p>
+                    <p className="text-xs text-muted-foreground">Vendas RD — etapa canônica</p>
                     <p className="font-semibold">{data.totals.rdWins}</p>
                   </div>
                   <div>

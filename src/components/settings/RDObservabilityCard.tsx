@@ -101,7 +101,7 @@ export function RDObservabilityCard() {
           {data && levelBadge(overall)}
         </CardTitle>
         <CardDescription>
-          Saúde por funil, qualidade dos dados, webhooks recebidos e atribuição multi-touch.
+          Saúde por funil, qualidade dos dados, atividade do espelho e atribuição multi-touch.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -197,11 +197,11 @@ export function RDObservabilityCard() {
               </p>
             </section>
 
-            {/* Bloco 3 — Webhooks */}
+            {/* Bloco 3 — Atividade do espelho. rd_deals.updated_at cannot prove delivery. */}
             <section className="space-y-2">
               <header className="flex items-center gap-2 text-sm font-semibold">
                 <Webhook className="h-4 w-4 text-muted-foreground" />
-                Webhooks RD {levelBadge(data.webhooks.level)}
+                Atualizações do espelho RD {levelBadge(data.webhooks.level)}
               </header>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 <Metric label="Últimas 24h" value={fmtNum(data.webhooks.events24h)} />
@@ -221,9 +221,12 @@ export function RDObservabilityCard() {
               </div>
               {data.webhooks.lastEventAt && (
                 <p className="text-xs text-muted-foreground">
-                  Último evento {formatDistanceToNow(parseISO(data.webhooks.lastEventAt), { locale: ptBR, addSuffix: true })}.
+                  Último negócio atualizado no espelho {formatDistanceToNow(parseISO(data.webhooks.lastEventAt), { locale: ptBR, addSuffix: true })}.
                 </p>
               )}
+              <p className="text-[11px] text-muted-foreground">
+                Este indicador usa o snapshot local (`rd_deals.updated_at`) e não confirma recebimento de webhook do RD.
+              </p>
             </section>
 
             {/* Bloco 4 — Atribuição */}

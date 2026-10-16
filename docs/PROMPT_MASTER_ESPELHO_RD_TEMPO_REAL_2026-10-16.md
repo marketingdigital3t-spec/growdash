@@ -102,3 +102,59 @@ escopo externo não puder ser confirmado.
 - A regra compartilhada de venda foi corrigida para usar a etapa atual do RD
   quando ela existe e só usar `win=true` em registros legados sem etapa. Isso
   evita contar como venda um negócio reaberto que conserva um flag antigo.
+
+## Prompt master de execução — auditoria integral e reparo seguro
+
+> Audite e corrija o espelho RD Station da Growdash sem inventar dados e sem
+> transformar uma sincronização parcial em sucesso. O RD Station é a fonte
+> canônica; a Growdash é somente leitura. Preserve a identidade
+> `rd_connection_id + rd_deal_id`, o isolamento por workspace/conta/funil e os
+> filtros de data civil no timezone da operação.
+
+### Checklist obrigatório
+
+1. Mapear, antes de editar, todos os consumidores de `rd_deals`, `sales`,
+   `sync_runs`, `rd_sync_scope_state`, `rd_account_connections`, Edge Functions,
+   MCPs, RAGs e agentes. Nenhum consumidor analítico pode ser fonte de verdade.
+2. Usar a etapa atual `rd_stage_name` para decidir venda; `win=true` é apenas
+   fallback de linha legada sem etapa. Deduplicar por conexão + ID do RD.
+3. Paginar o RD até página curta; usar cursor retomável e marcar `partial` em
+   qualquer limite, ID ausente, duplicidade, erro ou timeout.
+4. Manter o último snapshot em qualquer falha. Não deletar histórico em ciclos
+   recentes; reconciliação destrutiva só em backfill explicitamente completo.
+5. O webhook deve autenticar segredo, ser idempotente, resolver um único funil,
+   registrar tentativa/resultado e não avançar `last_success_at` quando
+   `rd-sync-deals` retornar `partial`, `ok=false` ou `success=false`.
+6. Nunca chamar `rd_deals.updated_at` de webhook. Sem uma tabela de eventos
+   comprováveis, rotular a métrica como “atividade do espelho” e informar a
+   limitação na interface.
+7. Watermarks de integração devem vir da conexão RD escopada
+   (`rd_account_connections.last_success_at`), nunca do último negócio global
+   de qualquer cliente/conta.
+8. Corrigir diagnósticos para reutilizar a regra canônica e incluir escopo de
+   conexão/workspace; divergência deve mostrar contagem, receita, funil e regra
+   de data comparados.
+9. Conferir pipelines duplicados por conexão + `rd_funnel_id`; não escolher um
+   vínculo arbitrariamente e não apagar registros sem confirmação.
+10. Executar TypeScript, lint, Vitest, build e `git diff --check`; conferir
+    `origin/main`; publicar funções e frontend separadamente; validar no domínio
+    autenticado com os mesmos filtros do RD. Relatar evidência de cada camada.
+
+### Resultado desta execução
+
+- `useRDHealthCheck` passou a contar vendas pela etapa canônica, respeitar a data
+  de fechamento/transição e deduplicar a identidade do provedor.
+- A tela de observabilidade deixou de afirmar que `rd_deals.updated_at` é um
+  webhook; ela exibe “Atualizações do espelho RD” e explica a origem real.
+- O status global de RD usa o watermark `last_success_at` das conexões visíveis,
+  evitando “Nunca sincronizado” causado por um negócio de outra conta.
+- `sync-rd-crm` agora preserva o watermark anterior e responde erro parcial
+  quando o sincronizador devolve snapshot incompleto.
+
+### Pendência que não deve ser mascarada
+
+O repositório não possui uma tabela de eventos de webhook RD. Portanto, até que
+uma auditoria de eventos seja criada e implantada, nenhum painel pode afirmar
+“webhook recebido em tempo real”; ele deve mostrar atividade do snapshot,
+status da conexão e execução do reconciliador. A prova final de tempo real
+exige um evento real do RD, seus logs remotos e a linha persistida correspondente.
