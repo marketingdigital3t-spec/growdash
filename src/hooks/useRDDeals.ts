@@ -313,6 +313,9 @@ export function useRDDeals(params: Params) {
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
 }
 
@@ -382,6 +385,9 @@ export function useRDClosedDeals(params: Params) {
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
 }
 

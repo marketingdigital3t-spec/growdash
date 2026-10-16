@@ -178,6 +178,9 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
   return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
 }
@@ -255,6 +258,9 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
     gcTime: 24 * 60 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
   return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
 }
@@ -323,6 +329,7 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
     gcTime: 24 * 60 * 60 * 1_000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });

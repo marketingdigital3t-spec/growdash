@@ -185,7 +185,7 @@ export default function FunnelAnalysis() {
     enabled: funnelScopeIds.length > 0,
   });
   // O recorte RD usa os funis vinculados à conta selecionada e os filtros do CRM.
-  const { data: periodDeals = [], isLoading: loadingPeriodDeals, error: periodDealsError, refetch: refetchPeriodDeals } = useRDDeals({
+  const { data: periodDeals = [], isLoading: loadingPeriodDeals, isFetched: periodDealsFetched, isFetching: fetchingPeriodDeals, isError: periodDealsIsError, error: periodDealsError, refetch: refetchPeriodDeals } = useRDDeals({
     funnelIds: funnelScopeIds,
     adAccountIds: selectedAccountIds,
     startDate,
@@ -277,7 +277,7 @@ export default function FunnelAnalysis() {
   // período. A consulta histórica acima continua disponível para filtros e
   // contexto, mas não pode gerar um segundo conjunto de vendas com regras
   // diferentes de data/escopo.
-  const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals } = useRDWonDealsForPeriod({
+  const { data: periodClosedDeals = [], isLoading: loadingPeriodClosedDeals, isFetched: periodClosedDealsFetched, isError: periodClosedDealsIsError, error: periodClosedDealsError } = useRDWonDealsForPeriod({
     funnelIds: funnelScopeIds,
     adAccountIds: selectedAccountIds,
     startDate,
@@ -689,7 +689,14 @@ export default function FunnelAnalysis() {
   // for the active scope should replace the page with the loading state.
   const initialDataLoading = !funnelsFetched
     || (funnelScopeIds.length > 0 && !stagesFetched)
-    || (funnelScopeIds.length > 0 && !dealsFetched);
+    || (funnelScopeIds.length > 0 && !dealsFetched)
+    || (funnelScopeIds.length > 0 && !periodDealsFetched)
+    || (funnelScopeIds.length > 0 && !periodClosedDealsFetched);
+  const rdPeriodError = periodDealsIsError || periodClosedDealsIsError;
+  const rdPeriodErrorMessage = [periodDealsError, periodClosedDealsError]
+    .map((error) => error instanceof Error ? error.message : error ? String(error) : "")
+    .filter(Boolean)
+    .join(" · ");
   const noStages = !initialDataLoading && operationalStages.length === 0;
 
   return (
@@ -729,7 +736,7 @@ export default function FunnelAnalysis() {
         </MotionItem>
       ) : (
         <>
-          {(activeFunnels.length === 0 || noStages || operationalPeriodDeals.length === 0) && (
+          {(activeFunnels.length === 0 || noStages || rdPeriodError || (!fetchingPeriodDeals && operationalPeriodDeals.length === 0)) && (
             <MotionItem>
               <div className="flex flex-col gap-3 rounded-xl border border-dashed border-primary/25 bg-primary/[0.035] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -738,11 +745,15 @@ export default function FunnelAnalysis() {
                       ? "Nenhum funil RD ativo disponível."
                       : noStages
                         ? "O catálogo de etapas do RD não está disponível."
-                        : "Nenhuma negociação encontrada no histórico sincronizado."}
+                    : rdPeriodError
+                      ? "Não foi possível confirmar as negociações RD deste recorte."
+                      : "Nenhuma negociação encontrada no histórico sincronizado."}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {noStages
                       ? "A distribuição usa as etapas salvas nas negociações; o histórico de movimentações entre etapas continua indisponível. O período acima continua sendo usado para comparar a mídia Meta."
+                    : rdPeriodError
+                      ? `${rdPeriodErrorMessage || "A consulta expirou ou a sincronização está incompleta."} O snapshot anterior foi preservado; não exibiremos zero como se fosse ausência de negociações.`
                       : "O período acima filtra os dados de CRM pela data de criação e compara a mídia Meta no mesmo intervalo."}
                   </p>
                 </div>
