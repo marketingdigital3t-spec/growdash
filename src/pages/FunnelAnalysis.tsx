@@ -577,50 +577,58 @@ export default function FunnelAnalysis() {
 
       const rdResults = await Promise.all(funnelsToSync.map(async (funnel): PromiseSettledResult<unknown> => {
         try {
-          const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
-            body: {
-              funnel_id: funnel.id,
-              analytics_mode: true,
-              // A atualização manual precisa respeitar exatamente o período
-              // visível no calendário. Enviar full_history sem as datas fazia
-              // a Edge Function varrer o arquivo inteiro e misturar negócios
-              // fora do escopo atual nos KPIs.
-              full_history: false,
-              // The RD amount selected in the CRM is the source for
-              // faturamento. On the maximum reconciliation, hydrate won
-              // deals from the authoritative detail endpoint so an older
-              // abbreviated list value cannot remain in the KPI.
-              refresh_amounts: preset === "max",
-              start_date: businessDateKey(startDate),
-              end_date: businessDateKey(endDate),
-              // Não limitar páginas no recorte selecionado. O RD entrega 200
-              // negócios por página; um teto fixo aqui fazia a sincronização
-              // parar em 600 registros por segmento e deixava a contagem da
-              // Growdash menor que a exibida no RD. A Edge Function encerra
-              // a leitura ao sair do período, respeita o orçamento de runtime
-              // e mantém cursor para continuar uma execução parcial.
-            },
-          });
-          if (error) {
-            // O lock do RD é por funil. Um ciclo automático pode já estar
-            // reconciliando o mesmo funil; isso não é falha nem motivo para
-            // zerar o último snapshot visível.
-            const httpStatus = Number((error as any)?.context?.status || (error as any)?.status || 0);
-            const errorText = `${(error as any)?.message || ""} ${(error as any)?.context?.body || ""}`;
-            if (httpStatus === 409 || /409|already.?running|sincroniza[cç][aã]o.*andamento/i.test(errorText)) {
-              return { status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } };
+          const syncBody = {
+            funnel_id: funnel.id,
+            analytics_mode: true,
+            // A atualização manual precisa respeitar exatamente o período
+            // visível no calendário. Enviar full_history sem as datas fazia
+            // a Edge Function varrer o arquivo inteiro e misturar negócios
+            // fora do escopo atual nos KPIs.
+            full_history: false,
+            // The RD amount selected in the CRM is the source for
+            // faturamento. On the maximum reconciliation, hydrate won
+            // deals from the authoritative detail endpoint so an older
+            // abbreviated list value cannot remain in the KPI.
+            refresh_amounts: preset === "max",
+            start_date: businessDateKey(startDate),
+            end_date: businessDateKey(endDate),
+            // Não limitar páginas no recorte selecionado. O RD entrega 200
+            // negócios por página; um teto fixo aqui fazia a sincronização
+            // parar em 600 registros por segmento e deixava a contagem da
+            // Growdash menor que a exibida no RD. A Edge Function encerra
+            // a leitura ao sair do período, respeita o orçamento de runtime
+            // e mantém cursor para continuar uma execução parcial.
+          };
+          let latestResult: any = null;
+          const MAX_RESUMABLE_PASSES = 12;
+          for (let pass = 0; pass < MAX_RESUMABLE_PASSES; pass++) {
+            const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: syncBody });
+            if (error) {
+              // O lock do RD é por funil. Um ciclo automático pode já estar
+              // reconciliando o mesmo funil; isso não é falha nem motivo para
+              // zerar o último snapshot visível.
+              const httpStatus = Number((error as any)?.context?.status || (error as any)?.status || 0);
+              const errorText = `${(error as any)?.message || ""} ${(error as any)?.context?.body || ""}`;
+              if (httpStatus === 409 || /409|already.?running|sincroniza[cç][aã]o.*andamento/i.test(errorText)) {
+                return { status: "fulfilled", value: { status: "running", message: "Este funil já está sendo sincronizado." } };
+              }
+              const details = await edgeFunctionErrorDetails(error);
+              throw new Error(formatEdgeFunctionError(details));
             }
-            const details = await edgeFunctionErrorDetails(error);
-            throw new Error(formatEdgeFunctionError(details));
+            if (data?.status === "already_running") {
+              return { status: "fulfilled", value: { status: "running", message: data.message } };
+            }
+            if (data?.error || data?.success === false) {
+              const details = Array.isArray(data?.errors) && data.errors.length ? `: ${data.errors.join(" · ")}` : "";
+              throw new Error(`${data?.error || data?.message || "Snapshot RD incompleto."}${details}`);
+            }
+            latestResult = data;
+            if (data?.complete !== false && !data?.partial) break;
+            if (pass === MAX_RESUMABLE_PASSES - 1) {
+              throw new Error("O RD ainda não concluiu todas as páginas. O snapshot anterior foi preservado e a sincronização pode ser retomada.");
+            }
           }
-          if (data?.status === "already_running") {
-            return { status: "fulfilled", value: { status: "running", message: data.message } };
-          }
-          if (data?.error || data?.success === false || data?.partial === true || (data?.status && data.status !== "success")) {
-            const details = Array.isArray(data?.errors) && data.errors.length ? `: ${data.errors.join(" · ")}` : "";
-            throw new Error(`${data?.error || data?.message || "Snapshot RD incompleto."}${details}`);
-          }
-          return { status: "fulfilled", value: data };
+          return { status: "fulfilled", value: latestResult };
         } catch (reason) {
           return { status: "rejected", reason };
         }

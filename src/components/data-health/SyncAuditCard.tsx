@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast";
 
 export function SyncAuditCard() {
   const [running, setRunning] = useState(false);
+  const continuingRun = useRef<string | null>(null);
   const { data, refetch } = useQuery({
     queryKey: ["sync-audit"],
     queryFn: async () => {
@@ -26,9 +27,10 @@ export function SyncAuditCard() {
   const start = async () => {
     setRunning(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("historical-backfill", { body: {} });
+      const { data: result, error } = await supabase.functions.invoke("historical-backfill", { body: { rd_only: true } });
       if (error) throw error;
-      toast({ title: "Backfill histórico iniciado", description: `Execução ${(result as any)?.run_id || "criada"}. O painel será atualizado automaticamente.` });
+      if ((result as any)?.status === "already_running") throw new Error("Já existe um backfill histórico em andamento. Aguarde ou atualize o painel.");
+      toast({ title: "Sincronização histórica do RD iniciada", description: `Execução ${(result as any)?.run_id || "criada"}. As páginas restantes serão retomadas automaticamente.` });
       refetch();
     } catch (error) {
       toast({ title: "Falha no backfill histórico", description: (error as Error).message, variant: "destructive" });
@@ -38,6 +40,29 @@ export function SyncAuditCard() {
   };
 
   const run = data?.run;
+
+  // Each RD invocation is intentionally bounded by the Edge runtime and
+  // persists a cursor. Keep requesting the next chunk in the background while
+  // the audit run is fresh; an old orphan is left for the next explicit start,
+  // which first marks it failed and creates a clean resumable run.
+  useEffect(() => {
+    if (!run || run.status !== "running" || running || continuingRun.current === run.id) return;
+    const age = Date.now() - new Date(run.started_at || 0).getTime();
+    if (!Number.isFinite(age) || age > 9 * 60_000) return;
+    continuingRun.current = run.id;
+    void (async () => {
+      try {
+        const { error } = await supabase.functions.invoke("historical-backfill", { body: { run_id: run.id, rd_only: true } });
+        if (error) throw error;
+      } catch (error) {
+        toast({ title: "Backfill RD pausado", description: (error as Error).message, variant: "destructive" });
+      } finally {
+        continuingRun.current = null;
+        await refetch();
+      }
+    })();
+  }, [refetch, run, running]);
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">

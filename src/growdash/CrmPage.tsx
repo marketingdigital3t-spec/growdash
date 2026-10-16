@@ -529,38 +529,56 @@ export default function CrmPage() {
     try {
       const syncResults: Array<{ deals?: number; pages_processed?: number; stage_sync_warning?: string | null }> = [];
       for (const funnel of connectedFunnels) {
-        const { data, error } = await supabase.functions.invoke("rd-sync-deals", {
-          body: {
-            funnel_id: funnel.id,
-            // This is an explicit user action, so synchronize every RD status
-            // in the period selected on the screen. The background realtime
-            // job remains deliberately small; it must not redefine history.
-            realtime: false,
-            analytics_mode: true,
-            // A list response from RD can be stale or omit the edited amount.
-            // A manual CRM refresh asks the server to hydrate each deal with
-            // its authoritative detail before updating CRM and Comercial.
-            refresh_amounts: true,
-            // "Máximo" is a full RD pipeline reconciliation, not a synthetic
-            // date interval beginning in 2000. The RD API's date filter can
-            // omit legacy/open negotiations in some accounts.
-            // A manual refresh is explicit user intent: reconcile the entire
-            // RD history instead of truncating at a page/deal ceiling.
-            full_history: true,
-            ...(preset === "max" ? {} : {
-              start_date: businessDateKey(startDate),
-              end_date: businessDateKey(endDate),
-            }),
-            trigger_source: "crm_history_refresh",
-          },
-        });
-        if (error || data?.error || data?.success === false || (data?.partial && data?.complete === false)) {
-          const details = data?.snapshot_missing_ids?.length
-            ? ` IDs ausentes: ${data.snapshot_missing_ids.slice(0, 5).join(", ")}`
-            : "";
-          throw error || new Error(`${data?.error || "Snapshot RD incompleto."}${details}`);
+        const syncBody = {
+          funnel_id: funnel.id,
+          // This is an explicit user action, so synchronize every RD status
+          // in the period selected on the screen. The background realtime
+          // job remains deliberately small; it must not redefine history.
+          realtime: false,
+          analytics_mode: true,
+          // A list response from RD can be stale or omit the edited amount.
+          // A manual CRM refresh asks the server to hydrate each deal with
+          // its authoritative detail before updating CRM and Comercial.
+          refresh_amounts: true,
+          // "Máximo" is a full RD pipeline reconciliation, not a synthetic
+          // date interval beginning in 2000. The RD API's date filter can
+          // omit legacy/open negotiations in some accounts.
+          // A manual refresh is explicit user intent: reconcile the entire
+          // RD history instead of truncating at a page/deal ceiling.
+          full_history: true,
+          ...(preset === "max" ? {} : {
+            start_date: businessDateKey(startDate),
+            end_date: businessDateKey(endDate),
+          }),
+          trigger_source: "crm_history_refresh",
+        };
+
+        // The RD Edge Function deliberately stops before its runtime budget
+        // and stores a cursor. A single HTTP call therefore represents one
+        // resumable chunk, not necessarily the complete pipeline. Continue
+        // the same explicit refresh until the provider reports a complete
+        // snapshot; without this loop a 1,176-deal pipeline stopped at the
+        // first ~600 rows while the UI reported a successful refresh.
+        let latestResult: (typeof syncResults)[number] | null = null;
+        const MAX_RESUMABLE_PASSES = 12;
+        for (let pass = 0; pass < MAX_RESUMABLE_PASSES; pass++) {
+          const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: syncBody });
+          if (error || data?.error || data?.success === false) {
+            const details = data?.snapshot_missing_ids?.length
+              ? ` IDs ausentes: ${data.snapshot_missing_ids.slice(0, 5).join(", ")}`
+              : "";
+            throw error || new Error(`${data?.error || "Snapshot RD incompleto."}${details}`);
+          }
+          latestResult = data;
+          if (data?.status === "already_running") {
+            throw new Error("Este funil já está sendo sincronizado. Aguarde o ciclo atual terminar e atualize novamente.");
+          }
+          if (data?.complete !== false && !data?.partial) break;
+          if (pass === MAX_RESUMABLE_PASSES - 1) {
+            throw new Error("O RD ainda não concluiu todas as páginas. A sincronização foi preservada e pode ser retomada sem duplicar registros.");
+          }
         }
-        syncResults.push(data);
+        syncResults.push(latestResult || {});
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),

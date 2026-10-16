@@ -91,9 +91,50 @@ Deno.serve(async (req) => {
   if ((isService || isCron) && typeof body.user_id === "string") userId = body.user_id;
   if (!userId) return new Response(JSON.stringify({ error: "user_id obrigatório para execução de serviço" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-  const started = new Date().toISOString();
-  const { data: run, error: runError } = await admin.from("sync_backfill_runs").insert({ user_id: userId, status: "running", started_at: started }).select("id").single();
-  if (runError || !run) return new Response(JSON.stringify({ error: runError?.message || "Não foi possível criar a execução" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const requestedRunId = typeof body.run_id === "string" ? body.run_id : null;
+  const staleBefore = new Date(Date.now() - 10 * 60_000).toISOString();
+  // A gateway timeout can leave only the audit row behind. Close those rows
+  // before creating a new run so a failed historical request never blocks a
+  // later resumable refresh forever. This changes audit state only; provider
+  // data is never deleted here.
+  const { data: runningRows, error: runningRowsError } = await admin
+    .from("sync_backfill_runs")
+    .select("id,started_at,status,summary")
+    .eq("user_id", userId)
+    .eq("status", "running")
+    .order("started_at", { ascending: false })
+    .limit(10);
+  if (runningRowsError) return new Response(JSON.stringify({ error: runningRowsError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const staleRuns = (runningRows || []).filter((row: any) => String(row.started_at || "") < staleBefore);
+  for (const staleRun of staleRuns) {
+    await admin.from("sync_backfill_runs").update({
+      status: "failed",
+      finished_at: new Date().toISOString(),
+      error_message: "Execução histórica interrompida após expirar o tempo de execução; o cursor pode ser retomado.",
+    }).eq("id", staleRun.id).eq("status", "running");
+  }
+  const activeRun = (runningRows || []).find((row: any) => !staleRuns.some((stale: any) => stale.id === row.id));
+
+  let run: any;
+  let runSummary: Record<string, any> = {};
+  if (requestedRunId) {
+    const { data: requestedRun, error: requestedRunError } = await admin
+      .from("sync_backfill_runs")
+      .select("id,user_id,status,summary,started_at")
+      .eq("id", requestedRunId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (requestedRunError || !requestedRun) return new Response(JSON.stringify({ error: requestedRunError?.message || "Execução não encontrada" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (requestedRun.status !== "running") return new Response(JSON.stringify({ ok: requestedRun.status === "success", status: requestedRun.status, run_id: requestedRun.id, summary: requestedRun.summary || {} }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    run = requestedRun;
+    runSummary = requestedRun.summary || {};
+  } else {
+    if (activeRun) return new Response(JSON.stringify({ ok: false, status: "already_running", run_id: activeRun.id, message: "Já existe um backfill histórico em andamento." }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const started = new Date().toISOString();
+    const { data: createdRun, error: runError } = await admin.from("sync_backfill_runs").insert({ user_id: userId, status: "running", started_at: started }).select("id,user_id,status,summary,started_at").single();
+    if (runError || !createdRun) return new Response(JSON.stringify({ error: runError?.message || "Não foi possível criar a execução" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    run = createdRun;
+  }
 
   const items: Array<Record<string, unknown>> = [];
   let failures = 0;
@@ -102,9 +143,10 @@ Deno.serve(async (req) => {
   // the default deterministic and bounded while still allowing an explicit
   // administrator-selected start date for older RD-only archives.
   const historicalStart = String(body.start_date || body.startDate || dateMonthsAgo(37));
+  const rdOnly = body.rd_only === true;
+  let incomplete = false;
 
   try {
-    const rdOnly = body.rd_only === true;
     if (!rdOnly) {
       // Keep the historical run account-complete, but never sync a manually
       // disconnected/blocked row. Legacy OAuth imports can leave duplicate
@@ -168,6 +210,7 @@ Deno.serve(async (req) => {
     const funnelResults = await mapWithConcurrency(funnels || [], 2, async (funnel) => {
       const result = await invoke(base, key, "rd-sync-deals", { funnel_id: funnel.id, service_user_id: userId, cron_trigger: true, analytics_mode: true, full_history: true, trigger_source: "historical_backfill" });
       const summary = itemSummary(result);
+      if (summary.response?.complete === false) incomplete = true;
       return { funnel, summary };
     });
     for (const { funnel, summary } of funnelResults) {
@@ -179,9 +222,12 @@ Deno.serve(async (req) => {
       const { error } = await admin.from("sync_backfill_items").insert(items);
       if (error) throw error;
     }
-    const status = failures ? "partial" : "success";
-    await admin.from("sync_backfill_runs").update({ status, finished_at: new Date().toISOString(), summary: { items: items.length, failures, historicalStart, historicalEnd: today } }).eq("id", run.id);
-    return new Response(JSON.stringify({ ok: !failures, status, run_id: run.id, items: items.length, failures, historicalStart, historicalEnd: today }), { status: failures ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const previousItems = Number(runSummary.items || 0);
+    const previousFailures = Number(runSummary.failures || 0);
+    const status = incomplete ? "running" : (failures || previousFailures ? "partial" : "success");
+    const summary = { items: previousItems + items.length, failures: previousFailures + failures, historicalStart, historicalEnd: today, incomplete };
+    await admin.from("sync_backfill_runs").update({ status, finished_at: status === "running" ? null : new Date().toISOString(), summary, error_message: status === "running" ? null : undefined }).eq("id", run.id);
+    return new Response(JSON.stringify({ ok: status === "success", status, run_id: run.id, items: items.length, failures, historicalStart, historicalEnd: today, incomplete }), { status: status === "partial" ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await admin.from("sync_backfill_runs").update({ status: "failed", finished_at: new Date().toISOString(), error_message: message }).eq("id", run.id);
