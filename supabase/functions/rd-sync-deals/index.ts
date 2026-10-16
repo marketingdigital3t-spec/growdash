@@ -559,6 +559,7 @@ Deno.serve(async (req) => {
       max_deals = 1000,
       realtime = false,
       max_pages,
+      skip_enrichment = false,
       trigger_source,
     } = body || {};
     let deal_ids = body?.deal_ids;
@@ -1399,7 +1400,7 @@ Deno.serve(async (req) => {
       // CRM record. The rd_deals trigger then propagates the same amount to
       // canonical sales, which is what Comercial displays.
       const hydratedItems: any[] = [];
-      if (analytics_mode) {
+      if (analytics_mode && !skip_enrichment) {
         // Reuse complete local profiles in incremental cycles. Only new or
         // incomplete deals call the RD detail/contact endpoints.
         const existingProfiles = new Map<string, any>();
@@ -1429,7 +1430,7 @@ Deno.serve(async (req) => {
           hydratedItems.push(...resolved);
           if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
         }
-      } else if (refresh_amounts) {
+      } else if (refresh_amounts && !skip_enrichment) {
         const HYDRATION_BATCH_SIZE = 4;
         for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
           const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
