@@ -1813,11 +1813,6 @@ Deno.serve(async (req) => {
             await persistAnalyticsBatch(rangedDeals);
             totalDeals += rangedDeals.length;
 
-            if (Date.now() >= runtimeDeadline) {
-              analyticsRangeComplete = false;
-              break segmentLoop;
-            }
-
             const timestamps = deals
               .filter((deal: any) => !segment.stageId || String(deal.deal_stage?.id || "") === String(segment.stageId))
               .map((deal: any) => {

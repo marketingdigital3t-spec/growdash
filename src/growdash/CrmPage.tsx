@@ -560,7 +560,11 @@ export default function CrmPage() {
         // snapshot; without this loop a 1,176-deal pipeline stopped at the
         // first ~600 rows while the UI reported a successful refresh.
         let latestResult: (typeof syncResults)[number] | null = null;
-        const MAX_RESUMABLE_PASSES = 12;
+        // A large RD pipeline can require several runtime-sized chunks. The
+        // edge function persists the next cursor before yielding, so this
+        // explicit refresh can safely drain the complete snapshot without
+        // re-reading the same page forever.
+        const MAX_RESUMABLE_PASSES = 24;
         for (let pass = 0; pass < MAX_RESUMABLE_PASSES; pass++) {
           const { data, error } = await supabase.functions.invoke("rd-sync-deals", { body: syncBody });
           if (error || data?.error || data?.success === false) {
