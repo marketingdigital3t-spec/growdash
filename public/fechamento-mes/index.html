@@ -29,7 +29,8 @@
       .card { border:1px solid var(--line); border-radius:18px; background:linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.025)); box-shadow:0 16px 38px rgba(0,0,0,.14); }
       .icon { display:grid; width:34px; height:34px; place-items:center; border:1px solid var(--line); border-radius:11px; color:var(--gold); background:var(--gold-soft); font-size:16px; }
       .label-mini { color:#737b87; font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
-      .grid-2 { display:grid; grid-template-columns:1.16fr .84fr; gap:16px; margin-top:16px; }
+      .grid-2 { display:grid; grid-template-columns:1.16fr .84fr; gap:16px; margin-top:16px; min-width:0; }
+      .grid-2 > *, .footer-grid > * { min-width:0; }
       .panel { padding:24px; }
       .panel-title { margin:0; font-size:20px; letter-spacing:-.03em; }
       .panel-kicker { margin:0 0 6px; color:var(--gold); font-size:10px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
@@ -77,7 +78,7 @@
       .decision span { flex:0 0 auto; width:7px; height:7px; margin-top:5px; border-radius:50%; background:var(--gold); }
       .bottom-note { display:flex; justify-content:space-between; gap:12px; margin-top:18px; padding:0 2px; color:#747d89; font-size:10px; }
       @media (max-width: 900px) { .grid-2, .footer-grid { grid-template-columns:1fr; } }
-      @media (max-width: 620px) { .page { width:min(100% - 20px, 560px); padding-top:18px; } .topbar { align-items:flex-start; flex-direction:column; gap:12px; margin-bottom:20px; } .hero { border-radius:20px; padding:26px 20px 22px; } .hero-meta { align-items:flex-start; flex-direction:column; } .compare { grid-template-columns:1fr; gap:22px; } .panel { padding:18px; } .opportunity .panel-title { font-size:25px; } .bottom-note { flex-direction:column; } }
+      @media (max-width: 620px) { .page { width:min(100% - 20px, 560px); padding-top:18px; } .topbar { align-items:flex-start; flex-direction:column; gap:12px; margin-bottom:20px; } .hero { border-radius:20px; padding:26px 20px 22px; } .hero:after { display:none; } .hero-meta { align-items:flex-start; flex-direction:column; } .compare { grid-template-columns:1fr; gap:22px; } .panel { padding:18px; } .opportunity .panel-title { font-size:25px; } .bottom-note { flex-direction:column; } }
     </style>
   </head>
   <body>
