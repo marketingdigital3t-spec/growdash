@@ -91,7 +91,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
         {visualMode ? (
           <div className="flex flex-col items-center gap-2 py-1" aria-label="Funil visual por etapa">
             <div className="w-full rounded-2xl border border-border/50 bg-background/30 px-1 py-2 sm:px-2 sm:py-3">
-              <div className="mx-auto flex w-full max-w-[280px] flex-col items-center">
+              <div className="mx-auto flex w-full max-w-[320px] flex-col items-center">
                 <TooltipProvider delayDuration={250}>
                   {stages.map((stage, index) => {
                     const width = funnelStageVisualWidth(index, visualStageCount);
@@ -104,9 +104,9 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                         <StageTooltipTrigger asChild>
                           <div
                             tabIndex={0}
-                            className="group relative z-10 -mt-px flex min-h-[36px] cursor-help flex-col items-center justify-center overflow-hidden border-y border-white/20 px-2 py-0.5 text-center text-white shadow-[0_6px_14px_-12px_rgba(0,0,0,.95)] outline-none transition-[width,filter,transform] duration-300 first:mt-0 hover:z-20 hover:brightness-110 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[40px] sm:px-3"
+                            className="group relative z-10 -mt-px flex min-h-[40px] cursor-help flex-col items-center justify-center overflow-hidden border-y border-white/20 px-2 py-0.5 text-center text-white shadow-[0_6px_14px_-12px_rgba(0,0,0,.95)] outline-none transition-[width,filter,transform] duration-300 first:mt-0 hover:z-20 hover:brightness-110 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[44px] sm:px-3"
                             style={{
-                              width: `max(${width}%, 132px)`,
+                              width: `max(${width}%, 150px)`,
                               background: "linear-gradient(105deg, #08090b 0%, #4b4f56 14%, #15171b 27%, #050506 53%, #777c84 85%, #17191d 100%)",
                               clipPath: "polygon(5% 0, 95% 0, 86% 100%, 14% 100%)",
                               filter: "drop-shadow(0 3px 3px rgba(0,0,0,.28))",
@@ -115,12 +115,12 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                           >
                             <span className="pointer-events-none absolute inset-x-[7%] top-0 h-px rounded-full bg-gradient-to-r from-white/20 via-white/90 to-white/20" aria-hidden="true" />
                             <span className="pointer-events-none absolute inset-x-[11%] bottom-0 h-[3px] rounded-full border-t border-white/60 bg-gradient-to-r from-slate-500 via-white/90 to-slate-500 shadow-[0_-1px_3px_rgba(255,255,255,.55)]" aria-hidden="true" />
-                            <span className="relative z-10 flex max-w-[92%] items-center justify-center gap-1 truncate text-[7px] font-bold uppercase leading-tight tracking-[0.06em] sm:text-[8px]">
+                            <span className="relative z-10 flex max-w-[92%] items-center justify-center gap-1 truncate text-[8px] font-bold uppercase leading-tight tracking-[0.06em] sm:text-[9px]">
                               <span className="h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-white/30" style={{ background: accentColor }} aria-hidden="true" />
                               <span className="truncate">{stage.name}</span>
                             </span>
-                            <span className="relative z-10 text-[11px] font-extrabold leading-tight tabular-nums sm:text-xs">{stage.count} <span className="text-[7px] font-semibold uppercase tracking-normal text-white/70 sm:text-[8px]">leads</span> <span className="text-[7px] font-semibold text-white/70 sm:text-[8px]">· {stage.pct.toFixed(1)}%</span></span>
-                            <span className="relative z-10 flex max-w-[94%] items-center justify-center gap-x-2 truncate text-[6px] font-medium leading-tight text-white/65 sm:text-[7px]">
+                            <span className="relative z-10 text-xs font-extrabold leading-tight tabular-nums sm:text-sm">{stage.count} <span className="text-[8px] font-semibold uppercase tracking-normal text-white/70 sm:text-[9px]">leads</span> <span className="text-[8px] font-semibold text-white/70 sm:text-[9px]">· {stage.pct.toFixed(1)}%</span></span>
+                            <span className="relative z-10 flex max-w-[94%] items-center justify-center gap-x-2 truncate text-[7px] font-medium leading-tight text-white/65 sm:text-[8px]">
                               <span>{stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} d médio` : "Tempo indisponível"}</span>
                               <span>{stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Sem valor"}</span>
                             </span>
@@ -136,7 +136,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                     );
                   })}
                 </TooltipProvider>
-                <div className="mt-0.5 h-2 w-10 rounded-b-md border-x border-b border-white/50 bg-gradient-to-r from-slate-500 via-slate-100 to-slate-600 shadow-[0_4px_8px_-5px_rgba(0,0,0,.9)]" aria-hidden="true" />
+                <div className="mt-0.5 h-2 w-12 rounded-b-md border-x border-b border-white/50 bg-gradient-to-r from-slate-500 via-slate-100 to-slate-600 shadow-[0_4px_8px_-5px_rgba(0,0,0,.9)]" aria-hidden="true" />
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
