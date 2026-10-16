@@ -1674,6 +1674,15 @@ Deno.serve(async (req) => {
         let segmentComplete = false;
 
         while (page <= maxPages) {
+          // Backfill workers can request a global page budget. Without this
+          // guard, max_pages=1 was applied independently to every status
+          // segment (won/open/lost/paused), still making one edge request too
+          // large for the gateway. Cursors keep the remaining segments for
+          // the next invocation.
+          if (analytics_mode && Number.isFinite(requestedPages) && requestedPages > 0 && pagesProcessed >= requestedPages) {
+            analyticsRangeComplete = false;
+            break segmentLoop;
+          }
           if (Date.now() >= runtimeDeadline) {
             analyticsRangeComplete = false;
             break segmentLoop;
