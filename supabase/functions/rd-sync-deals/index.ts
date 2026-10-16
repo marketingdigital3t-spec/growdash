@@ -983,6 +983,10 @@ Deno.serve(async (req) => {
     let snapshotMissingIds: string[] = [];
     let snapshotDuplicateCount = 0;
     let debugLogged = false;
+    // A resumed segment only sees the pages after its stored cursor. It is
+    // still safe to upsert those pages, but it is not safe to delete local
+    // rows that were seen by a previous invocation during reconciliation.
+    let resumedFromCursor = false;
 
     async function processDeal(d: any) {
       const id = String(d.id || d._id);
@@ -1377,7 +1381,7 @@ Deno.serve(async (req) => {
         const ids = items.map((item) => String(item?.id || item?._id || "")).filter(Boolean);
         if (ids.length) {
           const { data: profiles } = await admin.from("rd_deals")
-            .select("rd_deal_id,contact_name,contact_email,lead_city,lead_state,custom_fields,raw")
+            .select("rd_deal_id,contact_name,contact_email,lead_city,lead_state,custom_fields,raw,rd_stage_id,amount_total,closed_at,stage_updated_at,win")
             .eq("rd_funnel_id", funnel!.id).in("rd_deal_id", ids);
           for (const profile of profiles || []) existingProfiles.set(String(profile.rd_deal_id), profile);
         }
@@ -1443,6 +1447,20 @@ Deno.serve(async (req) => {
         const firstContact = Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
         const baseContact = d.contact || d.deal_contact || {};
         const storedProfile = d._storedProfile || {};
+        const providerUpdatedAt = d.updated_at || d.last_activity_at || null;
+        const storedRaw = storedProfile.raw && typeof storedProfile.raw === "object" ? storedProfile.raw : null;
+        const sameProviderSnapshot = Boolean(
+          storedRaw && providerUpdatedAt && storedRaw.updated_at === providerUpdatedAt
+            && String(storedProfile.rd_stage_id || "") === String(stageId || "")
+            && Number(storedProfile.amount_total || 0) === (parseFloat(d.amount_total || d.amount || "0") || 0)
+            && String(storedProfile.closed_at || "") === String(d.closed_at || "")
+            && Boolean(storedProfile.win) === Boolean(won),
+        );
+        // Existing non-won profiles are already the canonical row when RD
+        // returns the same provider timestamp/stage/value. Avoid rewriting
+        // hundreds of unchanged deals during a manual reconciliation; the
+        // IDs still count towards the complete snapshot through the set above.
+        if (sameProviderSnapshot && (!refresh_amounts || !won)) return null;
         const contact = { ...inline, ...firstContact, ...baseContact };
         const contactFields = firstContact.contact_custom_fields || contact.contact_custom_fields || baseContact.contact_custom_fields || [];
         const dealFields = Array.isArray(d.deal_custom_fields || d.custom_fields) ? (d.deal_custom_fields || d.custom_fields) : [];
@@ -1508,7 +1526,7 @@ Deno.serve(async (req) => {
           row.deal_owner_name = d.user?.name || d.deal_user?.name || d.owner?.name;
         if (d.deal_products?.[0]?.name) row.rd_product_name = d.deal_products[0].name;
         return row;
-      });
+      }).filter(Boolean) as Record<string, unknown>[];
       // Do not send an entire RD page (and its raw payloads) in one request.
       // Large pipelines routinely contain verbose custom fields; one 200-row
       // upsert can exceed the Edge Function CPU/memory budget even though the
@@ -1580,11 +1598,10 @@ Deno.serve(async (req) => {
       // https://developers.rdstation.com/reference/crm-v1-list-deals
       const analyticsSegments = analytics_mode
         ? [
-            // The unfiltered list is authoritative for open/lost records and
-            // already carries each deal's native stage. Some RD accounts
-            // silently ignore `deal_stage_id`, so walking every stage would
-            // repeat the entire pipeline and can exceed the Edge timeout.
-            { name: "ongoing", stageId: null, params: "", won: false },
+            // Prioritize terminal status so a long open pipeline cannot
+            // consume the whole runtime before the authoritative sales list
+            // is persisted.
+            { name: "won", stageId: null, params: "&win=true", won: true },
             // Terminal stages get a targeted pass as a complement to the
             // status endpoint. This catches old deals whose `win` flag was
             // not backfilled while keeping the request count bounded.
@@ -1596,10 +1613,12 @@ Deno.serve(async (req) => {
               params: `&deal_stage_id=${encodeURIComponent(stageId)}`,
               won: true,
             })),
-            // Keep status segments as a safety net for terminal deals whose
-            // stage is not returned by the list endpoint or whose legacy
-            // `win` flag was not backfilled.
-            { name: "won", stageId: null, params: "&win=true", won: true },
+            // The unfiltered list is authoritative for open/lost records and
+            // already carries each deal's native stage. Some RD accounts
+            // silently ignore `deal_stage_id`, so walking every stage must
+            // never stop at the first page that happens not to contain the
+            // requested stage.
+            { name: "ongoing", stageId: null, params: "", won: false },
             { name: "lost", stageId: null, params: "&win=false", won: false },
             { name: "paused", stageId: null, params: "&hold=true", won: false },
           ]
@@ -1615,6 +1634,7 @@ Deno.serve(async (req) => {
       segmentLoop: for (const segment of analyticsSegments) {
         const cursorKey = `${cursorPrefix}|${segment.name}`;
         let page = cursorBySegment.get(segment.name) || 1;
+        if (page > 1) resumedFromCursor = true;
         let segmentComplete = false;
 
         while (page <= maxPages) {
@@ -1663,6 +1683,23 @@ Deno.serve(async (req) => {
           }
 
           if (analytics_mode) {
+            // Some RD workspaces ignore deal_stage_id and return the regular
+            // list. In that case scanning every page for every stage is both
+            // redundant and a common cause of gateway timeouts. The status
+            // segments above remain the authoritative recovery path.
+            const stageQueryIgnored = Boolean(
+              segment.stageId
+              && deals.some((deal: any) => {
+                const returnedStageId = deal.deal_stage?.id ? String(deal.deal_stage.id) : "";
+                return returnedStageId && returnedStageId !== String(segment.stageId);
+              }),
+            );
+            if (stageQueryIgnored) {
+              segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              console.warn(`[rd] RD ignorou deal_stage_id para ${segment.name}; status segments serão usados.`);
+              continue segmentLoop;
+            }
             const rangedDeals = deals
               .filter((deal: any) => {
                 const rdDealId = String(deal.id || deal._id || "");
@@ -1695,9 +1732,37 @@ Deno.serve(async (req) => {
             // segment. Stop that segment when it contributes no new IDs;
             // otherwise a full-history run can loop forever at page 2+.
           if (rangedDeals.length === 0) {
-            segmentComplete = true;
-            await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
-            break;
+            // For a stage-specific query, an empty filtered page is not proof
+            // that the stage is exhausted: RD can return another stage when
+            // it ignores the filter, and the requested stage may be on a
+            // later page. Continue pagination until the provider ends it or
+            // the selected calendar is completely behind us.
+            const timestamps = deals
+              .filter((deal: any) => !segment.stageId || String(deal.deal_stage?.id || "") === String(segment.stageId))
+              .map((deal: any) => new Date((deal.created_at || deal.updated_at) || 0).getTime())
+              .filter((value: number) => Number.isFinite(value) && value > 0);
+            const pageBeforeRange = Boolean(
+              startMs && timestamps.length > 0 && timestamps.every((value: number) => value < startMs),
+            );
+            if (!segment.stageId || deals.length < 200 || pageBeforeRange) {
+              segmentComplete = true;
+              await admin.from("rd_sync_cursors").delete().eq("scope_key", cursorKey);
+              break;
+            }
+            page++;
+            await admin.from("rd_sync_cursors").upsert({
+              scope_key: cursorKey,
+              funnel_id: funnel.id,
+              rd_connection_id: funnel.rd_connection_id,
+              start_date: start_date || null,
+              end_date: end_date || null,
+              segment: segment.name,
+              next_page: page,
+              status: "partial",
+              last_error: null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "scope_key" });
+            continue;
           }
             await persistAnalyticsBatch(rangedDeals);
             totalDeals += rangedDeals.length;
@@ -1776,7 +1841,7 @@ Deno.serve(async (req) => {
       // intervalo com sucesso reconciliamos esses registros locais antigos.
       // Assim, a contagem por etapa representa o snapshot atual exibido pelo
       // RD para a mesma conta e o mesmo filtro de data.
-      if (analytics_mode && analyticsRangeComplete && (fullHistoryRequested || (start_date && end_date && !fullHistoryRequested))) {
+      if (analytics_mode && analyticsRangeComplete && !resumedFromCursor && (fullHistoryRequested || (start_date && end_date && !fullHistoryRequested))) {
         const localIds: string[] = [];
         const pageSize = 1000;
         // Paginate until PostgREST returns a short page. A fixed page count
