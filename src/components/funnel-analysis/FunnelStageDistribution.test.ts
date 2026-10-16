@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualTextColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
 
 const stage = (count: number) => ({
   rd_stage_id: `stage-${count}`,
@@ -40,6 +40,12 @@ describe("FunnelStageDistribution", () => {
     expect(funnelStageVisualColor(0, 3)).toBe("hsl(0 84% 56%)");
     expect(funnelStageVisualColor(1, 3)).toBe("hsl(71 84% 56%)");
     expect(funnelStageVisualColor(2, 3)).toBe("hsl(142 84% 56%)");
+  });
+
+  it("uses readable text across the bright part of the funnel", () => {
+    expect(funnelStageVisualTextColor(0, 3)).toBe("hsl(0 0% 100%)");
+    expect(funnelStageVisualTextColor(1, 3)).toBe("hsl(222 47% 11%)");
+    expect(funnelStageVisualTextColor(2, 3)).toBe("hsl(222 47% 11%)");
   });
 
   it("keeps the selected-period total independent from the funnel shape", () => {

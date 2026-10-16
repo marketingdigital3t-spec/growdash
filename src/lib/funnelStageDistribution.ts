@@ -16,3 +16,14 @@ export function funnelStageVisualColor(index: number, stageCount: number) {
   const hue = Math.round(progress * 142);
   return `hsl(${hue} 84% 56%)`;
 }
+
+/**
+ * The middle and lower funnel stages move through yellow/lime tones. Dark
+ * text keeps those bright surfaces readable while the red/orange entrance
+ * stages retain white text for contrast.
+ */
+export function funnelStageVisualTextColor(index: number, stageCount: number) {
+  if (stageCount <= 1) return "hsl(0 0% 100%)";
+  const progress = Math.max(0, Math.min(1, index / (stageCount - 1)));
+  return progress >= 0.34 ? "hsl(222 47% 11%)" : "hsl(0 0% 100%)";
+}

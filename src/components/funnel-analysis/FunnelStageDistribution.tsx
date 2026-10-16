@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip as StageTooltip, TooltipContent as StageTooltipContent, TooltipProvider, TooltipTrigger as StageTooltipTrigger } from "@/components/ui/tooltip";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
-import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualTextColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
 
 interface Props {
   a: FunnelAnalytics;
@@ -41,7 +41,9 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
   // current RD deal inventory for the selected account and funnel.
   const stages = a.stages;
   const total = funnelStageDistributionTotal(a);
-  const [visualMode, setVisualMode] = useState(false);
+  // The funnel is the primary representation. The table remains available
+  // for users who need a dense, row-by-row comparison.
+  const [visualMode, setVisualMode] = useState(true);
   const visualStageCount = stages.length;
 
   const data = stages.map((s, i) => ({
@@ -88,46 +90,55 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
       <CardContent>
         {visualMode ? (
           <div className="flex flex-col items-center gap-3 py-2" aria-label="Funil visual por etapa">
-            <div className="w-full max-w-5xl rounded-2xl border border-border/50 bg-background/30 px-2 py-4 sm:px-5 sm:py-6">
-              <TooltipProvider delayDuration={250}>
-                {stages.map((stage, index) => {
-                  const width = funnelStageVisualWidth(index, visualStageCount);
-                  const color = funnelStageVisualColor(index, visualStageCount);
-                  const avgTime = stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "Indisponível";
-                  const negotiationValue = stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Nenhum valor";
-                  const accessibleDescription = `${stage.name}: ${stage.count} leads, ${stage.pct.toFixed(1)}% do total. Tempo médio: ${avgTime}. Valor em negociação: ${negotiationValue}.`;
-                  const stageLabel = <div className={`hidden min-w-0 items-center gap-2 text-xs sm:flex ${index % 2 === 0 ? "justify-end text-right" : "justify-start text-left"}`}>
-                      {index % 2 === 0 ? <><span className="min-w-0"><b className="block truncate text-foreground">{stage.name}</b><span className="text-muted-foreground">{stage.count} leads · {stage.pct.toFixed(1)}%</span></span><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} /></> : <><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} /><span className="min-w-0"><b className="block truncate text-foreground">{stage.name}</b><span className="text-muted-foreground">{stage.count} leads · {stage.pct.toFixed(1)}%</span></span></>}
-                    </div>;
+            <div className="w-full overflow-x-auto rounded-2xl border border-border/50 bg-background/30 px-2 py-4 sm:px-5 sm:py-6">
+              <div className="mx-auto flex min-w-[320px] max-w-3xl flex-col items-center">
+                <TooltipProvider delayDuration={250}>
+                  {stages.map((stage, index) => {
+                    const width = funnelStageVisualWidth(index, visualStageCount);
+                    const color = funnelStageVisualColor(index, visualStageCount);
+                    const textColor = funnelStageVisualTextColor(index, visualStageCount);
+                    const avgTime = stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "Indisponível";
+                    const negotiationValue = stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Nenhum valor";
+                    const accessibleDescription = `${stage.name}: ${stage.count} leads, ${stage.pct.toFixed(1)}% do total. Tempo médio: ${avgTime}. Valor em negociação: ${negotiationValue}.`;
+                    const isBright = index / Math.max(visualStageCount - 1, 1) >= 0.34;
                     return (
-                    <div key={stage.rd_stage_id} className="grid grid-cols-[minmax(0,1fr)_minmax(180px,2.4fr)_minmax(0,1fr)] items-center gap-2 sm:gap-4">
-                    {index % 2 === 0 ? stageLabel : <span />}
-                    <StageTooltip>
-                      <StageTooltipTrigger asChild>
-                        <div
-                          tabIndex={0}
-                          className="mx-auto flex min-h-12 cursor-help items-center justify-center px-3 text-center text-[11px] font-semibold text-white shadow-sm outline-none transition-[width,filter] duration-300 hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-14 sm:px-4 sm:text-xs"
-                          style={{ width: `${width}%`, background: color, clipPath: "polygon(0 0, 100% 0, 96% 100%, 4% 100%)" }}
-                          aria-label={accessibleDescription}
-                        >
-                        </div>
-                      </StageTooltipTrigger>
-                      <StageTooltipContent side="top" className="max-w-xs space-y-1.5 px-3 py-2.5 text-xs">
-                        <p className="font-semibold text-foreground">{stage.name}</p>
-                        <p>{stage.count} leads · {stage.pct.toFixed(1)}% do total</p>
-                        <p>Tempo médio: {avgTime}</p>
-                        <p>Valor em negociação: {negotiationValue}</p>
-                      </StageTooltipContent>
-                    </StageTooltip>
-                    {index % 2 === 1 ? stageLabel : <span />}
-                    </div>
-                  );
-                })}
-              </TooltipProvider>
+                      <StageTooltip key={stage.rd_stage_id}>
+                        <StageTooltipTrigger asChild>
+                          <div
+                            tabIndex={0}
+                            className="group relative z-10 -mt-px flex min-h-[72px] cursor-help flex-col items-center justify-center px-5 py-2 text-center shadow-[0_8px_20px_-14px_rgba(0,0,0,.9)] outline-none transition-[width,filter,transform] duration-300 first:mt-0 hover:z-20 hover:brightness-110 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[82px] sm:px-8"
+                            style={{
+                              width: `max(${width}%, 220px)`,
+                              color: textColor,
+                              background: `linear-gradient(105deg, color-mix(in srgb, ${color} 86%, black), ${color} 52%, color-mix(in srgb, ${color} 82%, white))`,
+                              clipPath: "polygon(4% 0, 96% 0, 91% 100%, 9% 100%)",
+                            }}
+                            aria-label={accessibleDescription}
+                          >
+                            <span className="max-w-full truncate text-[11px] font-bold uppercase tracking-[0.08em] sm:text-xs">{stage.name}</span>
+                            <span className="mt-0.5 text-base font-extrabold tabular-nums sm:text-lg">{stage.count} <span className="text-[10px] font-semibold uppercase tracking-normal opacity-80 sm:text-[11px]">leads</span></span>
+                            <span className="text-[11px] font-semibold tabular-nums opacity-85">{stage.pct.toFixed(1)}% do total</span>
+                            <span className={`mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[10px] font-medium ${isBright ? "text-slate-950/70" : "text-white/80"}`}>
+                              <span>{stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} d médio` : "Tempo indisponível"}</span>
+                              <span>{stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Sem valor"}</span>
+                            </span>
+                          </div>
+                        </StageTooltipTrigger>
+                        <StageTooltipContent side="top" className="max-w-xs space-y-1.5 px-3 py-2.5 text-xs">
+                          <p className="font-semibold text-foreground">{stage.name}</p>
+                          <p>{stage.count} leads · {stage.pct.toFixed(1)}% do total</p>
+                          <p>Tempo médio: {avgTime}</p>
+                          <p>Valor em negociação: {negotiationValue}</p>
+                        </StageTooltipContent>
+                      </StageTooltip>
+                    );
+                  })}
+                </TooltipProvider>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">{unavailable ? "—" : total}</span>
-              <span>{unavailable ? "Indisponível" : "negociações no período"}</span>
+              <span>{unavailable ? "Indisponível" : "negociações no período · métricas dentro do funil"}</span>
             </div>
           </div>
         ) : (
