@@ -11,7 +11,7 @@ const trustedViews = {
   dashboard: { title: 'Dashboard', caption: 'Visão geral da operação, tráfego, leads e resultado.', src: 'assets/growdash-dashboard.png', alt: 'Dashboard real da Growdash com visão geral da operação' },
   crm: { title: 'CRM e negociações', caption: 'Pipeline, etapas, responsáveis e oportunidades em andamento.', src: 'assets/growdash-crm.png', alt: 'Tela real de CRM e negociações da Growdash' },
   performance: { title: 'Performance e vendas', caption: 'Acompanhamento de vendas, ranking, metas e evolução.', src: 'assets/growdash-performance.png', alt: 'Painel real de performance e vendas da Growdash' },
-  flow: { title: 'Growdash Flow', caption: 'Tarefas, prioridades e responsáveis para a operação avançar.', src: 'assets/growdash-flow.png', alt: 'Quadro real do Growdash Flow com tarefas e prioridades' },
+  flow: { title: 'Kanban', caption: 'Campanhas, formulários, automações e prioridades organizadas para a operação avançar.', src: 'assets/growdash-flow.png', alt: 'Quadro real do Kanban da Growdash com demandas e prioridades' },
   financeiro: { title: 'Financeiro', caption: 'Leitura financeira com dados sensíveis protegidos.', src: 'assets/growdash-financeiro.png', alt: 'Tela financeira da Growdash com dados protegidos' }
 };
 const trustedImage = document.getElementById('trusted-view-image');
