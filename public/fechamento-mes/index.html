@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#090b10" />
+    <link rel="icon" type="image/svg+xml" href="/growdash-mark-mono.svg" />
+    <title>Fechamento mensal · Ranielly | Growdash</title>
+    <meta name="description" content="Fechamento mensal de tráfego da Ranielly: KPIs, eficiência de aquisição e plano operacional." />
+    <style>
+      :root { color-scheme: dark; --bg:#090b10; --surface:#12151b; --surface-2:#181c23; --line:rgba(255,255,255,.11); --text:#f6f7f9; --muted:#9da4af; --gold:#e4b95f; --gold-soft:rgba(228,185,95,.12); --blue:#7dd3fc; --green:#86efac; --red:#fda4af; }
+      * { box-sizing:border-box; }
+      body { margin:0; min-width:320px; background:radial-gradient(circle at 78% -8%, rgba(228,185,95,.13), transparent 32rem), var(--bg); color:var(--text); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      button { font:inherit; }
+      .page { width:min(1180px, calc(100% - 32px)); margin:0 auto; padding:32px 0 56px; }
+      .topbar { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:30px; }
+      .brand { display:inline-flex; align-items:center; gap:12px; color:var(--text); text-decoration:none; font-size:14px; font-weight:800; letter-spacing:.06em; }
+      .brand img { width:28px; height:28px; object-fit:contain; }
+      .source { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:11px; font-weight:700; }
+      .dot { width:7px; height:7px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 5px rgba(228,185,95,.12); }
+      .hero { position:relative; overflow:hidden; border:1px solid rgba(228,185,95,.34); border-radius:26px; padding:38px clamp(22px, 5vw, 58px) 28px; background:linear-gradient(130deg, #151820, #0e1117 65%, #1c1810); box-shadow:0 24px 70px rgba(0,0,0,.26); }
+      .hero:after { content:""; position:absolute; width:320px; height:320px; right:-100px; top:-160px; border-radius:50%; background:rgba(228,185,95,.13); filter:blur(42px); }
+      .eyebrow { position:relative; z-index:1; color:var(--gold); font-size:10px; font-weight:900; letter-spacing:.2em; text-transform:uppercase; }
+      h1 { position:relative; z-index:1; max-width:760px; margin:16px 0 12px; font-size:clamp(2.2rem, 5vw, 4.5rem); line-height:.98; letter-spacing:-.055em; }
+      .hero-copy { position:relative; z-index:1; max-width:720px; margin:0; color:#c1c6ce; font-size:clamp(.95rem, 1.7vw, 1.1rem); line-height:1.65; }
+      .hero-meta { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-top:30px; padding-top:18px; border-top:1px solid var(--line); }
+      .period { color:#e9edf2; font-size:12px; font-weight:800; }
+      .tag { display:inline-flex; align-items:center; gap:7px; padding:8px 11px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.05); color:#bfc5cd; font-size:11px; font-weight:800; }
+      .kpis { display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-top:16px; }
+      .card { border:1px solid var(--line); border-radius:18px; background:linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.025)); box-shadow:0 16px 38px rgba(0,0,0,.14); }
+      .kpi { padding:20px; }
+      .kpi-label { color:#abb2bd; font-size:11px; font-weight:700; }
+      .kpi-value { margin-top:8px; font-size:clamp(1.55rem, 2.7vw, 2.15rem); font-weight:900; letter-spacing:-.04em; }
+      .kpi-note { margin-top:9px; color:#89919e; font-size:11px; }
+      .kpi-mark { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+      .icon { display:grid; width:34px; height:34px; place-items:center; border:1px solid var(--line); border-radius:11px; color:var(--gold); background:var(--gold-soft); font-size:16px; }
+      .label-mini { color:#737b87; font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
+      .grid-2 { display:grid; grid-template-columns:1.16fr .84fr; gap:16px; margin-top:16px; }
+      .panel { padding:24px; }
+      .panel-title { margin:0; font-size:20px; letter-spacing:-.03em; }
+      .panel-kicker { margin:0 0 6px; color:var(--gold); font-size:10px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
+      .panel-copy { margin:8px 0 0; color:var(--muted); font-size:12px; line-height:1.6; }
+      .compare { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-top:28px; }
+      .compare-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:13px; font-size:13px; font-weight:900; }
+      .delta { padding:5px 8px; border:1px solid rgba(253,164,175,.24); border-radius:999px; background:rgba(253,164,175,.09); color:#fecdd3; font-size:10px; }
+      .bar-row { display:grid; grid-template-columns:56px 1fr 82px; align-items:center; gap:9px; margin-top:10px; color:#8f98a6; font-size:11px; }
+      .bar { height:8px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.1); }
+      .bar > i { display:block; height:100%; border-radius:inherit; background:var(--gold); }
+      .bar-row:nth-child(3) .bar > i { background:var(--blue); }
+      .bar-value { color:#edf0f3; text-align:right; font-weight:900; }
+      .steps { display:grid; gap:12px; margin-top:24px; }
+      .step { display:flex; align-items:flex-start; gap:10px; color:#c5cad2; font-size:12px; line-height:1.5; }
+      .check { flex:0 0 auto; width:18px; height:18px; border:1px solid rgba(228,185,95,.42); border-radius:6px; background:var(--gold-soft); color:var(--gold); text-align:center; font-size:12px; line-height:16px; }
+      .opportunity { position:relative; overflow:hidden; background:linear-gradient(140deg, #211d14, #15171c 76%); }
+      .opportunity .panel-title { max-width:330px; font-size:29px; line-height:1.08; }
+      .opportunity .panel-copy { max-width:390px; color:#b4b8bf; font-size:13px; }
+      .pill-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
+      .pill { padding:8px 10px; border:1px solid rgba(228,185,95,.28); border-radius:999px; color:#e8d39b; font-size:10px; font-weight:800; }
+      .footer-grid { display:grid; grid-template-columns:.8fr 1.2fr; gap:16px; margin-top:16px; }
+      .money-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:20px; }
+      .money { padding:14px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.04); }
+      .money small { display:block; color:#8c95a2; font-size:10px; }
+      .money strong { display:block; margin-top:5px; font-size:22px; letter-spacing:-.04em; }
+      .notice { display:flex; gap:8px; margin-top:16px; color:#8f98a5; font-size:11px; line-height:1.5; }
+      .notice b { color:#efc56d; }
+      .table-wrap { overflow:auto; margin-top:20px; }
+      table { width:100%; min-width:620px; border-collapse:collapse; text-align:left; }
+      th { padding:0 12px 11px 0; border-bottom:1px solid var(--line); color:#7e8793; font-size:9px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; }
+      td { padding:14px 12px 14px 0; border-bottom:1px solid rgba(255,255,255,.07); color:#d7dbe1; font-size:11px; }
+      td:first-child { color:#fff; font-weight:800; }
+      .status { display:inline-flex; padding:5px 8px; border-radius:999px; font-size:10px; font-weight:900; }
+      .status.blue { background:rgba(125,211,252,.1); color:var(--blue); }
+      .status.gold { background:rgba(228,185,95,.11); color:#efd18a; }
+      .status.green { background:rgba(134,239,172,.1); color:var(--green); }
+      .tabs { display:flex; gap:8px; margin-top:16px; }
+      .tab { cursor:pointer; padding:10px 14px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.04); color:#aeb5bf; font-size:11px; font-weight:900; }
+      .tab[aria-selected="true"] { border-color:transparent; background:var(--gold); color:#19130a; }
+      .ops { display:none; }
+      .ops.active { display:block; }
+      .exec.hidden { display:none; }
+      .decisions { display:grid; gap:12px; margin-top:20px; }
+      .decision { display:flex; gap:10px; padding:13px; border:1px solid rgba(228,185,95,.2); border-radius:13px; background:rgba(228,185,95,.06); color:#d9d4c7; font-size:12px; line-height:1.45; }
+      .decision span { flex:0 0 auto; width:7px; height:7px; margin-top:5px; border-radius:50%; background:var(--gold); }
+      .bottom-note { display:flex; justify-content:space-between; gap:12px; margin-top:18px; padding:0 2px; color:#747d89; font-size:10px; }
+      @media (max-width: 900px) { .kpis { grid-template-columns:repeat(2, 1fr); } .grid-2, .footer-grid { grid-template-columns:1fr; } }
+      @media (max-width: 620px) { .page { width:min(100% - 20px, 560px); padding-top:18px; } .topbar { align-items:flex-start; flex-direction:column; gap:12px; margin-bottom:20px; } .hero { border-radius:20px; padding:26px 20px 22px; } .hero-meta { align-items:flex-start; flex-direction:column; } .kpis { gap:10px; } .kpi { padding:15px; } .kpi-value { font-size:1.45rem; } .compare { grid-template-columns:1fr; gap:22px; } .panel { padding:18px; } .opportunity .panel-title { font-size:25px; } .bottom-note { flex-direction:column; } }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar"><a class="brand" href="https://growdash.com.br/"><img src="/growdash-mark-mono.svg" alt="" />GROWDASH</a><span class="source"><i class="dot"></i>Snapshot da reunião · dados a validar</span></header>
+      <section class="hero">
+        <div class="eyebrow">Growdash · fechamento mensal · Ranielly</div>
+        <h1>CPL caiu. CAC subiu.</h1>
+        <p class="hero-copy">O mês trouxe mais volume de leads, mas a conversão comercial perdeu eficiência. O próximo ciclo precisa medir qualidade, maturação e origem — não apenas o custo do lead.</p>
+        <div class="hero-meta"><span class="period">Setembro × Outubro 2026</span><span class="tag">◷ Maturação média da venda: 1 semana</span></div>
+        <nav class="tabs" aria-label="Visões do fechamento"><button class="tab" type="button" aria-selected="true" data-view="exec">Visão executiva</button><button class="tab" type="button" aria-selected="false" data-view="ops">Plano operacional</button></nav>
+      </section>
+
+      <section class="kpis" aria-label="Indicadores principais">
+        <article class="card kpi"><div class="kpi-mark"><span class="icon">◎</span><span class="label-mini">KPI</span></div><div class="kpi-label">CPL geral</div><div class="kpi-value">R$ 2,98</div><div class="kpi-note">snapshot informado</div></article>
+        <article class="card kpi"><div class="kpi-mark"><span class="icon" style="color:var(--green);background:rgba(134,239,172,.1)">$</span><span class="label-mini">KPI</span></div><div class="kpi-label">CAC geral</div><div class="kpi-value">R$ 226,66</div><div class="kpi-note">base a confirmar</div></article>
+        <article class="card kpi"><div class="kpi-mark"><span class="icon" style="color:var(--blue);background:rgba(125,211,252,.1)">♙</span><span class="label-mini">KPI</span></div><div class="kpi-label">CPL · aluno · out/26</div><div class="kpi-value">R$ 8,31</div><div class="kpi-note">−31,5% vs. setembro</div></article>
+        <article class="card kpi"><div class="kpi-mark"><span class="icon" style="color:var(--red);background:rgba(253,164,175,.1)">▥</span><span class="label-mini">KPI</span></div><div class="kpi-label">CAC · aluno · out/26</div><div class="kpi-value">R$ 1.246,46</div><div class="kpi-note">3,35× vs. setembro</div></article>
+      </section>
+
+      <div class="exec">
+        <section class="grid-2">
+          <article class="card panel"><p class="panel-kicker">Eficiência · aluno</p><h2 class="panel-title">Mais leads, menos vendas por real</h2><p class="panel-copy">A retirada da lógica condicional baixou o CPL, mas o CAC ficou 3,35× maior. A leitura considera maturação média de uma semana e a nova régua comercial.</p><div class="compare"><div><div class="compare-head"><span>CPL</span><span class="delta">31,5% menor</span></div><div class="bar-row"><span>Set/26</span><span class="bar"><i style="width:100%"></i></span><span class="bar-value">R$ 12,13</span></div><div class="bar-row"><span>Out/26</span><span class="bar"><i style="width:69%"></i></span><span class="bar-value">R$ 8,31</span></div></div><div><div class="compare-head"><span>CAC</span><span class="delta">3,35× maior</span></div><div class="bar-row"><span>Set/26</span><span class="bar"><i style="width:30%"></i></span><span class="bar-value">R$ 371,54</span></div><div class="bar-row"><span>Out/26</span><span class="bar"><i style="width:100%"></i></span><span class="bar-value">R$ 1.246,46</span></div></div></div><div class="steps"><div class="step"><span class="check">✓</span><span>Setembro: lógica condicional + WhatsApp</span></div><div class="step"><span class="check">✓</span><span>Outubro: sem lógica condicional</span></div><div class="step"><span class="check">→</span><span>Leitura: qualidade virou o gargalo</span></div></div></article>
+          <article class="card panel opportunity"><p class="panel-kicker">Oportunidade prioritária</p><h2 class="panel-title">Link da bio é o canal mais quente</h2><p class="panel-copy">A hipótese é que quem chega pelo perfil já conhece a doutora e tem mais consciência de investimento. O próximo passo é registrar essa origem no RD e comparar oportunidade e venda.</p><div class="steps"><div class="step"><span class="check">✓</span><span>Registrar canal + campanha + conjunto + anúncio</span></div><div class="step"><span class="check">✓</span><span>Separar link da bio de tráfego pago</span></div><div class="step"><span class="check">✓</span><span>Comparar taxa de oportunidade e fechamento</span></div></div><div class="pill-row"><span class="pill">Público quente</span><span class="pill">Orgânico</span><span class="pill">RD</span></div></article>
+        </section>
+        <section class="footer-grid">
+          <article class="card panel"><p class="panel-kicker">Reativação</p><h2 class="panel-title">Final de mês</h2><p class="panel-copy">Reimpactar leads perdidos com uma ação específica do mês e medir o resultado separado do restante da operação.</p><div class="money-grid"><div class="money"><small>Verba de referência</small><strong>R$ 100</strong></div><div class="money"><small>CPL referência</small><strong>R$ 10</strong></div></div><p class="notice">⚠ <span><b>Confirmar antes de escalar:</b> período e conversão dos valores informados.</span></p></article>
+          <article class="card panel"><p class="panel-kicker">Mix de aquisição</p><h2 class="panel-title">Campanhas para o próximo ciclo</h2><div class="table-wrap"><table><thead><tr><th>Campanha</th><th>Canal</th><th>Objetivo</th><th>Status</th></tr></thead><tbody><tr><td>Tráfego direto · WhatsApp</td><td>WhatsApp</td><td>Contato imediato</td><td><span class="status blue">Em teste</span></td></tr><tr><td>Tráfego direto · Formulário → WhatsApp</td><td>Formulário</td><td>Qualificar antes do contato</td><td><span class="status gold">Próximo teste</span></td></tr><tr><td>Tráfego direto · Link da bio → WhatsApp</td><td>Orgânico / bio</td><td>Capturar público quente</td><td><span class="status green">Prioridade</span></td></tr></tbody></table></div></article>
+        </section>
+      </div>
+
+      <div class="ops">
+        <section class="grid-2"><article class="card panel"><p class="panel-kicker">Execução</p><h2 class="panel-title">Plano operacional</h2><div class="decisions"><div class="decision"><span></span>Testar formulário sem desqualificar automaticamente.</div><div class="decision"><span></span>Perguntar capacidade de investimento e priorizar o atendimento.</div><div class="decision"><span></span>Registrar origem completa no RD e no resumo do WhatsApp.</div><div class="decision"><span></span>Manter leads sem capacidade imediata em acompanhamento.</div><div class="decision"><span></span>Separar paciente modelo (SP/TO) de aluno (Brasil).</div></div></article><article class="card panel"><p class="panel-kicker">Decisões pendentes</p><h2 class="panel-title">Antes de escalar</h2><div class="decisions"><div class="decision"><span></span>Confirmar a base do CAC: R$ 226,66, R$ 272 ou outro valor.</div><div class="decision"><span></span>Definir o corte financeiro: R$ 5 mil, R$ 10 mil ou outra regra.</div><div class="decision"><span></span>Validar se a automação continuará filtrando leads abaixo da faixa escolhida.</div><div class="decision"><span></span>Separar paciente modelo (SP/TO) de aluno (Brasil) no acompanhamento.</div></div></article></section>
+      </div>
+
+      <div class="bottom-note"><span>Fonte: alinhamento de tráfego · Ranielly</span><span>Dados de reunião · validar antes de usar como resultado oficial</span></div>
+    </main>
+    <script>
+      const buttons = [...document.querySelectorAll('[data-view]')];
+      const exec = document.querySelector('.exec');
+      const ops = document.querySelector('.ops');
+      buttons.forEach((button) => button.addEventListener('click', () => {
+        const isOps = button.dataset.view === 'ops';
+        buttons.forEach((item) => item.setAttribute('aria-selected', String(item === button)));
+        exec.classList.toggle('hidden', isOps);
+        ops.classList.toggle('active', isOps);
+      }));
+    </script>
+  </body>
+</html>
