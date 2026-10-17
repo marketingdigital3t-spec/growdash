@@ -9668,28 +9668,102 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
   .brand-shell .brand-topbar [aria-label^="Progresso da meta"] + div { transition: none !important; }
 }
 
-/* Tráfego Pago: keep every area in one horizontal strip.  The strip itself
-   may scroll on narrow screens, but the labels never wrap into a second row
-   or stretch into uneven cards. */
-[data-traffic-nav] {
-  display: flex !important;
-  flex-wrap: nowrap !important;
+/* Tráfego Pago: the campaign workspace stays wide like Ads Manager. The
+   secondary areas live in a compact right rail and never steal table width. */
+.traffic-page-shell { --traffic-nav-width: 3.25rem; }
+.traffic-page-shell:has([data-traffic-nav][data-expanded="true"]) { --traffic-nav-width: 11.25rem; }
+.traffic-nav-rail {
+  position: fixed;
+  z-index: 30;
+  top: 5.25rem;
+  right: .75rem;
+  display: flex;
+  width: var(--traffic-nav-width);
+  max-height: calc(100vh - 6rem);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: .9rem;
+  background: hsl(var(--card) / .96);
+  box-shadow: 0 14px 32px -22px hsl(var(--foreground) / .65);
+  backdrop-filter: blur(14px);
+  transition: width .2s ease, box-shadow .2s ease;
+}
+.traffic-nav-rail-header {
+  display: flex;
+  min-height: 2.7rem;
   align-items: center;
-  overflow-x: auto;
-  overflow-y: hidden;
+  justify-content: space-between;
+  gap: .5rem;
+  border-bottom: 1px solid hsl(var(--border) / .75);
+  padding: .45rem .4rem .45rem .7rem;
+}
+.traffic-nav-rail-title {
+  overflow: hidden;
+  color: hsl(var(--muted-foreground));
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
   white-space: nowrap;
-  scrollbar-width: thin;
-  gap: .5rem !important;
 }
-[data-traffic-nav] > button {
-  min-width: max-content !important;
-  width: auto;
-  flex: 0 0 auto !important;
-  min-height: 2.75rem !important;
-  padding-inline: .65rem !important;
-  line-height: 1.15;
+.traffic-nav-toggle {
+  display: grid;
+  height: 1.85rem;
+  width: 1.85rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: .5rem;
+  color: hsl(var(--muted-foreground));
+  transition: background .15s ease, color .15s ease;
 }
-[data-traffic-nav] > button > span { min-width: 0; }
+.traffic-nav-toggle:hover,
+.traffic-nav-toggle:focus-visible { background: hsl(var(--muted) / .7); color: hsl(var(--foreground)); }
+.traffic-nav-items { display: grid; gap: .25rem; overflow-y: auto; padding: .45rem; scrollbar-width: thin; }
+.traffic-nav-item {
+  display: flex;
+  min-height: 2.55rem;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: .65rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: .62rem;
+  padding: .5rem .6rem;
+  color: hsl(var(--muted-foreground));
+  font-size: .68rem;
+  font-weight: 800;
+  text-align: left;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.traffic-nav-item:hover { background: hsl(var(--muted) / .65); color: hsl(var(--foreground)); }
+.traffic-nav-item.traffic-area-tab-active { border-color: hsl(var(--primary) / .45); background: hsl(var(--primary) / .12); color: hsl(var(--foreground)); box-shadow: 0 5px 14px -12px hsl(var(--primary)); }
+.traffic-nav-item > svg { color: hsl(var(--muted-foreground)); }
+.traffic-nav-item.traffic-area-tab-active > svg { color: hsl(var(--primary)); }
+.traffic-nav-label { overflow: hidden; text-overflow: ellipsis; opacity: 0; width: 0; transition: opacity .15s ease, width .2s ease; }
+.traffic-nav-rail[data-expanded="true"] .traffic-nav-label { width: auto; opacity: 1; }
+.traffic-nav-rail[data-expanded="false"] .traffic-nav-item { justify-content: center; padding-inline: .4rem; }
+.traffic-nav-rail[data-expanded="false"] .traffic-nav-rail-title { width: 0; opacity: 0; }
+.traffic-page-content { min-width: 0; }
+
+@media (max-width: 767px) {
+  .traffic-page-shell { padding: .75rem !important; }
+  .traffic-nav-rail { position: sticky; top: .5rem; right: auto; width: 100%; max-height: none; }
+  .traffic-nav-rail[data-expanded="false"] { width: 100%; }
+  .traffic-nav-rail-header { display: none; }
+  .traffic-nav-items { display: flex; overflow-x: auto; overflow-y: hidden; padding: .4rem; }
+  .traffic-nav-item, .traffic-nav-rail[data-expanded="false"] .traffic-nav-item { width: auto; flex: 0 0 auto; justify-content: center; padding-inline: .7rem; }
+  .traffic-nav-label, .traffic-nav-rail[data-expanded="true"] .traffic-nav-label { width: auto; opacity: 1; }
+  .traffic-nav-item > svg { display: none; }
+  .traffic-page-shell { display: flex; flex-direction: column; gap: .75rem; }
+  .traffic-page-content { order: 2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .traffic-nav-rail, .traffic-nav-label, .traffic-nav-item, .traffic-nav-toggle { transition: none; }
+}
 
 /* One alignment rhythm for the campaign manager.  Header, scope controls,
    hierarchy tabs and action controls share the same horizontal inset. */

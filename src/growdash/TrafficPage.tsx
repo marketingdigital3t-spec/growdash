@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
-  BarChart3, Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, CreditCard,
+  BarChart3, Bot, CalendarRange, Check, ChevronLeft, ChevronRight, CircleAlert, Copy, CreditCard,
   CircleDollarSign, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
   Network, RefreshCw, Settings2, Smartphone, Sparkles, Target, UsersRound, Video, GitCompareArrows,
   WalletCards, Wrench, Zap, Tag,
@@ -61,6 +61,7 @@ const funnelPreviewImages: Record<string, string> = {
 
 export default function TrafficPage() {
   const [params, setParams] = useSearchParams();
+  const [trafficNavExpanded, setTrafficNavExpanded] = useState(false);
   const { toast } = useToast();
   const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
   const campaignAnalysisMode = activeTab === "campaigns" && ["alerts", "intelligence"].includes(params.get("analise") || "");
@@ -74,34 +75,53 @@ export default function TrafficPage() {
 
   return (
     <div className={cn(
-      "gd-module-shell mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px]",
+      "traffic-page-shell gd-module-shell relative mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px] transition-[padding] duration-200",
+      trafficNavExpanded ? "md:pr-[190px]" : "md:pr-[66px]",
       activeTab === "campaigns"
         ? campaignAnalysisMode
           ? "space-y-3"
           : "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
-        : "space-y-3",
+      : "space-y-3",
     )}>
-      <nav data-traffic-nav className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-sm backdrop-blur" aria-label="Áreas de Tráfego Pago">
-        {tabs.map(({ id, label, icon: Icon }) => <button key={id} title={label} aria-label={label} aria-current={activeTab === id ? "page" : undefined} onClick={() => setParams({ aba: id })} className={cn("inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-3 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70 sm:flex-none", activeTab === id ? "traffic-area-tab-active border border-primary/60 bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground")}><Icon className="h-4 w-4 shrink-0" /><span className="truncate">{label}</span></button>)}
-      </nav>
+      <aside data-traffic-nav data-expanded={trafficNavExpanded ? "true" : "false"} className="traffic-nav-rail" aria-label="Áreas de Tráfego Pago">
+        <div className="traffic-nav-rail-header">
+          <span className="traffic-nav-rail-title">Áreas</span>
+          <button
+            type="button"
+            data-traffic-nav-toggle
+            aria-expanded={trafficNavExpanded}
+            aria-label={trafficNavExpanded ? "Recolher áreas de Tráfego Pago" : "Expandir áreas de Tráfego Pago"}
+            title={trafficNavExpanded ? "Recolher navegação" : "Expandir navegação"}
+            onClick={() => setTrafficNavExpanded((expanded) => !expanded)}
+            className="traffic-nav-toggle"
+          >
+            {trafficNavExpanded ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
+        <div className="traffic-nav-items" role="tablist" aria-label="Áreas da operação de tráfego">
+          {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" role="tab" title={label} aria-label={label} aria-selected={activeTab === id} aria-current={activeTab === id ? "page" : undefined} onClick={() => setParams({ aba: id })} className={cn("traffic-nav-item", activeTab === id ? "traffic-area-tab-active" : "")}><Icon className="h-4 w-4 shrink-0" /><span className="traffic-nav-label">{label}</span></button>)}
+        </div>
+      </aside>
 
-      {activeTab === "campaigns" && <CampaignsManager />}
-      {activeTab === "comparison" && <TrafficComparison />}
-      {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
-      {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, attribution_window: item.attribution_window }))} />}
-      {activeTab === "funnels" && <TrafficFunnels />}
-      {activeTab === "audiences" && <AudienceNamingStandardizer />}
-      {activeTab === "tools" && <MetaToolsWorkspace
-        accountId={account?.id}
-        providerAccountId={account?.account_id}
-        accountName={account?.name}
-        selectedAccountIds={selectedForDisplay}
-        accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, remaining_balance: item.remaining_balance, connection_status: item.connection_status, last_sync_success_at: item.last_sync_success_at, oauth_permissions: item.oauth_permissions }))}
-        startDate={startDate}
-        endDate={endDate}
-        onCampaigns={() => setParams({ aba: "campaigns" })}
-        onMissingAccount={() => toast({ title: "Selecione uma conta Meta", description: "Escolha uma conta específica acima para abrir a ferramenta no contexto correto." })}
-      />}
+      <div className="traffic-page-content min-w-0">
+        {activeTab === "campaigns" && <CampaignsManager />}
+        {activeTab === "comparison" && <TrafficComparison />}
+        {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
+        {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, attribution_window: item.attribution_window }))} />}
+        {activeTab === "funnels" && <TrafficFunnels />}
+        {activeTab === "audiences" && <AudienceNamingStandardizer />}
+        {activeTab === "tools" && <MetaToolsWorkspace
+          accountId={account?.id}
+          providerAccountId={account?.account_id}
+          accountName={account?.name}
+          selectedAccountIds={selectedForDisplay}
+          accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, remaining_balance: item.remaining_balance, connection_status: item.connection_status, last_sync_success_at: item.last_sync_success_at, oauth_permissions: item.oauth_permissions }))}
+          startDate={startDate}
+          endDate={endDate}
+          onCampaigns={() => setParams({ aba: "campaigns" })}
+          onMissingAccount={() => toast({ title: "Selecione uma conta Meta", description: "Escolha uma conta específica acima para abrir a ferramenta no contexto correto." })}
+        />}
+      </div>
     </div>
   );
 }
