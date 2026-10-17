@@ -81,15 +81,15 @@ function ParticipantRows({
             type="button"
             key={`${type}-${index}`}
             onClick={onSelect}
-            className="grid w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1 rounded-md border border-border/60 bg-background/30 px-1.5 py-1.5 text-left text-[11px] transition-colors hover:border-primary/60 hover:bg-primary/[.06]"
+            className="grid w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-1 rounded-md border border-slate-300/80 bg-background/30 px-1.5 py-1.5 text-left text-[11px] transition-colors hover:border-primary/60 hover:bg-primary/[.06] dark:border-slate-500/80"
           >
             <span className="text-muted-foreground">{index + 1}</span>
-            <span className="min-w-0 break-words leading-tight">
-              <span className={row ? "font-semibold" : "text-muted-foreground"}>
+            <span className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap leading-tight">
+              <span className={row ? "min-w-0 truncate font-semibold" : "min-w-0 truncate text-muted-foreground"}>
                 {row?.name || "Vaga disponível"}
               </span>
               {row?.seller_name && (
-                <span className="ml-1 text-[9px] text-muted-foreground">· {row.seller_name}</span>
+                <span className="min-w-0 max-w-[42%] truncate text-[9px] text-muted-foreground">· {row.seller_name}</span>
               )}
             </span>
             <span
