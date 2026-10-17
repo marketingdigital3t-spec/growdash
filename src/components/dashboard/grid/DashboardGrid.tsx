@@ -177,7 +177,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
     return defaultWidget
       ? anchorDefaultBlockAfterPreviousWidgets(alignCanonicalDefaultBlock(compacted, defaultWidget.id), defaultWidget.id)
       : compacted;
-  }, [layout, visibleWidgets]);
+  }, [analyticsOpen, isEditing, layout, visibleWidgets]);
 
   const responsiveLayouts = useMemo(() => {
     const widgetIds = new Set(visibleWidgets.map((widget) => widget.id));
