@@ -10236,11 +10236,9 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   background: transparent !important;
 }
 
-/* Dashboard desktop composition: the page keeps its own scroll surface so the
-   browser document does not grow past the viewport. The scrollbar is hidden
-   visually, but scrolling remains available with the wheel, trackpad and
-   keyboard. This is scoped to Dashboard only; other modules keep their normal
-   scroll behavior. */
+/* Dashboard composition: keep the authenticated canvas fixed in the viewport.
+   The Dashboard is intentionally a non-scrolling surface; its cards reflow
+   inside the available width while the other modules keep normal scrolling. */
 @media (min-width: 768px) {
   .brand-shell:has(.dashboard-page) .growdash-app-shell,
   .brand-shell:has(.dashboard-page) .growdash-content-shell {
@@ -10255,7 +10253,7 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   .brand-shell:has(.dashboard-page) .growdash-main {
     height: calc(100svh - 48px);
     max-height: calc(100svh - 48px);
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     overflow-x: hidden !important;
     overscroll-behavior: none;
     scrollbar-width: none;
@@ -10295,5 +10293,10 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
   .brand-shell .dashboard-grid-container .gd-platform-tabs {
     margin-top: 0 !important;
+  }
+
+  /* Keep the seven headline KPIs visually separated at desktop widths. */
+  .brand-shell .dashboard-page .dashboard-glass-metrics {
+    gap: 14px !important;
   }
 }
