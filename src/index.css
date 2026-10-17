@@ -10619,6 +10619,21 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
     margin-left: auto !important;
   }
 
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-tabs-header {
+    height: 50px !important;
+    max-height: 50px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-tabs-header [role="tablist"] {
+    width: max-content !important;
+    min-width: max-content !important;
+    flex: 0 0 auto !important;
+  }
+
   .campaigns-workspace[data-scroll-mode="locked"] .campaign-actions-toolbar {
     min-height: 56px !important;
     height: 56px !important;
