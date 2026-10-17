@@ -13,6 +13,7 @@ import {
   buildResponsiveDashboardLayout,
   findDashboardSlot,
   normalizeDesktopDashboardLayout,
+  packDashboardLayout,
   type DashboardGridItem,
 } from "@/lib/responsiveDashboardLayout";
 import { DashboardWidgetConfigDialog } from "./DashboardWidgetConfigDialog";
@@ -164,10 +165,13 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
 
   const desktopLayout = useMemo(() => {
     const normalized = normalizeDesktopDashboardLayout(layout, visibleWidgets, 12);
+    const compacted = !isEditing && !analyticsOpen
+      ? packDashboardLayout(normalized, 12)
+      : normalized;
     const defaultWidget = visibleWidgets.find((widget) => widget.type === "default_block");
     return defaultWidget
-      ? anchorDefaultBlockAfterPreviousWidgets(alignCanonicalDefaultBlock(normalized, defaultWidget.id), defaultWidget.id)
-      : normalized;
+      ? anchorDefaultBlockAfterPreviousWidgets(alignCanonicalDefaultBlock(compacted, defaultWidget.id), defaultWidget.id)
+      : compacted;
   }, [layout, visibleWidgets]);
 
   const responsiveLayouts = useMemo(() => {
