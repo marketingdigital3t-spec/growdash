@@ -10560,7 +10560,7 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
 }
 
 @media (min-width: 768px) {
-  .traffic-page-shell {
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode]) .traffic-page-shell {
     padding: 24px calc(24px + var(--traffic-nav-width) + 16px) 24px 24px !important;
   }
 
@@ -10570,7 +10570,7 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
 }
 
 @media (max-width: 767px) {
-  .traffic-page-shell,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode]) .traffic-page-shell,
   .traffic-page-shell[data-scroll-mode="locked"],
   .traffic-page-shell[data-scroll-mode="content"] {
     padding: 12px 12px calc(12px + 5rem + env(safe-area-inset-bottom)) !important;
