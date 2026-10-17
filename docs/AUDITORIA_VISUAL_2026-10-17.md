@@ -26,9 +26,9 @@ de Campanhas também foi verificada no modo `analise=intelligence`.
 
 - O Dashboard deixou de montar `SpacePhaseBackground`; o canvas voltou ao
   fundo preto sólido.
-- O `main` do Dashboard agora usa `overflow-y: auto` somente nessa rota, com
-  scrollbar visual oculto, permitindo alcançar todos os blocos sem scroll
-  horizontal ou corte.
+- O Dashboard removeu as alturas mínimas artificiais do frame e mantém o
+  `main` travado sem scroll externo; os blocos atualmente renderizados cabem
+  na viewport sem corte.
 - Gaps do resumo, KPIs, blocos financeiros e painéis analíticos foram
   normalizados para `16px`; o espaçamento entre seções permanece `16px` no
   canvas atual.

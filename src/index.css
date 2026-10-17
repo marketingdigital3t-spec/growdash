@@ -10334,14 +10334,12 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   gap: var(--dashboard-card-gap) !important;
 }
 
-/* Dashboard visual baseline: keep the canvas monochrome and allow the
-   complete metric stack to be reached inside the application frame. The
-   previous fixed hidden overflow left the lower widgets outside the viewport.
-   The scrollbar remains visually quiet while keyboard/wheel scrolling still
-   works inside the Dashboard only. */
+/* Dashboard visual baseline: keep the canvas monochrome and remove the
+   artificial viewport-height floor that previously created a phantom scroll
+   area below the final KPI row. */
 @media (min-width: 768px) {
   .brand-shell:has(.dashboard-page) .growdash-main {
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     overflow-x: hidden !important;
     scrollbar-width: none;
     background: #080808 !important;
@@ -10353,8 +10351,13 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page {
+  min-height: 0 !important;
   background: #080808 !important;
   background-image: none !important;
+}
+
+.brand-shell:has(.dashboard-page) .growdash-content-frame {
+  min-height: 0 !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page > * + * {
