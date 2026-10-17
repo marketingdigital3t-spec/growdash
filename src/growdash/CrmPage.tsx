@@ -695,6 +695,34 @@ export default function CrmPage() {
     }
   }
 
+  async function updateRDContact(deal: RDDealLite, fields: Record<string, unknown>) {
+    if (!rdIntegration?.write_enabled) {
+      toast.error("Habilite a escrita governada no card de integração do RD Station.");
+      return;
+    }
+    const connectionId = deal.rd_connection_id || connectedFunnels.find((funnel) => funnel.id === deal.rd_funnel_id)?.rd_connection_id;
+    if (!connectionId) {
+      toast.error("Esta negociação não tem uma conexão RD identificada.");
+      return;
+    }
+    try {
+      const operation = deal.contact_email || deal.contact_name ? "update" : "create";
+      const { data, error } = await supabase.functions.invoke("rd-contact-write", {
+        body: { operation, rd_connection_id: connectionId, rd_deal_id: deal.rd_deal_id, fields, correlation_id: crypto.randomUUID() },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
+      ]);
+      setSelectedDeal(null);
+      toast.success(data?.noop ? "O contato já estava vinculado à negociação." : "Contato atualizado no RD Station.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o contato no RD Station.");
+    }
+  }
+
   return (
     <div className="crm-page gd-module-shell mx-auto max-w-[1700px] space-y-5">
       <PageHeading
@@ -844,7 +872,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onUpdate={(deal, fields) => void updateRDDeal(deal, fields)} canWrite={rdIntegration?.write_enabled === true} />
+      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onUpdate={(deal, fields) => void updateRDDeal(deal, fields)} onContactUpdate={(deal, fields) => void updateRDContact(deal, fields)} canWrite={rdIntegration?.write_enabled === true} />
     </div>
   );
 }
@@ -966,9 +994,17 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose, onUpdate, canWrite }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; canWrite: boolean }) {
+function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose, onUpdate, onContactUpdate, canWrite }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; onContactUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; canWrite: boolean }) {
   const [winValue, setWinValue] = useState("false");
-  useEffect(() => { if (deal) setWinValue(deal.win ? "true" : "false"); }, [deal]);
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  useEffect(() => {
+    if (deal) {
+      setWinValue(deal.win ? "true" : "false");
+      setContactName(deal.contact_name || "");
+      setContactEmail(deal.contact_email || "");
+    }
+  }, [deal]);
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
   return (
@@ -990,6 +1026,15 @@ function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onCl
             <Button type="button" disabled={!canWrite || winValue === (deal.win ? "true" : "false")} onClick={() => onUpdate(deal, { win: winValue === "true" })}>{canWrite ? "Salvar no RD" : "Ativar escrita no RD"}</Button>
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">A alteração é validada no backend, auditada antes da chamada e sincronizada de volta ao espelho.</p>
+        </div>
+        <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+          <h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Contato vinculado no RD</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-xs font-bold"><span>Nome</span><Input value={contactName} onChange={(event) => setContactName(event.target.value)} disabled={!canWrite} /></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>E-mail</span><Input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} disabled={!canWrite} /></label>
+          </div>
+          <Button type="button" className="mt-3" variant="outline" disabled={!canWrite || (!contactName.trim() && !contactEmail.trim())} onClick={() => onContactUpdate(deal, { name: contactName.trim(), emails: contactEmail.trim() ? [{ email: contactEmail.trim() }] : [] })}>{deal.contact_name || deal.contact_email ? "Salvar contato no RD" : "Criar contato no RD"}</Button>
+          <p className="mt-2 text-[10px] text-muted-foreground">O backend deduplica por e-mail/telefone e preserva o vínculo com esta negociação.</p>
         </div>
         <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
           <DetailRow icon={<Columns3 />} label="Funil" value={funnelName || "Funil RD"} />
