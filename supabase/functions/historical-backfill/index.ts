@@ -130,10 +130,23 @@ Deno.serve(async (req) => {
     runSummary = requestedRun.summary || {};
   } else {
     if (activeRun) return new Response(JSON.stringify({ ok: false, status: "already_running", run_id: activeRun.id, message: "Já existe um backfill histórico em andamento." }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    const started = new Date().toISOString();
-    const { data: createdRun, error: runError } = await admin.from("sync_backfill_runs").insert({ user_id: userId, status: "running", started_at: started }).select("id,user_id,status,summary,started_at").single();
-    if (runError || !createdRun) return new Response(JSON.stringify({ error: runError?.message || "Não foi possível criar a execução" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    run = createdRun;
+    const resumableRun = staleRuns[0];
+    if (resumableRun) {
+      const { data: resumedRun, error: resumeError } = await admin
+        .from("sync_backfill_runs")
+        .update({ status: "running", finished_at: null, error_message: null })
+        .eq("id", resumableRun.id)
+        .select("id,user_id,status,summary,started_at")
+        .single();
+      if (resumeError || !resumedRun) return new Response(JSON.stringify({ error: resumeError?.message || "Não foi possível retomar a execução" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      run = resumedRun;
+      runSummary = resumedRun.summary || {};
+    } else {
+      const started = new Date().toISOString();
+      const { data: createdRun, error: runError } = await admin.from("sync_backfill_runs").insert({ user_id: userId, status: "running", started_at: started }).select("id,user_id,status,summary,started_at").single();
+      if (runError || !createdRun) return new Response(JSON.stringify({ error: runError?.message || "Não foi possível criar a execução" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      run = createdRun;
+    }
   }
 
   const items: Array<Record<string, unknown>> = [];
