@@ -26,6 +26,24 @@ describe("Growdash sidebar navigation", () => {
     expect(labels.indexOf("Business")).toBeGreaterThan(labels.indexOf("Análise de Funis"));
   });
 
+  it("keeps sidebar section labels tied to their section instead of filtered position", () => {
+    expect(NAV_SECTIONS.map((section) => section.sidebarLabel)).toEqual([
+      "MISSÃO",
+      "NAVE",
+      "TRIPULAÇÃO",
+      "GESTÃO",
+      "ADMINISTRAÇÃO",
+    ]);
+
+    const visibleSections = NAV_SECTIONS.filter((section) => section.label !== "Visão geral");
+    expect(visibleSections.map((section) => section.sidebarLabel)).toEqual([
+      "NAVE",
+      "TRIPULAÇÃO",
+      "GESTÃO",
+      "ADMINISTRAÇÃO",
+    ]);
+  });
+
   it("resolves content for every sidebar destination", () => {
     for (const module of ALL_MODULES) {
       expect(findModule(module.path)?.label).toBe(module.label);

@@ -39,12 +39,15 @@ export type ModuleConfig = {
 
 export type NavSection = {
   label: string;
+  /** Nome curto exibido no shell da barra lateral. A identidade continua sendo `label`. */
+  sidebarLabel?: string;
   items: ModuleConfig[];
 };
 
 export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Visão geral",
+    sidebarLabel: "MISSÃO",
     items: [
       {
         label: "Dashboard",
@@ -92,6 +95,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Inteligência",
+    sidebarLabel: "NAVE",
     items: [
       {
         label: "Análise de Funis",
@@ -146,6 +150,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Operação",
+    sidebarLabel: "TRIPULAÇÃO",
     items: [
       {
         label: "Agenda & Turmas",
@@ -214,6 +219,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Gestão",
+    sidebarLabel: "GESTÃO",
     items: [
       {
         label: "Financeiro",
@@ -274,6 +280,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     label: "Administração",
+    sidebarLabel: "ADMINISTRAÇÃO",
     items: [
       {
         label: "Integrações",

@@ -332,20 +332,24 @@ export default function GrowdashLayout() {
           </div>
         ) : <><TooltipProvider delayDuration={180}>
         <nav className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
-          {visibleSections.map((section, sectionIndex) => (
+          {visibleSections.map((section) => {
+            const isOpen = openSections[section.label] ?? true;
+            const sectionContentId = `sidebar-section-${section.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+            return (
             <section key={section.label} className="mb-4">
               {showSidebarLabels && (
                 <button
                   type="button"
                   onClick={() => setOpenSections((current) => ({ ...current, [section.label]: !current[section.label] }))}
                   className="mb-2 flex w-full items-center justify-between rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-[.12em] text-white/45 transition hover:bg-white/[.05] hover:text-white/70"
-                  aria-expanded={openSections[section.label]}
+                  aria-expanded={isOpen}
+                  aria-controls={sectionContentId}
                 >
-                  <span>{["MISSÃO", "NAVE", "TRIPULAÇÃO", "GESTÃO"][sectionIndex] || section.label}</span>
-                  <ChevronDown className={cn("h-3 w-3 transition-transform", !openSections[section.label] && "-rotate-90")} />
+                  <span>{section.sidebarLabel || section.label}</span>
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", !isOpen && "-rotate-90")} />
                 </button>
               )}
-              <div className={cn("space-y-0.5", showSidebarLabels && !openSections[section.label] && "hidden")}>
+              <div id={sectionContentId} hidden={showSidebarLabels && !isOpen} className="space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const [itemPathname, itemSearch = ""] = item.path.split("?");
@@ -389,7 +393,8 @@ export default function GrowdashLayout() {
                 })}
               </div>
             </section>
-          ))}
+            );
+          })}
         </nav>
         </TooltipProvider>
 
