@@ -7871,6 +7871,15 @@ html:not(.dark) .brand-shell .growdash-main :is(input, select, textarea, [role="
   max-width: none !important;
 }
 
+/* The Dashboard sits over the phase scene. The shared analytics wrapper has
+   a legacy opaque black fill, which creates a solid band beneath the KPI
+   strip and hides the Earth artwork. Keep that wrapper transparent only when
+   it contains the Dashboard; individual widgets retain their own surfaces
+   and contrast tokens. */
+.brand-shell .analytics-module:has(.dashboard-page) {
+  background: transparent !important;
+}
+
 /* Give the executive summary enough presence without changing the desktop
    grid or creating an enclosing surface again. */
 .brand-shell .dashboard-summary-strip .gd-glass-metric {
