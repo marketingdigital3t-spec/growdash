@@ -4,7 +4,7 @@ import RGL, { Responsive } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { WidgetRenderer } from "./WidgetRenderer";
-import { Settings2, X } from "lucide-react";
+import { BarChart3, ChevronDown, Settings2, X } from "lucide-react";
 import type { DashboardView } from "@/hooks/useDashboardViews";
 import { getWidgetDef } from "@/lib/widgetCatalog";
 import type { Sale } from "@/hooks/useSales";
@@ -23,6 +23,7 @@ const ResponsiveGrid = Responsive;
 const GRID_ROW_HEIGHT_DESKTOP = 56;
 const GRID_ROW_HEIGHT_COMPACT = 40;
 const GRID_MARGIN_Y = 16;
+const COMPACT_ANALYTIC_WIDGETS = new Set(["payment_chart", "platform_distribution"]);
 
 interface Props {
   view: DashboardView;
@@ -122,6 +123,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const [gridWidth, setGridWidth] = useState(0);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   // The sidebar changes the usable content width without firing window.resize.
   // Measuring this element (rather than the browser viewport) prevents RGL
@@ -149,22 +151,28 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
     () => widgets.filter((widget) => !isEmptyDefaultPlaceholder(widget)),
     [widgets],
   );
+  const visibleWidgets = useMemo(
+    () => !isEditing && !analyticsOpen
+      ? renderedWidgets.filter((widget) => !COMPACT_ANALYTIC_WIDGETS.has(widget.id))
+      : renderedWidgets,
+    [analyticsOpen, isEditing, renderedWidgets],
+  );
 
   const handleAutoHeight = useCallback((widgetId: string, rows: number) => {
     setAutoHeightRows((current) => current[widgetId] === rows ? current : { ...current, [widgetId]: rows });
   }, []);
 
   const desktopLayout = useMemo(() => {
-    const normalized = normalizeDesktopDashboardLayout(layout, renderedWidgets, 12);
-    const defaultWidget = renderedWidgets.find((widget) => widget.type === "default_block");
+    const normalized = normalizeDesktopDashboardLayout(layout, visibleWidgets, 12);
+    const defaultWidget = visibleWidgets.find((widget) => widget.type === "default_block");
     return defaultWidget
       ? anchorDefaultBlockAfterPreviousWidgets(alignCanonicalDefaultBlock(normalized, defaultWidget.id), defaultWidget.id)
       : normalized;
-  }, [layout, renderedWidgets]);
+  }, [layout, visibleWidgets]);
 
   const responsiveLayouts = useMemo(() => {
-    const widgetIds = new Set(renderedWidgets.map((widget) => widget.id));
-    const defaultIds = new Set(renderedWidgets.filter((widget) => widget.type === "default_block").map((widget) => widget.id));
+    const widgetIds = new Set(visibleWidgets.map((widget) => widget.id));
+    const defaultIds = new Set(visibleWidgets.filter((widget) => widget.type === "default_block").map((widget) => widget.id));
     const applyAutoHeight = (items: DashboardGridItem[]) => items.map((item) => ({
       ...item,
       ...(!isEditing && autoHeightRows[item.i] ? { h: autoHeightRows[item.i] } : {}),
@@ -178,9 +186,9 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
       md: appendSystemTail(md, 8, widgetIds, autoHeightRows, isEditing),
       sm: appendSystemTail(sm, 4, widgetIds, autoHeightRows, isEditing),
     };
-  }, [autoHeightRows, desktopLayout, isEditing, renderedWidgets]);
+  }, [autoHeightRows, desktopLayout, isEditing, visibleWidgets]);
 
-  const fullWidgets = useMemo(() => [...renderedWidgets, ...SYSTEM_TAIL], [renderedWidgets]);
+  const fullWidgets = useMemo(() => [...visibleWidgets, ...SYSTEM_TAIL], [visibleWidgets]);
 
   function layoutsEqual(a: any[], b: any[]) {
     if (a.length !== b.length) return false;
@@ -233,6 +241,11 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
 
   return (
     <div ref={gridContainerRef} className="dashboard-grid-container relative min-w-0 max-w-full overflow-x-clip">
+      {!isEditing && <button type="button" className="dashboard-analytics-toggle" onClick={() => setAnalyticsOpen((open) => !open)} aria-expanded={analyticsOpen}>
+        <BarChart3 className="h-4 w-4" aria-hidden="true" />
+        <span>{analyticsOpen ? "Ocultar análises financeiras" : "Ver análises financeiras"}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${analyticsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>}
       {gridWidth > 0 && <ResponsiveGrid
         width={gridWidth}
         className={isEditing ? "layout dashboard-layout-editing" : "layout"}

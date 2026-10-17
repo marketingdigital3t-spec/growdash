@@ -10342,6 +10342,28 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   height: 144px !important;
 }
 
+.brand-shell:has(.dashboard-page) .dashboard-analytics-toggle {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0 16px;
+  border: 1px solid var(--gd-content-border);
+  border-radius: 10px;
+  background: var(--gd-content-panel);
+  color: var(--gd-content-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-analytics-toggle:hover,
+.brand-shell:has(.dashboard-page) .dashboard-analytics-toggle:focus-visible {
+  border-color: var(--gd-content-text);
+  outline: 2px solid color-mix(in srgb, var(--gd-content-text) 30%, transparent);
+  outline-offset: 2px;
+}
+
 .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card-header,
 .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-card-header {
   padding: 12px 12px 8px !important;
