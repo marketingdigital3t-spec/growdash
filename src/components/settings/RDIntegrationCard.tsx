@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link2, CheckCircle2, AlertCircle, Trash2, Unplug } from "lucide-react";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
+import { Switch } from "@/components/ui/switch";
 
 export function RDIntegrationCard() {
   const { toast } = useToast();
@@ -18,6 +19,30 @@ export function RDIntegrationCard() {
 
   const { data: integration, isError: integrationLoadFailed, error: integrationLoadError, refetch: refetchIntegration } = useRDIntegration();
   const isConnected = !!integration?.is_active;
+  const writeEnabled = integration?.write_enabled === true;
+
+  const toggleWrite = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!integration?.id) throw new Error("Conexão RD não encontrada.");
+      const { data, error } = await supabase.functions.invoke("rd-write-settings", {
+        body: { rd_connection_id: integration.id, write_enabled: enabled },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data?.connection?.write_enabled ? "Escrita no RD habilitada" : "Escrita no RD desabilitada",
+        description: data?.connection?.write_enabled
+          ? "A Growdash poderá alterar somente ações governadas e auditadas."
+          : "A Growdash voltou ao modo somente leitura.",
+      });
+      qc.invalidateQueries({ queryKey: ["integration"] });
+      qc.invalidateQueries({ queryKey: ["rd_account_connections"] });
+    },
+    onError: (e: Error) => toast({ title: "Não foi possível alterar a permissão de escrita", description: e.message, variant: "destructive" }),
+  });
 
   const save = useMutation({
     mutationFn: async () => {
@@ -159,6 +184,23 @@ export function RDIntegrationCard() {
             </>
           )}
         </div>
+        {isConnected && integration?.id && (
+          <div className="flex items-start justify-between gap-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+            <div className="space-y-1">
+              <Label htmlFor="rd-write-enabled">Permitir que a Growdash altere dados no RD</Label>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Desativado por padrão. Quando habilitado, futuras ações de etapa, negócio ou contato exigirão permissão, auditoria e idempotência.
+              </p>
+            </div>
+            <Switch
+              id="rd-write-enabled"
+              checked={writeEnabled}
+              onCheckedChange={(checked) => toggleWrite.mutate(checked)}
+              disabled={toggleWrite.isPending || disconnect.isPending || remove.isPending}
+              aria-label="Permitir que a Growdash altere dados no RD"
+            />
+          </div>
+        )}
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Desconectar revoga o uso do token. Excluir elimina a credencial da Growdash e preserva os negócios já sincronizados para auditoria.
         </p>

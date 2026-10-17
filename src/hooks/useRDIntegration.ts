@@ -11,7 +11,7 @@ export function useRDIntegration() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("rd_account_connections")
-        .select("id, status, created_at, updated_at, last_success_at, last_error")
+        .select("id, status, write_enabled, created_at, updated_at, last_success_at, last_error")
         .eq("user_id", user!.id)
         .order("updated_at", { ascending: false })
         .limit(1)

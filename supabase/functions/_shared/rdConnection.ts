@@ -9,6 +9,7 @@ export type RDConnection = {
   external_account_id: string | null;
   account_name: string;
   api_token: string | null;
+  write_enabled: boolean;
   status: "pending" | "connected" | "blocked" | "partial" | "failed";
   permissions: unknown;
 };
@@ -35,7 +36,7 @@ export async function resolveRDConnection(
 
   let query = admin
     .from("rd_account_connections")
-    .select("id,user_id,workspace_id,external_account_id,account_name,api_token,status,permissions")
+    .select("id,user_id,workspace_id,external_account_id,account_name,api_token,status,permissions,write_enabled")
     .eq("id", connectionId);
   if (userId) query = query.eq("user_id", userId);
   const { data, error } = await query.maybeSingle();
@@ -48,7 +49,7 @@ export async function resolveRDConnection(
 export async function listAuthorizedRDConnections(admin: AdminClient, userIds?: string[]) {
   let query = admin
     .from("rd_account_connections")
-    .select("id,user_id,workspace_id,external_account_id,account_name,api_token,status,permissions")
+    .select("id,user_id,workspace_id,external_account_id,account_name,api_token,status,permissions,write_enabled")
     .eq("status", "connected")
     .not("api_token", "is", null);
   if (userIds?.length) query = query.in("user_id", userIds);

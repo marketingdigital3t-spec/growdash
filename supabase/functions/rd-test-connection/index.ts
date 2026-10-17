@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
         }
         const { error } = await admin
           .from("rd_account_connections")
-          .update({ api_token: null, status: "blocked", last_error: "Desconectado manualmente", updated_at: new Date().toISOString() })
+          .update({ api_token: null, status: "blocked", write_enabled: false, last_error: "Desconectado manualmente", updated_at: new Date().toISOString() })
           .eq("id", existing.id);
         if (error) throw error;
       }
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     if (!response || (!response.ok && !rateLimited)) {
       const status = response?.status ?? 502;
       if (existing?.id && (status === 401 || status === 403)) {
-        await admin.from("rd_account_connections").update({ status: "blocked", last_error: `RD API HTTP ${status}`, last_attempt_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", existing.id);
+        await admin.from("rd_account_connections").update({ status: "blocked", write_enabled: false, last_error: `RD API HTTP ${status}`, last_attempt_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", existing.id);
       }
       return json({
         error: `Token inválido ou sem permissão no RD Station (HTTP ${status}).`,

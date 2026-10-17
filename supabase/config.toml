@@ -24,6 +24,9 @@ verify_jwt = true
 [functions.rd-test-connection]
 verify_jwt = true
 
+[functions.rd-write-settings]
+verify_jwt = true
+
 [functions.delete-integration-account]
 verify_jwt = true
 

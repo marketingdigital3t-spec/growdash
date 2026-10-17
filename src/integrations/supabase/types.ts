@@ -4022,6 +4022,8 @@ export type Database = {
           user_id: string
           webhook_secret: string | null
           workspace_id: string | null
+          write_enabled: boolean
+          write_updated_at: string | null
         }
         Insert: {
           account_name: string
@@ -4038,6 +4040,8 @@ export type Database = {
           user_id: string
           webhook_secret?: string | null
           workspace_id?: string | null
+          write_enabled?: boolean
+          write_updated_at?: string | null
         }
         Update: {
           account_name?: string
@@ -4054,6 +4058,8 @@ export type Database = {
           user_id?: string
           webhook_secret?: string | null
           workspace_id?: string | null
+          write_enabled?: boolean
+          write_updated_at?: string | null
         }
         Relationships: [
           {
@@ -4061,6 +4067,59 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rd_write_audit: {
+        Row: {
+          acao: string
+          alvo: Json
+          created_at: string
+          correlation_id: string
+          erro: string | null
+          id: string
+          payload_antes: Json
+          payload_depois: Json
+          rd_connection_id: string
+          status: string
+          updated_at: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          alvo?: Json
+          created_at?: string
+          correlation_id: string
+          erro?: string | null
+          id?: string
+          payload_antes?: Json
+          payload_depois?: Json
+          rd_connection_id: string
+          status?: string
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          alvo?: Json
+          created_at?: string
+          correlation_id?: string
+          erro?: string | null
+          id?: string
+          payload_antes?: Json
+          payload_depois?: Json
+          rd_connection_id?: string
+          status?: string
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rd_write_audit_rd_connection_id_fkey"
+            columns: ["rd_connection_id"]
+            isOneToOne: false
+            referencedRelation: "rd_account_connections"
             referencedColumns: ["id"]
           },
         ]

@@ -14,6 +14,8 @@ export type RDAccountConnection = {
   last_success_at: string | null;
   last_error: string | null;
   permissions: unknown[];
+  write_enabled: boolean;
+  write_updated_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -37,7 +39,7 @@ export function useRDAccountConnections(workspaceId?: string) {
       }
       const { data, error } = await withRequestTimeout(
         (supabase as any).from("rd_account_connections")
-          .select("id,user_id,workspace_id,external_account_id,account_name,status,last_attempt_at,last_success_at,last_error,permissions,created_at,updated_at")
+          .select("id,user_id,workspace_id,external_account_id,account_name,status,last_attempt_at,last_success_at,last_error,permissions,write_enabled,write_updated_at,created_at,updated_at")
           .order("account_name", { ascending: true }),
         12_000,
       );
