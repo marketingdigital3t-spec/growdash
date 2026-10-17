@@ -872,7 +872,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onUpdate={(deal, fields) => void updateRDDeal(deal, fields)} onContactUpdate={(deal, fields) => void updateRDContact(deal, fields)} canWrite={rdIntegration?.write_enabled === true} />
+      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onUpdate={(deal, fields) => void updateRDDeal(deal, fields)} onContactUpdate={(deal, fields) => void updateRDContact(deal, fields)} onActivateWrite={() => { window.location.href = "/integracoes?tab=crm"; }} canWrite={rdIntegration?.write_enabled === true} />
     </div>
   );
 }
@@ -994,7 +994,7 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose, onUpdate, onContactUpdate, canWrite }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; onContactUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; canWrite: boolean }) {
+function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose, onUpdate, onContactUpdate, onActivateWrite, canWrite }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; onContactUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; onActivateWrite: () => void; canWrite: boolean }) {
   const [winValue, setWinValue] = useState("false");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -1023,9 +1023,9 @@ function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onCl
         <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
           <div className="flex flex-wrap items-end gap-3">
             <label className="grid min-w-44 flex-1 gap-1.5 text-xs font-bold"><span>Situação no RD</span><select value={winValue} onChange={(event) => setWinValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Em aberto / não ganha</option><option value="true">Venda ganha</option></select></label>
-            <Button type="button" disabled={!canWrite || winValue === (deal.win ? "true" : "false")} onClick={() => onUpdate(deal, { win: winValue === "true" })}>{canWrite ? "Salvar no RD" : "Ativar escrita no RD"}</Button>
+            <Button type="button" disabled={canWrite ? winValue === (deal.win ? "true" : "false") : false} onClick={canWrite ? () => onUpdate(deal, { win: winValue === "true" }) : onActivateWrite}>{canWrite ? "Salvar no RD" : "Ativar escrita no RD"}</Button>
           </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">A alteração é validada no backend, auditada antes da chamada e sincronizada de volta ao espelho.</p>
+          <p className="mt-2 text-[10px] text-muted-foreground">{canWrite ? "A alteração é validada no backend, auditada antes da chamada e sincronizada de volta ao espelho." : "A escrita está desativada. Abra a configuração do RD para autorizar edições governadas nesta conexão."}</p>
         </div>
         <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
           <h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Contato vinculado no RD</h3>
