@@ -159,6 +159,36 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
     };
   }
 
+  // v19 tightens the canonical financial row so the fixed desktop canvas can
+  // show every card without clipping. Only the standard widgets are reset;
+  // custom widgets remain below the canonical composition.
+  if (currentVersion === 18 && existingDefault) {
+    const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
+    const hasAllCanonicalWidgets = [...canonicalIds].every((id) => widgets.some((widget) => widget.id === id));
+    if (hasAllCanonicalWidgets) {
+      const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
+      const customWidgets = widgets.filter((widget) => !canonicalIds.has(widget.id));
+      const customLayout = layout.filter((item) => !canonicalIds.has(item.i));
+      const firstCustomRow = canonicalLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
+      const safeCustomLayout = customLayout.map((item) => ({
+        ...item,
+        x: 0,
+        y: Math.max(Number(item.y || 0), firstCustomRow),
+        w: Math.min(12, Math.max(2, Number(item.w || 3))),
+      }));
+      return {
+        ...view,
+        widgets: [
+          ...DEFAULT_VIEW.widgets.map((widget) => widget.type === "default_block"
+            ? { ...existingDefault, id: defaultId, config: { ...existingDefault.config, ...defaultWidget.config } }
+            : widgets.find((candidate) => candidate.id === widget.id) || { ...widget, config: { ...widget.config } }),
+          ...customWidgets,
+        ],
+        layout: [...canonicalLayout, ...safeCustomLayout],
+      };
+    }
+  }
+
   if (currentVersion >= DASHBOARD_CANONICAL_LAYOUT_VERSION) {
     if (hasDefaultLayout) return view;
 

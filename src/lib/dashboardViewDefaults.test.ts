@@ -149,7 +149,7 @@ describe("ensureDefaultDashboardContent", () => {
     expect(migrated.layout.find((item) => item.i === "campaign_ctr")).toMatchObject({ x: 9, y: 2, w: 3, h: 2 });
     expect(migrated.layout.find((item) => item.i === "campaign_conversion_rate")).toMatchObject({ x: 9, y: 4, w: 3, h: 2 });
     expect(migrated.layout.find((item) => item.i === "default")).toMatchObject({ x: 0, y: 6, w: 12 });
-    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({ canonicalLayoutVersion: 18 });
+    expect(migrated.widgets.find((widget) => widget.id === "default")?.config).toMatchObject({ canonicalLayoutVersion: DASHBOARD_CANONICAL_LAYOUT_VERSION });
   });
 
   it("migra uma visão v5 sem apagar os ajustes e separa a visão financeira em widgets", () => {
