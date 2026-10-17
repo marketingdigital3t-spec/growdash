@@ -31,17 +31,37 @@ export function RDIntegrationCard() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: (data) => {
+    onMutate: async (enabled) => {
+      await qc.cancelQueries({ queryKey: ["integration", "rd_station_crm"] });
+      const queryKey = ["integration", "rd_station_crm", integration?.id];
+      const previous = qc.getQueryData(queryKey);
+      qc.setQueryData(queryKey, (current: typeof integration) => current ? {
+        ...current,
+        write_enabled: enabled,
+      } : current);
+      return { previous, queryKey };
+    },
+    onSuccess: async (data, _enabled, context) => {
+      const savedConnection = data?.connection;
+      if (savedConnection?.id) {
+        qc.setQueryData(context?.queryKey ?? ["integration", "rd_station_crm", integration?.id], (current: typeof integration) => current ? {
+          ...current,
+          ...savedConnection,
+        } : current);
+      }
       toast({
-        title: data?.connection?.write_enabled ? "Escrita no RD habilitada" : "Escrita no RD desabilitada",
-        description: data?.connection?.write_enabled
+        title: savedConnection?.write_enabled ? "Escrita no RD habilitada" : "Escrita no RD desabilitada",
+        description: savedConnection?.write_enabled
           ? "A Growdash poderá alterar somente ações governadas e auditadas."
           : "A Growdash voltou ao modo somente leitura.",
       });
-      qc.invalidateQueries({ queryKey: ["integration"] });
-      qc.invalidateQueries({ queryKey: ["rd_account_connections"] });
+      await qc.invalidateQueries({ queryKey: ["integration", "rd_station_crm"] });
+      await qc.invalidateQueries({ queryKey: ["rd_account_connections"] });
     },
-    onError: (e: Error) => toast({ title: "Não foi possível alterar a permissão de escrita", description: e.message, variant: "destructive" }),
+    onError: (e: Error, _enabled, context) => {
+      if (context?.queryKey) qc.setQueryData(context.queryKey, context.previous);
+      toast({ title: "Não foi possível alterar a permissão de escrita", description: e.message, variant: "destructive" });
+    },
   });
 
   const save = useMutation({
@@ -189,7 +209,9 @@ export function RDIntegrationCard() {
             <div className="space-y-1">
               <Label htmlFor="rd-write-enabled">Permitir que a Growdash altere dados no RD</Label>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Desativado por padrão. Quando habilitado, futuras ações de etapa, negócio ou contato exigirão permissão, auditoria e idempotência.
+                {writeEnabled
+                  ? "Ativo e persistido nesta conexão. Desative manualmente para voltar ao modo somente leitura."
+                  : "Desativado por padrão. Quando habilitado, futuras ações de etapa, negócio ou contato exigirão permissão, auditoria e idempotência."}
               </p>
             </div>
             <Switch
