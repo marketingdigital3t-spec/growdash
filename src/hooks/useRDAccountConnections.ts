@@ -28,8 +28,8 @@ export function useRDAccountConnections(workspaceId?: string) {
     retry: 2,
     queryFn: async () => {
       if (workspaceId) {
-        const { data, error } = await withRequestTimeout(
-          (supabase as any).rpc("list_workspace_rd_account_connections", { _workspace_id: workspaceId }),
+        const { data, error } = await withRequestTimeout<{ data: RDAccountConnection[] | null; error: Error | null }>(
+          (supabase as any).rpc("list_workspace_rd_account_connections", { _workspace_id: workspaceId }) as PromiseLike<{ data: RDAccountConnection[] | null; error: Error | null }>,
           12_000,
         );
         if (error) throw error;
@@ -37,10 +37,10 @@ export function useRDAccountConnections(workspaceId?: string) {
         // never request or cache api_token in a member-visible query.
         return (data ?? []) as RDAccountConnection[];
       }
-      const { data, error } = await withRequestTimeout(
+      const { data, error } = await withRequestTimeout<{ data: RDAccountConnection[] | null; error: Error | null }>(
         (supabase as any).from("rd_account_connections")
           .select("id,user_id,workspace_id,external_account_id,account_name,status,last_attempt_at,last_success_at,last_error,permissions,write_enabled,write_updated_at,created_at,updated_at")
-          .order("account_name", { ascending: true }),
+          .order("account_name", { ascending: true }) as PromiseLike<{ data: RDAccountConnection[] | null; error: Error | null }>,
         12_000,
       );
       if (error) throw error;

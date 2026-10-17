@@ -252,8 +252,9 @@ export default function CrmPage() {
   const selectedAttribution = useMemo<LeadAttribution | null>(() => selectedDeal ? resolveLeadAttribution(selectedDeal, [...attributionInsights, ...historicalAttributionInsights]) : null, [attributionInsights, historicalAttributionInsights, selectedDeal]);
 
   useEffect(() => {
-    setSelectedFunnelIds((current) => current.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id)));
-  }, [availableFunnelIds, setSelectedFunnelIds]);
+    const next = selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id));
+    if (next.length !== selectedFunnelIds.length || next.some((id, index) => id !== selectedFunnelIds[index])) setSelectedFunnelIds(next);
+  }, [availableFunnelIds, selectedFunnelIds, setSelectedFunnelIds]);
 
   // Query cache keeps the previous screen visible globally, which is useful
   // for a silent refresh of the same scope. A different account is a hard
@@ -619,6 +620,54 @@ export default function CrmPage() {
     }
   }
 
+  async function moveRDDeal(deal: RDDealLite, destination: PipelineStage) {
+    if (isConsolidatedView || !destination.rdStageId || !destination.rdFunnelId) {
+      toast.error("Selecione uma única conta RD para movimentar uma negociação.");
+      return;
+    }
+    if (!rdIntegration?.write_enabled) {
+      toast.error("Habilite a escrita governada no card de integração do RD Station.");
+      return;
+    }
+    const connectionId = deal.rd_connection_id || connectedFunnels.find((funnel) => funnel.id === destination.rdFunnelId)?.rd_connection_id;
+    if (!connectionId) {
+      toast.error("Esta negociação não tem uma conexão RD identificada.");
+      return;
+    }
+    const previous = queryClient.getQueriesData({ queryKey: ["rd_crm_deals"] });
+    const optimisticBucket = destination.won ? "client" : destination.lost ? "lost" : "opportunity";
+    queryClient.setQueriesData({ queryKey: ["rd_crm_deals"] }, (current: RDDealLite[] | undefined) => current?.map((item) => item.id === deal.id ? {
+      ...item,
+      rd_stage_id: destination.rdStageId,
+      rd_stage_name: destination.name,
+      rd_stage_order: destination.order,
+      stage_bucket: optimisticBucket,
+      win: destination.won,
+      stage_updated_at: new Date().toISOString(),
+    } : item));
+    try {
+      const { data, error } = await supabase.functions.invoke("rd-move-deal", {
+        body: {
+          rd_connection_id: connectionId,
+          rd_deal_id: deal.rd_deal_id,
+          deal_stage_id: destination.rdStageId,
+          correlation_id: crypto.randomUUID(),
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_deal_stage_history"] }),
+      ]);
+      toast.success(data?.noop ? "A negociação já estava nessa etapa." : "Negociação movida no RD Station.");
+    } catch (error) {
+      for (const [key, data] of previous) queryClient.setQueryData(key, data);
+      toast.error(error instanceof Error ? error.message : "Não foi possível mover a negociação no RD Station.");
+    }
+  }
+
   return (
     <div className="crm-page gd-module-shell mx-auto max-w-[1700px] space-y-5">
       <PageHeading
@@ -746,6 +795,8 @@ export default function CrmPage() {
           getOpportunityAmount={getOpportunityAmount}
           onLoadMore={(stageId) => setStageLimits((current) => ({ ...current, [stageId]: (current[stageId] || BOARD_STEP) + BOARD_STEP }))}
           onOpen={setSelectedDeal}
+          onMove={(deal, stage) => void moveRDDeal(deal, stage)}
+          canMove={!isConsolidatedView && rdEnabled && rdIntegration?.write_enabled === true}
         />
       ) : (
         <DealsList
@@ -771,19 +822,23 @@ export default function CrmPage() {
   );
 }
 
-function KanbanBoard({ stages, stageDeals, stageLimits, getOpportunityAmount, onLoadMore, onOpen }: {
+function KanbanBoard({ stages, stageDeals, stageLimits, getOpportunityAmount, onLoadMore, onOpen, onMove, canMove }: {
   stages: PipelineStage[];
   stageDeals: Map<string, RDDealLite[]>;
   stageLimits: Record<string, number>;
   getOpportunityAmount: (deal: RDDealLite) => number;
   onLoadMore: (stageId: string) => void;
   onOpen: (deal: RDDealLite) => void;
+  onMove: (deal: RDDealLite, stage: PipelineStage) => void;
+  canMove: boolean;
 }) {
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const dealsById = new Map(Array.from(stageDeals.values()).flat().map((deal) => [deal.id, deal]));
   return (
     <section className="gd-panel mt-4 overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2"><Columns3 className="h-4 w-4 text-primary" /><div><h2 className="text-sm font-black">Pipeline de negociações</h2><p className="text-[10px] text-muted-foreground">Etapas na mesma ordem configurada no RD Station</p></div></div>
-        <span className="hidden text-[10px] text-muted-foreground sm:block">Clique em um cartão para ver todos os dados</span>
+        <span className="hidden text-[10px] text-muted-foreground sm:block">{canMove ? "Arraste um cartão para mover no RD · clique para ver os dados" : "Clique em um cartão para ver todos os dados"}</span>
       </div>
       <div className="overflow-x-auto p-3 sm:p-4">
         <div className="flex min-h-[520px] min-w-max items-start gap-3">
@@ -792,7 +847,7 @@ function KanbanBoard({ stages, stageDeals, stageLimits, getOpportunityAmount, on
             const total = deals.reduce((sum, deal) => sum + getOpportunityAmount(deal), 0);
             const limit = stageLimits[stage.id] || BOARD_STEP;
             return (
-              <div key={stage.id} className="w-[286px] shrink-0 overflow-hidden rounded-2xl border border-border bg-muted/25">
+              <div key={stage.id} onDragOver={(event) => { if (canMove) { event.preventDefault(); setDragOverStage(stage.id); } }} onDragLeave={() => setDragOverStage(null)} onDrop={(event) => { if (!canMove) return; event.preventDefault(); const deal = dealsById.get(event.dataTransfer.getData("text/growdash-deal")); setDragOverStage(null); if (deal) onMove(deal, stage); }} className={cn("w-[286px] shrink-0 overflow-hidden rounded-2xl border bg-muted/25 transition-colors", dragOverStage === stage.id ? "border-primary ring-2 ring-primary/20" : "border-border")}>
                 <div className="sticky top-0 z-10 border-b border-border bg-background/95 p-3 backdrop-blur-xl">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><StageDot won={stage.won} lost={stage.lost} /><h3 className="truncate text-xs font-black" title={stage.name}>{stage.name}</h3></div><p className="mt-1 pl-4 text-[10px] text-muted-foreground">{number.format(deals.length)} negócio(s) · {brl.format(total)}</p></div>
@@ -800,7 +855,7 @@ function KanbanBoard({ stages, stageDeals, stageLimits, getOpportunityAmount, on
                   </div>
                 </div>
                 <div className="max-h-[calc(100vh-390px)] min-h-[440px] space-y-2 overflow-y-auto p-2">
-                  {deals.slice(0, limit).map((deal) => <DealCard key={deal.id} deal={deal} getOpportunityAmount={getOpportunityAmount} onOpen={onOpen} />)}
+                  {deals.slice(0, limit).map((deal) => <DealCard key={deal.id} deal={deal} getOpportunityAmount={getOpportunityAmount} onOpen={onOpen} canMove={canMove} />)}
                   {!deals.length && <div className="m-2 rounded-xl border border-dashed border-border p-6 text-center text-[10px] text-muted-foreground">Nenhuma negociação nesta etapa</div>}
                   {deals.length > limit && <button type="button" className="gd-button w-full justify-center" onClick={() => onLoadMore(stage.id)}>Mostrar mais {Math.min(BOARD_STEP, deals.length - limit)}</button>}
                 </div>
@@ -813,10 +868,10 @@ function KanbanBoard({ stages, stageDeals, stageLimits, getOpportunityAmount, on
   );
 }
 
-function DealCard({ deal, getOpportunityAmount, onOpen }: { deal: RDDealLite; getOpportunityAmount: (deal: RDDealLite) => number; onOpen: (deal: RDDealLite) => void }) {
+function DealCard({ deal, getOpportunityAmount, onOpen, canMove }: { deal: RDDealLite; getOpportunityAmount: (deal: RDDealLite) => number; onOpen: (deal: RDDealLite) => void; canMove: boolean }) {
   const name = deal.contact_name || deal.contact_email || "Contato não informado";
   return (
-    <button type="button" onClick={() => onOpen(deal)} className="group w-full rounded-xl border border-border bg-background p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md">
+    <button type="button" draggable={canMove} onDragStart={(event) => { if (canMove) event.dataTransfer.setData("text/growdash-deal", deal.id); }} onClick={() => onOpen(deal)} className="group w-full rounded-xl border border-border bg-background p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md">
       <div className="flex items-start gap-2.5">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-black text-primary">{initials(name)}</span>
         <div className="min-w-0 grow"><h4 className="truncate text-xs font-black" title={name}>{name}</h4><p className="mt-0.5 truncate text-[9px] text-muted-foreground">{deal.rd_product_name || deal.rd_campaign_name || deal.utm_source || "Sem produto/origem"}</p></div>
