@@ -10112,27 +10112,27 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   z-index: 24;
 }
 
-.traffic-page-shell { --traffic-nav-width: 6.75rem; }
-.traffic-page-shell:has([data-traffic-nav][data-expanded="true"]) { --traffic-nav-width: 13rem; }
+.traffic-page-shell { --traffic-nav-width: 3.375rem; }
+.traffic-page-shell:has([data-traffic-nav][data-expanded="true"]) { --traffic-nav-width: 6.5rem; }
 
 .traffic-nav-rail-header {
-  min-height: 4.15rem;
-  padding: .75rem .65rem;
+  min-height: 3.25rem;
+  padding: .5rem .35rem;
 }
 
 .traffic-nav-items {
-  gap: .65rem;
-  padding: .75rem .7rem 1rem;
+  gap: .35rem;
+  padding: .5rem .35rem .7rem;
 }
 
 .traffic-nav-item,
 .traffic-nav-rail[data-expanded="false"] .traffic-nav-item {
-  min-height: 3.95rem;
+  min-height: 3rem;
   width: 100%;
   justify-content: center;
-  padding: .7rem;
+  padding: .45rem;
   border: 1px solid rgba(255,255,255,.72);
-  border-radius: 1.1rem;
+  border-radius: .8rem;
   color: rgba(255,255,255,.68);
 }
 
@@ -10168,6 +10168,11 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   display: block;
   width: auto;
   opacity: 1;
+  max-width: 4.2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .58rem;
 }
 
 @media (max-width: 767px) {
