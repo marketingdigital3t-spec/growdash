@@ -10339,7 +10339,17 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-chart-canvas {
-  height: 160px !important;
+  height: 144px !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card-header,
+.brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-card-header {
+  padding: 12px 12px 8px !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card-content,
+.brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-card-content {
+  padding: 0 12px 12px !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-empty {
@@ -10354,7 +10364,16 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   }
 
   .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-chart-canvas {
-    height: 144px !important;
+    height: 120px !important;
+  }
+
+  .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card .relative.h-40 {
+    width: 120px !important;
+    height: 112px !important;
+  }
+
+  .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card-content {
+    padding-bottom: 8px !important;
   }
 }
 
