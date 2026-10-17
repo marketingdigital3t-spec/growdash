@@ -10397,6 +10397,12 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card-content {
     padding-bottom: 8px !important;
   }
+
+  /* Two-column KPI rows at tablet width need a tighter inter-section rhythm
+     to keep both rows inside the locked canvas without reducing touch targets. */
+  .brand-shell:has(.dashboard-page) .dashboard-page > * + * {
+    margin-top: 16px !important;
+  }
 }
 
 @media (max-width: 767px) {
