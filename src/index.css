@@ -9661,3 +9661,59 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
 @media (prefers-reduced-motion: reduce) {
   .brand-shell .brand-topbar [aria-label^="Progresso da meta"] + div { transition: none !important; }
 }
+
+/* Tráfego Pago: keep the module navigation on a predictable grid.  The
+   previous flex-wrap layout made the long labels create uneven rows and
+   shifted the content depending on viewport width. */
+[data-traffic-nav] {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: .5rem !important;
+}
+[data-traffic-nav] > button {
+  min-width: 0 !important;
+  width: 100%;
+  flex: none !important;
+  min-height: 2.75rem !important;
+  padding-inline: .65rem !important;
+  line-height: 1.15;
+}
+[data-traffic-nav] > button > span { min-width: 0; }
+@media (min-width: 640px) {
+  [data-traffic-nav] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  [data-traffic-nav] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  [data-traffic-nav] { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+}
+
+/* One alignment rhythm for the campaign manager.  Header, scope controls,
+   hierarchy tabs and action controls share the same horizontal inset. */
+.campaigns-workspace {
+  min-width: 0;
+  width: 100%;
+}
+.campaigns-workspace .campaign-manager-top > div,
+.campaigns-workspace .campaign-scope-toolbar,
+.campaigns-workspace .campaign-tabs-header,
+.campaigns-workspace .campaign-actions-toolbar {
+  min-width: 0;
+}
+.campaigns-workspace .campaign-manager-top > div:first-child {
+  min-height: 3.25rem;
+}
+.campaigns-workspace .campaign-tabs-header [role="tablist"] {
+  align-items: center;
+}
+.campaigns-workspace .campaign-actions-toolbar > * {
+  min-width: 0;
+}
+
+.traffic-comparison-shell { min-width: 0; }
+.traffic-comparison-shell .traffic-comparison-metric { min-height: 142px; }
+@media (max-width: 639px) {
+  .traffic-comparison-shell .traffic-comparison-metric { min-height: 0; }
+}
