@@ -9786,6 +9786,16 @@ html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .dashboard-page {
 .brand-shell[data-dashboard-scene="true"] .space-phase-rings {
   border-color: color-mix(in srgb, var(--brand-gold) 72%, transparent) !important;
 }
+.brand-shell[data-dashboard-scene="true"] .space-phase-badge,
+.brand-shell[data-dashboard-scene="true"] .space-mission-title,
+.brand-shell[data-dashboard-scene="true"] .space-mission-strip > strong,
+.brand-shell[data-dashboard-scene="true"] .space-mission-rocket {
+  color: var(--brand-gold-light) !important;
+}
+.brand-shell[data-dashboard-scene="true"] .space-mission-track > span {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand-gold) 72%, #111), var(--brand-gold-light)) !important;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--brand-gold) 55%, transparent) !important;
+}
 
 .brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-summary-strip-surface,
 .brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-reference-kpi,
