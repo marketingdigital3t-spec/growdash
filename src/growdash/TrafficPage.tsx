@@ -65,6 +65,7 @@ export default function TrafficPage() {
   const { toast } = useToast();
   const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
   const campaignAnalysisMode = activeTab === "campaigns" && ["alerts", "intelligence"].includes(params.get("analise") || "");
+  const scrollMode = activeTab === "campaigns" && !campaignAnalysisMode ? "locked" : "content";
   const { adAccountId, setAdAccountId, adAccountIds, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId
@@ -81,7 +82,10 @@ export default function TrafficPage() {
           ? "space-y-3"
           : "space-y-3 md:flex md:h-full md:min-h-0 md:flex-col md:gap-3 md:space-y-0 md:overflow-hidden"
       : "space-y-3",
-    )}>
+    )}
+      data-scroll-mode={scrollMode}
+      data-traffic-tab={activeTab}
+    >
       <aside data-traffic-nav data-expanded={trafficNavExpanded ? "true" : "false"} className="traffic-nav-rail" aria-label="Áreas de Tráfego Pago">
         <div className="traffic-nav-rail-header">
           <span className="traffic-nav-rail-title">Áreas</span>

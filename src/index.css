@@ -10423,3 +10423,171 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
     padding: 24px !important;
   }
 }
+
+/* Traffic Manager layout contract ---------------------------------------
+   The right rail is fixed to the viewport, so the workspace reserves its
+   real width instead of allowing campaigns and totals to sit underneath it.
+   The scroll mode is declared by TrafficPage and is intentionally scoped to
+   this route so other modules keep their existing scrolling behavior. */
+.traffic-page-shell {
+  --traffic-gutter: 12px;
+  --traffic-block-gap: 12px;
+  --traffic-nav-width: 56px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1920px;
+  margin-inline: auto;
+  min-width: 0;
+}
+
+.traffic-page-shell:has([data-traffic-nav][data-expanded="true"]) {
+  --traffic-nav-width: 208px;
+}
+
+.traffic-page-content {
+  width: 100%;
+  max-width: 1920px;
+  margin-inline: auto;
+  min-width: 0;
+}
+
+.traffic-page-shell[data-scroll-mode="locked"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--traffic-block-gap);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.traffic-page-shell[data-scroll-mode="locked"] .traffic-page-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.campaigns-workspace[data-scroll-mode="locked"] {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.campaigns-workspace[data-scroll-mode="locked"] .campaigns-main-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.campaigns-workspace[data-scroll-mode="locked"] .campaigns-main-tabs {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.campaigns-workspace[data-scroll-mode="locked"] .campaigns-campaigns-tab {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame {
+  display: flex !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  flex: 1 1 0 !important;
+  flex-direction: column !important;
+}
+
+.campaigns-workspace[data-scroll-mode="locked"] [data-campaign-table-scroll] {
+  min-height: 0;
+  flex: 1 1 0;
+  overscroll-behavior: contain;
+}
+
+/* Intelligence/alerts are the explicit exception: the route shell becomes
+   the vertical scroller while the table keeps its own horizontal behavior. */
+.traffic-page-shell[data-scroll-mode="content"] {
+  min-height: 100%;
+  overflow: visible;
+}
+
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="content"]) .growdash-main {
+  height: calc(100dvh - 48px) !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="content"]) .growdash-content-frame,
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="content"]) .gd-page-transition {
+  height: auto !important;
+  min-height: 100% !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+/* Normal Campaigns mode is a fixed canvas. Only the table/cards and totals
+   bar can consume overflow; the browser and the application shell cannot. */
+html:has(.traffic-page-shell[data-scroll-mode="locked"]),
+body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
+  overflow: hidden !important;
+}
+
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .growdash-main {
+  height: calc(100dvh - 48px) !important;
+  max-height: calc(100dvh - 48px) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .growdash-content-frame,
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .gd-page-transition {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+@media (min-width: 768px) {
+  .traffic-page-shell {
+    padding: 24px calc(24px + var(--traffic-nav-width) + 16px) 24px 24px !important;
+  }
+
+  .traffic-page-content {
+    max-width: 1920px;
+  }
+}
+
+@media (max-width: 767px) {
+  .traffic-page-shell,
+  .traffic-page-shell[data-scroll-mode="locked"],
+  .traffic-page-shell[data-scroll-mode="content"] {
+    padding: 12px 12px calc(12px + 5rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .traffic-page-content {
+    max-width: 100%;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame {
+    min-height: 0 !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame > .space-y-2 {
+    min-height: 0;
+    flex: 1 1 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}

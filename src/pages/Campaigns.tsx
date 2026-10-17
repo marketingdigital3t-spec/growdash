@@ -993,6 +993,7 @@ export default function Campaigns() {
         "campaigns-workspace rounded-lg border-0 bg-transparent p-3 text-card-foreground shadow-none md:p-4",
         analysisMode ? "overflow-visible" : "overflow-hidden md:flex md:min-h-0 md:flex-1 md:flex-col",
       )}
+      data-scroll-mode={analysisMode ? "content" : "locked"}
     >
       <MotionItem className="campaign-manager-top shrink-0 border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
         <div className="flex flex-col gap-2 px-3 py-2 lg:flex-row lg:items-center">
@@ -1041,8 +1042,8 @@ export default function Campaigns() {
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
       {actionIsError && <MotionItem className="border-b border-amber-500/30 bg-amber-500/5 p-3" role="alert"><p className="text-xs text-amber-700 dark:text-amber-300"><b>Não foi possível consultar as ações de resultado da Meta.</b> Os resultados por evento podem estar incompletos; os valores canônicos já salvos nos Insights permanecem em uso. {actionError instanceof Error ? actionError.message : "Tente atualizar os dados."}</p></MotionItem>}
 
-      <MotionItem className={cn(!analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className={cn(!analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
+      <MotionItem className={cn("campaigns-main-content", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("campaigns-main-tabs", !analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
           <div className="campaign-tabs-header growdash-scrollbar-hidden flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
             <TabsList className="campaign-tabs-list h-auto w-max min-w-0 shrink-0 justify-start rounded-xl bg-transparent p-1">
               <TabsTrigger value="campaigns" className="campaign-hierarchy-tab h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-lg px-3 text-xs">
@@ -1173,7 +1174,7 @@ export default function Campaigns() {
           )}
 
           {/* Campaigns Tab */}
-          <TabsContent value="campaigns" className={cn("m-0", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
+          <TabsContent value="campaigns" className={cn("campaigns-campaigns-tab m-0", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
             {isLoading ? (
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : (
