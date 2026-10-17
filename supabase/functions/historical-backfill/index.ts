@@ -171,6 +171,9 @@ Deno.serve(async (req) => {
   let rdFunnelIndex = Number.isFinite(Number(runSummary.rd_funnel_index))
     ? Math.max(0, Number(runSummary.rd_funnel_index))
     : 0;
+  let metaProviderIndex = Number.isFinite(Number(runSummary.meta_provider_index))
+    ? Math.max(0, Math.min(2, Number(runSummary.meta_provider_index)))
+    : 0;
   let metaAccountTotal = Number.isFinite(Number(runSummary.meta_account_total))
     ? Math.max(0, Number(runSummary.meta_account_total))
     : 0;
@@ -198,11 +201,10 @@ Deno.serve(async (req) => {
       }
       const accounts = Array.from(accountMap.values());
       metaAccountTotal = accounts.length;
-      // Keep one bounded window per edge invocation. Each window fans out to
-      // insights, leads and hourly syncs; larger batches can exceed the
-      // gateway timeout on accounts with slower Meta responses before the
-      // cursor is persisted.
-      for (let windowCount = 0; windowCount < 1 && metaAccountIndex < accounts.length; windowCount++) {
+      // Keep one provider request per edge invocation. A single insights
+      // window can be large enough to exceed the gateway timeout, so persist
+      // the provider cursor before moving to leads or hourly data.
+      if (metaAccountIndex < accounts.length) {
         const account = accounts[metaAccountIndex];
         const windowStart = metaWindowStart <= today ? metaWindowStart : historicalStart;
         const windowEnd = addDays(windowStart, 89) < today ? addDays(windowStart, 89) : today;
@@ -218,23 +220,24 @@ Deno.serve(async (req) => {
           breakdownEndDate: windowEnd,
           triggerSource: "historical_backfill",
         };
-        const [insight, lead, hourly] = await Promise.all([
-          invoke(base, key, "sync-meta-insights", common),
-          invoke(base, key, "sync-meta-leads", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" }),
-          invoke(base, key, "sync-meta-hourly", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" }),
-        ]);
-        const insightSummary = itemSummary(insight);
-        const leadSummary = itemSummary(lead);
-        const hourlySummary = itemSummary(hourly);
-        for (const [provider, summary] of [["meta_insights", insightSummary], ["meta_leads", leadSummary], ["meta_hourly", hourlySummary]] as const) {
-          const ok = summary.ok;
-          if (!ok) failures++;
-          items.push({ run_id: run.id, user_id: userId, provider, account_id: account.id, window_start: windowStart, window_end: windowEnd, status: ok ? "success" : "partial", pages_read: summary.pages, records_read: summary.records, records_upserted: summary.records, duplicates: summary.duplicates, gaps: Array.isArray(summary.gaps) ? summary.gaps : [summary.gaps], details: summary.response, error_message: ok ? null : String(summary.response?.error || "Falha no provedor"), finished_at: new Date().toISOString() });
-        }
-        if (windowEnd === today) {
+        const providers = [
+          ["meta_insights", "sync-meta-insights", common],
+          ["meta_leads", "sync-meta-leads", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" }],
+          ["meta_hourly", "sync-meta-hourly", { adAccountId: account.id, startDate: windowStart, endDate: windowEnd, triggerSource: "historical_backfill" }],
+        ] as const;
+        const [provider, functionName, requestBody] = providers[metaProviderIndex];
+        const result = await invoke(base, key, functionName, requestBody);
+        const summary = itemSummary(result);
+        if (!summary.ok) failures++;
+        items.push({ run_id: run.id, user_id: userId, provider, account_id: account.id, window_start: windowStart, window_end: windowEnd, status: summary.ok ? "success" : "partial", pages_read: summary.pages, records_read: summary.records, records_upserted: summary.records, duplicates: summary.duplicates, gaps: Array.isArray(summary.gaps) ? summary.gaps : [summary.gaps], details: summary.response, error_message: summary.ok ? null : String(summary.response?.error || "Falha no provedor"), finished_at: new Date().toISOString() });
+        if (metaProviderIndex < providers.length - 1) {
+          metaProviderIndex += 1;
+        } else if (windowEnd === today) {
+          metaProviderIndex = 0;
           metaAccountIndex += 1;
           metaWindowStart = historicalStart;
         } else {
+          metaProviderIndex = 0;
           metaWindowStart = addDays(windowEnd, 1);
         }
       }
@@ -278,6 +281,7 @@ Deno.serve(async (req) => {
       incomplete: !done || incomplete,
       meta_account_index: metaAccountIndex,
       meta_window_start: metaWindowStart,
+      meta_provider_index: metaProviderIndex,
       meta_account_total: metaAccountTotal,
       rd_funnel_index: rdFunnelIndex,
       rd_funnel_total: availableFunnels.length,
