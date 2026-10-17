@@ -184,6 +184,12 @@ function pickField(fd: any[], wants: string[]): string | null {
   return null;
 }
 
+function usableAttributionText(value: unknown): string | null {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text || /^\{\{[^{}]+\}\}$/.test(text)) return null;
+  return text;
+}
+
 async function hydrateMissingAttribution(
   rows: LeadRow[],
   token: string,
@@ -207,25 +213,40 @@ async function hydrateMissingAttribution(
       await Promise.all(ids.slice(i, i + 8).map(task));
     }
   };
-  const adIds = [...new Set(rows.filter((row) => row.ad_id && !row.ad_name).map((row) => String(row.ad_id)))];
+  for (const row of rows) {
+    const raw = row.raw && typeof row.raw === "object" ? row.raw as any : {};
+    row.campaign_name ||= usableAttributionText(raw.campaign_name || raw.meta_campaign_name);
+    row.adset_name ||= usableAttributionText(raw.adset_name || raw.meta_adset_name);
+    row.ad_name ||= usableAttributionText(raw.ad_name || raw.meta_ad_name);
+    row.form_name ||= usableAttributionText(raw.form_name || raw.meta_form_name);
+    row.platform ||= usableAttributionText(raw.platform || raw.site_source_name || raw.publisher_platform);
+    row.placement ||= usableAttributionText(raw.placement || raw.platform_position);
+    row.campaign_name = usableAttributionText(row.campaign_name);
+    row.adset_name = usableAttributionText(row.adset_name);
+    row.ad_name = usableAttributionText(row.ad_name);
+    row.form_name = usableAttributionText(row.form_name);
+    row.platform = usableAttributionText(row.platform);
+    row.placement = usableAttributionText(row.placement);
+  }
+  const adIds = [...new Set(rows.filter((row) => row.ad_id && !usableAttributionText(row.ad_name)).map((row) => String(row.ad_id)))];
   await runBatches(adIds, async (id) => {
-    const ad = await getObject(id, "name,adset_id,campaign_id");
+    const ad = await getObject(id, "name,adset{id,name},campaign{id,name}");
     if (ad?.name) adNames.set(id, String(ad.name));
-    if (ad?.adset_id && ad?.adset?.name) adsetNames.set(String(ad.adset_id), String(ad.adset.name));
-    if (ad?.campaign_id && ad?.campaign?.name) campaignNames.set(String(ad.campaign_id), String(ad.campaign.name));
+    if (ad?.adset?.id && ad?.adset?.name) adsetNames.set(String(ad.adset.id), String(ad.adset.name));
+    if (ad?.campaign?.id && ad?.campaign?.name) campaignNames.set(String(ad.campaign.id), String(ad.campaign.name));
   });
-  const adsetIds = [...new Set(rows.filter((row) => row.adset_id && !row.adset_name).map((row) => String(row.adset_id)))];
+  const adsetIds = [...new Set(rows.filter((row) => row.adset_id && !usableAttributionText(row.adset_name)).map((row) => String(row.adset_id)))];
   await runBatches(adsetIds, async (id) => {
-    const adset = await getObject(id, "name,campaign_id");
+    const adset = await getObject(id, "name,campaign{id,name}");
     if (adset?.name) adsetNames.set(id, String(adset.name));
-    if (adset?.campaign_id && adset?.campaign?.name) campaignNames.set(String(adset.campaign_id), String(adset.campaign.name));
+    if (adset?.campaign?.id && adset?.campaign?.name) campaignNames.set(String(adset.campaign.id), String(adset.campaign.name));
   });
-  const campaignIds = [...new Set(rows.filter((row) => row.campaign_id && !row.campaign_name).map((row) => String(row.campaign_id)))];
+  const campaignIds = [...new Set(rows.filter((row) => row.campaign_id && !usableAttributionText(row.campaign_name)).map((row) => String(row.campaign_id)))];
   await runBatches(campaignIds, async (id) => {
     const campaign = await getObject(id, "name");
     if (campaign?.name) campaignNames.set(id, String(campaign.name));
   });
-  const formIds = [...new Set(rows.filter((row) => row.form_id && !row.form_name).map((row) => String(row.form_id)))];
+  const formIds = [...new Set(rows.filter((row) => row.form_id && !usableAttributionText(row.form_name)).map((row) => String(row.form_id)))];
   await runBatches(formIds, async (id) => {
     const form = await getObject(id, "name");
     if (form?.name) formNames.set(id, String(form.name));
@@ -235,8 +256,8 @@ async function hydrateMissingAttribution(
     row.adset_name ||= row.adset_id ? adsetNames.get(String(row.adset_id)) || null : null;
     row.ad_name ||= row.ad_id ? adNames.get(String(row.ad_id)) || null : null;
     row.form_name ||= row.form_id ? formNames.get(String(row.form_id)) || null : null;
-    row.platform ||= String((row.raw as any)?.site_source_name || (row.raw as any)?.publisher_platform || "") || null;
-    row.placement ||= String((row.raw as any)?.platform_position || (row.raw as any)?.placement || "") || null;
+    row.platform ||= usableAttributionText((row.raw as any)?.site_source_name || (row.raw as any)?.publisher_platform);
+    row.placement ||= usableAttributionText((row.raw as any)?.platform_position || (row.raw as any)?.placement);
     row.attribution_status = row.campaign_id && row.adset_id && row.ad_id ? "captured" : "partial";
   }
 }
@@ -548,6 +569,63 @@ Deno.serve(async (req) => {
 
         let leadsUpserted = 0;
         const formErrors: string[] = [];
+
+        // When leads_retrieval is unavailable, Meta may still allow the ad
+        // catalog (ads/adsets/campaigns) to be read. Repair the attribution
+        // snapshot already stored in our mirror from those immutable IDs so a
+        // historical permission gap does not leave the CRM permanently blank.
+        // This path never fabricates form/platform/placement values: those
+        // remain null unless the original raw lead payload contains them.
+        let existingQuery = admin
+          .from("meta_leads")
+          .select("*")
+          .eq("ad_account_id", acc.id)
+          .gte("created_time", new Date(since * 1000).toISOString())
+          .limit(10000);
+        if (exactRange || recentRange) {
+          existingQuery = existingQuery.lt(
+            "created_time",
+            new Date((exactRange || recentRange)!.endExclusiveEpoch * 1000).toISOString(),
+          );
+        }
+        const { data: existingLeads, error: existingLeadsError } = await existingQuery;
+        if (existingLeadsError) {
+          formErrors.push(`catalog repair: ${existingLeadsError.message}`);
+        } else if (existingLeads?.length) {
+          const existingRows = existingLeads as unknown as LeadRow[];
+          const before = new Map(existingRows.map((row: any) => [String(row.meta_lead_id), JSON.stringify({
+            campaign_name: row.campaign_name,
+            adset_name: row.adset_name,
+            ad_name: row.ad_name,
+            form_name: row.form_name,
+            platform: row.platform,
+            placement: row.placement,
+            attribution_status: row.attribution_status,
+          })]));
+          await hydrateMissingAttribution(existingRows, token, formNames, adNames, adsetNames, campaignNames);
+          const changedRows = existingRows.filter((row: any) => before.get(String(row.meta_lead_id)) !== JSON.stringify({
+            campaign_name: row.campaign_name,
+            adset_name: row.adset_name,
+            ad_name: row.ad_name,
+            form_name: row.form_name,
+            platform: row.platform,
+            placement: row.placement,
+            attribution_status: row.attribution_status,
+          }));
+          for (let i = 0; i < changedRows.length; i += 500) {
+            const { error: repairError } = await admin
+              .from("meta_leads")
+              .upsert(changedRows.slice(i, i + 500), {
+                onConflict: "meta_lead_id",
+                ignoreDuplicates: false,
+              });
+            if (repairError) {
+              formErrors.push(`catalog repair upsert: ${repairError.message}`);
+              break;
+            }
+            leadsUpserted += Math.min(500, changedRows.length - i);
+          }
+        }
 
         for (const formId of formIds) {
           const filters: Array<Record<string, string | number>> = [

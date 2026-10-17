@@ -143,8 +143,24 @@ Deno.serve(async (req) => {
   // the default deterministic and bounded while still allowing an explicit
   // administrator-selected start date for older RD-only archives.
   const historicalStart = String(body.start_date || body.startDate || dateMonthsAgo(37));
-  const rdOnly = body.rd_only === true;
+  // A one-off operator run can temporarily include Meta even when the
+  // existing UI sends rd_only=true. The flag is server-side only and is
+  // removed after the historical repair; normal RD backfills remain RD-only.
+  const forceMeta = Deno.env.get("HISTORICAL_BACKFILL_FORCE_META") === "true";
+  const rdOnly = body.rd_only === true && !forceMeta;
   let incomplete = false;
+  let metaAccountIndex = Number.isFinite(Number(runSummary.meta_account_index))
+    ? Math.max(0, Number(runSummary.meta_account_index))
+    : 0;
+  let metaWindowStart = typeof runSummary.meta_window_start === "string" && runSummary.meta_window_start
+    ? runSummary.meta_window_start
+    : historicalStart;
+  let rdFunnelIndex = Number.isFinite(Number(runSummary.rd_funnel_index))
+    ? Math.max(0, Number(runSummary.rd_funnel_index))
+    : 0;
+  let metaAccountTotal = Number.isFinite(Number(runSummary.meta_account_total))
+    ? Math.max(0, Number(runSummary.meta_account_total))
+    : 0;
 
   try {
     if (!rdOnly) {
@@ -168,9 +184,10 @@ Deno.serve(async (req) => {
         if (!current || String(account.created_at || "") > String(current.created_at || "")) accountMap.set(providerId, account);
       }
       const accounts = Array.from(accountMap.values());
-      for (const account of accounts) {
-      let windowStart = historicalStart;
-      while (windowStart <= today) {
+      metaAccountTotal = accounts.length;
+      if (metaAccountIndex < accounts.length) {
+        const account = accounts[metaAccountIndex];
+        const windowStart = metaWindowStart <= today ? metaWindowStart : historicalStart;
         const windowEnd = addDays(windowStart, 89) < today ? addDays(windowStart, 89) : today;
         const common = {
           adAccountId: account.id,
@@ -197,9 +214,15 @@ Deno.serve(async (req) => {
           if (!ok) failures++;
           items.push({ run_id: run.id, user_id: userId, provider, account_id: account.id, window_start: windowStart, window_end: windowEnd, status: ok ? "success" : "partial", pages_read: summary.pages, records_read: summary.records, records_upserted: summary.records, duplicates: summary.duplicates, gaps: Array.isArray(summary.gaps) ? summary.gaps : [summary.gaps], details: summary.response, error_message: ok ? null : String(summary.response?.error || "Falha no provedor"), finished_at: new Date().toISOString() });
         }
-        if (windowEnd === today) break;
-        windowStart = addDays(windowEnd, 1);
+        if (windowEnd === today) {
+          metaAccountIndex += 1;
+          metaWindowStart = historicalStart;
+        } else {
+          metaWindowStart = addDays(windowEnd, 1);
+        }
       }
+      else {
+        metaAccountIndex = accounts.length;
       }
     }
 
@@ -207,18 +230,19 @@ Deno.serve(async (req) => {
     if (typeof body.funnel_id === "string") funnelsQuery = funnelsQuery.eq("id", body.funnel_id);
     const { data: funnels, error: funnelsError } = await funnelsQuery;
     if (funnelsError) throw funnelsError;
-    const funnelResults = await mapWithConcurrency(funnels || [], 2, async (funnel) => {
+    const availableFunnels = funnels || [];
+    const metaComplete = rdOnly || metaAccountIndex >= metaAccountTotal;
+    if (metaComplete && rdFunnelIndex < availableFunnels.length) {
+      const funnel = availableFunnels[rdFunnelIndex];
       // Keep each edge invocation short. rd-sync-deals persists the next page
       // cursor, so the following backfill tick safely continues the same full
       // history without waiting for every RD status in one gateway request.
       const result = await invoke(base, key, "rd-sync-deals", { funnel_id: funnel.id, service_user_id: userId, cron_trigger: true, analytics_mode: true, full_history: true, max_pages: 1, skip_enrichment: true, trigger_source: "historical_backfill" });
       const summary = itemSummary(result);
-      if (summary.response?.complete === false) incomplete = true;
-      return { funnel, summary };
-    });
-    for (const { funnel, summary } of funnelResults) {
       if (!summary.ok) failures++;
       items.push({ run_id: run.id, user_id: userId, provider: "rd_deals", funnel_id: funnel.id, window_start: historicalStart, window_end: today, status: summary.ok ? "success" : "partial", pages_read: summary.pages, records_read: summary.records, records_upserted: summary.records, duplicates: summary.duplicates, gaps: Array.isArray(summary.gaps) ? summary.gaps : [summary.gaps], details: summary.response, error_message: summary.ok ? null : String(summary.response?.error || "Falha no RD"), finished_at: new Date().toISOString() });
+      if (summary.response?.complete === false) incomplete = true;
+      else rdFunnelIndex += 1;
     }
 
     if (items.length) {
@@ -227,8 +251,20 @@ Deno.serve(async (req) => {
     }
     const previousItems = Number(runSummary.items || 0);
     const previousFailures = Number(runSummary.failures || 0);
-    const status = incomplete ? "running" : (failures || previousFailures ? "partial" : "success");
-    const summary = { items: previousItems + items.length, failures: previousFailures + failures, historicalStart, historicalEnd: today, incomplete };
+    const done = metaComplete && rdFunnelIndex >= availableFunnels.length;
+    const status = done && !incomplete ? (failures || previousFailures ? "partial" : "success") : "running";
+    const summary = {
+      items: previousItems + items.length,
+      failures: previousFailures + failures,
+      historicalStart,
+      historicalEnd: today,
+      incomplete: !done || incomplete,
+      meta_account_index: metaAccountIndex,
+      meta_window_start: metaWindowStart,
+      meta_account_total: metaAccountTotal,
+      rd_funnel_index: rdFunnelIndex,
+      rd_funnel_total: availableFunnels.length,
+    };
     await admin.from("sync_backfill_runs").update({ status, finished_at: status === "running" ? null : new Date().toISOString(), summary, error_message: status === "running" ? null : undefined }).eq("id", run.id);
     return new Response(JSON.stringify({ ok: status === "success", status, run_id: run.id, items: items.length, failures, historicalStart, historicalEnd: today, incomplete }), { status: status === "partial" ? 207 : 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
