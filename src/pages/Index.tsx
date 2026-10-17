@@ -416,6 +416,7 @@ const Index = () => {
               setDraftView((current) => current ? { ...current, layout, widgets } : current);
             }}
             onEditSale={(s) => { setEditingSale(s); setSalesDialogOpen(true); }}
+            onRegisterSale={() => { setEditingSale(null); setSalesDialogOpen(true); }}
           />
         </DashboardProvider>
       )}

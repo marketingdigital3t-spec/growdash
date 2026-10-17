@@ -10242,7 +10242,7 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   }
 
   .brand-shell:has(.dashboard-page) .growdash-content-shell {
-    overflow: hidden;
+    overflow: visible;
   }
 
   .brand-shell:has(.dashboard-page) .growdash-main {
@@ -10293,5 +10293,86 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   /* Keep the seven headline KPIs visually separated at desktop widths. */
   .brand-shell .dashboard-page .dashboard-glass-metrics {
     gap: 14px !important;
+  }
+}
+
+/* Dashboard UX contract: one spacing scale and a compact grid are the final
+   authority for the fixed desktop canvas. The content shell stays visible so
+   it cannot clip descendants; only the dashboard main surface is locked. */
+.brand-shell:has(.dashboard-page) {
+  --dashboard-card-gap: 16px;
+  --dashboard-section-gap: 32px;
+  --dashboard-gutter: 32px;
+  --dashboard-card-padding: 24px;
+  --dashboard-kpi-height: 128px;
+}
+
+.brand-shell:has(.dashboard-page) .growdash-main {
+  padding-inline: var(--dashboard-gutter) !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page {
+  width: 100%;
+  max-width: none !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page > * + * {
+  margin-top: var(--dashboard-section-gap) !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics,
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-primary-kpis,
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-financial-overview,
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-kpi-grid,
+.brand-shell:has(.dashboard-page) .dashboard-page .gd-kpi-grid,
+.brand-shell:has(.dashboard-page) .dashboard-page .gd-aligned-grid {
+  gap: var(--dashboard-card-gap) !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics {
+  padding: 12px !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page .gd-metric-card-content {
+  min-height: var(--dashboard-kpi-height) !important;
+  padding: var(--dashboard-card-padding) !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-chart-canvas {
+  height: 160px !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-empty {
+  min-height: 0 !important;
+  max-height: 180px;
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .brand-shell:has(.dashboard-page) {
+    --dashboard-gutter: 16px;
+    --dashboard-kpi-height: 112px;
+  }
+
+  .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-chart-canvas {
+    height: 144px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .brand-shell:has(.dashboard-page) {
+    --dashboard-gutter: 12px;
+    --dashboard-kpi-height: 104px;
+  }
+
+  .brand-shell:has(.dashboard-page) .growdash-main {
+    padding-inline: var(--dashboard-gutter) !important;
+  }
+
+  .brand-shell:has(.dashboard-page) .dashboard-page > * + * {
+    margin-top: 24px !important;
+  }
+
+  .brand-shell:has(.dashboard-page) .gd-metric-card-content {
+    padding: 24px !important;
   }
 }
