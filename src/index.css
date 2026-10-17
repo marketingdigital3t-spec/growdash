@@ -10081,7 +10081,8 @@ html:not(.dark) .brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.g
 html.dark body .brand-shell:has(.traffic-page-shell) .analytics-module,
 html.dark body .brand-shell:has(.traffic-page-shell) .gd-page-transition,
 html.dark body .brand-shell:has(.traffic-page-shell) .growdash-main,
-html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-frame {
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-frame,
+html.dark body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   background-color: #16181b !important;
   background-image: none !important;
 }
@@ -10089,7 +10090,8 @@ html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-frame {
 html:not(.dark) body .brand-shell:has(.traffic-page-shell) .analytics-module,
 html:not(.dark) body .brand-shell:has(.traffic-page-shell) .gd-page-transition,
 html:not(.dark) body .brand-shell:has(.traffic-page-shell) .growdash-main,
-html:not(.dark) body .brand-shell:has(.traffic-page-shell) .growdash-content-frame {
+html:not(.dark) body .brand-shell:has(.traffic-page-shell) .growdash-content-frame,
+html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   background-color: #eef1f4 !important;
   background-image: none !important;
 }
