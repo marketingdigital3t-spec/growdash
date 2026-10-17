@@ -9747,3 +9747,54 @@ html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .dashboard-page {
   background-color: rgba(0, 0, 0, 0) !important;
   background-image: none !important;
 }
+
+/* The reference images use a distinct palette for each revenue phase. Keep
+   the shell graphite, but restore those phase accents in the Dashboard scene. */
+.brand-shell[data-dashboard-scene="true"][data-space-phase="terra"] {
+  --brand-gold: #2e86de;
+  --brand-gold-light: #63c5ff;
+  --brand-accent-rgb: 46, 134, 222;
+}
+.brand-shell[data-dashboard-scene="true"][data-space-phase="orbita"] {
+  --brand-gold: #ffc107;
+  --brand-gold-light: #ffe082;
+  --brand-accent-rgb: 255, 193, 7;
+}
+.brand-shell[data-dashboard-scene="true"][data-space-phase="galaxia"] {
+  --brand-gold: #a855f7;
+  --brand-gold-light: #d8b4fe;
+  --brand-accent-rgb: 168, 85, 247;
+}
+
+.brand-shell[data-dashboard-scene="true"] .space-mission-strip { display: grid !important; }
+.brand-shell[data-dashboard-scene="true"] .space-phase-badge { display: flex !important; }
+
+.brand-shell[data-dashboard-scene="true"][data-space-phase="terra"] .space-phase-planet {
+  filter: brightness(.78) saturate(1.35) contrast(1.14) !important;
+}
+.brand-shell[data-dashboard-scene="true"][data-space-phase="orbita"] .space-phase-planet {
+  background-image: radial-gradient(circle at 32% 28%, #ffe9a3, #b77900 42%, #2b1b02 76%, #080808 100%) !important;
+  filter: brightness(.82) saturate(1.32) contrast(1.12) !important;
+  box-shadow: 0 0 125px 32px rgba(255, 193, 7, .24) !important;
+}
+.brand-shell[data-dashboard-scene="true"][data-space-phase="galaxia"] .space-phase-planet {
+  background-image: radial-gradient(circle at 32% 28%, #e9d5ff, #9333ea 42%, #25103d 76%, #07030c 100%) !important;
+  filter: brightness(.82) saturate(1.32) contrast(1.12) !important;
+  box-shadow: 0 0 125px 32px rgba(168, 85, 247, .26) !important;
+}
+.brand-shell[data-dashboard-scene="true"] .space-phase-rings {
+  border-color: color-mix(in srgb, var(--brand-gold) 72%, transparent) !important;
+}
+
+.brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-summary-strip-surface,
+.brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-reference-kpi,
+.brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-reference-funnel,
+.brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-reference-radar {
+  border-color: color-mix(in srgb, var(--brand-gold) 38%, rgba(255, 255, 255, .14)) !important;
+}
+.brand-shell[data-dashboard-scene="true"] .dashboard-page .gd-glass-metric-icon,
+.brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-reference-icon {
+  border-color: color-mix(in srgb, var(--brand-gold) 62%, transparent) !important;
+  background: color-mix(in srgb, var(--brand-gold) 14%, transparent) !important;
+  color: var(--brand-gold-light) !important;
+}
