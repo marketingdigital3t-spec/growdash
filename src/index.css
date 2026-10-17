@@ -10453,6 +10453,7 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
 .traffic-page-shell[data-scroll-mode="locked"] {
   display: flex;
+  height: 100% !important;
   flex-direction: column;
   gap: var(--traffic-block-gap);
   min-height: 0;
