@@ -10313,11 +10313,11 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
 .brand-shell:has(.dashboard-page) .dashboard-page {
   width: 100%;
-  max-width: none !important;
+  max-width: 1680px !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page > * + * {
-  margin-top: var(--dashboard-section-gap) !important;
+  margin-top: 16px !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics,
@@ -10331,6 +10331,7 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
 .brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics {
   padding: 12px !important;
+  gap: var(--dashboard-card-gap) !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page .gd-metric-card-content {

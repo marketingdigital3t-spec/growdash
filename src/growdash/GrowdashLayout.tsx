@@ -40,7 +40,7 @@ import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
-import { SpaceMissionStrip, SpacePhaseBackground } from "@/components/space/SpacePhaseBackground";
+import { SpacePhaseBackground } from "@/components/space/SpacePhaseBackground";
 import { getSpacePhase } from "@/lib/spacePhase";
 import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 import { AgentChatDock } from "@/components/agents/AgentChatDock";
@@ -504,7 +504,6 @@ export default function GrowdashLayout() {
               : "min-h-[calc(100vh-48px)]",
           )}
         >
-          {(pathname === "/" || pathname === "/painel-expert") && <SpaceMissionStrip phase={spacePhase} realized={goalRevenue} target={goalTarget} />}
           <div
             className={cn(
               "growdash-content-frame gd-layout-canvas mx-auto w-full min-w-0 max-w-[1920px]",
