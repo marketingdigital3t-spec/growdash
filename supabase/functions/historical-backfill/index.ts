@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
       if (metaAccountIndex < accounts.length) {
         const account = accounts[metaAccountIndex];
         const windowStart = metaWindowStart <= today ? metaWindowStart : historicalStart;
-        const windowEnd = addDays(windowStart, 89) < today ? addDays(windowStart, 89) : today;
+        const windowEnd = addDays(windowStart, 29) < today ? addDays(windowStart, 29) : today;
         const common = {
           adAccountId: account.id,
           startDate: windowStart,
