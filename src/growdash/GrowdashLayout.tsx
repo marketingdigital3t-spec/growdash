@@ -350,7 +350,7 @@ export default function GrowdashLayout() {
                 </button>
               )}
               <div id={sectionContentId} hidden={showSidebarLabels && !isOpen} className="space-y-0.5">
-                {section.items.map((item) => {
+                {(!showSidebarLabels || isOpen) && section.items.map((item) => {
                   const Icon = item.icon;
                   const [itemPathname, itemSearch = ""] = item.path.split("?");
                   const targetAnalysis = new URLSearchParams(itemSearch).get("analise");
