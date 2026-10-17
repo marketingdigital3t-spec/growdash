@@ -213,11 +213,10 @@ Deno.serve(async (req) => {
           startDate: windowStart,
           endDate: windowEnd,
           incremental: false,
-          // Historical audience/placement/region data is part of the same
-          // provider truth and must not be omitted from a complete backfill.
-          includeBreakdowns: true,
-          breakdownStartDate: windowStart,
-          breakdownEndDate: windowEnd,
+          // Keep the historical base facts bounded. Audience/placement/region
+          // breakdowns have their own incremental sync and can exceed the
+          // gateway timeout when requested across a 90-day historical window.
+          includeBreakdowns: false,
           triggerSource: "historical_backfill",
         };
         const providers = [
