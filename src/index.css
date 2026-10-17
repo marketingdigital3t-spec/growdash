@@ -9731,3 +9731,19 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
   background-color: transparent !important;
   background-image: none !important;
 }
+
+/* Theme-specific shell rules have a higher selector weight, so repeat the
+   transparent canvas contract with equal-or-greater specificity. */
+html.dark body .brand-shell[data-dashboard-scene="true"] .growdash-content-shell,
+html.dark body .brand-shell[data-dashboard-scene="true"] .growdash-main,
+html.dark body .brand-shell[data-dashboard-scene="true"] .growdash-content-frame,
+html.dark body .brand-shell[data-dashboard-scene="true"] .gd-page-transition,
+html.dark body .brand-shell[data-dashboard-scene="true"] .dashboard-page,
+html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .growdash-content-shell,
+html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .growdash-main,
+html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .growdash-content-frame,
+html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .gd-page-transition,
+html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .dashboard-page {
+  background-color: rgba(0, 0, 0, 0) !important;
+  background-image: none !important;
+}
