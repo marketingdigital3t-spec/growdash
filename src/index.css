@@ -10590,4 +10590,53 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+
+  /* Keep the mobile frame usable without turning the page into a second
+     scroller. The scope and action rows remain horizontally scrollable strips
+     instead of expanding into a multi-row grid that consumes the table. */
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-scope-toolbar,
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-actions-toolbar {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-scope-toolbar {
+    min-height: 50px !important;
+    height: 50px !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-scope-toolbar > .campaign-scope-action {
+    width: auto !important;
+    min-width: max-content !important;
+    white-space: nowrap !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-scope-toolbar > .meta-toolbar-primary {
+    margin-left: auto !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-actions-toolbar {
+    min-height: 56px !important;
+    height: 56px !important;
+    max-height: 56px !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] :is(.campaign-primary-actions, .campaign-secondary-actions) {
+    display: flex !important;
+    width: auto !important;
+    min-width: max-content !important;
+    flex: 0 0 auto !important;
+    margin-left: 0 !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-actions-toolbar :is(.campaign-action-button, .campaign-action-select, .campaign-columns-control, .campaign-columns-control > button) {
+    width: auto !important;
+    min-width: max-content !important;
+    min-height: 44px !important;
+    white-space: nowrap !important;
+  }
 }
