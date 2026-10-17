@@ -9727,6 +9727,7 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
 .brand-shell[data-dashboard-scene="true"] .growdash-content-frame,
 .brand-shell[data-dashboard-scene="true"] .gd-page-transition,
 .brand-shell[data-dashboard-scene="true"] .dashboard-page {
+  background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
 }
