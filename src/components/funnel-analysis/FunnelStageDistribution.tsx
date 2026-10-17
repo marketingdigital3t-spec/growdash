@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip as StageTooltip, TooltipContent as StageTooltipContent, TooltipProvider, TooltipTrigger as StageTooltipTrigger } from "@/components/ui/tooltip";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
-import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualTextColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
 
 interface Props {
   a: FunnelAnalytics;
@@ -90,12 +90,13 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
       <CardContent>
         {visualMode ? (
           <div className="flex flex-col items-center gap-2 py-1" aria-label="Funil visual por etapa">
-            <div className="w-full rounded-2xl border border-border/50 bg-background/30 px-1 py-2 sm:px-2 sm:py-3">
-              <div className="mx-auto flex w-full max-w-[320px] flex-col items-center">
+            <div className="gd-funnel-visual w-full rounded-2xl border border-border/50 bg-background/30 px-2 py-3 sm:px-4 sm:py-4">
+              <div className="gd-funnel-visual-stack mx-auto flex w-full max-w-[560px] flex-col items-center gap-1.5">
                 <TooltipProvider delayDuration={250}>
                   {stages.map((stage, index) => {
                     const width = funnelStageVisualWidth(index, visualStageCount);
                     const accentColor = funnelStageVisualColor(index, visualStageCount);
+                    const textColor = funnelStageVisualTextColor(index, visualStageCount);
                     const avgTime = stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "Indisponível";
                     const negotiationValue = stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Nenhum valor";
                     const accessibleDescription = `${stage.name}: ${stage.count} leads, ${stage.pct.toFixed(1)}% do total. Tempo médio: ${avgTime}. Valor em negociação: ${negotiationValue}.`;
@@ -104,23 +105,25 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                         <StageTooltipTrigger asChild>
                           <div
                             tabIndex={0}
-                            className="group relative z-10 -mt-px flex min-h-[40px] cursor-help flex-col items-center justify-center overflow-hidden border-y border-white/20 px-2 py-0.5 text-center text-white shadow-[0_6px_14px_-12px_rgba(0,0,0,.95)] outline-none transition-[width,filter,transform] duration-300 first:mt-0 hover:z-20 hover:brightness-110 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[44px] sm:px-3"
+                            className="gd-funnel-stage group relative z-10 flex min-h-[64px] cursor-help flex-col items-center justify-center overflow-hidden px-3 py-2.5 text-center outline-none transition-[width,filter,transform] duration-200 hover:z-20 hover:-translate-y-0.5 hover:brightness-105 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[70px] sm:px-5"
                             style={{
-                              width: `max(${width}%, 150px)`,
-                              background: "linear-gradient(105deg, #08090b 0%, #4b4f56 14%, #15171b 27%, #050506 53%, #777c84 85%, #17191d 100%)",
-                              clipPath: "polygon(5% 0, 95% 0, 86% 100%, 14% 100%)",
-                              filter: "drop-shadow(0 3px 3px rgba(0,0,0,.28))",
-                            }}
+                              width: `max(${width}%, 210px)`,
+                              "--funnel-stage-accent": accentColor,
+                              "--funnel-stage-text": textColor,
+                            } as CSSProperties}
                             aria-label={accessibleDescription}
                           >
-                            <span className="pointer-events-none absolute inset-x-[7%] top-0 h-px rounded-full bg-gradient-to-r from-white/20 via-white/90 to-white/20" aria-hidden="true" />
-                            <span className="pointer-events-none absolute inset-x-[11%] bottom-0 h-[3px] rounded-full border-t border-white/60 bg-gradient-to-r from-slate-500 via-white/90 to-slate-500 shadow-[0_-1px_3px_rgba(255,255,255,.55)]" aria-hidden="true" />
-                            <span className="relative z-10 flex max-w-[92%] items-center justify-center gap-1 truncate text-[8px] font-bold uppercase leading-tight tracking-[0.06em] sm:text-[9px]">
-                              <span className="h-1.5 w-1.5 shrink-0 rounded-full ring-1 ring-white/30" style={{ background: accentColor }} aria-hidden="true" />
-                              <span className="truncate">{stage.name}</span>
+                            <span className="pointer-events-none absolute inset-x-6 top-0 h-px rounded-full bg-white/45" aria-hidden="true" />
+                            <span className="relative z-10 flex max-w-full items-center justify-center gap-2 text-[10px] font-extrabold uppercase leading-none tracking-[0.08em]" style={{ color: "var(--funnel-stage-text)" }}>
+                              <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-black/10" style={{ background: "var(--funnel-stage-accent)" }} aria-hidden="true" />
+                              <span className="max-w-full break-words">{stage.name}</span>
                             </span>
-                            <span className="relative z-10 text-xs font-extrabold leading-tight tabular-nums sm:text-sm">{stage.count} <span className="text-[8px] font-semibold uppercase tracking-normal text-white/70 sm:text-[9px]">leads</span> <span className="text-[8px] font-semibold text-white/70 sm:text-[9px]">· {stage.pct.toFixed(1)}%</span></span>
-                            <span className="relative z-10 flex max-w-[94%] items-center justify-center gap-x-2 truncate text-[7px] font-medium leading-tight text-white/65 sm:text-[8px]">
+                            <span className="relative z-10 mt-1 flex items-baseline justify-center gap-2 tabular-nums" style={{ color: "var(--funnel-stage-text)" }}>
+                              <span className="text-xl font-black leading-none sm:text-2xl">{stage.count}</span>
+                              <span className="text-[9px] font-bold uppercase tracking-[0.08em] opacity-70">leads</span>
+                              <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[9px] font-bold">{stage.pct.toFixed(1)}%</span>
+                            </span>
+                            <span className="relative z-10 mt-1 flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[9px] font-semibold leading-tight opacity-70" style={{ color: "var(--funnel-stage-text)" }}>
                               <span>{stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} d médio` : "Tempo indisponível"}</span>
                               <span>{stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Sem valor"}</span>
                             </span>

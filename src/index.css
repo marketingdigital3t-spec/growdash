@@ -7017,6 +7017,44 @@ html:not(.dark) .growdash-sidebar-tooltip {
   height: auto !important;
 }
 
+/* The RD funnel is a data visualization, not a metallic illustration. Keep
+   each stage as a compact, rounded surface so the silhouette reads clearly,
+   while the stage accent carries the progression from first contact to sale. */
+.gd-funnel-visual {
+  background: color-mix(in srgb, var(--gd-content-panel) 72%, transparent) !important;
+  border-color: var(--gd-content-border) !important;
+}
+.gd-funnel-visual-stack { padding-block: .25rem; }
+.gd-funnel-stage {
+  border: 1px solid color-mix(in srgb, var(--funnel-stage-accent) 68%, var(--gd-content-border));
+  border-radius: 15px 15px 12px 12px;
+  background: color-mix(in srgb, var(--funnel-stage-accent) 78%, var(--gd-content-panel) 22%);
+  color: var(--funnel-stage-text);
+  box-shadow:
+    0 9px 18px -16px color-mix(in srgb, var(--funnel-stage-accent) 80%, transparent),
+    inset 0 1px rgba(255,255,255,.32),
+    inset 0 -1px rgba(0,0,0,.16);
+}
+.gd-funnel-stage::after {
+  position: absolute;
+  right: 14%;
+  bottom: -5px;
+  left: 14%;
+  height: 5px;
+  border-radius: 0 0 8px 8px;
+  background: color-mix(in srgb, var(--funnel-stage-accent) 58%, var(--gd-content-panel));
+  box-shadow: inset 0 1px rgba(255,255,255,.25);
+  content: "";
+  opacity: .9;
+}
+.gd-funnel-stage:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--funnel-stage-accent) 45%, transparent), 0 9px 18px -16px color-mix(in srgb, var(--funnel-stage-accent) 80%, transparent); }
+.dark .gd-funnel-stage { box-shadow: 0 12px 22px -17px rgba(0,0,0,.95), inset 0 1px rgba(255,255,255,.2), inset 0 -1px rgba(0,0,0,.28); }
+@media (max-width: 640px) {
+  .gd-funnel-stage { min-width: 0 !important; }
+  .gd-funnel-stage .text-xl { font-size: 1.15rem; }
+  .gd-funnel-stage { padding-inline: .75rem; }
+}
+
 /* The top KPI summary is one deliberate compact group. It is distinct from
    the open dashboard sections below, which must remain without a giant card. */
 .brand-shell .dashboard-summary-strip-surface {
