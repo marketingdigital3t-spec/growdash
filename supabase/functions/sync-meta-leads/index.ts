@@ -543,6 +543,22 @@ Deno.serve(async (req) => {
           if (f?.id) formIds.add(String(f.id));
         }
 
+        // Keep a server-side form -> account route so the webhook can resolve
+        // a brand-new lead before the ad catalog has seen its ad/adset.
+        if (formIds.size) {
+          const catalogRows = Array.from(formIds).map((formId) => ({
+            form_id: formId,
+            ad_account_id: acc.id,
+            name: formNames.get(formId) || null,
+            last_seen_at: new Date().toISOString(),
+            raw: { source: "sync-meta-leads" },
+          }));
+          const { error: catalogError } = await admin
+            .from("meta_lead_form_catalog")
+            .upsert(catalogRows, { onConflict: "form_id", ignoreDuplicates: false });
+          if (catalogError) discoveryWarnings.push(`form catalog: ${catalogError.message}`);
+        }
+
         const adNames = new Map<string, string>();
         const adsetNames = new Map<string, string>();
         const campaignNames = new Map<string, string>();

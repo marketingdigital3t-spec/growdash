@@ -9,6 +9,13 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 type MetaAccount = { id: string; user_id: string; workspace_id: string | null; access_token: string; account_id: string };
 
+function bytesToHex(bytes: ArrayBuffer | Uint8Array) {
+  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  return Array.from(view, (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+}
+
 function pickField(fields: unknown, names: string[]) {
   if (!Array.isArray(fields)) return null;
   const wanted = names.map((name) => name.toLowerCase().replace(/[^a-z0-9]/g, ""));
@@ -36,6 +43,10 @@ async function resolveAccount(admin: any, adId: string | null, formId: string | 
   if (!accountId && formId) {
     const { data: lead } = await admin.from("meta_leads").select("ad_account_id").eq("form_id", formId).order("created_time", { ascending: false }).limit(1).maybeSingle();
     accountId = lead?.ad_account_id ?? null;
+  }
+  if (!accountId && formId) {
+    const { data: form } = await admin.from("meta_lead_form_catalog").select("ad_account_id").eq("form_id", formId).maybeSingle();
+    accountId = form?.ad_account_id ?? null;
   }
   if (!accountId) return null;
   const { data: account } = await admin.from("ad_accounts").select("id,user_id,workspace_id,access_token,account_id").eq("id", accountId).maybeSingle();
