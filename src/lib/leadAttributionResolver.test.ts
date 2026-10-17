@@ -8,7 +8,7 @@ const insight = (overrides: any = {}) => ({
 describe("resolveLeadAttribution", () => {
   it("resolve somente com utm_id e respeita a conta", () => {
     const result = resolveLeadAttribution({ ad_account_id: "acc-1", utm_id: "ad-1" }, [insight() as any]);
-    expect(result).toMatchObject({ campaignName: "Campanha 1", adsetName: "Conjunto 1", adName: "Criativo 1", method: "meta_id", status: "attributed" });
+    expect(result).toMatchObject({ source: null, platform: null, campaignName: "Campanha 1", adsetName: "Conjunto 1", adName: "Criativo 1", method: "meta_id", status: "attributed" });
   });
 
   it("não cruza o anúncio de outra conta", () => {

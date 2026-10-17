@@ -1205,7 +1205,7 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
           <DetailRow icon={<Mail />} label="E-mail" value={deal.contact_email || "Não informado"} />
           <DetailRow icon={<MapPin />} label="Localização" value={[deal.lead_city, deal.lead_state].filter(Boolean).join(" / ") || "Não informada"} />
           <DetailRow icon={<UsersRound />} label="Produto" value={deal.rd_product_name || "Não informado"} />
-          <DetailRow icon={<Target />} label="Origem" value={attribution?.platform || "Sem parâmetros de rastreamento"} />
+          <DetailRow icon={<Target />} label="Origem" value={attribution?.source || (attribution?.isOrganic === true ? "Orgânico" : "Sem parâmetros de rastreamento")} />
           <DetailRow icon={<Target />} label="Campanha" value={attribution?.campaignName || "Não atribuída"} />
           <DetailRow icon={<Target />} label="Conjunto" value={attribution?.adsetName || "Não atribuído"} />
           <DetailRow icon={<Target />} label="Criativo" value={attribution?.adName || "Não atribuído"} />

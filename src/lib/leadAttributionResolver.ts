@@ -4,6 +4,7 @@ export type LeadAttributionMethod = "meta_id" | "utm" | "touch" | "unmatched";
 export type LeadAttributionStatus = "attributed" | "partial" | "unavailable";
 
 export interface LeadAttribution {
+  source: string | null;
   platform: string | null;
   placement: string | null;
   formId: string | null;
@@ -58,6 +59,7 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
   const campaign = text(deal.utm_campaign);
   const adset = text(deal.utm_term);
   const creative = text(deal.utm_content);
+  const source = text(deal.utm_source) || null;
   const byNames = campaign && adset && creative
     ? rows.find((row) => same(row.campaign_name, campaign) && same(row.adset_name, adset) && same(row.ad_name, creative))
     : undefined;
@@ -71,7 +73,8 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
   const hasAny = Boolean(adId || campaign || adset || creative || campaignId || adsetId);
   if (!hit) {
     return {
-      platform: text(deal.meta_platform) || text(deal.utm_source) || (hasAny ? "meta" : null),
+      source,
+      platform: text(deal.meta_platform) || null,
       placement: text(deal.meta_placement) || null,
       formId: text(deal.meta_form_id) || null,
       formName: text(deal.meta_form_name) || null,
@@ -87,7 +90,8 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
     };
   }
   return {
-    platform: text(deal.meta_platform) || text(deal.utm_source) || "meta",
+    source,
+    platform: text(deal.meta_platform) || null,
     placement: text(deal.meta_placement) || null,
     formId: text(deal.meta_form_id) || null,
     formName: text(deal.meta_form_name) || null,
