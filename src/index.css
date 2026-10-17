@@ -9883,3 +9883,162 @@ html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .dashboard-page {
   background: color-mix(in srgb, var(--brand-gold) 14%, transparent) !important;
   color: var(--brand-gold-light) !important;
 }
+
+/* Final visual pass -------------------------------------------------------
+   Traffic navigation is a secondary dock: persistent on desktop, compact by
+   default and expanded only on demand. The Dashboard scene remains the
+   canvas, while cards keep enough contrast for data without painting a black
+   slab over the Earth. */
+.traffic-page-shell { --traffic-nav-width: 3.5rem; }
+.traffic-page-shell:has([data-traffic-nav][data-expanded="true"]) { --traffic-nav-width: 13rem; }
+
+.traffic-nav-rail {
+  top: calc(48px + 14px);
+  right: 14px;
+  bottom: 14px;
+  width: var(--traffic-nav-width);
+  max-height: none;
+  border-color: rgba(255,255,255,.16);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(25,26,30,.96), rgba(11,12,15,.94));
+  box-shadow: 0 22px 48px -28px rgba(0,0,0,.9), inset 0 1px rgba(255,255,255,.08);
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.traffic-nav-rail-header {
+  min-height: 3rem;
+  border-bottom-color: rgba(255,255,255,.1);
+  padding: .55rem .5rem .55rem .75rem;
+}
+
+.traffic-nav-rail[data-expanded="false"] .traffic-nav-rail-header {
+  justify-content: center;
+  padding-inline: .5rem;
+}
+
+.traffic-nav-toggle {
+  height: 2rem;
+  width: 2rem;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px;
+  background: rgba(255,255,255,.045);
+  color: rgba(255,255,255,.72);
+}
+
+.traffic-nav-toggle:hover,
+.traffic-nav-toggle:focus-visible {
+  border-color: rgba(255,255,255,.42);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+
+.traffic-nav-items { gap: .35rem; padding: .6rem .5rem .65rem; }
+
+.traffic-nav-item {
+  position: relative;
+  min-height: 2.7rem;
+  border-color: transparent;
+  border-radius: 10px;
+  padding: .55rem .65rem;
+  color: rgba(255,255,255,.62);
+  font-size: .69rem;
+  transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease;
+}
+
+.traffic-nav-item:hover {
+  border-color: rgba(255,255,255,.14);
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  transform: translateX(-1px);
+}
+
+.traffic-nav-item.traffic-area-tab-active {
+  border-color: rgba(255,255,255,.72);
+  background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(216,221,229,.9));
+  color: #101216;
+  box-shadow: 0 10px 24px -18px rgba(255,255,255,.9), inset 0 1px rgba(255,255,255,.95);
+}
+
+.traffic-nav-item.traffic-area-tab-active::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 3px;
+  width: 3px;
+  border-radius: 999px;
+  background: #111318;
+  content: "";
+}
+
+.traffic-nav-item > svg { color: rgba(255,255,255,.56); }
+.traffic-nav-item.traffic-area-tab-active > svg { color: #101216 !important; }
+
+.traffic-nav-rail[data-expanded="false"] .traffic-nav-item {
+  justify-content: center;
+  padding-inline: .45rem;
+}
+
+.traffic-nav-rail[data-expanded="false"] .traffic-nav-item.traffic-area-tab-active::before {
+  top: 8px;
+  bottom: 8px;
+  left: 2px;
+}
+
+.traffic-nav-label { font-size: .69rem; letter-spacing: -.005em; }
+
+/* Keep the right dock out of the content flow on narrow screens. It becomes
+   a readable horizontal tab strip instead of overlapping the page. */
+@media (max-width: 767px) {
+  .traffic-nav-rail,
+  .traffic-nav-rail[data-expanded="false"] {
+    top: auto;
+    right: .75rem;
+    bottom: .75rem;
+    left: .75rem;
+    width: auto;
+    max-height: 4.2rem;
+    border-radius: 14px;
+  }
+
+  .traffic-nav-rail-header { display: none; }
+  .traffic-nav-items { gap: .35rem; padding: .45rem; }
+  .traffic-nav-item,
+  .traffic-nav-rail[data-expanded="false"] .traffic-nav-item {
+    min-height: 2.7rem;
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: center;
+    padding-inline: .75rem;
+  }
+  .traffic-nav-label,
+  .traffic-nav-rail[data-expanded="true"] .traffic-nav-label {
+    width: auto;
+    opacity: 1;
+  }
+  .traffic-nav-item > svg { display: none; }
+}
+
+/* The fixed Earth is decorative but should be visible between the cards. */
+.brand-shell[data-dashboard-scene="true"] .space-phase-planet {
+  opacity: .98 !important;
+  filter: brightness(1.08) saturate(1.55) contrast(1.08) !important;
+  box-shadow: 0 0 32px 3px rgba(92,203,255,.72), 0 0 150px 38px rgba(0,134,255,.3), inset -48px -32px 72px rgba(0,0,0,.42) !important;
+}
+
+.brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar) {
+  background: rgba(9, 15, 23, .34) !important;
+  border-color: rgba(164, 211, 255, .34) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .14), inset 0 1px rgba(255, 255, 255, .1) !important;
+  backdrop-filter: blur(8px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(1.2) !important;
+}
+
+.brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-summary-strip-surface {
+  background: rgba(9, 15, 23, .52) !important;
+}
+
+html:not(.dark) .brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar) {
+  background: rgba(255, 255, 255, .62) !important;
+  border-color: rgba(17, 61, 98, .26) !important;
+}
