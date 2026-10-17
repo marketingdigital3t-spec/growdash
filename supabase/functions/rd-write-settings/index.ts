@@ -50,15 +50,23 @@ Deno.serve(async (req) => {
       return json({ error: "Conecte e valide o RD antes de habilitar escritas" }, 409);
     }
 
-    const { data, error } = await admin
+    // The card represents the user's global RD write permission, while the
+    // database stores the guard per connection. Normalize every connection so
+    // a sync on another account cannot make the toggle appear to change after
+    // a reload, and an explicit disable really disables all RD writes.
+    const { error: updateError } = await admin
       .from("rd_account_connections")
       .update({ write_enabled: body.write_enabled, write_updated_at: new Date().toISOString() })
-      .eq("id", connection.id)
-      .eq("user_id", userId)
-      .select("id,write_enabled,write_updated_at")
-      .single();
-    if (error) throw error;
-    return json({ ok: true, connection: data });
+      .eq("user_id", userId);
+    if (updateError) throw updateError;
+    return json({
+      ok: true,
+      connection: {
+        id: connection.id,
+        write_enabled: body.write_enabled,
+        write_updated_at: new Date().toISOString(),
+      },
+    });
   } catch (error) {
     console.error("rd-write-settings", error);
     return json({ error: error instanceof Error ? error.message : "Erro interno" }, 500);

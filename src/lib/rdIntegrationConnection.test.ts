@@ -17,6 +17,13 @@ describe("selectPrimaryRDIntegration", () => {
     expect(selectPrimaryRDIntegration([syncedAccount, primary])?.id).toBe("rd-owner");
   });
 
+  it("preserves an existing enabled permission while connections are normalized", () => {
+    const owner = connection({ id: "rd-owner", external_account_id: "rd:user:rd-station", write_enabled: false });
+    const enabledAccount = connection({ id: "enabled-account", external_account_id: "act_123", write_enabled: true });
+
+    expect(selectPrimaryRDIntegration([owner, enabledAccount])?.id).toBe("enabled-account");
+  });
+
   it("uses a legacy RD-only row when the new owner-level row does not exist", () => {
     const legacy = connection({ id: "legacy-rd", external_account_id: null });
     const meta = connection({ id: "meta-account", external_account_id: "act_123" });

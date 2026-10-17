@@ -1,6 +1,7 @@
 export type RDIntegrationConnectionCandidate = {
   id: string;
   status: string;
+  write_enabled?: boolean;
   external_account_id?: string | null;
   created_at?: string | null;
 };
@@ -21,10 +22,14 @@ export function selectPrimaryRDIntegration<T extends RDIntegrationConnectionCand
     const externalId = connection.external_account_id ?? "";
     const isOwnerLevel = externalId.startsWith("rd:") || externalId === "";
     const isConnected = connection.status === "connected";
-    if (isOwnerLevel && isConnected) return 0;
-    if (isOwnerLevel) return 1;
+    // Preserve an already-enabled permission during the transition from the
+    // old "latest updated row" selector. The settings endpoint normalizes all
+    // rows on the next explicit toggle, so disabling is still deterministic.
+    if (connection.write_enabled === true && isConnected) return 0;
+    if (isOwnerLevel && isConnected) return 1;
     if (isConnected) return 2;
-    return 3;
+    if (isOwnerLevel) return 3;
+    return 4;
   };
 
   return [...connections].sort((a, b) => {
