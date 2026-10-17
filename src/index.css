@@ -9770,7 +9770,8 @@ html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .dashboard-page {
 .brand-shell[data-dashboard-scene="true"] .space-phase-badge { display: flex !important; }
 
 .brand-shell[data-dashboard-scene="true"][data-space-phase="terra"] .space-phase-planet {
-  filter: brightness(.78) saturate(1.35) contrast(1.14) !important;
+  opacity: .86 !important;
+  filter: brightness(.92) saturate(1.4) contrast(1.14) !important;
 }
 .brand-shell[data-dashboard-scene="true"][data-space-phase="orbita"] .space-phase-planet {
   background-image: radial-gradient(circle at 32% 28%, #ffe9a3, #b77900 42%, #2b1b02 76%, #080808 100%) !important;
