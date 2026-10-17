@@ -10235,3 +10235,65 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 .brand-shell .analytics-module.analytics-module:has(.dashboard-page) {
   background: transparent !important;
 }
+
+/* Dashboard desktop composition: the page keeps its own scroll surface so the
+   browser document does not grow past the viewport. The scrollbar is hidden
+   visually, but scrolling remains available with the wheel, trackpad and
+   keyboard. This is scoped to Dashboard only; other modules keep their normal
+   scroll behavior. */
+@media (min-width: 768px) {
+  .brand-shell:has(.dashboard-page) .growdash-app-shell,
+  .brand-shell:has(.dashboard-page) .growdash-content-shell {
+    height: 100svh;
+    max-height: 100svh;
+  }
+
+  .brand-shell:has(.dashboard-page) .growdash-content-shell {
+    overflow: hidden;
+  }
+
+  .brand-shell:has(.dashboard-page) .growdash-main {
+    height: calc(100svh - 48px);
+    max-height: calc(100svh - 48px);
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: none;
+    scrollbar-width: none;
+  }
+
+  .brand-shell:has(.dashboard-page) .growdash-main::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Keep the Dashboard as a single contained surface: only its main content
+     scrolls, and the browser-level side scrollbar never appears. */
+  html:has(.dashboard-page),
+  body:has(.dashboard-page),
+  .brand-shell:has(.dashboard-page) {
+    overflow-x: hidden !important;
+  }
+
+  html:has(.dashboard-page),
+  body:has(.dashboard-page) {
+    overflow-y: hidden !important;
+  }
+
+  /* The standard platform card has its own chart/list geometry. Remove the
+     legacy 320px floor so the 4-row financial strip stays compact and aligned. */
+  .brand-shell .dashboard-grid-container :is(.dashboard-glass-card, .dashboard-terra-card) {
+    min-height: 0 !important;
+  }
+
+  .brand-shell .dashboard-grid-container [class~="h-[188px]"] {
+    width: 164px !important;
+    height: 164px !important;
+  }
+
+  .brand-shell .dashboard-grid-container [class~="h-48"] {
+    height: 160px !important;
+  }
+
+  .brand-shell .dashboard-grid-container .gd-platform-tabs {
+    margin-top: 0 !important;
+  }
+}

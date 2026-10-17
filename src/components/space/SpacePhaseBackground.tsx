@@ -33,7 +33,10 @@ export function SpacePhaseBackground({ phase, dashboardScene = false }: { phase:
       </div>
       <div className="space-phase-radar" aria-hidden="true"><span /><i /><i /><i /></div>
       <div className="space-phase-rocket"><SpaceRocket /><span /></div>
-      <div className="space-phase-badge"><Globe2 /><span><b>{copy.title}</b><small>{copy.subtitle}</small></span><em><Sparkles /> FASE: {phase === "orbita" ? "ÓRBITA" : phase.toUpperCase()}</em></div>
+      {/* The phase badge competes with the Dashboard header and is intentionally
+          omitted from that route. The phase still drives the background, theme
+          accent and mission strip without adding another floating control. */}
+      {!dashboardScene && <div className="space-phase-badge"><Globe2 /><span><b>{copy.title}</b><small>{copy.subtitle}</small></span><em><Sparkles /> FASE: {phase === "orbita" ? "ÓRBITA" : phase.toUpperCase()}</em></div>}
     </div>
   );
 }
