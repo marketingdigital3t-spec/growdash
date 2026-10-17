@@ -26,6 +26,14 @@ type LeadRow = {
   lead_state: string | null;
   lead_state_source: string | null;
   lead_city: string | null;
+  campaign_name: string | null;
+  adset_name: string | null;
+  ad_name: string | null;
+  form_name: string | null;
+  platform: string | null;
+  placement: string | null;
+  is_organic: boolean | null;
+  attribution_status: "captured" | "partial";
   raw: any;
 };
 
@@ -330,6 +338,7 @@ Deno.serve(async (req) => {
     let totalPages = 0;
     let lastCursor: string | null = null;
     const pageFormsByToken = new Map<string, Map<string, string[]>>();
+    const formNamesByToken = new Map<string, Map<string, string>>();
     const permissionsByToken = new Map<string, Set<string> | null>();
 
     async function inspectPermissions(token: string): Promise<Set<string> | null> {
@@ -361,8 +370,9 @@ Deno.serve(async (req) => {
       const cached = pageFormsByToken.get(token);
       if (cached) return cached;
       const result = new Map<string, string[]>();
+      const names = formNamesByToken.get(token) || new Map<string, string>();
       const pagesRes = await fetchAll(
-        `${GRAPH}/me/accounts?fields=id,leadgen_forms.limit(200){id,account_id}&limit=100&access_token=${token}`,
+        `${GRAPH}/me/accounts?fields=id,leadgen_forms.limit(200){id,name,account_id}&limit=100&access_token=${token}`,
       );
       if (!pagesRes.error) {
         for (const page of pagesRes.data || []) {
@@ -371,10 +381,12 @@ Deno.serve(async (req) => {
             if (!accountKey) continue;
             const list = result.get(accountKey) || [];
             if (form?.id) list.push(String(form.id));
+            if (form?.id && form?.name) names.set(String(form.id), String(form.name));
             result.set(accountKey, list);
           }
         }
       }
+      formNamesByToken.set(token, names);
       pageFormsByToken.set(token, result);
       return result;
     }
@@ -389,7 +401,7 @@ Deno.serve(async (req) => {
         // Discover form_ids primarily via /leadgen_forms. The ads creative field is
         // unreliable across Meta API versions and was aborting the whole account.
         const adsUrl =
-          `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id,creative{object_story_spec}&limit=50&access_token=${token}`;
+          `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id,adset{name},campaign{name},creative{object_story_spec}&limit=50&access_token=${token}`;
         // Follow every ads page. Discovering only the first page silently
         // omitted forms from larger accounts and made lead KPIs look partial.
         let adsRes = await fetchAll(adsUrl);
@@ -398,7 +410,7 @@ Deno.serve(async (req) => {
           // lead synchronization alive with the minimal ad listing, while
           // retaining the error only if the fallback also fails.
           const fallbackAds = await fetchAll(
-            `${GRAPH}/${actId}/ads?fields=id,adset_id,campaign_id&limit=200&access_token=${token}`,
+            `${GRAPH}/${actId}/ads?fields=id,name,adset_id,campaign_id&limit=200&access_token=${token}`,
           );
           if (!fallbackAds.error) adsRes = fallbackAds;
           else adsRes = { ...adsRes, error: `ads: ${adsRes.error}; fallback: ${fallbackAds.error}` };
@@ -432,11 +444,16 @@ Deno.serve(async (req) => {
         for (const ad of adsRes.data || []) collectFormIds(ad?.creative);
         // Also discover via /leadgen_forms on the account (covers forms not bound to specific ads)
         const formsUrl =
-          `${GRAPH}/${actId}/leadgen_forms?fields=id&limit=200&access_token=${token}`;
+          `${GRAPH}/${actId}/leadgen_forms?fields=id,name&limit=200&access_token=${token}`;
         const canReadLeadForms = !grantedPermissions || grantedPermissions.has("leads_retrieval");
         const formsRes = canReadLeadForms
           ? await fetchAll(formsUrl)
           : { data: [], pages: 0, error: "leads_retrieval ausente" };
+        const formNames = formNamesByToken.get(token) || new Map<string, string>();
+        for (const form of formsRes.data || []) {
+          if (form?.id && form?.name) formNames.set(String(form.id), String(form.name));
+        }
+        formNamesByToken.set(token, formNames);
         if (formsRes.error && canReadLeadForms) {
           const pageForms = await discoverPageForms(token);
           for (const id of pageForms.get(raw.replace(/^act_/, "")) || []) formIds.add(id);
@@ -446,6 +463,30 @@ Deno.serve(async (req) => {
         if (formsRes.error && formIds.size === 0) discoveryWarnings.push(`forms: ${formsRes.error}`);
         for (const f of formsRes.data || []) {
           if (f?.id) formIds.add(String(f.id));
+        }
+
+        const adNames = new Map<string, string>();
+        const adsetNames = new Map<string, string>();
+        const campaignNames = new Map<string, string>();
+        for (const ad of adsRes.data || []) {
+          if (ad?.id && ad?.name) adNames.set(String(ad.id), String(ad.name));
+          if (ad?.adset_id && ad?.adset?.name) adsetNames.set(String(ad.adset_id), String(ad.adset.name));
+          if (ad?.campaign_id && ad?.campaign?.name) campaignNames.set(String(ad.campaign_id), String(ad.campaign.name));
+        }
+        const campaignIds = Array.from(new Set((adsRes.data || []).map((ad: any) => String(ad?.campaign_id || "")).filter(Boolean)));
+        const adsetIds = Array.from(new Set((adsRes.data || []).map((ad: any) => String(ad?.adset_id || "")).filter(Boolean)));
+        const adIds = Array.from(new Set((adsRes.data || []).map((ad: any) => String(ad?.id || "")).filter(Boolean)));
+        if (campaignIds.length) {
+          const { data } = await admin.from("campaigns").select("id,name").in("id", campaignIds);
+          for (const row of data || []) campaignNames.set(String(row.id), String(row.name));
+        }
+        if (adsetIds.length) {
+          const { data } = await admin.from("adsets").select("id,name").in("id", adsetIds);
+          for (const row of data || []) adsetNames.set(String(row.id), String(row.name));
+        }
+        if (adIds.length) {
+          const { data } = await admin.from("ads").select("id,name").in("id", adIds);
+          for (const row of data || []) adNames.set(String(row.id), String(row.name));
         }
 
         let leadsUpserted = 0;
@@ -468,8 +509,17 @@ Deno.serve(async (req) => {
           }
           const filtering = encodeURIComponent(JSON.stringify(filters));
           const leadsUrl =
-            `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
-          const r = await fetchAll(leadsUrl);
+            `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,form_name,platform,site_source_name,placement,platform_position,is_organic,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
+          let r = await fetchAll(leadsUrl);
+          if (r.error) {
+            // Some Graph API versions reject optional name/placement fields
+            // on /leads. Retry with the stable lead fields so one unsupported
+            // field cannot make the whole form disappear from the mirror.
+            const fallbackLeadsUrl =
+              `${GRAPH}/${formId}/leads?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&limit=200&filtering=${filtering}&access_token=${token}`;
+            const fallback = await fetchAll(fallbackLeadsUrl);
+            if (!fallback.error) r = fallback;
+          }
           totalPages += r.pages;
           if (r.lastCursor) lastCursor = r.lastCursor;
           if (r.error) {
@@ -517,6 +567,14 @@ Deno.serve(async (req) => {
               lead_state: state,
               lead_state_source: source,
               lead_city: pickField(fd, CITY_KEYS),
+              campaign_name: String(l.campaign_name || campaignNames.get(String(l.campaign_id || "")) || "") || null,
+              adset_name: String(l.adset_name || adsetNames.get(String(l.adset_id || "")) || "") || null,
+              ad_name: String(l.ad_name || adNames.get(String(l.ad_id || "")) || "") || null,
+              form_name: String(l.form_name || formNames.get(String(l.form_id || formId)) || "") || null,
+              platform: String(l.platform || l.site_source_name || l.publisher_platform || "") || null,
+              placement: String(l.placement || l.platform_position || "") || null,
+              is_organic: typeof l.is_organic === "boolean" ? l.is_organic : null,
+              attribution_status: l.campaign_id && l.adset_id && l.ad_id ? "captured" : "partial",
               raw: l,
             };
           });

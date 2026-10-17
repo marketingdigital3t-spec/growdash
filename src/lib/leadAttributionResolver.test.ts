@@ -21,4 +21,32 @@ describe("resolveLeadAttribution", () => {
     const result = resolveLeadAttribution({ ad_account_id: "acc-1", utm_campaign: "Campanha 1", utm_term: "Conjunto 1", utm_content: "Criativo 1" }, [insight() as any]);
     expect(result).toMatchObject({ method: "utm", status: "attributed", adId: "ad-1" });
   });
+
+  it("preserva os detalhes capturados no lead mesmo sem breakdown de insights", () => {
+    const result = resolveLeadAttribution({
+      ad_account_id: "acc-1",
+      meta_campaign_id: "camp-1",
+      meta_adset_id: "set-1",
+      meta_ad_id: "ad-1",
+      meta_campaign_name: "Campanha do lead",
+      meta_adset_name: "Conjunto do lead",
+      meta_ad_name: "Anúncio do lead",
+      meta_form_id: "form-1",
+      meta_form_name: "Formulário do lead",
+      meta_platform: "ig",
+      meta_placement: null,
+      meta_is_organic: false,
+    }, []);
+    expect(result).toMatchObject({
+      status: "partial",
+      campaignName: "Campanha do lead",
+      adsetName: "Conjunto do lead",
+      adName: "Anúncio do lead",
+      formId: "form-1",
+      formName: "Formulário do lead",
+      platform: "ig",
+      placement: null,
+      isOrganic: false,
+    });
+  });
 });

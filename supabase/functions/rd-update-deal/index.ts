@@ -33,7 +33,9 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const connectionId = typeof body?.rd_connection_id === "string" ? body.rd_connection_id : "";
     const rdDealId = typeof body?.rd_deal_id === "string" ? body.rd_deal_id : "";
-    const fields = body?.fields && typeof body.fields === "object" && !Array.isArray(body.fields) ? body.fields as Record<string, unknown> : null;
+    const rawFields = body?.fields && typeof body.fields === "object" && !Array.isArray(body.fields) ? body.fields as Record<string, unknown> : null;
+    const confirmLoss = body?.confirm_loss === true;
+    const fields = rawFields ? Object.fromEntries(Object.entries(rawFields).filter(([key]) => key !== "confirm_loss")) : null;
     const correlationId = typeof body?.correlation_id === "string" && body.correlation_id ? body.correlation_id : crypto.randomUUID();
     if (!connectionId || !rdDealId || !fields || !Object.keys(fields).length) return json({ error: "rd_connection_id, rd_deal_id e fields são obrigatórios" }, 400);
     const unknown = Object.keys(fields).filter((field) => !ALLOWED_FIELDS.has(field));
@@ -48,8 +50,9 @@ Deno.serve(async (req) => {
     if ("user_id" in fields && fields.user_id !== null && typeof fields.user_id !== "string") return json({ error: "user_id deve ser texto ou nulo" }, 422);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    if (fields.win === false && !confirmLoss) return json({ error: "Para marcar a negociação como perdida, confirme explicitamente a perda.", code: "RD_LOSS_CONFIRMATION_REQUIRED" }, 422);
     const { data: deal, error: dealError } = await admin.from("rd_deals")
-      .select("id,rd_connection_id,rd_deal_id,raw,win,lost_reason")
+      .select("id,rd_connection_id,rd_deal_id,raw,win,lost_reason,stage_bucket")
       .eq("rd_connection_id", connectionId).eq("rd_deal_id", rdDealId).maybeSingle();
     if (dealError) throw dealError;
     if (!deal) return json({ error: "Negociação não encontrada na conexão RD selecionada" }, 404);

@@ -5,6 +5,10 @@ export type LeadAttributionStatus = "attributed" | "partial" | "unavailable";
 
 export interface LeadAttribution {
   platform: string | null;
+  placement: string | null;
+  formId: string | null;
+  formName: string | null;
+  isOrganic: boolean | null;
   campaignId: string | null;
   campaignName: string | null;
   adsetId: string | null;
@@ -25,6 +29,14 @@ type AttributionDeal = {
   meta_campaign_id?: string | null;
   meta_adset_id?: string | null;
   meta_ad_id?: string | null;
+  meta_campaign_name?: string | null;
+  meta_adset_name?: string | null;
+  meta_ad_name?: string | null;
+  meta_form_id?: string | null;
+  meta_form_name?: string | null;
+  meta_platform?: string | null;
+  meta_placement?: string | null;
+  meta_is_organic?: boolean | null;
   meta_attribution_method?: string | null;
 };
 
@@ -59,25 +71,33 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
   const hasAny = Boolean(adId || campaign || adset || creative || campaignId || adsetId);
   if (!hit) {
     return {
-      platform: text(deal.utm_source) || (hasAny ? "meta" : null),
+      platform: text(deal.meta_platform) || text(deal.utm_source) || (hasAny ? "meta" : null),
+      placement: text(deal.meta_placement) || null,
+      formId: text(deal.meta_form_id) || null,
+      formName: text(deal.meta_form_name) || null,
+      isOrganic: typeof deal.meta_is_organic === "boolean" ? deal.meta_is_organic : null,
       campaignId,
-      campaignName: campaign || null,
+      campaignName: text(deal.meta_campaign_name) || campaign || null,
       adsetId,
-      adsetName: adset || null,
+      adsetName: text(deal.meta_adset_name) || adset || null,
       adId,
-      adName: creative || null,
+      adName: text(deal.meta_ad_name) || creative || null,
       method: hasAny ? "unmatched" : "unmatched",
       status: hasAny ? "partial" : "unavailable",
     };
   }
   return {
-    platform: text(deal.utm_source) || "meta",
+    platform: text(deal.meta_platform) || text(deal.utm_source) || "meta",
+    placement: text(deal.meta_placement) || null,
+    formId: text(deal.meta_form_id) || null,
+    formName: text(deal.meta_form_name) || null,
+    isOrganic: typeof deal.meta_is_organic === "boolean" ? deal.meta_is_organic : null,
     campaignId: hit.campaign_id ?? campaignId,
-    campaignName: hit.campaign_name || campaign || null,
+    campaignName: text(deal.meta_campaign_name) || hit.campaign_name || campaign || null,
     adsetId: hit.adset_id ?? adsetId,
-    adsetName: hit.adset_name || adset || null,
+    adsetName: text(deal.meta_adset_name) || hit.adset_name || adset || null,
     adId: hit.ad_id || adId,
-    adName: hit.ad_name || creative || null,
+    adName: text(deal.meta_ad_name) || hit.ad_name || creative || null,
     method: byAd || byIds ? "meta_id" : "utm",
     status: "attributed",
   };

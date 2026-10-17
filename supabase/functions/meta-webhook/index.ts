@@ -44,10 +44,56 @@ async function resolveAccount(admin: any, adId: string | null, formId: string | 
 
 async function fetchLead(leadId: string, account: MetaAccount) {
   const version = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
-  const response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(leadId)}?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&access_token=${encodeURIComponent(account.access_token)}`);
+  const fields = "id,created_time,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,form_name,platform,site_source_name,placement,platform_position,is_organic,field_data";
+  const response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(leadId)}?fields=${fields}&access_token=${encodeURIComponent(account.access_token)}`);
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload?.error) throw new Error(payload?.error?.message || `Meta lead HTTP ${response.status}`);
-  return payload;
+  if (response.ok && !payload?.error) return enrichLeadReferences(payload, account);
+  // Older Graph versions may reject one of the optional enrichment fields.
+  // Keep the real-time lead instead of dropping it; the IDs remain available
+  // for a later catalog enrichment.
+  const fallback = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(leadId)}?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&access_token=${encodeURIComponent(account.access_token)}`);
+  const fallbackPayload = await fallback.json().catch(() => ({}));
+  if (!fallback.ok || fallbackPayload?.error) throw new Error(fallbackPayload?.error?.message || payload?.error?.message || `Meta lead HTTP ${response.status}`);
+  return enrichLeadReferences(fallbackPayload, account);
+}
+
+async function graphObject(id: string | null | undefined, fields: string, account: MetaAccount) {
+  if (!id) return null;
+  const version = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
+  const response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(id)}?fields=${fields}&access_token=${encodeURIComponent(account.access_token)}`);
+  const payload = await response.json().catch(() => ({}));
+  return response.ok && !payload?.error ? payload : null;
+}
+
+async function enrichLeadReferences(lead: any, account: MetaAccount) {
+  const next = { ...lead };
+  // Lead webhooks are acknowledged immediately. These lookups are best-effort
+  // snapshots of names; a permission/API-version failure must never discard
+  // the lead or replace its immutable IDs.
+  if (next.ad_id && (!next.ad_name || !next.adset_id || !next.campaign_id)) {
+    const ad = await graphObject(String(next.ad_id), "name,adset_id,campaign_id", account);
+    if (ad) {
+      next.ad_name ??= ad.name ?? null;
+      next.adset_id ??= ad.adset_id ?? null;
+      next.campaign_id ??= ad.campaign_id ?? null;
+    }
+  }
+  if (next.adset_id && (!next.adset_name || !next.campaign_id)) {
+    const adset = await graphObject(String(next.adset_id), "name,campaign_id", account);
+    if (adset) {
+      next.adset_name ??= adset.name ?? null;
+      next.campaign_id ??= adset.campaign_id ?? null;
+    }
+  }
+  if (next.campaign_id && !next.campaign_name) {
+    const campaign = await graphObject(String(next.campaign_id), "name", account);
+    if (campaign) next.campaign_name = campaign.name ?? null;
+  }
+  if (next.form_id && !next.form_name) {
+    const form = await graphObject(String(next.form_id), "name", account);
+    if (form) next.form_name = form.name ?? null;
+  }
+  return next;
 }
 
 async function sha256(value: string) {
@@ -132,6 +178,14 @@ Deno.serve(async (req) => {
             phone: pickField(fieldData, ["phone_number", "phone", "telefone", "whatsapp"]),
             full_name: pickField(fieldData, ["full_name", "name", "nome"]),
             lead_city: pickField(fieldData, ["city", "cidade"]),
+            campaign_name: lead.campaign_name ?? null,
+            adset_name: lead.adset_name ?? null,
+            ad_name: lead.ad_name ?? null,
+            form_name: lead.form_name ?? null,
+            platform: lead.platform ?? lead.site_source_name ?? lead.publisher_platform ?? null,
+            placement: lead.placement ?? lead.platform_position ?? null,
+            is_organic: typeof lead.is_organic === "boolean" ? lead.is_organic : null,
+            attribution_status: lead.campaign_id && lead.adset_id && lead.ad_id ? "captured" : "partial",
             raw: lead,
           }, { onConflict: "meta_lead_id" });
           if (leadError) throw leadError;

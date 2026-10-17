@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   CalendarClock,
@@ -55,6 +55,7 @@ import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { useInsights } from "@/hooks/useInsights";
 import { useLeadAttributionCatalog } from "@/hooks/useLeadAttributionCatalog";
 import { resolveLeadAttribution, type LeadAttribution } from "@/lib/leadAttributionResolver";
+import { buildRDDealUpdate, serializeRDDealUpdate, statusFromRDDeal, type DealEditDraft, type DealEditStatus } from "@/lib/rdDealEdit";
 import { useRDDealNotes, useCreateRDDealNote } from "@/hooks/useRDDealNotes";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
@@ -707,9 +708,16 @@ export default function CrmPage() {
       toast.error("Esta negociação não tem uma conexão RD identificada.");
       return;
     }
+    const dealUpdate = serializeRDDealUpdate(fields);
     try {
       const { data, error } = await supabase.functions.invoke("rd-update-deal", {
-        body: { rd_connection_id: connectionId, rd_deal_id: deal.rd_deal_id, fields, correlation_id: crypto.randomUUID() },
+        body: {
+          rd_connection_id: connectionId,
+          rd_deal_id: deal.rd_deal_id,
+          fields: dealUpdate.fields,
+          confirm_loss: dealUpdate.confirm_loss,
+          correlation_id: crypto.randomUUID(),
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -1050,7 +1058,7 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
   onActivateWrite: () => void;
   canWrite: boolean;
 }) {
-  const [winValue, setWinValue] = useState("false");
+  const [winValue, setWinValue] = useState<DealEditStatus>("open");
   const [dealName, setDealName] = useState("");
   const [holdValue, setHoldValue] = useState("false");
   const [rating, setRating] = useState("");
@@ -1061,6 +1069,7 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
   const [note, setNote] = useState("");
   const [selectedFunnelId, setSelectedFunnelId] = useState("");
   const [selectedStageId, setSelectedStageId] = useState("");
+  const initialEdit = useRef<DealEditDraft | null>(null);
   const notes = useRDDealNotes(deal?.id ?? null);
   const createNote = useCreateRDDealNote();
   const stageHistory = useQuery({
@@ -1082,12 +1091,22 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
     const raw = deal.raw && typeof deal.raw === "object" ? deal.raw : {};
     const nested = raw.deal;
     const rawDeal = nested && typeof nested === "object" && !Array.isArray(nested) ? nested as Record<string, unknown> : raw;
-    setWinValue(deal.win ? "true" : "false");
-    setDealName(String(rawDeal.name || deal.contact_name || ""));
-    setHoldValue(rawDeal.hold === true ? "true" : "false");
-    setRating(rawDeal.rating == null ? "" : String(rawDeal.rating));
-    setPredictionDate(typeof rawDeal.prediction_date === "string" ? rawDeal.prediction_date.slice(0, 10) : "");
-    setLostNote(String(rawDeal.deal_lost_note || ""));
+    const nextStatus = statusFromRDDeal(deal);
+    const nextDraft: DealEditDraft = {
+      name: String(rawDeal.name || deal.contact_name || ""),
+      status: nextStatus,
+      hold: rawDeal.hold === true,
+      rating: rawDeal.rating == null ? "" : String(rawDeal.rating),
+      predictionDate: typeof rawDeal.prediction_date === "string" ? rawDeal.prediction_date.slice(0, 10) : "",
+      lostNote: String(rawDeal.deal_lost_note || ""),
+    };
+    initialEdit.current = nextDraft;
+    setWinValue(nextStatus);
+    setDealName(nextDraft.name);
+    setHoldValue(nextDraft.hold ? "true" : "false");
+    setRating(nextDraft.rating);
+    setPredictionDate(nextDraft.predictionDate);
+    setLostNote(nextDraft.lostNote);
     setContactName(deal.contact_name || "");
     setContactEmail(deal.contact_email || "");
     setNote("");
@@ -1101,18 +1120,20 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
   const selectedStage = stagesForFunnel.find((stage) => stage.rd_stage_id === selectedStageId);
   const selectedFunnel = funnels.find((funnel) => funnel.id === selectedFunnelId);
   const noteConnectionId = deal.rd_connection_id || selectedFunnel?.rd_connection_id || "";
-  const canSaveDeal = canWrite && !!dealName.trim();
+  const draft: DealEditDraft = {
+    name: dealName,
+    status: winValue,
+    hold: holdValue === "true",
+    rating,
+    predictionDate,
+    lostNote,
+  };
+  const fieldsToUpdate = initialEdit.current ? buildRDDealUpdate(initialEdit.current, draft) : {};
+  const canSaveDeal = canWrite && !!dealName.trim() && Object.keys(fieldsToUpdate).length > 0;
 
   const saveDealFields = () => {
     if (!canWrite) return onActivateWrite();
-    const fieldsToUpdate: Record<string, unknown> = {
-      name: dealName.trim(),
-      win: winValue === "true",
-      hold: holdValue === "true",
-      prediction_date: predictionDate || null,
-      deal_lost_note: lostNote.trim() || null,
-    };
-    if (rating.trim()) fieldsToUpdate.rating = Number(rating);
+    if (!Object.keys(fieldsToUpdate).length) return;
     onUpdate(deal, fieldsToUpdate);
   };
 
@@ -1148,7 +1169,7 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
           <div className="flex items-center justify-between gap-3"><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">Campos permitidos pela API oficial do RD. O valor financeiro é somente leitura no RD v1.</p></div><Pencil className="h-4 w-4 text-primary" /></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5 text-xs font-bold sm:col-span-2"><span>Nome da negociação</span><Input value={dealName} onChange={(event) => setDealName(event.target.value)} disabled={!canWrite} /></label>
-            <label className="grid gap-1.5 text-xs font-bold"><span>Situação</span><select value={winValue} onChange={(event) => setWinValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Em aberto / não ganha</option><option value="true">Venda ganha</option></select></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>Situação</span><select value={winValue} onChange={(event) => setWinValue(event.target.value as DealEditStatus)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="open">Em aberto</option><option value="won">Venda ganha</option><option value="lost">Venda perdida</option></select></label>
             <label className="grid gap-1.5 text-xs font-bold"><span>Em espera</span><select value={holdValue} onChange={(event) => setHoldValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Não</option><option value="true">Sim</option></select></label>
             <label className="grid gap-1.5 text-xs font-bold"><span>Classificação (0–5)</span><Input inputMode="decimal" value={rating} onChange={(event) => setRating(event.target.value)} disabled={!canWrite} placeholder="Não informado" /></label>
             <label className="grid gap-1.5 text-xs font-bold"><span>Data prevista</span><Input type="date" value={predictionDate} onChange={(event) => setPredictionDate(event.target.value)} disabled={!canWrite} /></label>
@@ -1188,6 +1209,10 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
           <DetailRow icon={<Target />} label="Campanha" value={attribution?.campaignName || "Não atribuída"} />
           <DetailRow icon={<Target />} label="Conjunto" value={attribution?.adsetName || "Não atribuído"} />
           <DetailRow icon={<Target />} label="Criativo" value={attribution?.adName || "Não atribuído"} />
+          <DetailRow icon={<Target />} label="Formulário Meta" value={attribution?.formName || attribution?.formId || "Não informado"} />
+          <DetailRow icon={<Target />} label="Plataforma Meta" value={attribution?.platform || "Não informado"} />
+          <DetailRow icon={<Target />} label="Posicionamento" value={attribution?.placement || "Não informado por lead"} />
+          <DetailRow icon={<Target />} label="Origem orgânica" value={attribution?.isOrganic == null ? "Não informado" : attribution.isOrganic ? "Sim" : "Não"} />
           <DetailRow icon={<Target />} label="Rastreamento" value={attribution?.status === "attributed" ? (attribution.method === "meta_id" ? "Atribuído pelo ID do anúncio" : "Atribuído pelas UTMs") : attribution?.status === "partial" ? "Parâmetros recebidos, anúncio não encontrado" : "Sem parâmetros de rastreamento"} />
           <DetailRow icon={<CalendarClock />} label="Criado em" value={fullDate(deal.lead_created_at)} />
           <DetailRow icon={<Clock3 />} label="Última movimentação" value={fullDate(deal.stage_updated_at || deal.updated_at)} />

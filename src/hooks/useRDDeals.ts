@@ -74,6 +74,14 @@ export interface RDDeal {
   meta_campaign_id?: string | null;
   meta_adset_id?: string | null;
   meta_ad_id?: string | null;
+  meta_campaign_name?: string | null;
+  meta_adset_name?: string | null;
+  meta_ad_name?: string | null;
+  meta_form_name?: string | null;
+  meta_platform?: string | null;
+  meta_placement?: string | null;
+  meta_is_organic?: boolean | null;
+  meta_attribution_status?: string | null;
   meta_attribution_method?: string | null;
   custom_fields?: Record<string, unknown> | null;
   lead_created_at: string | null;
@@ -224,7 +232,7 @@ export function shouldApplyRDDateRange(includeHistory = false) {
 }
 
 const DEAL_FIELDS =
-  "id, rd_connection_id, ad_account_id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, amount_total_effective, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_attribution_method, lead_state, lead_city, contact_name, contact_email, contact_phone, custom_fields, lead_created_at, stage_updated_at, closed_at, updated_at";
+  "id, rd_connection_id, ad_account_id, rd_funnel_id, rd_deal_id, rd_stage_id, rd_stage_name, rd_stage_order, deal_owner_name, rd_product_name, stage_bucket, win, lost_reason, amount_total, amount_total_effective, utm_source, utm_medium, utm_campaign, utm_term, utm_content, utm_id, meta_lead_id, meta_form_id, meta_campaign_id, meta_adset_id, meta_ad_id, meta_campaign_name, meta_adset_name, meta_ad_name, meta_form_name, meta_platform, meta_placement, meta_is_organic, meta_attribution_status, meta_attribution_method, lead_state, lead_city, contact_name, contact_email, contact_phone, custom_fields, lead_created_at, stage_updated_at, closed_at, updated_at";
 
 /** Keeps the newest snapshot of a single RD deal when an integration retry
  * left more than one local row. The RD deal ID is global and is the canonical
