@@ -76,7 +76,6 @@ export default function TrafficPage() {
   return (
     <div className={cn(
       "traffic-page-shell gd-module-shell relative mx-auto box-border min-h-0 w-full max-w-[1920px] p-[14px] transition-[padding] duration-200",
-      trafficNavExpanded ? "md:pr-[190px]" : "md:pr-[66px]",
       activeTab === "campaigns"
         ? campaignAnalysisMode
           ? "space-y-3"

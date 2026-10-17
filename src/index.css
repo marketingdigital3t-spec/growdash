@@ -10064,6 +10064,142 @@ html:not(.dark) .brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.g
   border-color: rgba(17, 61, 98, .26) !important;
 }
 
+/* Traffic Manager canvas --------------------------------------------------
+   Keep the Meta-like navigation completely independent from the content
+   layout. PageTransition applies a zero-radius blur filter to its wrapper;
+   that filter creates a containing block and makes fixed descendants appear
+   trapped inside the page grid. Removing it only on this route restores a
+   true viewport dock. */
+.brand-shell:has(.traffic-page-shell) .gd-page-transition {
+  filter: none !important;
+}
+
+/* The workspace owns the full usable canvas. The old opaque black wrappers
+   made the campaign manager look like a small card floating in a dark block;
+   use a neutral manager surface and let the actual toolbars/table carry the
+   stronger surfaces. */
+html.dark body .brand-shell:has(.traffic-page-shell) .analytics-module,
+html.dark body .brand-shell:has(.traffic-page-shell) .gd-page-transition,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-main,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-frame {
+  background-color: #16181b !important;
+  background-image: none !important;
+}
+
+html:not(.dark) body .brand-shell:has(.traffic-page-shell) .analytics-module,
+html:not(.dark) body .brand-shell:has(.traffic-page-shell) .gd-page-transition,
+html:not(.dark) body .brand-shell:has(.traffic-page-shell) .growdash-main,
+html:not(.dark) body .brand-shell:has(.traffic-page-shell) .growdash-content-frame {
+  background-color: #eef1f4 !important;
+  background-image: none !important;
+}
+
+/* Match the reference manager: a full-height, self-contained rail flush with
+   the right viewport edge. The global header remains above it via z-index. */
+.traffic-nav-rail {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--traffic-nav-width);
+  max-height: none;
+  border-radius: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 1px solid rgba(255,255,255,.14);
+  z-index: 24;
+}
+
+.traffic-page-shell { --traffic-nav-width: 6.75rem; }
+.traffic-page-shell:has([data-traffic-nav][data-expanded="true"]) { --traffic-nav-width: 13rem; }
+
+.traffic-nav-rail-header {
+  min-height: 4.15rem;
+  padding: .75rem .65rem;
+}
+
+.traffic-nav-items {
+  gap: .65rem;
+  padding: .75rem .7rem 1rem;
+}
+
+.traffic-nav-item,
+.traffic-nav-rail[data-expanded="false"] .traffic-nav-item {
+  min-height: 3.95rem;
+  width: 100%;
+  justify-content: center;
+  padding: .7rem;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 1.1rem;
+  color: rgba(255,255,255,.68);
+}
+
+.traffic-nav-item:hover,
+.traffic-nav-item:focus-visible {
+  transform: none;
+  border-color: rgba(255,255,255,.95);
+  background: rgba(255,255,255,.1);
+  color: #fff;
+}
+
+.traffic-nav-item.traffic-area-tab-active {
+  border-color: rgba(255,255,255,.92);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  box-shadow: inset 0 1px rgba(255,255,255,.16), 0 10px 25px -20px rgba(0,0,0,.95);
+}
+
+.traffic-nav-item.traffic-area-tab-active::before { display: none; }
+.traffic-nav-item > svg,
+.traffic-nav-item.traffic-area-tab-active > svg { color: currentColor !important; }
+
+.traffic-nav-label,
+.traffic-nav-rail[data-expanded="false"] .traffic-nav-label {
+  display: none;
+}
+
+.traffic-nav-rail[data-expanded="true"] .traffic-nav-item {
+  justify-content: flex-start;
+}
+
+.traffic-nav-rail[data-expanded="true"] .traffic-nav-label {
+  display: block;
+  width: auto;
+  opacity: 1;
+}
+
+@media (max-width: 767px) {
+  .traffic-nav-rail,
+  .traffic-nav-rail[data-expanded="false"] {
+    top: auto;
+    right: .75rem;
+    bottom: .75rem;
+    left: .75rem;
+    width: auto;
+    max-height: 4.2rem;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 14px;
+  }
+
+  .traffic-nav-rail-header { display: none; }
+  .traffic-nav-items { gap: .35rem; padding: .45rem; }
+  .traffic-nav-item,
+  .traffic-nav-rail[data-expanded="false"] .traffic-nav-item {
+    min-height: 2.7rem;
+    width: auto;
+    flex: 0 0 auto;
+    padding-inline: .75rem;
+    border-radius: .75rem;
+  }
+  .traffic-nav-label,
+  .traffic-nav-rail[data-expanded="true"] .traffic-nav-label {
+    display: block;
+    width: auto;
+    opacity: 1;
+  }
+  .traffic-nav-item > svg { display: none; }
+}
+
 /* Final cascade guard: the legacy analytics surface rule is more general,
    but still marked !important. This higher-specificity exception keeps only
    the Dashboard canvas transparent so the phase artwork remains visible. */
