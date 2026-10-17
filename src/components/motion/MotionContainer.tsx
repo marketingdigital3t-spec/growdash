@@ -27,16 +27,18 @@ const itemVariants = {
 interface MotionContainerProps {
   children: ReactNode;
   className?: string;
+  "data-scroll-mode"?: "locked" | "content";
 }
 
 /** Wraps a page — animates the whole section with staggered children */
-export function MotionPage({ children, className }: MotionContainerProps) {
+export function MotionPage({ children, className, "data-scroll-mode": dataScrollMode }: MotionContainerProps) {
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
       className={className}
+      data-scroll-mode={dataScrollMode}
     >
       {children}
     </motion.div>
