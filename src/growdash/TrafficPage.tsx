@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   BarChart3, Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, CreditCard,
-  ExternalLink, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
+  CircleDollarSign, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
   Network, RefreshCw, Settings2, Smartphone, Sparkles, Target, UsersRound, Video, GitCompareArrows,
   WalletCards, Wrench, Zap, Tag,
 } from "lucide-react";
@@ -30,6 +30,8 @@ import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 import { FunnelAudienceProfile, useAudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import AudienceNamingStandardizer from "@/components/campaigns/AudienceNamingStandardizer";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
+import { useAccountPixels, useSyncMetaPixels } from "@/hooks/useAccountPixels";
+import { useBudgetHistory } from "@/hooks/useBudgetHistory";
 import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import CampaignsManager from "@/pages/Campaigns";
 import TrafficComparison from "@/components/campaigns/TrafficComparison";
@@ -90,8 +92,13 @@ export default function TrafficPage() {
       {activeTab === "funnels" && <TrafficFunnels />}
       {activeTab === "audiences" && <AudienceNamingStandardizer />}
       {activeTab === "tools" && <MetaToolsWorkspace
+        accountId={account?.id}
         providerAccountId={account?.account_id}
         accountName={account?.name}
+        selectedAccountIds={selectedForDisplay}
+        accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, remaining_balance: item.remaining_balance, connection_status: item.connection_status, last_sync_success_at: item.last_sync_success_at, oauth_permissions: item.oauth_permissions }))}
+        startDate={startDate}
+        endDate={endDate}
         onCampaigns={() => setParams({ aba: "campaigns" })}
         onMissingAccount={() => toast({ title: "Selecione uma conta Meta", description: "Escolha uma conta específica acima para abrir a ferramenta no contexto correto." })}
       />}
@@ -99,24 +106,38 @@ export default function TrafficPage() {
   );
 }
 
-function MetaToolsWorkspace({ providerAccountId, accountName, onCampaigns, onMissingAccount }: {
+type MetaToolId = "reports" | "audiences" | "settings" | "billing" | "events" | "all";
+
+type InternalMetaAccount = {
+  id: string;
+  name: string;
+  remaining_balance?: number | null;
+  connection_status?: string | null;
+  last_sync_success_at?: string | null;
+  // Supabase exposes this JSON column as `Json`; keep the view tolerant of
+  // legacy rows while only counting an actual array of permissions.
+  oauth_permissions?: unknown;
+};
+
+function MetaToolsWorkspace({ accountId, providerAccountId: _providerAccountId, accountName, selectedAccountIds, accounts, startDate, endDate, onCampaigns, onMissingAccount }: {
+  accountId?: string;
   providerAccountId?: string;
   accountName?: string;
+  selectedAccountIds: string[];
+  accounts: InternalMetaAccount[];
+  startDate: Date;
+  endDate: Date;
   onCampaigns: () => void;
   onMissingAccount: () => void;
 }) {
-  const normalizedAccountId = String(providerAccountId || "").replace(/^act_/i, "");
-  const openMeta = (url: string) => {
-    if (!normalizedAccountId) return onMissingAccount();
-    window.open(url.replace("{account}", normalizedAccountId), "_blank", "noopener,noreferrer");
-  };
+  const [selectedTool, setSelectedTool] = useState<MetaToolId>("reports");
   const tools = [
-    { title: "Relatórios de Anúncios", description: "Crie, salve e compare relatórios detalhados da conta.", icon: FileBarChart, url: "https://business.facebook.com/adsmanager/reporting/view?act={account}" },
-    { title: "Públicos", description: "Crie públicos personalizados, semelhantes e salvos.", icon: UsersRound, url: "https://business.facebook.com/adsmanager/audiences?act={account}" },
-    { title: "Configurações de publicidade", description: "Gerencie ativos, permissões e preferências da conta.", icon: Settings2, url: "https://business.facebook.com/settings/ad-accounts/{account}" },
-    { title: "Cobrança e pagamentos", description: "Consulte saldo, formas de pagamento e transações.", icon: CreditCard, url: "https://business.facebook.com/billing_hub/accounts/details/?asset_id={account}" },
-    { title: "Gerenciador de Eventos", description: "Configure Pixel, CAPI, eventos e diagnósticos.", icon: Network, url: "https://business.facebook.com/events_manager2/overview?act={account}" },
-    { title: "Todas as ferramentas", description: "Abra a central oficial de ferramentas empresariais da Meta.", icon: Wrench, url: "https://business.facebook.com/latest/home?asset_id={account}" },
+    { id: "reports" as const, title: "Relatórios de Anúncios", description: "Analise campanhas, investimento, resultados e vendas sem sair da Growdash.", icon: FileBarChart },
+    { id: "audiences" as const, title: "Públicos", description: "Padronize públicos e acompanhe a entrega sincronizada da Meta.", icon: UsersRound },
+    { id: "settings" as const, title: "Configurações de publicidade", description: "Confira conexão, permissões e saúde da conta selecionada.", icon: Settings2 },
+    { id: "billing" as const, title: "Cobrança e pagamentos", description: "Consulte saldo, investimento e histórico financeiro sincronizado.", icon: CreditCard },
+    { id: "events" as const, title: "Gerenciador de Eventos", description: "Veja Pixels, eventos e cobertura de rastreamento disponíveis.", icon: Network },
+    { id: "all" as const, title: "Todas as ferramentas", description: "Centralize os módulos internos da operação em um único painel.", icon: Wrench },
   ];
 
   return (
@@ -124,22 +145,53 @@ function MetaToolsWorkspace({ providerAccountId, accountName, onCampaigns, onMis
       <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-black"><Wrench className="h-5 w-5 text-primary" />Ferramentas Meta</h2>
-          <p className="text-xs text-muted-foreground">{accountName ? `Conta selecionada: ${accountName}` : "Selecione uma conta para abrir as ferramentas oficiais no contexto correto."}</p>
+          <p className="text-xs text-muted-foreground">{accountName ? `Conta selecionada: ${accountName}` : "Selecione uma conta para consultar o escopo específico."}</p>
         </div>
         <Button className="sm:ml-auto" onClick={onCampaigns}><Megaphone className="mr-2 h-4 w-4" />Criar ou editar campanha</Button>
       </header>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {tools.map(({ title, description, icon: Icon, url }) => (
-          <button key={title} type="button" onClick={() => openMeta(url)} className="group flex min-h-28 items-start gap-3 rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary/50 hover:bg-primary/5">
+        {tools.map(({ id, title, description, icon: Icon }) => (
+          <button key={id} type="button" aria-pressed={selectedTool === id} onClick={() => setSelectedTool(id)} className={cn("group flex min-h-28 items-start gap-3 rounded-xl border bg-background p-4 text-left transition hover:border-primary/50 hover:bg-primary/5", selectedTool === id ? "border-primary/60 bg-primary/5 shadow-sm" : "border-border")}>
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Icon className="h-5 w-5" /></span>
-            <span className="min-w-0"><span className="flex items-center gap-2 font-black">{title}<ExternalLink className="h-3.5 w-3.5 text-muted-foreground transition group-hover:text-primary" /></span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span></span>
+            <span className="min-w-0"><span className="flex items-center gap-2 font-black">{title}<ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition", selectedTool === id && "translate-x-0.5 text-primary")} /></span><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span></span>
           </button>
         ))}
       </div>
-      <p className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3 text-[11px] text-muted-foreground"><Check className="mr-2 inline h-4 w-4 text-emerald-500" />A criação e a edição de campanhas acontecem dentro da Growdash com confirmação e auditoria. Ferramentas sensíveis abrem diretamente na Meta, sem expor o token no navegador.</p>
+      <MetaToolDetail tool={selectedTool} accountId={accountId} accountName={accountName} selectedAccountIds={selectedAccountIds} accounts={accounts} startDate={startDate} endDate={endDate} onMissingAccount={onMissingAccount} />
+      <p className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3 text-[11px] text-muted-foreground"><Check className="mr-2 inline h-4 w-4 text-emerald-500" />Os dados e análises ficam dentro da Growdash. Quando a Meta não entrega uma permissão ou métrica, mostramos o estado indisponível sem inventar valores.</p>
     </section>
   );
 }
+
+function MetaToolDetail({ tool, accountId, accountName, selectedAccountIds, accounts, startDate, endDate, onMissingAccount }: { tool: MetaToolId; accountId?: string; accountName?: string; selectedAccountIds: string[]; accounts: InternalMetaAccount[]; startDate: Date; endDate: Date; onMissingAccount: () => void }) {
+  const pixels = useAccountPixels();
+  const syncPixels = useSyncMetaPixels();
+  const budgetHistory = useBudgetHistory(accountId, startDate, endDate);
+  const account = accounts.find((item) => item.id === accountId);
+  const selectedCount = selectedAccountIds.length;
+
+  if (tool === "reports") return <div className="rounded-xl border border-border/70 bg-background/40 p-3"><AIAndLeadReports accountId={accountId || "all"} accountIds={selectedAccountIds} accounts={accounts.map((item) => ({ id: item.id, name: item.name }))} /></div>;
+  if (tool === "audiences") return <div className="rounded-xl border border-border/70 bg-background/40 p-3"><AudienceNamingStandardizer /></div>;
+  if (tool === "billing") {
+    if (!accountId) return <ToolUnavailable title="Cobrança e pagamentos" message="Selecione uma única conta Meta para consultar saldo e histórico financeiro." onAction={onMissingAccount} />;
+    return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex items-center gap-2"><CircleDollarSign className="h-4 w-4 text-primary" /><h3 className="font-black">Cobrança e pagamentos dentro da Growdash</h3></div><p className="text-xs text-muted-foreground">Saldo e transações oficiais sincronizados para {accountName || "a conta selecionada"}.</p>{budgetHistory.isLoading ? <ToolStatus text="Carregando snapshot financeiro…" /> : budgetHistory.isError ? <ToolStatus text="Não foi possível carregar o snapshot financeiro. O último valor válido foi preservado." tone="warning" /> : <div className="grid gap-2 sm:grid-cols-3"><ToolMetric label="Saldo atual" value={budgetHistory.data?.totals.currentBalance == null ? "Indisponível" : brl.format(budgetHistory.data.totals.currentBalance)} /><ToolMetric label="Investimento no período" value={brl.format(budgetHistory.data?.totals.spendSum || 0)} /><ToolMetric label="Aportes no período" value={brl.format(budgetHistory.data?.totals.topUpSum || 0)} /></div>}</section>;
+  }
+  if (tool === "events") {
+    if (!accountId) return <ToolUnavailable title="Gerenciador de Eventos" message="Selecione uma única conta Meta para consultar Pixels e eventos." onAction={onMissingAccount} />;
+    const accountPixels = pixels.data?.byAccount[accountId] || [];
+    const eventCount = accountPixels.reduce((sum, pixel) => sum + (pixels.data?.eventsByPixel[pixel.pixel_id]?.length || 0), 0);
+    return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="flex items-center gap-2"><Network className="h-4 w-4 text-primary" /><h3 className="font-black">Gerenciador de Eventos dentro da Growdash</h3></div><p className="mt-1 text-xs text-muted-foreground">Pixels e eventos persistidos pela sincronização oficial da conta.</p></div><Button size="sm" variant="outline" onClick={() => void syncPixels.mutateAsync(accountId)} disabled={syncPixels.isPending}><RefreshCw className={cn("mr-2 h-3.5 w-3.5", syncPixels.isPending && "animate-spin")} />{syncPixels.isPending ? "Sincronizando…" : "Atualizar eventos"}</Button></div>{pixels.isLoading ? <ToolStatus text="Carregando Pixels e eventos…" /> : pixels.isError ? <ToolStatus text="A consulta de Pixels falhou; nenhum evento foi inventado." tone="warning" /> : <div className="grid gap-2 sm:grid-cols-3"><ToolMetric label="Pixels" value={integer.format(accountPixels.length)} /><ToolMetric label="Eventos registrados" value={integer.format(eventCount)} /><ToolMetric label="Escopo" value={accountName || "Conta selecionada"} /></div>}{!pixels.isLoading && !accountPixels.length && <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">Nenhum Pixel sincronizado para esta conta.</p>}</section>;
+  }
+  if (tool === "settings") {
+    const permissionCount = Array.isArray(account?.oauth_permissions) ? account.oauth_permissions.length : 0;
+    return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex items-center gap-2"><Settings2 className="h-4 w-4 text-primary" /><h3 className="font-black">Configurações de publicidade</h3></div>{account ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><ToolMetric label="Conta" value={account.name} /><ToolMetric label="Conexão" value={account.connection_status || "Indisponível"} /><ToolMetric label="Última sincronização" value={account.last_sync_success_at ? new Date(account.last_sync_success_at).toLocaleString("pt-BR") : "Não confirmada"} /><ToolMetric label="Permissões lidas" value={permissionCount ? integer.format(permissionCount) : "Não informado"} /></div> : <ToolUnavailable title="Configurações de publicidade" message="Selecione uma conta Meta para ver o estado autorizado dentro da Growdash." onAction={onMissingAccount} />}</section>;
+  }
+  return <section className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-4"><div className="flex items-center gap-2"><Wrench className="h-4 w-4 text-primary" /><h3 className="font-black">Central de operação Growdash</h3></div><p className="text-xs text-muted-foreground">Todos os módulos abaixo permanecem na plataforma e respeitam o escopo de {selectedCount || "todas as"}{selectedCount === 1 ? " conta selecionada" : " contas autorizadas"}.</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{["Relatórios e IA", "Públicos e nomenclatura", "Configurações e permissões", "Cobrança e saldo", "Pixels e eventos", "Análise de funil e vendas"].map((label) => <div key={label} className="rounded-lg border border-border bg-card/70 px-3 py-3 text-xs font-bold">{label}<span className="mt-1 block text-[10px] font-normal text-muted-foreground">Disponível no menu interno da Growdash.</span></div>)}</div></section>;
+}
+
+function ToolMetric({ label, value }: { label: string; value: string }) { return <div className="min-w-0 rounded-lg border border-border bg-card/70 px-3 py-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p><p className="mt-1 truncate text-sm font-black" title={value}>{value}</p></div>; }
+function ToolStatus({ text, tone = "neutral" }: { text: string; tone?: "neutral" | "warning" }) { return <p className={cn("rounded-lg border px-3 py-2 text-xs", tone === "warning" ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300" : "border-border bg-card/60 text-muted-foreground")} role="status">{text}</p>; }
+function ToolUnavailable({ title, message, onAction }: { title: string; message: string; onAction: () => void }) { return <section className="rounded-xl border border-dashed border-primary/30 bg-primary/[.035] p-4"><h3 className="font-black">{title}</h3><p className="mt-1 text-xs text-muted-foreground">{message}</p><Button className="mt-3" size="sm" variant="outline" onClick={onAction}>Selecionar conta</Button></section>; }
 
 function BudgetWorkspace({ accountId, selectedAccountIds, accounts, startDate, endDate }: { accountId: string; selectedAccountIds: string[]; accounts: Array<{ id: string; name: string }>; startDate: Date; endDate: Date }) {
   const queryClient = useQueryClient();
@@ -305,8 +357,9 @@ function AIAndLeadReports({ accountId, accountIds, accounts }: { accountId: stri
     }
     return Array.from(map.values()).sort((a, b) => b.leads - a.leads);
   }, [insights, metaTraffic.data.leadBreakdownByAd]);
-  const copyReport = async () => { const metaSummary = metaSpendAvailable && metaLeadsAvailable ? `Meta Ads: ${integer.format(metaLeads)} resultados (${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas iniciadas) | ${brl.format(canonicalSpend)} investidos | custo por resultado ${brl.format(metaLeads ? canonicalSpend / metaLeads : 0)}` : `Meta Ads: dados indisponíveis ou cobertura não confirmada (${metaTraffic.data.unavailableReason || "aguardando sincronização"})`; const report = `Relatório de resultados Meta — ${accountName || "Conta"}\nPeríodo: ${format(businessCalendarDate(startDate), "dd/MM/yyyy")} a ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}\n${metaSummary}\nRD Station: ${integer.format(deals.length)} negócios | ${won} vendas | ${brl.format(revenue)} em receita líquida`; await navigator.clipboard.writeText(report); toast({ title: "Relatório copiado" }); };
   const scopedAccounts = accounts.filter((account) => accountIds.includes(account.id));
+  const reportAccountLabel = scopedAccounts.length === 1 ? scopedAccounts[0].name : "Contas selecionadas";
+  const copyReport = async () => { const metaSummary = metaSpendAvailable && metaLeadsAvailable ? `Meta Ads: ${integer.format(metaLeads)} resultados (${integer.format(metaLeads - conversations)} leads + ${integer.format(conversations)} conversas iniciadas) | ${brl.format(canonicalSpend)} investidos | custo por resultado ${brl.format(metaLeads ? canonicalSpend / metaLeads : 0)}` : `Meta Ads: dados indisponíveis ou cobertura não confirmada (${metaTraffic.data.unavailableReason || "aguardando sincronização"})`; const report = `Relatório de resultados Meta — ${reportAccountLabel}\nPeríodo: ${format(businessCalendarDate(startDate), "dd/MM/yyyy")} a ${format(businessCalendarDate(endDate), "dd/MM/yyyy")}\n${metaSummary}\nRD Station: ${integer.format(deals.length)} negócios | ${won} vendas | ${brl.format(revenue)} em receita líquida`; await navigator.clipboard.writeText(report); toast({ title: "Relatório copiado" }); };
   return <div className="space-y-4">
     <section className="gd-panel p-4 sm:p-5">
       <header className="flex flex-wrap items-end justify-between gap-3">

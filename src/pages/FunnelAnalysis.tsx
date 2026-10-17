@@ -794,11 +794,11 @@ export default function FunnelAnalysis() {
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
               <HelpBlock help={blockHelp.bottlenecks}><FunnelBottlenecks a={periodAnalytics} /></HelpBlock>
-              <HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} liveState={rdLiveState} lastUpdatedAt={rdLastUpdatedAt} liveError={rdLiveError} onRefresh={() => void handleSync()} /></HelpBlock>
+              <HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={periodAnalytics} /></HelpBlock>
             </div>
           </MotionItem>
 
-          <MotionItem><HelpBlock help={blockHelp.conversion}><FunnelStageConversion a={periodAnalytics} /></HelpBlock></MotionItem>
+          <MotionItem><HelpBlock help={blockHelp.distribution}><FunnelStageDistribution a={periodAnalytics} liveState={rdLiveState} lastUpdatedAt={rdLastUpdatedAt} liveError={rdLiveError} onRefresh={() => void handleSync()} /></HelpBlock></MotionItem>
 
           <MotionItem><HelpBlock help={blockHelp.evolution}><FunnelLeadsEvolution a={periodAnalytics} /></HelpBlock></MotionItem>
 

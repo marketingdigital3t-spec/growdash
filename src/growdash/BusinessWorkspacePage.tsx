@@ -69,7 +69,7 @@ function MetaLink({ item, accountId, collapsed }: { item: BusinessMenuItem; acco
   if (!href) {
     return <NavLink to={item.path} end={item.path === "/business"} title={collapsed ? item.label : undefined} className={({ isActive }) => `flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${isActive ? "bg-slate-700 text-white" : "text-slate-700 hover:bg-slate-100"}`}><item.icon className="h-4 w-4 shrink-0" /><span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span></NavLink>;
   }
-  return <a href={href} target="_blank" rel="noreferrer" title={collapsed ? item.label : undefined} className="flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100"><item.icon className="h-4 w-4 shrink-0" /><span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span><span className={collapsed ? "sr-only" : "ml-auto text-[10px] text-slate-400"}>Meta</span></a>;
+  return <NavLink to={item.path} title={collapsed ? item.label : undefined} className={({ isActive }) => `flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${isActive ? "bg-slate-700 text-white" : "text-slate-700 hover:bg-slate-100"}`}><item.icon className="h-4 w-4 shrink-0" /><span className={collapsed ? "sr-only" : "truncate"}>{item.label}</span><span className={collapsed ? "sr-only" : "ml-auto text-[10px] text-slate-400"}>Growdash</span></NavLink>;
 }
 
 export default function BusinessWorkspacePage() {
@@ -102,5 +102,6 @@ export default function BusinessWorkspacePage() {
 }
 
 export function BusinessUnavailablePage({ title, description, externalUrl }: { title: string; description: string; externalUrl?: string }) {
-  return <section className="mx-auto max-w-3xl"><PageHeading eyebrow="Meta Business Suite" title={title} description={description} /><div className="gd-panel p-6 text-center"><p className="text-sm text-muted-foreground">Este módulo só exibe dados oficiais. Quando a Meta não fornece o endpoint ou a permissão necessária, nenhum valor é estimado.</p>{externalUrl && <Button asChild className="mt-4"><a href={externalUrl} target="_blank" rel="noreferrer">Abrir ferramenta oficial da Meta</a></Button>}</div></section>;
+  void externalUrl;
+  return <section className="mx-auto max-w-3xl"><PageHeading eyebrow="Meta Business Suite" title={title} description={description} /><div className="gd-panel p-6 text-center"><p className="text-sm text-muted-foreground">Este módulo permanece dentro da Growdash. Quando a Meta não fornece o endpoint ou a permissão necessária para a conexão, mostramos o estado indisponível sem abrir outra plataforma ou estimar valores.</p></div></section>;
 }
