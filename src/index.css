@@ -9687,7 +9687,7 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
   [data-traffic-nav] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 @media (min-width: 1280px) {
-  [data-traffic-nav] { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+  [data-traffic-nav] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
 /* One alignment rhythm for the campaign manager.  Header, scope controls,
