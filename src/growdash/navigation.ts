@@ -31,6 +31,7 @@ import {
 export type ModuleConfig = {
   label: string;
   path: string;
+  external?: boolean;
   icon: LucideIcon;
   description: string;
   metrics: Array<{ label: string; value: string; change: string }>;
@@ -123,6 +124,14 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: ["Jornadas", "Pessoas em fluxo", "Conclusão por etapa"],
       },
       {
+        label: "Quadro",
+        path: "/quadro",
+        icon: Columns3,
+        description: "Organize ideias, fluxos e planos visuais em um quadro.",
+        metrics: [],
+        highlights: ["Ideias", "Fluxos", "Planos de ação"],
+      },
+      {
         label: "Análise de Mídia Social",
         path: "/midia-social",
         icon: Radio,
@@ -208,10 +217,11 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: ["Pendentes", "Recuperados", "Sem origem"],
       },
       {
-        label: "Automações",
-        path: "/automacoes",
+        label: "Automação",
+        path: "https://automation.growdash.com.br",
+        external: true,
         icon: Workflow,
-        description: "Configure sequências e tarefas automáticas da operação.",
+        description: "Abra o n8n para conectar tarefas e sistemas da operação.",
         metrics: [],
         highlights: ["Fluxos ativos", "Execuções", "Taxa de sucesso"],
       },

@@ -1,0 +1,3 @@
+automation.growdash.com.br {
+    reverse_proxy n8n:5678
+}

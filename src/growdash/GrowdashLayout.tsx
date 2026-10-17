@@ -74,6 +74,7 @@ const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
   "/agentes": () => import("@/growdash/AgentsOfficePage"),
   "/gestor-trafego": () => import("@/growdash/TrafficAgentPage"),
   "/whatsapp": () => import("@/pages/WhatsApp"),
+  "/quadro": () => import("@/growdash/QuadroPage"),
   "/chamados": () => import("@/growdash/ModulePage"),
   "/automacoes": () => import("@/growdash/ModulePage"),
   "/marcas": () => import("@/growdash/ModulePage"),
@@ -209,7 +210,11 @@ export default function GrowdashLayout() {
     });
   }, []);
 
-  const permittedPath = (path: string) => {
+  const permittedPath = (item: (typeof NAV_SECTIONS)[number]["items"][number]) => {
+    // The n8n editor remains behind the same automation permission as the
+    // former internal module; an external URL must not broaden access.
+    if (item.external) return permissions.canAutomations;
+    const path = item.path;
     const pathnameOnly = path.split("?")[0];
     const guarded: Record<string, boolean> = {
       "/": permissions.canDashboard,
@@ -237,13 +242,14 @@ export default function GrowdashLayout() {
       "/usuarios": permissions.canUsers,
       "/agentes": permissions.canAgents,
       "/whatsapp": permissions.canIntegrations,
+      "/quadro": true,
       "/configuracoes": permissions.canSettings,
       "/saude-dos-dados": permissions.canDataHealth,
     };
     return guarded[pathnameOnly] ?? isMaster;
   };
   const visibleSections = NAV_SECTIONS
-    .map((section) => ({ ...section, items: section.items.filter((item) => permittedPath(item.path)) }))
+    .map((section) => ({ ...section, items: section.items.filter((item) => permittedPath(item)) }))
     .filter((section) => section.items.length > 0);
 
   // Route chunks are fetched only after a person points at or focuses a menu
@@ -357,12 +363,32 @@ export default function GrowdashLayout() {
                   const [itemPathname, itemSearch = ""] = item.path.split("?");
                   const targetAnalysis = new URLSearchParams(itemSearch).get("analise");
                   const currentAnalysis = new URLSearchParams(location.search).get("analise");
-                  const isActive = targetAnalysis
+                  const isActive = item.external ? false : targetAnalysis
                     ? location.pathname.startsWith(itemPathname) && currentAnalysis === targetAnalysis
                     : itemPathname === "/"
                       ? location.pathname === "/"
                       : location.pathname.startsWith(itemPathname);
-                  const link = (
+                  const linkClassName = cn(
+                    "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
+                    showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
+                    !showSidebarLabels
+                      ? "bg-transparent text-white/75 shadow-none hover:bg-white/[.06] hover:text-white"
+                      : isActive
+                      ? "bg-white/[.10] text-white shadow-none"
+                      : "text-white/68 hover:bg-white/[.07] hover:text-white",
+                  );
+                  const link = item.external ? (
+                    <a
+                      href={item.path}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${item.label} (abre em nova aba)`}
+                      className={linkClassName}
+                    >
+                      <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                      {showSidebarLabels && <span className="truncate">{item.label}</span>}
+                    </a>
+                  ) : (
                     <NavLink
                       to={item.path}
                       end={itemPathname === "/"}
@@ -370,15 +396,7 @@ export default function GrowdashLayout() {
                       onPointerEnter={() => preloadRoute(item.path)}
                       onFocus={() => preloadRoute(item.path)}
                       onPointerDown={() => preloadRoute(item.path)}
-                      className={cn(
-                        "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
-                        showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
-                        !showSidebarLabels
-                          ? "bg-transparent text-white/75 shadow-none hover:bg-white/[.06] hover:text-white"
-                          : isActive
-                          ? "bg-white/[.10] text-white shadow-none"
-                          : "text-white/68 hover:bg-white/[.07] hover:text-white",
-                      )}
+                      className={linkClassName}
                     >
                       <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
                       {showSidebarLabels && <span className="truncate">{item.label}</span>}
