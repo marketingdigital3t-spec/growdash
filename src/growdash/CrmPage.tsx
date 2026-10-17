@@ -668,6 +668,33 @@ export default function CrmPage() {
     }
   }
 
+  async function updateRDDeal(deal: RDDealLite, fields: Record<string, unknown>) {
+    if (!rdIntegration?.write_enabled) {
+      toast.error("Habilite a escrita governada no card de integração do RD Station.");
+      return;
+    }
+    const connectionId = deal.rd_connection_id || connectedFunnels.find((funnel) => funnel.id === deal.rd_funnel_id)?.rd_connection_id;
+    if (!connectionId) {
+      toast.error("Esta negociação não tem uma conexão RD identificada.");
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke("rd-update-deal", {
+        body: { rd_connection_id: connectionId, rd_deal_id: deal.rd_deal_id, fields, correlation_id: crypto.randomUUID() },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
+      ]);
+      setSelectedDeal(null);
+      toast.success(data?.noop ? "A negociação já estava com esses dados." : "Negociação atualizada no RD Station.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a negociação no RD Station.");
+    }
+  }
+
   return (
     <div className="crm-page gd-module-shell mx-auto max-w-[1700px] space-y-5">
       <PageHeading
@@ -817,7 +844,7 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} />
+      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onUpdate={(deal, fields) => void updateRDDeal(deal, fields)} canWrite={rdIntegration?.write_enabled === true} />
     </div>
   );
 }
@@ -939,7 +966,9 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void }) {
+function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose, onUpdate, canWrite }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; canWrite: boolean }) {
+  const [winValue, setWinValue] = useState("false");
+  useEffect(() => { if (deal) setWinValue(deal.win ? "true" : "false"); }, [deal]);
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
   return (
@@ -954,6 +983,13 @@ function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onCl
           <DetailMetric icon={<Target />} label="Etapa" value={deal.rd_stage_name || "Sem etapa"} />
           <DetailMetric icon={<UserRound />} label="Responsável" value={deal.deal_owner_name || "Não informado"} />
           <DetailMetric icon={deal.win ? <Trophy /> : <XCircle />} label="Situação" value={statusLabel(deal)} />
+        </div>
+        <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid min-w-44 flex-1 gap-1.5 text-xs font-bold"><span>Situação no RD</span><select value={winValue} onChange={(event) => setWinValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Em aberto / não ganha</option><option value="true">Venda ganha</option></select></label>
+            <Button type="button" disabled={!canWrite || winValue === (deal.win ? "true" : "false")} onClick={() => onUpdate(deal, { win: winValue === "true" })}>{canWrite ? "Salvar no RD" : "Ativar escrita no RD"}</Button>
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">A alteração é validada no backend, auditada antes da chamada e sincronizada de volta ao espelho.</p>
         </div>
         <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
           <DetailRow icon={<Columns3 />} label="Funil" value={funnelName || "Funil RD"} />
@@ -971,7 +1007,7 @@ function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onCl
           {deal.lost_reason && <DetailRow icon={<XCircle />} label="Motivo da perda" value={deal.lost_reason} danger />}
         </div>
         {!!fields.length && <div className="mt-5"><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Campos personalizados do RD</h3><div className="mt-2 divide-y divide-border rounded-2xl border border-border">{fields.map(([key, value]) => <div key={key} className="grid grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)] gap-3 px-4 py-3 text-xs"><span className="break-words text-muted-foreground">{key}</span><b className="break-words text-right">{String(value)}</b></div>)}</div></div>}
-        <div className="mt-5 rounded-xl border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">ID RD: {deal.rd_deal_id}. A Growdash exibe somente o espelho do RD Station: os dados são atualizados pelo sincronizador e não podem ser editados nesta tela.</div>
+        <div className="mt-5 rounded-xl border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">ID RD: {deal.rd_deal_id}. A Growdash mantém o espelho do RD Station; alterações ficam disponíveis apenas quando a escrita governada está habilitada e são sempre auditadas.</div>
       </SheetContent>
     </Sheet>
   );

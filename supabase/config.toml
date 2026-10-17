@@ -30,6 +30,9 @@ verify_jwt = true
 [functions.rd-move-deal]
 verify_jwt = true
 
+[functions.rd-update-deal]
+verify_jwt = true
+
 [functions.delete-integration-account]
 verify_jwt = true
 
