@@ -266,9 +266,10 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
 }
 
 /**
- * Base operacional do CRM. Diferente dos relatórios, ela não corta negócios
- * pela data de criação: um lead antigo que continua aberto precisa permanecer
- * visível no pipeline, exatamente como no RD Station.
+ * Base operacional do CRM. Em "pipeline" preserva o histórico completo do
+ * RD Station; em "period" aplica o intervalo civil escolhido no calendário.
+ * O chamador precisa escolher explicitamente o modo para não misturar os dois
+ * escopos na mesma tela.
  */
 export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate, endDate, dateScope = "pipeline", enabled = true }: RDCRMQueryScope) {
   const rdScope = useResolvedRDAccountFunnelScope({ adAccountId, adAccountIds, funnelIds });

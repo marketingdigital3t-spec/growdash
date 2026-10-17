@@ -202,6 +202,9 @@ export default function CrmPage() {
     funnelIds: requestedFunnelIds,
     startDate: preset === "max" ? undefined : startDate,
     endDate: preset === "max" ? undefined : endDate,
+    // O quadro precisa obedecer ao mesmo calendário visível nos indicadores.
+    // "Máximo" continua sendo a única escolha que solicita o histórico inteiro.
+    dateScope: preset === "max" ? "pipeline" : "period",
     enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
   const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
@@ -344,9 +347,8 @@ export default function CrmPage() {
     endDate,
     dateRule: "lead_created_at",
   }), [accountScopeIds, endDate, funnelScopeIds, startDate]);
-  // The CRM board is the current RD pipeline, not a lead-creation report.
-  // Keep older open negotiations visible when the calendar is set to Today;
-  // only the summary KPIs below use the selected period.
+  // O quadro e os indicadores usam o mesmo recorte do calendário. A exceção
+  // é o preset "Máximo", que solicita explicitamente todo o histórico.
   const dealsInPipeline = scopedDeals;
   const dealsInSelectedPeriod = useMemo(
     () => preset === "max" ? scopedDeals : scopedDeals.filter((deal) => isRDDealInScopePeriod(deal, { ...rdScope, accountIds: [], funnelIds: [] })),
@@ -539,9 +541,9 @@ export default function CrmPage() {
         const syncBody = {
           funnel_id: funnel.id,
           // This is an explicit user action, so synchronize every RD status
-          // in the connected RD pipeline. The calendar selected on the CRM
-          // screen scopes the summary indicators only; the Kanban itself is
-          // the current pipeline and must mirror old/open/won/lost deals too.
+          // in the connected RD pipeline. This explicit action reconciles the
+          // provider snapshot independently of the visual calendar scope;
+          // the refreshed rows are then queried according to that scope.
           realtime: false,
           analytics_mode: true,
           // The historical mirror is intentionally list-first. Hydrating each
@@ -622,7 +624,9 @@ export default function CrmPage() {
       <PageHeading
         eyebrow="RD Station CRM"
         title="Negociações"
-        description="Pipeline atual do RD Station, com negociações abertas independentemente da data de criação."
+        description={preset === "max"
+          ? "Pipeline completo do RD Station, com todo o histórico disponível."
+          : "Negociações do RD Station criadas no período selecionado no calendário."}
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Visualização das negociações">
@@ -641,7 +645,7 @@ export default function CrmPage() {
       <section className="crm-filter-strip gd-panel mb-4 p-3 sm:p-4">
         <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-3">
           <Search className="h-4 w-4 text-primary" />
-          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro mantém o histórico completo do pipeline, enquanto os indicadores respeitam o período selecionado.</p></div>
+          <div><h2 className="text-sm font-black text-foreground">Filtros e escopo</h2><p className="text-[11px] text-muted-foreground">A conta define os funis RD vinculados. O quadro e os indicadores respeitam o período selecionado; escolha “Máximo” para consultar todo o histórico.</p></div>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(200px,1.2fr)_minmax(180px,.82fr)_minmax(170px,.72fr)_minmax(235px,.95fr)_auto]">
           <label className="relative min-w-0">
