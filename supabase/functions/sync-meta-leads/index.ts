@@ -184,6 +184,63 @@ function pickField(fd: any[], wants: string[]): string | null {
   return null;
 }
 
+async function hydrateMissingAttribution(
+  rows: LeadRow[],
+  token: string,
+  formNames: Map<string, string>,
+  adNames: Map<string, string>,
+  adsetNames: Map<string, string>,
+  campaignNames: Map<string, string>,
+) {
+  const cache = new Map<string, any>();
+  const getObject = async (id: string, fields: string) => {
+    const key = `${id}:${fields}`;
+    if (cache.has(key)) return cache.get(key);
+    const response = await fetch(`${GRAPH}/${encodeURIComponent(id)}?fields=${fields}&access_token=${encodeURIComponent(token)}`);
+    const payload = await response.json().catch(() => ({}));
+    const value = response.ok && !payload?.error ? payload : null;
+    cache.set(key, value);
+    return value;
+  };
+  const runBatches = async (ids: string[], task: (id: string) => Promise<void>) => {
+    for (let i = 0; i < ids.length; i += 8) {
+      await Promise.all(ids.slice(i, i + 8).map(task));
+    }
+  };
+  const adIds = [...new Set(rows.filter((row) => row.ad_id && !row.ad_name).map((row) => String(row.ad_id)))];
+  await runBatches(adIds, async (id) => {
+    const ad = await getObject(id, "name,adset_id,campaign_id");
+    if (ad?.name) adNames.set(id, String(ad.name));
+    if (ad?.adset_id && ad?.adset?.name) adsetNames.set(String(ad.adset_id), String(ad.adset.name));
+    if (ad?.campaign_id && ad?.campaign?.name) campaignNames.set(String(ad.campaign_id), String(ad.campaign.name));
+  });
+  const adsetIds = [...new Set(rows.filter((row) => row.adset_id && !row.adset_name).map((row) => String(row.adset_id)))];
+  await runBatches(adsetIds, async (id) => {
+    const adset = await getObject(id, "name,campaign_id");
+    if (adset?.name) adsetNames.set(id, String(adset.name));
+    if (adset?.campaign_id && adset?.campaign?.name) campaignNames.set(String(adset.campaign_id), String(adset.campaign.name));
+  });
+  const campaignIds = [...new Set(rows.filter((row) => row.campaign_id && !row.campaign_name).map((row) => String(row.campaign_id)))];
+  await runBatches(campaignIds, async (id) => {
+    const campaign = await getObject(id, "name");
+    if (campaign?.name) campaignNames.set(id, String(campaign.name));
+  });
+  const formIds = [...new Set(rows.filter((row) => row.form_id && !row.form_name).map((row) => String(row.form_id)))];
+  await runBatches(formIds, async (id) => {
+    const form = await getObject(id, "name");
+    if (form?.name) formNames.set(id, String(form.name));
+  });
+  for (const row of rows) {
+    row.campaign_name ||= row.campaign_id ? campaignNames.get(String(row.campaign_id)) || null : null;
+    row.adset_name ||= row.adset_id ? adsetNames.get(String(row.adset_id)) || null : null;
+    row.ad_name ||= row.ad_id ? adNames.get(String(row.ad_id)) || null : null;
+    row.form_name ||= row.form_id ? formNames.get(String(row.form_id)) || null : null;
+    row.platform ||= String((row.raw as any)?.site_source_name || (row.raw as any)?.publisher_platform || "") || null;
+    row.placement ||= String((row.raw as any)?.platform_position || (row.raw as any)?.placement || "") || null;
+    row.attribution_status = row.campaign_id && row.adset_id && row.ad_id ? "captured" : "partial";
+  }
+}
+
 async function fetchAll(
   url: string,
   maxPages = Number.POSITIVE_INFINITY,
@@ -578,6 +635,12 @@ Deno.serve(async (req) => {
               raw: l,
             };
           });
+
+          // A lead can arrive before the catalog sync, and some Graph API
+          // versions return only immutable IDs on /<form>/leads. Resolve the
+          // missing names from the canonical Graph objects before persistence;
+          // IDs remain the only matching key and failures stay partial.
+          await hydrateMissingAttribution(rows, token, formNames, adNames, adsetNames, campaignNames);
 
           // Enrich rows still missing state via RD deals (match by email only — rd_deals has no phone column)
           const missing = rows.filter((x) => !x.lead_state && x.email);

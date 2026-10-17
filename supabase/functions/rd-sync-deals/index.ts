@@ -72,14 +72,21 @@ function mergeUtmSources(sources: any[]) {
   return sources.filter(Boolean).reduce((merged, source) => ({ ...merged, ...(source || {}) }), {} as Record<string, unknown>);
 }
 
+function cleanTrackingValue(value: unknown): string | null {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (!text || /^\{\{[^{}]+\}\}$/.test(text) || /^\$\{[^{}]+\}$/.test(text)) return null;
+  return text;
+}
+
 function pickTrackingValue(direct: any, merged: Record<string, unknown>, customSources: any[], aliases: string[]) {
-  const directValue = direct;
-  if (directValue != null && String(directValue).trim()) return String(directValue).trim();
+  const directValue = cleanTrackingValue(direct);
+  if (directValue) return directValue;
   for (const alias of aliases) {
-    const value = merged[alias] ?? merged[`utm_${alias}`] ?? merged[`gd_${alias}`];
-    if (value != null && String(value).trim()) return String(value).trim();
+    const value = cleanTrackingValue(merged[alias] ?? merged[`utm_${alias}`] ?? merged[`gd_${alias}`]);
+    if (value) return value;
   }
-  return findCustomField(customSources, aliases);
+  return cleanTrackingValue(findCustomField(customSources, aliases));
 }
 
 /**
