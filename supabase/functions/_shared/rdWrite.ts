@@ -5,7 +5,7 @@ type AdminClient = {
   rpc: (fn: string, args?: Record<string, unknown>) => any;
 };
 
-export type RDWriteAction = "move_stage" | "update_deal" | "update_contact" | "create_contact";
+export type RDWriteAction = "move_stage" | "update_deal" | "update_contact" | "create_contact" | "add_note";
 
 export type RDWriteInput = {
   admin: AdminClient;

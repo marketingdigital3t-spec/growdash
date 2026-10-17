@@ -12,8 +12,11 @@ import {
   List,
   Mail,
   MapPin,
+  MessageSquare,
+  Pencil,
   RefreshCw,
   Search,
+  Send,
   Target,
   Trophy,
   UserRound,
@@ -52,6 +55,7 @@ import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { useInsights } from "@/hooks/useInsights";
 import { useLeadAttributionCatalog } from "@/hooks/useLeadAttributionCatalog";
 import { resolveLeadAttribution, type LeadAttribution } from "@/lib/leadAttributionResolver";
+import { useRDDealNotes, useCreateRDDealNote } from "@/hooks/useRDDealNotes";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
@@ -73,6 +77,10 @@ type PipelineStage = {
   rdFunnelId?: string | null;
   rdStageId?: string | null;
 };
+
+type EditablePipeline = { id: string; name: string; rd_funnel_id: string; rd_connection_id?: string | null };
+type EditableStage = { rd_funnel_id: string; rd_stage_id: string; name: string; order: number; is_won: boolean; is_lost: boolean };
+type RDStageHistoryRow = { id: string; from_stage_name: string | null; to_stage_name: string | null; source: string; changed_at: string };
 
 type FirstPartyLead = { id: string; status: string | null; source_provider: string | null; first_received_at: string | null; utm_source: string | null; utm_campaign: string | null };
 type FirstPartyLeadQuery = {
@@ -324,6 +332,15 @@ export default function CrmPage() {
   ), [accountOpportunityFallbackById, productPriceByName]);
 
   const { data: storedStages = [] } = useFunnelStagesForIds(funnelScopeIds);
+  const editableFunnels = useMemo<EditablePipeline[]>(() => {
+    const connectionId = selectedDeal?.rd_connection_id || connectedFunnels.find((funnel) => funnel.id === selectedDeal?.rd_funnel_id)?.rd_connection_id;
+    if (!connectionId) return [];
+    return availableFunnels
+      .filter((funnel) => funnel.rd_connection_id === connectionId && !!funnel.rd_funnel_id)
+      .map((funnel) => ({ id: funnel.id, name: funnel.name, rd_funnel_id: funnel.rd_funnel_id!, rd_connection_id: funnel.rd_connection_id }));
+  }, [availableFunnels, connectedFunnels, selectedDeal]);
+  const editableFunnelIds = useMemo(() => editableFunnels.map((funnel) => funnel.id), [editableFunnels]);
+  const { data: editableStages = [] } = useFunnelStagesForIds(editableFunnelIds);
   const visibleStoredStages = useMemo(() => storedStages.filter((stage) =>
     !isExcludedLegacyRannielyStage(connectedFunnelNameById.get(stage.rd_funnel_id), stage.name),
   ), [connectedFunnelNameById, storedStages]);
@@ -638,6 +655,7 @@ export default function CrmPage() {
     const optimisticBucket = destination.won ? "client" : destination.lost ? "lost" : "opportunity";
     queryClient.setQueriesData({ queryKey: ["rd_crm_deals"] }, (current: RDDealLite[] | undefined) => current?.map((item) => item.id === deal.id ? {
       ...item,
+      rd_funnel_id: destination.rdFunnelId || item.rd_funnel_id,
       rd_stage_id: destination.rdStageId,
       rd_stage_name: destination.name,
       rd_stage_order: destination.order,
@@ -650,6 +668,7 @@ export default function CrmPage() {
         body: {
           rd_connection_id: connectionId,
           rd_deal_id: deal.rd_deal_id,
+          destination_rd_funnel_id: destination.rdFunnelId,
           deal_stage_id: destination.rdStageId,
           correlation_id: crypto.randomUUID(),
         },
@@ -661,6 +680,16 @@ export default function CrmPage() {
         queryClient.invalidateQueries({ queryKey: ["rd_deals"] }),
         queryClient.invalidateQueries({ queryKey: ["rd_deal_stage_history"] }),
       ]);
+      setSelectedDeal((current) => current?.id === deal.id ? {
+        ...current,
+        rd_funnel_id: destination.rdFunnelId || current.rd_funnel_id,
+        rd_stage_id: destination.rdStageId || current.rd_stage_id,
+        rd_stage_name: destination.name,
+        rd_stage_order: destination.order,
+        stage_bucket: optimisticBucket,
+        win: destination.won,
+        stage_updated_at: new Date().toISOString(),
+      } : current);
       toast.success(data?.noop ? "A negociação já estava nessa etapa." : "Negociação movida no RD Station.");
     } catch (error) {
       for (const [key, data] of previous) queryClient.setQueryData(key, data);
@@ -872,7 +901,20 @@ export default function CrmPage() {
         </section>
       )}
 
-      <DealDetails deal={selectedDeal} attribution={selectedAttribution} funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined} getOpportunityAmount={getOpportunityAmount} onClose={() => setSelectedDeal(null)} onUpdate={(deal, fields) => void updateRDDeal(deal, fields)} onContactUpdate={(deal, fields) => void updateRDContact(deal, fields)} onActivateWrite={() => { window.location.href = "/integracoes?tab=crm"; }} canWrite={rdIntegration?.write_enabled === true} />
+      <DealDetails
+        deal={selectedDeal}
+        attribution={selectedAttribution}
+        funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined}
+        funnels={editableFunnels}
+        stages={editableStages as EditableStage[]}
+        getOpportunityAmount={getOpportunityAmount}
+        onClose={() => setSelectedDeal(null)}
+        onUpdate={(deal, fields) => void updateRDDeal(deal, fields)}
+        onContactUpdate={(deal, fields) => void updateRDContact(deal, fields)}
+        onMove={(deal, destination) => void moveRDDeal(deal, destination)}
+        onActivateWrite={() => { window.location.href = "/integracoes?tab=crm"; }}
+        canWrite={rdIntegration?.write_enabled === true}
+      />
     </div>
   );
 }
@@ -994,50 +1036,151 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onClose, onUpdate, onContactUpdate, onActivateWrite, canWrite }: { deal: RDDealLite | null; attribution: LeadAttribution | null; funnelName?: string; getOpportunityAmount: (deal: RDDealLite) => number; onClose: () => void; onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; onContactUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void; onActivateWrite: () => void; canWrite: boolean }) {
+function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpportunityAmount, onClose, onUpdate, onContactUpdate, onMove, onActivateWrite, canWrite }: {
+  deal: RDDealLite | null;
+  attribution: LeadAttribution | null;
+  funnelName?: string;
+  funnels: EditablePipeline[];
+  stages: EditableStage[];
+  getOpportunityAmount: (deal: RDDealLite) => number;
+  onClose: () => void;
+  onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void;
+  onContactUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void;
+  onMove: (deal: RDDealLite, stage: PipelineStage) => void;
+  onActivateWrite: () => void;
+  canWrite: boolean;
+}) {
   const [winValue, setWinValue] = useState("false");
+  const [dealName, setDealName] = useState("");
+  const [holdValue, setHoldValue] = useState("false");
+  const [rating, setRating] = useState("");
+  const [predictionDate, setPredictionDate] = useState("");
+  const [lostNote, setLostNote] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [note, setNote] = useState("");
+  const [selectedFunnelId, setSelectedFunnelId] = useState("");
+  const [selectedStageId, setSelectedStageId] = useState("");
+  const notes = useRDDealNotes(deal?.id ?? null);
+  const createNote = useCreateRDDealNote();
+  const stageHistory = useQuery({
+    queryKey: ["rd_deal_stage_history", deal?.id],
+    enabled: !!deal?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("rd_deal_stage_history")
+        .select("id,from_stage_name,to_stage_name,source,changed_at,metadata")
+        .eq("rd_deal_id", deal!.id)
+        .order("changed_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   useEffect(() => {
-    if (deal) {
-      setWinValue(deal.win ? "true" : "false");
-      setContactName(deal.contact_name || "");
-      setContactEmail(deal.contact_email || "");
-    }
+    if (!deal) return;
+    const raw = deal.raw && typeof deal.raw === "object" ? deal.raw : {};
+    const nested = raw.deal;
+    const rawDeal = nested && typeof nested === "object" && !Array.isArray(nested) ? nested as Record<string, unknown> : raw;
+    setWinValue(deal.win ? "true" : "false");
+    setDealName(String(rawDeal.name || deal.contact_name || ""));
+    setHoldValue(rawDeal.hold === true ? "true" : "false");
+    setRating(rawDeal.rating == null ? "" : String(rawDeal.rating));
+    setPredictionDate(typeof rawDeal.prediction_date === "string" ? rawDeal.prediction_date.slice(0, 10) : "");
+    setLostNote(String(rawDeal.deal_lost_note || ""));
+    setContactName(deal.contact_name || "");
+    setContactEmail(deal.contact_email || "");
+    setNote("");
+    setSelectedFunnelId(deal.rd_funnel_id || "");
+    setSelectedStageId(deal.rd_stage_id || "");
   }, [deal]);
+
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
+  const stagesForFunnel = stages.filter((stage) => stage.rd_funnel_id === selectedFunnelId).sort((a, b) => a.order - b.order);
+  const selectedStage = stagesForFunnel.find((stage) => stage.rd_stage_id === selectedStageId);
+  const selectedFunnel = funnels.find((funnel) => funnel.id === selectedFunnelId);
+  const noteConnectionId = deal.rd_connection_id || selectedFunnel?.rd_connection_id || "";
+  const canSaveDeal = canWrite && !!dealName.trim();
+
+  const saveDealFields = () => {
+    if (!canWrite) return onActivateWrite();
+    const fieldsToUpdate: Record<string, unknown> = {
+      name: dealName.trim(),
+      win: winValue === "true",
+      hold: holdValue === "true",
+      prediction_date: predictionDate || null,
+      deal_lost_note: lostNote.trim() || null,
+    };
+    if (rating.trim()) fieldsToUpdate.rating = Number(rating);
+    onUpdate(deal, fieldsToUpdate);
+  };
+
+  const submitNote = async () => {
+    if (!canWrite) return onActivateWrite();
+    const body = note.trim();
+    if (!body || !noteConnectionId) return;
+    try {
+      await createNote.mutateAsync({ dealId: deal.id, rdConnectionId: noteConnectionId, rdProviderDealId: deal.rd_deal_id, body });
+      setNote("");
+      toast.success("Anotação enviada para o RD Station.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível enviar a anotação.");
+    }
+  };
+
   return (
     <Sheet open={!!deal} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader className="pr-7">
           <SheetTitle className="text-xl font-black">{deal.contact_name || deal.contact_email || "Negociação sem contato"}</SheetTitle>
-          <SheetDescription>Negociação sincronizada do RD Station CRM</SheetDescription>
+          <SheetDescription>Visão da negociação, histórico e ações sincronizadas com o RD Station CRM.</SheetDescription>
         </SheetHeader>
-        <div className="mt-6 grid grid-cols-2 gap-3">
+
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <DetailMetric icon={<CircleDollarSign />} label="Valor estimado" value={brl.format(getOpportunityAmount(deal))} />
           <DetailMetric icon={<Target />} label="Etapa" value={deal.rd_stage_name || "Sem etapa"} />
           <DetailMetric icon={<UserRound />} label="Responsável" value={deal.deal_owner_name || "Não informado"} />
           <DetailMetric icon={deal.win ? <Trophy /> : <XCircle />} label="Situação" value={statusLabel(deal)} />
         </div>
-        <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="grid min-w-44 flex-1 gap-1.5 text-xs font-bold"><span>Situação no RD</span><select value={winValue} onChange={(event) => setWinValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Em aberto / não ganha</option><option value="true">Venda ganha</option></select></label>
-            <Button type="button" disabled={canWrite ? winValue === (deal.win ? "true" : "false") : false} onClick={canWrite ? () => onUpdate(deal, { win: winValue === "true" }) : onActivateWrite}>{canWrite ? "Salvar no RD" : "Ativar escrita no RD"}</Button>
-          </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">{canWrite ? "A alteração é validada no backend, auditada antes da chamada e sincronizada de volta ao espelho." : "A escrita está desativada. Abra a configuração do RD para autorizar edições governadas nesta conexão."}</p>
-        </div>
-        <div className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
-          <h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Contato vinculado no RD</h3>
+
+        <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+          <div className="flex items-center justify-between gap-3"><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">Campos permitidos pela API oficial do RD. O valor financeiro é somente leitura no RD v1.</p></div><Pencil className="h-4 w-4 text-primary" /></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5 text-xs font-bold"><span>Nome</span><Input value={contactName} onChange={(event) => setContactName(event.target.value)} disabled={!canWrite} /></label>
-            <label className="grid gap-1.5 text-xs font-bold"><span>E-mail</span><Input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} disabled={!canWrite} /></label>
+            <label className="grid gap-1.5 text-xs font-bold sm:col-span-2"><span>Nome da negociação</span><Input value={dealName} onChange={(event) => setDealName(event.target.value)} disabled={!canWrite} /></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>Situação</span><select value={winValue} onChange={(event) => setWinValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Em aberto / não ganha</option><option value="true">Venda ganha</option></select></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>Em espera</span><select value={holdValue} onChange={(event) => setHoldValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Não</option><option value="true">Sim</option></select></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>Classificação (0–5)</span><Input inputMode="decimal" value={rating} onChange={(event) => setRating(event.target.value)} disabled={!canWrite} placeholder="Não informado" /></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>Data prevista</span><Input type="date" value={predictionDate} onChange={(event) => setPredictionDate(event.target.value)} disabled={!canWrite} /></label>
+            <label className="grid gap-1.5 text-xs font-bold sm:col-span-2"><span>Observação de perda</span><Input value={lostNote} onChange={(event) => setLostNote(event.target.value)} disabled={!canWrite} placeholder="Preencha quando aplicável" /></label>
           </div>
+          <Button type="button" className="mt-3" disabled={canWrite ? !canSaveDeal : false} onClick={saveDealFields}>{canWrite ? "Salvar informações no RD" : "Ativar escrita no RD"}</Button>
+          <p className="mt-2 text-[10px] text-muted-foreground">{canWrite ? "A alteração é validada no backend, auditada antes da chamada e sincronizada de volta ao espelho." : "A escrita está desativada. O proprietário precisa autorizá-la no card de integração do RD."}</p>
+        </section>
+
+        <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+          <div className="flex items-center gap-2"><Columns3 className="h-4 w-4 text-primary" /><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Mover no RD Station</h3><p className="mt-1 text-[10px] text-muted-foreground">A etapa destino define automaticamente o pipeline no RD.</p></div></div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-xs font-bold"><span>Pipeline</span><select value={selectedFunnelId} onChange={(event) => { setSelectedFunnelId(event.target.value); setSelectedStageId(""); }} disabled={!canWrite || !funnels.length} className="h-10 rounded-lg border border-border bg-background px-3">{!funnels.length && <option value="">Pipeline não disponível</option>}{funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}</select></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>Etapa</span><select value={selectedStageId} onChange={(event) => setSelectedStageId(event.target.value)} disabled={!canWrite || !stagesForFunnel.length} className="h-10 rounded-lg border border-border bg-background px-3">{!stagesForFunnel.length && <option value="">Etapas não disponíveis</option>}{stagesForFunnel.map((stage) => <option key={stage.rd_stage_id} value={stage.rd_stage_id}>{stage.name}</option>)}</select></label>
+          </div>
+          <Button type="button" className="mt-3" variant="outline" disabled={!canWrite || !selectedStage || !selectedFunnel || (selectedFunnel.id === deal.rd_funnel_id && selectedStage.rd_stage_id === deal.rd_stage_id)} onClick={() => selectedStage && selectedFunnel && onMove(deal, { id: `${selectedFunnel.id}:${selectedStage.rd_stage_id}`, name: selectedStage.name, order: selectedStage.order, won: selectedStage.is_won, lost: selectedStage.is_lost, rdFunnelId: selectedFunnel.id, rdStageId: selectedStage.rd_stage_id })}>Salvar pipeline e etapa no RD</Button>
+        </section>
+
+        <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+          <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4 text-primary" /><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Anotações e histórico</h3><p className="mt-1 text-[10px] text-muted-foreground">A anotação fica na Growdash e é enviada para a timeline da negociação no RD.</p></div></div>
+          <div className="mt-3 flex gap-2"><Input value={note} onChange={(event) => setNote(event.target.value)} disabled={!canWrite} placeholder="Escreva uma anotação comercial…" maxLength={4000} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void submitNote(); }} /><Button type="button" size="icon" aria-label="Enviar anotação" disabled={canWrite ? !note.trim() || createNote.isPending : false} onClick={() => void submitNote()}>{canWrite ? <Send className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}</Button></div>
+          <div className="mt-4 space-y-2">{notes.isLoading && <p className="text-xs text-muted-foreground">Carregando anotações…</p>}{notes.data?.map((item) => <article key={item.id} className="rounded-xl border border-border bg-background p-3"><p className="whitespace-pre-wrap text-xs">{item.body}</p><p className="mt-2 text-[10px] text-muted-foreground">{item.author_name} · {fullDate(item.created_at)}</p></article>)}{(stageHistory.data as RDStageHistoryRow[] | undefined)?.map((item) => <article key={item.id} className="rounded-xl border border-dashed border-border p-3"><p className="text-xs font-bold">Etapa alterada: {item.from_stage_name || "—"} → {item.to_stage_name || "—"}</p><p className="mt-1 text-[10px] text-muted-foreground">{item.source === "rd_sync" ? "Sincronizado do RD" : item.source} · {fullDate(item.changed_at)}</p></article>)}{!notes.isLoading && !notes.data?.length && !stageHistory.data?.length && <p className="text-xs text-muted-foreground">Nenhum evento local registrado ainda.</p>}</div>
+        </section>
+
+        <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+          <h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Contato vinculado no RD</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-bold"><span>Nome</span><Input value={contactName} onChange={(event) => setContactName(event.target.value)} disabled={!canWrite} /></label><label className="grid gap-1.5 text-xs font-bold"><span>E-mail</span><Input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} disabled={!canWrite} /></label></div>
           <Button type="button" className="mt-3" variant="outline" disabled={!canWrite || (!contactName.trim() && !contactEmail.trim())} onClick={() => onContactUpdate(deal, { name: contactName.trim(), emails: contactEmail.trim() ? [{ email: contactEmail.trim() }] : [] })}>{deal.contact_name || deal.contact_email ? "Salvar contato no RD" : "Criar contato no RD"}</Button>
-          <p className="mt-2 text-[10px] text-muted-foreground">O backend deduplica por e-mail/telefone e preserva o vínculo com esta negociação.</p>
-        </div>
+        </section>
+
         <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
-          <DetailRow icon={<Columns3 />} label="Funil" value={funnelName || "Funil RD"} />
+          <DetailRow icon={<Columns3 />} label="Funil" value={selectedFunnel?.name || funnelName || "Funil RD"} />
           <DetailRow icon={<Mail />} label="E-mail" value={deal.contact_email || "Não informado"} />
           <DetailRow icon={<MapPin />} label="Localização" value={[deal.lead_city, deal.lead_state].filter(Boolean).join(" / ") || "Não informada"} />
           <DetailRow icon={<UsersRound />} label="Produto" value={deal.rd_product_name || "Não informado"} />
@@ -1045,14 +1188,13 @@ function DealDetails({ deal, attribution, funnelName, getOpportunityAmount, onCl
           <DetailRow icon={<Target />} label="Campanha" value={attribution?.campaignName || "Não atribuída"} />
           <DetailRow icon={<Target />} label="Conjunto" value={attribution?.adsetName || "Não atribuído"} />
           <DetailRow icon={<Target />} label="Criativo" value={attribution?.adName || "Não atribuído"} />
-          <DetailRow icon={<Target />} label="ID do anúncio" value={attribution?.adId || "Não atribuído"} />
           <DetailRow icon={<Target />} label="Rastreamento" value={attribution?.status === "attributed" ? (attribution.method === "meta_id" ? "Atribuído pelo ID do anúncio" : "Atribuído pelas UTMs") : attribution?.status === "partial" ? "Parâmetros recebidos, anúncio não encontrado" : "Sem parâmetros de rastreamento"} />
           <DetailRow icon={<CalendarClock />} label="Criado em" value={fullDate(deal.lead_created_at)} />
           <DetailRow icon={<Clock3 />} label="Última movimentação" value={fullDate(deal.stage_updated_at || deal.updated_at)} />
           {deal.lost_reason && <DetailRow icon={<XCircle />} label="Motivo da perda" value={deal.lost_reason} danger />}
         </div>
-        {!!fields.length && <div className="mt-5"><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Campos personalizados do RD</h3><div className="mt-2 divide-y divide-border rounded-2xl border border-border">{fields.map(([key, value]) => <div key={key} className="grid grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)] gap-3 px-4 py-3 text-xs"><span className="break-words text-muted-foreground">{key}</span><b className="break-words text-right">{String(value)}</b></div>)}</div></div>}
-        <div className="mt-5 rounded-xl border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">ID RD: {deal.rd_deal_id}. A Growdash mantém o espelho do RD Station; alterações ficam disponíveis apenas quando a escrita governada está habilitada e são sempre auditadas.</div>
+        {!!fields.length && <div className="mt-5"><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Campos personalizados do RD (leitura)</h3><div className="mt-2 divide-y divide-border rounded-2xl border border-border">{fields.map(([key, value]) => <div key={key} className="grid grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)] gap-3 px-4 py-3 text-xs"><span className="break-words text-muted-foreground">{key}</span><b className="break-words text-right">{String(value)}</b></div>)}</div></div>}
+        <div className="mt-5 rounded-xl border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">ID RD: {deal.rd_deal_id}. O RD Station continua sendo a fonte canônica; cada escrita é autorizada, auditada antes da chamada e refletida no espelho local.</div>
       </SheetContent>
     </Sheet>
   );

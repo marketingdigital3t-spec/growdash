@@ -13,6 +13,7 @@ const ALLOWED_FIELDS = new Set([
   "hold",
   "prediction_date",
   "rating",
+  "organization_id",
   "user_id",
   "win",
   "deal_custom_fields",
@@ -41,6 +42,10 @@ Deno.serve(async (req) => {
     if ("win" in fields && fields.win !== null && typeof fields.win !== "boolean") return json({ error: "win deve ser booleano ou nulo" }, 422);
     if ("hold" in fields && fields.hold !== null && typeof fields.hold !== "boolean") return json({ error: "hold deve ser booleano ou nulo" }, 422);
     if ("rating" in fields && fields.rating !== null && (typeof fields.rating !== "number" || fields.rating < 0 || fields.rating > 5)) return json({ error: "rating deve estar entre 0 e 5" }, 422);
+    if ("prediction_date" in fields && fields.prediction_date !== null && (typeof fields.prediction_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(fields.prediction_date))) return json({ error: "prediction_date deve estar no formato AAAA-MM-DD" }, 422);
+    if ("deal_custom_fields" in fields && fields.deal_custom_fields !== null && !Array.isArray(fields.deal_custom_fields)) return json({ error: "deal_custom_fields deve ser uma lista" }, 422);
+    if ("organization_id" in fields && fields.organization_id !== null && typeof fields.organization_id !== "string") return json({ error: "organization_id deve ser texto ou nulo" }, 422);
+    if ("user_id" in fields && fields.user_id !== null && typeof fields.user_id !== "string") return json({ error: "user_id deve ser texto ou nulo" }, 422);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: deal, error: dealError } = await admin.from("rd_deals")

@@ -36,6 +36,9 @@ verify_jwt = true
 [functions.rd-contact-write]
 verify_jwt = true
 
+[functions.rd-add-deal-note]
+verify_jwt = true
+
 [functions.delete-integration-account]
 verify_jwt = true
 

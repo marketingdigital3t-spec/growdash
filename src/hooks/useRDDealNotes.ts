@@ -29,14 +29,18 @@ export function useRDDealNotes(dealId: string | null) {
 export function useCreateRDDealNote() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ dealId, authorId, authorName, body }: { dealId: string; authorId: string; authorName: string; body: string }) => {
-      const { error } = await (supabase as any).from("rd_deal_notes").insert({
-        rd_deal_id: dealId,
-        author_id: authorId,
-        author_name: authorName,
-        body: body.trim(),
+    mutationFn: async ({ dealId, rdConnectionId, rdProviderDealId, body }: { dealId: string; rdConnectionId: string; rdProviderDealId: string; body: string }) => {
+      const { data, error } = await supabase.functions.invoke("rd-add-deal-note", {
+        body: {
+          rd_connection_id: rdConnectionId,
+          rd_deal_id: rdProviderDealId,
+          body: body.trim(),
+          correlation_id: crypto.randomUUID(),
+        },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
     onSuccess: async (_result, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["rd_deal_notes", variables.dealId] });
