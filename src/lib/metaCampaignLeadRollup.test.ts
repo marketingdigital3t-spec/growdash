@@ -80,7 +80,7 @@ describe("aggregateMetaCampaignLeadFacts", () => {
       {},
     );
 
-    const [synthetic] = addInsightOnlyCampaignRows([], rollup.deliveryByCampaign);
+    const [synthetic] = addInsightOnlyCampaignRows([], rollup.deliveryByCampaign, rollup.byCampaign);
     expect(synthetic).toMatchObject({
       id: "missing-catalog-id",
       name: "Expert | Leads | Outubro",
@@ -88,6 +88,10 @@ describe("aggregateMetaCampaignLeadFacts", () => {
       spend: 12.5,
       impressions: 1000,
       clicks: 20,
+      leads: 7,
+      formLeads: 7,
+      siteLeads: 0,
+      conversations: 0,
       catalogMissing: true,
       budget: null,
     });

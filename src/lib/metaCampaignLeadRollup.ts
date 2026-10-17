@@ -154,11 +154,21 @@ export function aggregateMetaCampaignLeadFacts(
 export function addInsightOnlyCampaignRows<T extends { id: string | number }>(
   catalogRows: T[],
   deliveryByCampaign: Record<string, MetaCampaignDeliveryTotals>,
+  leadTotalsByCampaign: Record<string, MetaLeadTotals> = {},
 ) {
   const knownCampaignIds = new Set(catalogRows.map((campaign) => String(campaign.id)));
   const insightOnlyRows = Object.entries(deliveryByCampaign)
     .filter(([campaignId, delivery]) => !knownCampaignIds.has(campaignId) && delivery.accountIds.length === 1)
     .map(([campaignId, delivery]) => ({
+      ...(() => {
+        const leads = leadTotalsByCampaign[campaignId] || { forms: 0, site: 0, conversations: 0, total: 0 };
+        return {
+          leads: leads.total,
+          formLeads: leads.forms,
+          siteLeads: leads.site,
+          conversations: leads.conversations,
+        };
+      })(),
       id: campaignId,
       name: campaignId.startsWith("__unmapped__:")
         ? "Campanha não identificada (Insights sem campaign_id)"
@@ -179,10 +189,6 @@ export function addInsightOnlyCampaignRows<T extends { id: string | number }>(
       linkCpc: 0,
       uniqueLinkCtr: 0,
       frequency: delivery.reach > 0 ? delivery.impressions / delivery.reach : 0,
-      leads: 0,
-      formLeads: 0,
-      siteLeads: 0,
-      conversations: 0,
       legacyLeads: 0,
       hasCanonicalLeadParts: true,
       salesCount: 0,

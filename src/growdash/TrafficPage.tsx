@@ -6,7 +6,7 @@ import {
   BarChart3, Bot, CalendarRange, Check, ChevronRight, CircleAlert, Copy, CreditCard,
   ExternalLink, FileBarChart, GitBranch, Megaphone, MessageCircle, MousePointerClick,
   Network, RefreshCw, Settings2, Smartphone, Sparkles, Target, UsersRound, Video, GitCompareArrows,
-  WalletCards, Wrench, Zap, Presentation, ShieldCheck, Tag,
+  WalletCards, Wrench, Zap, Tag,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -28,8 +28,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LeadReportStudio } from "@/growdash/LeadReportStudio";
 import { FunnelAudienceProfile, useAudienceProfileData } from "@/components/funnel-analysis/FunnelAudienceProfile";
-import { PaidTrafficPresentation } from "@/growdash/PaidTrafficPresentation";
-import TrafficAgentPage from "@/growdash/TrafficAgentPage";
 import AudienceNamingStandardizer from "@/components/campaigns/AudienceNamingStandardizer";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
@@ -40,16 +38,14 @@ import funnelPilulaAulaGratuita from "@/assets/zntt-funnels/02-pilula-aula-gratu
 import funnelDemandaReprimida from "@/assets/zntt-funnels/03-demanda-reprimida.png";
 import funnelSocialSeller from "@/assets/zntt-funnels/04-social-seller.png";
 
-const validTabs = new Set(["campaigns", "comparison", "manager", "budget", "ai", "funnels", "audiences", "presentation", "tools"]);
+const validTabs = new Set(["campaigns", "comparison", "budget", "ai", "funnels", "audiences", "tools"]);
 const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
   { id: "comparison", label: "Comparação", icon: GitCompareArrows },
-  { id: "manager", label: "Gestor autônomo", icon: ShieldCheck },
   { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
   { id: "ai", label: "IA & Relatórios de Leads", icon: Bot },
   { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
   { id: "audiences", label: "Padronizar públicos", icon: Tag },
-  { id: "presentation", label: "Apresentação", icon: Presentation },
   { id: "tools", label: "Ferramentas Meta", icon: Wrench },
 ] as const;
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -89,12 +85,10 @@ export default function TrafficPage() {
 
       {activeTab === "campaigns" && <CampaignsManager />}
       {activeTab === "comparison" && <TrafficComparison />}
-      {activeTab === "manager" && <TrafficAgentPage />}
       {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
       {activeTab === "ai" && <AIAndLeadReports accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} accountIds={selectedForDisplay} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name, attribution_window: item.attribution_window }))} />}
       {activeTab === "funnels" && <TrafficFunnels />}
       {activeTab === "audiences" && <AudienceNamingStandardizer />}
-      {activeTab === "presentation" && <PaidTrafficPresentation />}
       {activeTab === "tools" && <MetaToolsWorkspace
         providerAccountId={account?.account_id}
         accountName={account?.name}

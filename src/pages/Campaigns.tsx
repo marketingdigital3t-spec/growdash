@@ -480,8 +480,8 @@ export default function Campaigns() {
     attributionWindowsByAccount,
   });
   const campaignRowsWithInsights = useMemo(
-    () => addInsightOnlyCampaignRows(campaignBaseRows, canonicalLeadRollup?.deliveryByCampaign || {}),
-    [campaignBaseRows, canonicalLeadRollup?.deliveryByCampaign],
+    () => addInsightOnlyCampaignRows(campaignBaseRows, canonicalLeadRollup?.deliveryByCampaign || {}, canonicalLeadRollup?.byCampaign || {}),
+    [campaignBaseRows, canonicalLeadRollup?.byCampaign, canonicalLeadRollup?.deliveryByCampaign],
   );
   const campaigns = useMemo(() => campaignRowsWithInsights.map((campaign: any) => {
     const actionMetrics = { linkClicks: 0, landingPageViews: 0, checkouts: 0, purchases: 0, purchaseValue: 0 };
@@ -502,7 +502,12 @@ export default function Campaigns() {
 
     const linkClicks = campaign.linkClicks > 0 ? campaign.linkClicks : actionMetrics.linkClicks;
     const canonicalCampaignLeads = canonicalLeadRollup?.byCampaign[String(campaign.id)];
-    const results = canonicalCampaignLeads
+    // The rollup is built from insight_actions. Older or partially synced
+    // rows can have no action fact even though the persisted daily Insights
+    // already contains form/site/conversation totals. Only let a non-empty
+    // canonical action rollup replace those values; otherwise preserve the
+    // persisted facts instead of turning the Result column into zero.
+    const results = canonicalCampaignLeads && canonicalCampaignLeads.total > 0
       ? {
         total: canonicalCampaignLeads.total,
         leadCount: canonicalCampaignLeads.forms + canonicalCampaignLeads.site,

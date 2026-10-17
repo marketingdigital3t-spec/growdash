@@ -57,7 +57,7 @@ export default function TrafficComparison() {
   const { data: accounts = [], isLoading: accountsLoading } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId ? accounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id)) : accounts, [accounts, businessUnitId, segment]);
   const accountIds = useMemo(() => {
-    if (adAccountId !== "all") return [adAccountId];
+    if (adAccountId && adAccountId !== "all") return [adAccountId];
     const selected = adAccountIds.length ? adAccountIds : visibleAccounts.map((account) => account.id);
     return Array.from(new Set(selected.filter(Boolean)));
   }, [adAccountId, adAccountIds, visibleAccounts]);
