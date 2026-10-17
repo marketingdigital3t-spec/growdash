@@ -8844,6 +8844,12 @@ html:not(.dark) .dashboard-scope-sync {
   background-image: none !important;
 }
 
+/* The dashboard owns the spatial reference canvas. Other modules keep their
+   solid content surface, while this route explicitly reveals the phase scene. */
+.brand-shell[data-dashboard-scene="true"] .space-phase-bg {
+  display: block !important;
+}
+
 .brand-shell[data-dashboard-scene="true"] .dashboard-page::before {
   display: none !important;
 }
@@ -9712,4 +9718,15 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
 .traffic-comparison-shell .traffic-comparison-metric { min-height: 142px; }
 @media (max-width: 639px) {
   .traffic-comparison-shell .traffic-comparison-metric { min-height: 0; }
+}
+
+/* Final authority for the Dashboard reference canvas. The fixed phase scene
+   sits behind the widgets; only this route is transparent to reveal it. */
+.brand-shell[data-dashboard-scene="true"] .growdash-content-shell,
+.brand-shell[data-dashboard-scene="true"] .growdash-main,
+.brand-shell[data-dashboard-scene="true"] .growdash-content-frame,
+.brand-shell[data-dashboard-scene="true"] .gd-page-transition,
+.brand-shell[data-dashboard-scene="true"] .dashboard-page {
+  background-color: transparent !important;
+  background-image: none !important;
 }
