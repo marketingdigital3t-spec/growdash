@@ -10063,3 +10063,10 @@ html:not(.dark) .brand-shell[data-dashboard-scene="true"] .dashboard-page :is(.g
   background: rgba(255, 255, 255, .62) !important;
   border-color: rgba(17, 61, 98, .26) !important;
 }
+
+/* Final cascade guard: the legacy analytics surface rule is more general,
+   but still marked !important. This higher-specificity exception keeps only
+   the Dashboard canvas transparent so the phase artwork remains visible. */
+.brand-shell .analytics-module.analytics-module:has(.dashboard-page) {
+  background: transparent !important;
+}
