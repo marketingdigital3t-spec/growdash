@@ -16,7 +16,7 @@ export function FunnelStageConversion({ a }: Props) {
   return (
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">3. Taxa de avanço entre etapas</CardTitle>
+        <CardTitle className="text-base">2. Taxa de avanço entre etapas</CardTitle>
         <p className="text-xs text-muted-foreground">
           {a.stageConversionMode === "history"
             ? "Transições reais registradas no histórico do RD."

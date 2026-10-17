@@ -57,7 +57,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
     <Card className="gd-analysis-card bg-card/60 border-border/40">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-base">2. Distribuição por etapa do funil (RD)</CardTitle>
+          <CardTitle className="text-base">3. Distribuição por etapa do funil (RD)</CardTitle>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground" aria-label="Modo de visualização do funil">
               <span className={!visualMode ? "font-semibold text-foreground" : undefined}>Tabela</span>
