@@ -48,6 +48,25 @@ async function resolveAccount(admin: any, adId: string | null, formId: string | 
     const { data: form } = await admin.from("meta_lead_form_catalog").select("ad_account_id").eq("form_id", formId).maybeSingle();
     accountId = form?.ad_account_id ?? null;
   }
+  if (!accountId && (adId || formId)) {
+    // A first-ever lead can arrive before the scheduled catalog sync. Resolve
+    // it against the provider-owned object using each connected account token;
+    // this is bounded to the small set of accounts in the workspace.
+    const { data: accounts } = await admin
+      .from("ad_accounts")
+      .select("id,user_id,workspace_id,access_token,account_id")
+      .neq("connection_status", "disconnected")
+      .limit(50);
+    for (const candidate of accounts || []) {
+      const object = await graphObject(adId || formId, adId ? "account_id" : "account_id,page_id", candidate);
+      const providerAccountId = String(object?.account_id || "").replace(/^act_/, "");
+      const savedAccountId = String(candidate.account_id || "").replace(/^act_/, "");
+      if (providerAccountId && savedAccountId && providerAccountId === savedAccountId) {
+        accountId = candidate.id;
+        break;
+      }
+    }
+  }
   if (!accountId) return null;
   const { data: account } = await admin.from("ad_accounts").select("id,user_id,workspace_id,access_token,account_id").eq("id", accountId).maybeSingle();
   return account ?? null;
@@ -103,6 +122,14 @@ async function enrichLeadReferences(lead: any, account: MetaAccount) {
   if (next.form_id && !next.form_name) {
     const form = await graphObject(String(next.form_id), "name", account);
     if (form) next.form_name = form.name ?? null;
+  }
+  if (next.id && (!next.platform || !next.placement || typeof next.is_organic !== "boolean")) {
+    const delivery = await graphObject(String(next.id), "platform,site_source_name,publisher_platform,placement,platform_position,is_organic", account);
+    if (delivery) {
+      next.platform ??= delivery.platform ?? delivery.site_source_name ?? delivery.publisher_platform ?? null;
+      next.placement ??= delivery.placement ?? delivery.platform_position ?? null;
+      if (typeof next.is_organic !== "boolean" && typeof delivery.is_organic === "boolean") next.is_organic = delivery.is_organic;
+    }
   }
   return next;
 }
@@ -196,7 +223,7 @@ Deno.serve(async (req) => {
             platform: lead.platform ?? lead.site_source_name ?? lead.publisher_platform ?? null,
             placement: lead.placement ?? lead.platform_position ?? null,
             is_organic: typeof lead.is_organic === "boolean" ? lead.is_organic : null,
-            attribution_status: lead.campaign_id && lead.adset_id && lead.ad_id ? "captured" : "partial",
+            attribution_status: lead.campaign_id && lead.adset_id && lead.ad_id && lead.campaign_name && lead.adset_name && lead.ad_name && lead.form_name && (lead.platform || lead.site_source_name || lead.publisher_platform) && (lead.placement || lead.platform_position) ? "captured" : "partial",
             raw: lead,
           }, { onConflict: "meta_lead_id" });
           if (leadError) throw leadError;

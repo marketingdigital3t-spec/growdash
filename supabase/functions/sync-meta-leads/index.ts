@@ -208,6 +208,13 @@ async function hydrateMissingAttribution(
     cache.set(key, value);
     return value;
   };
+  const deliveryCache = new Map<string, any>();
+  const getLeadDelivery = async (id: string) => {
+    if (deliveryCache.has(id)) return deliveryCache.get(id);
+    const value = await getObject(id, "platform,site_source_name,publisher_platform,placement,platform_position,is_organic");
+    deliveryCache.set(id, value);
+    return value;
+  };
   const runBatches = async (ids: string[], task: (id: string) => Promise<void>) => {
     for (let i = 0; i < ids.length; i += 8) {
       await Promise.all(ids.slice(i, i + 8).map(task));
@@ -227,6 +234,15 @@ async function hydrateMissingAttribution(
     row.form_name = usableAttributionText(row.form_name);
     row.platform = usableAttributionText(row.platform);
     row.placement = usableAttributionText(row.placement);
+    if (row.meta_lead_id && (!row.platform || !row.placement || row.is_organic == null)) {
+      // Some Graph API versions reject delivery fields when combined with the
+      // lead identity fields. Retry them separately so an optional field never
+      // removes the lead or its campaign hierarchy.
+      const delivery = await getLeadDelivery(String(row.meta_lead_id));
+      row.platform ||= usableAttributionText(delivery?.platform || delivery?.site_source_name || delivery?.publisher_platform);
+      row.placement ||= usableAttributionText(delivery?.placement || delivery?.platform_position);
+      if (row.is_organic == null && typeof delivery?.is_organic === "boolean") row.is_organic = delivery.is_organic;
+    }
   }
   const adIds = [...new Set(rows.filter((row) => row.ad_id && !usableAttributionText(row.ad_name)).map((row) => String(row.ad_id)))];
   await runBatches(adIds, async (id) => {
@@ -258,7 +274,9 @@ async function hydrateMissingAttribution(
     row.form_name ||= row.form_id ? formNames.get(String(row.form_id)) || null : null;
     row.platform ||= usableAttributionText((row.raw as any)?.site_source_name || (row.raw as any)?.publisher_platform);
     row.placement ||= usableAttributionText((row.raw as any)?.platform_position || (row.raw as any)?.placement);
-    row.attribution_status = row.campaign_id && row.adset_id && row.ad_id ? "captured" : "partial";
+    row.attribution_status = row.campaign_id && row.adset_id && row.ad_id && row.campaign_name && row.adset_name && row.ad_name && row.form_name && row.platform && row.placement
+      ? "captured"
+      : "partial";
   }
 }
 
