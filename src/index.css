@@ -10175,6 +10175,28 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   font-size: .58rem;
 }
 
+/* The global module rhythm adds a 24px top margin between the dock and its
+   content. On the traffic manager that creates an empty black band and makes
+   the workspace look nested inside a second card. Keep one canvas and let the
+   manager's own toolbars provide the visual hierarchy. */
+@media (min-width: 768px) {
+  .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .brand-shell:has(.traffic-page-shell) .traffic-page-content {
+    margin-top: 0 !important;
+  }
+
+  .brand-shell:has(.traffic-page-shell) .campaigns-workspace {
+    margin: 0 !important;
+    padding: 0 0 14px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+}
+
 @media (max-width: 767px) {
   .traffic-nav-rail,
   .traffic-nav-rail[data-expanded="false"] {
