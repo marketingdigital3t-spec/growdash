@@ -10334,6 +10334,44 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
   gap: var(--dashboard-card-gap) !important;
 }
 
+/* Dashboard visual baseline: keep the canvas monochrome and allow the
+   complete metric stack to be reached inside the application frame. The
+   previous fixed hidden overflow left the lower widgets outside the viewport.
+   The scrollbar remains visually quiet while keyboard/wheel scrolling still
+   works inside the Dashboard only. */
+@media (min-width: 768px) {
+  .brand-shell:has(.dashboard-page) .growdash-main {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: none;
+    background: #080808 !important;
+  }
+
+  .brand-shell:has(.dashboard-page) .growdash-main::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page {
+  background: #080808 !important;
+  background-image: none !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page > * + * {
+  margin-top: 16px !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics,
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-primary-kpis,
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-financial-overview,
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-reference-panels {
+  gap: 16px !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics {
+  padding: 12px !important;
+}
+
 .brand-shell:has(.dashboard-page) .dashboard-page .gd-metric-card-content {
   min-height: var(--dashboard-kpi-height) !important;
   padding: var(--dashboard-card-padding) !important;
