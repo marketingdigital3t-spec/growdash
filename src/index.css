@@ -8844,6 +8844,12 @@ html:not(.dark) .dashboard-scope-sync {
   background-image: none !important;
 }
 
+/* The dashboard owns the spatial reference canvas. Other modules keep their
+   solid content surface, while this route explicitly reveals the phase scene. */
+.brand-shell[data-dashboard-scene="true"] .space-phase-bg {
+  display: block !important;
+}
+
 .brand-shell[data-dashboard-scene="true"] .dashboard-page::before {
   display: none !important;
 }
