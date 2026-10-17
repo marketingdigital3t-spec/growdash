@@ -24,7 +24,12 @@ const ResponsiveGrid = Responsive;
 const GRID_ROW_HEIGHT_DESKTOP = 56;
 const GRID_ROW_HEIGHT_COMPACT = 40;
 const GRID_MARGIN_Y = 16;
-const COMPACT_ANALYTIC_WIDGETS = new Set(["payment_chart", "platform_distribution"]);
+const COMPACT_ANALYTIC_WIDGETS = new Set([
+  "payment_chart",
+  "platform_distribution",
+  "campaign_ctr",
+  "campaign_conversion_rate",
+]);
 
 interface Props {
   view: DashboardView;
