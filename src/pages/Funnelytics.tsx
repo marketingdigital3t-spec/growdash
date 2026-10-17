@@ -64,7 +64,7 @@ import { GrowdashFlowCanvas } from "@/components/GrowdashFlow/GrowdashFlowCanvas
 import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
 import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate } from "@/components/GrowdashFlow/utils/templates";
 
-function FlowDataScopePanel() {
+function FlowDataScopeSync() {
   const { adAccountIds, funnelIds, startDate, endDate } = useGlobalFilters();
   const accounts = useAdAccounts();
   const selectedAccounts = useMemo(() => accounts.data || [], [accounts.data]);
@@ -226,61 +226,7 @@ function FlowDataScopePanel() {
   // incorrectly make this snapshot look fresher than it is.
   const latestRDSync = scopedRDSyncRows.map((row) => row.last_success_at).filter(Boolean).sort()[0] || null;
 
-  return (
-    <section aria-label="Métricas da conta e do período selecionados" className="gd-panel mb-4 p-4 sm:p-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-black">Dados reais da seleção</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Meta Ads para mídia e resultados · RD Station para negociações e vendas · {periodLabel}</p>
-        </div>
-        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${meta.data.status === "fresh" ? "bg-emerald-500/10 text-emerald-600" : meta.data.status === "syncing" ? "bg-amber-500/10 text-amber-600" : "bg-muted text-muted-foreground"}`}>
-          Meta · {meta.data.status === "fresh" ? "Atualizado" : meta.data.status === "syncing" ? "Sincronizando" : meta.data.status === "partial" ? "Parcial" : meta.data.status === "error" ? "Erro" : "Aguardando"}
-        </span>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-border/70 bg-background/40 p-3">
-          <div className="mb-2 text-[10px] font-black uppercase tracking-wider text-primary">Meta Ads</div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-            <FlowMetric label="Investimento" value={metaMoney("spend", meta.data.spend)} />
-            <FlowMetric label="Leads Meta" value={metaValue("leads", meta.data.totalLeads)} />
-            <FlowMetric label="CPM" value={metaMoney("impressions", meta.data.cpm)} />
-            <FlowMetric label="CPL" value={!meta.data.metricAvailability.leads?.available ? "Indisponível" : meta.data.totalLeads > 0 ? money(meta.data.cpl) : "—"} />
-            <FlowMetric label="Impressões" value={metaValue("impressions", meta.data.impressions)} />
-            <FlowMetric label="Cliques" value={metaValue("clicks", meta.data.clicks)} />
-            <FlowMetric label="Leads de formulário" value={meta.data.metricAvailability.leads?.available ? count(meta.data.formLeads) : "Indisponível"} />
-            <FlowMetric label="Leads de site" value={meta.data.metricAvailability.leads?.available ? count(meta.data.siteLeads) : "Indisponível"} />
-            <FlowMetric label="Conversas iniciadas" value={meta.data.metricAvailability.leads?.available ? count(meta.data.conversations) : "Indisponível"} />
-          </div>
-          {!meta.data.available && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">{meta.data.unavailableReason || meta.data.errors[0] || "Aguardando snapshot Meta confirmado."}</p>}
-          {meta.data.available && meta.data.status === "partial" && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Snapshot Meta parcial: {meta.data.coverageReason || meta.data.errors[0] || "algum bloco auxiliar ainda não confirmou cobertura total. Os valores exibidos são o último snapshot disponível para este recorte."}</p>}
-          {meta.data.available && !meta.data.metricAvailability.leads?.available && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Leads Meta: {meta.data.metricAvailability.leads?.reason || "Ações Meta ainda não confirmadas para este período."}</p>}
-        </div>
-        <div className="rounded-xl border border-border/70 bg-background/40 p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600">RD Station</div>
-            <span className="text-[10px] text-muted-foreground">{!rdScopeEnabled || sortedFunnelIds.length === 0 ? "Sem vínculo" : rdSyncing ? "Sincronizando" : rdError || rdScopeCoverage.isError || rdSyncRequestError ? "Erro" : scopedRDSyncRows.some((row) => row.status === "partial") ? (rdConfirmed ? "Parcial · último snapshot" : "Parcial") : rdConfirmed ? "Atualizado" : "Indisponível"}</span>
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-            <FlowMetric label="Negociações criadas" value={rdValue(rdMetrics.created)} />
-            <FlowMetric label="Oportunidades" value={rdValue(rdMetrics.opportunities)} />
-            <FlowMetric label="Vendas ganhas" value={rdValue(rdMetrics.won)} />
-            <FlowMetric label="Receita RD" value={rdRevenue()} />
-          </div>
-          {latestRDSync
-            ? <p className="mt-2 text-[10px] text-muted-foreground">Última sincronização RD: {new Date(latestRDSync).toLocaleString("pt-BR")}</p>
-            : rdDataAvailable && <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Leitura do snapshot RD confirmada; a conexão não registra data da última sincronização.</p>}
-          {rdSyncing && rdMetricsAvailable && <p role="status" className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Mostrando o último snapshot RD confirmado para este funil e período enquanto a atualização termina.</p>}
-          {rdSyncRequestError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Sincronização RD: {rdSyncRequestError}</p>}
-          {hasNoResolvedRDFunnel && !rdSyncing && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">A conta selecionada não tem um funil RD vinculado.</p>}
-          {rdError && <p role="status" className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">Não foi possível confirmar os dados do RD nesta seleção.</p>}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FlowMetric({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0"><div className="truncate text-[10px] text-muted-foreground">{label}</div><div className="mt-0.5 truncate text-sm font-bold" title={value}>{value}</div></div>;
+  return null;
 }
 
 /* ─── Types ─── */
@@ -1907,11 +1853,11 @@ const Funnelytics = () => {
 
   if (view === "canvas" && canvasData) {
     if (canvasData.funnelType === "blank") {
-      return <div className="space-y-4"><FlowDataScopePanel /><FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} /></div>;
+      return <div className="space-y-4"><FlowDataScopeSync /><FreeCanvasEditor key={activeFunnelId || "new-free-canvas"} funnelId={activeFunnelId} initialNodes={canvasData.nodes} initialConnections={canvasData.connections} initialName={canvasData.name} onBack={handleBack} /></div>;
     }
     return (
       <div className="space-y-4">
-        <FlowDataScopePanel />
+        <FlowDataScopeSync />
         <FunnelCanvas
           key={activeFunnelId || "new"}
           funnelId={activeFunnelId}
@@ -1929,7 +1875,7 @@ const Funnelytics = () => {
 
   return (
     <>
-      <FlowDataScopePanel />
+      <FlowDataScopeSync />
       <FunnelListing onSelect={handleSelectFunnel} onCreate={() => setCreateDialogOpen(true)} />
       <CreateFunnelDialog
         open={createDialogOpen}
