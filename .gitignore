@@ -14,6 +14,7 @@ html
 .env
 .env.*
 !.env.example
+deploy/.env
 .output
 .vinxi
 .tanstack/**

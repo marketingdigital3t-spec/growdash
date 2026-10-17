@@ -2,8 +2,7 @@ services:
   n8n:
     image: docker.n8n.io/n8nio/n8n
     restart: unless-stopped
-    ports:
-      - "5678:5678"
+    # Sem ports: o acesso externo passa somente pelo Caddy em HTTPS.
     environment:
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - TZ=America/Sao_Paulo
@@ -11,6 +10,9 @@ services:
       - N8N_PROTOCOL=https
       - WEBHOOK_URL=https://automation.growdash.com.br/
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=336
     volumes:
       - n8n_data:/home/node/.n8n
 

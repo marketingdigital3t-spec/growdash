@@ -8,7 +8,8 @@ versionado neste repositório.
 
 1. Crie um VPS Ubuntu com Docker Engine e o plugin `docker compose` instalado.
 2. Crie um registro DNS `A` para `automation.growdash.com.br` apontando para o
-   IP público do VPS.
+   IP público do VPS, com o proxy do Cloudflare desativado (DNS only / nuvem
+   cinza) para que o Caddy possa emitir o certificado diretamente.
 3. No VPS, copie esta pasta e crie o arquivo de ambiente:
 
    ```bash
@@ -28,6 +29,9 @@ versionado neste repositório.
 
 5. Abra `https://automation.growdash.com.br`. No primeiro acesso, crie a conta
    owner do n8n e conclua a configuração inicial.
+
+O n8n não publica a porta `5678` no host. O único acesso externo é feito pelo
+Caddy nas portas `80` e `443`, através da rede interna do Docker.
 
 ## Licença e acesso
 
