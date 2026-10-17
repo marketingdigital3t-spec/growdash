@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { resolveRDConnection } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -129,7 +130,7 @@ Deno.serve(async (req) => {
     // Find account owner to fetch integration token
     const { data: account } = await admin
       .from("ad_accounts")
-      .select("id, user_id, workspace_id")
+      .select("id, user_id, workspace_id, account_id")
       .eq("id", adAccountId)
       .maybeSingle();
     if (!account) {
@@ -160,15 +161,64 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: integration } = await admin
-      .from("integrations")
-      .select("api_token")
+    // New connections are scoped by Meta external account and are the
+    // canonical source for RD credentials. Keep the legacy integrations row
+    // only as a compatibility fallback for accounts that have not yet been
+    // migrated to rd_account_connections.
+    const canonicalExternalId = (value: unknown) => {
+      const digits = String(value || "").trim().replace(/^act_/i, "");
+      return digits ? `act_${digits}` : "";
+    };
+    let token: string | null = null;
+    let canonicalConnectionId: string | null = null;
+    const { data: connections } = await admin
+      .from("rd_account_connections")
+      .select("id, external_account_id")
       .eq("user_id", account.user_id)
-      .eq("provider", "rd_station_crm")
-      .eq("is_active", true)
-      .maybeSingle();
+      .eq("status", "connected")
+      .not("api_token", "is", null)
+      .order("updated_at", { ascending: false });
+    const accountExternalId = canonicalExternalId(account.account_id);
+    canonicalConnectionId = (connections || []).find((connection: any) =>
+      accountExternalId && canonicalExternalId(connection.external_account_id) === accountExternalId
+    )?.id || null;
 
-    const token = integration?.api_token;
+    // A funnel can carry the connection identity even when an older account
+    // row has no external ID match. Use only an active funnel linked to this
+    // exact account; never widen the lookup to another account's connection.
+    if (!canonicalConnectionId) {
+      const { data: linkedFunnels } = await admin
+        .from("rd_funnels")
+        .select("rd_connection_id")
+        .eq("ad_account_id", adAccountId)
+        .eq("user_id", account.user_id)
+        .eq("is_active", true)
+        .not("rd_connection_id", "is", null)
+        .order("updated_at", { ascending: false });
+      canonicalConnectionId = linkedFunnels?.[0]?.rd_connection_id || null;
+    }
+
+    if (canonicalConnectionId) {
+      try {
+        token = (await resolveRDConnection(admin, {
+          connectionId: canonicalConnectionId,
+          userId: account.user_id,
+        })).api_token;
+      } catch (error) {
+        console.warn("rd-discover-fields: canonical RD connection unavailable", error);
+      }
+    }
+
+    if (!token) {
+      const { data: integration } = await admin
+        .from("integrations")
+        .select("api_token")
+        .eq("user_id", account.user_id)
+        .eq("provider", "rd_station_crm")
+        .eq("is_active", true)
+        .maybeSingle();
+      token = integration?.api_token || null;
+    }
 
     // 1) Existing configs to preserve user choices
     const { data: existingConfigs } = await admin
