@@ -185,9 +185,11 @@ Deno.serve(async (req) => {
       }
       const accounts = Array.from(accountMap.values());
       metaAccountTotal = accounts.length;
-      // Three bounded windows keep each edge invocation well below the gateway
-      // timeout while reducing the number of resumable ticks for a 37-month run.
-      for (let windowCount = 0; windowCount < 3 && metaAccountIndex < accounts.length; windowCount++) {
+      // Keep one bounded window per edge invocation. Each window fans out to
+      // insights, leads and hourly syncs; larger batches can exceed the
+      // gateway timeout on accounts with slower Meta responses before the
+      // cursor is persisted.
+      for (let windowCount = 0; windowCount < 1 && metaAccountIndex < accounts.length; windowCount++) {
         const account = accounts[metaAccountIndex];
         const windowStart = metaWindowStart <= today ? metaWindowStart : historicalStart;
         const windowEnd = addDays(windowStart, 89) < today ? addDays(windowStart, 89) : today;
