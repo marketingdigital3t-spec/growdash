@@ -212,7 +212,22 @@ async function hydrateMissingAttribution(
   const deliveryCache = new Map<string, any>();
   const getLeadDelivery = async (id: string) => {
     if (deliveryCache.has(id)) return deliveryCache.get(id);
-    const value = await getObject(id, "platform,site_source_name,publisher_platform,placement,platform_position,is_organic");
+    // Meta may reject `placement`/`platform_position` for a lead while still
+    // exposing `platform` and `is_organic`. Keep each optional field isolated
+    // so one unsupported field never removes the delivery facts that are
+    // available for the lead.
+    const value: Record<string, unknown> = {};
+    for (const field of [
+      "platform",
+      "site_source_name",
+      "publisher_platform",
+      "placement",
+      "platform_position",
+      "is_organic",
+    ]) {
+      const part = await getObject(id, field);
+      if (part && typeof part === "object") Object.assign(value, part);
+    }
     deliveryCache.set(id, value);
     return value;
   };

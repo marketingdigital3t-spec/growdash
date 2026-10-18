@@ -91,12 +91,25 @@ async function fetchLead(leadId: string, account: MetaAccount) {
   if (!base.response.ok || base.payload?.error) {
     throw new Error(base.payload?.error?.message || `Meta lead HTTP ${base.response.status}`);
   }
-  const names = await request("ad_name,adset_name,campaign_name,form_name");
-  const delivery = await request("platform,site_source_name,publisher_platform,placement,platform_position,is_organic");
+  const optional = async (fields: string[]) => {
+    const merged: Record<string, unknown> = {};
+    for (const field of fields) {
+      const part = await request(field);
+      if (part.response.ok && !part.payload?.error && part.payload && typeof part.payload === "object") {
+        Object.assign(merged, part.payload);
+      }
+    }
+    return merged;
+  };
+  // Optional lead fields are not uniformly available across Graph API
+  // versions. Request them independently so an unavailable placement field
+  // cannot discard names, platform, or the immutable lead identity.
+  const names = await optional(["ad_name", "adset_name", "campaign_name", "form_name"]);
+  const delivery = await optional(["platform", "site_source_name", "publisher_platform", "placement", "platform_position", "is_organic"]);
   return enrichLeadReferences({
     ...base.payload,
-    ...(names.response.ok && !names.payload?.error ? names.payload : {}),
-    ...(delivery.response.ok && !delivery.payload?.error ? delivery.payload : {}),
+    ...names,
+    ...delivery,
   }, account);
 }
 
@@ -137,7 +150,18 @@ async function enrichLeadReferences(lead: any, account: MetaAccount) {
     if (form) next.form_name = form.name ?? null;
   }
   if (next.id && (!next.platform || !next.placement || typeof next.is_organic !== "boolean")) {
-    const delivery = await graphObject(String(next.id), "platform,site_source_name,publisher_platform,placement,platform_position,is_organic", account);
+    const delivery: Record<string, unknown> = {};
+    for (const field of [
+      "platform",
+      "site_source_name",
+      "publisher_platform",
+      "placement",
+      "platform_position",
+      "is_organic",
+    ]) {
+      const part = await graphObject(String(next.id), field, account);
+      if (part && typeof part === "object") Object.assign(delivery, part);
+    }
     if (delivery) {
       next.platform ??= delivery.platform ?? delivery.site_source_name ?? delivery.publisher_platform ?? null;
       next.placement ??= delivery.placement ?? delivery.platform_position ?? null;
