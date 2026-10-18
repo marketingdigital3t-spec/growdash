@@ -1,0 +1,66 @@
+/* Growdash visual tokens. The existing shadcn/theme tokens remain the source
+ * for product colors; these aliases provide a stable visual contract for the
+ * redesign phases without changing data, routing or behavior. */
+:root {
+  --gd-space-1: 4px;
+  --gd-space-2: 8px;
+  --gd-space-3: 12px;
+  --gd-space-4: 16px;
+  --gd-space-5: 24px;
+  --gd-space-6: 32px;
+  --gd-space-7: 48px;
+  --gd-space-8: 64px;
+
+  --gd-font-display: 34px;
+  --gd-font-title: 28px;
+  --gd-font-subtitle: 22px;
+  --gd-font-h3: 18px;
+  --gd-font-body: 16px;
+  --gd-font-secondary: 14px;
+  --gd-font-label: 12px;
+  --gd-font-micro: 11px;
+  --gd-line-title: 1.2;
+  --gd-line-body: 1.5;
+
+  --gd-radius-card: 16px;
+  --gd-radius-control: 10px;
+  --gd-radius-pill: 999px;
+  --gd-radius-modal: 20px;
+
+  --gd-elevation-0: 0 0 0 1px hsl(var(--border));
+  --gd-elevation-1: 0 2px 8px rgba(0, 0, 0, .14);
+  --gd-elevation-2: 0 12px 40px rgba(0, 0, 0, .28);
+
+  --gd-z-base-image: 0;
+  --gd-z-scrim: 1;
+  --gd-z-content: 10;
+  --gd-z-header: 100;
+  --gd-z-drawer: 200;
+  --gd-z-modal: 300;
+  --gd-z-toast: 400;
+
+  --gd-status-critical: #e74c3c;
+  --gd-status-attention: #f39c12;
+  --gd-status-observation: #f1c40f;
+  --gd-status-initial: #3498db;
+  --gd-status-healthy: #2ecc71;
+  --gd-status-inactive: #95a5a6;
+}
+
+/* Keep the focus treatment available to every primitive introduced later. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.gd-label {
+  font-size: var(--gd-font-label);
+  font-weight: 500;
+  letter-spacing: .06em;
+  line-height: var(--gd-line-title);
+  text-transform: uppercase;
+}
+
+.gd-tabular {
+  font-variant-numeric: tabular-nums;
+}
