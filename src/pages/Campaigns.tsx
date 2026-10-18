@@ -387,7 +387,22 @@ export default function Campaigns() {
 
   const { data: campaignBaseRows = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), JSON.stringify(attributionWindowsByAccount), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
-    queryFn: async () => {
+    // A consulta anterior podia ficar pendurada por vários minutos ao abrir
+    // períodos longos porque o embed trazia todo o histórico de insights de
+    // cada anúncio. O abort explícito garante que a tela saia do skeleton e
+    // ofereça uma ação clara ao usuário quando o backend não responder.
+    retry: 0,
+    queryFn: async ({ signal }) => {
+      const timeoutController = new AbortController();
+      let timedOut = false;
+      const timeoutId = window.setTimeout(() => {
+        timedOut = true;
+        timeoutController.abort();
+      }, 15000);
+      const abortFromQuery = () => timeoutController.abort();
+      signal?.addEventListener("abort", abortFromQuery, { once: true });
+
+      try {
       let query = supabase
         .from("campaigns")
         .select(`
@@ -402,6 +417,12 @@ export default function Campaigns() {
         `)
         .order("created_at", { ascending: false });
 
+      // Insights fora do período selecionado não participam de nenhum cálculo
+      // desta tela. Filtrar a relação no PostgREST reduz drasticamente a
+      // resposta e evita que uma conta com histórico grande congele a tabela.
+      if (startDate) query = query.gte("adsets.ads.insights.date", formatApiDate(startDate));
+      if (endDate) query = query.lte("adsets.ads.insights.date", formatApiDate(endDate));
+
       if (selectedAccount !== "all") {
         query = query.eq("ad_account_id", selectedAccount);
       } else {
@@ -409,6 +430,7 @@ export default function Campaigns() {
         query = query.in("ad_account_id", visibleIds.length ? visibleIds : ["00000000-0000-0000-0000-000000000000"]);
       }
 
+      query = query.abortSignal(timeoutController.signal);
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map((c: any) => {
@@ -468,6 +490,15 @@ export default function Campaigns() {
         const budget = Number(c.daily_budget || 0) > 0 ? Number(c.daily_budget) : adsetBudget;
         return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads: 0, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
       });
+      } catch (error) {
+        if (timedOut) {
+          throw new Error("A consulta de campanhas demorou mais de 15 segundos. Tente novamente ou reduza o período selecionado.");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+        signal?.removeEventListener("abort", abortFromQuery);
+      }
     },
   });
 
