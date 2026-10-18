@@ -12,6 +12,7 @@ describe("Growdash sidebar navigation", () => {
     expect(["Growdash Flow", "Análise de Mídia Social", "Alertas", "Leads incompletos", "Automação"]
       .every((label) => ALL_MODULES.some((module) => module.label === label))).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "Quadro")).toBe(false);
+    expect(ALL_MODULES.some((module) => module.label === "Business")).toBe(false);
     expect(ALL_MODULES.some((module) => module.label === "Automação" && module.external && module.path === "https://automation.growdash.com.br")).toBe(true);
   });
 
@@ -25,7 +26,7 @@ describe("Growdash sidebar navigation", () => {
     const labels = intelligence?.items.map((item) => item.label) ?? [];
     expect(labels.indexOf("Análise de Funis")).toBeGreaterThanOrEqual(0);
     expect(labels.indexOf("Tráfego Pago")).toBeGreaterThan(labels.indexOf("Análise de Funis"));
-    expect(labels.indexOf("Business")).toBeGreaterThan(labels.indexOf("Análise de Funis"));
+    expect(labels).not.toContain("Business");
   });
 
   it("keeps sidebar section labels tied to their section instead of filtered position", () => {
