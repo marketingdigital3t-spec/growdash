@@ -39,9 +39,9 @@ const SYSTEM_TAIL: Array<{ id: string; type: never; title: string; config: Recor
 
 /**
  * The former default block is retained in saved dashboard views for backwards
- * compatibility, but the current Dashboard hides every section inside it.
- * Rendering that empty static grid item still reserves its legacy 30 rows and
- * creates a large, scrollable blank area after the visible cards.
+ * compatibility. When it has no visible sections, rendering that empty static
+ * grid item still reserves its legacy 30 rows and creates a large blank area
+ * after the visible cards.
  */
 function isEmptyDefaultPlaceholder(widget: any) {
   if (widget.type !== "default_block") return false;
