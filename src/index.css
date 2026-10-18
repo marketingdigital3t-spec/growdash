@@ -11172,6 +11172,31 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   .brand-shell .dashboard-page .gd-glass-metric p:not(.gd-label) { font-size: clamp(.84rem, 1.1vw, 1rem) !important; }
 }
 
+/* Keep the executive strip prominent without taking a full viewport band. */
+.brand-shell .dashboard-page .dashboard-summary-strip-surface {
+  padding: 6px !important;
+}
+
+.brand-shell .dashboard-page .dashboard-glass-metrics {
+  gap: 8px !important;
+  padding: 0 !important;
+}
+
+.brand-shell .dashboard-page .gd-glass-metric {
+  min-height: 80px !important;
+  padding: 10px !important;
+}
+
+.brand-shell .dashboard-page .gd-glass-metric-icon {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+@media (max-width: 767px) {
+  .brand-shell .dashboard-page .dashboard-summary-strip-surface { padding: 6px !important; }
+  .brand-shell .dashboard-page .gd-glass-metric { min-height: 72px !important; padding: 8px !important; }
+}
+
 /* Final Meta-style geometry for Campanhas. The manager is one continuous
    surface: controls use one compact radius, hierarchy tabs are flat, and the
    totals row is part of the table instead of a second outlined card. */
