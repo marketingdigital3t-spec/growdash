@@ -83,12 +83,12 @@ export function recordRuntimeDiagnostic(scope: string, error: unknown) {
  * The session marker prevents a failed deployment from becoming a reload loop.
  */
 export function recoverLatestBuildOnce(scope: string, error: unknown) {
-  // A route can fail while an old Pages shell is mixing with a newer shared
-  // chunk, even when the browser reports a generic render error instead of a
-  // recognizable dynamic-import message. Treat the first route error as a
-  // recoverable deployment mismatch; the session marker still guarantees a
-  // single attempt and prevents reload loops for genuine application bugs.
+  // Only module/chunk failures are recoverable by replacing the document.
+  // A genuine render or data error must stay visible in the route boundary;
+  // treating every exception as a deployment mismatch creates an opaque reload
+  // loop and hides the real cause from the user and from diagnostics.
   recordRuntimeDiagnostic(`chunk-reload:${scope}`, error);
+  if (!isRecoverableChunkError(error)) return false;
   // A Pages deploy can remove the hash requested by an already-open tab.
   // Reload exactly once for this route so the browser receives the new HTML
   // and manifest. The marker deliberately survives the application boot: if
