@@ -24,12 +24,6 @@ const ResponsiveGrid = Responsive;
 const GRID_ROW_HEIGHT_DESKTOP = 56;
 const GRID_ROW_HEIGHT_COMPACT = 40;
 const GRID_MARGIN_Y = 16;
-const COMPACT_ANALYTIC_WIDGETS = new Set([
-  "payment_chart",
-  "platform_distribution",
-  "campaign_ctr",
-  "campaign_conversion_rate",
-]);
 interface Props {
   view: DashboardView;
   isEditing: boolean;
@@ -155,15 +149,10 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
     () => widgets.filter((widget) => !isEmptyDefaultPlaceholder(widget)),
     [widgets],
   );
-  // Keep the compact analytic widgets out of the normal Dashboard flow. The
-  // former expand/collapse control was removed from the visual layout; editing
-  // still exposes every saved widget so no configuration is lost.
-  const visibleWidgets = useMemo(
-    () => isEditing
-      ? renderedWidgets
-      : renderedWidgets.filter((widget) => !COMPACT_ANALYTIC_WIDGETS.has(widget.id)),
-    [isEditing, renderedWidgets],
-  );
+  // The expand/collapse control was removed from the visual layout, but the
+  // widgets it used to reveal remain visible in the normal Dashboard flow.
+  // Removing the control must not remove the saved KPI and analysis cards.
+  const visibleWidgets = renderedWidgets;
 
   const handleAutoHeight = useCallback((widgetId: string, rows: number) => {
     setAutoHeightRows((current) => current[widgetId] === rows ? current : { ...current, [widgetId]: rows });
