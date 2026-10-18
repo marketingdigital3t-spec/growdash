@@ -32,6 +32,9 @@ de Campanhas também foi verificada no modo `analise=intelligence`.
 - Gaps do resumo, KPIs, blocos financeiros e painéis analíticos foram
   normalizados para `16px`; o espaçamento entre seções permanece `16px` no
   canvas atual.
+- O botão intermediário de expandir/recolher análises financeiras foi removido;
+  os quatro cards financeiros principais permanecem no fluxo do Dashboard e os
+  widgets analíticos compactos continuam disponíveis no modo de edição.
 
 ## Limites
 
