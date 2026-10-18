@@ -10830,6 +10830,10 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
   padding-inline: 12px;
 }
 
+.campaigns-workspace [data-campaign-table-scroll] :is(th, td):nth-child(3) {
+  min-width: 280px;
+}
+
 .campaigns-workspace [data-campaign-totals-bar] {
   flex: 0 0 auto;
   max-width: 100%;
