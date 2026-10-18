@@ -11840,3 +11840,74 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   .brand-shell .gd-global-scope-toolbar > span:last-child { display: none !important; }
   .brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card) { border-radius: 8px !important; }
 }
+
+/* Campaign workspace alignment ------------------------------------------
+   Keep the table on the same left/right rhythm as the manager header. The
+   previous 24px frame margin made the results area look like a second,
+   unrelated card and introduced the dark-looking border in the screenshot. */
+.campaigns-workspace {
+  padding: 0 !important;
+}
+
+.campaigns-workspace .campaign-manager-top {
+  border: 1px solid #e4e7ec !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  overflow: visible !important;
+}
+
+.campaigns-workspace .campaign-app-header,
+.campaigns-workspace .campaign-filters-row,
+.campaigns-workspace .campaign-tabs-header,
+.campaigns-workspace .campaign-actions-toolbar {
+  padding-inline: 16px !important;
+}
+
+.campaigns-workspace .campaign-app-logo {
+  filter: brightness(0) saturate(100%) !important;
+}
+
+.campaigns-workspace .campaign-table-frame {
+  margin: 12px 0 0 !important;
+  border: 1px solid #e4e7ec !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.campaigns-workspace .campaign-select-checkbox {
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
+  border: 1.5px solid #111827 !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.campaigns-workspace .campaign-select-checkbox[data-state="checked"] {
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #fff !important;
+}
+
+.campaigns-workspace .campaign-select-checkbox[data-state="unchecked"] {
+  border-color: #111827 !important;
+  background: #fff !important;
+}
+
+.campaigns-workspace .campaign-select-checkbox:focus-visible {
+  outline: 2px solid #0866ff !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 767px) {
+  .campaigns-workspace .campaign-manager-top {
+    border-radius: 8px !important;
+  }
+
+  .campaigns-workspace .campaign-table-frame {
+    margin: 8px 0 0 !important;
+  }
+}
