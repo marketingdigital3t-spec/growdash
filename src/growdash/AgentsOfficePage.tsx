@@ -314,7 +314,7 @@ type KnowledgeNode = { id: CoreAreaId; label: string; agentName: string; agentRo
 type SpatialGraphNode = { id: string; area: CoreAreaId | null; label: string; kind: "root" | "area" | "topic"; x: number; y: number; strategyId?: string };
 
 const AREA_POSITIONS: Record<CoreAreaId, readonly [number, number]> = {
-  traffic: [24, 22], crm: [77, 20], commercial: [80, 49], finance: [71, 78], brand: [24, 77], automations: [17, 50],
+  traffic: [19, 24], crm: [50, 16], commercial: [81, 24], finance: [81, 74], brand: [50, 84], automations: [19, 74],
 };
 
 const TOPIC_POSITIONS: Record<CoreAreaId, readonly (readonly [number, number])[]> = {
@@ -511,13 +511,23 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
             return <line key={`${fromId}-${toId}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} style={{ "--map-delay": `${-(index % 10) * .25}s` } as React.CSSProperties} />;
           })}
         </svg>
-        {SPATIAL_GRAPH_NODES.map((graphNode, index) => {
-          const active = graphNode.area !== null && selectedArea === graphNode.area && (!graphNode.strategyId || selectedStrategy === graphNode.strategyId);
-          const areaNode = graphNode.area ? KNOWLEDGE_NODES.find((node) => node.id === graphNode.area) : null;
-          return <button key={graphNode.id} type="button" className={cn("growdash-map-node", `is-${graphNode.kind}`, graphNode.kind === "area" && "is-agent-area", active && "is-selected")} style={{ left: `${graphNode.x}%`, top: `${graphNode.y}%`, "--node-index": index, "--agent-color": areaNode?.agentColor || "#fff" } as React.CSSProperties} onClick={() => graphNode.area && openArea(graphNode.area, graphNode.strategyId)} aria-pressed={active} aria-label={graphNode.kind === "root" ? "Growdash, centro do mapa" : areaNode ? `Abrir área ${areaNode.label} e conversar com ${areaNode.agentName}` : `Abrir documento: ${graphNode.label}`}>
-            <i aria-hidden="true" />{areaNode ? <><span><b>{graphNode.label}</b><em><Bot className="h-2.5 w-2.5" />{areaNode.agentName}</em></span><small>{areaNode.agentRole}</small></> : <span>{graphNode.label}</span>}
-          </button>;
-        })}
+        <button type="button" className="growdash-map-node is-root" style={{ left: "50%", top: "50%" }} aria-label="Growdash, centro do mapa">
+          <i aria-hidden="true" /><span>Growdash</span>
+        </button>
+        <div className="growdash-agent-rooms" aria-label="Salas dos agentes Growdash">
+          {KNOWLEDGE_NODES.map((areaNode, index) => {
+            const [x, y] = AREA_POSITIONS[areaNode.id];
+            const active = selectedArea === areaNode.id;
+            return <button key={areaNode.id} type="button" className={cn("growdash-agent-room", active && "is-selected")} style={{ left: `${x}%`, top: `${y}%`, "--room-index": index, "--agent-color": areaNode.agentColor } as React.CSSProperties} onClick={() => openArea(areaNode.id)} aria-pressed={active} aria-label={`Abrir sala ${areaNode.label} e conversar com ${areaNode.agentName}`}>
+              <span className="growdash-agent-room-head"><span className="growdash-agent-room-title"><i aria-hidden="true" /><b>{areaNode.label}</b></span><small>{areaNode.strategies.length} frentes · ativo</small></span>
+              <span className="growdash-agent-room-floor">
+                <span className="growdash-agent-room-agent"><span className="growdash-agent-room-avatar"><Bot className="h-4 w-4" /></span><b>{areaNode.agentName}</b><small>{areaNode.agentRole}</small></span>
+                <span className="growdash-agent-room-workstations">{areaNode.strategies.map(([label, strategyId]) => <span key={strategyId} className="growdash-agent-room-workstation"><i aria-hidden="true" /><span>{label}</span></span>)}</span>
+              </span>
+              <span className="growdash-agent-room-foot"><span>Conectado ao núcleo</span><ChevronRight className="h-3 w-3" /></span>
+            </button>;
+          })}
+        </div>
         <div className="growdash-map-legend"><span><i /> Área + agente</span><span><i /> Conexão operacional</span><span>Selecione uma área para ver dados e conversar com o agente</span></div>
       </div>
       <div className="jarvis-actions"><button type="button" onClick={resetCore}><RotateCcw className="h-3.5 w-3.5" />Visão do cérebro</button><button type="button" onClick={onOpenOffice}><BriefcaseBusiness className="h-3.5 w-3.5" />Entrar no escritório 3D</button></div>
