@@ -64,50 +64,6 @@ export function ensureDefaultDashboardContent<T extends DashboardViewShape>(view
   const defaultId = existingDefault?.id || defaultWidget.id;
   const hasDefaultLayout = layout.some((item) => item.i === defaultId);
 
-  // v17 ainda pode estar salvo com a faixa financeira antiga: o cartão de
-  // plataforma em largura total e os KPIs empilhados abaixo dos gráficos.
-  // Corrigimos somente quando a composição tem os widgets canônicos e os
-  // sinais objetivos desse layout; widgets personalizados são mantidos abaixo
-  // da nova faixa, sem substituir escolhas feitas pelo usuário.
-  if (currentVersion === 17 && existingDefault) {
-    const canonicalIds = new Set([...DEFAULT_VIEW.widgets.map((widget) => widget.id), defaultId]);
-    const hasAllCanonicalWidgets = [...canonicalIds].every((id) => widgets.some((widget) => widget.id === id));
-    const oldLayout = new Map(layout.map((item) => [item.i, item]));
-    const oldPlatform = oldLayout.get("platform_distribution");
-    const oldPayment = oldLayout.get("payment_chart");
-    const oldConversion = oldLayout.get("campaign_conversion_rate");
-    const hasLegacyAnalyticShape = Boolean(
-      oldPlatform && (Number(oldPlatform.w) >= 9 || Number(oldPlatform.y) > 2 || Number(oldPlatform.h) >= 5)
-      || oldPayment && Number(oldPayment.h) >= 5
-      || oldConversion && Number(oldConversion.h) >= 3,
-    );
-
-    if (hasAllCanonicalWidgets && hasLegacyAnalyticShape) {
-      const canonicalLayout = DEFAULT_VIEW.layout.map((item) => ({ ...item, i: item.i === "default" ? defaultId : item.i }));
-      const customWidgets = widgets.filter((widget) => !canonicalIds.has(widget.id));
-      const customLayout = layout
-        .filter((item) => !canonicalIds.has(item.i))
-        .map((item) => ({ ...item }));
-      const firstCustomRow = canonicalLayout.reduce((maximum, item) => Math.max(maximum, item.y + item.h), 0);
-      const safeCustomLayout = customLayout.map((item) => ({
-        ...item,
-        x: 0,
-        y: Math.max(Number(item.y || 0), firstCustomRow),
-        w: Math.min(12, Math.max(2, Number(item.w || 3))),
-      }));
-      return {
-        ...view,
-        widgets: [
-          ...DEFAULT_VIEW.widgets.map((widget) => widget.type === "default_block"
-            ? { ...existingDefault, id: defaultId, config: { ...existingDefault.config, ...defaultWidget.config } }
-            : widgets.find((candidate) => candidate.id === widget.id) || { ...widget, config: { ...widget.config } }),
-          ...customWidgets,
-        ],
-        layout: [...canonicalLayout, ...safeCustomLayout],
-      };
-    }
-  }
-
   // O primeiro KPI canônico representa faturamento bruto. A correção é
   // propositalmente estreita: só alcança a combinação legada exata, sem
   // sobrescrever um cartão que o usuário tenha personalizado.
