@@ -1,4 +1,4 @@
-import { Download, Grid3X3, LayoutTemplate, Redo2, RotateCcw, Save, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { Download, Grid3X3, LayoutTemplate, Maximize2, Minimize2, Redo2, Save, Trash2, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -26,12 +26,14 @@ export function TopBar({
   showGrid,
   snapToGrid,
   saving,
+  isMaximized,
   onUndo,
   onRedo,
   onZoom,
   onResetView,
   onToggleGrid,
   onToggleSnap,
+  onToggleMaximize,
   onClear,
   onApplyAcquisitionTemplate,
   onSave,
@@ -43,12 +45,14 @@ export function TopBar({
   showGrid: boolean;
   snapToGrid: boolean;
   saving?: boolean;
+  isMaximized: boolean;
   onUndo: () => void;
   onRedo: () => void;
   onZoom: (delta: number) => void;
   onResetView: () => void;
   onToggleGrid: () => void;
   onToggleSnap: () => void;
+  onToggleMaximize: () => void;
   onClear: () => void;
   onApplyAcquisitionTemplate: () => void;
   onSave: () => void;
@@ -59,6 +63,7 @@ export function TopBar({
     <div aria-label="Ações do quadro" className="growdash-flow-chrome absolute right-3 top-3 z-30 flex items-center gap-1 rounded-2xl p-1.5">
       <Button variant="ghost" size="icon" className={cn(controlClass, showGrid && "growdash-flow-control-active")} onClick={onToggleGrid} title="Mostrar ou esconder grade"><Grid3X3 className="h-4 w-4" /></Button>
       <button type="button" onClick={onToggleSnap} className={cn("growdash-flow-control h-9 shrink-0 rounded-xl px-2 text-[10px] font-black uppercase tracking-wide", snapToGrid && "growdash-flow-control-active")} title="Encaixar na grade">Snap</button>
+      <Button variant="ghost" size="icon" className={controlClass} onClick={onToggleMaximize} title={isMaximized ? "Sair da tela maximizada" : "Maximizar tela"} aria-label={isMaximized ? "Sair da tela maximizada" : "Maximizar tela"} aria-pressed={isMaximized}>{isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
       <AlertDialog>
         <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="growdash-flow-danger-control h-9 w-9 shrink-0" title="Limpar quadro"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar todo o quadro?</AlertDialogTitle><AlertDialogDescription>Todos os elementos serão removidos. Você ainda poderá usar Desfazer enquanto permanecer nesta tela.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={onClear}>Limpar tudo</AlertDialogAction></AlertDialogFooter></AlertDialogContent>

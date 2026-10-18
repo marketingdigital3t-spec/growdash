@@ -3500,6 +3500,18 @@ html:not(.dark) {
   box-shadow: 0 24px 80px rgba(0, 0, 0, .16);
 }
 
+/* Focus mode keeps the editor above the app chrome and removes the page
+   scroll context. Escape or the same toolbar button returns to the page. */
+.growdash-flow-shell.growdash-flow-shell-maximized {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  border-radius: 0 !important;
+}
+
 .dark .growdash-flow-shell {
   --flow-chrome-bg: hsl(var(--card) / .94);
   --flow-chrome-fg: hsl(var(--foreground));
@@ -3513,6 +3525,8 @@ html:not(.dark) {
 
 .growdash-flow-canvas {
   background: hsl(var(--background));
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .dark .growdash-flow-canvas {

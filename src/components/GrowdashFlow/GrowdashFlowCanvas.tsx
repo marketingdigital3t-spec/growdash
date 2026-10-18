@@ -52,6 +52,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
   const [clipboard, setClipboard] = useState<DrawElement[] | null>(null);
   const [spacePressed, setSpacePressed] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ client: Point; world: Point } | null>(null);
   const history = useUndoRedo<DrawElement[]>(structuredClone(flow.elements || []));
   const canvas = useCanvas(flow.zoom || 1, flow.panOffset || { x: 0, y: 0 });
@@ -66,6 +67,21 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
     snapToGrid: flow.snapToGrid ?? false,
   }), [flow.elements, flow.panOffset, flow.showGrid, flow.snapToGrid, flow.version, flow.zoom]);
   const lastLoadedFlowSignature = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isMaximized) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isMaximized]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isMaximized) setIsMaximized(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMaximized]);
 
   useEffect(() => {
     // The editor can stay mounted while the user opens another saved funnel.
@@ -266,7 +282,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
     interactionRef.current = null;
   }, [clientToWorld, findTopElement, history, keepToolActive]);
 
-  const handleResizePointerDown = useCallback((event: React.PointerEvent<SVGRectElement>, handle: ResizeHandle) => {
+  const handleResizePointerDown = useCallback((event: React.PointerEvent<SVGElement>, handle: ResizeHandle) => {
     event.preventDefault();
     event.stopPropagation();
     if (!primarySelected || primarySelected.locked) return;
@@ -355,7 +371,13 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
     setEditingId(null);
   }, [history]);
 
-  return <section ref={rootRef} className={`growdash-flow-shell relative min-h-[620px] h-[calc(100dvh-7.5rem)] w-full overflow-hidden rounded-2xl ${className}`}>
+  const handleCanvasWheel = useCallback((event: WheelEvent) => {
+    const rect = rootRect();
+    if (!rect.width || !rect.height) return;
+    canvas.zoomAt({ x: event.clientX, y: event.clientY }, rect, event.deltaY);
+  }, [canvas, rootRect]);
+
+  return <section ref={rootRef} className={`growdash-flow-shell relative min-h-[620px] h-[calc(100dvh-7.5rem)] w-full overflow-hidden rounded-2xl ${isMaximized ? "growdash-flow-shell-maximized" : ""} ${className}`}>
     <Canvas
       elements={history.value}
       selectedIds={selectedIds}
@@ -368,7 +390,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={finishInteraction}
-      onWheel={(event) => { event.preventDefault(); canvas.zoomAt({ x: event.clientX, y: event.clientY }, rootRect(), event.deltaY); }}
+      onWheel={handleCanvasWheel}
       onElementPointerDown={handleElementPointerDown}
       onElementDoubleClick={(element) => { if (element.type === "text" || element.type === "sticky") { textSnapshotRef.current = structuredClone(history.valueRef.current); setEditingId(element.id); setSelectedIds([element.id]); } }}
       onResizePointerDown={handleResizePointerDown}
@@ -384,7 +406,7 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
 
     <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[25%] items-center gap-2"><div className="growdash-flow-chrome pointer-events-auto flex min-w-0 items-center gap-2 rounded-xl p-1.5 pr-3">{onBack && <Button variant="ghost" size="icon" className="growdash-flow-control h-8 w-8 shrink-0" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>}<div className="hidden min-w-0 xl:block"><span className="block truncate text-[10px] font-black uppercase tracking-[.16em] text-primary">Growdash Flow</span><strong className="block truncate text-xs text-foreground">{title}</strong></div></div></div>
     <Toolbar tool={tool} onToolChange={setTool} onImage={() => fileInputRef.current?.click()} keepToolActive={keepToolActive} onKeepToolActive={setKeepToolActive} />
-    <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onApplyAcquisitionTemplate={() => { const template = createAcquisitionFunnelTemplate(); history.commit(template); setSelectedIds([]); canvas.setZoom(0.72); canvas.setPanOffset({ x: 48, y: 30 }); toast({ title: "Estratégia inserida", description: "O funil de aquisição está pronto para você editar." }); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
+    <TopBar zoom={canvas.zoom} canUndo={history.canUndo} canRedo={history.canRedo} showGrid={canvas.showGrid} snapToGrid={canvas.snapToGrid} saving={isSaving} isMaximized={isMaximized} onUndo={history.undo} onRedo={history.redo} onZoom={(delta) => canvas.setZoom((current) => current + delta)} onResetView={canvas.resetView} onToggleGrid={() => canvas.setShowGrid((value) => !value)} onToggleSnap={() => canvas.setSnapToGrid((value) => !value)} onToggleMaximize={() => setIsMaximized((value) => !value)} onClear={() => { history.commit([]); setSelectedIds([]); }} onApplyAcquisitionTemplate={() => { const template = createAcquisitionFunnelTemplate(); history.commit(template); setSelectedIds([]); canvas.setZoom(0.72); canvas.setPanOffset({ x: 48, y: 30 }); toast({ title: "Estratégia inserida", description: "O funil de aquisição está pronto para você editar." }); }} onSave={() => void save()} onExport={(type) => void handleExport(type)} />
     {primarySelected && <PropertiesPanel element={primarySelected} selectionCount={selectedIds.length} onChange={changeSelected} onDuplicate={duplicateSelected} onDelete={deleteSelected} onFront={() => moveLayer("front")} onBack={() => moveLayer("back")} onClose={() => setSelectedIds([])} />}
 
     {contextMenu && <div className="absolute z-50 min-w-44 rounded-xl border border-white/10 bg-[#17130e]/96 p-1.5 text-xs text-white shadow-2xl backdrop-blur-xl" style={{ left: Math.min(contextMenu.client.x, rootRect().width - 190), top: Math.min(contextMenu.client.y, rootRect().height - 190) }}>
