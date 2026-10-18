@@ -104,7 +104,7 @@ export function FunnelKPIs({ a, rdLeads, rdLeadsLoading = false, rdLeadsError = 
         const Icon = c.icon;
         const tone = toneClasses[c.tone];
         return (
-          <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} showHint>
+          <MetricHelpTooltip key={c.label} title={c.label} description={metricDescription(c.label)} className="gd-funnel-kpi-tooltip" showHint>
             <Card data-kpi-tone={c.tone} className={`gd-metric-card gd-funnel-kpi cursor-default bg-card/75 border-border/60 border-l-2 backdrop-blur ${tone.border}`}>
               <CardContent className="gd-funnel-kpi-content flex h-full flex-col">
                 <div className="flex items-start justify-between gap-3">

@@ -11414,3 +11414,83 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 .brand-shell .crm-page .crm-filter-strip > div:last-child span {
   color: #aeb5bf !important;
 }
+
+/* Funnel KPI grid: reduce the vertical footprint and reserve a clear lane
+   for the metric icon and its contextual-help button. */
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-grid {
+  grid-auto-rows: 88px !important;
+  gap: 10px !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-grid > *,
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-grid .gd-funnel-kpi {
+  height: 88px !important;
+  min-height: 88px !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-content {
+  min-height: 88px !important;
+  gap: 4px !important;
+  padding: 10px 12px !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-content > div:first-child {
+  min-width: 0;
+  margin: 0 !important;
+  padding-right: 26px !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-label {
+  max-width: 100% !important;
+  font-size: 11px !important;
+  line-height: 1.12 !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-icon {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-value {
+  margin: 0 !important;
+  font-size: clamp(1.2rem, 1.5vw, 1.6rem) !important;
+  line-height: 1 !important;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-detail {
+  min-height: 0 !important;
+  margin: 0 !important;
+  overflow: hidden;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi-tooltip > button {
+  top: 8px !important;
+  right: 8px !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-color: #59616b !important;
+  background: #24272b !important;
+  color: #dbe1e8 !important;
+}
+
+@media (max-width: 767px) {
+  .brand-shell .gd-funnel-analysis .gd-funnel-kpi-grid {
+    grid-auto-rows: 84px !important;
+    gap: 8px !important;
+  }
+
+  .brand-shell .gd-funnel-analysis .gd-funnel-kpi-grid > *,
+  .brand-shell .gd-funnel-analysis .gd-funnel-kpi-grid .gd-funnel-kpi,
+  .brand-shell .gd-funnel-analysis .gd-funnel-kpi-content {
+    height: 84px !important;
+    min-height: 84px !important;
+  }
+
+  .brand-shell .gd-funnel-analysis .gd-funnel-kpi-content {
+    padding: 9px 10px !important;
+  }
+}
