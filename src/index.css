@@ -10484,11 +10484,11 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
 .brand-shell:has(.dashboard-page) .dashboard-page {
   width: 100%;
-  max-width: 1680px !important;
+  max-width: none !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page > * + * {
-  margin-top: 16px !important;
+  margin-top: var(--dashboard-section-gap) !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics,
@@ -10502,48 +10502,6 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
 .brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics {
   padding: 12px !important;
-  gap: var(--dashboard-card-gap) !important;
-}
-
-/* Dashboard visual baseline: keep the canvas monochrome and remove the
-   artificial viewport-height floor that previously created a phantom scroll
-   area below the final KPI row. */
-@media (min-width: 768px) {
-  .brand-shell:has(.dashboard-page) .growdash-main {
-    overflow-y: hidden !important;
-    overflow-x: hidden !important;
-    scrollbar-width: none;
-    background: #080808 !important;
-  }
-
-  .brand-shell:has(.dashboard-page) .growdash-main::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-.brand-shell:has(.dashboard-page) .dashboard-page {
-  min-height: 0 !important;
-  background: #080808 !important;
-  background-image: none !important;
-}
-
-.brand-shell:has(.dashboard-page) .growdash-content-frame {
-  min-height: 0 !important;
-}
-
-.brand-shell:has(.dashboard-page) .dashboard-page > * + * {
-  margin-top: 16px !important;
-}
-
-.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics,
-.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-primary-kpis,
-.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-financial-overview,
-.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-reference-panels {
-  gap: 16px !important;
-}
-
-.brand-shell:has(.dashboard-page) .dashboard-page .dashboard-glass-metrics {
-  padding: 12px !important;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-page .gd-metric-card-content {
@@ -10553,6 +10511,28 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
 .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-payment-chart-canvas {
   height: 144px !important;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-analytics-toggle {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0 16px;
+  border: 1px solid var(--gd-content-border);
+  border-radius: 10px;
+  background: var(--gd-content-panel);
+  color: var(--gd-content-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brand-shell:has(.dashboard-page) .dashboard-analytics-toggle:hover,
+.brand-shell:has(.dashboard-page) .dashboard-analytics-toggle:focus-visible {
+  border-color: var(--gd-content-text);
+  outline: 2px solid color-mix(in srgb, var(--gd-content-text) 30%, transparent);
+  outline-offset: 2px;
 }
 
 .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card-header,
@@ -10587,12 +10567,6 @@ html:not(.dark) body .brand-shell:has(.traffic-page-shell) .traffic-page-shell {
 
   .brand-shell:has(.dashboard-page) .dashboard-grid-container .dashboard-platform-card-content {
     padding-bottom: 8px !important;
-  }
-
-  /* Two-column KPI rows at tablet width need a tighter inter-section rhythm
-     to keep both rows inside the locked canvas without reducing touch targets. */
-  .brand-shell:has(.dashboard-page) .dashboard-page > * + * {
-    margin-top: 16px !important;
   }
 }
 

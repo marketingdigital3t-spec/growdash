@@ -40,6 +40,7 @@ import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
+import { SpaceMissionStrip, SpacePhaseBackground } from "@/components/space/SpacePhaseBackground";
 import { getSpacePhase } from "@/lib/spacePhase";
 import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 import { AgentChatDock } from "@/components/agents/AgentChatDock";
@@ -284,6 +285,7 @@ export default function GrowdashLayout() {
 
   return (
     <div className="brand-shell growdash-app-shell relative min-h-screen max-w-full text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
+      {pathname === "/" && <SpacePhaseBackground phase={spacePhase} dashboardScene />}
       <aside
         className={cn(
           "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
@@ -502,6 +504,7 @@ export default function GrowdashLayout() {
               : "min-h-[calc(100vh-48px)]",
           )}
         >
+          {(pathname === "/" || pathname === "/painel-expert") && <SpaceMissionStrip phase={spacePhase} realized={goalRevenue} target={goalTarget} />}
           <div
             className={cn(
               "growdash-content-frame gd-layout-canvas mx-auto w-full min-w-0 max-w-[1920px]",
