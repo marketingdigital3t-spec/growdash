@@ -51,7 +51,13 @@ export async function inspectMetaToken(
   };
 }
 
-export function hasMinimumMetaTokenLifetime(expiresAt: string | null, minimumDays = 30, dataAccessExpiresAt: string | null = null): boolean {
+// Meta can return a valid long-lived user token whose data-access deadline is
+// slightly under 30 days at the instant OAuth finishes. A hard 30-day gate
+// rejects that authorization even though the token is usable. Keep the gate
+// aligned with the health monitor's expiring threshold instead: tokens with
+// less than one week remaining are not accepted for a new connection, while
+// valid tokens above that threshold are stored and monitored normally.
+export function hasMinimumMetaTokenLifetime(expiresAt: string | null, minimumDays = 7, dataAccessExpiresAt: string | null = null): boolean {
   const expiryCandidates = [expiresAt, dataAccessExpiresAt]
     .map((value) => value ? new Date(value).getTime() : NaN)
     .filter((value) => Number.isFinite(value));

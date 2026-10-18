@@ -116,7 +116,8 @@ Deno.serve(async (req) => {
     const tokenResult = await tokenResponse.json().catch(() => ({}));
     if (!tokenResponse.ok || !tokenResult.access_token) {
       console.error("Meta short token exchange failed", tokenResult?.error?.code ?? tokenResponse.status);
-      return resultPage("error", "A Meta não aceitou a troca do código de autorização.");
+      const detail = tokenResult?.error?.message ? ` ${String(tokenResult.error.message)}` : "";
+      return resultPage("error", `A Meta não aceitou a troca do código de autorização.${detail}`);
     }
 
     const longTokenUrl = new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`);
@@ -134,8 +135,8 @@ Deno.serve(async (req) => {
     if (!tokenInspection.isValid) {
       return resultPage("error", tokenInspection.errorMessage || "A Meta não confirmou o novo token.");
     }
-    if (!hasMinimumMetaTokenLifetime(tokenInspection.expiresAt, 30, tokenInspection.dataAccessExpiresAt)) {
-      return resultPage("error", "A Meta devolveu um token com validade inferior a 30 dias. Nenhuma conta foi alterada; autorize novamente com um usuário Meta que tenha acesso às contas de anúncio.");
+    if (!hasMinimumMetaTokenLifetime(tokenInspection.expiresAt, 7, tokenInspection.dataAccessExpiresAt)) {
+      return resultPage("error", "A Meta devolveu um token com menos de 7 dias de validade. Nenhuma conta foi alterada; autorize novamente com um usuário Meta que tenha acesso às contas de anúncio.");
     }
 
     // `/me/adaccounts` is the canonical endpoint. For Meta Login for
@@ -249,7 +250,10 @@ Deno.serve(async (req) => {
       else saved += 1;
     }
 
-    if (saved === 0) return resultPage("error", "As contas foram encontradas, mas não puderam ser salvas na Growdash.");
+    if (saved === 0) {
+      const directDiagnostic = direct.error ? ` consulta direta: ${direct.error}` : " consulta direta sem contas";
+      return resultPage("error", `A Meta não retornou contas de anúncio utilizáveis para este usuário.${directDiagnostic}`);
+    }
     return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio importada${saved === 1 ? "" : "s"}. Token válido até ${new Date(tokenInspection.expiresAt!).toLocaleDateString("pt-BR")}.`, saved);
   } catch (error) {
     console.error("meta-oauth-callback", error);
