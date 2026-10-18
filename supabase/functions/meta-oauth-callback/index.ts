@@ -250,7 +250,12 @@ Deno.serve(async (req) => {
       const directDiagnostic = direct.error ? ` consulta direta: ${direct.error}` : " consulta direta sem contas";
       return resultPage("error", `A Meta não retornou contas de anúncio utilizáveis para este usuário.${directDiagnostic}`);
     }
-    return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio importada${saved === 1 ? "" : "s"}. Token válido até ${new Date(tokenInspection.expiresAt!).toLocaleDateString("pt-BR")}.`, saved);
+    const tokenValidity = tokenInspection.expiresAt
+      ? new Date(tokenInspection.expiresAt).toLocaleDateString("pt-BR")
+      : tokenInspection.dataAccessExpiresAt
+        ? `acesso aos dados até ${new Date(tokenInspection.dataAccessExpiresAt).toLocaleDateString("pt-BR")}`
+        : "validade não informada pela Meta";
+    return resultPage("success", `${saved} conta${saved === 1 ? "" : "s"} de anúncio importada${saved === 1 ? "" : "s"}. Token: ${tokenValidity}.`, saved);
   } catch (error) {
     console.error("meta-oauth-callback", error);
     return resultPage("error", "Ocorreu uma falha interna ao concluir a conexão.");
