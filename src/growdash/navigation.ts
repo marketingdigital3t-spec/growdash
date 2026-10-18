@@ -124,14 +124,6 @@ export const NAV_SECTIONS: NavSection[] = [
         highlights: ["Jornadas", "Pessoas em fluxo", "Conclusão por etapa"],
       },
       {
-        label: "Quadro",
-        path: "/quadro",
-        icon: Columns3,
-        description: "Organize ideias, fluxos e planos visuais em um quadro.",
-        metrics: [],
-        highlights: ["Ideias", "Fluxos", "Planos de ação"],
-      },
-      {
         label: "Análise de Mídia Social",
         path: "/midia-social",
         icon: Radio,
