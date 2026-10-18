@@ -83,6 +83,9 @@ import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/camp
 import { useMetaCampaignLeadRollup } from "@/hooks/useMetaCampaignLeadRollup";
 import { isMetaMessagingDestination } from "@/lib/metaLeadScope";
 import { addInsightOnlyCampaignRows } from "@/lib/metaCampaignLeadRollup";
+import { BrandLogo } from "@/components/BrandLogo";
+import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
+import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -256,8 +259,8 @@ export default function Campaigns() {
   const [statusSortCycle, setStatusSortCycle] = useState<0 | 1 | 2>(0);
   const [columnPreset, setColumnPreset] = useState<MetaColumnPresetKey>("performance");
   const [visibleColumns, setVisibleColumns] = useState<Set<CampaignColumnKey>>(() => {
-    try { const saved = JSON.parse(localStorage.getItem("growdash:meta-columns-v2") || "[]"); if (Array.isArray(saved) && saved.length) return new Set(saved); } catch { /* usa o preset padrão */ }
-    return new Set(getMetaColumnPreset("performance").columns);
+    try { const saved = JSON.parse(localStorage.getItem("growdash:meta-columns-v3") || "[]"); if (Array.isArray(saved) && saved.length) return new Set(saved); } catch { /* usa o preset padrão */ }
+    return new Set(["name", "deliveryStatus", "actions", "spend", "budget", "impressions", "cpm", "reach"]);
   });
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
@@ -275,7 +278,7 @@ export default function Campaigns() {
   const pageSize = 50;
 
   useEffect(() => {
-    localStorage.setItem("growdash:meta-columns-v2", JSON.stringify(Array.from(visibleColumns)));
+    localStorage.setItem("growdash:meta-columns-v3", JSON.stringify(Array.from(visibleColumns)));
     localStorage.setItem("growdash:meta-breakdown", breakdown);
   }, [visibleColumns, breakdown]);
 
@@ -299,9 +302,14 @@ export default function Campaigns() {
   const {
     startDate,
     endDate,
+    preset,
+    setPreset,
+    customRange,
+    setCustomRange,
     adAccountId: selectedAccount,
     setAdAccountId: setSelectedAccount,
     adAccountIds: selectedAccountIds,
+    setAdAccountIds: setSelectedAccountIds,
     funnelIds,
     businessUnitId,
     segment,
@@ -492,7 +500,7 @@ export default function Campaigns() {
       });
       } catch (error) {
         if (timedOut) {
-          throw new Error("A consulta de campanhas demorou mais de 15 segundos. Tente novamente ou reduza o período selecionado.");
+          throw new Error("A consulta de campanhas demorou mais de 15 segundos. Tente novamente ou reduza o período selecionado.", { cause: error });
         }
         throw error;
       } finally {
@@ -1035,38 +1043,49 @@ export default function Campaigns() {
       )}
       data-scroll-mode={analysisMode ? "content" : "locked"}
     >
-      <MotionItem className="campaign-manager-top shrink-0 border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
-        <div className="flex flex-col gap-2 px-3 py-2 lg:flex-row lg:items-center">
-          <div className="flex shrink-0 items-center gap-2">
-            <h1 className="text-lg font-black tracking-tight">Campanhas</h1>
-            <span className="campaign-brand-badge grid h-7 w-7 place-items-center rounded-md border text-[9px] font-black">GD</span>
+      <MotionItem className="campaign-manager-top shrink-0 border-b border-border bg-card">
+        <header className="campaign-app-header flex min-w-0 items-center gap-3 border-b border-border px-4">
+          <BrandLogo eager className="campaign-app-logo h-7 w-[104px] shrink-0" />
+          <h1 className="campaign-app-title shrink-0 text-base font-semibold">Campanhas</h1>
+          <AccountMultiSelect
+            accounts={adAccounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))}
+            selectedIds={selectedAccountIds}
+            onChange={setSelectedAccountIds}
+            className="campaign-account-pill min-w-0 max-w-[260px]"
+            ariaLabel="Selecionar conta Meta"
+          />
+          <div className="campaign-opportunity-pill inline-flex h-8 shrink-0 items-center gap-2 rounded-[18px] border border-border px-3 text-xs font-semibold">
+            <span className="campaign-opportunity-score grid h-5 w-5 place-items-center rounded-full border text-[10px] font-bold">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
+            <span>Pontuação de oportunidade</span><ChevronDown className="h-3.5 w-3.5" />
           </div>
-          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <span className="campaign-opportunity-score grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-black">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
-            <span className="truncate">Pontuação de oportunidade</span>
-            <ChevronDown className="h-3.5 w-3.5" />
-          </div>
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            <span className="hidden text-[10px] text-muted-foreground xl:inline">Atualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
-            <Button variant="outline" size="icon" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="h-8 w-8" title="Atualizar dados">
-              <RefreshCw className={cn("h-3.5 w-3.5", (isFetching || syncMeta.isPending) && "animate-spin")} />
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            <MetaDateRangePicker
+              preset={preset}
+              onPresetChange={setPreset}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+              startDate={startDate}
+              endDate={endDate}
+              className="campaign-date-pill hidden lg:flex"
+            />
+            <span className="hidden text-xs text-muted-foreground xl:inline">Atualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+            <Button variant="outline" size="icon" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="campaign-header-icon h-9 w-9" title="Atualizar dados">
+              <RefreshCw className={cn("h-4 w-4", (isFetching || syncMeta.isPending) && "animate-spin")} />
             </Button>
-            <Button variant="outline" size="sm" disabled className="meta-toolbar-button hidden sm:inline-flex"><Send className="h-3.5 w-3.5" />Conferir e publicar</Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" title="Mais opções"><MoreHorizontal className="h-4 w-4" /></Button>
+            <Button variant="default" size="sm" disabled className="campaign-publish-button h-9 px-4"><Send className="h-4 w-4" />Conferir e publicar</Button>
+            <Button variant="outline" size="icon" className="campaign-header-icon h-9 w-9" title="Mais opções"><MoreHorizontal className="h-4 w-4" /></Button>
           </div>
-        </div>
+        </header>
 
-        <div className="campaign-scope-toolbar growdash-scrollbar-hidden flex items-center gap-2 overflow-x-auto border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
+        <div className="campaign-filters-row flex min-w-0 items-center gap-3 border-b border-border px-4 py-3">
+          <div className="campaign-scope-toolbar growdash-scrollbar-hidden flex min-w-0 items-center gap-2 overflow-x-auto">
           <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button meta-toolbar-button-active shrink-0"><FolderOpen className="h-3.5 w-3.5" />Todos os anúncios</Button>
           <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Megaphone className="h-3.5 w-3.5" />Anúncios ativos</Button>
           <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0"><ShieldCheck className="h-3.5 w-3.5" />Ações</Button>
           <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-button shrink-0" onClick={() => setStatusFilter("ACTIVE")}><Eye className="h-3.5 w-3.5" />Tiveram veiculação</Button>
           <Button variant="ghost" size="sm" className="campaign-scope-action h-8 shrink-0 gap-2 text-[11px]"><Plus className="h-3.5 w-3.5" />Ver mais</Button>
-          <Button variant="outline" size="sm" className="campaign-scope-action meta-toolbar-primary ml-auto shrink-0"><SlidersHorizontal className="h-3.5 w-3.5" />Criar visualização</Button>
-        </div>
-
-        <div className="border-t border-border/60 px-3 py-2 dark:border-[#24221c]">
-          <div className="relative w-full">
+          </div>
+          <div className="campaign-search-wrap relative ml-auto w-[360px] max-w-[38%] shrink-0">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Pesquise para filtrar por: nome, identificação ou métrica" value={search} onChange={(e) => setSearch(e.target.value)} className="campaign-search-input h-8 border-border bg-background pl-9 text-xs" />
           </div>
@@ -1075,10 +1094,6 @@ export default function Campaigns() {
 
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
       {actionIsError && <MotionItem className="border-b border-amber-500/30 bg-amber-500/5 p-3" role="alert"><p className="text-xs text-amber-700 dark:text-amber-300"><b>Não foi possível consultar as ações de resultado da Meta.</b> Os resultados por evento podem estar incompletos; os valores canônicos já salvos nos Insights permanecem em uso. {actionError instanceof Error ? actionError.message : "Tente atualizar os dados."}</p></MotionItem>}
-
-      <MotionItem className="campaign-kpi-strip shrink-0" aria-label="Resumo operacional das campanhas">
-        <CampaignKpiStrip totals={displayedTotals} totalCpl={totalCpl} totalCtr={totalCtr} />
-      </MotionItem>
 
       <MotionItem className={cn("campaigns-main-content", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("campaigns-main-tabs", !analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
@@ -1244,24 +1259,22 @@ export default function Campaigns() {
                   <table className="w-full caption-bottom text-sm [&_td]:overflow-hidden [&_td]:whitespace-nowrap" style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-50 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
                       <TableRow className="campaign-metric-header h-11 border-b border-border hover:bg-transparent [&>th]:h-11 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e]">
-                        <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted dark:bg-[#11110f]">
-                          <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
+                        <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="campaign-check-head sticky left-0 z-40 bg-muted">
+                          <Checkbox className="h-4 w-4 rounded-[3px] border-primary/80" checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
                         </ResizableHead>
-                        <ResizableHead colKey="delivery" width={camp.colWidths.delivery} onResize={camp.startResize("delivery")} sortable sortableKey="status" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 bg-muted dark:bg-[#11110f]" style={{ left: camp.colWidths.check }}>Status</ResizableHead>
-                        <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] dark:border-[#28251e] dark:bg-[#11110f]" style={{ left: camp.colWidths.check + camp.colWidths.delivery }}>Campanha</ResizableHead>
+                        <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="campaign-name-head sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.35)]" style={{ left: camp.colWidths.check }}>Campanha</ResizableHead>
                         {showColumn("deliveryStatus") && <ResizableHead colKey="deliveryStatus" width={camp.colWidths.deliveryStatus} onResize={camp.startResize("deliveryStatus")}>Veiculação</ResizableHead>}
-                        {showColumn("actions") && <ResizableHead colKey="actions" width={camp.colWidths.actions} onResize={camp.startResize("actions")}>Ações</ResizableHead>}
-                        {showColumn("reach") && <ResizableHead colKey="reach" width={camp.colWidths.reach} onResize={camp.startResize("reach")} sortable sortableKey="reach" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Alcance</ResizableHead>}
+                        {showColumn("actions") && <ResizableHead colKey="actions" width={camp.colWidths.actions} onResize={camp.startResize("actions")}>Recomendações</ResizableHead>}
+                        {showColumn("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Valor gasto</ResizableHead>}
+                        {showColumn("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
                         {showColumn("impressions") && <ResizableHead colKey="impressions" width={camp.colWidths.impressions} onResize={camp.startResize("impressions")} sortable sortableKey="impressions" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Impressões</ResizableHead>}
-                        {showColumn("frequency") && <ResizableHead colKey="frequency" width={camp.colWidths.frequency} onResize={camp.startResize("frequency")} sortable sortableKey="frequency" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Frequência</ResizableHead>}
+                        {showColumn("cpm") && <ResizableHead colKey="cpm" width={camp.colWidths.cpm} onResize={camp.startResize("cpm")} sortable sortableKey="cpm" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPM</ResizableHead>}
+                        {showColumn("reach") && <ResizableHead colKey="reach" width={camp.colWidths.reach} onResize={camp.startResize("reach")} sortable sortableKey="reach" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Alcance</ResizableHead>}
                         {showColumn("linkClicks") && <ResizableHead colKey="linkClicks" width={camp.colWidths.linkClicks} onResize={camp.startResize("linkClicks")} sortable sortableKey="linkClicks" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Cliques no link</ResizableHead>}
                         {showColumn("linkCpc") && <ResizableHead colKey="linkCpc" width={camp.colWidths.linkCpc} onResize={camp.startResize("linkCpc")} sortable sortableKey="linkCpc" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPC (clique no link)</ResizableHead>}
                         {showColumn("uniqueLinkCtr") && <ResizableHead colKey="uniqueLinkCtr" width={camp.colWidths.uniqueLinkCtr} onResize={camp.startResize("uniqueLinkCtr")} sortable sortableKey="uniqueLinkCtr" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CTR único (link)</ResizableHead>}
-                        {showColumn("cpm") && <ResizableHead colKey="cpm" width={camp.colWidths.cpm} onResize={camp.startResize("cpm")} sortable sortableKey="cpm" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">CPM</ResizableHead>}
-                        {showColumn("budget") && <ResizableHead colKey="budget" width={camp.colWidths.budget} onResize={camp.startResize("budget")} sortable sortableKey="budget" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Orçamento</ResizableHead>}
                         {showColumn("leads") && <ResizableHead colKey="leads" width={camp.colWidths.leads} onResize={camp.startResize("leads")} sortable sortableKey="leads" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right" title="Leads atribuídos à campanha pelos eventos da Meta">Leads atribuídos</ResizableHead>}
                         {showColumn("cpl") && <ResizableHead colKey="cpl" width={camp.colWidths.cpl} onResize={camp.startResize("cpl")} sortable sortableKey="cpl" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo por lead</ResizableHead>}
-                        {showColumn("spend") && <ResizableHead colKey="spend" width={camp.colWidths.spend} onResize={camp.startResize("spend")} sortable sortableKey="spend" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Valor usado</ResizableHead>}
                         {showColumn("landingPageViews") && <ResizableHead colKey="landingPageViews" width={camp.colWidths.landingPageViews} onResize={camp.startResize("landingPageViews")} sortable sortableKey="landingPageViews" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Visualização da página de destino</ResizableHead>}
                         {showColumn("costPerLandingPageView") && <ResizableHead colKey="costPerLandingPageView" width={camp.colWidths.costPerLandingPageView} onResize={camp.startResize("costPerLandingPageView")} sortable sortableKey="costPerLandingPageView" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Custo por visualização da página</ResizableHead>}
                         {showColumn("checkouts") && <ResizableHead colKey="checkouts" width={camp.colWidths.checkouts} onResize={camp.startResize("checkouts")} sortable sortableKey="checkouts" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} align="right">Finalização de compra iniciada</ResizableHead>}
@@ -1295,44 +1308,26 @@ export default function Campaigns() {
                             <TableCell style={{ ...cellW("check"), left: 0 }} className={cn("sticky z-20 transition-colors group-hover:bg-muted", stickySurface)} onClick={(e) => e.stopPropagation()}>
                               <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.has(c.id)} disabled={c.catalogMissing} aria-label={c.catalogMissing ? "Campanha somente leitura: catálogo Meta indisponível" : `Selecionar ${c.name}`} onCheckedChange={() => toggleSelect(c.id)} />
                             </TableCell>
-                            <TableCell style={{ ...cellW("delivery"), left: camp.colWidths.check }} className={cn("sticky z-20 transition-colors group-hover:bg-muted", stickySurface)} onClick={(event) => event.stopPropagation()}>
-                              <div className="flex items-center gap-2 text-xs font-semibold">
-                                {c.catalogMissing ? <span className="text-muted-foreground">—</span> : <>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget })}
-                                  className={cn(
-                                    "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-                                    normalizeStatus(c.status) === "ACTIVE"
-                                      ? "border-emerald-600/70 bg-emerald-500"
-                                      : "border-border bg-muted",
-                                  )}
-                                  title={c.catalogMissing ? "Status indisponível: campanha ausente do catálogo Meta" : "Editar status na Meta Ads"}
-                                >
-                                  <span className={cn(
-                                    "absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-all",
-                                    normalizeStatus(c.status) === "ACTIVE" ? "left-[17px]" : "left-0.5",
-                                  )} />
-                                </button>
-                                </>}
+                            <TableCell style={{ ...cellW("name"), left: camp.colWidths.check }} className={cn("campaign-name-cell sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.18)] transition-colors group-hover:bg-muted", stickySurface)}>
+                              <div className="flex min-w-0 items-center gap-3">
+                                {!c.catalogMissing && <button type="button" onClick={(event) => { event.stopPropagation(); setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget }); }} className={cn("campaign-row-toggle relative h-5 w-9 shrink-0 rounded-full border transition-colors", normalizeStatus(c.status) === "ACTIVE" ? "border-blue-600 bg-[#0866FF]" : "border-[#8A8D91] bg-[#8A8D91]")} title="Editar status na Meta Ads"><span className={cn("absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-all", normalizeStatus(c.status) === "ACTIVE" ? "left-[17px]" : "left-0.5")} /></button>}
+                                <span className="block min-w-0 truncate font-medium text-foreground" title={c.catalogMissing ? `${c.name} · somente Insights; metadados de catálogo indisponíveis` : c.name}>{c.name}{c.catalogMissing && <span className="ml-2 text-[9px] font-normal text-amber-600">Somente Insights · catálogo indisponível</span>}</span>
+                                {!c.catalogMissing && <Pencil className="campaign-row-edit ml-auto h-4 w-4 shrink-0" aria-hidden="true" />}
                               </div>
                             </TableCell>
-                            <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.85)] transition-colors group-hover:bg-muted", stickySurface)}>
-                              <span className="block truncate font-medium text-foreground" title={c.catalogMissing ? `${c.name} · somente Insights; metadados de catálogo indisponíveis` : c.name}>{c.name}{c.catalogMissing && <span className="ml-2 text-[9px] font-normal text-amber-600">Somente Insights · catálogo indisponível</span>}</span>
-                            </TableCell>
                             {showColumn("deliveryStatus") && <TableCell style={cellW("deliveryStatus")} className="text-xs">{c.catalogMissing ? <span className="text-muted-foreground">Indisponível</span> : <span className="inline-flex items-center gap-2"><StatusDot status={c.status} />{getStatusBadge(c.status).label}</span>}</TableCell>}
-                            {showColumn("actions") && <TableCell style={cellW("actions")} onClick={(event) => event.stopPropagation()}>{!c.catalogMissing && <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={() => setEditingEntity({ type: "campaign", id: c.id, name: c.name, status: c.status, dailyBudget: c.daily_budget ?? c.budget })}><Pencil className="mr-1 h-3 w-3" />Editar</Button>}</TableCell>}
-                            {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
+                            {showColumn("actions") && <TableCell style={cellW("actions")} className="text-left" onClick={(event) => event.stopPropagation()}>{Number(c.recommendations || 0) > 0 ? <span className="text-[13px] font-medium text-[#0866FF]">{c.recommendations} recomendações</span> : null}</TableCell>}
+                            {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}>{c.catalogMissing ? <span className="text-muted-foreground">Indisponível</span> : <><AnimatedNumber value={c.budget} prefix="R$ " decimals={2} /><span className="block text-[11px] text-muted-foreground">Diário</span></>}</TableCell>}
                             {showColumn("impressions") && <TableCell style={cellW("impressions")} className={cn("text-right tabular-nums text-sm", sortBg("impressions"))}><AnimatedNumber value={c.impressions} decimals={0} /></TableCell>}
+                            {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
+                            {showColumn("reach") && <TableCell style={cellW("reach")} className={cn("text-right tabular-nums text-sm", sortBg("reach"))}><AnimatedNumber value={c.reach} decimals={0} /></TableCell>}
                             {showColumn("frequency") && <TableCell style={cellW("frequency")} className={cn("text-right tabular-nums text-sm", sortBg("frequency"))}><AnimatedNumber value={c.frequency} decimals={2} /></TableCell>}
                             {showColumn("linkClicks") && <TableCell style={cellW("linkClicks")} className={cn("text-right tabular-nums text-sm", sortBg("linkClicks"))}><AnimatedNumber value={c.linkClicks} decimals={0} /></TableCell>}
                             {showColumn("linkCpc") && <TableCell style={cellW("linkCpc")} className={cn("text-right tabular-nums text-sm", sortBg("linkCpc"))}><AnimatedNumber value={c.linkCpc} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("uniqueLinkCtr") && <TableCell style={cellW("uniqueLinkCtr")} className={cn("text-right tabular-nums text-sm", sortBg("uniqueLinkCtr"))}><AnimatedNumber value={c.uniqueLinkCtr} suffix="%" decimals={2} /></TableCell>}
-                            {showColumn("cpm") && <TableCell style={cellW("cpm")} className={cn("text-right tabular-nums text-sm", sortBg("cpm"))}><AnimatedNumber value={c.cpm} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("budget") && <TableCell style={cellW("budget")} className={cn("text-right tabular-nums text-sm", sortBg("budget"))}>{c.catalogMissing ? <span className="text-muted-foreground" title="Orçamento não consta no snapshot de Insights">Indisponível</span> : <AnimatedNumber value={c.budget} prefix="R$ " decimals={2} />}</TableCell>}
                             {showColumn("leads") && <TableCell style={cellW("leads")} className={cn("text-right tabular-nums text-sm", sortBg("leads"))} onClick={(event) => event.stopPropagation()}><CampaignResultCell campaign={c} onOpen={() => !c.catalogMissing && setDetailCampaignId(c.id)} /></TableCell>}
                             {showColumn("cpl") && <TableCell style={cellW("cpl")} className={cn("text-right tabular-nums text-sm", sortBg("cpl"))}><AnimatedNumber value={c.costPerResult ?? c.cpl} prefix="R$ " decimals={2} /></TableCell>}
-                            {showColumn("spend") && <TableCell style={cellW("spend")} className={cn("text-right tabular-nums text-sm", sortBg("spend"))}><AnimatedNumber value={c.spend} prefix="R$ " decimals={2} /></TableCell>}
                             {showColumn("landingPageViews") && <TableCell style={cellW("landingPageViews")} className={cn("text-right tabular-nums text-sm", sortBg("landingPageViews"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.landingPageViews} decimals={0} />}</TableCell>}
                             {showColumn("costPerLandingPageView") && <TableCell style={cellW("costPerLandingPageView")} className={cn("text-right tabular-nums text-sm", sortBg("costPerLandingPageView"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.costPerLandingPageView} prefix="R$ " decimals={2} />}</TableCell>}
                             {showColumn("checkouts") && <TableCell style={cellW("checkouts")} className={cn("text-right tabular-nums text-sm", sortBg("checkouts"))}>{c.catalogMissing ? <UnavailableMetric /> : <AnimatedNumber value={c.checkouts} decimals={0} />}</TableCell>}
@@ -1902,10 +1897,10 @@ function CampaignTotalsRow({ widths, visibleColumns, count, totals, totalCpm, to
   const show = (key: CampaignColumnKey) => visibleColumns.has(key);
   const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const decimal = (value: number, suffix = "") => `${value.toFixed(2).replace(".", ",")}${suffix}`;
-  return <TableRow data-campaign-totals className="h-16 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
-    <CampaignTotalCell width={widths.check} stickyLeft={0} /><CampaignTotalCell width={widths.delivery} stickyLeft={widths.check} /><CampaignTotalCell width={widths.name} value={`Resultados de ${count} campanhas`} label="Totais do período e filtros selecionados" align="left" stickyLeft={widths.check + widths.delivery} strongDivider />
-    {show("deliveryStatus") && <CampaignTotalCell width={widths.deliveryStatus} value="—" />}{show("actions") && <CampaignTotalCell width={widths.actions} value="—" />}{show("reach") && <CampaignTotalCell width={widths.reach} value={totals.reach.toLocaleString("pt-BR")} label="Total" />}{show("impressions") && <CampaignTotalCell width={widths.impressions} value={totals.impressions.toLocaleString("pt-BR")} label="Total" />}{show("frequency") && <CampaignTotalCell width={widths.frequency} value={totals.reach ? decimal(totals.impressions / totals.reach) : "0,00"} label="Média" />}{show("linkClicks") && <CampaignTotalCell width={widths.linkClicks} value={totals.linkClicks.toLocaleString("pt-BR")} label="Total" />}{show("linkCpc") && <CampaignTotalCell width={widths.linkCpc} value={money(totalLinkCpc)} label="Por clique no link" />}{show("uniqueLinkCtr") && <CampaignTotalCell width={widths.uniqueLinkCtr} value={decimal(totalUniqueLinkCtr, "%")} label="Taxa total" />}{show("cpm") && <CampaignTotalCell width={widths.cpm} value={money(totalCpm)} label="Por 1.000 impressões" />}{show("budget") && <CampaignTotalCell width={widths.budget} value={money(totals.budget)} label="Orçamento somado" />}
-    {show("leads") && <CampaignTotalCell width={widths.leads} value={totals.results.toLocaleString("pt-BR")} label={leadPartsLabel} />}{show("cpl") && <CampaignTotalCell width={widths.cpl} value={money(totalCpl)} label="Por resultado" />}{show("spend") && <CampaignTotalCell width={widths.spend} value={money(totals.spend)} label="Total usado" />}{show("landingPageViews") && <CampaignTotalCell width={widths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}{show("costPerLandingPageView") && <CampaignTotalCell width={widths.costPerLandingPageView} value={money(totalCostPerLandingPageView)} label="Por visualização" />}{show("checkouts") && <CampaignTotalCell width={widths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} label="Total" />}{show("costPerCheckout") && <CampaignTotalCell width={widths.costPerCheckout} value={money(totalCostPerCheckout)} label="Por finalização" />}{show("metaPurchases") && <CampaignTotalCell width={widths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} label="Total" />}{show("metaCostPerPurchase") && <CampaignTotalCell width={widths.metaCostPerPurchase} value={money(totalMetaCostPerPurchase)} label="Por compra" />}{show("metaPurchaseRoas") && <CampaignTotalCell width={widths.metaPurchaseRoas} value={decimal(totalMetaPurchaseRoas, "x")} label="Retorno total" />}
+  return <TableRow data-campaign-totals className="h-12 border-0 bg-card hover:bg-card [&>td]:px-3 [&>td]:py-1">
+    <CampaignTotalCell width={widths.check} stickyLeft={0} /><CampaignTotalCell width={widths.name} value={`Resultados de ${count} campanhas`} label="Totais do período e filtros selecionados" align="left" stickyLeft={widths.check} strongDivider />
+    {show("deliveryStatus") && <CampaignTotalCell width={widths.deliveryStatus} value="—" />}{show("actions") && <CampaignTotalCell width={widths.actions} value="—" />}{show("spend") && <CampaignTotalCell width={widths.spend} value={money(totals.spend)} label="Total usado" />}{show("budget") && <CampaignTotalCell width={widths.budget} value={money(totals.budget)} label="Orçamento somado" />}{show("impressions") && <CampaignTotalCell width={widths.impressions} value={totals.impressions.toLocaleString("pt-BR")} label="Total" />}{show("cpm") && <CampaignTotalCell width={widths.cpm} value={money(totalCpm)} label="Por 1.000 impressões" />}{show("reach") && <CampaignTotalCell width={widths.reach} value={totals.reach.toLocaleString("pt-BR")} label="Total" />}{show("frequency") && <CampaignTotalCell width={widths.frequency} value={totals.reach ? decimal(totals.impressions / totals.reach) : "0,00"} label="Média" />}{show("linkClicks") && <CampaignTotalCell width={widths.linkClicks} value={totals.linkClicks.toLocaleString("pt-BR")} label="Total" />}{show("linkCpc") && <CampaignTotalCell width={widths.linkCpc} value={money(totalLinkCpc)} label="Por clique no link" />}{show("uniqueLinkCtr") && <CampaignTotalCell width={widths.uniqueLinkCtr} value={decimal(totalUniqueLinkCtr, "%")} label="Taxa total" />}
+    {show("leads") && <CampaignTotalCell width={widths.leads} value={totals.results.toLocaleString("pt-BR")} label={leadPartsLabel} />}{show("cpl") && <CampaignTotalCell width={widths.cpl} value={money(totalCpl)} label="Por resultado" />}{show("landingPageViews") && <CampaignTotalCell width={widths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}{show("costPerLandingPageView") && <CampaignTotalCell width={widths.costPerLandingPageView} value={money(totalCostPerLandingPageView)} label="Por visualização" />}{show("checkouts") && <CampaignTotalCell width={widths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} label="Total" />}{show("costPerCheckout") && <CampaignTotalCell width={widths.costPerCheckout} value={money(totalCostPerCheckout)} label="Por finalização" />}{show("metaPurchases") && <CampaignTotalCell width={widths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} label="Total" />}{show("metaCostPerPurchase") && <CampaignTotalCell width={widths.metaCostPerPurchase} value={money(totalMetaCostPerPurchase)} label="Por compra" />}{show("metaPurchaseRoas") && <CampaignTotalCell width={widths.metaPurchaseRoas} value={decimal(totalMetaPurchaseRoas, "x")} label="Retorno total" />}
     {show("objective") && <CampaignTotalCell width={widths.objective} value="—" />}{show("clicks") && <CampaignTotalCell width={widths.clicks} value={totals.clicks.toLocaleString("pt-BR")} label="Total" />}{show("cpc") && <CampaignTotalCell width={widths.cpc} value={money(totalCpc)} label="Por clique" />}{show("ctr") && <CampaignTotalCell width={widths.ctr} value={decimal(totalCtr, "%")} label="Taxa total" />}{show("conversion") && <CampaignTotalCell width={widths.conversion} value={decimal(totalResultRate, "%")} label="Taxa total" />}{show("sales") && <CampaignTotalCell width={widths.sales} value={totals.salesCount.toLocaleString("pt-BR")} label="Total" />}{show("cpa") && <CampaignTotalCell width={widths.cpa} value={money(totals.salesCount ? totals.spend / totals.salesCount : 0)} label="Por venda" />}{show("revenue") && <CampaignTotalCell width={widths.revenue} value={money(totals.revenue)} label="Valor total" />}{show("roas") && <CampaignTotalCell width={widths.roas} value={decimal(totalRoas, "x")} label="Retorno total" />}{show("profit") && <CampaignTotalCell width={widths.profit} value={money(totals.profit)} label="Total" />}{show("roi") && <CampaignTotalCell width={widths.roi} value={decimal(totals.spend ? totals.profit / totals.spend * 100 : 0, "%")} label="Retorno total" />}{show("videoViews") && <CampaignTotalCell width={widths.videoViews} value="—" label="Não sincronizado" />}
   </TableRow>;
 }

@@ -1947,6 +1947,172 @@ html:not(.dark) {
   }
 }
 
+/* Meta Ads Manager visual pass -------------------------------------------
+   This route is intentionally a light, dense workspace. The existing data
+   shell remains untouched; these rules only restyle and reflow the campaign
+   surface so the page follows the supplied reference anatomy. */
+.brand-shell:has(.traffic-page-shell) .growdash-main {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  padding: 0 !important;
+  overflow: clip !important;
+  background: #f2f4f7 !important;
+}
+.brand-shell:has(.traffic-page-shell) .growdash-content-frame,
+.brand-shell:has(.traffic-page-shell) .gd-page-transition {
+  height: 100% !important;
+  max-width: none !important;
+  overflow: clip !important;
+}
+.brand-shell:has(.traffic-page-shell) .traffic-page-shell {
+  display: block !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  background: #f2f4f7 !important;
+  color: #1c1e21 !important;
+}
+.brand-shell:has(.traffic-page-shell) .traffic-page-content {
+  width: calc(100% - 56px) !important;
+  max-width: none !important;
+  min-height: 100%;
+  margin-left: 56px !important;
+}
+.brand-shell:has(.traffic-page-shell) .traffic-nav-rail {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: auto !important;
+  width: 56px !important;
+  min-width: 56px !important;
+  max-height: none !important;
+  border: 0 !important;
+  border-right: 1px solid #e4e7ec !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  color: #606770 !important;
+  z-index: 80;
+}
+.brand-shell:has(.traffic-page-shell) .traffic-nav-rail-header { display: none !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-items {
+  display: flex !important;
+  flex-direction: column;
+  gap: 16px !important;
+  padding: 16px 8px !important;
+  overflow: visible !important;
+}
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item,
+.brand-shell:has(.traffic-page-shell) .traffic-nav-rail[data-expanded="false"] .traffic-nav-item {
+  position: relative;
+  width: 40px !important;
+  min-height: 40px !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: #606770 !important;
+  background: transparent !important;
+}
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item:hover,
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item:focus-visible { background: #f2f4f7 !important; color: #1c1e21 !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active { color: #0866ff !important; background: #eaf2ff !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active::before {
+  display: block !important;
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: -8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: #0866ff;
+  content: "";
+}
+.brand-shell:has(.traffic-page-shell) .traffic-nav-label { display: none !important; }
+
+.campaigns-workspace {
+  --campaign-surface: #fff;
+  --campaign-subtle: #f7f8fa;
+  --campaign-border: #e4e7ec;
+  --campaign-text: #1c1e21;
+  --campaign-muted: #606770;
+  --campaign-blue: #0866ff;
+  min-height: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #f2f4f7 !important;
+  color: var(--campaign-text) !important;
+}
+.campaigns-workspace .campaign-manager-top { background: var(--campaign-surface) !important; border-color: var(--campaign-border) !important; }
+.campaigns-workspace .campaign-app-header { height: 56px; background: #fff; }
+.campaigns-workspace .campaign-app-logo { object-fit: contain; }
+.campaigns-workspace .campaign-app-title { color: var(--campaign-text) !important; }
+.campaigns-workspace .campaign-opportunity-pill { color: var(--campaign-text); background: #fff; }
+.campaigns-workspace .campaign-account-pill,
+.campaigns-workspace .campaign-date-pill,
+.campaigns-workspace .campaign-header-icon,
+.campaigns-workspace .campaign-publish-button { border-color: var(--campaign-border) !important; border-radius: 6px !important; }
+.campaigns-workspace .campaign-account-pill,
+.campaigns-workspace .campaign-date-pill { height: 32px !important; min-height: 32px !important; padding-inline: 12px !important; }
+.campaigns-workspace .campaign-header-icon { background: #fff !important; color: var(--campaign-text) !important; }
+.campaigns-workspace .campaign-publish-button { background: #0866ff !important; color: #fff !important; }
+.campaigns-workspace .campaign-filters-row { height: 56px; background: #fff; }
+.campaigns-workspace .campaign-scope-toolbar { border: 0 !important; padding: 0 !important; }
+.campaigns-workspace .campaign-scope-action,
+.campaigns-workspace .meta-toolbar-button { height: 32px !important; min-height: 32px !important; border: 1px solid var(--campaign-border) !important; border-radius: 18px !important; background: #fff !important; color: var(--campaign-text) !important; box-shadow: none !important; font-size: 13px !important; font-weight: 500 !important; }
+.campaigns-workspace .meta-toolbar-button-active { border-color: var(--campaign-blue) !important; color: var(--campaign-blue) !important; background: #fff !important; }
+.campaigns-workspace .meta-toolbar-primary { border-color: #0866ff !important; background: #0866ff !important; color: #fff !important; }
+.campaigns-workspace .campaign-search-wrap { max-width: 360px; }
+.campaigns-workspace .campaign-search-input { height: 32px !important; border: 1px solid var(--campaign-border) !important; border-radius: 18px !important; background: #fff !important; color: var(--campaign-text) !important; }
+.campaigns-workspace .campaign-tabs-header { height: 44px; padding: 0 16px !important; background: #fff !important; border-color: var(--campaign-border) !important; }
+.campaigns-workspace .campaign-tabs-list { gap: 4px; padding: 0 !important; border: 0 !important; background: transparent !important; }
+.campaigns-workspace .campaign-hierarchy-tab { height: 44px !important; min-width: 0 !important; padding: 0 16px !important; border-radius: 0 !important; color: #606770 !important; background: transparent !important; font-size: 14px !important; font-weight: 400 !important; }
+.campaigns-workspace .campaign-hierarchy-tab[data-state="active"] { color: #1c1e21 !important; background: transparent !important; box-shadow: inset 0 -2px #0866ff !important; transform: none !important; font-weight: 600 !important; }
+.campaigns-workspace .campaign-hierarchy-tab svg { color: currentColor !important; }
+.campaigns-workspace .campaign-actions-toolbar { height: 56px; min-height: 56px !important; padding: 10px 16px !important; background: #fff !important; border-color: var(--campaign-border) !important; }
+.campaigns-workspace .campaign-action-button,
+.campaigns-workspace .campaign-action-select,
+.campaigns-workspace .campaign-columns-control > button { height: 36px !important; min-height: 36px !important; border-radius: 6px !important; font-size: 14px !important; }
+.campaigns-workspace .campaign-primary-actions > .campaign-action-button:first-child { background: #00a400 !important; border-color: #00a400 !important; color: #fff !important; }
+.campaigns-workspace .campaign-primary-actions .meta-toolbar-button { border-radius: 6px !important; }
+.campaigns-workspace .campaign-secondary-actions .meta-toolbar-button,
+.campaigns-workspace .campaign-secondary-actions .campaign-columns-control > button { border-radius: 6px !important; background: #fff !important; color: #1c1e21 !important; }
+.campaigns-workspace .campaign-table-frame { margin: 24px !important; border: 1px solid var(--campaign-border) !important; border-radius: 8px !important; background: #fff !important; }
+.campaigns-workspace [data-campaign-table-scroll] { scrollbar-color: #b8c0cc transparent; }
+.campaigns-workspace [data-campaign-table-scroll] table,
+.campaigns-workspace [data-campaign-totals-bar] table { color: #1c1e21 !important; }
+.campaigns-workspace .campaign-metric-header > th { height: 40px !important; padding-inline: 12px !important; background: #f7f8fa !important; color: #606770 !important; border-color: var(--campaign-border) !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr { height: 52px !important; background: #fff !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:hover { background: #f5f6f8 !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td { height: 52px !important; padding-inline: 12px !important; border-color: var(--campaign-border) !important; color: #1c1e21 !important; font-size: 14px !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td:nth-child(n+5) { font-variant-numeric: tabular-nums; text-align: right; }
+.campaigns-workspace .campaign-name-cell { min-width: 280px !important; background: #fff !important; }
+.campaigns-workspace .campaign-row-toggle { width: 32px !important; height: 20px !important; }
+.campaigns-workspace .campaign-row-edit { opacity: 0; color: #606770; }
+.campaigns-workspace tbody tr:hover .campaign-row-edit { opacity: 1; }
+.campaigns-workspace .campaign-total-bar,
+.campaigns-workspace [data-campaign-totals-bar] { min-height: 48px; background: #f7f8fa !important; border-top: 1px solid var(--campaign-border) !important; }
+.campaigns-workspace [data-campaign-totals-bar] td { height: 48px !important; border-color: var(--campaign-border) !important; background: #f7f8fa !important; }
+.campaigns-workspace [data-campaign-totals-bar] strong { color: #1c1e21 !important; font-size: 14px !important; }
+.campaigns-workspace [data-campaign-totals-bar] span { color: #606770 !important; }
+
+@media (max-width: 767px) {
+  .brand-shell:has(.traffic-page-shell) .traffic-page-content { width: 100% !important; margin-left: 0 !important; padding-bottom: 60px; }
+  .brand-shell:has(.traffic-page-shell) .traffic-nav-rail { top: auto !important; right: 12px !important; bottom: 12px !important; left: 12px !important; width: auto !important; min-width: 0 !important; height: 56px !important; }
+  .brand-shell:has(.traffic-page-shell) .traffic-nav-items { flex-direction: row; gap: 8px !important; padding: 8px !important; overflow-x: auto !important; }
+  .brand-shell:has(.traffic-page-shell) .traffic-nav-item { flex: 0 0 40px; }
+  .campaigns-workspace .campaign-app-header { height: auto; min-height: 56px; flex-wrap: wrap; padding: 12px !important; }
+  .campaigns-workspace .campaign-account-pill { order: 5; width: 100%; max-width: none; }
+  .campaigns-workspace .campaign-opportunity-pill { display: none; }
+  .campaigns-workspace .campaign-filters-row { height: auto; min-height: 56px; flex-wrap: wrap; padding: 12px !important; }
+  .campaigns-workspace .campaign-scope-toolbar { width: 100%; order: 1; }
+  .campaigns-workspace .campaign-search-wrap { order: 2; width: 100%; max-width: none; margin-left: 0; }
+  .campaigns-workspace .campaign-scope-action.meta-toolbar-primary { order: 3; margin-left: 0; }
+  .campaigns-workspace .campaign-table-frame { margin: 12px !important; }
+}
+
 @media (min-width: 768px) and (max-width: 1180px) {
   :root {
     --gd-page-gutter: .8rem;
@@ -10998,4 +11164,206 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
     max-height: 100dvh !important;
     overflow: hidden !important;
   }
+}
+
+/* Final campaign cascade: this block intentionally lives after the legacy
+   theme layers so the reference geometry cannot be reintroduced by old rules. */
+.brand-shell:has(.traffic-page-shell) .growdash-main { height: calc(100dvh - 48px) !important; min-height: 0 !important; max-height: calc(100dvh - 48px) !important; padding: 0 !important; background: #f2f4f7 !important; }
+.brand-shell:has(.traffic-page-shell) .growdash-content-frame,
+.brand-shell:has(.traffic-page-shell) .gd-page-transition { height: 100% !important; min-height: 0 !important; max-width: none !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-page-shell { display: block !important; width: 100% !important; max-width: none !important; height: 100% !important; min-height: 0 !important; padding: 0 !important; background: #f2f4f7 !important; color: #1c1e21 !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-page-content { width: calc(100% - 56px) !important; max-width: none !important; min-height: 100% !important; margin: 0 0 0 56px !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-rail { position: fixed !important; inset: 48px auto 0 220px !important; z-index: 40 !important; width: 56px !important; min-width: 56px !important; max-height: none !important; overflow: visible !important; border: 0 !important; border-right: 1px solid #e4e7ec !important; border-radius: 0 !important; background: #fff !important; color: #606770 !important; }
+.brand-shell:has(.traffic-page-shell):has(.brand-sidebar.w-16) .traffic-nav-rail { left: 64px !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-rail-header { display: none !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-items { display: flex !important; flex-direction: column !important; gap: 16px !important; padding: 16px 8px !important; overflow: visible !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item,
+.brand-shell:has(.traffic-page-shell) .traffic-nav-rail[data-expanded="false"] .traffic-nav-item { position: relative !important; display: flex !important; width: 40px !important; min-height: 40px !important; align-items: center !important; justify-content: center !important; padding: 0 !important; border: 0 !important; border-radius: 6px !important; background: transparent !important; color: #606770 !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item:hover,
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item:focus-visible { background: #f2f4f7 !important; color: #1c1e21 !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active { background: #eaf2ff !important; color: #0866ff !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active::before { position: absolute !important; top: 8px !important; bottom: 8px !important; left: -8px !important; display: block !important; width: 3px !important; border-radius: 0 2px 2px 0 !important; background: #0866ff !important; content: "" !important; }
+.brand-shell:has(.traffic-page-shell) .traffic-nav-label { display: none !important; }
+.campaigns-workspace .campaign-manager-top,
+.campaigns-workspace .campaign-app-header,
+.campaigns-workspace .campaign-filters-row,
+.campaigns-workspace .campaign-tabs-header,
+.campaigns-workspace .campaign-actions-toolbar { background: #fff !important; }
+.campaigns-workspace .campaign-app-header { height: 56px !important; min-height: 56px !important; }
+.campaigns-workspace .campaign-table-frame { margin: 24px !important; border: 1px solid #e4e7ec !important; border-radius: 8px !important; background: #fff !important; }
+.campaigns-workspace .campaign-metric-header > th { height: 40px !important; padding-inline: 12px !important; background: #f7f8fa !important; color: #606770 !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr { height: 52px !important; background: #fff !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:hover { background: #f5f6f8 !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td { height: 52px !important; padding-inline: 12px !important; border-color: #e4e7ec !important; color: #1c1e21 !important; font-size: 14px !important; }
+.brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] :is(td, td *, th, th *) { color: #1c1e21 !important; }
+.brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] :is(.text-muted-foreground, .campaign-row-edit) { color: #606770 !important; }
+.brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] :is(td, th) { background: #fff !important; }
+.campaigns-workspace [data-campaign-totals-bar] { min-height: 48px !important; border-top: 1px solid #e4e7ec !important; background: #f7f8fa !important; }
+html:has(.traffic-page-shell[data-scroll-mode="locked"]),
+body:has(.traffic-page-shell[data-scroll-mode="locked"]) { overflow: hidden !important; }
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .growdash-main,
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .growdash-content-frame,
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .gd-page-transition { overflow: hidden !important; }
+.brand-shell:has(.traffic-page-shell[data-scroll-mode="content"]) .growdash-main { overflow-x: hidden !important; overflow-y: auto !important; }
+
+html.dark body .brand-shell:has(.traffic-page-shell),
+html.dark body .brand-shell:has(.traffic-page-shell) .analytics-module,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-shell,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-main,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-frame,
+html.dark body .brand-shell:has(.traffic-page-shell) .gd-page-transition,
+html.dark body .brand-shell:has(.traffic-page-shell) .traffic-page-shell,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace {
+  background: #f2f4f7 !important;
+  background-image: none !important;
+}
+
+.campaigns-workspace .campaign-account-pill,
+.campaigns-workspace .campaign-account-pill > *,
+.campaigns-workspace .campaign-account-pill .gd-account-count,
+.campaigns-workspace .campaign-opportunity-pill,
+.campaigns-workspace .campaign-opportunity-pill > *,
+.campaigns-workspace .campaign-date-pill,
+.campaigns-workspace .campaign-date-pill > *,
+.campaigns-workspace .campaign-header-icon,
+.campaigns-workspace .campaign-header-icon > * {
+  background-color: #fff !important;
+  color: #1c1e21 !important;
+}
+
+@media (min-width: 768px) {
+  .campaigns-workspace .campaign-account-pill {
+    width: 190px !important;
+    min-width: 190px !important;
+    max-width: 210px !important;
+  }
+
+  .campaigns-workspace .campaign-opportunity-pill {
+    width: 190px !important;
+    max-width: 190px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+  }
+
+  .campaigns-workspace .campaign-opportunity-pill > span:not(.campaign-opportunity-score) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .campaigns-workspace .campaign-date-pill {
+    width: 240px !important;
+    max-width: 240px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+  }
+
+  .campaigns-workspace .campaign-publish-button {
+    min-width: 142px !important;
+    padding-inline: 10px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+  }
+}
+
+.campaigns-workspace .campaign-date-pill,
+.campaigns-workspace .campaign-date-pill * {
+  background-color: #fff !important;
+  color: #1c1e21 !important;
+  background-image: none !important;
+}
+
+/* The application keeps the dark theme active globally.  Campanhas is a
+   light Meta-style surface, so descendants that carry the global dark
+   utility classes must be explicitly scoped back to this workspace. */
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill *,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-date-pill,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-date-pill *,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-search-input,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-action-select,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-actions-toolbar [role="combobox"] {
+  background-color: #fff !important;
+  color: #1c1e21 !important;
+  background-image: none !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-account-pill .gd-account-count {
+  border-color: #e4e7ec !important;
+  background-color: #f7f8fa !important;
+  color: #1c1e21 !important;
+}
+
+.campaigns-workspace .campaign-scope-action,
+.campaigns-workspace .campaign-scope-action > *,
+.campaigns-workspace .meta-toolbar-button,
+.campaigns-workspace .meta-toolbar-button > *,
+.campaigns-workspace .campaign-action-select,
+.campaigns-workspace .campaign-action-select > * {
+  background-color: #fff !important;
+  color: #1c1e21 !important;
+}
+
+.campaigns-workspace .meta-toolbar-button-active,
+.campaigns-workspace .meta-toolbar-button-active > * {
+  color: #0866ff !important;
+}
+
+.campaigns-workspace .campaign-search-input {
+  background: #fff !important;
+  color: #1c1e21 !important;
+}
+
+.campaigns-workspace .campaign-search-input::placeholder {
+  color: #8a8d91 !important;
+  opacity: 1 !important;
+}
+
+.campaigns-workspace .campaign-check-head,
+.campaigns-workspace .campaign-name-cell,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td.sticky {
+  background: #fff !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.sticky,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-name-cell,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-check-head {
+  background: #fff !important;
+  color: #1c1e21 !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:hover > td {
+  background: #f5f6f8 !important;
+}
+
+.campaigns-workspace .campaign-name-cell,
+.campaigns-workspace .campaign-name-cell .text-foreground,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td {
+  color: #1c1e21 !important;
+}
+
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td .text-muted-foreground {
+  color: #606770 !important;
+}
+
+.campaigns-workspace .campaign-metric-header > th,
+.campaigns-workspace .campaign-metric-header > th > * {
+  background: #f7f8fa !important;
+  color: #606770 !important;
+}
+
+@media (max-width: 767px) {
+  .brand-shell:has(.traffic-page-shell) .growdash-content-shell { padding-left: 0 !important; }
+  .brand-shell:has(.traffic-page-shell) .growdash-main { height: calc(100dvh - 48px) !important; max-height: calc(100dvh - 48px) !important; }
+  .brand-shell:has(.traffic-page-shell) .traffic-page-content { width: 100% !important; margin-left: 0 !important; padding-bottom: 68px !important; }
+  .brand-shell:has(.traffic-page-shell) .traffic-nav-rail { inset: auto 12px calc(12px + env(safe-area-inset-bottom)) 12px !important; width: auto !important; min-width: 0 !important; height: 56px !important; max-height: 56px !important; border: 1px solid #e4e7ec !important; border-radius: 12px !important; }
+  .brand-shell:has(.traffic-page-shell) .traffic-nav-items { flex-direction: row !important; gap: 8px !important; padding: 8px !important; overflow-x: auto !important; }
+  .brand-shell:has(.traffic-page-shell) .traffic-nav-item { flex: 0 0 40px !important; }
+  .campaigns-workspace .campaign-app-header { height: auto !important; min-height: 56px !important; flex-wrap: wrap !important; padding: 12px !important; }
+  .campaigns-workspace .campaign-filters-row { height: auto !important; min-height: 56px !important; flex-wrap: wrap !important; padding: 12px !important; }
+  .campaigns-workspace .campaign-scope-toolbar { width: 100% !important; order: 1 !important; }
+  .campaigns-workspace .campaign-search-wrap { width: 100% !important; max-width: none !important; margin-left: 0 !important; order: 2 !important; }
+  .campaigns-workspace .campaign-table-frame { margin: 12px !important; }
 }
