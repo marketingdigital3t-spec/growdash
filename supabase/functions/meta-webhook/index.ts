@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -180,6 +181,7 @@ Deno.serve(async (req) => {
     let inserted = 0;
     let processed = 0;
     const errors: string[] = [];
+    const rdTracking: unknown[] = [];
     for (const event of events) {
       const eventPayload = JSON.stringify(event.payload);
       const value = event.payload?.value ?? {};
@@ -228,6 +230,11 @@ Deno.serve(async (req) => {
           }, { onConflict: "meta_lead_id" });
           if (leadError) throw leadError;
           processed++;
+          // The webhook is the real-time handoff: after the Growdash mirror is
+          // committed, attempt the governed write/readback on the matching RD
+          // negotiation. If RD is not linked or writes are disabled, the lead
+          // remains safely stored and the next RD webhook can retry it.
+          rdTracking.push(await syncMetaLeadToRD(admin, String(lead.id ?? leadId)));
           await admin.from("meta_webhook_events").update({ processed_at: new Date().toISOString(), error_message: null }).eq("id", data.id);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -236,7 +243,7 @@ Deno.serve(async (req) => {
         }
       }
     }
-    return json({ ok: true, received: events.length, inserted, processed, duplicate: events.length - inserted, errors }, 200);
+    return json({ ok: true, received: events.length, inserted, processed, duplicate: events.length - inserted, errors, rd_tracking: rdTracking }, 200);
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Falha ao processar webhook Meta" }, 500);
   }

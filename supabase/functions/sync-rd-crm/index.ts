@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { buildRDDealNote, isNoteAutomationFunnel } from "../_shared/rdDealNote.ts";
+import { syncRDDealToMeta } from "../_shared/metaLeadRdSync.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 
 const corsHeaders = {
@@ -127,12 +128,16 @@ Deno.serve(async (req) => {
       await admin.from("rd_account_connections").update({ last_error: message, updated_at: new Date().toISOString() }).eq("id", connection.id);
       return json({ error: message, partial: true, result }, 502);
     }
+    // The opposite ordering is also supported: if RD creates the negotiation
+    // after Meta has already stored the lead, enrich the real RD negotiation
+    // immediately instead of waiting for a later manual sync.
+    const rdTracking = await syncRDDealToMeta(admin, connection.id, String(dealId));
     await admin.from("rd_account_connections").update({ last_success_at: new Date().toISOString(), last_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id);
     let note: { status: string; error?: string } | undefined;
-    if (eventName === "crm_deal_created" && isNoteAutomationFunnel(funnel.name)) {
+    if (eventName === "crm_deal_created" && isNoteAutomationFunnel(funnel.name) && rdTracking.status === "skipped" && rdTracking.reason === "meta_lead_not_found") {
       note = await publishCreationNote(admin, connection, funnel, String(dealId));
     }
-    return json({ ok: true, event: eventName, funnel_id: funnel.id, result, note });
+    return json({ ok: true, event: eventName, funnel_id: funnel.id, result, rd_tracking: rdTracking, note });
   } catch (error) {
     console.error("sync-rd-crm", error);
     return json({ error: error instanceof Error ? error.message : "Internal error" }, 500);
