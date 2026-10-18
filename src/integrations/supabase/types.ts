@@ -39,6 +39,58 @@ export type Database = {
   }
   public: {
     Tables: {
+      platform_performance_events: {
+        Row: {
+          created_at: string
+          duration_ms: number
+          id: string
+          metadata: Json
+          metric_name: string
+          route: string
+          status: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_ms: number
+          id?: string
+          metadata?: Json
+          metric_name: string
+          route: string
+          status?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number
+          id?: string
+          metadata?: Json
+          metric_name?: string
+          route?: string
+          status?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_performance_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedSchema: "auth"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_performance_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_balance_events: {
         Row: {
           ad_account_id: string

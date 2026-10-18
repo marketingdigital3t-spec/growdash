@@ -16,6 +16,7 @@ import { MetaValidationCard } from "@/components/data-health/MetaValidationCard"
 import { MetaLeadsReconciliationCard } from "@/components/data-health/MetaLeadsReconciliationCard";
 import { SyncAuditCard } from "@/components/data-health/SyncAuditCard";
 import { Inbox } from "lucide-react";
+import { PlatformPerformanceCard } from "@/components/data-health/PlatformPerformanceCard";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
 
@@ -144,7 +145,7 @@ function useOperationalAudit(adAccountId: string, startDate: Date, endDate: Date
 }
 
 export default function DataHealth() {
-  const { adAccountId, adAccountIds, startDate, endDate } = useGlobalFilters();
+  const { adAccountId, adAccountIds, startDate, endDate, workspaceId } = useGlobalFilters();
   const { data, isLoading, refetch } = useHealth();
   const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, startDate, endDate);
   const [enriching, setEnriching] = useState(false);
@@ -240,6 +241,8 @@ export default function DataHealth() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarRange className="h-4 w-4 text-primary" />{formatSafeDate(startDate, "dd/MM/yyyy")} — {formatSafeDate(endDate, "dd/MM/yyyy")}</div>
         </CardContent>
       </Card>
+
+      <PlatformPerformanceCard workspaceId={workspaceId} />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Auditoria operacional por conta e período</CardTitle></CardHeader>

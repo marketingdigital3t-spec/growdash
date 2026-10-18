@@ -43,6 +43,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { SpaceMissionStrip, type SpacePhase } from "@/components/space/SpacePhaseBackground";
 import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 import { AgentChatDock } from "@/components/agents/AgentChatDock";
+import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
 
 const SIDEBAR_STORAGE_KEY = "growdash:sidebar-collapsed";
 const SIDEBAR_SECTIONS_STORAGE_KEY = "growdash:sidebar-sections";
@@ -146,9 +147,11 @@ export default function GrowdashLayout() {
     setAdAccountId,
     segment,
     businessUnitId,
+    workspaceId,
     startDate,
     endDate,
   } = useGlobalFilters();
+  usePerformanceMonitor(workspaceId);
   const visibleAccounts = useMemo(
     () => businessUnitId
       ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
