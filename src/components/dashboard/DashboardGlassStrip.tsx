@@ -45,13 +45,13 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
   ];
 
   return <section className="dashboard-summary-strip sticky top-[calc(88px+env(safe-area-inset-top))] z-20 min-w-0 lg:top-[49px]" aria-label="Resumo fixo do Dashboard">
-    <div className="dashboard-summary-strip-surface overflow-visible">
+      <div className="dashboard-summary-strip-surface overflow-visible">
       <button type="button" onClick={() => setCollapsed((value) => !value)} className="flex min-h-11 w-full items-center gap-2 px-3 text-left md:hidden" aria-expanded={!compact}><span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary"><BarChart3 className="h-4 w-4" /></span><span className="min-w-0 grow truncate text-xs font-black">Resumo da operação</span><span className="text-[10px] text-muted-foreground">{brl.format(revenue)} · {roas.toFixed(2)}x</span><ChevronDown className={cn("h-4 w-4 shrink-0 transition", !compact && "rotate-180")} /></button>
       {!compact && <>
-        <div className="dashboard-glass-metrics grid min-w-0 grid-cols-2 gap-3 border-t border-border/40 bg-transparent p-3 md:grid-cols-2 md:border-t-0 xl:grid-cols-4">
+        <div className="dashboard-glass-metrics grid min-w-0 grid-cols-2 gap-3 border-t border-border/40 bg-transparent p-3 md:grid-cols-4 md:border-t-0 xl:grid-cols-8">
           {metrics.map((metric) => {
             const isLeads = metric.label === "Leads" && leadsBreakdown;
-            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[10px] [&_svg]:h-3.5 [&_svg]:w-3.5", metric.tone === "good" && "is-good", metric.tone === "negative" && "is-negative")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="break-words text-[6.5px] font-black uppercase leading-tight tracking-[.035em] text-muted-foreground" title={metric.label}>{metric.label}</p><p className={cn("mt-1 min-w-0 break-words text-[clamp(.68rem,1.25vw,.78rem)] font-black leading-tight tabular-nums", metric.tone === "good" && "text-emerald-600 dark:text-emerald-400", metric.tone === "negative" && "text-red-600 dark:text-red-400")} title={metric.value}>{metric.value}</p></div></>;
+            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[var(--gd-radius-control)] [&_svg]:h-4 [&_svg]:w-4", metric.tone === "good" && "is-good", metric.tone === "negative" && "is-negative")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="gd-label break-words text-muted-foreground" title={metric.label}>{metric.label}</p><p className={cn("mt-1 min-w-0 break-words text-[22px] font-bold leading-tight tabular-nums", metric.tone === "good" && "text-emerald-600 dark:text-emerald-400", metric.tone === "negative" && "text-red-600 dark:text-red-400")} title={metric.value}>{metric.value}</p></div></>;
             const className = cn(
               "gd-glass-metric group flex min-h-[72px] min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-left",
               isLeads && "gd-glass-metric-leads",

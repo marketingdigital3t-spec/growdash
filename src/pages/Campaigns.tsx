@@ -1115,7 +1115,7 @@ export default function Campaigns() {
 
           <div className="campaign-actions-toolbar growdash-scrollbar-hidden flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">
             <div className="campaign-primary-actions flex shrink-0 items-center gap-2">
-              <Button size="sm" className="campaign-action-button h-8 gap-2 bg-emerald-700 px-3 text-[11px] font-black text-white hover:bg-emerald-600" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
+              <Button size="sm" className="campaign-action-button gd-primary-action h-8 gap-2 px-3 text-[11px] font-black text-white" onClick={() => setCreateCampaignOpen(true)}><Plus className="h-3.5 w-3.5" />Criar</Button>
               <Button variant="outline" size="sm" className="campaign-action-button meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDuplicatingCampaign({ id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })}><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
               <Button variant="outline" size="sm" className="campaign-action-button meta-toolbar-button" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })}><Pencil className="h-3.5 w-3.5" />Editar</Button>
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="campaign-action-select h-8 w-full bg-background sm:w-[160px]"><SelectValue placeholder="Todos os status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="ACTIVE">Ativa</SelectItem><SelectItem value="PAUSED">Pausada</SelectItem><SelectItem value="ARCHIVED">Arquivada</SelectItem><SelectItem value="IN_PROCESS">Em análise</SelectItem></SelectContent></Select>
@@ -1297,7 +1297,7 @@ export default function Campaigns() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {visibleCampaigns.map((c: any, rowIndex: number) => {
+                      {visibleCampaigns.length === 0 ? <TableRow><TableCell colSpan={Math.max(3, visibleColumns.size + 4)} className="h-52 text-center"><LevelEmpty level="campanhas" selected={selectedIds.size > 0 || Boolean(search.trim())} onClear={() => { setSelectedIds(new Set()); setSearch(""); }} /></TableCell></TableRow> : visibleCampaigns.map((c: any, rowIndex: number) => {
                           const stickySurface = selectedIds.has(c.id) ? "bg-muted dark:bg-[#202020]" : rowIndex % 2 ? "bg-muted dark:bg-[#0c0c0b]" : "bg-card dark:bg-[#070706]";
                           return (
                           <tr

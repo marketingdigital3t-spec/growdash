@@ -11081,7 +11081,7 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-icon { color: #16a34a !important; }
 .brand-shell .gd-funnel-analysis .gd-aligned-grid { gap: 16px !important; }
 @media (min-width: 1280px) {
-  .brand-shell .dashboard-page .dashboard-glass-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  .brand-shell .dashboard-page .dashboard-glass-metrics { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; }
   .brand-shell .gd-funnel-analysis .gd-funnel-kpi-grid { gap: 16px !important; }
 }
 @media (max-width: 767px) {
@@ -11091,4 +11091,70 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   .brand-shell .gd-funnel-analysis .gd-funnel-filter-strip.gd-filter-strip { align-items: stretch !important; padding: 12px !important; }
   .brand-shell .gd-funnel-analysis .gd-funnel-kpi { min-height: 116px !important; }
   .brand-shell .gd-funnel-analysis .gd-funnel-kpi-content { padding: 12px !important; }
+}
+
+/* Fase 3 — autoridade visual para o grupo comercial prioritário. */
+.gd-primary-action {
+  border-color: transparent !important;
+  background: linear-gradient(135deg, #8e44ff 0%, #c084fc 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgb(142 68 255 / 24%);
+  transition: transform 180ms cubic-bezier(.4, 0, .2, 1), box-shadow 180ms cubic-bezier(.4, 0, .2, 1), filter 180ms cubic-bezier(.4, 0, .2, 1);
+}
+.gd-primary-action:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 4px 16px rgb(142 68 255 / 32%); transform: translateY(-1px); }
+.gd-primary-action:active:not(:disabled) { transform: translateY(0); }
+.gd-primary-action:focus-visible { outline: 2px solid #c084fc; outline-offset: 2px; }
+.brand-shell .dashboard-page { gap: var(--gd-space-6) !important; }
+.brand-shell .dashboard-page > div:first-of-type > div { align-items: center; gap: var(--gd-space-4); }
+.brand-shell .dashboard-page .dashboard-summary-strip-surface {
+  border: 1px solid hsl(var(--gd-content-border)) !important;
+  border-radius: var(--gd-radius-card) !important;
+  box-shadow: var(--gd-elevation-1) !important;
+}
+.brand-shell .dashboard-page .dashboard-glass-metrics { gap: var(--gd-space-4) !important; padding: var(--gd-space-4) !important; }
+.brand-shell .dashboard-page .gd-glass-metric {
+  min-height: 88px !important;
+  border-radius: var(--gd-radius-card) !important;
+  padding: var(--gd-space-4) !important;
+  transition: transform 180ms cubic-bezier(.4, 0, .2, 1), box-shadow 180ms cubic-bezier(.4, 0, .2, 1), border-color 180ms cubic-bezier(.4, 0, .2, 1);
+}
+.brand-shell .dashboard-page .gd-glass-metric:hover { transform: translateY(-1px); box-shadow: var(--gd-elevation-1); }
+.brand-shell .dashboard-page .gd-glass-metric p.gd-label { font-size: var(--gd-font-label) !important; line-height: var(--gd-line-title) !important; letter-spacing: .06em !important; }
+.brand-shell .dashboard-page .gd-glass-metric p:not(.gd-label) { font-size: var(--gd-font-subtitle) !important; line-height: var(--gd-line-title) !important; }
+
+.campaigns-workspace .campaign-manager-top,
+.campaigns-workspace .campaign-table-frame { border-radius: var(--gd-radius-card) !important; }
+.campaigns-workspace .campaign-manager-top { overflow: hidden; box-shadow: var(--gd-elevation-1); }
+.campaigns-workspace .campaign-app-header,
+.campaigns-workspace .campaign-filters-row,
+.campaigns-workspace .campaign-tabs-header,
+.campaigns-workspace .campaign-actions-toolbar { gap: var(--gd-space-4) !important; }
+.campaigns-workspace .campaign-filters-row { min-height: 56px; }
+.campaigns-workspace .campaign-hierarchy-tab { min-height: 44px !important; }
+.campaigns-workspace .campaign-action-button,
+.campaigns-workspace .campaign-action-select,
+.campaigns-workspace .campaign-columns-control > button { min-height: 40px !important; border-radius: var(--gd-radius-control) !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr { height: 48px !important; }
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td { height: 48px !important; }
+.campaigns-workspace [data-campaign-totals-bar] { min-height: 48px !important; }
+.campaigns-workspace .campaign-total-bar { min-height: 48px !important; }
+
+@media (max-width: 1279px) {
+  .brand-shell .dashboard-page .dashboard-glass-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 767px) {
+  .brand-shell .dashboard-page { padding-inline: var(--gd-space-4) !important; }
+  .brand-shell .dashboard-page .dashboard-glass-metrics { gap: var(--gd-space-3) !important; padding: var(--gd-space-3) !important; }
+  .brand-shell .dashboard-page .gd-glass-metric { min-height: 80px !important; padding: var(--gd-space-3) !important; }
+  .brand-shell .dashboard-page .gd-glass-metric p:not(.gd-label) { font-size: var(--gd-font-h3) !important; }
+  .campaigns-workspace { padding: var(--gd-space-3) !important; }
+  .campaigns-workspace .campaign-table-frame { margin: 0 !important; }
+  .campaigns-workspace .campaign-app-header { gap: var(--gd-space-3) !important; }
+  .campaigns-workspace .campaign-action-button,
+  .campaigns-workspace .campaign-action-select { min-height: 44px !important; }
+}
+@media (max-width: 479px) {
+  .brand-shell .dashboard-page .dashboard-glass-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .brand-shell .dashboard-page .gd-glass-metric { gap: var(--gd-space-2) !important; }
+  .brand-shell .dashboard-page .gd-glass-metric-icon { width: 32px !important; height: 32px !important; }
 }
