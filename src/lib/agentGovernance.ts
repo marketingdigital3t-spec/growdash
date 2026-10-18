@@ -1,4 +1,4 @@
-export const AGENT_OFFICE_ROLES = ["ceo", "marketing", "commercial", "finance", "legal", "backend_security", "backend_meta_rd", "frontend", "designer"] as const;
+export const AGENT_OFFICE_ROLES = ["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist", "backend_security", "backend_meta_rd", "frontend"] as const;
 export type AgentOfficeRole = typeof AGENT_OFFICE_ROLES[number];
 
 export type AgentDepartment = AgentOfficeRole;

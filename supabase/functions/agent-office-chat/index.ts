@@ -3,16 +3,29 @@ import { findMetaSyncCoverage, type MetaSyncCoverageRow } from "../../../src/lib
 import { canonicalMetaLeadValue, canonicalMetaLeads, META_LEAD_ACTION_TYPES } from "../_shared/metaLeadMetrics.ts";
 import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
+import { isWonRDStageName } from "../../../src/lib/rdDealStatus.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-const DIRECTOR_ROLES = new Set(["ceo", "marketing", "commercial", "finance", "legal"]);
+const DIRECTOR_ROLES = new Set(["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist"]);
 
 function dateKey(value: unknown) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function inBusinessPeriod(value: unknown, startDate: string | null, endDate: string | null) {
+  if (!startDate || !endDate || typeof value !== "string") return true;
+  const timestamp = new Date(value).getTime();
+  const start = new Date(`${startDate}T00:00:00-03:00`).getTime();
+  const end = new Date(`${endDate}T23:59:59.999-03:00`).getTime();
+  return Number.isFinite(timestamp) && timestamp >= start && timestamp <= end;
+}
+
+function isCanonicalWonDeal(deal: { win?: boolean | null; rd_stage_name?: string | null }) {
+  return String(deal.rd_stage_name || "").trim() ? isWonRDStageName(deal.rd_stage_name) : deal.win === true;
 }
 
 async function authenticate(req: Request, url: string, serviceKey: string) {
@@ -183,6 +196,78 @@ Deno.serve(async (req) => {
       tracking_rows: (crmLeads || []).filter((lead) => lead.utm_source || lead.utm_campaign).length,
       period: { start_date: startDate, end_date: endDate },
     };
+    // RD and sales are loaded in the same account/funnel scope as the Meta
+    // facts above. This keeps seller ranking and revenue grounded in the
+    // canonical CRM materialization instead of a client-side placeholder.
+    const rdDealRows: any[] = [];
+    if (accountIds.length) {
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await admin.from("rd_deals")
+          .select("rd_deal_id,rd_connection_id,ad_account_id,rd_funnel_id,rd_stage_name,win,amount_total,amount_total_effective,deal_owner_name,lead_created_at,closed_at,stage_updated_at,updated_at")
+          .eq("user_id", user.id).in("ad_account_id", accountIds).range(offset, offset + 999);
+        if (error) throw error;
+        rdDealRows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+    }
+    const scopedDeals = rdDealRows.filter((deal) => {
+      const directAccountMatch = accountIds.includes(deal.ad_account_id);
+      const funnelMatch = funnelIds.includes(deal.rd_funnel_id);
+      const scopeMatch = funnelIds.length
+        ? (deal.rd_funnel_id ? funnelMatch && directAccountMatch : directAccountMatch)
+        : directAccountMatch;
+      if (!scopeMatch) return false;
+      const dateValue = isCanonicalWonDeal(deal) ? (deal.closed_at || deal.stage_updated_at) : deal.lead_created_at;
+      return inBusinessPeriod(dateValue, startDate, endDate);
+    });
+    const uniqueDeals = Array.from(new Map(scopedDeals.filter((deal) => deal.rd_deal_id).map((deal) => [`${deal.rd_connection_id || deal.ad_account_id}:${deal.rd_deal_id}`, deal])).values());
+    const saleRows: any[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      let query = admin.from("sales").select("id,ad_account_id,rd_funnel_id,rd_deal_id,status,quantity,net_revenue,sale_date,source_provider,source_record_id,updated_at").eq("user_id", user.id);
+      if (startDate) query = query.gte("sale_date", startDate);
+      if (endDate) query = query.lte("sale_date", endDate);
+      const { data, error } = await query.range(offset, offset + 999);
+      if (error) throw error;
+      saleRows.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    const scopedSales = saleRows.filter((sale) => {
+      const directAccountMatch = Boolean(sale.ad_account_id && accountIds.includes(sale.ad_account_id));
+      const funnelMatch = Boolean(sale.rd_funnel_id && funnelIds.includes(sale.rd_funnel_id));
+      return funnelIds.length ? (sale.rd_funnel_id ? funnelMatch && (!sale.ad_account_id || directAccountMatch) : directAccountMatch) : directAccountMatch;
+    });
+    const uniqueSales = Array.from(new Map(scopedSales.map((sale) => [sale.source_provider && sale.source_record_id ? `${sale.source_provider}:${sale.source_record_id}` : sale.id, sale])).values());
+    const dealByProviderId = new Map(uniqueDeals.map((deal) => [deal.rd_deal_id, deal]));
+    const sellerMap = new Map<string, { sales: number; revenue: number }>();
+    uniqueSales.filter((sale) => String(sale.status).toLowerCase() === "confirmed").forEach((sale) => {
+      const seller = dealByProviderId.get(sale.rd_deal_id)?.deal_owner_name || "Sem responsável";
+      const current = sellerMap.get(seller) || { sales: 0, revenue: 0 };
+      current.sales += Number(sale.quantity || 1);
+      current.revenue += Number(sale.net_revenue || 0);
+      sellerMap.set(seller, current);
+    });
+    const sellerRanking = [...sellerMap.entries()]
+      .map(([seller, values]) => ({ seller, ...values }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 20);
+    const confirmedSales = uniqueSales.filter((sale) => String(sale.status).toLowerCase() === "confirmed");
+    const rdFacts = {
+      source: "RD Station deals",
+      status: "confirmed",
+      rows: uniqueDeals.length,
+      won_deals: uniqueDeals.filter(isCanonicalWonDeal).length,
+      pipeline: uniqueDeals.reduce((sum, deal) => sum + Number(deal.amount_total_effective ?? deal.amount_total ?? 0), 0),
+      period: { start_date: startDate, end_date: endDate },
+    };
+    const salesFacts = {
+      source: "Growdash sales canonical",
+      status: "confirmed",
+      rows: confirmedSales.length,
+      quantity: confirmedSales.reduce((sum, sale) => sum + Number(sale.quantity || 1), 0),
+      revenue: confirmedSales.reduce((sum, sale) => sum + Number(sale.net_revenue || 0), 0),
+      seller_ranking: sellerRanking,
+      period: { start_date: startDate, end_date: endDate },
+    };
     const factsForModel = {
       spend: insightsConfirmed ? facts.spend : null,
       impressions: insightsConfirmed ? facts.impressions : null,
@@ -196,14 +281,19 @@ Deno.serve(async (req) => {
       attribution_window_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.attribution_window || "account_default"])),
       timezone_by_account: Object.fromEntries((accounts || []).map((account) => [account.id, account.timezone_name || "America/Sao_Paulo"])),
       crm_leads: crmLeadFacts,
+      rd_deals: rdFacts,
+      sales: salesFacts,
     };
     const sourceNote = [
       { type: "meta", reference: "insights", label: insightsConfirmed ? `${facts.rows} linhas confirmadas de entrega Meta` : "Insights Meta sem cobertura confirmada para todas as contas" },
       { type: "meta", reference: "insight_actions", label: leadActionSnapshotAvailable ? `${actionRowCount} linhas de ações Meta canônicas; cobertura confirmada` : "Ações de lead Meta indisponíveis neste recorte" },
       { type: "crm", reference: "crm_leads", label: `${crmLeadFacts.rows} leads do CRM próprio no período; rastreamento em ${crmLeadFacts.tracking_rows} registro(s)` },
+      { type: "rd", reference: "rd_deals", label: `${rdFacts.rows} negócios RD no período; ${rdFacts.won_deals} ganho(s)` },
+      { type: "sales", reference: "sales", label: `${salesFacts.rows} venda(s) confirmada(s); ${salesFacts.quantity} unidade(s) e R$ ${salesFacts.revenue.toFixed(2)}` },
     ];
     const scopeLabel = `${startDate || "período disponível"} a ${endDate || "hoje"}`;
-    const system = `Você é o agente ${agent.name} da Growdash, departamento ${agent.department || role}. Responda em português do Brasil. Escopo: ${scopeLabel}. Conta(s) Meta: ${accountIds.join(", ") || "nenhuma conta selecionada"}. Funil(is) RD: ${funnelIds.join(", ") || "não filtrado"}. Use somente os fatos fornecidos. Se insights_status for unavailable, diga que investimento e entrega Meta estão indisponíveis, não zero; se leads_status for unavailable, diga que Leads Meta e CPL estão indisponíveis, não zero. Nunca use leads legado. Diferencie Meta, RD e CRM próprio; não atribua dados de CRM à Meta. Nunca invente zero. O histórico da conversa é contexto de linguagem, nunca fonte factual. Você pode analisar e preparar recomendações, mas não promete executar alterações. Fatos recuperados: ${JSON.stringify(factsForModel)}.`;
+    const roleFocus: Record<string, string> = { ceo: "orquestre prioridades entre áreas", marketing: "analise mídia, criativos e aquisição", commercial: "analise pipeline, follow-up e conversão", finance: "analise receita, margem e caixa", legal: "analise permissões, riscos e conformidade", growth: "conecte metas, conversão, receita e alavancas de escala", designer: "analise mensagem, criativos e consistência visual", strategist: "transforme sinais em playbooks, automações e próximos passos" };
+    const system = `Você é o agente ${agent.name} da Growdash, departamento ${agent.department || role}; sua responsabilidade é ${roleFocus[role] || "analisar a operação"}. Responda em português do Brasil. Escopo: ${scopeLabel}. Conta(s) Meta: ${accountIds.join(", ") || "nenhuma conta selecionada"}. Funil(is) RD: ${funnelIds.join(", ") || "não filtrado"}. Use somente os fatos fornecidos. Se insights_status for unavailable, diga que investimento e entrega Meta estão indisponíveis, não zero; se leads_status for unavailable, diga que Leads Meta e CPL estão indisponíveis, não zero. Nunca use leads legado. Diferencie Meta, RD e CRM próprio; não atribua dados de CRM à Meta. Para vendas e ranking, use somente sales.revenue, sales.quantity e sales.seller_ranking; para negócios e pipeline, use rd_deals. Nunca invente zero. O histórico da conversa é contexto de linguagem, nunca fonte factual. Você pode analisar e preparar recomendações, mas não promete executar alterações. Fatos recuperados: ${JSON.stringify(factsForModel)}.`;
     const model = await callModel([{ role: "system", content: system }, ...((history.data || []).reverse() as Array<{ role: string; content: string }>), { role: "user", content: question }]);
     const userMessage = await admin.from("agent_office_messages").insert({ workspace_id: workspace.id, agent_id: agent.id, conversation_id: conversationId, role: "user", content: question, sources: [], scope: { accountIds, funnelIds, startDate, endDate } }).select("id").single();
     const agentMessage = await admin.from("agent_office_messages").insert({ workspace_id: workspace.id, agent_id: agent.id, conversation_id: conversationId, role: "agent", content: model.content, sources: sourceNote, scope: { accountIds, funnelIds, startDate, endDate } }).select("id,created_at").single();

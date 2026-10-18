@@ -35,17 +35,24 @@ function bucket() { return Math.floor(Date.now() / 900_000).toString(); }
 async function ensureAgents(workspace: { id: string; owner_id: string }) {
   const seed = [
     ["ceo", "CEO Orquestrador", { audit: true, dispatch: true, approve: false, deploy: false }],
+    ["marketing", "Gestor de Marketing", { audit: true, prepare: true, publish: false }],
+    ["commercial", "Diretor Comercial", { audit: true, prepare: true, send_messages: false }],
+    ["finance", "CFO", { audit: true, prepare: true, authorize_spend: false }],
+    ["legal", "Advogado", { audit: true, prepare: true, legal_advice: false }],
+    ["growth", "Helena · Chief of Staff", { audit: true, prepare: true, publish: false, cross_domain: true }],
+    ["strategist", "Júlia · Estrategista", { audit: true, prepare: true, publish: false }],
     ["backend_security", "Dev Backend Segurança", { audit: true, patch_backend: true, deploy: false }],
     ["backend_meta_rd", "Dev Backend Meta/RD", { audit: true, patch_backend: true, deploy: false }],
     ["frontend", "Dev Frontend", { audit: true, patch_frontend: true, deploy: false }],
-    ["designer", "Designer", { audit: true, proposal_only: true, deploy: false }],
+    ["designer", "Milo · Diretor Criativo", { audit: true, proposal_only: true, deploy: false }],
   ] as const;
   const { data, error: listError } = await admin.from("agent_office_agents").select("id,role").eq("workspace_id", workspace.id);
   if (listError) throw listError;
   const existing = new Set((data || []).map((row: { role: string }) => row.role));
   for (const [role, name, permissions] of seed) {
     if (existing.has(role)) continue;
-    const { error } = await admin.from("agent_office_agents").insert({ workspace_id: workspace.id, owner_id: workspace.owner_id, role, name, permissions, config: {} });
+    const isVisible = ["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist"].includes(role);
+    const { error } = await admin.from("agent_office_agents").insert({ workspace_id: workspace.id, owner_id: workspace.owner_id, role, name, is_visible: isVisible, permissions, config: {} });
     if (error) throw error;
   }
   const { data: agents, error: agentsError } = await admin.from("agent_office_agents").select("id,role,name").eq("workspace_id", workspace.id);

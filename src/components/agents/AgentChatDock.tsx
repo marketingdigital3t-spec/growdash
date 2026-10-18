@@ -7,10 +7,10 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { cn } from "@/lib/utils";
 import { businessDateKey } from "@/lib/businessDate";
 
-type DirectorRole = "ceo" | "marketing" | "commercial" | "finance" | "legal";
+type DirectorRole = "ceo" | "marketing" | "commercial" | "finance" | "legal" | "growth" | "designer" | "strategist";
 const FALLBACK = [
   ["ceo", "CEO · Chief of Staff"], ["marketing", "Gestor de Marketing"], ["commercial", "Diretor Comercial"],
-  ["finance", "CFO"], ["legal", "Advogado"],
+  ["finance", "CFO"], ["legal", "Advogado"], ["growth", "Helena · Growth"], ["designer", "Milo · Designer"], ["strategist", "Júlia · Estrategista"],
 ] as const;
 type ChatMessage = { id: string; role: "user" | "agent" | "system"; content: string; created_at?: string; sources?: Array<{ label: string }> };
 
@@ -33,13 +33,16 @@ export function AgentChatDock() {
     },
     staleTime: 60_000,
   });
-  const directors = useMemo(() => (agentsQuery.data?.length ? agentsQuery.data : FALLBACK.map(([agentRole, name]) => ({ id: agentRole, role: agentRole, name, runtime_status: "idle" }))), [agentsQuery.data]);
+  const directors = useMemo(() => {
+    const loaded = agentsQuery.data || [];
+    return FALLBACK.map(([agentRole, name]) => loaded.find((agent) => agent.role === agentRole) || ({ id: agentRole, role: agentRole, name, runtime_status: "idle" }));
+  }, [agentsQuery.data]);
   const active = directors.find((agent) => agent.role === role) || directors[0];
 
   useEffect(() => {
     const handleOpenAgentChat = (event: Event) => {
       const requestedRole = (event as CustomEvent<{ role?: string }>).detail?.role;
-      if (requestedRole && ["ceo", "marketing", "commercial", "finance", "legal"].includes(requestedRole)) setRole(requestedRole as DirectorRole);
+      if (requestedRole && ["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist"].includes(requestedRole)) setRole(requestedRole as DirectorRole);
       setOpen(true);
     };
     window.addEventListener("growdash:open-agent-chat", handleOpenAgentChat);
