@@ -10987,6 +10987,31 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) { overflow: hidden !imp
 .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .gd-page-transition { overflow: hidden !important; }
 .brand-shell:has(.traffic-page-shell[data-scroll-mode="content"]) .growdash-main { overflow-x: hidden !important; overflow-y: auto !important; }
 
+/* The campaign manager uses a light Meta-style surface even when the
+   surrounding shell keeps its dark navigation. Keep all hierarchy tabs
+   readable on that white strip; the global dark-theme contrast guard must
+   not turn inactive tabs white on white. */
+.campaigns-workspace .campaign-tabs-header .campaign-hierarchy-tab {
+  color: #667085 !important;
+  opacity: 1 !important;
+  background: transparent !important;
+  text-shadow: none !important;
+}
+.campaigns-workspace .campaign-tabs-header .campaign-hierarchy-tab:hover,
+.campaigns-workspace .campaign-tabs-header .campaign-hierarchy-tab:focus-visible {
+  color: #344054 !important;
+  background: #f2f4f7 !important;
+}
+.campaigns-workspace .campaign-tabs-header .campaign-hierarchy-tab[data-state="active"] {
+  color: #182230 !important;
+  background: #dbe5f3 !important;
+  box-shadow: inset 0 -2px #0866ff !important;
+}
+.campaigns-workspace .campaign-tabs-header .campaign-hierarchy-tab svg {
+  color: currentColor !important;
+  opacity: 1 !important;
+}
+
 html.dark body .brand-shell:has(.traffic-page-shell),
 html.dark body .brand-shell:has(.traffic-page-shell) .analytics-module,
 html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-shell,
