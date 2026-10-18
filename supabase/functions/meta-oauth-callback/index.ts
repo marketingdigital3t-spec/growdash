@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { hasMinimumMetaTokenLifetime, inspectMetaToken } from "../_shared/metaToken.ts";
+import { inspectMetaToken } from "../_shared/metaToken.ts";
 
 const resultPage = (status: "success" | "error", message: string, accounts = 0) => {
   const appUrl = (Deno.env.get("GROWDASH_APP_URL") ?? "https://growdash.com.br").replace(/\/$/, "");
@@ -135,10 +135,6 @@ Deno.serve(async (req) => {
     if (!tokenInspection.isValid) {
       return resultPage("error", tokenInspection.errorMessage || "A Meta não confirmou o novo token.");
     }
-    if (!hasMinimumMetaTokenLifetime(tokenInspection.expiresAt, 7, tokenInspection.dataAccessExpiresAt)) {
-      return resultPage("error", "A Meta devolveu um token com menos de 7 dias de validade. Nenhuma conta foi alterada; autorize novamente com um usuário Meta que tenha acesso às contas de anúncio.");
-    }
-
     // `/me/adaccounts` is the canonical endpoint. For Meta Login for
     // Business, some users only expose assets through their Business Manager;
     // use the business-owned and client-owned collections as a safe fallback.

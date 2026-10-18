@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { hasMinimumMetaTokenLifetime, inspectMetaToken } from "../_shared/metaToken.ts";
+import { inspectMetaToken } from "../_shared/metaToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -97,18 +97,6 @@ Deno.serve(async (req) => {
         updated_at: now,
       }).eq("id", account.id).eq("user_id", user.id);
       return json({ ok: false, account: { id: account.id, name: account.name }, error: errorMessage }, 409);
-    }
-
-    if (!hasMinimumMetaTokenLifetime(inspection.expiresAt, 7, inspection.dataAccessExpiresAt)) {
-      await admin.from("ad_accounts").update({
-        connection_status: "expired",
-        oauth_health_status: "expiring",
-        last_sync_error: "O token Meta tem menos de 7 dias de validade restante. Reconecte pelo OAuth.",
-        last_sync_error_code: 190,
-        last_sync_attempt_at: now,
-        updated_at: now,
-      }).eq("id", account.id).eq("user_id", user.id);
-      return json({ ok: false, account: { id: account.id, name: account.name }, error: "O token salvo tem menos de 7 dias restantes. Clique em Conectar / atualizar perfil Meta para autorizar um novo token." }, 409);
     }
 
     const returnedAccountId = `act_${String(meta.account_id ?? meta.id ?? "").replace(/^act_/i, "")}`;
