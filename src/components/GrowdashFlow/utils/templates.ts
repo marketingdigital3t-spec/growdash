@@ -8,7 +8,7 @@ const base = (type: DrawElement["type"], x: number, y: number, width: number, he
   createdAt: now(), updatedAt: now(), ...patch,
 });
 
-const fitTemplateText = (elements: DrawElement[]) => elements.map((element) => element.type === "text"
+const fitTemplateText = (elements: DrawElement[]) => elements.map((element) => element.type === "text" && element.autoSize !== false
   ? fitTextElementToContent({ ...element, autoSize: true })
   : element);
 
@@ -58,26 +58,93 @@ const sqlStages: SqlStage[] = [
 export function createSqlTrafficFunnelTemplate(): DrawElement[] {
   const elements: DrawElement[] = [];
   const stageX = [70, 390, 710, 1030];
-  elements.push(base("text", 70, 30, 1180, 42, 4, { text: "FUNIL DE TRÁFEGO PAGO — QUALIFICAÇÃO MQL / SQL", strokeColor: "#f5f5f5", fontSize: 26, fontFamily: "Inter" }));
-  elements.push(base("text", 70, 75, 1180, 28, 4, { text: "Advantage+ · público amplo · avanço por intenção e comportamento", strokeColor: "#b8b8b8", fontSize: 15, fontFamily: "Inter" }));
+  // Reserve a clear header band so the board title never competes with the
+  // stage headers below it. Explicitly sized text stays on one line and is
+  // not collapsed by the content-fit pass used by regular labels.
+  elements.push(base("rectangle", 70, 20, 1220, 104, 0, { fillColor: "#0d1118", strokeColor: "#2c384a", strokeWidth: 1 }));
+  elements.push(base("text", 92, 34, 320, 18, 4, { text: "QUALIFICAÇÃO MQL / SQL", strokeColor: "#91b4ee", fontSize: 12, fontFamily: "Inter", autoSize: false }));
+  elements.push(base("text", 92, 55, 1140, 32, 4, { text: "FUNIL DE TRÁFEGO PAGO", strokeColor: "#f5f5f5", fontSize: 24, fontFamily: "Inter", autoSize: false }));
+  elements.push(base("text", 92, 92, 1140, 22, 4, { text: "Advantage+ · público amplo · avanço por intenção e comportamento", strokeColor: "#b8c2d1", fontSize: 14, fontFamily: "Inter", autoSize: false }));
 
   sqlStages.forEach((stage, index) => {
     const x = stageX[index];
-    elements.push(base("rectangle", x, 145, 260, 470, 1, { fillColor: "#0c0c0d", strokeColor: stage.color, strokeWidth: 2 }));
-    elements.push(base("rectangle", x + 18, 128, 224, 54, 3, { fillColor: stage.fill, strokeColor: stage.color, strokeWidth: 2 }));
-    elements.push(base("text", x + 30, 143, 200, 24, 4, { text: stage.title, strokeColor: "#f7f7f7", fontSize: 15, fontFamily: "Inter" }));
-    elements.push(base("text", x + 25, 208, 210, 55, 4, { text: stage.campaign, strokeColor: stage.color, fontSize: 18, fontFamily: "Inter" }));
-    elements.push(base("text", x + 25, 275, 210, 36, 4, { text: stage.budget, strokeColor: "#eeeeee", fontSize: 14, fontFamily: "Inter" }));
-    elements.push(base("sticky", x + 22, 338, 216, 88, 3, { text: `PÚBLICO\n${stage.audience}`, fillColor: stage.fill, strokeColor: stage.color, strokeWidth: 1, fontSize: 14, fontFamily: "Inter" }));
-    elements.push(base("sticky", x + 22, 442, 216, 72, 3, { text: stage.content, fillColor: "#151515", strokeColor: "#5b5b5b", strokeWidth: 1, fontSize: 14, fontFamily: "Inter" }));
-    elements.push(base("sticky", x + 22, 532, 216, 58, 3, { text: stage.exit, fillColor: "#1b1810", strokeColor: "#d7ae37", strokeWidth: 2, fontSize: 13, fontFamily: "Inter" }));
-    if (index < sqlStages.length - 1) elements.push(base("arrow", x + 262, 380, 54, 0, 2, { strokeColor: "#d7ae37", strokeWidth: 3 }));
+    elements.push(base("rectangle", x, 180, 260, 465, 1, { fillColor: "#0c0c0d", strokeColor: stage.color, strokeWidth: 2 }));
+    elements.push(base("rectangle", x + 18, 155, 224, 54, 3, { fillColor: stage.fill, strokeColor: stage.color, strokeWidth: 2 }));
+    elements.push(base("text", x + 30, 168, 200, 36, 4, { text: stage.title, strokeColor: "#f7f7f7", fontSize: 13, fontFamily: "Inter", autoSize: false }));
+    elements.push(base("text", x + 25, 238, 210, 48, 4, { text: stage.campaign, strokeColor: stage.color, fontSize: 17, fontFamily: "Inter", autoSize: false }));
+    elements.push(base("text", x + 25, 300, 210, 36, 4, { text: stage.budget, strokeColor: "#eeeeee", fontSize: 13, fontFamily: "Inter", autoSize: false }));
+    elements.push(base("sticky", x + 22, 354, 216, 78, 3, { text: `PÚBLICO\n${stage.audience}`, fillColor: stage.fill, strokeColor: stage.color, strokeWidth: 1, fontSize: 13, fontFamily: "Inter" }));
+    elements.push(base("sticky", x + 22, 448, 216, 66, 3, { text: stage.content, fillColor: "#151515", strokeColor: "#5b5b5b", strokeWidth: 1, fontSize: 13, fontFamily: "Inter" }));
+    elements.push(base("sticky", x + 22, 530, 216, 62, 3, { text: stage.exit, fillColor: "#1b1810", strokeColor: "#d7ae37", strokeWidth: 2, fontSize: 12, fontFamily: "Inter" }));
+    if (index < sqlStages.length - 1) elements.push(base("arrow", x + 262, 393, 54, 0, 2, { strokeColor: "#d7ae37", strokeWidth: 3 }));
   });
-  elements.push(base("rectangle", 70, 660, 1220, 82, 1, { fillColor: "#101010", strokeColor: "#d7ae37", strokeWidth: 2 }));
-  elements.push(base("text", 98, 680, 235, 25, 4, { text: "DISTRIBUIÇÃO DO BUDGET", strokeColor: "#f3f3f3", fontSize: 16, fontFamily: "Inter" }));
-  ["25–30%", "35–40%", "20–25%", "10–15%"].forEach((budget, index) => elements.push(base("text", 390 + index * 220, 683, 150, 28, 4, { text: budget, strokeColor: sqlStages[index].color, fontSize: 22, fontFamily: "Inter" })));
-  elements.push(base("sticky", 300, 775, 760, 70, 3, { text: "COMERCIAL — recebe SQL com consciência alta: viu 25% + viu 50% + respondeu procedimento, orçamento e prazo.", fillColor: "#102419", strokeColor: "#65d47b", strokeWidth: 2, fontSize: 16, fontFamily: "Inter" }));
+  elements.push(base("rectangle", 70, 680, 1220, 72, 1, { fillColor: "#101010", strokeColor: "#d7ae37", strokeWidth: 2 }));
+  elements.push(base("text", 98, 699, 235, 34, 4, { text: "DISTRIBUIÇÃO\nDO BUDGET", strokeColor: "#f3f3f3", fontSize: 14, fontFamily: "Inter", autoSize: false }));
+  ["25–30%", "35–40%", "20–25%", "10–15%"].forEach((budget, index) => elements.push(base("text", 390 + index * 220, 700, 150, 32, 4, { text: budget, strokeColor: sqlStages[index].color, fontSize: 19, fontFamily: "Inter", autoSize: false })));
+  elements.push(base("sticky", 300, 785, 760, 64, 3, { text: "COMERCIAL — recebe SQL com consciência alta: viu 25% + viu 50% + respondeu procedimento, orçamento e prazo.", fillColor: "#102419", strokeColor: "#65d47b", strokeWidth: 2, fontSize: 15, fontFamily: "Inter" }));
   return fitTemplateText(elements);
+}
+
+/**
+ * Brings older saved SQL boards in line with the current visual hierarchy.
+ * The migration is content-based so it keeps the user's element ids and copy
+ * while only correcting the stock template geometry.
+ */
+export function normalizeSqlTrafficFunnelElements(elements: DrawElement[]): DrawElement[] {
+  const title = elements.find((element) => element.type === "text" && element.text?.includes("FUNIL DE TRÁFEGO"));
+  const subtitle = elements.find((element) => element.type === "text" && element.text?.includes("Advantage+"));
+  if (!title || !subtitle) return elements;
+
+  const stageX = [70, 390, 710, 1030];
+  const stageByTitle = new Map(sqlStages.map((stage, index) => [stage.title, index]));
+  const stageIndexFor = (element: DrawElement) => {
+    const exact = stageX.findIndex((x) => Math.abs(element.x - x) < 8 || Math.abs(element.x - (x + 18)) < 8 || Math.abs(element.x - (x + 22)) < 8 || Math.abs(element.x - (x + 25)) < 8 || Math.abs(element.x - (x + 30)) < 8);
+    return exact >= 0 ? exact : null;
+  };
+  const hasHeaderBand = elements.some((element) => element.type === "rectangle" && element.x === 70 && element.y <= 24 && element.width >= 1200);
+  const normalized = elements.map((element) => {
+    if (element.id === title.id) return { ...element, x: 92, y: 55, width: 1140, height: 32, text: "FUNIL DE TRÁFEGO PAGO", fontSize: 24, autoSize: false };
+    if (element.id === subtitle.id) return { ...element, x: 92, y: 92, width: 1140, height: 22, fontSize: 14, autoSize: false };
+    if (element.type === "rectangle" && element.width === 260) return { ...element, y: 180, height: 465 };
+    if (element.type === "rectangle" && element.width === 224) return { ...element, y: 155, height: 54 };
+    if (element.type === "arrow") {
+      const index = stageX.findIndex((x) => Math.abs(element.x - (x + 262)) < 12);
+      return index >= 0 ? { ...element, y: 393 } : element;
+    }
+    if (element.type === "text") {
+      const stageTitleIndex = stageByTitle.get(element.text || "");
+      if (stageTitleIndex !== undefined) return { ...element, x: stageX[stageTitleIndex] + 30, y: 168, width: 200, height: 36, fontSize: 13, autoSize: false };
+      if (element.text?.startsWith("CAMPANHA")) {
+        const index = stageIndexFor(element);
+        return index === null ? element : { ...element, x: stageX[index] + 25, y: 238, width: 210, height: 48, fontSize: 17, autoSize: false };
+      }
+      if (element.text?.includes("budget")) {
+        const index = stageIndexFor(element);
+        return index === null ? element : { ...element, x: stageX[index] + 25, y: 300, width: 210, height: 36, fontSize: 13, autoSize: false };
+      }
+      if (element.text === "DISTRIBUIÇÃO DO BUDGET") return { ...element, x: 98, y: 699, width: 235, height: 34, fontSize: 14, autoSize: false };
+      if (["25–30%", "35–40%", "20–25%", "10–15%"].includes(element.text || "")) {
+        const index = ["25–30%", "35–40%", "20–25%", "10–15%"].indexOf(element.text || "");
+        return { ...element, x: 390 + index * 220, y: 700, width: 150, height: 32, fontSize: 19, autoSize: false };
+      }
+    }
+    if (element.type === "sticky") {
+      const index = stageIndexFor(element);
+      if (index !== null) {
+        if (element.text?.startsWith("PÚBLICO")) return { ...element, x: stageX[index] + 22, y: 354, width: 216, height: 78, fontSize: 13 };
+        if (element.text === sqlStages[index].content) return { ...element, x: stageX[index] + 22, y: 448, width: 216, height: 66, fontSize: 13 };
+        if (element.text === sqlStages[index].exit) return { ...element, x: stageX[index] + 22, y: 530, width: 216, height: 62, fontSize: 12 };
+      }
+      if (element.text?.startsWith("COMERCIAL")) return { ...element, x: 300, y: 785, width: 760, height: 64, fontSize: 15 };
+    }
+    return element;
+  });
+
+  if (!hasHeaderBand) {
+    normalized.push(base("rectangle", 70, 20, 1220, 104, 0, { fillColor: "#0d1118", strokeColor: "#2c384a", strokeWidth: 1 }));
+    normalized.push(base("text", 92, 34, 320, 18, 4, { text: "QUALIFICAÇÃO MQL / SQL", strokeColor: "#91b4ee", fontSize: 12, fontFamily: "Inter", autoSize: false }));
+  }
+  return normalized;
 }
 
 /** Adds operational exclusions and launch rules to the SQL traffic template. */

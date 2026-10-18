@@ -62,7 +62,7 @@ import {
 } from "@/components/ui/select";
 import { GrowdashFlowCanvas } from "@/components/GrowdashFlow/GrowdashFlowCanvas";
 import type { DrawElement, FlowData } from "@/components/GrowdashFlow/types";
-import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate } from "@/components/GrowdashFlow/utils/templates";
+import { createSqlTrafficDetailedTemplate, createSqlTrafficFunnelTemplate, normalizeSqlTrafficFunnelElements } from "@/components/GrowdashFlow/utils/templates";
 
 function FlowDataScopeSync() {
   const { adAccountIds, funnelIds, startDate, endDate } = useGlobalFilters();
@@ -1714,9 +1714,10 @@ function migrateToFreeCanvas(initialNodes: FunnelNode[], initialConnections: Fun
   const metadata = (initialConnections as unknown as Array<Record<string, any>>).find((connection) => connection.kind === "growdash-flow-view");
 
   if (alreadyModern) {
+    const normalizedElements = normalizeSqlTrafficFunnelElements(initialNodes as unknown as DrawElement[]);
     return {
       version: 1,
-      elements: initialNodes as unknown as DrawElement[],
+      elements: normalizedElements,
       zoom: Number(metadata?.zoom || 1),
       panOffset: metadata?.panOffset || { x: 0, y: 0 },
       showGrid: metadata?.showGrid ?? true,
