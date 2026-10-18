@@ -11911,3 +11911,395 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
     margin: 8px 0 0 !important;
   }
 }
+
+/* Growdash platform visual system ---------------------------------------
+   One final, route-agnostic contract for the authenticated product. Older
+   modules still carry legacy Terra/accent utilities, so this layer owns the
+   shared shell, canvas, controls and analytic surfaces. Campaign Manager has
+   its own Meta-style contract above and is intentionally excluded here. */
+.brand-shell {
+  --gd-ui-canvas: #f3f5f8;
+  --gd-ui-surface: #ffffff;
+  --gd-ui-surface-muted: #f7f8fa;
+  --gd-ui-border: #e1e6ec;
+  --gd-ui-border-strong: #cbd3dd;
+  --gd-ui-text: #182230;
+  --gd-ui-muted: #667385;
+  --gd-ui-primary: #0866ff;
+  --gd-ui-radius-card: 10px;
+  --gd-ui-radius-control: 6px;
+  --gd-ui-shadow-card: 0 1px 2px rgba(16, 24, 40, .04), 0 8px 24px rgba(16, 24, 40, .045);
+  --gd-ui-shadow-card-dark: 0 10px 28px rgba(0, 0, 0, .22);
+  --background: 216 25% 96%;
+  --foreground: 218 30% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 218 30% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 218 30% 14%;
+  --muted: 216 22% 94%;
+  --muted-foreground: 215 16% 42%;
+  --border: 214 22% 88%;
+  --input: 214 22% 84%;
+  --primary: 217 100% 52%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 217 100% 52%;
+  --radius: .5rem;
+}
+
+.dark .brand-shell {
+  --gd-ui-canvas: #111418;
+  --gd-ui-surface: #191d22;
+  --gd-ui-surface-muted: #20252c;
+  --gd-ui-border: #303741;
+  --gd-ui-border-strong: #46515f;
+  --gd-ui-text: #f4f7fa;
+  --gd-ui-muted: #aab4c0;
+  --gd-ui-shadow-card: var(--gd-ui-shadow-card-dark);
+  --background: 220 14% 9%;
+  --foreground: 216 33% 96%;
+  --card: 220 14% 12%;
+  --card-foreground: 216 33% 96%;
+  --popover: 220 14% 14%;
+  --popover-foreground: 216 33% 96%;
+  --muted: 220 14% 16%;
+  --muted-foreground: 215 14% 72%;
+  --border: 218 16% 23%;
+  --input: 218 16% 28%;
+  --primary: 217 100% 63%;
+  --primary-foreground: 220 20% 8%;
+  --ring: 217 100% 63%;
+}
+
+/* App chrome */
+.brand-shell .brand-sidebar,
+.brand-shell .brand-topbar,
+.brand-shell .brand-topbar.growdash-global-header {
+  background: #0b0d10 !important;
+  border-color: #252b33 !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .brand-sidebar {
+  box-shadow: 10px 0 28px rgba(0, 0, 0, .16) !important;
+}
+
+.brand-shell .brand-sidebar > div:first-child {
+  height: 72px !important;
+  border-bottom-color: #252b33 !important;
+}
+
+.brand-shell .brand-sidebar nav {
+  padding: 14px 12px !important;
+}
+
+.brand-shell .brand-sidebar nav > section {
+  margin-bottom: 16px !important;
+}
+
+.brand-shell .brand-sidebar nav > section > button {
+  height: 24px !important;
+  margin-bottom: 4px !important;
+  border-radius: 5px !important;
+  color: #7f8b99 !important;
+  font-size: 10px !important;
+  letter-spacing: .13em !important;
+}
+
+.brand-shell .brand-sidebar nav > section > button:hover {
+  background: #151a20 !important;
+  color: #cbd5e1 !important;
+}
+
+.brand-shell .brand-sidebar nav a {
+  height: 36px !important;
+  min-height: 36px !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  color: #aeb7c4 !important;
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+}
+
+.brand-shell .brand-sidebar nav a:hover {
+  background: #171c23 !important;
+  color: #f5f7fa !important;
+}
+
+.brand-shell .brand-sidebar nav a[aria-current="page"] {
+  border-color: #303945 !important;
+  background: #202732 !important;
+  color: #ffffff !important;
+  box-shadow: inset 2px 0 0 var(--gd-ui-primary) !important;
+}
+
+.brand-shell .brand-topbar {
+  min-height: 56px !important;
+  height: 56px !important;
+  padding: 8px 16px !important;
+}
+
+.brand-shell .brand-topbar :is(button, a) {
+  border-radius: 6px !important;
+}
+
+@media (max-width: 767px) {
+  .brand-shell .brand-topbar {
+    min-height: 50px !important;
+    height: auto !important;
+    padding: 8px 12px !important;
+  }
+
+  .brand-shell .brand-sidebar > div:first-child {
+    height: 64px !important;
+  }
+}
+
+/* Canvas and page rhythm */
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main {
+  background: var(--gd-ui-canvas) !important;
+  color: var(--gd-ui-text) !important;
+  padding: clamp(16px, 2vw, 28px) !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-content-frame {
+  width: 100% !important;
+  max-width: 1680px !important;
+  margin-inline: auto !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-page-transition > :where(:not(.life-sim-page)) {
+  width: 100% !important;
+  max-width: 1680px !important;
+  margin-inline: auto !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-module-shell, .dashboard-page, .expert-dashboard, .gd-funnel-analysis, .analytics-module, .crm-page, .commercial-page, .finance-page, .kanban-page) {
+  min-width: 0 !important;
+  color: var(--gd-ui-text) !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-page-heading {
+  align-items: flex-end !important;
+  gap: 18px !important;
+  margin-bottom: 20px !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-page-heading-eyebrow {
+  margin-bottom: 6px !important;
+  color: var(--gd-ui-primary) !important;
+  font-size: 10px !important;
+  letter-spacing: .16em !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-page-heading-title {
+  color: var(--gd-ui-text) !important;
+  font-size: clamp(1.45rem, 2.2vw, 2rem) !important;
+  line-height: 1.1 !important;
+  letter-spacing: -.035em !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-page-heading-description {
+  color: var(--gd-ui-muted) !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+/* Shared surfaces */
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar) {
+  border: 1px solid var(--gd-ui-border) !important;
+  border-radius: var(--gd-ui-radius-card) !important;
+  background: var(--gd-ui-surface) !important;
+  color: var(--gd-ui-text) !important;
+  box-shadow: var(--gd-ui-shadow-card) !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass)::before,
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass)::after {
+  display: none !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-metric-card {
+  min-height: 96px !important;
+  padding: 16px !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-metric-card-content {
+  min-height: 104px !important;
+  padding: 16px !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass) :is(h1, h2, h3, h4, h5, strong, b, label, td, th) {
+  color: var(--gd-ui-text) !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass) .text-muted-foreground,
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass) small {
+  color: var(--gd-ui-muted) !important;
+}
+
+/* Filters, buttons and fields */
+.brand-shell:not(:has(.campaigns-workspace)) .gd-global-scope-toolbar {
+  min-height: 52px !important;
+  margin-bottom: 18px !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  border: 1px solid var(--gd-ui-border) !important;
+  border-radius: var(--gd-ui-radius-card) !important;
+  background: var(--gd-ui-surface) !important;
+  box-shadow: var(--gd-ui-shadow-card) !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-global-scope-toolbar .gd-filter-control,
+.brand-shell:not(:has(.campaigns-workspace)) .gd-global-scope-toolbar .gd-filter-account,
+.brand-shell:not(:has(.campaigns-workspace)) .gd-global-scope-toolbar .gd-filter-date {
+  min-height: 36px !important;
+  height: 36px !important;
+  border: 1px solid var(--gd-ui-border-strong) !important;
+  border-radius: var(--gd-ui-radius-control) !important;
+  background: var(--gd-ui-surface-muted) !important;
+  color: var(--gd-ui-text) !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) :is(.gd-button, .page-heading-actions button, .gd-global-scope-toolbar button, .meta-toolbar-button, .meta-toolbar-primary) {
+  min-height: 36px !important;
+  border-radius: var(--gd-ui-radius-control) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border: 1px solid var(--gd-ui-border-strong) !important;
+  background: var(--gd-ui-surface) !important;
+  color: var(--gd-ui-text) !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .gd-button:hover:not(:disabled),
+.brand-shell:not(:has(.campaigns-workspace)) .meta-toolbar-button:hover:not(:disabled) {
+  border-color: var(--gd-ui-primary) !important;
+  background: #edf4ff !important;
+  color: #1456c4 !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main :is(input, select, textarea, [role="combobox"], [cmdk-input]) {
+  min-height: 36px !important;
+  border: 1px solid var(--gd-ui-border-strong) !important;
+  border-radius: var(--gd-ui-radius-control) !important;
+  background: var(--gd-ui-surface) !important;
+  color: var(--gd-ui-text) !important;
+  box-shadow: none !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main :is(input, select, textarea, [role="combobox"], [cmdk-input])::placeholder {
+  color: var(--gd-ui-muted) !important;
+  opacity: 1 !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main :is(input, select, textarea, [role="combobox"], [cmdk-input]):focus-visible,
+.brand-shell:not(:has(.campaigns-workspace)) .gd-button:focus-visible {
+  border-color: var(--gd-ui-primary) !important;
+  outline: 2px solid rgba(8, 102, 255, .22) !important;
+  outline-offset: 1px !important;
+}
+
+/* Tabs and data tables */
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main :is([role="tablist"], .tabs-list) {
+  gap: 4px !important;
+  border-bottom: 1px solid var(--gd-ui-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main :is([role="tab"], .tabs-trigger) {
+  min-height: 36px !important;
+  border-radius: var(--gd-ui-radius-control) !important;
+  color: var(--gd-ui-muted) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main :is([role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .tabs-trigger[data-state="active"]) {
+  background: #edf4ff !important;
+  color: #1456c4 !important;
+  box-shadow: none !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main table thead {
+  background: var(--gd-ui-surface-muted) !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main table th {
+  height: 42px !important;
+  padding: 10px 12px !important;
+  border-color: var(--gd-ui-border) !important;
+  color: var(--gd-ui-muted) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main table td {
+  min-height: 46px !important;
+  padding: 12px !important;
+  border-color: var(--gd-ui-border) !important;
+  color: var(--gd-ui-text) !important;
+  font-size: 13px !important;
+}
+
+.brand-shell:not(:has(.campaigns-workspace)) .growdash-main table tbody tr:hover {
+  background: var(--gd-ui-surface-muted) !important;
+}
+
+/* Keep the dark, bespoke experiences readable without forcing light cards
+   into their canvases. Their own contracts still control their backgrounds. */
+.dark .brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass) {
+  border-color: var(--gd-ui-border) !important;
+  background: var(--gd-ui-surface) !important;
+  box-shadow: var(--gd-ui-shadow-card-dark) !important;
+}
+
+@media (max-width: 767px) {
+  .brand-shell:not(:has(.campaigns-workspace)) .growdash-main {
+    padding: 12px !important;
+  }
+
+  .brand-shell:not(:has(.campaigns-workspace)) .gd-page-heading {
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .brand-shell:not(:has(.campaigns-workspace)) .gd-page-heading-title {
+    font-size: 1.45rem !important;
+  }
+
+  .brand-shell:not(:has(.campaigns-workspace)) .gd-global-scope-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    padding: 8px !important;
+  }
+
+  .brand-shell:not(:has(.campaigns-workspace)) .gd-global-scope-toolbar :is(.gd-filter-control, .gd-filter-account, .gd-filter-date) {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .brand-shell:not(:has(.campaigns-workspace)) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass) {
+    border-radius: 8px !important;
+  }
+}
