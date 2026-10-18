@@ -25,7 +25,6 @@ interface Props {
   title: string;
   config: WidgetConfig;
   onEditSale?: (s: Sale) => void;
-  onRegisterSale?: () => void;
 }
 
 function BrazilMapWrap() {
@@ -41,14 +40,14 @@ function AlertsWrap() {
   return <div className="h-full overflow-auto"><AlertsSection alerts={alerts} onMarkRead={(id) => mark.mutate(id)} /></div>;
 }
 
-export function WidgetRenderer({ type, title, config, onEditSale, onRegisterSale }: Props) {
+export function WidgetRenderer({ type, title, config, onEditSale }: Props) {
   switch (type) {
     case "kpi":
       return <KPIWidget title={title} config={config} />;
     case "kpi_grid":
       return <KPIGridWidget config={config} />;
     case "payment_chart":
-      return <PaymentChartWidget onRegisterSale={onRegisterSale} />;
+      return <PaymentChartWidget />;
     case "platform_distribution":
       return <PlatformDistributionWidget />;
     case "line_chart":

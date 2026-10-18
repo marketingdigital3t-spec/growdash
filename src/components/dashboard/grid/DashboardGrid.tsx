@@ -4,7 +4,7 @@ import RGL, { Responsive } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { WidgetRenderer } from "./WidgetRenderer";
-import { BarChart3, ChevronDown, Settings2, X } from "lucide-react";
+import { Settings2, X } from "lucide-react";
 import type { DashboardView } from "@/hooks/useDashboardViews";
 import { getWidgetDef } from "@/lib/widgetCatalog";
 import type { Sale } from "@/hooks/useSales";
@@ -20,10 +20,8 @@ import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp"
 import { alignCanonicalDefaultBlock, anchorDefaultBlockAfterPreviousWidgets } from "@/lib/dashboardViewDefaults";
 
 const ResponsiveGrid = Responsive;
-const GRID_ROW_HEIGHT_DESKTOP = 56;
-const GRID_ROW_HEIGHT_COMPACT = 40;
-const GRID_MARGIN_Y = 16;
-const COMPACT_ANALYTIC_WIDGETS = new Set(["payment_chart", "platform_distribution"]);
+const GRID_ROW_HEIGHT = 60;
+const GRID_MARGIN_Y = 12;
 
 interface Props {
   view: DashboardView;
@@ -31,7 +29,6 @@ interface Props {
   onChange: (layout: any[], widgets: any[]) => void;
   onAddClick?: () => void;
   onEditSale: (s: Sale) => void;
-  onRegisterSale?: () => void;
 }
 
 // A leitura operacional de campanhas e a consulta à IA pertencem à Análise
@@ -60,7 +57,7 @@ function isEmptyDefaultPlaceholder(widget: any) {
 }
 
 function pixelsToGridRows(height: number) {
-  return Math.max(1, Math.ceil((height + GRID_MARGIN_Y) / (GRID_ROW_HEIGHT_DESKTOP + GRID_MARGIN_Y)));
+  return Math.max(1, Math.ceil((height + GRID_MARGIN_Y) / (GRID_ROW_HEIGHT + GRID_MARGIN_Y)));
 }
 
 function AutoHeightWidget({
@@ -113,7 +110,7 @@ function appendSystemTail(
   return [...visibleLayout, ...tail];
 }
 
-export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegisterSale }: Props) {
+export function DashboardGrid({ view, isEditing, onChange, onEditSale }: Props) {
   const isMobile = useIsMobile();
   const [breakpoint, setBreakpoint] = useState("lg");
   // Local state mirrors the persisted view, with auto-debounced save via onChange.
@@ -123,7 +120,6 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
   const [configuringWidgetId, setConfiguringWidgetId] = useState<string | null>(null);
   const gridContainerRef = useRef<HTMLDivElement>(null);
   const [gridWidth, setGridWidth] = useState(0);
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   // The sidebar changes the usable content width without firing window.resize.
   // Measuring this element (rather than the browser viewport) prevents RGL
@@ -151,28 +147,22 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
     () => widgets.filter((widget) => !isEmptyDefaultPlaceholder(widget)),
     [widgets],
   );
-  const visibleWidgets = useMemo(
-    () => !isEditing && !analyticsOpen
-      ? renderedWidgets.filter((widget) => !COMPACT_ANALYTIC_WIDGETS.has(widget.id))
-      : renderedWidgets,
-    [analyticsOpen, isEditing, renderedWidgets],
-  );
 
   const handleAutoHeight = useCallback((widgetId: string, rows: number) => {
     setAutoHeightRows((current) => current[widgetId] === rows ? current : { ...current, [widgetId]: rows });
   }, []);
 
   const desktopLayout = useMemo(() => {
-    const normalized = normalizeDesktopDashboardLayout(layout, visibleWidgets, 12);
-    const defaultWidget = visibleWidgets.find((widget) => widget.type === "default_block");
+    const normalized = normalizeDesktopDashboardLayout(layout, renderedWidgets, 12);
+    const defaultWidget = renderedWidgets.find((widget) => widget.type === "default_block");
     return defaultWidget
       ? anchorDefaultBlockAfterPreviousWidgets(alignCanonicalDefaultBlock(normalized, defaultWidget.id), defaultWidget.id)
       : normalized;
-  }, [layout, visibleWidgets]);
+  }, [layout, renderedWidgets]);
 
   const responsiveLayouts = useMemo(() => {
-    const widgetIds = new Set(visibleWidgets.map((widget) => widget.id));
-    const defaultIds = new Set(visibleWidgets.filter((widget) => widget.type === "default_block").map((widget) => widget.id));
+    const widgetIds = new Set(renderedWidgets.map((widget) => widget.id));
+    const defaultIds = new Set(renderedWidgets.filter((widget) => widget.type === "default_block").map((widget) => widget.id));
     const applyAutoHeight = (items: DashboardGridItem[]) => items.map((item) => ({
       ...item,
       ...(!isEditing && autoHeightRows[item.i] ? { h: autoHeightRows[item.i] } : {}),
@@ -186,9 +176,9 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
       md: appendSystemTail(md, 8, widgetIds, autoHeightRows, isEditing),
       sm: appendSystemTail(sm, 4, widgetIds, autoHeightRows, isEditing),
     };
-  }, [autoHeightRows, desktopLayout, isEditing, visibleWidgets]);
+  }, [autoHeightRows, desktopLayout, isEditing, renderedWidgets]);
 
-  const fullWidgets = useMemo(() => [...visibleWidgets, ...SYSTEM_TAIL], [visibleWidgets]);
+  const fullWidgets = useMemo(() => [...renderedWidgets, ...SYSTEM_TAIL], [renderedWidgets]);
 
   function layoutsEqual(a: any[], b: any[]) {
     if (a.length !== b.length) return false;
@@ -233,7 +223,7 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
         const isSystem = widget.id.startsWith("__sys_") || widget.type === "default_block";
         return <section key={widget.id} className="relative min-w-0 max-w-full overflow-hidden rounded-xl">
           {isEditing && !isSystem && <div className="no-drag absolute right-2 top-2 z-20 flex gap-1"><button onClick={() => setConfiguringWidgetId(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-background/95 text-primary shadow" aria-label={`Configurar ${widget.title}`}><Settings2 className="h-4 w-4" /></button><button onClick={() => removeWidget(widget.id)} className="grid h-11 w-11 place-items-center rounded-full bg-destructive/90 text-destructive-foreground shadow" aria-label="Remover"><X className="h-4 w-4" /></button></div>}
-          <DashboardWidgetHelp type={widget.type} title={widget.title} className={`${widget.type === "default_block" ? "dashboard-default-widget-shell " : ""}${widget.id.startsWith("__sys_") ? "dashboard-open-widget-shell " : ""}min-w-0 max-w-full overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} onRegisterSale={onRegisterSale} /></DashboardWidgetHelp>
+          <DashboardWidgetHelp type={widget.type} title={widget.title} className={`${widget.type === "default_block" ? "dashboard-default-widget-shell " : ""}${widget.id.startsWith("__sys_") ? "dashboard-open-widget-shell " : ""}min-w-0 max-w-full overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}><WidgetRenderer type={widget.type} title={widget.title} config={widget.config || {}} onEditSale={onEditSale} /></DashboardWidgetHelp>
         </section>;
       })}
     </div><DashboardWidgetConfigDialog widget={configuringWidget} open={!!configuringWidget} onOpenChange={(open) => !open && setConfiguringWidgetId(null)} onSave={(patch) => { if (configuringWidget) updateWidget(configuringWidget.id, patch); }} /></>;
@@ -241,19 +231,14 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
 
   return (
     <div ref={gridContainerRef} className="dashboard-grid-container relative min-w-0 max-w-full overflow-x-clip">
-      {!isEditing && <button type="button" className="dashboard-analytics-toggle" onClick={() => setAnalyticsOpen((open) => !open)} aria-expanded={analyticsOpen}>
-        <BarChart3 className="h-4 w-4" aria-hidden="true" />
-        <span>{analyticsOpen ? "Ocultar análises financeiras" : "Ver análises financeiras"}</span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${analyticsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-      </button>}
       {gridWidth > 0 && <ResponsiveGrid
         width={gridWidth}
         className={isEditing ? "layout dashboard-layout-editing" : "layout"}
         layouts={responsiveLayouts}
         breakpoints={{ lg: 1280, md: 900, sm: 0 }}
         cols={{ lg: 12, md: 8, sm: 4 }}
-        rowHeight={breakpoint === "lg" ? GRID_ROW_HEIGHT_DESKTOP : GRID_ROW_HEIGHT_COMPACT}
-        margin={[GRID_MARGIN_Y, GRID_MARGIN_Y]}
+        rowHeight={GRID_ROW_HEIGHT}
+        margin={[12, GRID_MARGIN_Y]}
         compactType="vertical"
         preventCollision={false}
         isDraggable={isEditing && breakpoint === "lg"}
@@ -277,10 +262,10 @@ export function DashboardGrid({ view, isEditing, onChange, onEditSale, onRegiste
               <DashboardWidgetHelp type={w.type} title={w.title} className={`dashboard-widget-shell ${w.type === "default_block" ? "dashboard-default-widget-shell " : ""}${w.id.startsWith("__sys_") ? "dashboard-open-widget-shell " : ""}h-full w-full no-drag-children outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}>
                 {w.type === "default_block" || w.id.startsWith("__sys_") ? (
                   <AutoHeightWidget widgetId={w.id} onHeightChange={handleAutoHeight}>
-                    <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} onRegisterSale={onRegisterSale} />
+                    <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
                   </AutoHeightWidget>
                 ) : (
-                  <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} onRegisterSale={onRegisterSale} />
+                  <WidgetRenderer type={w.type} title={w.title} config={w.config || {}} onEditSale={onEditSale} />
                 )}
               </DashboardWidgetHelp>
             </div>

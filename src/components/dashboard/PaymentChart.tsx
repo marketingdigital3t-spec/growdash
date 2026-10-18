@@ -1,12 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { ShoppingCart } from "lucide-react";
 
 interface PaymentChartProps {
   byPayment: { pix: number; cartao: number; boleto: number; outros: number };
-  onRegisterSale?: () => void;
 }
 
 const COLORS: Record<string, string> = {
@@ -23,7 +20,7 @@ const LABELS: Record<string, string> = {
   outros: "Outros",
 };
 
-export function PaymentChart({ byPayment, onRegisterSale }: PaymentChartProps) {
+export function PaymentChart({ byPayment }: PaymentChartProps) {
   const data = Object.entries(byPayment)
     .map(([key, value]) => ({ key, name: LABELS[key], value }))
     .filter((d) => d.value > 0);
@@ -32,28 +29,24 @@ export function PaymentChart({ byPayment, onRegisterSale }: PaymentChartProps) {
 
   if (total === 0) {
     return (
-      <Card className="dashboard-terra-card dashboard-glass-card dashboard-payment-card h-full min-h-0">
-        <CardHeader className="dashboard-payment-card-header p-3 pb-2">
+      <Card className="dashboard-terra-card dashboard-glass-card h-full">
+        <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-1 items-center justify-center p-4 pt-0 text-center text-sm text-muted-foreground">
-          <div className="dashboard-payment-empty grid max-w-xs justify-items-center gap-2.5">
-            <ShoppingCart className="h-8 w-8 opacity-55" aria-hidden="true" />
-            <p>Nenhuma venda registrada</p>
-            {onRegisterSale && <Button type="button" size="sm" onClick={onRegisterSale}>Registrar venda</Button>}
-          </div>
+        <CardContent className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          Nenhuma venda registrada
         </CardContent>
       </Card>
     );
   }
 
   return (
-      <Card className="dashboard-terra-card dashboard-glass-card dashboard-payment-card flex h-full min-h-0 flex-col">
-      <CardHeader className="dashboard-payment-card-header p-3 pb-2">
+    <Card className="dashboard-terra-card dashboard-glass-card flex h-full flex-col">
+      <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
       </CardHeader>
-      <CardContent className="dashboard-payment-card-content flex flex-1 flex-col justify-center p-3 pt-0">
-        <div className="dashboard-payment-chart-canvas relative h-48 shrink-0">
+      <CardContent className="flex flex-1 flex-col justify-center">
+        <div className="relative h-48 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
