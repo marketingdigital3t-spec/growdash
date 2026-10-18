@@ -52,8 +52,10 @@ export async function inspectMetaToken(
 }
 
 export function hasMinimumMetaTokenLifetime(expiresAt: string | null, minimumDays = 30, dataAccessExpiresAt: string | null = null): boolean {
-  const effectiveExpiry = expiresAt || dataAccessExpiresAt;
-  if (!effectiveExpiry) return false;
-  const expiry = new Date(effectiveExpiry).getTime();
-  return Number.isFinite(expiry) && expiry >= Date.now() + minimumDays * 86_400_000;
+  const expiryCandidates = [expiresAt, dataAccessExpiresAt]
+    .map((value) => value ? new Date(value).getTime() : NaN)
+    .filter((value) => Number.isFinite(value));
+  if (!expiryCandidates.length) return false;
+  const earliestExpiry = Math.min(...expiryCandidates);
+  return earliestExpiry >= Date.now() + minimumDays * 86_400_000;
 }

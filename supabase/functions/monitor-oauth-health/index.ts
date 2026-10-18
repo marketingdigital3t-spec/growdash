@@ -49,11 +49,18 @@ async function checkMetaToken(token: string, appId?: string, appSecret?: string)
   // for person-level form submissions and must not block aggregate metrics.
   const permissionStatus = resolveMetaPermissionStatus(permissions);
   const tokenExpiresAt = Number(data.expires_at) > 0 ? Number(data.expires_at) * 1000 : null;
+  const dataAccessExpiresAt = Number(data.data_access_expiration_time) > 0
+    ? Number(data.data_access_expiration_time) * 1000
+    : null;
+  const expiryCandidates = [tokenExpiresAt, dataAccessExpiresAt].filter((value): value is number => value != null);
+  const earliestExpiry = expiryCandidates.length ? Math.min(...expiryCandidates) : null;
   const status: HealthStatus = data.is_valid !== true
     ? "expired"
     : permissionStatus.status === "permission_removed"
       ? permissionStatus.status
-      : tokenExpiresAt && tokenExpiresAt < Date.now() + 30 * 86_400_000
+      : earliestExpiry && earliestExpiry < Date.now()
+        ? "expired"
+      : earliestExpiry && earliestExpiry < Date.now() + 30 * 86_400_000
         ? "expiring"
       : "healthy";
   return {
