@@ -11075,6 +11075,10 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi-detail { min-height: 2.3em; font-size: 10px; line-height: 1.35; }
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] { border-left-color: #dc2626 !important; box-shadow: inset 3px 0 0 rgba(220, 38, 38, .16), 0 8px 24px rgba(0, 0, 0, .06) !important; }
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] { border-left-color: #16a34a !important; }
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-value,
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] .gd-funnel-kpi-icon { color: #dc2626 !important; }
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-value,
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] .gd-funnel-kpi-icon { color: #16a34a !important; }
 .brand-shell .gd-funnel-analysis .gd-aligned-grid { gap: 16px !important; }
 @media (min-width: 1280px) {
   .brand-shell .dashboard-page .dashboard-glass-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
