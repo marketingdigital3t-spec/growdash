@@ -13,7 +13,7 @@ export function GlobalScopeToolbar({ syncing = false, lastSyncAt = null, syncSta
   const { data: accounts = [] } = useAdAccounts();
 
   return (
-    <div className="gd-global-scope-toolbar gd-filter-strip mb-4 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card/80 p-2 shadow-sm">
+    <div className="gd-global-scope-toolbar gd-filter-strip mb-4 flex min-w-0 flex-wrap items-center gap-2">
       <AccountMultiSelect
         accounts={accounts.map((account) => ({ id: account.id, name: account.name, connection_status: account.connection_status }))}
         selectedIds={adAccountIds}

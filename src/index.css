@@ -11515,3 +11515,328 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
     padding: 9px 10px !important;
   }
 }
+
+/* -------------------------------------------------------------------------
+   Growdash visual system — single, compact product language
+
+   This is deliberately the last layer in the stylesheet. The project has a
+   long history of theme experiments; keeping this contract at the end makes
+   the shell, filters and analytic surfaces resolve to one predictable visual
+   system without changing any data or interaction behavior.
+   ------------------------------------------------------------------------- */
+:root {
+  --gd-ui-canvas-light: #f5f6f8;
+  --gd-ui-surface-light: #ffffff;
+  --gd-ui-surface-muted-light: #f8f9fb;
+  --gd-ui-border-light: #e2e5e9;
+  --gd-ui-border-strong-light: #d4d9e0;
+  --gd-ui-text-light: #17191c;
+  --gd-ui-muted-light: #68717d;
+  --gd-ui-canvas-dark: #0d0f12;
+  --gd-ui-surface-dark: #15181c;
+  --gd-ui-surface-muted-dark: #1b1f24;
+  --gd-ui-border-dark: #2b3037;
+  --gd-ui-border-strong-dark: #3a414a;
+  --gd-ui-text-dark: #f4f6f8;
+  --gd-ui-muted-dark: #a6afb9;
+  --gd-ui-radius-card: 10px;
+  --gd-ui-radius-control: 6px;
+  --gd-ui-shadow-card: 0 5px 18px rgba(15, 23, 42, .055);
+  --gd-ui-shadow-card-dark: 0 8px 24px rgba(0, 0, 0, .22);
+  --gd-ui-control-height: 36px;
+}
+
+.brand-shell {
+  --gd-ui-canvas: var(--gd-ui-canvas-light);
+  --gd-ui-surface: var(--gd-ui-surface-light);
+  --gd-ui-surface-muted: var(--gd-ui-surface-muted-light);
+  --gd-ui-border: var(--gd-ui-border-light);
+  --gd-ui-border-strong: var(--gd-ui-border-strong-light);
+  --gd-ui-text: var(--gd-ui-text-light);
+  --gd-ui-muted: var(--gd-ui-muted-light);
+  --gd-content-bg: var(--gd-ui-canvas-light);
+  --gd-content-surface: var(--gd-ui-surface-light);
+  --gd-content-panel: var(--gd-ui-surface-muted-light);
+  --gd-content-border: var(--gd-ui-border-light);
+  --gd-content-text: var(--gd-ui-text-light);
+  --gd-content-muted: var(--gd-ui-muted-light);
+  --gd-card-radius: var(--gd-ui-radius-card);
+  --gd-card-padding: 16px;
+  --gd-space-card: 16px;
+  --gd-space-section: 20px;
+  background: var(--gd-ui-canvas) !important;
+  color: var(--gd-ui-text) !important;
+}
+
+.dark .brand-shell {
+  --gd-ui-canvas: var(--gd-ui-canvas-dark);
+  --gd-ui-surface: var(--gd-ui-surface-dark);
+  --gd-ui-surface-muted: var(--gd-ui-surface-muted-dark);
+  --gd-ui-border: var(--gd-ui-border-dark);
+  --gd-ui-border-strong: var(--gd-ui-border-strong-dark);
+  --gd-ui-text: var(--gd-ui-text-dark);
+  --gd-ui-muted: var(--gd-ui-muted-dark);
+  --gd-content-bg: var(--gd-ui-canvas-dark);
+  --gd-content-surface: var(--gd-ui-surface-dark);
+  --gd-content-panel: var(--gd-ui-surface-muted-dark);
+  --gd-content-border: var(--gd-ui-border-dark);
+  --gd-content-text: var(--gd-ui-text-dark);
+  --gd-content-muted: var(--gd-ui-muted-dark);
+}
+
+/* App chrome stays dark and quiet. The product canvas carries the hierarchy. */
+.brand-shell .brand-sidebar,
+.brand-shell .brand-topbar,
+.brand-shell .brand-topbar.growdash-global-header {
+  background: #0b0c0e !important;
+  border-color: #262a30 !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .brand-sidebar {
+  box-shadow: 10px 0 28px rgba(0, 0, 0, .18) !important;
+}
+
+.brand-shell .brand-topbar {
+  min-height: 52px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .03) !important;
+}
+
+.brand-shell .brand-sidebar nav {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+.brand-shell .brand-sidebar nav > section {
+  margin-bottom: 14px !important;
+}
+
+.brand-shell .brand-sidebar nav > section > button {
+  height: 24px !important;
+  margin-bottom: 4px !important;
+  border-radius: 5px !important;
+  color: #87909b !important;
+  font-size: 10px !important;
+  letter-spacing: .11em !important;
+}
+
+.brand-shell .brand-sidebar nav a {
+  height: 36px !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  color: #aeb5be !important;
+  font-size: 12px !important;
+}
+
+.brand-shell .brand-sidebar nav a:hover {
+  background: #171a1e !important;
+  color: #f6f7f9 !important;
+}
+
+.brand-shell .brand-sidebar nav a[aria-current="page"],
+.brand-shell .brand-sidebar nav a[data-state="active"] {
+  border-color: #343a42 !important;
+  background: #20242a !important;
+  color: #ffffff !important;
+}
+
+.brand-shell .brand-sidebar > div:last-child {
+  padding: 10px !important;
+}
+
+/* Shared page canvas and spacing. */
+.brand-shell .growdash-main {
+  background: var(--gd-ui-canvas) !important;
+}
+
+.brand-shell .growdash-content-frame {
+  max-width: 1680px !important;
+  padding-inline: 0 !important;
+}
+
+.brand-shell .gd-page-transition {
+  width: 100% !important;
+}
+
+.brand-shell .gd-page-heading {
+  align-items: flex-end;
+  margin-bottom: 18px !important;
+  gap: 18px !important;
+}
+
+.brand-shell .gd-page-heading-title {
+  color: var(--gd-ui-text) !important;
+  font-size: clamp(1.45rem, 2.2vw, 2rem) !important;
+  line-height: 1.1 !important;
+  letter-spacing: -.035em !important;
+}
+
+.brand-shell .gd-page-heading-eyebrow {
+  color: #6d7783 !important;
+  font-size: 9px !important;
+  letter-spacing: .16em !important;
+}
+
+.dark .brand-shell .gd-page-heading-eyebrow { color: #9ba5b0 !important; }
+
+.brand-shell .gd-page-heading-description {
+  color: var(--gd-ui-muted) !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+/* Compact global account/date scope. It is one toolbar, not two floating cards. */
+.brand-shell .gd-global-scope-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 52px !important;
+  margin-bottom: 18px !important;
+  padding: 7px !important;
+  gap: 7px !important;
+  overflow: visible !important;
+  border: 1px solid var(--gd-ui-border) !important;
+  border-radius: var(--gd-ui-radius-card) !important;
+  background: var(--gd-ui-surface) !important;
+  box-shadow: var(--gd-ui-shadow-card) !important;
+}
+
+.dark .brand-shell .gd-global-scope-toolbar { box-shadow: var(--gd-ui-shadow-card-dark) !important; }
+
+.brand-shell .gd-global-scope-toolbar .gd-filter-control {
+  height: var(--gd-ui-control-height) !important;
+  min-height: var(--gd-ui-control-height) !important;
+  border: 1px solid var(--gd-ui-border-strong) !important;
+  border-radius: var(--gd-ui-radius-control) !important;
+  background: var(--gd-ui-surface-muted) !important;
+  color: var(--gd-ui-text) !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+}
+
+.brand-shell .gd-global-scope-toolbar .gd-filter-control:hover,
+.brand-shell .gd-global-scope-toolbar .gd-filter-control:focus-visible {
+  border-color: #8995a3 !important;
+  background: var(--gd-ui-surface) !important;
+}
+
+.brand-shell .gd-global-scope-toolbar .gd-filter-account { min-width: 220px !important; }
+.brand-shell .gd-global-scope-toolbar .gd-filter-date { min-width: 230px !important; }
+
+.brand-shell .gd-global-scope-toolbar .gd-scope-refresh-status {
+  color: var(--gd-ui-muted) !important;
+  font-size: 10px !important;
+}
+
+.brand-shell .gd-global-scope-toolbar > span:last-child {
+  color: var(--gd-ui-muted) !important;
+  font-size: 10px !important;
+}
+
+/* One surface recipe for analytic cards, tables and empty states. */
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar) {
+  border: 1px solid var(--gd-ui-border) !important;
+  border-radius: var(--gd-ui-radius-card) !important;
+  background: var(--gd-ui-surface) !important;
+  box-shadow: var(--gd-ui-shadow-card) !important;
+}
+
+.dark .brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar) {
+  box-shadow: var(--gd-ui-shadow-card-dark) !important;
+}
+
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass)::before,
+.brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card, .dashboard-video-glass)::after {
+  display: none !important;
+}
+
+.brand-shell .gd-metric-card {
+  border-radius: var(--gd-ui-radius-card) !important;
+  background: var(--gd-ui-surface) !important;
+  box-shadow: var(--gd-ui-shadow-card) !important;
+}
+
+.brand-shell .gd-metric-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(15, 23, 42, .09) !important; }
+.dark .brand-shell .gd-metric-card:hover { box-shadow: 0 10px 26px rgba(0, 0, 0, .3) !important; }
+
+.brand-shell .gd-metric-card-label,
+.brand-shell .gd-metric-card .text-muted-foreground { color: var(--gd-ui-muted) !important; }
+.brand-shell .gd-metric-card-value { color: var(--gd-ui-text) !important; }
+.brand-shell .gd-metric-card-emphasis { border-color: #aab4c0 !important; background: var(--gd-ui-surface-muted) !important; }
+
+/* Keep headings, controls and tables on the same typographic rhythm. */
+.brand-shell .growdash-main :is(h1, h2, h3, h4) { color: var(--gd-ui-text); }
+.brand-shell .growdash-main :is(.text-muted-foreground, .text-slate-500, .text-slate-400) { color: var(--gd-ui-muted) !important; }
+.brand-shell .growdash-main :is(input, select, textarea, [role="combobox"]) {
+  min-height: var(--gd-ui-control-height);
+  border-radius: var(--gd-ui-radius-control) !important;
+  border-color: var(--gd-ui-border-strong) !important;
+  background: var(--gd-ui-surface) !important;
+  color: var(--gd-ui-text) !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .growdash-main :is(table thead, .bg-muted\/60) {
+  background: var(--gd-ui-surface-muted) !important;
+}
+
+.brand-shell .growdash-main table th {
+  color: var(--gd-ui-muted) !important;
+  font-size: 10px !important;
+  font-weight: 750 !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase;
+}
+
+.brand-shell .growdash-main table tr { border-color: var(--gd-ui-border) !important; }
+.brand-shell .growdash-main table tbody tr:hover { background: var(--gd-ui-surface-muted) !important; }
+
+.brand-shell .growdash-main :is(.rounded-2xl, .rounded-xl) { border-radius: var(--gd-ui-radius-card) !important; }
+.brand-shell .growdash-main :is(.rounded-lg, .rounded-md) { border-radius: var(--gd-ui-radius-control) !important; }
+
+.brand-shell .gd-button,
+.brand-shell .gd-global-scope-toolbar button,
+.brand-shell .page-heading-actions button,
+.brand-shell .meta-toolbar-button,
+.brand-shell .meta-toolbar-primary {
+  min-height: var(--gd-ui-control-height) !important;
+  border-radius: var(--gd-ui-radius-control) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.brand-shell .gd-button:hover:not(:disabled),
+.brand-shell .meta-toolbar-button:hover:not(:disabled) { background: var(--gd-ui-surface-muted) !important; }
+
+.brand-shell :is([role="tablist"], .tabs-list) {
+  border-bottom: 1px solid var(--gd-ui-border) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.brand-shell :is([role="tab"], .campaign-hierarchy-tab) {
+  border-radius: 0 !important;
+  color: var(--gd-ui-muted) !important;
+}
+
+.brand-shell :is([role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .campaign-hierarchy-tab[data-state="active"]) {
+  background: transparent !important;
+  color: var(--gd-ui-text) !important;
+  box-shadow: inset 0 -2px 0 var(--gd-ui-text) !important;
+}
+
+@media (max-width: 767px) {
+  .brand-shell .brand-topbar { min-height: 50px !important; }
+  .brand-shell .growdash-main { padding: 12px !important; }
+  .brand-shell .growdash-content-frame { padding-inline: 0 !important; }
+  .brand-shell .gd-page-heading { align-items: stretch; gap: 12px !important; margin-bottom: 14px !important; }
+  .brand-shell .gd-page-heading-title { font-size: 1.45rem !important; }
+  .brand-shell .gd-page-heading-description { font-size: 12px !important; }
+  .brand-shell .gd-global-scope-toolbar { align-items: stretch !important; flex-direction: column !important; gap: 6px !important; padding: 8px !important; }
+  .brand-shell .gd-global-scope-toolbar .gd-filter-control,
+  .brand-shell .gd-global-scope-toolbar .gd-filter-account,
+  .brand-shell .gd-global-scope-toolbar .gd-filter-date { width: 100% !important; min-width: 0 !important; }
+  .brand-shell .gd-global-scope-toolbar > span:last-child { display: none !important; }
+  .brand-shell :is(.gd-panel, .dashboard-glass-card, .dashboard-terra-card) { border-radius: 8px !important; }
+}
