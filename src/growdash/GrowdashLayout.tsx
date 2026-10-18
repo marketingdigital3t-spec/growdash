@@ -202,6 +202,10 @@ export default function GrowdashLayout() {
   const isCampaignsWorkspace = pathname.startsWith("/campanhas")
     && campaignWorkspaceTab === "campaigns"
     && !campaignAnalysisMode;
+  // Campanhas owns its account and date controls in the Meta-style manager
+  // header. Rendering the shell-wide scope bar as well duplicates the same
+  // controls and places them underneath the traffic rail.
+  const isCampaignsRoute = pathname.startsWith("/campanhas");
   const preloadRoute = useCallback((path: string) => {
     const pathnameOnly = path.split("?")[0];
     void ROUTE_PRELOADERS[pathnameOnly]?.().catch(() => {
@@ -510,7 +514,7 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
-            <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} />
+            {!isCampaignsRoute && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} />}
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
               <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>

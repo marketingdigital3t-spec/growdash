@@ -11171,3 +11171,126 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   .brand-shell .dashboard-page .gd-glass-metric .gd-label { font-size: 9px !important; }
   .brand-shell .dashboard-page .gd-glass-metric p:not(.gd-label) { font-size: clamp(.84rem, 1.1vw, 1rem) !important; }
 }
+
+/* Final Meta-style geometry for Campanhas. The manager is one continuous
+   surface: controls use one compact radius, hierarchy tabs are flat, and the
+   totals row is part of the table instead of a second outlined card. */
+.campaigns-workspace .campaign-manager-top {
+  margin-bottom: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid #e4e7ec !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.campaigns-workspace .campaign-app-header,
+.campaigns-workspace .campaign-filters-row,
+.campaigns-workspace .campaign-tabs-header,
+.campaigns-workspace .campaign-actions-toolbar {
+  border-radius: 0 !important;
+}
+
+.campaigns-workspace .campaign-app-header {
+  gap: 12px !important;
+  padding-inline: 16px !important;
+}
+
+.campaigns-workspace :is(.campaign-account-pill, .campaign-opportunity-pill, .campaign-date-pill, .campaign-header-icon, .campaign-publish-button, .campaign-action-button, .campaign-action-select, .campaign-columns-control > button) {
+  border-radius: 6px !important;
+}
+
+.campaigns-workspace .campaign-account-pill,
+.campaigns-workspace .campaign-date-pill,
+.campaigns-workspace .campaign-opportunity-pill,
+.campaigns-workspace .campaign-header-icon,
+.campaigns-workspace .campaign-publish-button {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.campaigns-workspace .campaign-filters-row {
+  gap: 12px !important;
+  padding-inline: 16px !important;
+}
+
+.campaigns-workspace .campaign-scope-action,
+.campaigns-workspace .meta-toolbar-button {
+  height: 32px !important;
+  min-height: 32px !important;
+  border-radius: 16px !important;
+}
+
+.campaigns-workspace .campaign-tabs-header {
+  height: 44px !important;
+  padding-inline: 16px !important;
+}
+
+.campaigns-workspace .campaign-tabs-list {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.campaigns-workspace .campaign-hierarchy-tab,
+.campaigns-workspace .campaign-hierarchy-tab[data-state="active"] {
+  height: 44px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: inset 0 -2px transparent !important;
+  transform: none !important;
+}
+
+.campaigns-workspace .campaign-hierarchy-tab[data-state="active"] {
+  color: #1c1e21 !important;
+  box-shadow: inset 0 -2px #0866ff !important;
+}
+
+.campaigns-workspace .campaign-actions-toolbar {
+  gap: 8px !important;
+  padding-inline: 16px !important;
+}
+
+.campaigns-workspace .campaign-table-frame {
+  margin: 16px 16px 0 !important;
+  overflow: hidden !important;
+  border: 1px solid #e4e7ec !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.campaigns-workspace [data-campaign-table-scroll] tfoot,
+.campaigns-workspace [data-campaign-table-scroll] tfoot tr,
+.campaigns-workspace [data-campaign-table-scroll] tfoot td,
+.campaigns-workspace [data-campaign-totals-bar],
+.campaigns-workspace [data-campaign-totals-bar] tr,
+.campaigns-workspace [data-campaign-totals-bar] td {
+  border-color: #e4e7ec !important;
+  background: #f7f8fa !important;
+}
+
+.campaigns-workspace [data-campaign-table-scroll] tfoot,
+.campaigns-workspace [data-campaign-totals-bar] {
+  border-top: 1px solid #e4e7ec !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+}
+
+.campaigns-workspace [data-campaign-totals-bar] {
+  position: relative !important;
+  z-index: 2;
+}
+
+.campaigns-workspace .campaigns-main-content {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .campaigns-workspace .campaign-manager-top { margin-bottom: 12px !important; }
+  .campaigns-workspace .campaign-app-header { gap: 8px !important; padding: 12px !important; }
+  .campaigns-workspace .campaign-filters-row { padding: 12px !important; }
+  .campaigns-workspace .campaign-table-frame { margin: 8px 0 0 !important; }
+}
