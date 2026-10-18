@@ -962,22 +962,31 @@ export default function Campaigns() {
     const totals = campaignTotalsScrollRef.current;
     if (!table || !totals || activeTab !== "campaigns") return;
 
-    const sync = () => { totals.scrollLeft = table.scrollLeft; };
+    const syncFromTable = () => { totals.scrollLeft = table.scrollLeft; };
+    const syncFromTotals = () => { table.scrollLeft = totals.scrollLeft; };
     const matchViewportWidth = () => {
       // The campaign list has a vertical scrollbar; reserve that same width in
       // the separate totals block so both horizontal viewports finish together.
       totals.style.marginRight = `${Math.max(0, table.offsetWidth - table.clientWidth)}px`;
-      sync();
+      const totalsTable = totals.querySelector("table");
+      if (totalsTable) {
+        const contentWidth = Math.max(table.scrollWidth, table.clientWidth);
+        totalsTable.style.width = `${contentWidth}px`;
+        totalsTable.style.minWidth = `${contentWidth}px`;
+      }
+      syncFromTable();
     };
     matchViewportWidth();
-    table.addEventListener("scroll", sync, { passive: true });
+    table.addEventListener("scroll", syncFromTable, { passive: true });
+    totals.addEventListener("scroll", syncFromTotals, { passive: true });
     const observer = new ResizeObserver(matchViewportWidth);
     observer.observe(table);
     return () => {
-      table.removeEventListener("scroll", sync);
+      table.removeEventListener("scroll", syncFromTable);
+      totals.removeEventListener("scroll", syncFromTotals);
       observer.disconnect();
     };
-  }, [activeTab, camp.colWidths, filtered.length]);
+  }, [activeTab, camp.colWidths, filtered.length, visibleColumns]);
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   const showColumn = (key: CampaignColumnKey) => visibleColumns.has(key);
@@ -1001,12 +1010,6 @@ export default function Campaigns() {
             <h1 className="text-lg font-black tracking-tight">Campanhas</h1>
             <span className="campaign-brand-badge grid h-7 w-7 place-items-center rounded-md border text-[9px] font-black">GD</span>
           </div>
-          {visibleAdAccounts.length > 0 && (
-            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-              <SelectTrigger className="campaign-account-select h-8 w-full text-left text-xs sm:w-[260px] [&>span]:truncate [&>span]:text-left" aria-label="Trocar conta de anúncio"><SelectValue placeholder="Conta de anúncio" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">Todas as contas de anúncio</SelectItem>{visibleAdAccounts.map((acc) => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
-            </Select>
-          )}
           <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-muted-foreground">
             <span className="campaign-opportunity-score grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-black">{Math.max(0, Math.min(100, Math.round((healthCounts.healthy / Math.max(campaigns.length, 1)) * 100)))}</span>
             <span className="truncate">Pontuação de oportunidade</span>
@@ -1041,6 +1044,10 @@ export default function Campaigns() {
 
       {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
       {actionIsError && <MotionItem className="border-b border-amber-500/30 bg-amber-500/5 p-3" role="alert"><p className="text-xs text-amber-700 dark:text-amber-300"><b>Não foi possível consultar as ações de resultado da Meta.</b> Os resultados por evento podem estar incompletos; os valores canônicos já salvos nos Insights permanecem em uso. {actionError instanceof Error ? actionError.message : "Tente atualizar os dados."}</p></MotionItem>}
+
+      <MotionItem className="campaign-kpi-strip shrink-0" aria-label="Resumo operacional das campanhas">
+        <CampaignKpiStrip totals={displayedTotals} totalCpl={totalCpl} totalCtr={totalCtr} />
+      </MotionItem>
 
       <MotionItem className={cn("campaigns-main-content", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("campaigns-main-tabs", !analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
@@ -1077,7 +1084,7 @@ export default function Campaigns() {
                 </DropdownMenuContent>
               </DropdownMenu>}
               {activeTab === "campaigns" ? <MetaTableControls preset={columnPreset} columns={visibleColumns} breakdown={breakdown} onPreset={setColumnPreset} onColumns={setVisibleColumns} onBreakdown={setBreakdown} onRequestBreakdown={requestBreakdownSync} isRequestingBreakdown={syncMeta.isPending} /> : <span className="flex items-center gap-2 text-[11px] text-muted-foreground"><SlidersHorizontal className="h-4 w-4" />Colunas redimensionáveis</span>}
-              {activeTab === "campaigns" && <Button variant="outline" size="sm" className={cn("campaign-action-button meta-toolbar-button", columnFiltersOpen && "meta-toolbar-button-active")} onClick={() => setColumnFiltersOpen((open) => !open)}><SlidersHorizontal className="h-3.5 w-3.5" />Filtros por coluna{activeColumnFilterCount > 0 && <Badge className="ml-1 h-4 min-w-4 px-1 text-[8px]">{activeColumnFilterCount}</Badge>}</Button>}
+              {activeTab === "campaigns" && <Button variant="outline" size="sm" className={cn("campaign-action-button meta-toolbar-button", columnFiltersOpen && "meta-toolbar-button-active")} onClick={() => setColumnFiltersOpen((open) => !open)}><SlidersHorizontal className="h-3.5 w-3.5" />Mais filtros{activeColumnFilterCount > 0 && <Badge className="ml-1 h-4 min-w-4 px-1 text-[8px]">{activeColumnFilterCount}</Badge>}</Button>}
             </div>
           </div>
 
@@ -1094,10 +1101,18 @@ export default function Campaigns() {
           )}
 
           <AnimatePresence>
-            {selectedIds.size > 0 && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-10 flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5">
+            {selectedIds.size > 0 && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="campaign-selection-toolbar flex min-h-11 flex-wrap items-center gap-2 border-b border-primary/20 bg-primary/5 px-3 py-1.5">
               <Badge variant="secondary">{selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}</Badge>
-              {activeTab === "campaigns" && <><Button size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })} className="h-7 gap-1.5"><Pencil className="h-3.5 w-3.5" />Editar orçamento e campanha</Button><Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-7 gap-1.5"><Eye className="h-3.5 w-3.5" />Ver desempenho</Button></>}
-              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-7 gap-1 text-xs"><X className="h-3 w-3" />Limpar</Button>
+              {activeTab === "campaigns" && <>
+                <Button size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setEditingEntity({ type: "campaign", id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status, dailyBudget: selectedCampaign.daily_budget ?? selectedCampaign.budget })} className="h-8 gap-1.5"><Pencil className="h-3.5 w-3.5" />Editar</Button>
+                <Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDetailCampaignId(selectedCampaign.id)} className="h-8 gap-1.5"><Eye className="h-3.5 w-3.5" />Ver detalhes</Button>
+                <Button variant="outline" size="sm" disabled={!selectedCampaign} onClick={() => selectedCampaign && setDuplicatingCampaign({ id: selectedCampaign.id, name: selectedCampaign.name, status: selectedCampaign.status })} className="h-8 gap-1.5"><CopyIcon className="h-3.5 w-3.5" />Duplicar</Button>
+                <Button variant="outline" size="sm" disabled title="Em breve" className="campaign-future-action h-8">Pausar/ativar <span>Em breve</span></Button>
+                <Button variant="outline" size="sm" disabled title="Em breve" className="campaign-future-action h-8">Publicar <span>Em breve</span></Button>
+                <Button variant="outline" size="sm" disabled title="Em breve" className="campaign-future-action h-8">Arquivar <span>Em breve</span></Button>
+                <Button variant="outline" size="sm" disabled title="Em breve" className="campaign-future-action h-8">Excluir <span>Em breve</span></Button>
+              </>}
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="ml-auto h-8 gap-1 text-xs"><X className="h-3 w-3" />Limpar</Button>
             </motion.div>}
           </AnimatePresence>
 
@@ -1170,6 +1185,7 @@ export default function Campaigns() {
               startDate={startDate}
               endDate={endDate}
               selectedCampaignIds={Array.from(selectedIds)}
+              onClose={() => updateAnalysisPanel(null)}
             />
           )}
 
@@ -1196,7 +1212,7 @@ export default function Campaigns() {
                 >
                   <table className="w-full caption-bottom text-sm [&_td]:overflow-hidden [&_td]:whitespace-nowrap" style={{ tableLayout: "fixed", width: "max-content" }}>
                     <TableHeader className="sticky top-0 z-50 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
-                      <TableRow className="campaign-metric-header h-10 border-b border-border hover:bg-transparent [&>th]:h-10 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e]">
+                      <TableRow className="campaign-metric-header h-11 border-b border-border hover:bg-transparent [&>th]:h-11 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e]">
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="sticky left-0 z-40 bg-muted dark:bg-[#11110f]">
                           <Checkbox className="h-4 w-4 rounded-full border-primary/80" checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
                         </ResizableHead>
@@ -1242,7 +1258,7 @@ export default function Campaigns() {
                           return (
                           <tr
                             key={c.id}
-                            className={`group h-11 ${c.catalogMissing ? "cursor-default" : "cursor-pointer"} border-b border-border transition-colors hover:bg-muted/60 [&>td]:px-3 [&>td]:py-1 dark:border-[#242424] dark:hover:bg-[#181818] ${selectedIds.has(c.id) ? "bg-muted/70" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
+                            className={`group h-12 ${c.catalogMissing ? "cursor-default" : "cursor-pointer"} border-b border-border transition-colors hover:bg-muted/60 [&>td]:px-3 [&>td]:py-1 dark:border-[#242424] dark:hover:bg-[#181818] ${selectedIds.has(c.id) ? "bg-muted/70" : "odd:bg-card even:bg-muted/20 dark:odd:bg-[#070706] dark:even:bg-[#0c0c0b]"}`}
                             onClick={() => !c.catalogMissing && setDetailCampaignId(c.id)}
                           >
                             <TableCell style={{ ...cellW("check"), left: 0 }} className={cn("sticky z-20 transition-colors group-hover:bg-muted", stickySurface)} onClick={(e) => e.stopPropagation()}>
@@ -1578,7 +1594,7 @@ export default function Campaigns() {
   );
 }
 
-function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, totalRoas, totalResultRate, series, campaigns, adsets, ads, accountId, accountName, startDate, endDate, selectedCampaignIds }: {
+function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, totalRoas, totalResultRate, series, campaigns, adsets, ads, accountId, accountName, startDate, endDate, selectedCampaignIds, onClose }: {
   totals: any;
   totalCtr: number;
   totalCpc: number;
@@ -1595,6 +1611,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
   startDate: Date;
   endDate: Date;
   selectedCampaignIds: string[];
+  onClose: () => void;
 }) {
   const [view, setView] = useState<"overview" | "metrics" | "campaigns" | "adsets" | "creatives" | "actions">("overview");
   const currency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1636,6 +1653,7 @@ function CampaignIntelligence({ totals, totalCtr, totalCpc, totalCpm, totalCpl, 
         <div className="flex items-center gap-2">
           <a href="/inteligencia" className="gd-button h-8 px-3 text-[10px]"><Sparkles className="h-3.5 w-3.5" />10 automações IA</a>
           <Badge variant="outline" className="w-fit">{daysWithData} de {series.length} dia(s) com dados</Badge>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onClose} aria-label="Fechar Intelligence" title="Fechar Intelligence"><X className="h-4 w-4" /></Button>
         </div>
       </header>
 
@@ -1859,6 +1877,22 @@ function CampaignTotalsRow({ widths, visibleColumns, count, totals, totalCpm, to
     {show("leads") && <CampaignTotalCell width={widths.leads} value={totals.results.toLocaleString("pt-BR")} label={leadPartsLabel} />}{show("cpl") && <CampaignTotalCell width={widths.cpl} value={money(totalCpl)} label="Por resultado" />}{show("spend") && <CampaignTotalCell width={widths.spend} value={money(totals.spend)} label="Total usado" />}{show("landingPageViews") && <CampaignTotalCell width={widths.landingPageViews} value={totals.landingPageViews.toLocaleString("pt-BR")} label="Total" />}{show("costPerLandingPageView") && <CampaignTotalCell width={widths.costPerLandingPageView} value={money(totalCostPerLandingPageView)} label="Por visualização" />}{show("checkouts") && <CampaignTotalCell width={widths.checkouts} value={totals.checkouts.toLocaleString("pt-BR")} label="Total" />}{show("costPerCheckout") && <CampaignTotalCell width={widths.costPerCheckout} value={money(totalCostPerCheckout)} label="Por finalização" />}{show("metaPurchases") && <CampaignTotalCell width={widths.metaPurchases} value={totals.metaPurchases.toLocaleString("pt-BR")} label="Total" />}{show("metaCostPerPurchase") && <CampaignTotalCell width={widths.metaCostPerPurchase} value={money(totalMetaCostPerPurchase)} label="Por compra" />}{show("metaPurchaseRoas") && <CampaignTotalCell width={widths.metaPurchaseRoas} value={decimal(totalMetaPurchaseRoas, "x")} label="Retorno total" />}
     {show("objective") && <CampaignTotalCell width={widths.objective} value="—" />}{show("clicks") && <CampaignTotalCell width={widths.clicks} value={totals.clicks.toLocaleString("pt-BR")} label="Total" />}{show("cpc") && <CampaignTotalCell width={widths.cpc} value={money(totalCpc)} label="Por clique" />}{show("ctr") && <CampaignTotalCell width={widths.ctr} value={decimal(totalCtr, "%")} label="Taxa total" />}{show("conversion") && <CampaignTotalCell width={widths.conversion} value={decimal(totalResultRate, "%")} label="Taxa total" />}{show("sales") && <CampaignTotalCell width={widths.sales} value={totals.salesCount.toLocaleString("pt-BR")} label="Total" />}{show("cpa") && <CampaignTotalCell width={widths.cpa} value={money(totals.salesCount ? totals.spend / totals.salesCount : 0)} label="Por venda" />}{show("revenue") && <CampaignTotalCell width={widths.revenue} value={money(totals.revenue)} label="Valor total" />}{show("roas") && <CampaignTotalCell width={widths.roas} value={decimal(totalRoas, "x")} label="Retorno total" />}{show("profit") && <CampaignTotalCell width={widths.profit} value={money(totals.profit)} label="Total" />}{show("roi") && <CampaignTotalCell width={widths.roi} value={decimal(totals.spend ? totals.profit / totals.spend * 100 : 0, "%")} label="Retorno total" />}{show("videoViews") && <CampaignTotalCell width={widths.videoViews} value="—" label="Não sincronizado" />}
   </TableRow>;
+}
+
+function CampaignKpiStrip({ totals, totalCpl, totalCtr }: { totals: any; totalCpl: number; totalCtr: number }) {
+  const currency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+  const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  const metrics = [
+    { label: "Investimento", value: currency(Number(totals.spend || 0)) },
+    { label: "Resultados", value: number(Number(totals.results || 0)) },
+    { label: "Custo por resultado", value: currency(Number(totalCpl || 0)) },
+    { label: "Impressões", value: number(Number(totals.impressions || 0)) },
+    { label: "Cliques", value: number(Number(totals.clicks || 0)) },
+    { label: "CTR", value: `${Number(totalCtr || 0).toFixed(2).replace(".", ",")}%` },
+  ];
+  return <section className="campaign-kpi-grid">
+    {metrics.map((metric) => <article key={metric.label} className="campaign-kpi-card"><span>{metric.label}</span><strong>{metric.value}</strong></article>)}
+  </section>;
 }
 
 function TotalMetric({ label, value }: { label: string; value: string }) {

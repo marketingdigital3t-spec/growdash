@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -66,6 +66,9 @@ export default function TrafficPage() {
   const activeTab = validTabs.has(params.get("aba") || "") ? params.get("aba")! : "campaigns";
   const campaignAnalysisMode = activeTab === "campaigns" && ["alerts", "intelligence"].includes(params.get("analise") || "");
   const scrollMode = activeTab === "campaigns" && !campaignAnalysisMode ? "locked" : "content";
+  useEffect(() => {
+    if (scrollMode === "locked") window.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollMode]);
   const { adAccountId, setAdAccountId, adAccountIds, startDate, endDate, businessUnitId, segment } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
   const visibleAccounts = useMemo(() => businessUnitId

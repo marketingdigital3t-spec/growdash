@@ -10677,3 +10677,261 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
     white-space: nowrap !important;
   }
 }
+
+/* Traffic Manager visual contract ----------------------------------------
+   Final authority for the paid-traffic workspace. The normal campaign mode
+   locks the viewport; table and toolbars own their horizontal overflow, while
+   Intelligence opts into the content scroller. */
+.traffic-page-shell {
+  --traffic-gutter: 24px;
+  --traffic-block-gap: 12px;
+  --traffic-nav-width: 56px;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  max-width: 1920px;
+  margin-inline: auto;
+}
+
+.traffic-page-shell:has([data-traffic-nav][data-expanded="true"]) {
+  --traffic-nav-width: 208px;
+}
+
+.traffic-page-content {
+  min-width: 0;
+  width: 100%;
+  max-width: 1920px;
+  margin-inline: auto;
+}
+
+.traffic-nav-rail {
+  width: var(--traffic-nav-width) !important;
+  min-width: var(--traffic-nav-width);
+  overflow: hidden;
+}
+
+.traffic-nav-items {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.traffic-nav-item,
+.traffic-nav-toggle {
+  min-height: 44px;
+}
+
+.campaigns-workspace {
+  --campaign-gap: 12px;
+  --campaign-card-padding: 16px;
+  min-width: 0;
+  width: 100%;
+}
+
+.campaign-kpi-strip {
+  min-width: 0;
+  padding: var(--campaign-gap) 0;
+}
+
+.campaign-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--campaign-gap);
+  min-width: 0;
+}
+
+.campaign-kpi-card {
+  display: flex;
+  min-width: 0;
+  min-height: 80px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--campaign-card-padding);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  box-shadow: 0 8px 18px -18px hsl(var(--foreground) / .55);
+}
+
+.campaign-kpi-card span {
+  overflow: hidden;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.campaign-kpi-card strong {
+  overflow: hidden;
+  color: hsl(var(--foreground));
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campaign-selection-toolbar {
+  min-height: 44px;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+.campaign-selection-toolbar > * {
+  flex: 0 0 auto;
+}
+
+.campaign-selection-toolbar .campaign-future-action {
+  gap: 6px;
+  color: hsl(var(--muted-foreground));
+  opacity: .66;
+}
+
+.campaign-selection-toolbar .campaign-future-action span {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.campaigns-workspace .campaign-table-frame {
+  min-width: 0;
+}
+
+.campaigns-workspace [data-campaign-table-scroll],
+.campaigns-workspace [data-campaign-totals-bar] {
+  min-width: 0;
+  scrollbar-color: hsl(var(--muted-foreground) / .35) transparent;
+  scrollbar-width: thin;
+}
+
+.campaigns-workspace [data-campaign-table-scroll] table,
+.campaigns-workspace [data-campaign-totals-bar] table {
+  min-width: max-content;
+}
+
+.campaigns-workspace [data-campaign-table-scroll] th {
+  height: 44px;
+  padding-inline: 12px;
+}
+
+.campaigns-workspace [data-campaign-table-scroll] tbody tr {
+  height: 48px;
+}
+
+.campaigns-workspace [data-campaign-table-scroll] td,
+.campaigns-workspace [data-campaign-totals-bar] td {
+  padding-inline: 12px;
+}
+
+.campaigns-workspace [data-campaign-totals-bar] {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.campaigns-workspace [data-campaign-totals-bar] table {
+  table-layout: fixed;
+}
+
+@media (min-width: 768px) {
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode]) .traffic-page-shell {
+    padding: var(--traffic-gutter) calc(var(--traffic-gutter) + var(--traffic-nav-width) + 16px) var(--traffic-gutter) var(--traffic-gutter) !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-actions-toolbar,
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-scope-toolbar {
+    flex-wrap: nowrap;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame {
+    flex: 1 1 0 !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .campaign-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode]) .traffic-page-shell,
+  .traffic-page-shell[data-scroll-mode="locked"],
+  .traffic-page-shell[data-scroll-mode="content"] {
+    padding: 12px 12px calc(12px + 5rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .traffic-page-content {
+    max-width: 100%;
+  }
+
+  .campaign-kpi-strip {
+    overflow-x: auto;
+    padding-block: 8px;
+  }
+
+  .campaign-kpi-grid {
+    display: flex;
+    width: max-content;
+    gap: 12px;
+  }
+
+  .campaign-kpi-card {
+    width: 132px;
+    max-width: none !important;
+    flex: 0 0 132px !important;
+    min-height: 72px;
+    padding: 12px;
+  }
+
+  .campaign-kpi-card strong {
+    font-size: 15px;
+  }
+
+  .campaign-selection-toolbar {
+    min-height: 48px;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame > .space-y-2 {
+    min-height: 0;
+    flex: 1 1 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Keep the compact area rail attached to the viewport instead of the
+     content column. It must not consume layout height or push campaigns below
+     the fold on a 390px screen. */
+  .traffic-nav-rail,
+  .traffic-nav-rail[data-expanded="false"] {
+    position: fixed !important;
+    top: auto !important;
+    right: 12px !important;
+    bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+    left: 12px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-height: 68px !important;
+  }
+
+  .traffic-page-shell[data-scroll-mode="locked"] {
+    height: calc(100dvh - 255px) !important;
+    max-height: calc(100dvh - 255px) !important;
+  }
+
+  html:has(.traffic-page-shell[data-scroll-mode="locked"]),
+  body:has(.traffic-page-shell[data-scroll-mode="locked"]),
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+}
