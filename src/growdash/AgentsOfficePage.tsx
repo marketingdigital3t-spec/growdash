@@ -502,8 +502,12 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
         <svg className="growdash-spatial-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           <defs><linearGradient id="growdash-map-link" x1="0" x2="1"><stop stopColor="#fff" stopOpacity=".12" /><stop offset=".5" stopColor="#fff" stopOpacity=".72" /><stop offset="1" stopColor="#fff" stopOpacity=".12" /></linearGradient></defs>
           {SPATIAL_GRAPH_EDGES.map(([fromId, toId], index) => {
-            const from = SPATIAL_GRAPH_NODES.find((node) => node.id === fromId)!;
-            const to = SPATIAL_GRAPH_NODES.find((node) => node.id === toId)!;
+            const from = SPATIAL_GRAPH_NODES.find((node) => node.id === fromId);
+            const to = SPATIAL_GRAPH_NODES.find((node) => node.id === toId);
+            // A cross-area connection is optional context. If a strategy is
+            // renamed or unavailable in a partial deployment, skip only that
+            // edge instead of taking the whole command center down.
+            if (!from || !to) return null;
             return <line key={`${fromId}-${toId}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} style={{ "--map-delay": `${-(index % 10) * .25}s` } as React.CSSProperties} />;
           })}
         </svg>
