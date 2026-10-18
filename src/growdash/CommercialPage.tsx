@@ -64,7 +64,7 @@ export default function CommercialPage() {
   } = useGlobalFilters();
   const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
   const { data: sales = [], isLoading, isError: salesIsError, error: salesError } = useSales({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
-  const { data: rdDeals = [], isError: rdIsError, error: rdError } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
+  const { data: rdDeals = [], resolvedFunnelIds, isError: rdIsError, error: rdError } = useRDDealsForPeriod({ startDate, endDate, adAccountId: accountFilter, adAccountIds, funnelIds });
   const { data: products = [], isError: productsIsError, error: productsError } = useProducts();
   const { data: adAccounts = [], isError: accountsIsError, error: accountsError } = useAdAccounts();
   const effectiveWorkspaceId = workspaceId || adAccounts.find((account) => account.workspace_id)?.workspace_id;
@@ -211,7 +211,23 @@ export default function CommercialPage() {
     });
   }, [detailAccountFilter, detailProductFilter, detailSearch, detailSellerFilter, detailStatusFilter, filtered]);
   const goals = useMemo(() => new Map((goalData?.rows ?? []).map((goal) => [goal.ad_account_id, Number(goal.target_revenue)])), [goalData?.rows]);
-  const rankingDeals = useMemo(() => rdDeals.filter((deal) => visibleAccounts.some((account) => account.id === deal.ad_account_id) && (sellerFilter === "all" || deal.deal_owner_name === sellerFilter)), [rdDeals, sellerFilter, visibleAccounts]);
+  const rankingDeals = useMemo(() => {
+    const visibleAccountIds = new Set(visibleAccounts.map((account) => account.id));
+    const scopedFunnelIds = new Set((resolvedFunnelIds ?? []).filter((id) => id !== "__no_linked_rd_funnels__"));
+    const hasExplicitAccountScope = adAccountIds.length > 0 || selectedExpertIds.length > 0;
+    return rdDeals.filter((deal) => {
+      const visibleByAccount = deal.ad_account_id
+        ? visibleAccountIds.has(deal.ad_account_id)
+        : hasExplicitAccountScope
+          ? scopedFunnelIds.has(deal.rd_funnel_id || "")
+          : true;
+      return visibleByAccount && (sellerFilter === "all" || deal.deal_owner_name === sellerFilter);
+    }).map((deal) => (
+      !deal.ad_account_id && adAccountIds.length === 1 && scopedFunnelIds.has(deal.rd_funnel_id || "")
+        ? { ...deal, ad_account_id: adAccountIds[0] }
+        : deal
+    ));
+  }, [adAccountIds, rdDeals, resolvedFunnelIds, selectedExpertIds.length, sellerFilter, visibleAccounts]);
   const accountRankings = useMemo(() => buildCommercialAccountRankings({ sales: filtered, deals: rankingDeals, accounts: rankingAccountOptions, goals }), [filtered, goals, rankingAccountOptions, rankingDeals]);
   const filteredExpertLinks = useMemo(() => expertScope.filter((link) => (!adAccountIds.length || adAccountIds.includes(link.adAccountId)) && (!selectedExpertIds.length || selectedExpertIds.includes(link.expertId))), [adAccountIds, expertScope, selectedExpertIds]);
   const expertRankings = useMemo(() => buildCommercialExpertRankings(accountRankings, filteredExpertLinks), [accountRankings, filteredExpertLinks]);
@@ -364,12 +380,12 @@ function CommercialLeaderboard({ account, accounts, isLoading, metric, onMetricC
     <div className="relative p-4 sm:p-6 xl:p-8">
       <header className="flex flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0"><div className="flex items-center gap-2 text-[#f6c94c]"><Trophy className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-[.28em]">Ranking Comercial</span></div><h2 className="mt-2 text-2xl font-black tracking-[-.045em] text-white sm:text-3xl">Painel de performance</h2><p className="mt-1 text-xs text-slate-400">Classificação calculada somente com vendas confirmadas no período.</p></div>
-        <div className="flex flex-wrap items-end justify-end gap-2">
-          <AccountMultiSelect accounts={accountOptions} selectedIds={selectedAccountIds} onChange={onAccountsChange} popoverClassName="z-[360]" ariaLabel="Selecionar contas do ranking comercial" />
-          <OptionMultiSelect options={expertOptions} selectedIds={selectedExpertIds} onChange={onExpertsChange} popoverClassName="z-[360]" emptyLabel="Todos os experts" emptyMessage="Este expert não possui contas de anúncio vinculadas." ariaLabel="Selecionar experts do ranking comercial" />
-          <select aria-label="Filtrar por vendedor" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={sellerFilter} onChange={(event) => onSellerFilterChange(event.target.value)}><option value="all">Todos os vendedores</option>{sellerOptions.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
-          <select aria-label="Filtrar por produto" className="gd-button min-w-40 border-white/10 bg-white/[.045] text-slate-100" value={productFilter} onChange={(event) => onProductFilterChange(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
-          {focusMode && <MetaDateRangePicker preset={preset} onPresetChange={onPresetChange} customRange={customRange} onCustomRangeChange={onCustomRangeChange} startDate={startDate} endDate={endDate} popoverClassName="z-[360]" className="border-white/10 bg-white/[.045] text-slate-100" />}
+        <div className="commercial-ranking-controls flex flex-wrap items-end justify-end gap-2">
+          <AccountMultiSelect accounts={accountOptions} selectedIds={selectedAccountIds} onChange={onAccountsChange} popoverClassName="z-[360]" ariaLabel="Selecionar contas do ranking comercial" className="commercial-ranking-control" />
+          <OptionMultiSelect options={expertOptions} selectedIds={selectedExpertIds} onChange={onExpertsChange} popoverClassName="z-[360]" emptyLabel="Todos os experts" emptyMessage="Este expert não possui contas de anúncio vinculadas." ariaLabel="Selecionar experts do ranking comercial" className="commercial-ranking-control" />
+          <select aria-label="Filtrar por vendedor" className="commercial-ranking-control gd-button border-white/10 bg-white/[.045] text-slate-100" value={sellerFilter} onChange={(event) => onSellerFilterChange(event.target.value)}><option value="all">Todos os vendedores</option>{sellerOptions.map((seller) => <option key={seller} value={seller}>{seller}</option>)}</select>
+          <select aria-label="Filtrar por produto" className="commercial-ranking-control gd-button border-white/10 bg-white/[.045] text-slate-100" value={productFilter} onChange={(event) => onProductFilterChange(event.target.value)}><option value="all">Todos os produtos</option>{productOptions.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}</select>
+          {focusMode && <MetaDateRangePicker preset={preset} onPresetChange={onPresetChange} customRange={customRange} onCustomRangeChange={onCustomRangeChange} startDate={startDate} endDate={endDate} popoverClassName="z-[360]" className="commercial-ranking-control border-white/10 bg-white/[.045] text-slate-100" />}
           <div className="rounded-xl border border-white/10 bg-white/[.045] px-3 py-2"><p className="text-[9px] font-bold uppercase tracking-[.17em] text-slate-500">Período atual</p><p className="mt-0.5 text-xs font-black tracking-wide text-[#f5deb0]">{periodLabel}</p></div>
           <button type="button" aria-label={focusMode ? "Restaurar tela do ranking" : "Mostrar somente o ranking"} aria-pressed={focusMode} onClick={toggleFocusMode} className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[.045] text-slate-300 transition hover:border-[#f6c94c]/50 hover:text-[#f6c94c]">{focusMode ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}</button>
         </div>

@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Plus } from "lucide-react";
 import { SalesDialog } from "@/components/dashboard/SalesDialog";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { useInsights } from "@/hooks/useInsights";
@@ -17,7 +16,6 @@ import { excludedOperationalRDDealIds, filterOperationalRDDeals } from "@/lib/cr
 import { differenceInCalendarDays, format } from "date-fns";
 import { businessDateKey } from "@/lib/businessDate";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
-import { Button } from "@/components/ui/button";
 import { DashboardProvider } from "@/contexts/DashboardContext";
 import { DashboardGrid, buildWidgetFromDef } from "@/components/dashboard/grid/DashboardGrid";
 import { FALLBACK_DASHBOARD_VIEW_ID, useGlobalView, useSaveView, type DashboardView } from "@/hooks/useDashboardViews";
@@ -365,9 +363,6 @@ const Index = () => {
             <h1 className="text-2xl font-bold">Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-1">Visão geral financeira e de performance · Meta: última sincronização {dashboardMeta.data.syncedAt ? `às ${new Date(dashboardMeta.data.syncedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : "não confirmada"}</p>
           </div>
-          <Button className="gd-primary-action" onClick={() => { setEditingSale(null); setSalesDialogOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />Registrar Venda
-          </Button>
         </div>
       </MotionItem>
 

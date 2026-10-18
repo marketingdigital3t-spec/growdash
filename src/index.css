@@ -11218,9 +11218,41 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   .brand-shell .dashboard-page .gd-glass-metric { min-height: 72px !important; padding: 8px !important; }
 }
 
+/* The Dashboard canvas should not show the page-level scrollbar. The sidebar
+   remains an independent scroll container through its own `nav` element. */
+html:has(.brand-shell[data-dashboard-scene="true"]),
+body:has(.brand-shell[data-dashboard-scene="true"]) {
+  scrollbar-width: none;
+}
+
+html:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar,
+body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* Final Meta-style geometry for Campanhas. The manager is one continuous
    surface: controls use one compact radius, hierarchy tabs are flat, and the
    totals row is part of the table instead of a second outlined card. */
+.commercial-ranking-controls .commercial-ranking-control {
+  box-sizing: border-box !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  flex: 0 0 220px !important;
+  justify-content: space-between !important;
+}
+
+@media (max-width: 767px) {
+  .commercial-ranking-controls .commercial-ranking-control {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex-basis: 100% !important;
+  }
+}
+
 .campaigns-workspace .campaign-manager-top {
   margin-bottom: 12px !important;
   overflow: hidden !important;

@@ -160,7 +160,18 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
           // the selected interval must not be lost by a lead_created filter.
           .or(`and(lead_created_at.gte.${rangeStart},lead_created_at.lte.${rangeEnd}),and(closed_at.gte.${rangeStart},closed_at.lte.${rangeEnd}),and(closed_at.is.null,stage_updated_at.gte.${rangeStart},stage_updated_at.lte.${rangeEnd})`)
           .order("lead_created_at", { ascending: false });
-        if (resolvedFunnelIds?.length) q = q.in("rd_funnel_id", resolvedFunnelIds);
+        const usableFunnelIds = (resolvedFunnelIds ?? []).filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
+        if (usableFunnelIds.length && selectedAccountIds.length) {
+          // Keep the period as the only server-side `or` expression. The
+          // PostgREST client appends repeated `or` params, which is not a
+          // reliable AND between `(date A OR date B)` and `(funnel OR direct
+          // account)`. The final client-side scope check below applies both
+          // account paths without risking an empty or widened response.
+        } else if (usableFunnelIds.length) {
+          q = q.in("rd_funnel_id", usableFunnelIds);
+        } else if (selectedAccountIds.length) {
+          q = q.in("ad_account_id", selectedAccountIds);
+        }
         const from = p * PAGE;
         const to = from + PAGE - 1;
         const { data, error } = await withRequestTimeout(q.range(from, to), 15_000);
@@ -191,7 +202,14 @@ export function useRDDealsForPeriod({ startDate, endDate, adAccountId, adAccount
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
-  return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
+  return {
+    ...query,
+    resolvedFunnelIds,
+    isLoading: query.isLoading || rdScope.loading,
+    isFetching: query.isFetching || rdScope.loading,
+    isError: query.isError || Boolean(rdScope.error),
+    error: query.error ?? rdScope.error,
+  };
 }
 
 /**
