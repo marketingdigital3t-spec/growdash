@@ -11338,6 +11338,19 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   background: #f5f6f8 !important;
 }
 
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] td {
+  background: #f7f8fa !important;
+  color: #1c1e21 !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] strong {
+  color: #1c1e21 !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] span {
+  color: #606770 !important;
+}
+
 .campaigns-workspace .campaign-name-cell,
 .campaigns-workspace .campaign-name-cell .text-foreground,
 .campaigns-workspace [data-campaign-table-scroll] tbody tr > td {
