@@ -15,6 +15,7 @@ import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, recordRun
 import GrowdashLayout from "@/growdash/GrowdashLayout";
 import BusinessWorkspacePage, { BusinessUnavailablePage } from "@/growdash/BusinessWorkspacePage";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
+import AgentsOfficePage from "@/growdash/AgentsOfficePage";
 
 // Route modules must remain lazy here as well as in the layout preloader.
 // Statically importing them defeated code splitting and made one stale asset
@@ -41,7 +42,6 @@ const ProfilePage = lazyWithRetry(() => import("@/growdash/ProfilePage"), "profi
 const SocialMediaPage = lazyWithRetry(() => import("@/growdash/SocialMediaPage"), "social-media");
 const AnnouncementsPage = lazyWithRetry(() => import("@/growdash/AnnouncementsPage"), "announcements");
 const ModulePage = lazyWithRetry(() => import("@/growdash/ModulePage"), "module");
-const AgentsOfficePage = lazyWithRetry(() => import("@/growdash/AgentsOfficePage"), "agent-office");
 const TrafficAgentPage = lazyWithRetry(() => import("@/growdash/TrafficAgentPage"), "traffic-agent");
 const BrandDiagnosticPage = lazyWithRetry(() => import("@/growdash/BrandDiagnosticPage"), "brand-diagnostic");
 const IntelligenceCenterPage = lazyWithRetry(() => import("@/growdash/IntelligenceCenterPage"), "intelligence-center");
