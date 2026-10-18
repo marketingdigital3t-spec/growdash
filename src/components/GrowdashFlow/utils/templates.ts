@@ -71,8 +71,8 @@ export function createSqlTrafficFunnelTemplate(): DrawElement[] {
     elements.push(base("rectangle", x, 180, 260, 465, 1, { fillColor: "#0c0c0d", strokeColor: stage.color, strokeWidth: 2 }));
     elements.push(base("rectangle", x + 18, 155, 224, 54, 3, { fillColor: stage.fill, strokeColor: stage.color, strokeWidth: 2 }));
     elements.push(base("text", x + 30, 168, 200, 36, 4, { text: stage.title, strokeColor: "#f7f7f7", fontSize: 13, fontFamily: "Inter", autoSize: false }));
-    elements.push(base("text", x + 25, 238, 210, 48, 4, { text: stage.campaign, strokeColor: stage.color, fontSize: 17, fontFamily: "Inter", autoSize: false }));
-    elements.push(base("text", x + 25, 300, 210, 36, 4, { text: stage.budget, strokeColor: "#eeeeee", fontSize: 13, fontFamily: "Inter", autoSize: false }));
+    elements.push(base("text", x + 25, 238, 210, 58, 4, { text: stage.campaign, strokeColor: stage.color, fontSize: 16, fontFamily: "Inter", autoSize: false }));
+    elements.push(base("text", x + 25, 310, 210, 36, 4, { text: stage.budget, strokeColor: "#eeeeee", fontSize: 13, fontFamily: "Inter", autoSize: false }));
     elements.push(base("sticky", x + 22, 354, 216, 78, 3, { text: `PÚBLICO\n${stage.audience}`, fillColor: stage.fill, strokeColor: stage.color, strokeWidth: 1, fontSize: 13, fontFamily: "Inter" }));
     elements.push(base("sticky", x + 22, 448, 216, 66, 3, { text: stage.content, fillColor: "#151515", strokeColor: "#5b5b5b", strokeWidth: 1, fontSize: 13, fontFamily: "Inter" }));
     elements.push(base("sticky", x + 22, 530, 216, 62, 3, { text: stage.exit, fillColor: "#1b1810", strokeColor: "#d7ae37", strokeWidth: 2, fontSize: 12, fontFamily: "Inter" }));
@@ -116,11 +116,11 @@ export function normalizeSqlTrafficFunnelElements(elements: DrawElement[]): Draw
       if (stageTitleIndex !== undefined) return { ...element, x: stageX[stageTitleIndex] + 30, y: 168, width: 200, height: 36, fontSize: 13, autoSize: false };
       if (element.text?.startsWith("CAMPANHA")) {
         const index = stageIndexFor(element);
-        return index === null ? element : { ...element, x: stageX[index] + 25, y: 238, width: 210, height: 48, fontSize: 17, autoSize: false };
+        return index === null ? element : { ...element, x: stageX[index] + 25, y: 238, width: 210, height: 58, fontSize: 16, autoSize: false };
       }
       if (element.text?.includes("budget")) {
         const index = stageIndexFor(element);
-        return index === null ? element : { ...element, x: stageX[index] + 25, y: 300, width: 210, height: 36, fontSize: 13, autoSize: false };
+        return index === null ? element : { ...element, x: stageX[index] + 25, y: 310, width: 210, height: 36, fontSize: 13, autoSize: false };
       }
       if (element.text === "DISTRIBUIÇÃO DO BUDGET") return { ...element, x: 98, y: 699, width: 235, height: 34, fontSize: 14, autoSize: false };
       if (["25–30%", "35–40%", "20–25%", "10–15%"].includes(element.text || "")) {
