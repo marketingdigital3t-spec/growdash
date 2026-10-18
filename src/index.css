@@ -3512,6 +3512,13 @@ html:not(.dark) {
   border-radius: 0 !important;
 }
 
+/* A page-transition filter creates a containing block for fixed descendants.
+   Disable only that zero-blur wrapper while focus mode is active so the
+   fallback maximizer can escape the app content frame. */
+.gd-page-transition:has(.growdash-flow-shell-maximized) {
+  filter: none !important;
+}
+
 .dark .growdash-flow-shell {
   --flow-chrome-bg: hsl(var(--card) / .94);
   --flow-chrome-fg: hsl(var(--foreground));
