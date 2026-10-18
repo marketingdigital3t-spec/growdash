@@ -85,11 +85,18 @@ function dateOf(value: unknown): number | null {
 }
 
 function leadHasCompleteTracking(lead: MetaLead): boolean {
-  return TRACKING_FIELDS.every((field) => clean(lead[field.key]));
+  return Boolean(lead.campaign_id && lead.adset_id && lead.ad_id && lead.form_id)
+    && TRACKING_FIELDS.every((field) => clean(lead[field.key]));
 }
 
 function trackingFingerprint(lead: MetaLead): string {
-  return TRACKING_FIELDS.map((field) => `${field.key}=${clean(lead[field.key]) || ""}`).join("|");
+  return [
+    `campaign_id=${clean(lead.campaign_id) || ""}`,
+    `adset_id=${clean(lead.adset_id) || ""}`,
+    `ad_id=${clean(lead.ad_id) || ""}`,
+    `form_id=${clean(lead.form_id) || ""}`,
+    ...TRACKING_FIELDS.map((field) => `${field.key}=${clean(lead[field.key]) || ""}`),
+  ].join("|");
 }
 
 async function stableUuid(value: string): Promise<string> {
@@ -185,9 +192,7 @@ function dealMatchesLead(deal: RdDeal, lead: MetaLead): { match: boolean; score:
 
 async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal): Promise<TrackingResult> {
   if (!deal.rd_connection_id) return { status: "skipped", rd_deal_id: deal.rd_deal_id, reason: "rd_connection_missing" };
-  if (!leadHasCompleteTracking(lead)) {
-    return { status: "partial", rd_deal_id: deal.rd_deal_id, reason: "meta_tracking_incomplete" };
-  }
+  const trackingComplete = leadHasCompleteTracking(lead);
 
   const { data: connection, error: connectionError } = await admin
     .from("rd_account_connections")
@@ -206,7 +211,13 @@ async function writeAttribution(admin: AdminClient, lead: MetaLead, deal: RdDeal
   const patchedFields = customFieldPatch(deal.raw, configs || [], lead);
   const fingerprint = trackingFingerprint(lead);
   const noteCorrelation = await stableUuid(`meta-rd-note:${lead.meta_lead_id}:${deal.rd_deal_id}:${fingerprint}`);
-  const result: TrackingResult = { status: "written", rd_deal_id: deal.rd_deal_id, note: "skipped", custom_fields: "skipped" };
+  const result: TrackingResult = {
+    status: trackingComplete ? "written" : "partial",
+    rd_deal_id: deal.rd_deal_id,
+    note: "skipped",
+    custom_fields: "skipped",
+    reason: trackingComplete ? undefined : "meta_tracking_incomplete",
+  };
 
   try {
     const noteWrite = await executeRDWrite({
@@ -264,13 +275,46 @@ async function loadLead(admin: AdminClient, metaLeadId: string): Promise<MetaLea
 }
 
 async function findDealsForLead(admin: AdminClient, lead: MetaLead): Promise<RdDeal[]> {
-  const { data, error } = await admin
-    .from("rd_deals")
-    .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
-    .eq("ad_account_id", lead.ad_account_id)
-    .limit(500);
-  if (error) throw error;
-  return (data || [])
+  const candidates: RdDeal[] = [];
+  const email = normalizeEmail(lead.email);
+  const phone = normalizePhone(lead.phone);
+  if (email) {
+    const { data, error } = await admin
+      .from("rd_deals")
+      .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
+      .eq("ad_account_id", lead.ad_account_id)
+      .ilike("contact_email", email)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
+  if (phone) {
+    const { data, error } = await admin
+      .from("rd_deals")
+      .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
+      .eq("ad_account_id", lead.ad_account_id)
+      .eq("contact_phone", phone)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+    if (!(data || []).length) {
+      // RD commonly returns Brazilian phones with +55, spaces or punctuation.
+      // The expression index protects SQL-side joins, but PostgREST cannot
+      // filter an expression directly, so only use this bounded fallback when
+      // the canonical value lookup found nothing.
+      const { data: formatted, error: formattedError } = await admin
+        .from("rd_deals")
+        .select("id,user_id,rd_connection_id,rd_deal_id,ad_account_id,contact_email,contact_phone,lead_created_at,stage_updated_at,closed_at,raw")
+        .eq("ad_account_id", lead.ad_account_id)
+        .not("contact_phone", "is", null)
+        .order("lead_created_at", { ascending: false })
+        .limit(5000);
+      if (formattedError) throw formattedError;
+      candidates.push(...(formatted || []).filter((deal: RdDeal) => normalizePhone(deal.contact_phone) === phone));
+    }
+  }
+  const unique = [...new Map(candidates.map((deal) => [deal.rd_deal_id, deal])).values()];
+  return unique
     .map((deal: RdDeal) => ({ deal, match: dealMatchesLead(deal, lead) }))
     .filter((item: any) => item.match.match)
     .sort((a: any, b: any) => b.match.score - a.match.score)
@@ -278,13 +322,41 @@ async function findDealsForLead(admin: AdminClient, lead: MetaLead): Promise<RdD
 }
 
 async function findLeadForDeal(admin: AdminClient, deal: RdDeal): Promise<MetaLead | null> {
-  const { data, error } = await admin
-    .from("meta_leads")
-    .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
-    .eq("ad_account_id", deal.ad_account_id)
-    .limit(1000);
-  if (error) throw error;
-  return (data || [])
+  const candidates: MetaLead[] = [];
+  const email = normalizeEmail(deal.contact_email);
+  const phone = normalizePhone(deal.contact_phone);
+  if (email) {
+    const { data, error } = await admin
+      .from("meta_leads")
+      .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
+      .eq("ad_account_id", deal.ad_account_id)
+      .ilike("email", email)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+  }
+  if (phone) {
+    const { data, error } = await admin
+      .from("meta_leads")
+      .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
+      .eq("ad_account_id", deal.ad_account_id)
+      .eq("phone", phone)
+      .limit(100);
+    if (error) throw error;
+    candidates.push(...(data || []));
+    if (!(data || []).length) {
+      const { data: formatted, error: formattedError } = await admin
+        .from("meta_leads")
+        .select("meta_lead_id,ad_account_id,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,email,phone,created_time,raw")
+        .eq("ad_account_id", deal.ad_account_id)
+        .not("phone", "is", null)
+        .order("created_time", { ascending: false })
+        .limit(5000);
+      if (formattedError) throw formattedError;
+      candidates.push(...(formatted || []).filter((lead: MetaLead) => normalizePhone(lead.phone) === phone));
+    }
+  }
+  return [...new Map(candidates.map((lead) => [lead.meta_lead_id, lead])).values()]
     .map((lead: MetaLead) => ({ lead, match: dealMatchesLead(deal, lead) }))
     .filter((item: any) => item.match.match)
     .sort((a: any, b: any) => b.match.score - a.match.score)

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { syncMetaLeadToRD } from "../_shared/metaLeadRdSync.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -274,7 +275,7 @@ async function hydrateMissingAttribution(
     row.form_name ||= row.form_id ? formNames.get(String(row.form_id)) || null : null;
     row.platform ||= usableAttributionText((row.raw as any)?.site_source_name || (row.raw as any)?.publisher_platform);
     row.placement ||= usableAttributionText((row.raw as any)?.platform_position || (row.raw as any)?.placement);
-    row.attribution_status = row.campaign_id && row.adset_id && row.ad_id && row.campaign_name && row.adset_name && row.ad_name && row.form_name && row.platform && row.placement
+    row.attribution_status = row.campaign_id && row.adset_id && row.ad_id && row.form_id && row.campaign_name && row.adset_name && row.ad_name && row.form_name && row.platform && row.placement
       ? "captured"
       : "partial";
   }
@@ -296,6 +297,14 @@ async function fetchAll(
     seen.add(next);
     const r: Response = await fetch(next);
     const json: any = await r.json();
+    if (!r.ok) {
+      return {
+        data: all,
+        pages,
+        lastCursor,
+        error: json?.error?.message || `Meta respondeu HTTP ${r.status}`,
+      };
+    }
     if (json.error) {
       return { data: all, pages, lastCursor, error: json.error.message || String(json.error) };
     }
@@ -659,6 +668,9 @@ Deno.serve(async (req) => {
             }
             leadsUpserted += Math.min(500, changedRows.length - i);
           }
+          for (const row of changedRows) {
+            await syncMetaLeadToRD(admin, String(row.meta_lead_id));
+          }
         }
 
         for (const formId of formIds) {
@@ -743,7 +755,7 @@ Deno.serve(async (req) => {
               platform: String(l.platform || l.site_source_name || l.publisher_platform || "") || null,
               placement: String(l.placement || l.platform_position || "") || null,
               is_organic: typeof l.is_organic === "boolean" ? l.is_organic : null,
-              attribution_status: l.campaign_id && l.adset_id && l.ad_id ? "captured" : "partial",
+              attribution_status: l.campaign_id && l.adset_id && l.ad_id && (l.form_id || formId) ? "captured" : "partial",
               raw: l,
             };
           });
@@ -795,6 +807,9 @@ Deno.serve(async (req) => {
               break;
             }
             leadsUpserted += chunk.length;
+            for (const row of chunk) {
+              await syncMetaLeadToRD(admin, String(row.meta_lead_id));
+            }
           }
         }
 

@@ -195,14 +195,32 @@ async function publishCreationNote(admin: any, connection: any, funnel: any, rdD
 }
 
 async function findMetaLead(admin: any, deal: any) {
-  let query = admin.from("meta_leads").select("meta_lead_id,full_name,email,phone,lead_city,lead_state,created_time,field_data,raw").limit(1);
+  const select = "meta_lead_id,full_name,email,phone,lead_city,lead_state,created_time,campaign_id,adset_id,ad_id,form_id,campaign_name,adset_name,ad_name,form_name,platform,placement,is_organic,field_data,raw";
+  let query = admin.from("meta_leads").select(select).limit(1);
   if (deal.meta_lead_id) query = query.eq("meta_lead_id", deal.meta_lead_id);
-  else if (deal.contact_email) query = query.eq("email", deal.contact_email.toLowerCase());
-  else if (deal.contact_phone) query = query.eq("phone", deal.contact_phone);
+  else if (deal.contact_email) query = query.ilike("email", String(deal.contact_email).trim());
+  else if (deal.contact_phone) query = query.eq("phone", String(deal.contact_phone).replace(/\D/g, ""));
   else return null;
-  const { data } = await query.maybeSingle();
+  let { data } = await query.maybeSingle();
+  if (!data && deal.contact_phone) {
+    const wanted = String(deal.contact_phone).replace(/\D/g, "");
+    const { data: candidates } = await admin.from("meta_leads")
+      .select(select)
+      .eq("ad_account_id", deal.ad_account_id)
+      .not("phone", "is", null)
+      .order("created_time", { ascending: false })
+      .limit(5000);
+    data = (candidates || []).find((candidate: any) => String(candidate.phone || "").replace(/\D/g, "") === wanted) || null;
+  }
   if (!data) return null;
-  return { ...data, name: data.full_name, city: data.lead_city, state: data.lead_state, ...(data.raw || {}), ...(Array.isArray(data.field_data) ? { field_data: data.field_data } : {}) };
+  return {
+    ...data,
+    name: data.full_name,
+    city: data.lead_city,
+    state: data.lead_state,
+    ...(data.raw || {}),
+    ...(Array.isArray(data.field_data) ? { field_data: data.field_data } : {}),
+  };
 }
 
 async function createRDNote(token: string, rdDealId: string, body: string): Promise<string | null> {

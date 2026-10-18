@@ -75,17 +75,29 @@ async function resolveAccount(admin: any, adId: string | null, formId: string | 
 
 async function fetchLead(leadId: string, account: MetaAccount) {
   const version = Deno.env.get("META_GRAPH_API_VERSION") || "v25.0";
-  const fields = "id,created_time,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,form_name,platform,site_source_name,placement,platform_position,is_organic,field_data";
-  const response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(leadId)}?fields=${fields}&access_token=${encodeURIComponent(account.access_token)}`);
-  const payload = await response.json().catch(() => ({}));
-  if (response.ok && !payload?.error) return enrichLeadReferences(payload, account);
-  // Older Graph versions may reject one of the optional enrichment fields.
-  // Keep the real-time lead instead of dropping it; the IDs remain available
-  // for a later catalog enrichment.
-  const fallback = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(leadId)}?fields=id,created_time,ad_id,adset_id,campaign_id,form_id,field_data&access_token=${encodeURIComponent(account.access_token)}`);
-  const fallbackPayload = await fallback.json().catch(() => ({}));
-  if (!fallback.ok || fallbackPayload?.error) throw new Error(fallbackPayload?.error?.message || payload?.error?.message || `Meta lead HTTP ${response.status}`);
-  return enrichLeadReferences(fallbackPayload, account);
+  const baseUrl = `https://graph.facebook.com/${version}/${encodeURIComponent(leadId)}`;
+  const accessToken = `access_token=${encodeURIComponent(account.access_token)}`;
+  const request = async (fields: string) => {
+    const response = await fetch(`${baseUrl}?fields=${fields}&${accessToken}`);
+    const payload = await response.json().catch(() => ({}));
+    return { response, payload };
+  };
+
+  // Meta rejects the complete field list when one optional delivery field is
+  // unavailable for the app/version. Keep the immutable lead identity in a
+  // separate request, then enrich names and delivery independently so one
+  // rejected field never erases campaign, adset, ad or form attribution.
+  const base = await request("id,created_time,ad_id,adset_id,campaign_id,form_id,field_data");
+  if (!base.response.ok || base.payload?.error) {
+    throw new Error(base.payload?.error?.message || `Meta lead HTTP ${base.response.status}`);
+  }
+  const names = await request("ad_name,adset_name,campaign_name,form_name");
+  const delivery = await request("platform,site_source_name,publisher_platform,placement,platform_position,is_organic");
+  return enrichLeadReferences({
+    ...base.payload,
+    ...(names.response.ok && !names.payload?.error ? names.payload : {}),
+    ...(delivery.response.ok && !delivery.payload?.error ? delivery.payload : {}),
+  }, account);
 }
 
 async function graphObject(id: string | null | undefined, fields: string, account: MetaAccount) {
@@ -225,7 +237,7 @@ Deno.serve(async (req) => {
             platform: lead.platform ?? lead.site_source_name ?? lead.publisher_platform ?? null,
             placement: lead.placement ?? lead.platform_position ?? null,
             is_organic: typeof lead.is_organic === "boolean" ? lead.is_organic : null,
-            attribution_status: lead.campaign_id && lead.adset_id && lead.ad_id && lead.campaign_name && lead.adset_name && lead.ad_name && lead.form_name && (lead.platform || lead.site_source_name || lead.publisher_platform) && (lead.placement || lead.platform_position) ? "captured" : "partial",
+            attribution_status: lead.campaign_id && lead.adset_id && lead.ad_id && lead.form_id && lead.campaign_name && lead.adset_name && lead.ad_name && lead.form_name && (lead.platform || lead.site_source_name || lead.publisher_platform) && (lead.placement || lead.platform_position) ? "captured" : "partial",
             raw: lead,
           }, { onConflict: "meta_lead_id" });
           if (leadError) throw leadError;

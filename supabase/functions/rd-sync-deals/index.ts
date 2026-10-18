@@ -1433,7 +1433,7 @@ Deno.serve(async (req) => {
         const ids = items.map((item) => String(item?.id || item?._id || "")).filter(Boolean);
         if (ids.length) {
           const { data: profiles } = await admin.from("rd_deals")
-            .select("rd_deal_id,contact_name,contact_email,lead_city,lead_state,custom_fields,raw,rd_stage_id,amount_total,closed_at,stage_updated_at,win")
+            .select("rd_deal_id,contact_name,contact_email,contact_phone,lead_city,lead_state,custom_fields,raw,rd_stage_id,amount_total,closed_at,stage_updated_at,win")
             .eq("rd_funnel_id", funnel!.id).in("rd_deal_id", ids);
           for (const profile of profiles || []) existingProfiles.set(String(profile.rd_deal_id), profile);
         }
@@ -1443,7 +1443,7 @@ Deno.serve(async (req) => {
           const resolved = await Promise.all(batch.map((item) => {
             const id = String(item?.id || item?._id || "");
             const profile = existingProfiles.get(id);
-            const complete = Boolean(profile?.raw) && Boolean(profile.contact_name || profile.contact_email || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
+            const complete = Boolean(profile?.raw) && Boolean(profile.contact_name || profile.contact_email || profile.contact_phone || profile.lead_city || profile.lead_state || Object.keys(profile.custom_fields || {}).length);
             // A list snapshot with the same provider timestamp/stage/value is
             // already authoritative for the mirror. Rehydrating every won
             // deal on every historical pass made two otherwise harmless
@@ -1501,6 +1501,26 @@ Deno.serve(async (req) => {
         const firstContact = Array.isArray(d._contacts) && d._contacts.length > 0 ? d._contacts[0] : {};
         const baseContact = d.contact || d.deal_contact || {};
         const storedProfile = d._storedProfile || {};
+        const contactEmail = firstString(
+          baseContact.email,
+          firstContact.email,
+          firstContact.contact?.email,
+          inline.email,
+          d.contact_email,
+          storedProfile.contact_email,
+        );
+        const contactPhone = firstString(
+          baseContact.phones?.[0]?.phone,
+          firstContact.phones?.[0]?.phone,
+          firstContact.contact?.phones?.[0]?.phone,
+          inline.phones?.[0]?.phone,
+          baseContact.phone,
+          firstContact.phone,
+          firstContact.contact?.phone,
+          inline.phone,
+          d.contact_phone,
+          storedProfile.contact_phone,
+        );
         const providerUpdatedAt = d.updated_at || d.last_activity_at || null;
         const storedRaw = storedProfile.raw && typeof storedProfile.raw === "object" ? storedProfile.raw : null;
         const sameProviderSnapshot = Boolean(
@@ -1508,7 +1528,9 @@ Deno.serve(async (req) => {
             && String(storedProfile.rd_stage_id || "") === String(stageId || "")
             && Number(storedProfile.amount_total || 0) === (parseFloat(d.amount_total || d.amount || "0") || 0)
             && String(storedProfile.closed_at || "") === String(d.closed_at || "")
-            && Boolean(storedProfile.win) === Boolean(won),
+            && Boolean(storedProfile.win) === Boolean(won)
+            && (!contactEmail || Boolean(storedProfile.contact_email))
+            && (!contactPhone || Boolean(storedProfile.contact_phone)),
         );
         // Existing non-won profiles are already the canonical row when RD
         // returns the same provider timestamp/stage/value. Avoid rewriting
@@ -1564,6 +1586,8 @@ Deno.serve(async (req) => {
           lead_created_at: d.created_at || null,
           stage_updated_at: d.updated_at || d.stage_updated_at || null,
           closed_at: d.closed_at || null,
+          contact_email: contactEmail,
+          contact_phone: contactPhone,
           raw: d,
           custom_fields: customFields,
           utm_source: pickUtm("source", ["utmsource", "utm_source", "source", "fonte"]),
@@ -1579,7 +1603,6 @@ Deno.serve(async (req) => {
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;
         if (contact.name || d.contact_name || storedProfile.contact_name) row.contact_name = cleanContactName(contact.name || d.contact_name || storedProfile.contact_name);
-        if (contact.email || storedProfile.contact_email) row.contact_email = contact.email || storedProfile.contact_email;
         if (d.deal_lost_reason?.name || d.deal_lost_reason)
           row.lost_reason = d.deal_lost_reason?.name || d.deal_lost_reason;
         if (d.user?.name || d.deal_user?.name || d.owner?.name)
