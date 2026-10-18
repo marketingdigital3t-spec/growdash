@@ -391,12 +391,16 @@ export const GrowdashFlowCanvas = forwardRef<GrowdashFlowCanvasHandle, GrowdashF
       void document.exitFullscreen();
       return;
     }
+    if (isMaximized) {
+      setIsMaximized(false);
+      return;
+    }
     if (element.requestFullscreen) {
       void element.requestFullscreen().catch(() => setIsMaximized(true));
       return;
     }
     setIsMaximized(true);
-  }, []);
+  }, [isMaximized]);
 
   return <section ref={rootRef} className={`growdash-flow-shell relative min-h-[620px] h-[calc(100dvh-7.5rem)] w-full overflow-hidden rounded-2xl ${isMaximized ? "growdash-flow-shell-maximized" : ""} ${className}`}>
     <Canvas
