@@ -27,11 +27,17 @@ META_APP_ID
 META_APP_SECRET
 META_OAUTH_REDIRECT_URI=https://cixnvosxqlacjbpymjha.supabase.co/functions/v1/meta-oauth-callback
 META_GRAPH_API_VERSION=<versão ativa do aplicativo Meta>
-META_OAUTH_SCOPES=ads_read,ads_management,business_management
+META_OAUTH_SCOPES=ads_read,ads_management,business_management,leads_retrieval
 # Opcional/recomendado para Meta Login for Business. Quando informado,
 # as permissões e ativos são definidos na configuração do Business Login.
 META_LOGIN_CONFIG_ID=<config_id do Meta Login for Business>
 ```
+
+Quando `META_LOGIN_CONFIG_ID` estiver definido, a Meta usa as permissões
+configuradas nessa configuração do Login for Business e ignora
+`META_OAUTH_SCOPES`. Nesse caso, habilite `leads_retrieval` e o acesso às
+Páginas/formulários dentro da própria configuração; não tente forçar a
+permissão por uma URL OAuth com escopo inválido.
 
 Depois aplique a migration `20260714152000_add_meta_oauth_states.sql` e publique, nesta ordem:
 
