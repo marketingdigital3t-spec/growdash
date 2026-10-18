@@ -335,10 +335,6 @@ const SPATIAL_GRAPH_NODES: SpatialGraphNode[] = [
 
 const SPATIAL_GRAPH_EDGES = [
   ...KNOWLEDGE_NODES.map((node) => ["growdash", node.id] as const),
-  ...KNOWLEDGE_NODES.flatMap((node) => node.strategies.map(([, strategyId]) => [node.id, `${node.id}-${strategyId}`] as const)),
-  ["traffic-creative", "brand-content"], ["traffic-performance", "commercial-forecast"], ["crm-pipeline", "commercial-playbook"],
-  ["commercial-ranking", "finance-planning"], ["finance-margin", "traffic-media"], ["automations-whatsapp", "crm-followups"],
-  ["automations-webhooks", "finance-dre"], ["brand-positioning", "commercial-scripts"],
 ] as const;
 
 function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOffice: () => void; accounts: CoreAccountInput[]; startDate: Date; endDate: Date }) {
