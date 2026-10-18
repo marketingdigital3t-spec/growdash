@@ -9958,9 +9958,13 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
 }
 
 .traffic-comparison-shell { min-width: 0; }
-.traffic-comparison-metrics-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+.traffic-comparison-metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .traffic-comparison-shell .traffic-comparison-metric { min-height: 142px; }
+@media (max-width: 1199px) {
+  .traffic-comparison-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 639px) {
+  .traffic-comparison-metrics-grid { grid-template-columns: minmax(0, 1fr); }
   .traffic-comparison-shell .traffic-comparison-metric { min-height: 0; }
 }
 
