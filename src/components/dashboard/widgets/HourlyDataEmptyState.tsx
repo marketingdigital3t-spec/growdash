@@ -5,6 +5,7 @@ import type { HourlyCoverage, MissingAccount, MissingReason } from "@/hooks/useH
 import { useSyncMeta } from "@/hooks/useSyncMeta";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { businessDateKey } from "@/lib/businessDate";
+import { EmptyState } from "@/components/ui/growdash-primitives";
 
 const REASON_TEXT: Record<MissingReason, (name: string) => string> = {
   token_expired: (n) =>
@@ -23,28 +24,7 @@ export function HourlyDataEmptyState({ coverage }: { coverage: HourlyCoverage })
   const start = businessDateKey(startDate);
   const end = businessDateKey(endDate);
 
-  return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-6 py-4 gap-3">
-      <AlertCircle className="h-8 w-8 text-muted-foreground" />
-      <div className="space-y-1 max-w-xl">
-        <p className="text-sm font-medium">Sem dados horários para este período</p>
-        <ul className="text-xs text-muted-foreground space-y-1">
-          {coverage.missingAccounts.map((m) => (
-            <li key={m.id}>{REASON_TEXT[m.reason](m.name)}</li>
-          ))}
-        </ul>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={sync.isPending}
-        onClick={() => sync.mutate({ adAccountId, startDate: start, endDate: end })}
-      >
-        <RefreshCw className={`h-3 w-3 mr-1 ${sync.isPending ? "animate-spin" : ""}`} />
-        Sincronizar agora
-      </Button>
-    </div>
-  );
+  return <EmptyState icon={<AlertCircle className="h-6 w-6" />} title="Sem dados horários para este período" description={coverage.missingAccounts.map((m) => REASON_TEXT[m.reason](m.name)).join(" ")} action={<Button size="sm" variant="outline" disabled={sync.isPending} onClick={() => sync.mutate({ adAccountId, startDate: start, endDate: end })}><RefreshCw className={`mr-1 h-3 w-3 ${sync.isPending ? "animate-spin" : ""}`} />Sincronizar agora</Button>} className="h-full min-h-40 border-0 bg-transparent" />;
 }
 
 export function HourlyCoverageBadge({ coverage }: { coverage: HourlyCoverage }) {
