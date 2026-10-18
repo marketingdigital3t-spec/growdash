@@ -9958,6 +9958,7 @@ html:not(.dark) .brand-shell :is(.gd-panel, .dashboard-glass-card,
 }
 
 .traffic-comparison-shell { min-width: 0; }
+.brand-shell .traffic-comparison-shell :is(h1, h2, h3) { color: var(--gd-content-text) !important; }
 .traffic-comparison-metrics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .traffic-comparison-shell .traffic-comparison-metric { min-height: 142px; }
 @media (max-width: 1199px) {
