@@ -1408,7 +1408,7 @@ export default function Campaigns() {
                 <div
                   ref={campaignTotalsScrollRef}
                   data-campaign-totals-bar
-                  className="growdash-scrollbar-hidden hidden shrink-0 overflow-x-auto overflow-y-hidden border-t-2 border-border bg-card md:block dark:border-[#2a271f] dark:bg-[#070706]"
+                  className="growdash-scrollbar-hidden hidden shrink-0 overflow-x-auto overflow-y-hidden bg-card md:block dark:bg-[#070706]"
                   aria-label="Totais das campanhas filtradas"
                 >
                   <Table className="[&_td]:overflow-hidden [&_td]:whitespace-nowrap" style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}>

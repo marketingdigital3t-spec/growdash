@@ -11367,7 +11367,7 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 
 .campaigns-workspace [data-campaign-table-scroll] tfoot,
 .campaigns-workspace [data-campaign-totals-bar] {
-  border-top: 1px solid #e4e7ec !important;
+  border: 0 !important;
   border-right: 0 !important;
   border-bottom: 0 !important;
   border-left: 0 !important;
