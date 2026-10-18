@@ -2,12 +2,13 @@ import { Fuel, Globe2, Rocket, Sparkles } from "lucide-react";
 import type { CSSProperties } from "react";
 import earthTexture from "@/assets/growth/earth-blue-marble-dashboard.jpg";
 import { SpaceRocket } from "./SpaceRocket";
-import type { SpacePhase } from "@/lib/spacePhase";
+
+export type SpacePhase = "terra" | "orbita" | "galaxia";
 
 const PHASE_COPY: Record<SpacePhase, { title: string; subtitle: string }> = {
-  terra: { title: "GROWDASH — FASE TERRA", subtitle: "Missão em andamento — R$ 0 a R$ 49.999,99" },
-  orbita: { title: "GROWDASH — FASE ÓRBITA", subtitle: "Missão em aceleração — R$ 50 mil a R$ 100 mil" },
-  galaxia: { title: "GROWDASH — FASE GALÁXIA", subtitle: "Missão no topo — acima de R$ 100 mil" },
+  terra: { title: "GROWDASH — FASE TERRA", subtitle: "Missão em andamento — R$ 0 a R$ 100 mil" },
+  orbita: { title: "GROWDASH — FASE ÓRBITA", subtitle: "Missão em aceleração — R$ 100 mil a R$ 500 mil" },
+  galaxia: { title: "GROWDASH — FASE GALÁXIA", subtitle: "Missão no topo — acima de R$ 500 mil" },
 };
 
 function starCount(phase: SpacePhase) {

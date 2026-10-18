@@ -9019,12 +9019,6 @@ html:not(.dark) .dashboard-scope-sync {
   background-image: none !important;
 }
 
-/* The dashboard owns the spatial reference canvas. Other modules keep their
-   solid content surface, while this route explicitly reveals the phase scene. */
-.brand-shell[data-dashboard-scene="true"] .space-phase-bg {
-  display: block !important;
-}
-
 .brand-shell[data-dashboard-scene="true"] .dashboard-page::before {
   display: none !important;
 }
@@ -10024,8 +10018,7 @@ html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .dashboard-page {
 .brand-shell[data-dashboard-scene="true"] .space-phase-badge { display: flex !important; }
 
 .brand-shell[data-dashboard-scene="true"][data-space-phase="terra"] .space-phase-planet {
-  opacity: .86 !important;
-  filter: brightness(.92) saturate(1.4) contrast(1.14) !important;
+  filter: brightness(.78) saturate(1.35) contrast(1.14) !important;
 }
 .brand-shell[data-dashboard-scene="true"][data-space-phase="orbita"] .space-phase-planet {
   background-image: radial-gradient(circle at 32% 28%, #ffe9a3, #b77900 42%, #2b1b02 76%, #080808 100%) !important;
@@ -10039,16 +10032,6 @@ html:not(.dark) body .brand-shell[data-dashboard-scene="true"] .dashboard-page {
 }
 .brand-shell[data-dashboard-scene="true"] .space-phase-rings {
   border-color: color-mix(in srgb, var(--brand-gold) 72%, transparent) !important;
-}
-.brand-shell[data-dashboard-scene="true"] .space-phase-badge,
-.brand-shell[data-dashboard-scene="true"] .space-mission-title,
-.brand-shell[data-dashboard-scene="true"] .space-mission-strip > strong,
-.brand-shell[data-dashboard-scene="true"] .space-mission-rocket {
-  color: var(--brand-gold-light) !important;
-}
-.brand-shell[data-dashboard-scene="true"] .space-mission-track > span {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--brand-gold) 72%, #111), var(--brand-gold-light)) !important;
-  box-shadow: 0 0 14px color-mix(in srgb, var(--brand-gold) 55%, transparent) !important;
 }
 
 .brand-shell[data-dashboard-scene="true"] .dashboard-page .dashboard-summary-strip-surface,

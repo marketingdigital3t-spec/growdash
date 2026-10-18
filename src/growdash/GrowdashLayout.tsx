@@ -40,8 +40,7 @@ import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { supabase } from "@/integrations/supabase/client";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { PageTransition } from "@/components/PageTransition";
-import { SpaceMissionStrip, SpacePhaseBackground } from "@/components/space/SpacePhaseBackground";
-import { getSpacePhase } from "@/lib/spacePhase";
+import { SpaceMissionStrip, type SpacePhase } from "@/components/space/SpacePhaseBackground";
 import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 import { AgentChatDock } from "@/components/agents/AgentChatDock";
 
@@ -177,7 +176,7 @@ export default function GrowdashLayout() {
   const goalAccountLabel = adAccountId === "all"
     ? `Meta mensal · todas as contas · ${segment === "saas" ? "SaaS" : "Infoproduto"}`
     : `Meta mensal · ${visibleAccounts.find((account) => account.id === adAccountId)?.name || "Conta selecionada"}`;
-  const spacePhase = getSpacePhase(goalRevenue);
+  const spacePhase: SpacePhase = goalRevenue >= 500_000 ? "galaxia" : goalRevenue >= 100_000 ? "orbita" : "terra";
 
   // Renderiza o cache/banco imediatamente e atualiza Meta + RD em segundo
   // plano, sem bloquear a navegação ou trocar a tela por um loader.
@@ -285,7 +284,6 @@ export default function GrowdashLayout() {
 
   return (
     <div className="brand-shell growdash-app-shell relative min-h-screen max-w-full text-foreground transition-colors" data-space-phase={spacePhase} data-dashboard-scene={pathname === "/" ? "true" : undefined} data-funnel-scene={pathname === "/analise-de-funis" ? "true" : undefined}>
-      {pathname === "/" && <SpacePhaseBackground phase={spacePhase} dashboardScene />}
       <aside
         className={cn(
           "brand-sidebar growdash-safe-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r text-foreground shadow-[20px_0_65px_-42px_rgba(0,0,0,.95)] transition-[width,transform] duration-300",
