@@ -11158,3 +11158,16 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   .brand-shell .dashboard-page .gd-glass-metric { gap: var(--gd-space-2) !important; }
   .brand-shell .dashboard-page .gd-glass-metric-icon { width: 32px !important; height: 32px !important; }
 }
+
+@media (min-width: 1280px) {
+  .brand-shell .dashboard-page .gd-glass-metric { gap: 8px !important; padding: 10px !important; }
+  .brand-shell .dashboard-page .gd-glass-metric-icon { width: 30px !important; height: 30px !important; }
+  .brand-shell .dashboard-page .gd-glass-metric .gd-label,
+  .brand-shell .dashboard-page .gd-glass-metric p:not(.gd-label) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .brand-shell .dashboard-page .gd-glass-metric .gd-label { font-size: 9px !important; }
+  .brand-shell .dashboard-page .gd-glass-metric p:not(.gd-label) { font-size: clamp(.84rem, 1.1vw, 1rem) !important; }
+}
