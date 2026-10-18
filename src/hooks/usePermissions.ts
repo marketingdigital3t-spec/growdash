@@ -137,8 +137,10 @@ export function usePermissions() {
 
   return {
     // Owners/admins already have authority through the workspace membership;
-    // do not leave their whole platform behind a secondary permissions query.
-    loading: loadingWorkspace || (!canAdmin && (loadingMaster || isLoading)),
+    // masters have authority independently of the workspace bootstrap. Do not
+    // leave the whole platform behind a workspace/permissions query that can
+    // be slow or unavailable while the authenticated shell is already usable.
+    loading: !canAdmin && (loadingWorkspace || loadingMaster || isLoading),
     // A workspace bootstrap error used to be ignored here. A protected route
     // then redirected to the first "allowed" route with no permissions,
     // which looked like a perpetual loading/reload to the user.
@@ -146,7 +148,7 @@ export function usePermissions() {
     // not depend on the secondary permission catalog. A transient failure in
     // that catalog must not blank the entire CRM/Funnel application for them.
     // Non-admin members remain fail-closed when their permission read fails.
-    error: workspaceError || (!canAdmin && isError),
+    error: !canAdmin && (workspaceError || isError),
     retry: async () => {
       await refetchWorkspace();
       return refetch();
