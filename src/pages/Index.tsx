@@ -30,7 +30,6 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { useToast } from "@/hooks/use-toast";
-import { DashboardReferenceDeck } from "@/components/dashboard/DashboardReferenceDeck";
 import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
 import { useEventClasses } from "@/hooks/useEventClasses";
 
@@ -223,8 +222,6 @@ const Index = () => {
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
-  const glassImpressions = hasCanonicalMetaRows ? dashboardMeta.data.impressions : dashboardInsights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
-  const glassClicks = hasCanonicalMetaRows ? dashboardMeta.data.clicks : dashboardInsights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
 
@@ -376,10 +373,6 @@ const Index = () => {
 
       <div>
         <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
-      </div>
-
-      <div>
-        <DashboardReferenceDeck impressions={glassImpressions} clicks={glassClicks} leads={glassLeads} clients={glassSales.totalQuantity} roas={glassRoas} cpl={glassCpl} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
       </div>
 
       <div>

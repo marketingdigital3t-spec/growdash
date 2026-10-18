@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { metricDescription } from "@/lib/metricPresentation";
 
-interface GlassMetric { label: string; value: string; icon: ReactNode; tone?: "good"; requiresMeta?: boolean; }
+interface GlassMetric { label: string; value: string; icon: ReactNode; tone?: "good" | "negative"; requiresMeta?: boolean; }
 interface Props {
   revenue: number;
   spend: number;
@@ -37,9 +37,10 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
     { label: "Faturamento bruto", value: display(brl.format(revenue), false), icon: <DollarSign /> },
     { label: "Investimento em anúncio", value: display(brl.format(spend)), icon: <Coins /> },
     { label: "Leads", value: display(integer.format(leads)), icon: <Users /> },
+    { label: "Conversas", value: display(integer.format(leadsBreakdown?.conversations ?? 0)), icon: <Users /> },
     { label: "CPL", value: display(brl.format(cpl)), icon: <BarChart3 /> },
-    { label: "ROAS", value: display(`${roas.toFixed(2)}x`), icon: <TrendingUp />, tone: roas >= 1 ? "good" : undefined },
-    { label: "Previsão 30d", value: display(brl.format(forecast30), false), icon: <TrendingUp /> },
+    { label: "ROAS", value: display(`${roas.toFixed(2)}x`), icon: <TrendingUp />, tone: roas >= 1 ? "good" : "negative" },
+    { label: "Previsão 30d", value: display(brl.format(forecast30), false), icon: <TrendingUp />, tone: forecast30 < 0 ? "negative" : undefined },
     { label: "Vendas", value: display(integer.format(sales), false), icon: <ShoppingCart /> },
   ];
 
@@ -47,12 +48,12 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
     <div className="dashboard-summary-strip-surface overflow-visible">
       <button type="button" onClick={() => setCollapsed((value) => !value)} className="flex min-h-11 w-full items-center gap-2 px-3 text-left md:hidden" aria-expanded={!compact}><span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary"><BarChart3 className="h-4 w-4" /></span><span className="min-w-0 grow truncate text-xs font-black">Resumo da operação</span><span className="text-[10px] text-muted-foreground">{brl.format(revenue)} · {roas.toFixed(2)}x</span><ChevronDown className={cn("h-4 w-4 shrink-0 transition", !compact && "rotate-180")} /></button>
       {!compact && <>
-        <div className="dashboard-glass-metrics grid min-w-0 grid-cols-2 gap-1.5 border-t border-border/40 bg-transparent p-1.5 md:grid-cols-7 md:gap-1.5 md:border-t-0 md:p-2">
+        <div className="dashboard-glass-metrics grid min-w-0 grid-cols-2 gap-3 border-t border-border/40 bg-transparent p-3 md:grid-cols-2 md:border-t-0 xl:grid-cols-4">
           {metrics.map((metric) => {
             const isLeads = metric.label === "Leads" && leadsBreakdown;
-            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[10px] [&_svg]:h-3.5 [&_svg]:w-3.5", metric.tone === "good" && "is-good")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="break-words text-[6.5px] font-black uppercase leading-tight tracking-[.035em] text-muted-foreground" title={metric.label}>{metric.label}</p><p className="mt-1 min-w-0 break-words text-[clamp(.68rem,1.25vw,.78rem)] font-black leading-tight tabular-nums" title={metric.value}>{metric.value}</p></div></>;
+            const content = <><span className={cn("gd-glass-metric-icon grid h-8 w-8 shrink-0 place-items-center rounded-[10px] [&_svg]:h-3.5 [&_svg]:w-3.5", metric.tone === "good" && "is-good", metric.tone === "negative" && "is-negative")}>{metric.icon}</span><div className="min-w-0 flex-1"><p className="break-words text-[6.5px] font-black uppercase leading-tight tracking-[.035em] text-muted-foreground" title={metric.label}>{metric.label}</p><p className="mt-1 min-w-0 break-words text-[clamp(.68rem,1.25vw,.78rem)] font-black leading-tight tabular-nums" title={metric.value}>{metric.value}</p></div></>;
             const className = cn(
-              "gd-glass-metric group flex min-h-[66px] min-w-0 items-center gap-1.5 rounded-xl px-2 py-2.5 text-left",
+              "gd-glass-metric group flex min-h-[72px] min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-left",
               isLeads && "gd-glass-metric-leads",
             );
             return isLeads ? <button key={metric.label} type="button" className={className} title="Forms/site e conversas iniciadas. Clique para detalhar." aria-expanded={showLeadBreakdown} onClick={() => setShowLeadBreakdown((value) => !value)}>{content}</button> : <article key={metric.label} className={className} title={metricDescription(metric.label)}>{content}</article>;
