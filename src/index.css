@@ -11319,3 +11319,98 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   .campaigns-workspace .campaign-filters-row { padding: 12px !important; }
   .campaigns-workspace .campaign-table-frame { margin: 8px 0 0 !important; }
 }
+
+/* CRM scope strip: compact geometry and one readable dark hierarchy. */
+.brand-shell .crm-page .crm-filter-strip {
+  padding: 10px 12px !important;
+  border: 1px solid #3a3d42 !important;
+  border-radius: 10px !important;
+  background: #181a1d !important;
+  color: #f5f7fa !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 12px 28px rgba(0, 0, 0, .22) !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:first-child {
+  margin-bottom: 8px !important;
+  gap: 8px !important;
+  border-color: #34383e !important;
+  padding-bottom: 8px !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:first-child :is(h2, p) {
+  color: #f5f7fa !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:first-child p {
+  color: #aeb5bf !important;
+  line-height: 1.25 !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip svg {
+  color: #c7cdd6 !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:nth-child(2) {
+  gap: 8px !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:nth-child(2) :is(input, select) {
+  height: 36px !important;
+  min-height: 36px !important;
+  border-color: #454a52 !important;
+  border-radius: 8px !important;
+  background: #24272b !important;
+  color: #f5f7fa !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:nth-child(2) input::placeholder {
+  color: #aeb5bf !important;
+  opacity: 1 !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:nth-child(2) :is(input, select):focus-visible {
+  border-color: #dce2ea !important;
+  outline: 2px solid rgba(220, 226, 234, .22) !important;
+  outline-offset: 1px;
+}
+
+.brand-shell .crm-page .crm-filter-strip .crm-filter-status {
+  gap: 2px !important;
+  border-color: #454a52 !important;
+  border-radius: 8px !important;
+  background: #24272b !important;
+  padding: 2px !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip .crm-filter-status button {
+  min-height: 30px !important;
+  border-radius: 6px !important;
+  padding: 4px 10px !important;
+  color: #c7cdd6 !important;
+  line-height: 1 !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip .crm-filter-status button:hover {
+  background: #34383e !important;
+  color: #ffffff !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip .crm-filter-status button[aria-pressed="true"] {
+  background: #f5f7fa !important;
+  color: #17191c !important;
+  border-color: transparent !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:last-child {
+  margin-top: 8px !important;
+  gap: 8px !important;
+  border-color: #34383e !important;
+  padding-top: 8px !important;
+  color: #aeb5bf !important;
+  line-height: 1.2 !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip > div:last-child span {
+  color: #aeb5bf !important;
+}
