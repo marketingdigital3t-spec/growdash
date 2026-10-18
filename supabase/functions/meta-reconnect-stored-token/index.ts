@@ -81,7 +81,25 @@ Deno.serve(async (req) => {
     const appId = Deno.env.get("META_APP_ID");
     const appSecret = Deno.env.get("META_APP_SECRET");
     const inspection = await inspectMetaToken(String(account.access_token), appId, appSecret);
-    if (!inspection.isValid || !hasMinimumMetaTokenLifetime(inspection.expiresAt, 30, inspection.dataAccessExpiresAt)) {
+    if (!inspection.isValid) {
+      const missingAppCredentials = inspection.errorMessage === "META_APP_ID/META_APP_SECRET não configurados";
+      const healthStatus = missingAppCredentials ? "error" : "expired";
+      const connectionStatus = missingAppCredentials ? "error" : "expired";
+      const errorMessage = missingAppCredentials
+        ? "As credenciais do aplicativo Meta não estão configuradas no servidor."
+        : "O token Meta está inválido ou foi revogado. Reconecte pelo OAuth.";
+      await admin.from("ad_accounts").update({
+        connection_status: connectionStatus,
+        oauth_health_status: healthStatus,
+        last_sync_error: errorMessage,
+        last_sync_error_code: inspection.errorCode,
+        last_sync_attempt_at: now,
+        updated_at: now,
+      }).eq("id", account.id).eq("user_id", user.id);
+      return json({ ok: false, account: { id: account.id, name: account.name }, error: errorMessage }, 409);
+    }
+
+    if (!hasMinimumMetaTokenLifetime(inspection.expiresAt, 30, inspection.dataAccessExpiresAt)) {
       await admin.from("ad_accounts").update({
         connection_status: "expired",
         oauth_health_status: "expiring",
