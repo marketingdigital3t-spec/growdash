@@ -35,6 +35,7 @@ import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import { buildCoreAccountSummaries, type CoreAccountInput, type CoreAgentConfig, type CoreAreaId, type CoreSchedule } from "@/lib/agentCore";
 import { AGENT_NEED_META, advanceAgentLifeState, createInitialAgentLifeStates, formatAgentClock, getAgentPhaseLabel, type AgentLifeState, type AgentNeedKey } from "@/lib/agentLife";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { NeuralCommandCore3D } from "@/growdash/NeuralCommandCore3D";
@@ -65,9 +66,9 @@ export default function AgentsOfficePage() {
     ? accounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
     : accounts, [accounts, businessUnitId, segment]);
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
-  // The authenticated /agentes route opens directly on the operating room;
-  // the neural map remains available as a secondary view.
-  const [view, setView] = useState<"map" | "office">("office");
+  // The command map is the primary agent surface. The 3D office remains
+  // available as a secondary workspace for presence and status controls.
+  const [view, setView] = useState<"map" | "office">("map");
   const showLegacyOfficePreview = window.location.hash === "#legacy-office";
   const [officeAngle, setOfficeAngle] = useState(0);
   const officeDragStart = useRef<number | null>(null);
@@ -282,12 +283,12 @@ export default function AgentsOfficePage() {
 }
 
 const KNOWLEDGE_NODES: KnowledgeNode[] = [
-  { id: "traffic", label: "Tráfego", note: "Mídia, criativos, orçamento e escala", document: "Centraliza investimento, campanhas, criativos e os sinais que mostram onde escalar ou proteger margem.", decision: "Priorize orçamento nos conjuntos que combinam volume de leads e custo sustentável; investigue os criativos antes de ampliar investimento.", strategies: [["Estratégias de mídia", "media"], ["Criativos & testes", "creative"], ["Alertas de performance", "performance"]] },
-  { id: "crm", label: "CRM", note: "Pipeline, qualificação e follow-up", document: "Conecta negociações, etapas, origem e histórico de contato para revelar onde cada oportunidade perde ritmo.", decision: "Use as etapas com maior acúmulo para organizar cadência, responsáveis e a próxima ação de cada lead.", strategies: [["Pipeline & etapas", "pipeline"], ["Scripts de vendas", "scripts"], ["Follow-ups", "followups"]] },
-  { id: "commercial", label: "Comercial", note: "Metas, conversão e receita", document: "Transforma o pipeline em leitura de vendas, metas, receita e previsibilidade por operação.", decision: "Compare receita confirmada com pipeline em aberto para orientar o time para as oportunidades que mudam a meta do período.", strategies: [["Metas e ranking", "ranking"], ["Playbook de vendas", "playbook"], ["Forecast", "forecast"]] },
-  { id: "finance", label: "Financeiro", note: "Caixa, margem e previsibilidade", document: "Reúne receita, investimento de mídia e custos para acompanhar resultado e capacidade de decisão da empresa.", decision: "Leia receita e mídia juntas: crescimento saudável preserva margem e não depende de um custo de aquisição fora do planejado.", strategies: [["DRE & caixa", "dre"], ["Margem e custos", "margin"], ["Planejamento", "planning"]] },
-  { id: "brand", label: "Marca", note: "Posicionamento, conteúdo e confiança", document: "Organiza posicionamento, conteúdo e sinais de audiência que sustentam a demanda antes e depois da conversão.", decision: "Use alcance, CTR e campanha líder para decidir quais mensagens merecem virar novos criativos, páginas e conteúdos.", strategies: [["Posicionamento", "positioning"], ["Conteúdo estratégico", "content"], ["Reputação", "reputation"]] },
-  { id: "automations", label: "Automações", note: "Playbooks, WhatsApp e operações", document: "Acompanha rotinas automatizadas, playbooks e integrações que mantêm atendimento e análise consistentes.", decision: "Mantenha rotinas críticas monitoradas e conecte cada automação a uma etapa ou objetivo mensurável da operação.", strategies: [["Playbooks", "playbooks"], ["WhatsApp", "whatsapp"], ["Webhooks & rotinas", "webhooks"]] },
+  { id: "traffic", label: "Tráfego pago", agentName: "Ágata", agentRole: "Gestora de aquisição", agentColor: "#38bdf8", chatRole: "marketing", note: "Mídia, criativos, orçamento e escala", document: "Centraliza investimento, campanhas, criativos e os sinais que mostram onde escalar ou proteger margem.", decision: "Priorize orçamento nos conjuntos que combinam volume de leads e custo sustentável; investigue os criativos antes de ampliar investimento.", strategies: [["Estratégias de mídia", "media"], ["Criativos & testes", "creative"], ["Alertas de performance", "performance"]] },
+  { id: "crm", label: "Comercial", agentName: "Camila", agentRole: "Diretora de vendas", agentColor: "#fb7185", chatRole: "commercial", note: "Pipeline, qualificação e follow-up", document: "Conecta negociações, etapas, origem e histórico de contato para revelar onde cada oportunidade perde ritmo.", decision: "Use as etapas com maior acúmulo para organizar cadência, responsáveis e a próxima ação de cada lead.", strategies: [["Pipeline & etapas", "pipeline"], ["Scripts de vendas", "scripts"], ["Follow-ups", "followups"]] },
+  { id: "commercial", label: "Growth", agentName: "Helena", agentRole: "Chief of Staff de crescimento", agentColor: "#e9b72d", chatRole: "ceo", note: "Metas, conversão e receita", document: "Transforma o pipeline em leitura de vendas, metas, receita e previsibilidade por operação.", decision: "Compare receita confirmada com pipeline em aberto para orientar o time para as oportunidades que mudam a meta do período.", strategies: [["Metas e ranking", "ranking"], ["Playbook de vendas", "playbook"], ["Forecast", "forecast"]] },
+  { id: "finance", label: "Financeiro", agentName: "Bianca", agentRole: "CFO de margem", agentColor: "#34d399", chatRole: "finance", note: "Caixa, margem e previsibilidade", document: "Reúne receita, investimento de mídia e custos para acompanhar resultado e capacidade de decisão da empresa.", decision: "Leia receita e mídia juntas: crescimento saudável preserva margem e não depende de um custo de aquisição fora do planejado.", strategies: [["DRE & caixa", "dre"], ["Margem e custos", "margin"], ["Planejamento", "planning"]] },
+  { id: "brand", label: "Designer", agentName: "Milo", agentRole: "Diretor criativo", agentColor: "#a78bfa", chatRole: "marketing", note: "Posicionamento, conteúdo e confiança", document: "Organiza posicionamento, conteúdo e sinais de audiência que sustentam a demanda antes e depois da conversão.", decision: "Use alcance, CTR e campanha líder para decidir quais mensagens merecem virar novos criativos, páginas e conteúdos.", strategies: [["Posicionamento", "positioning"], ["Conteúdo estratégico", "content"], ["Reputação", "reputation"]] },
+  { id: "automations", label: "Estrategista", agentName: "Júlia", agentRole: "Estrategista de operações", agentColor: "#f59e0b", chatRole: "legal", note: "Playbooks, integrações e rotina", document: "Acompanha rotinas automatizadas, playbooks e integrações que mantêm atendimento e análise consistentes.", decision: "Mantenha rotinas críticas monitoradas e conecte cada automação a uma etapa ou objetivo mensurável da operação.", strategies: [["Playbooks", "playbooks"], ["WhatsApp", "whatsapp"], ["Webhooks & rotinas", "webhooks"]] },
 ];
 
 const NEURAL_POINTS = Array.from({ length: 18 }, (_, index) => ({
@@ -309,7 +310,7 @@ const NEURAL_LINKS = Array.from({ length: 20 }, (_, index) => {
 type CorePhase = "brain" | "entering" | "core";
 
 type KnowledgeStrategy = readonly [string, string];
-type KnowledgeNode = { id: CoreAreaId; label: string; note: string; document: string; decision: string; strategies: readonly KnowledgeStrategy[] };
+type KnowledgeNode = { id: CoreAreaId; label: string; agentName: string; agentRole: string; agentColor: string; chatRole: "ceo" | "marketing" | "commercial" | "finance" | "legal"; note: string; document: string; decision: string; strategies: readonly KnowledgeStrategy[] };
 type SpatialGraphNode = { id: string; area: CoreAreaId | null; label: string; kind: "root" | "area" | "topic"; x: number; y: number; strategyId?: string };
 
 const AREA_POSITIONS: Record<CoreAreaId, readonly [number, number]> = {
@@ -341,7 +342,7 @@ const SPATIAL_GRAPH_EDGES = [
 ] as const;
 
 function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOffice: () => void; accounts: CoreAccountInput[]; startDate: Date; endDate: Date }) {
-  const [phase, setPhase] = useState<CorePhase>("brain");
+  const [phase, setPhase] = useState<CorePhase>("core");
   const [selectedArea, setSelectedArea] = useState<CoreAreaId | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
   const [animationsActive, setAnimationsActive] = useState(true);
@@ -508,11 +509,12 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
         </svg>
         {SPATIAL_GRAPH_NODES.map((graphNode, index) => {
           const active = graphNode.area !== null && selectedArea === graphNode.area && (!graphNode.strategyId || selectedStrategy === graphNode.strategyId);
-          return <button key={graphNode.id} type="button" className={cn("growdash-map-node", `is-${graphNode.kind}`, active && "is-selected")} style={{ left: `${graphNode.x}%`, top: `${graphNode.y}%`, "--node-index": index } as React.CSSProperties} onClick={() => graphNode.area && openArea(graphNode.area, graphNode.strategyId)} aria-pressed={active} aria-label={graphNode.kind === "root" ? "Growdash, centro do mapa" : `Abrir documento: ${graphNode.label}`}>
-            <i aria-hidden="true" /><span>{graphNode.label}</span>{graphNode.kind === "area" && <small>{KNOWLEDGE_NODES.find((node) => node.id === graphNode.area)?.note}</small>}
+          const areaNode = graphNode.area ? KNOWLEDGE_NODES.find((node) => node.id === graphNode.area) : null;
+          return <button key={graphNode.id} type="button" className={cn("growdash-map-node", `is-${graphNode.kind}`, graphNode.kind === "area" && "is-agent-area", active && "is-selected")} style={{ left: `${graphNode.x}%`, top: `${graphNode.y}%`, "--node-index": index, "--agent-color": areaNode?.agentColor || "#fff" } as React.CSSProperties} onClick={() => graphNode.area && openArea(graphNode.area, graphNode.strategyId)} aria-pressed={active} aria-label={graphNode.kind === "root" ? "Growdash, centro do mapa" : areaNode ? `Abrir área ${areaNode.label} e conversar com ${areaNode.agentName}` : `Abrir documento: ${graphNode.label}`}>
+            <i aria-hidden="true" />{areaNode ? <><span><b>{graphNode.label}</b><em><Bot className="h-2.5 w-2.5" />{areaNode.agentName}</em></span><small>{areaNode.agentRole}</small></> : <span>{graphNode.label}</span>}
           </button>;
         })}
-        <div className="growdash-map-legend"><span><i /> Área</span><span><i /> Documento</span><span>Selecione um nó para abrir sua leitura operacional</span></div>
+        <div className="growdash-map-legend"><span><i /> Área + agente</span><span><i /> Conexão operacional</span><span>Selecione uma área para ver dados e conversar com o agente</span></div>
       </div>
       <div className="jarvis-actions"><button type="button" onClick={resetCore}><RotateCcw className="h-3.5 w-3.5" />Visão do cérebro</button><button type="button" onClick={onOpenOffice}><BriefcaseBusiness className="h-3.5 w-3.5" />Entrar no escritório 3D</button></div>
       {selectedNode && <OperationalAreaPanel node={selectedNode} summaries={summaries} selectedStrategy={selectedStrategyLabel} loading={panelLoading} onClose={() => setSelectedArea(null)} onSelectStrategy={(id) => setSelectedStrategy(id)} />}
@@ -523,8 +525,10 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
 }
 
 function OperationalAreaPanel({ node, summaries, selectedStrategy, loading, onClose, onSelectStrategy }: { node: KnowledgeNode; summaries: ReturnType<typeof buildCoreAccountSummaries>; selectedStrategy: string; loading: boolean; onClose: () => void; onSelectStrategy: (id: string) => void }) {
+  const openChat = () => window.dispatchEvent(new CustomEvent("growdash:open-agent-chat", { detail: { role: node.chatRole } }));
   return <aside className="growdash-core-panel" aria-label={`Inteligência de ${node.label}`}>
-    <header className="growdash-core-panel-header"><div><span className="growdash-core-kicker">DOCUMENTO OPERACIONAL · {node.label.toUpperCase()}</span><h2>{node.label}</h2><p>{node.note}</p></div><button type="button" onClick={onClose} aria-label="Fechar análise da área"><X className="h-4 w-4" /></button></header>
+    <header className="growdash-core-panel-header"><div className="growdash-core-agent-heading"><span className="growdash-core-agent-avatar" style={{ "--agent-color": node.agentColor } as React.CSSProperties}><Bot className="h-4 w-4" /></span><div><span className="growdash-core-kicker">AGENTE · {node.label.toUpperCase()}</span><h2>{node.agentName}</h2><p>{node.agentRole} · {node.note}</p></div></div><button type="button" onClick={onClose} aria-label="Fechar análise da área"><X className="h-4 w-4" /></button></header>
+    <div className="growdash-core-agent-actions"><span><i style={{ background: node.agentColor }} /> Dados Growdash conectados</span><button type="button" onClick={openChat}><MessageCircle className="h-3.5 w-3.5" /> Conversar</button><Link to="/integracoes" className="growdash-core-api-link"><Zap className="h-3.5 w-3.5" /> Conexões e APIs</Link></div>
     <div className="growdash-core-strategies" role="tablist" aria-label={`Estratégias de ${node.label}`}>
       {node.strategies.map(([label, id]) => <button type="button" key={id} role="tab" aria-selected={selectedStrategy === label} onClick={() => onSelectStrategy(id)} className={cn(selectedStrategy === label && "is-active")}><span>{label}</span><ChevronRight className="h-3 w-3" /></button>)}
     </div>

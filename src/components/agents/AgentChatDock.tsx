@@ -37,6 +37,16 @@ export function AgentChatDock() {
   const active = directors.find((agent) => agent.role === role) || directors[0];
 
   useEffect(() => {
+    const handleOpenAgentChat = (event: Event) => {
+      const requestedRole = (event as CustomEvent<{ role?: string }>).detail?.role;
+      if (requestedRole && ["ceo", "marketing", "commercial", "finance", "legal"].includes(requestedRole)) setRole(requestedRole as DirectorRole);
+      setOpen(true);
+    };
+    window.addEventListener("growdash:open-agent-chat", handleOpenAgentChat);
+    return () => window.removeEventListener("growdash:open-agent-chat", handleOpenAgentChat);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const loadHistory = async () => {
       if (!workspace?.id || !active?.id || active.id === active.role) { setConversationId(null); setMessages([]); return; }
