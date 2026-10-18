@@ -1947,6 +1947,23 @@ html:not(.dark) {
   }
 }
 
+/* Sidebar navigation hierarchy: the current module is fully legible while
+   inactive modules recede without changing their hit area or scroll behavior. */
+.brand-shell .brand-sidebar nav a {
+  opacity: .5 !important;
+  transition: opacity .18s ease, background-color .18s ease, color .18s ease, border-color .18s ease !important;
+}
+
+.brand-shell .brand-sidebar nav a:hover,
+.brand-shell .brand-sidebar nav a:focus-visible {
+  opacity: .8 !important;
+}
+
+.brand-shell .brand-sidebar nav a[aria-current="page"],
+.brand-shell .brand-sidebar nav a[data-state="active"] {
+  opacity: 1 !important;
+}
+
 /* Meta Ads Manager visual pass -------------------------------------------
    This route is intentionally a light, dense workspace. The existing data
    shell remains untouched; these rules only restyle and reflow the campaign
