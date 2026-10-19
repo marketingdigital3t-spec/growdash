@@ -1031,7 +1031,6 @@ Deno.serve(async (req) => {
     const seenAnalyticsDealStages = new Map<string, string | null>();
     let snapshotMissingIds: string[] = [];
     let snapshotDuplicateCount = 0;
-    let debugLogged = false;
     // A resumed segment only sees the pages after its stored cursor. It is
     // still safe to upsert those pages, but it is not safe to delete local
     // rows that were seen by a previous invocation during reconciliation.
@@ -1101,21 +1100,6 @@ Deno.serve(async (req) => {
         if (enriched.length > 0) dealContacts = enriched;
       }
 
-      if (!debugLogged && detailOk) {
-        debugLogged = true;
-        const cfs = detail.deal_custom_fields || detail.custom_fields || [];
-        const labels = (Array.isArray(cfs) ? cfs : []).map((f: any) => ({
-          label: f?.custom_field?.label || f?.label || f?.name,
-          value: f?.value ?? f?.values,
-        }));
-        console.log(`[rd-debug ${id}] deal keys=`, Object.keys(detail).join(","));
-        console.log(`[rd-debug ${id}] deal_custom_fields=`, JSON.stringify(labels).slice(0, 1500));
-        console.log(`[rd-debug ${id}] contact keys=`, Object.keys(detail.contact || {}).join(","));
-        console.log(
-          `[rd-debug ${id}] _contacts sample=`,
-          JSON.stringify(dealContacts[0] || null).slice(0, 800),
-        );
-      }
       return { ...detail, _contacts: dealContacts };
     }
 

@@ -115,7 +115,20 @@ Deno.serve(async (req) => {
     const previousMonthEndStr = dateString(previousMonthEnd);
 
     const admin = createClient(supabaseUrl, serviceKey);
-    let accountQuery = admin.from("ad_accounts").select("id, account_id, name, timezone_name, attribution_window, daily_budget, remaining_balance, target_cpl, min_spend_threshold").eq("user_id", user.id);
+    const { data: membership, error: membershipError } = await admin.from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (membershipError || !membership?.workspace_id) return responseError("WORKSPACE_NOT_FOUND", 404);
+    // This function uses a service-role client after validating the session;
+    // enforce the active workspace again instead of relying on browser RLS.
+    let accountQuery = admin.from("ad_accounts")
+      .select("id, account_id, name, workspace_id, timezone_name, attribution_window, daily_budget, remaining_balance, target_cpl, min_spend_threshold")
+      .eq("user_id", user.id)
+      .or(`workspace_id.eq.${membership.workspace_id},workspace_id.is.null`);
     if (accountId && accountId !== "all") accountQuery = accountQuery.eq("id", accountId);
     else if (requestedAccountIds.length) accountQuery = accountQuery.in("id", requestedAccountIds);
     const { data: accounts, error: accountError } = await accountQuery;

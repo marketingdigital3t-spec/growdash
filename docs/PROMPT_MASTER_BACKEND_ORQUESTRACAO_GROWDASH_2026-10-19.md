@@ -176,3 +176,24 @@ Trabalhe nesta ordem, registrando evidências no repositório:
   os dois domínios principais retornam HTTP 200, título `Growdash` e o mesmo
   bundle SHA-256. O registro automático `f2b09b85` continua marcado como
   `Failure` e não é usado como prova de publicação.
+
+## Correções adicionais de isolamento e observabilidade — 19/10/2026
+
+- `agent-office-chat` passou a filtrar explicitamente as contas pelo workspace
+  ativo antes de montar o contexto do escritório de agentes. Contas legadas com
+  `workspace_id IS NULL` continuam disponíveis somente quando pertencem ao
+  usuário autenticado; o cliente com service role não é tratado como escopo.
+- `ask-ai` passou a exigir associação ativa em `workspace_members` e aplicar o
+  mesmo filtro de workspace nas contas usadas no contexto RAG/IA. Ausência de
+  workspace retorna `WORKSPACE_NOT_FOUND`, sem consultar dados de outro tenant.
+- `rd-sync-deals` deixou de registrar amostras de campos personalizados e
+  contatos nos logs. Valores de campos, chaves de payload e PII não são mais
+  usados como debug de produção.
+- As versões publicadas no projeto Supabase `cixnvosxqlacjbpymjha` foram:
+  `agent-office-chat` v19, `ask-ai` v44 e `rd-sync-deals` v100. As três
+  recusaram chamadas sem sessão com HTTP 401; `deno check` foi aprovado.
+- O estado de integração permanece deliberadamente `partial`/`unavailable`:
+  a inspeção autenticada ainda mostra divergência Meta/RD, UTMs incompletas,
+  backfill sem reconciliação persistida e IA sem `AI_API_KEY`/`OPENAI_API_KEY`.
+  Deploy, 401 e type-check não são tratados como prova de paridade, RAG vivo,
+  OAuth revalidado ou sincronização concluída.

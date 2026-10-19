@@ -75,7 +75,13 @@ Deno.serve(async (req) => {
     if (membershipError || !membership) return json({ error: "WORKSPACE_NOT_FOUND" }, 404);
     const { data: workspace, error: workspaceError } = await admin.from("workspaces").select("id,name,timezone").eq("id", membership.workspace_id).maybeSingle();
     if (workspaceError || !workspace) return json({ error: "WORKSPACE_NOT_FOUND" }, 404);
-    let accountQuery = admin.from("ad_accounts").select("id,name,attribution_window,timezone_name").eq("user_id", user.id);
+    // The service-role client bypasses RLS, so tenant scope must be explicit.
+    // Keep legacy NULL workspace accounts available only to their owner while
+    // preventing a member of one workspace from reading another workspace's
+    // accounts through the agent context.
+    let accountQuery = admin.from("ad_accounts").select("id,name,workspace_id,attribution_window,timezone_name")
+      .eq("user_id", user.id)
+      .or(`workspace_id.eq.${workspace.id},workspace_id.is.null`);
     if (requestedAccountIds.length) accountQuery = accountQuery.in("id", requestedAccountIds);
     const { data: accounts, error: accountsError } = await accountQuery;
     if (accountsError) throw accountsError;
