@@ -13040,6 +13040,16 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   color: var(--traffic-text-dark) !important;
 }
 
+/* Status is a first-class control, not an icon hidden inside the campaign
+   name. Keep its hit area and label readable in both themes. */
+.campaigns-workspace .campaign-status-cell > button {
+  min-height: 30px;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button:hover {
+  background: var(--traffic-muted-dark) !important;
+}
+
 /* Monochrome chrome contract: the sidebar selection and theme toggle must
    never inherit the legacy blue primary/ring, including keyboard focus. */
 .brand-shell .brand-sidebar nav a[aria-current="page"],
