@@ -12871,3 +12871,56 @@ html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campa
   outline: 2px solid rgba(255, 255, 255, .72) !important;
   outline-offset: 2px !important;
 }
+
+/* Expert panel density contract: keep every visible block close to a 10px
+   rhythm so the dashboard reads as a compact command surface instead of a
+   stack of oversized cards. Data and chart geometry remain unchanged. */
+.expert-dashboard {
+  row-gap: 10px !important;
+}
+
+.expert-dashboard > .expert-dashboard-tabs,
+.expert-dashboard .gd-module-section,
+.expert-dashboard .expert-operations-view {
+  margin-inline: 10px !important;
+}
+
+.expert-dashboard .expert-kpi-grid,
+.expert-dashboard [aria-labelledby="expert-charts-title"] > .grid,
+.expert-dashboard .expert-classes-section > .grid,
+.expert-dashboard .expert-operations-view > section > .grid {
+  gap: 10px !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card,
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  min-height: 78px !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  padding: 10px !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-icon {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 8px !important;
+}
+
+.expert-dashboard .dashboard-glass-card {
+  min-height: 240px !important;
+}
+
+.expert-dashboard .dashboard-glass-card > [class*="p-6"] {
+  padding: 10px !important;
+}
+
+.expert-dashboard .dashboard-glass-card .relative {
+  height: 150px !important;
+  width: 150px !important;
+}
+
+.expert-dashboard .expert-operations-toolbar {
+  margin-inline: 0 !important;
+  padding: 10px !important;
+}
