@@ -126,7 +126,7 @@ export default function ExpertDashboard() {
         </div>
       </MotionItem>
 
-      <div className="expert-dashboard-tabs flex w-fit items-center gap-1 rounded-xl border border-border bg-muted/50 p-1" role="tablist" aria-label="Visão do Painel do Expert">
+      <div className="expert-dashboard-tabs flex w-fit items-center gap-1 rounded-xl bg-muted/50 p-1" role="tablist" aria-label="Visão do Painel do Expert">
         <button type="button" role="tab" aria-selected={view === "executive"} onClick={() => setView("executive")} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${view === "executive" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Visão executiva</button>
         <button type="button" role="tab" aria-selected={view === "operations"} onClick={() => setView("operations")} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${view === "operations" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Operação</button>
       </div>
