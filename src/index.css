@@ -12873,6 +12873,14 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   color: var(--traffic-text-dark) !important;
 }
 
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-app-logo {
+  filter: brightness(0) invert(1) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-app-title {
+  color: var(--traffic-text-dark) !important;
+}
+
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
   .campaign-account-pill,
   .campaign-opportunity-pill,
@@ -12937,6 +12945,11 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-metric-header > th {
   border-color: var(--traffic-border-dark) !important;
   background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-metric-header > th > * {
+  background: transparent !important;
   color: var(--traffic-muted-text-dark) !important;
 }
 
