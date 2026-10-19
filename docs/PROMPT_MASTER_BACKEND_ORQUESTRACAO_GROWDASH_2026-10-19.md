@@ -171,3 +171,8 @@ Trabalhe nesta ordem, registrando evidências no repositório:
 - `growdash.com.br`, `www.growdash.com.br` e `c02e2e05.growdash.pages.dev` retornam
   HTML byte-a-byte igual e o bundle SHA-256
   `a69beb60bed8244640bbf3752dfe00ac6a6de7267ccf385b8fb822b68771ceb1`.
+- Após o commit `bd42626`, o upload direto foi repetido e o deployment
+  verificável passou a ser `https://5fe0f99c.growdash.pages.dev/`; esse preview e
+  os dois domínios principais retornam HTTP 200, título `Growdash` e o mesmo
+  bundle SHA-256. O registro automático `f2b09b85` continua marcado como
+  `Failure` e não é usado como prova de publicação.
