@@ -202,3 +202,25 @@ Trabalhe nesta ordem, registrando evidências no repositório:
   backfill sem reconciliação persistida e IA sem `AI_API_KEY`/`OPENAI_API_KEY`.
   Deploy, 401 e type-check não são tratados como prova de paridade, RAG vivo,
   OAuth revalidado ou sincronização concluída.
+
+## Segunda rodada: MCP, orquestração e paginação Meta — 19/10/2026
+
+- `meta-traffic-mcp` agora valida UUIDs internos, resolve todas as associações
+  ativas do usuário e autoriza cada `ad_account` pelo workspace ativo; contas
+  legadas sem workspace só passam quando pertencem ao usuário. Isso impede que
+  o cliente service-role transforme apenas `user_id` em escopo suficiente.
+- `sync-meta-transactions` não envia mais o token Meta nas URLs de paginação:
+  a primeira chamada e as páginas seguintes usam o header Bearer. O teto foi
+  ampliado para 100 páginas e, se ainda houver `paging.next`, a resposta marca
+  erro parcial em vez de declarar um snapshot completo silenciosamente.
+- `agent-office-orchestrator` audita contas vinculadas ao workspace mais as
+  contas legadas do proprietário em consultas separadas, sem importar contas de
+  outro workspace para o diagnóstico de agentes.
+- Publicação Supabase confirmada: `agent-office-orchestrator` v21,
+  `meta-traffic-mcp` v20 e `sync-meta-transactions` v21, todos `ACTIVE`. Smoke
+  sem sessão retornou HTTP 401 para as três funções. `supabase db lint
+  --linked --level error` continuou sem resultados.
+- Validação local desta rodada: 66 Edge Functions passaram em `deno check`, a
+  suíte passou em 99 arquivos/491 testes, ESLint e `git diff --check` passaram.
+- Commit desta rodada: `9e1e4bd`, enviado para `origin/main`. O checkout deve
+  permanecer limpo e alinhado antes de qualquer nova publicação.
