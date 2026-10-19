@@ -67,13 +67,14 @@ describe("CRM consolidated pipeline", () => {
     expect(result.sourceToCanonicalId.get("funnel-a:stage")).toBe(result.sourceToCanonicalId.get("funnel-b:stage"));
   });
 
-  it("does not exclude historical stages from the canonical CRM history", () => {
-    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Leads Antigos do Junior")).toBe(false);
+  it("excludes the deleted Junior lead stage only from Ranniely's student funnel", () => {
+    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Leads Antigos do Junior")).toBe(true);
+    expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Lead do Dro Junior")).toBe(true);
     expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Paciente modelo", "Leads antigos do Dr Junior")).toBe(false);
     expect(isExcludedLegacyRannielyStage("Dra. Ranniely Silva – Aluna", "Novos leads")).toBe(false);
   });
 
-  it("retains historical stages in every dashboard data source", () => {
+  it("removes the deleted stage from every operational dashboard data source", () => {
     const rows = filterOperationalRDDeals([
       { rd_funnel_id: "aluna", rd_stage_name: "Leads Antigos do Junior", id: "legacy" },
       { rd_funnel_id: "aluna", rd_stage_name: "Venda Realizada", id: "sale" },
@@ -83,10 +84,10 @@ describe("CRM consolidated pipeline", () => {
       { id: "model", name: "Dra. Ranniely Silva – Paciente Modelo" },
     ]);
 
-    expect(rows.map((row) => row.id)).toEqual(["legacy", "sale", "model"]);
+    expect(rows.map((row) => row.id)).toEqual(["sale", "model"]);
   });
 
-  it("does not remove historical revenue IDs or stages", () => {
+  it("does not remove the same label from other Ranniely funnels", () => {
     const funnels = [
       { id: "aluna", name: "Dra. Ranniely Silva – Aluna" },
       { id: "model", name: "Dra. Ranniely Silva – Paciente Modelo" },
@@ -95,10 +96,10 @@ describe("CRM consolidated pipeline", () => {
       { rd_funnel_id: "aluna", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "legacy" },
       { rd_funnel_id: "model", rd_stage_name: "Leads Antigos do Junior", rd_deal_id: "valid" },
     ];
-    expect(excludedOperationalRDDealIds(deals, funnels)).toEqual(new Set());
+    expect(excludedOperationalRDDealIds(deals, funnels)).toEqual(new Set(["legacy"]));
     expect(filterOperationalRDFunnelStages([
       { rd_funnel_id: "aluna", name: "Leads Antigos do Junior" },
       { rd_funnel_id: "aluna", name: "Novos Leads" },
-    ], funnels).map((stage) => stage.name)).toEqual(["Leads Antigos do Junior", "Novos Leads"]);
+    ], funnels).map((stage) => stage.name)).toEqual(["Novos Leads"]);
   });
 });
