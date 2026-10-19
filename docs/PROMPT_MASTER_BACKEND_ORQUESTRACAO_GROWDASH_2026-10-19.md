@@ -102,3 +102,29 @@ Trabalhe nesta ordem, registrando evidências no repositório:
 - A execução ainda não autoriza afirmar que todos os tokens, contas Meta/RD,
   backfills ou MCPs estão operacionalmente saudáveis. Isso exige credenciais,
   escopo autenticado e verificação dos dados vivos.
+
+## Evidência pós-publicação — 19/10/2026
+
+- Commit verificado: `bbc177b` (`main` e `origin/main` alinhadas), sem alterações
+  pendentes no checkout.
+- Cloudflare Pages: `https://d37e30e9.growdash.pages.dev/` publicado e os
+  domínios `https://growdash.com.br/` e `https://www.growdash.com.br/` retornam
+  HTTP 200, CSP e cabeçalhos de segurança esperados.
+- O HTML servido pelos três endereços referencia `/assets/app-BwMBlERs.js` e o
+  SHA-256 do bundle remoto é
+  `a69beb60bed8244640bbf3752dfe00ac6a6de7267ccf385b8fb822b68771ceb1`, igual ao
+  `dist` gerado localmente.
+- Smoke sem sessão: `agent-office-orchestrator`, `controlled-realtime-sync`,
+  `rd-sync-deals` (com `funnel_id`), `sync-rd-crm`, `meta-traffic-mcp` e
+  `sync-meta-transactions` recusaram a chamada com HTTP 401. O callback
+  `instagram-oauth-callback` é deliberadamente público para o redirect OAuth e,
+  sem `state`, respondeu HTTP 400; isso não é evidência de uma conexão válida.
+- Funções publicadas no Supabase `cixnvosxqlacjbpymjha`: versões registradas
+  incluem `agent-office-orchestrator` v20, `controlled-realtime-sync` v55,
+  `rd-sync-deals` v99, `sync-rd-crm` v32, `meta-traffic-mcp` v19,
+  `sync-meta-transactions` v20 e `instagram-oauth-callback` v23.
+- Ainda não verificado: login autenticado, tokens atuais Meta/RD/Google,
+  desafio SMS, backfill histórico, reconciliação de contagens em
+  `meta_leads`/`rd_deals`/CRM, RAG com dados vivos e inspeção visual autenticada.
+  Esses itens permanecem pendentes e não devem ser marcados como concluídos
+  apenas por causa do build, deploy ou HTTP 200.
