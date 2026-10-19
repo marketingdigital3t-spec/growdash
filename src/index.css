@@ -12660,3 +12660,36 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
     box-shadow: none !important;
   }
 }
+
+/* Monochrome control contract: switches must not reintroduce the legacy blue
+   accent into the black-and-white Growdash interface. */
+.brand-shell [role="switch"][data-state="checked"] {
+  border-color: #111111 !important;
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+
+.brand-shell [role="switch"][data-state="unchecked"] {
+  border-color: #aeb4bc !important;
+  background: #e9ebee !important;
+  color: #111111 !important;
+}
+
+.brand-shell [role="switch"] > span {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+.brand-shell [role="switch"]:hover:not(:disabled)[data-state="checked"] {
+  background: #000000 !important;
+}
+
+.brand-shell [role="switch"]:hover:not(:disabled)[data-state="unchecked"] {
+  background: #dfe2e6 !important;
+}
+
+.brand-shell [role="switch"]:focus-visible {
+  outline: 2px solid #111111 !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+}
