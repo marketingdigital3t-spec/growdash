@@ -11450,9 +11450,22 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   .brand-shell[data-dashboard-scene="true"] .growdash-content-frame,
   .brand-shell[data-dashboard-scene="true"] .gd-page-transition,
   .brand-shell[data-dashboard-scene="true"] .dashboard-page {
-    height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
+  }
+
+  .brand-shell[data-dashboard-scene="true"] .growdash-content-frame {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .brand-shell[data-dashboard-scene="true"] .gd-page-transition {
+    height: auto !important;
+    flex: 1 1 auto !important;
+  }
+
+  .brand-shell[data-dashboard-scene="true"] .dashboard-page {
+    height: 100% !important;
   }
 }
 
