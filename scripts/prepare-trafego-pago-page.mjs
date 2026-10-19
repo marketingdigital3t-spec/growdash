@@ -37,12 +37,20 @@ clearInline("#heroLeftCol, #heroRightCol", ["transform", "opacity"]);
 clearInline(".scroll-parallax-item, .tilt-card", ["transform"]);
 document.querySelectorAll("[data-section-head].in-focus").forEach((element) => element.classList.remove("in-focus"));
 
+// The source snapshot captures only the elements that were visible when it
+// was exported. Activate every reveal in the static route so a fast scroll or
+// a deep-link never leaves sections blank before IntersectionObserver runs.
+document.querySelectorAll(".reveal").forEach((element) => element.classList.add("active"));
+
 // The shell chart helpers are unused on this page and add parse/execute cost.
 document.querySelectorAll("script").forEach((script) => {
   if (script.textContent.includes("Skip artifact shell — fixed helpers")) script.remove();
 });
 
 const performanceStyle = document.createElement("style");
+document.querySelectorAll("style").forEach((style) => {
+  if (style.textContent.includes("Static presentation route:")) style.remove();
+});
 performanceStyle.textContent = `
   /* Static presentation route: keep first paint light while preserving the source effects. */
   .particles-canvas { contain: strict; }
