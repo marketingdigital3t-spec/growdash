@@ -12569,3 +12569,53 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   min-width: 0 !important;
   flex: 1 1 0 !important;
 }
+
+/* Keep every campaign control light and quiet. Older global button effects
+   were painting a dark border/hover over this Meta-style surface. */
+.campaigns-workspace :is(
+  .campaign-account-pill,
+  .campaign-opportunity-pill,
+  .campaign-date-pill,
+  .campaign-header-icon,
+  .campaign-publish-button,
+  .campaign-scope-action,
+  .campaign-action-button,
+  .meta-toolbar-button,
+  .campaign-action-select,
+  .campaign-columns-control > button,
+  .campaign-search-input
+) {
+  border-color: #d5dbe3 !important;
+  box-shadow: none !important;
+}
+
+.campaigns-workspace :is(
+  .campaign-account-pill,
+  .campaign-opportunity-pill,
+  .campaign-date-pill,
+  .campaign-header-icon,
+  .campaign-scope-action,
+  .campaign-action-button,
+  .meta-toolbar-button,
+  .campaign-action-select,
+  .campaign-columns-control > button,
+  .campaign-search-input
+):hover:not(:disabled) {
+  border-color: #bcc6d2 !important;
+  background: #f8fafc !important;
+  color: #1c1e21 !important;
+  box-shadow: 0 1px 3px rgba(28, 30, 33, .08) !important;
+}
+
+.campaigns-workspace .meta-toolbar-button-active,
+.campaigns-workspace .meta-toolbar-button-active:hover:not(:disabled) {
+  border-color: #9bbdff !important;
+  background: #f3f7ff !important;
+  color: #0866ff !important;
+  box-shadow: none !important;
+}
+
+.campaigns-workspace .campaign-publish-button:hover:not(:disabled) {
+  border-color: #c4ccd7 !important;
+  filter: none !important;
+}
