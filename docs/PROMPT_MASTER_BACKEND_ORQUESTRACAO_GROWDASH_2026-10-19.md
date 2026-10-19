@@ -128,3 +128,35 @@ Trabalhe nesta ordem, registrando evidências no repositório:
   `meta_leads`/`rd_deals`/CRM, RAG com dados vivos e inspeção visual autenticada.
   Esses itens permanecem pendentes e não devem ser marcados como concluídos
   apenas por causa do build, deploy ou HTTP 200.
+
+## Evidência autenticada pós-deploy — 19/10/2026
+
+- A sessão autenticada do Growdash exibiu 33 contas Meta/RD conectadas; o token
+  RD foi validado e há 23 funis ativos vinculados. Meta indicava snapshot há
+  cerca de 3 minutos e RD há cerca de 23 minutos no momento da inspeção.
+- Uma sincronização RD manual foi disparada pelo diagnóstico. O histórico passou
+  a registrar execuções recentes (por exemplo, 60 deals em 78 s), mas o funil
+  `Instituto Palazzo RD` continuou com último negócio em `08/10/2026`; portanto
+  a sincronização executada não prova que esse funil esteja recebendo dados novos.
+- O confronto autenticado continua inconsistente: 27 vendas canônicas RD contra
+  15 vendas em campanhas, divergência indicada de 44%, e match de campanhas em
+  0% para o conjunto exibido. A receita exibida é R$ 93.700,00 nas duas fontes,
+  então a diferença de contagem não deve ser tratada como paridade.
+- Diagnóstico de UTMs autenticado: 776/1.000 deals (78%) sem UTM completo,
+  262 deals com `utm_campaign` sem correspondência a campanha Meta e 4 funis
+  sem deals recentes. Isso exige dados/UTMs reais ou backfill autorizado; não
+  pode ser corrigido por inferência de nome de campanha.
+- Observabilidade autenticada: base de 6.217 deals em 30 dias, UTMs completos
+  em 25%, responsáveis preenchidos em 100%, vitórias com valor em 62%, e
+  atribuição multi-touch em 0% (toques e toques casados com Meta). O painel
+  recomenda backfill, mas o resultado do backfill ainda não foi comprovado.
+- Escritório de agentes autenticado registrou a conversa, porém informa que a
+  IA ainda não está configurada no backend e consultou 0 linhas Meta. O
+  inventário de segredos do projeto não contém `AI_API_KEY` nem
+  `OPENAI_API_KEY`; não criar ou inventar chave. A habilitação depende de uma
+  credencial fornecida/rotacionada pelo operador.
+- Estado correto após essa inspeção: código, contratos, deploy e autenticação
+  básica estão verificados; sincronização parcial ocorreu; reconciliação Meta/RD,
+  UTMs, backfill de atribuição, RAG vivo e IA dos agentes permanecem
+  `partial`/`unavailable` até haver execução autenticada bem-sucedida e contagens
+  persistidas que confirmem a correção.
