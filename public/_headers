@@ -12,5 +12,11 @@
   Cache-Control: no-store, no-cache, must-revalidate
   Pragma: no-cache
 
+/apresentacao-trafego-pago/*
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/apresenta%C3%A7ao-trafego-pago/*
+  Cache-Control: public, max-age=3600, must-revalidate
+
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
