@@ -12055,9 +12055,27 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 }
 
 .campaigns-workspace .campaign-select-checkbox[data-state="checked"] {
-  border-color: #111827 !important;
-  background: #111827 !important;
+  border-color: #0866ff !important;
+  background: #0866ff !important;
   color: #fff !important;
+}
+
+/* Radix keeps the checkmark inside its indicator.  Keep it explicit here so
+   the selected campaign state never collapses into a solid dark circle when
+   the table theme overrides the shared checkbox styles. */
+.campaigns-workspace .campaign-select-checkbox[data-state="checked"] > span,
+.campaigns-workspace .campaign-select-checkbox[data-state="checked"] > span > svg {
+  display: flex !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.campaigns-workspace .campaign-select-checkbox[data-state="checked"] > span > svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke: currentColor !important;
+  stroke-width: 3 !important;
 }
 
 .campaigns-workspace .campaign-select-checkbox[data-state="unchecked"] {
