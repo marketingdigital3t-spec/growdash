@@ -234,8 +234,8 @@ function ClassCard({
   };
   return (
     <>
-      <Card className="flex h-full w-full flex-col overflow-hidden border-border/80 bg-card/95 shadow-lg">
-        <CardHeader className="relative min-h-[148px] space-y-1.5 p-3 pb-2">
+      <Card className="expert-ops-card flex h-full w-full flex-col overflow-hidden border-border/80 bg-card/95 shadow-lg">
+        <CardHeader className="relative min-h-[126px] space-y-1.5 p-3 pb-2">
           <div className="grid grid-cols-[minmax(0,1fr)_120px] items-start gap-2">
             <div className="min-w-0">
               <Badge
@@ -660,13 +660,13 @@ export function ExpertOperationsView() {
           <h3 className="text-lg font-black">Tráfego & resultado</h3>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="expert-ops-card">
+            <CardHeader className="p-3 pb-2">
               <CardTitle className="text-base">Investimento x faturamento</CardTitle>
               <p className="text-xs text-muted-foreground">Últimos 14 dias · {accountLabel}</p>
             </CardHeader>
-            <CardContent>
-              <div className="flex h-48 items-end gap-1.5 border-b border-border px-1">
+            <CardContent className="p-3">
+              <div className="flex h-40 items-end gap-1.5 border-b border-border px-1">
                 {dailyRevenue.length ? (
                   dailyRevenue.map(([day, value]) => (
                     <div
@@ -693,14 +693,14 @@ export function ExpertOperationsView() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
+          <Card className="expert-ops-card">
+            <CardHeader className="p-3 pb-2">
               <CardTitle className="text-base">Funil de conversão</CardTitle>
               <p className="text-xs text-muted-foreground">
                 Leads Meta no período selecionado · vendas confirmadas do RD Station CRM
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 p-3">
               <div className="rounded-xl border border-border/70 bg-background/40 p-3">
                 <svg
                   className="h-44 w-full"
@@ -771,8 +771,8 @@ export function ExpertOperationsView() {
             ],
             ["Conversão", conversion == null ? "Indisponível" : `${conversion.toFixed(1)}%`],
           ].map(([label, value]) => (
-            <Card key={String(label)}>
-              <CardContent className="p-4">
+            <Card key={String(label)} className="expert-ops-card">
+              <CardContent className="p-3">
                 <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                   {label}
                 </div>
@@ -789,7 +789,7 @@ export function ExpertOperationsView() {
           </p>
           <h3 className="text-lg font-black">Ranking de vendedores</h3>
         </div>
-        <Card>
+        <Card className="expert-ops-card">
           <CardContent className="p-0">
             {operations.sellers.length ? (
               operations.sellers.map((seller, index) => (
@@ -831,8 +831,8 @@ export function ExpertOperationsView() {
           </CardContent>
         </Card>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Card>
-            <CardContent className="p-4">
+          <Card className="expert-ops-card">
+            <CardContent className="p-3">
               <CircleDollarSign className="h-4 w-4 text-primary" />
               <div className="mt-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 Faturamento bruto
@@ -840,8 +840,8 @@ export function ExpertOperationsView() {
               <div className="mt-1 text-lg font-black">{brl(gross)}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
+          <Card className="expert-ops-card">
+            <CardContent className="p-3">
               <WalletCards className="h-4 w-4 text-emerald-500" />
               <div className="mt-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 Caixa real
@@ -849,8 +849,8 @@ export function ExpertOperationsView() {
               <div className="mt-1 text-lg font-black text-emerald-500">{brl(cash)}</div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
+          <Card className="expert-ops-card">
+            <CardContent className="p-3">
               <CheckCircle2 className="h-4 w-4 text-primary" />
               <div className="mt-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                 Margem disponível

@@ -12924,3 +12924,78 @@ html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campa
   margin-inline: 0 !important;
   padding: 10px !important;
 }
+
+/* Final visual pass for the Expert panel: the cards stay readable without
+   the heavy, high-contrast chrome that made the screen look like a stack of
+   unrelated boxes. */
+.expert-dashboard .expert-dashboard-tabs {
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.expert-dashboard .expert-dashboard-tabs > button {
+  min-height: 38px;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+}
+
+.expert-dashboard .expert-dashboard-tabs > button[aria-selected="true"] {
+  background: #171717 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.expert-dashboard .expert-dashboard-tabs > button[aria-selected="false"] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .expert-ops-card) {
+  border: 1px solid rgba(127, 127, 127, .22) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card,
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  height: 78px !important;
+  min-height: 78px !important;
+}
+
+.expert-dashboard .dashboard-glass-card {
+  min-height: 220px !important;
+}
+
+.expert-dashboard .expert-ops-card > .p-3,
+.expert-dashboard .expert-ops-card > .p-4,
+.expert-dashboard .expert-ops-card > .p-0 {
+  border-color: rgba(127, 127, 127, .16) !important;
+}
+
+.expert-dashboard .expert-operations-view {
+  gap: 10px !important;
+}
+
+.expert-dashboard .expert-operations-view > section {
+  gap: 8px !important;
+}
+
+.expert-dashboard .expert-operations-view .expert-ops-card :is(.p-6, .p-5) {
+  padding: 12px !important;
+}
+
+.expert-dashboard .expert-operations-view .expert-ops-card .border-border,
+.expert-dashboard .expert-operations-view .expert-ops-card .border-border\/70 {
+  border-color: rgba(127, 127, 127, .18) !important;
+}
+
+html.dark .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .expert-ops-card) {
+  background: #111111 !important;
+  border-color: rgba(255, 255, 255, .14) !important;
+}
+
+html:not(.dark) .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .expert-ops-card) {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, .12) !important;
+}
