@@ -229,7 +229,11 @@ export default function FunnelAnalysis() {
       if (debounceTimer) window.clearTimeout(debounceTimer);
       debounceTimer = window.setTimeout(() => void refreshDistribution(), 500);
     };
-    const channel = supabase.channel(`funnel-analysis-rd-${analyticsScopeKey.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180)}`)
+    // The scope can change while Supabase is still removing the previous
+    // channel. Reusing the same topic in that window makes Supabase return
+    // the already-subscribed channel and throws when callbacks are added.
+    // A per-mount suffix keeps subscriptions isolated until cleanup finishes.
+    const channel = supabase.channel(`funnel-analysis-rd-${analyticsScopeKey.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 150)}-${Math.random().toString(36).slice(2, 10)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_deals" }, queueRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "rd_funnel_stages" }, queueRefresh)
       .subscribe();
