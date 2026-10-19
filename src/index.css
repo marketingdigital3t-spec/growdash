@@ -11430,6 +11430,32 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   height: 0;
 }
 
+/* O Dashboard ocupa uma única tela. O canvas principal não cria uma segunda
+   área de rolagem nem aumenta a altura do documento; a navegação lateral
+   continua independente e mantém seu comportamento próprio. */
+@media (min-width: 1024px) {
+  .brand-shell[data-dashboard-scene="true"] {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  .brand-shell[data-dashboard-scene="true"] .growdash-content-shell {
+    height: calc(100dvh - 42px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .brand-shell[data-dashboard-scene="true"] .growdash-main,
+  .brand-shell[data-dashboard-scene="true"] .growdash-content-frame,
+  .brand-shell[data-dashboard-scene="true"] .gd-page-transition,
+  .brand-shell[data-dashboard-scene="true"] .dashboard-page {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+}
+
 /* Final Meta-style geometry for Campanhas. The manager is one continuous
    surface: controls use one compact radius, hierarchy tabs are flat, and the
    totals row is part of the table instead of a second outlined card. */
