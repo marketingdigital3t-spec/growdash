@@ -12281,9 +12281,11 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
 }
 
 .brand-shell .brand-topbar {
-  min-height: 56px !important;
-  height: 56px !important;
-  padding: 8px 16px !important;
+  /* The goal track is the only dark strip in this row. Keep the chrome
+     tight to its content so an empty black band cannot remain underneath. */
+  min-height: 42px !important;
+  height: auto !important;
+  padding: 4px 16px !important;
 }
 
 .brand-shell .brand-topbar :is(button, a) {
