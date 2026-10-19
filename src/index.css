@@ -12843,6 +12843,141 @@ html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campa
   color: var(--traffic-muted-text-dark) !important;
 }
 
+/* Dark campaign cascade authority ----------------------------------------
+   A legacy Meta-style block above still targets the campaign table with
+   `html.dark body ...` and `!important`.  Its higher specificity was painting
+   the table cells and the canvas white after the dark theme was selected.
+   Keep this final, equally-specific contract as the single source of truth
+   for the black Tráfego Pago surface. */
+html.dark body .brand-shell:has(.traffic-page-shell),
+html.dark body .brand-shell:has(.traffic-page-shell) .analytics-module,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-shell,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-main,
+html.dark body .brand-shell:has(.traffic-page-shell) .growdash-content-frame,
+html.dark body .brand-shell:has(.traffic-page-shell) .gd-page-transition,
+html.dark body .brand-shell:has(.traffic-page-shell) .traffic-page-shell,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace {
+  background: var(--traffic-canvas-dark) !important;
+  background-image: none !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-manager-top,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-app-header,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-filters-row,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-tabs-header,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-actions-toolbar,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-table-frame {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-surface-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
+  .campaign-account-pill,
+  .campaign-opportunity-pill,
+  .campaign-date-pill,
+  .campaign-header-icon,
+  .campaign-scope-action,
+  .meta-toolbar-button,
+  .campaign-action-select,
+  .campaign-columns-control > button,
+  .campaign-search-input
+) {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-raised-dark) !important;
+  background-image: none !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
+  .campaign-account-pill > *,
+  .campaign-opportunity-pill > *,
+  .campaign-date-pill > *,
+  .campaign-header-icon > *,
+  .campaign-scope-action > *,
+  .meta-toolbar-button > *,
+  .campaign-action-select > *,
+  .campaign-columns-control > button > *
+) {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
+  .meta-toolbar-button-active,
+  .campaign-hierarchy-tab[data-state="active"]
+) {
+  border-color: #f3f4f6 !important;
+  background: #f3f4f6 !important;
+  color: #111111 !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab {
+  background: transparent !important;
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab:hover,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab:focus-visible {
+  background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab[data-state="active"] {
+  background: #f3f4f6 !important;
+  color: #111111 !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] table,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] table {
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-metric-header > th {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr {
+  background: var(--traffic-surface-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:hover {
+  background: var(--traffic-muted-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.sticky,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-name-cell,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-check-head,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] td {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-surface-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td *,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] td * {
+  color: inherit !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td .text-muted-foreground,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] td span {
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-total-bar,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-muted-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] strong {
+  color: var(--traffic-text-dark) !important;
+}
+
 /* Monochrome chrome contract: the sidebar selection and theme toggle must
    never inherit the legacy blue primary/ring, including keyboard focus. */
 .brand-shell .brand-sidebar nav a[aria-current="page"],
