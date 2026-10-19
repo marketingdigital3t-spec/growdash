@@ -12693,3 +12693,152 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   outline-offset: 2px !important;
   box-shadow: none !important;
 }
+
+/* Paid Traffic follows the selected application theme. Its Meta-style light
+   pass above is intentionally scoped to light mode; these final dark rules
+   prevent white surfaces from leaking into the dark canvas. */
+html.dark .brand-shell:has(.traffic-page-shell) {
+  --traffic-canvas-dark: #0f1114;
+  --traffic-surface-dark: #171a1f;
+  --traffic-raised-dark: #1d2228;
+  --traffic-muted-dark: #232830;
+  --traffic-border-dark: #343b45;
+  --traffic-text-dark: #f3f4f6;
+  --traffic-muted-text-dark: #aab2bd;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .growdash-main,
+html.dark .brand-shell:has(.traffic-page-shell) .traffic-page-shell,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace {
+  background: var(--traffic-canvas-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .traffic-nav-rail {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-surface-dark) !important;
+  color: var(--traffic-muted-text-dark) !important;
+  box-shadow: 0 22px 48px -28px rgba(0, 0, 0, .95), inset 0 1px rgba(255,255,255,.06) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .traffic-nav-item {
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .traffic-nav-item:hover,
+html.dark .brand-shell:has(.traffic-page-shell) .traffic-nav-item:focus-visible {
+  background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active {
+  background: #f3f4f6 !important;
+  color: #111111 !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active::before {
+  background: #f3f4f6 !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-manager-top,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-app-header,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-filters-row,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-tabs-header,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-actions-toolbar,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-table-frame {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-surface-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
+  .campaign-opportunity-pill,
+  .campaign-account-pill,
+  .campaign-date-pill,
+  .campaign-header-icon,
+  .campaign-scope-action,
+  .meta-toolbar-button,
+  .campaign-action-select,
+  .campaign-columns-control > button,
+  .campaign-search-input
+) {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-raised-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-search-input::placeholder {
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace :is(
+  .meta-toolbar-button-active,
+  .campaign-hierarchy-tab[data-state="active"]
+) {
+  border-color: #f3f4f6 !important;
+  background: #f3f4f6 !important;
+  color: #111111 !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab {
+  color: var(--traffic-muted-text-dark) !important;
+  background: transparent !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab:hover {
+  background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab[data-state="active"] {
+  background: #f3f4f6 !important;
+  color: #111111 !important;
+  box-shadow: inset 0 1px #ffffff, 0 4px 12px -9px rgba(255,255,255,.35) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-publish-button,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-primary-actions > .campaign-action-button:first-child {
+  border-color: #f3f4f6 !important;
+  background: #f3f4f6 !important;
+  color: #111111 !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] table,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] table {
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-metric-header > th {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr {
+  background: var(--traffic-surface-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:hover {
+  background: var(--traffic-muted-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-name-cell,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] td {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-surface-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-total-bar,
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-muted-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] strong {
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals-bar] span {
+  color: var(--traffic-muted-text-dark) !important;
+}
