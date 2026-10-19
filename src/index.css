@@ -12619,3 +12619,42 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
   border-color: #c4ccd7 !important;
   filter: none !important;
 }
+
+/* Final Meta-style rhythm for the desktop manager. Keep each horizontal band
+   predictable instead of letting legacy rules change its height or shadow. */
+@media (min-width: 768px) {
+  .campaigns-workspace .campaign-manager-top {
+    border: 1px solid #e4e7ec !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04) !important;
+  }
+
+  .campaigns-workspace .campaign-app-header {
+    height: 56px !important;
+    min-height: 56px !important;
+    padding-inline: 16px !important;
+    border-bottom: 1px solid #eef1f4 !important;
+  }
+
+  .campaigns-workspace .campaign-filters-row,
+  .campaigns-workspace .campaign-actions-toolbar {
+    height: 56px !important;
+    min-height: 56px !important;
+    padding-block: 8px !important;
+    border-color: #eef1f4 !important;
+  }
+
+  .campaigns-workspace .campaign-tabs-header {
+    height: 44px !important;
+    min-height: 44px !important;
+    border-color: #eef1f4 !important;
+  }
+
+  .campaigns-workspace .campaign-table-frame {
+    margin: 12px 0 0 !important;
+    border: 1px solid #e4e7ec !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+  }
+}
