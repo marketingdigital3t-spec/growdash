@@ -535,7 +535,7 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
             const persistedAgent = directorsByRole.get(areaNode.dbRole);
             const agentName = persistedAgent?.name?.split(" · ")[0] || areaNode.agentName;
             const runtime = persistedAgent?.runtime_status || persistedAgent?.status || "aguardando";
-            const runtimeLabel = runtime === "analyzing" || runtime === "working" ? "analisando" : runtime === "waiting_approval" ? "aguardando aprovação" : runtime === "error" ? "com alerta" : "pronto";
+            const runtimeLabel = !persistedAgent ? "aguardando conexão" : runtime === "analyzing" || runtime === "working" ? "analisando" : runtime === "waiting_approval" ? "aguardando aprovação" : runtime === "error" ? "com alerta" : "pronto";
             return <button key={areaNode.id} type="button" className={cn("growdash-agent-room", active && "is-selected")} style={{ left: `${x}%`, top: `${y}%`, "--room-index": index, "--agent-color": areaNode.agentColor } as React.CSSProperties} onClick={() => openArea(areaNode.id)} aria-pressed={active} aria-label={`Abrir sala ${areaNode.label} e conversar com ${areaNode.agentName}`}>
               <span className="growdash-agent-room-head"><span className="growdash-agent-room-title"><i aria-hidden="true" /><b>{areaNode.label}</b></span><small>{areaNode.strategies.length} frentes</small></span>
               <span className="growdash-agent-room-floor">
