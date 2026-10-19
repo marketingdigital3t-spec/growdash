@@ -1260,7 +1260,7 @@ export default function Campaigns() {
                     <TableHeader className="sticky top-0 z-50 shadow-[0_2px_8px_rgba(0,0,0,.08)]">
                       <TableRow className="campaign-metric-header h-11 border-b border-border hover:bg-transparent [&>th]:h-11 [&>th]:px-3 [&>th]:py-1 dark:border-[#28251e]">
                         <ResizableHead colKey="check" width={camp.colWidths.check} onResize={camp.startResize("check")} className="campaign-check-head sticky left-0 z-40 bg-muted">
-                          <Checkbox className="h-4 w-4 rounded-[3px] border-primary/80" checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} />
+                          <Checkbox className="campaign-select-checkbox" checked={selectedIds.size === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} aria-label="Selecionar todas as campanhas" />
                         </ResizableHead>
                         <ResizableHead colKey="name" width={camp.colWidths.name} onResize={camp.startResize("name")} sortable sortableKey="name" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} className="campaign-name-head sticky z-40 border-r border-border bg-muted shadow-[8px_0_14px_-14px_rgba(0,0,0,.35)]" style={{ left: camp.colWidths.check }}>Campanha</ResizableHead>
                         {showColumn("deliveryStatus") && <ResizableHead colKey="deliveryStatus" width={camp.colWidths.deliveryStatus} onResize={camp.startResize("deliveryStatus")}>Veiculação</ResizableHead>}
