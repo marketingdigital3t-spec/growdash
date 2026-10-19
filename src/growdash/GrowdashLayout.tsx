@@ -426,6 +426,7 @@ export default function GrowdashLayout() {
           <button
             type="button"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            data-theme-toggle
             className={cn(
               "flex h-10 w-full items-center rounded-lg text-[12px] text-white/60 hover:bg-white/[.06] hover:text-white",
               showSidebarLabels ? "gap-3 px-3" : "justify-center",
