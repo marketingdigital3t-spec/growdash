@@ -192,8 +192,9 @@ Trabalhe nesta ordem, registrando evidências no repositório:
 - As versões publicadas no projeto Supabase `cixnvosxqlacjbpymjha` foram:
   `agent-office-chat` v19, `ask-ai` v44 e `rd-sync-deals` v100. As três
   recusaram chamadas sem sessão com HTTP 401; `deno check` foi aprovado.
-- O código e este registro estão no commit `6edc916`, enviado para
-  `origin/main`. A validação final passou em `npm test` (99 arquivos/491
+- As correções de código estão no commit `6edc916` e este registro final está
+  no commit posterior `8836ff7`, ambos enviados para `origin/main`. A
+  validação final passou em `npm test` (99 arquivos/491
   testes), `npm run lint`, `git diff --check` e `supabase db lint --linked
   --level error` (sem resultados).
 - O estado de integração permanece deliberadamente `partial`/`unavailable`:
