@@ -23,6 +23,10 @@ function validDate(value: unknown): value is string {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+function validUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function actionTypes(siteActions: string[]) {
   return Array.from(new Set([...META_LEAD_ACTION_TYPES, ...siteActions]));
 }
@@ -56,13 +60,22 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
   const startDate = args.start_date;
   const endDate = args.end_date;
   if (!accountIds.length) throw new Error("account_ids precisa conter pelo menos um UUID interno autorizado.");
+  if (accountIds.some((id) => !validUuid(id))) throw new Error("account_ids precisa conter somente UUIDs internos válidos.");
   if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error("start_date e end_date devem ser datas civis válidas e inclusivas (YYYY-MM-DD).");
 
+  const { data: memberships, error: membershipError } = await admin.from("workspace_members")
+    .select("workspace_id").eq("user_id", userId).eq("status", "active");
+  if (membershipError) throw membershipError;
+  const activeWorkspaceIds = new Set((memberships || []).map((row: { workspace_id: string }) => String(row.workspace_id)));
   const { data: accounts, error: accountsError } = await admin.from("ad_accounts")
-    .select("id,name,account_id,timezone_name,attribution_window")
-    .eq("user_id", userId).in("id", accountIds);
+    .select("id,name,account_id,user_id,workspace_id,timezone_name,attribution_window")
+    .in("id", accountIds);
   if (accountsError) throw accountsError;
-  if ((accounts || []).length !== accountIds.length) throw new Error("Uma ou mais contas não existem ou não estão autorizadas.");
+  const authorizedAccounts = (accounts || []).filter((account: { user_id: string; workspace_id: string | null }) => {
+    if (account.workspace_id) return activeWorkspaceIds.has(String(account.workspace_id));
+    return account.user_id === userId;
+  });
+  if (authorizedAccounts.length !== accountIds.length) throw new Error("Uma ou mais contas não existem ou não estão autorizadas no workspace ativo.");
 
   const { data: lpConfigs, error: configError } = await admin.from("account_lp_config")
     .select("ad_account_id,action_type").in("ad_account_id", accountIds);
@@ -79,7 +92,7 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
   const actions: any[] = [];
   const accountCoverage: Record<string, AccountCoverage> = {};
 
-  for (const account of accounts || []) {
+  for (const account of authorizedAccounts) {
     const attributionWindow = account.attribution_window || "account_default";
     let insightQuery = admin.from("insights")
       .select("ad_account_id,ad_id,adset_id,campaign_id,date,attribution_window,spend,impressions,reach,clicks")

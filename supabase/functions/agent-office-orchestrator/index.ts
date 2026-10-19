@@ -66,10 +66,15 @@ async function ensureAgents(workspace: { id: string; owner_id: string }) {
 
 async function collectFindings(workspace: { id: string; owner_id: string }): Promise<Finding[]> {
   const findings: Finding[] = [];
-  const { data: accounts, error: accountsError } = await admin.from("ad_accounts")
-    .select("id,name,connection_status,last_sync_success_at,last_sync_error,metadata").eq("user_id", workspace.owner_id);
-  if (accountsError) findings.push({ fingerprint: `meta-query:${workspace.id}`, severity: "high", category: "meta", source: "ad_accounts", description: "Não foi possível consultar as contas Meta.", evidence: { code: accountsError.code || "QUERY_ERROR" } });
-  for (const account of accounts || []) {
+  const accountSelect = "id,name,workspace_id,connection_status,last_sync_success_at,last_sync_error,metadata";
+  const { data: workspaceAccounts, error: workspaceAccountsError } = await admin.from("ad_accounts")
+    .select(accountSelect).eq("workspace_id", workspace.id);
+  const { data: legacyAccounts, error: legacyAccountsError } = await admin.from("ad_accounts")
+    .select(accountSelect).eq("user_id", workspace.owner_id).is("workspace_id", null);
+  const accountErrors = [workspaceAccountsError, legacyAccountsError].filter(Boolean);
+  const accounts = Array.from(new Map([...(workspaceAccounts || []), ...(legacyAccounts || [])].map((account) => [account.id, account])).values());
+  if (accountErrors.length) findings.push({ fingerprint: `meta-query:${workspace.id}`, severity: "high", category: "meta", source: "ad_accounts", description: "Não foi possível consultar as contas Meta.", evidence: { code: accountErrors[0]?.code || "QUERY_ERROR" } });
+  for (const account of accounts) {
     if (account.connection_status === "disconnected") continue;
     if (account.connection_status !== "connected") findings.push({ fingerprint: `meta-status:${account.id}`, severity: "high", category: "meta", source: "ad_accounts", account_id: account.id, description: `Conta Meta ${account.name || account.id} está ${account.connection_status || "sem estado"}.`, evidence: { status: account.connection_status || null, last_error: account.last_sync_error || null } });
     if (account.last_sync_error) findings.push({ fingerprint: `meta-error:${account.id}:${String(account.last_sync_error).slice(0, 80)}`, severity: "medium", category: "meta", source: "ad_accounts", account_id: account.id, description: `A última sincronização da conta Meta registrou erro.`, evidence: { last_error: String(account.last_sync_error).slice(0, 500) } });

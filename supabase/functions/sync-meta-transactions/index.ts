@@ -5,6 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+const MAX_TRANSACTION_PAGES = 100;
 
 function mapPaymentMethod(option?: string | null): string | null {
   if (!option) return null;
@@ -45,17 +46,24 @@ async function fetchTransactions(metaAccountId: string, token: string, sinceUnix
   let url: string | null =
     `${graphBase}/${metaAccountId}/transactions` +
     `?fields=id,time,billing_reason,payment_option,status,amount,vat,provider_amount,billing_period,app_amount` +
-    `&since=${sinceUnix}&limit=200&access_token=${token}`;
+    `&since=${sinceUnix}&limit=200`;
   let pages = 0;
-  while (url && pages < 15) {
-    const res: Response = await fetch(url);
+  while (url && pages < MAX_TRANSACTION_PAGES) {
+    const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     const json: any = await res.json();
     if (json.error) throw new Error(json.error.message || "Meta API error");
     if (Array.isArray(json.data)) all.push(...json.data);
-    url = json.paging?.next ?? null;
+    const next = json.paging?.next;
+    if (typeof next === "string" && next) {
+      const nextUrl = new URL(next);
+      nextUrl.searchParams.delete("access_token");
+      url = nextUrl.toString();
+    } else {
+      url = null;
+    }
     pages++;
   }
-  return all;
+  return { transactions: all, pages, truncated: Boolean(url) };
 }
 
 Deno.serve(async (req) => {
@@ -157,8 +165,12 @@ Deno.serve(async (req) => {
       try {
         const raw = acc.account_id;
         const metaId = raw.startsWith("act_") ? raw : `act_${raw}`;
-        const txs = await fetchTransactions(metaId, acc.access_token, sinceUnix);
-        console.log(`[${acc.name}] fetched ${txs.length} transactions from Meta`);
+        const fetched = await fetchTransactions(metaId, acc.access_token, sinceUnix);
+        const txs = fetched.transactions;
+        console.log(`[${acc.name}] fetched ${txs.length} transactions from Meta across ${fetched.pages} page(s)`);
+        if (fetched.truncated) {
+          errors.push(`${acc.name}: paginação Meta excedeu ${MAX_TRANSACTION_PAGES} páginas; snapshot parcial preservado.`);
+        }
         if (txs.length === 0) {
           perAccount[acc.name] = 0;
           continue;
