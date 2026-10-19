@@ -10,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-const DIRECTOR_ROLES = new Set(["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist"]);
+const DIRECTOR_ROLES = new Set(["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist", "research", "social", "analytics", "inbox"]);
 
 function dateKey(value: unknown) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;

@@ -283,12 +283,16 @@ export default function AgentsOfficePage() {
 }
 
 const KNOWLEDGE_NODES: KnowledgeNode[] = [
-  { id: "traffic", label: "Tráfego pago", agentName: "Ágata", agentRole: "Gestora de aquisição", agentColor: "#38bdf8", chatRole: "marketing", note: "Mídia, criativos, orçamento e escala", document: "Centraliza investimento, campanhas, criativos e os sinais que mostram onde escalar ou proteger margem.", decision: "Priorize orçamento nos conjuntos que combinam volume de leads e custo sustentável; investigue os criativos antes de ampliar investimento.", strategies: [["Estratégias de mídia", "media"], ["Criativos & testes", "creative"], ["Alertas de performance", "performance"]] },
-  { id: "crm", label: "Comercial", agentName: "Camila", agentRole: "Diretora de vendas", agentColor: "#fb7185", chatRole: "commercial", note: "Pipeline, qualificação e follow-up", document: "Conecta negociações, etapas, origem e histórico de contato para revelar onde cada oportunidade perde ritmo.", decision: "Use as etapas com maior acúmulo para organizar cadência, responsáveis e a próxima ação de cada lead.", strategies: [["Pipeline & etapas", "pipeline"], ["Scripts de vendas", "scripts"], ["Follow-ups", "followups"]] },
-  { id: "commercial", label: "Growth", agentName: "Helena", agentRole: "Chief of Staff de crescimento", agentColor: "#e9b72d", chatRole: "growth", note: "Metas, conversão e receita", document: "Transforma o pipeline em leitura de vendas, metas, receita e previsibilidade por operação.", decision: "Compare receita confirmada com pipeline em aberto para orientar o time para as oportunidades que mudam a meta do período.", strategies: [["Metas e ranking", "ranking"], ["Playbook de vendas", "playbook"], ["Forecast", "forecast"]] },
-  { id: "finance", label: "Financeiro", agentName: "Bianca", agentRole: "CFO de margem", agentColor: "#34d399", chatRole: "finance", note: "Caixa, margem e previsibilidade", document: "Reúne receita, investimento de mídia e custos para acompanhar resultado e capacidade de decisão da empresa.", decision: "Leia receita e mídia juntas: crescimento saudável preserva margem e não depende de um custo de aquisição fora do planejado.", strategies: [["DRE & caixa", "dre"], ["Margem e custos", "margin"], ["Planejamento", "planning"]] },
-  { id: "brand", label: "Designer", agentName: "Milo", agentRole: "Diretor criativo", agentColor: "#a78bfa", chatRole: "designer", note: "Posicionamento, conteúdo e confiança", document: "Organiza posicionamento, conteúdo e sinais de audiência que sustentam a demanda antes e depois da conversão.", decision: "Use alcance, CTR e campanha líder para decidir quais mensagens merecem virar novos criativos, páginas e conteúdos.", strategies: [["Posicionamento", "positioning"], ["Conteúdo estratégico", "content"], ["Reputação", "reputation"]] },
-  { id: "automations", label: "Estrategista", agentName: "Júlia", agentRole: "Estrategista de operações", agentColor: "#f59e0b", chatRole: "strategist", note: "Playbooks, integrações e rotina", document: "Acompanha rotinas automatizadas, playbooks e integrações que mantêm atendimento e análise consistentes.", decision: "Mantenha rotinas críticas monitoradas e conecte cada automação a uma etapa ou objetivo mensurável da operação.", strategies: [["Playbooks", "playbooks"], ["WhatsApp", "whatsapp"], ["Webhooks & rotinas", "webhooks"]] },
+  { id: "strategy", dbRole: "ceo", label: "CEO · Estratégia", agentName: "Helena", agentRole: "Gestora de estratégia", agentColor: "#f2c14e", chatRole: "ceo", note: "Prioridades, decisões e alinhamento", document: "Lê o Cérebro Central e consolida os sinais das outras salas em prioridades de negócio.", decision: "Escolha uma prioridade por ciclo, registre a decisão e encaminhe o próximo passo para o gestor responsável.", strategies: [["Visão executiva", "executive"], ["Prioridades", "priorities"], ["Revisão cruzada", "cross-review"]] },
+  { id: "research", dbRole: "research", label: "Pesquisa", agentName: "Rafael", agentRole: "Gestor de pesquisa", agentColor: "#42b8ff", chatRole: "research", note: "Mercado, concorrência e tendências", document: "Organiza hipóteses, benchmarks e evidências para reduzir incerteza antes das decisões.", decision: "Separe dado observado de hipótese e registre a fonte antes de recomendar um novo teste.", strategies: [["Benchmark", "benchmark"], ["Concorrentes", "competitors"], ["Tendências", "trends"]] },
+  { id: "traffic", dbRole: "marketing", label: "Tráfego", agentName: "Ágata", agentRole: "Gestora de aquisição", agentColor: "#3fc7f5", chatRole: "marketing", note: "Meta, Google, orçamento e ROAS", document: "Centraliza investimento, campanhas e sinais de aquisição para proteger custo e escalar o que funciona.", decision: "Priorize conjuntos com volume de leads e custo sustentável; qualquer alteração em campanha ativa exige aprovação.", strategies: [["Campanhas", "campaigns"], ["Orçamento", "budget"], ["Alertas", "alerts"]] },
+  { id: "creative", dbRole: "designer", label: "Criativo", agentName: "Milo", agentRole: "Gestor criativo", agentColor: "#ae8bff", chatRole: "designer", note: "Copies, hooks e testes", document: "Transforma sinais de campanha em hipóteses de mensagem, roteiros e variações de criativos.", decision: "Teste uma hipótese por vez e preserve a promessa central até que o dado prove o contrário.", strategies: [["Hooks", "hooks"], ["Roteiros", "scripts"], ["Testes A/B", "creative-tests"]] },
+  { id: "social", dbRole: "social", label: "Social", agentName: "Sofia", agentRole: "Gestora de conteúdo", agentColor: "#e35fe8", chatRole: "social", note: "Instagram e calendário editorial", document: "Conecta calendário, formatos e distribuição social ao que a operação precisa provar ou reforçar.", decision: "Planeje conteúdo a partir da prioridade do ciclo e acompanhe a resposta antes de replicar o formato.", strategies: [["Calendário", "calendar"], ["Posts", "posts"], ["Distribuição", "distribution"]] },
+  { id: "sales", dbRole: "commercial", label: "Vendas", agentName: "Camila", agentRole: "Gestora comercial", agentColor: "#ff718b", chatRole: "commercial", note: "Funil, qualificação e follow-up", document: "Lê o CRM, identifica gargalos e organiza a próxima ação de cada oportunidade sem enviar mensagens automaticamente.", decision: "Use a etapa e o responsável registrados no CRM para definir o próximo follow-up.", strategies: [["Pipeline", "pipeline"], ["Qualificação", "qualification"], ["Follow-up", "followups"]] },
+  { id: "analytics", dbRole: "analytics", label: "Analytics", agentName: "Theo", agentRole: "Gestor de dados", agentColor: "#56d5bb", chatRole: "analytics", note: "Métricas, diagnósticos e relatórios", document: "Compara períodos e fontes com o mesmo escopo antes de afirmar que um número está correto.", decision: "Confirme conta, período e definição do evento; divergências sobem ao CEO antes da entrega.", strategies: [["KPIs", "kpis"], ["Diagnóstico", "diagnostics"], ["Relatórios", "reports"]] },
+  { id: "finance", dbRole: "finance", label: "Financeiro", agentName: "Bianca", agentRole: "Gestora financeira", agentColor: "#35d7a0", chatRole: "finance", note: "Faturamento, metas e margem", document: "Reúne receita confirmada, investimento e custos para acompanhar resultado e capacidade de decisão.", decision: "Leia receita e mídia juntas; qualquer gasto ou mudança de meta fica pendente de aprovação.", strategies: [["DRE", "dre"], ["Margem", "margin"], ["Projeções", "forecast"]] },
+  { id: "legal", dbRole: "legal", label: "Jurídico", agentName: "Júlia", agentRole: "Gestora jurídica", agentColor: "#c5a4ff", chatRole: "legal", note: "Contratos, LGPD e conformidade", document: "Revisa integrações, permissões, contratos e mensagens para reduzir risco antes de qualquer ação externa.", decision: "Prepare a recomendação e escale para aprovação do usuário quando houver impacto legal ou público.", strategies: [["LGPD", "lgpd"], ["Contratos", "contracts"], ["Permissões", "permissions"]] },
+  { id: "inbox", dbRole: "inbox", label: "Inbox", agentName: "Nina", agentRole: "Gestora de triagem", agentColor: "#ff9b45", chatRole: "inbox", note: "Mensagens, triagem e encaminhamento", document: "Classifica mensagens, identifica urgência e encaminha cada assunto para a sala responsável.", decision: "Não responda em nome do usuário sem aprovação; registre contexto e próxima ação antes de encaminhar.", strategies: [["Triagem", "triage"], ["Prioridades", "inbox-priorities"], ["Encaminhamentos", "routing"]] },
 ];
 
 const NEURAL_POINTS = Array.from({ length: 18 }, (_, index) => ({
@@ -310,26 +314,21 @@ const NEURAL_LINKS = Array.from({ length: 20 }, (_, index) => {
 type CorePhase = "brain" | "entering" | "core";
 
 type KnowledgeStrategy = readonly [string, string];
-type KnowledgeNode = { id: CoreAreaId; label: string; agentName: string; agentRole: string; agentColor: string; chatRole: "ceo" | "marketing" | "commercial" | "finance" | "legal" | "growth" | "designer" | "strategist"; note: string; document: string; decision: string; strategies: readonly KnowledgeStrategy[] };
+type DirectorRole = "ceo" | "marketing" | "commercial" | "finance" | "legal" | "growth" | "designer" | "strategist" | "research" | "social" | "analytics" | "inbox";
+type KnowledgeNode = { id: CoreAreaId; dbRole: DirectorRole; label: string; agentName: string; agentRole: string; agentColor: string; chatRole: DirectorRole; note: string; document: string; decision: string; strategies: readonly KnowledgeStrategy[] };
 type SpatialGraphNode = { id: string; area: CoreAreaId | null; label: string; kind: "root" | "area" | "topic"; x: number; y: number; strategyId?: string };
 
 const AREA_POSITIONS: Record<CoreAreaId, readonly [number, number]> = {
-  traffic: [19, 24], crm: [50, 16], commercial: [81, 24], finance: [81, 74], brand: [50, 84], automations: [19, 74],
-};
-
-const TOPIC_POSITIONS: Record<CoreAreaId, readonly (readonly [number, number])[]> = {
-  traffic: [[8, 10], [35, 8], [42, 26]], crm: [[61, 8], [91, 11], [91, 30]], commercial: [[94, 42], [94, 59], [82, 68]],
-  finance: [[58, 91], [76, 94], [91, 87]], brand: [[8, 89], [29, 94], [42, 73]], automations: [[5, 39], [5, 59], [23, 62]],
+  strategy: [50, 11], research: [28, 16], traffic: [72, 16], creative: [14, 36], social: [86, 36],
+  sales: [14, 66], analytics: [86, 66], finance: [28, 86], legal: [50, 91], inbox: [72, 86],
+  crm: [14, 66], commercial: [14, 66], brand: [14, 36], automations: [72, 86],
 };
 
 const SPATIAL_GRAPH_NODES: SpatialGraphNode[] = [
   { id: "growdash", area: null, label: "Growdash", kind: "root", x: 50, y: 50 },
-  ...KNOWLEDGE_NODES.flatMap((node) => {
+  ...KNOWLEDGE_NODES.map((node) => {
     const [x, y] = AREA_POSITIONS[node.id];
-    return [{ id: node.id, area: node.id, label: node.label, kind: "area" as const, x, y }, ...node.strategies.map(([label, strategyId], index) => {
-      const [topicX, topicY] = TOPIC_POSITIONS[node.id][index];
-      return { id: `${node.id}-${strategyId}`, area: node.id, label, kind: "topic" as const, x: topicX, y: topicY, strategyId };
-    })];
+    return { id: node.id, area: node.id, label: node.label, kind: "area" as const, x, y };
   }),
 ];
 
@@ -355,6 +354,24 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
   const needsDeals = isCoreOpen;
   const needsSales = isCoreOpen;
   const { data: workspace } = useWorkspace();
+  const directorsQuery = useQuery<Array<{ id: string; role: string; name: string; status: string; runtime_status: string; is_visible: boolean }>>({
+    queryKey: ["agent-core-directors", workspace?.id],
+    enabled: isCoreOpen && !!workspace?.id,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("agent_office_agents")
+        .select("id,role,name,status,runtime_status,is_visible")
+        .eq("workspace_id", workspace!.id)
+        .eq("is_visible", true)
+        .order("role");
+      if (error) {
+        console.warn("Growdash agent rooms unavailable:", error.message);
+        return [];
+      }
+      return (data || []) as Array<{ id: string; role: string; name: string; status: string; runtime_status: string; is_visible: boolean }>;
+    },
+    staleTime: 60_000,
+  });
   const mediaQuery = useInsights({ startDate, endDate, enabled: isCoreOpen && needsMedia });
   const dealsQuery = useRDDealsForPeriod({ startDate, endDate, enabled: isCoreOpen && needsDeals });
   const salesQuery = useSales({ startDate, endDate, enabled: isCoreOpen && needsSales });
@@ -400,6 +417,7 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
     schedules: schedulesQuery.data,
     agentConfigs: configsQuery.data,
   }), [accounts, configsQuery.data, dealsQuery.data, mediaQuery.data, schedulesQuery.data, selectedArea, salesQuery.data]);
+  const directorsByRole = useMemo(() => new Map((directorsQuery.data || []).map((agent) => [agent.role, agent])), [directorsQuery.data]);
   const neuralHealth = useMemo(() => {
     const measured = summaries.filter((summary) => summary.health !== "no-data");
     if (!measured.length) return { status: "no-data" as const, score: null };
@@ -514,13 +532,17 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
           {KNOWLEDGE_NODES.map((areaNode, index) => {
             const [x, y] = AREA_POSITIONS[areaNode.id];
             const active = selectedArea === areaNode.id;
+            const persistedAgent = directorsByRole.get(areaNode.dbRole);
+            const agentName = persistedAgent?.name?.split(" · ")[0] || areaNode.agentName;
+            const runtime = persistedAgent?.runtime_status || persistedAgent?.status || "aguardando";
+            const runtimeLabel = runtime === "analyzing" || runtime === "working" ? "analisando" : runtime === "waiting_approval" ? "aguardando aprovação" : runtime === "error" ? "com alerta" : "pronto";
             return <button key={areaNode.id} type="button" className={cn("growdash-agent-room", active && "is-selected")} style={{ left: `${x}%`, top: `${y}%`, "--room-index": index, "--agent-color": areaNode.agentColor } as React.CSSProperties} onClick={() => openArea(areaNode.id)} aria-pressed={active} aria-label={`Abrir sala ${areaNode.label} e conversar com ${areaNode.agentName}`}>
-              <span className="growdash-agent-room-head"><span className="growdash-agent-room-title"><i aria-hidden="true" /><b>{areaNode.label}</b></span><small>{areaNode.strategies.length} frentes · ativo</small></span>
+              <span className="growdash-agent-room-head"><span className="growdash-agent-room-title"><i aria-hidden="true" /><b>{areaNode.label}</b></span><small>{areaNode.strategies.length} frentes</small></span>
               <span className="growdash-agent-room-floor">
-                <span className="growdash-agent-room-agent"><span className="growdash-agent-room-avatar"><Bot className="h-4 w-4" /></span><b>{areaNode.agentName}</b><small>{areaNode.agentRole}</small></span>
+                <span className="growdash-agent-room-agent"><span className="growdash-agent-room-avatar"><Bot className="h-4 w-4" /></span><b>{agentName}</b><small>{areaNode.agentRole}</small><em className={cn(runtime === "error" && "is-alert")}><i />{runtimeLabel}</em></span>
                 <span className="growdash-agent-room-workstations">{areaNode.strategies.map(([label, strategyId]) => <span key={strategyId} className="growdash-agent-room-workstation"><i aria-hidden="true" /><span>{label}</span></span>)}</span>
               </span>
-              <span className="growdash-agent-room-foot"><span>Conectado ao núcleo</span><ChevronRight className="h-3 w-3" /></span>
+              <span className="growdash-agent-room-foot"><span><i /> Gestor conectado ao Cérebro</span><ChevronRight className="h-3 w-3" /></span>
             </button>;
           })}
         </div>
@@ -553,11 +575,18 @@ function OperationalAreaPanel({ node, summaries, selectedStrategy, loading, onCl
 function getAreaMetrics(area: CoreAreaId, summary: ReturnType<typeof buildCoreAccountSummaries>[number]) {
   const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
   const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
+  if (area === "strategy") return [{ label: "Receita", value: money(summary.revenue) }, { label: "Mídia", value: money(summary.spend) }, { label: "Negócios", value: integer.format(summary.deals) }, { label: "ROAS", value: summary.roas ? `${summary.roas.toFixed(2).replace(".", ",")}x` : "—" }];
+  if (area === "research") return [{ label: "Campanha líder", value: summary.topCampaign || "Sem dados" }, { label: "Impressões", value: integer.format(summary.impressions) }, { label: "CTR", value: summary.ctr ? `${summary.ctr.toFixed(2).replace(".", ",")}%` : "—" }, { label: "Objetivo", value: summary.topObjective || "Sem leitura" }];
   if (area === "traffic") return [{ label: "Investimento", value: money(summary.spend) }, { label: "Leads", value: integer.format(summary.leads) }, { label: "CPL", value: summary.cpl ? money(summary.cpl) : "—" }, { label: "Campanhas ativas", value: integer.format(summary.activeCampaigns) }];
-  if (area === "crm") return [{ label: "Negócios", value: integer.format(summary.deals) }, { label: "Ganhos", value: integer.format(summary.wonDeals) }, { label: "Pipeline", value: money(summary.pipeline) }, { label: "Rotinas", value: integer.format(summary.schedules) }];
+  if (area === "creative") return [{ label: "CTR", value: summary.ctr ? `${summary.ctr.toFixed(2).replace(".", ",")}%` : "—" }, { label: "Alcance", value: integer.format(summary.reach) }, { label: "Cliques", value: integer.format(summary.clicks) }, { label: "Campanha", value: summary.topCampaign || "Sem dados" }];
+  if (area === "social") return [{ label: "Alcance", value: integer.format(summary.reach) }, { label: "Impressões", value: integer.format(summary.impressions) }, { label: "Cliques", value: integer.format(summary.clicks) }, { label: "CTR", value: summary.ctr ? `${summary.ctr.toFixed(2).replace(".", ",")}%` : "—" }];
+  if (area === "crm" || area === "sales") return [{ label: "Negócios", value: integer.format(summary.deals) }, { label: "Ganhos", value: integer.format(summary.wonDeals) }, { label: "Pipeline", value: money(summary.pipeline) }, { label: "Ticket", value: summary.ticket ? money(summary.ticket) : "—" }];
   if (area === "commercial") return [{ label: "Receita", value: money(summary.revenue) }, { label: "Vendas", value: integer.format(summary.sales) }, { label: "Ticket médio", value: summary.ticket ? money(summary.ticket) : "—" }, { label: "Melhor vendedor", value: summary.topSeller || "Sem atribuição" }];
+  if (area === "analytics") return [{ label: "Leads", value: integer.format(summary.leads) }, { label: "Negócios", value: integer.format(summary.deals) }, { label: "Receita", value: money(summary.revenue) }, { label: "ROAS", value: summary.roas ? `${summary.roas.toFixed(2).replace(".", ",")}x` : "—" }];
   if (area === "finance") return [{ label: "Receita", value: money(summary.revenue) }, { label: "Mídia", value: money(summary.spend) }, { label: "Resultado", value: money(summary.revenue - summary.spend) }, { label: "ROAS", value: summary.roas ? `${summary.roas.toFixed(2).replace(".", ",")}x` : "—" }];
   if (area === "brand") return [{ label: "Impressões", value: integer.format(summary.impressions) }, { label: "Alcance", value: integer.format(summary.reach) }, { label: "CTR", value: summary.ctr ? `${summary.ctr.toFixed(2).replace(".", ",")}%` : "—" }, { label: "Campanha líder", value: summary.topCampaign || "Sem dados" }];
+  if (area === "legal") return [{ label: "Contas", value: summary.spend || summary.revenue ? "Com dados" : "Sem dados" }, { label: "Permissões", value: "Revisão" }, { label: "LGPD", value: "Monitorada" }, { label: "Ação externa", value: "Aprovação" }];
+  if (area === "inbox") return [{ label: "Negócios", value: integer.format(summary.deals) }, { label: "Ganhos", value: integer.format(summary.wonDeals) }, { label: "Pipeline", value: money(summary.pipeline) }, { label: "Próxima ação", value: summary.deals > 0 ? "Encaminhar" : "Aguardando" }];
   return [{ label: "Rotinas", value: integer.format(summary.schedules) }, { label: "Ativas", value: integer.format(summary.activeSchedules) }, { label: "Última estratégia", value: summary.strategy }, { label: "Execução", value: summary.activeSchedules > 0 ? "Monitorada" : "Pendente" }];
 }
 

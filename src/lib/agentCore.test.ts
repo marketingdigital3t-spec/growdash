@@ -128,4 +128,13 @@ describe("buildCoreAccountSummaries", () => {
     expect(summary.activeSchedules).toBe(1);
     expect(summary.strategy).toBe("Playbooks automatizados ativos");
   });
+
+  it("keeps the ten canonical operating rooms data-backed", () => {
+    const areas = ["strategy", "research", "traffic", "creative", "social", "sales", "analytics", "finance", "legal", "inbox"] as const;
+    for (const area of areas) {
+      const [summary] = buildCoreAccountSummaries(area, { accounts: [account], insights: [insight] });
+      expect(summary.id).toBe(account.id);
+      expect(summary.strategy.length).toBeGreaterThan(0);
+    }
+  });
 });

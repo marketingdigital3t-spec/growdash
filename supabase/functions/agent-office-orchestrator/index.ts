@@ -39,6 +39,10 @@ async function ensureAgents(workspace: { id: string; owner_id: string }) {
     ["commercial", "Diretor Comercial", { audit: true, prepare: true, send_messages: false }],
     ["finance", "CFO", { audit: true, prepare: true, authorize_spend: false }],
     ["legal", "Advogado", { audit: true, prepare: true, legal_advice: false }],
+    ["research", "Rafael · Gestor de Pesquisa", { audit: true, prepare: true, publish: false }],
+    ["social", "Sofia · Gestora de Conteúdo", { audit: true, prepare: true, publish: false }],
+    ["analytics", "Theo · Gestor de Dados", { audit: true, prepare: true, publish: false }],
+    ["inbox", "Nina · Gestora de Triagem", { audit: true, prepare: true, send_messages: false }],
     ["growth", "Helena · Chief of Staff", { audit: true, prepare: true, publish: false, cross_domain: true }],
     ["strategist", "Júlia · Estrategista", { audit: true, prepare: true, publish: false }],
     ["backend_security", "Dev Backend Segurança", { audit: true, patch_backend: true, deploy: false }],
@@ -51,7 +55,7 @@ async function ensureAgents(workspace: { id: string; owner_id: string }) {
   const existing = new Set((data || []).map((row: { role: string }) => row.role));
   for (const [role, name, permissions] of seed) {
     if (existing.has(role)) continue;
-    const isVisible = ["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist"].includes(role);
+    const isVisible = ["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist", "research", "social", "analytics", "inbox"].includes(role);
     const { error } = await admin.from("agent_office_agents").insert({ workspace_id: workspace.id, owner_id: workspace.owner_id, role, name, is_visible: isVisible, permissions, config: {} });
     if (error) throw error;
   }

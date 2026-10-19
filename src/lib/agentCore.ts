@@ -2,7 +2,12 @@ import type { InsightRow } from "@/hooks/useInsights";
 import type { RDDealLite } from "@/hooks/useRDDealsForPeriod";
 import type { Sale } from "@/hooks/useSales";
 
-export type CoreAreaId = "traffic" | "crm" | "commercial" | "finance" | "brand" | "automations";
+// Public area ids used by the Growdash operating map. The legacy ids remain
+// accepted by the summary builder so saved dashboards and older tests keep
+// their meaning while the visual hub uses the ten canonical rooms.
+export type CoreAreaId =
+  | "strategy" | "research" | "traffic" | "creative" | "social" | "sales" | "analytics" | "finance" | "legal" | "inbox"
+  | "crm" | "commercial" | "brand" | "automations";
 
 export type CoreAccountInput = {
   id: string;
@@ -100,6 +105,7 @@ function healthFor(spend: number, leads: number, cpl: number, targetCpl: number)
 function inferStrategy(args: {
   area: CoreAreaId;
   spend: number;
+  impressions: number;
   leads: number;
   cpl: number;
   targetCpl: number;
@@ -120,8 +126,15 @@ function inferStrategy(args: {
     if (args.leads > 0 && args.targetCpl > 0 && args.cpl > args.targetCpl * 1.4) return { title: "Otimização de CPL", detail: `CPL de ${brl.format(args.cpl)} acima do alvo de ${brl.format(args.targetCpl)}; priorizar os conjuntos com melhor custo.` };
     return { title: configuredLabel || (args.revenue > 0 ? "Escala orientada a vendas" : "Aquisição e testes"), detail: args.topCampaign ? `Campanha líder: ${args.topCampaign}${args.topObjective ? ` · objetivo ${args.topObjective}` : ""}.` : "Sem campanha com dados suficientes para recomendar escala." };
   }
-  if (args.area === "crm") return { title: args.wonDeals > 0 ? "Follow-up de oportunidades quentes" : "Qualificação de pipeline", detail: `${args.wonDeals} negócio(s) ganho(s) em ${args.deals} negócio(s) monitorado(s); priorizar próximos estágios e follow-ups.` };
+  if (args.area === "crm" || args.area === "sales") return { title: args.wonDeals > 0 ? "Follow-up de oportunidades quentes" : "Qualificação de pipeline", detail: `${args.wonDeals} negócio(s) ganho(s) em ${args.deals} negócio(s) monitorado(s); priorizar próximos estágios e follow-ups.` };
   if (args.area === "commercial") return { title: args.topSeller ? `Acelerar ${args.topSeller}` : "Playbook de vendas", detail: args.revenue > 0 ? `${brl.format(args.revenue)} em receita confirmada; comparar vendedores e replicar o melhor argumento.` : "Ainda não há venda confirmada para comparar vendedores." };
+  if (args.area === "strategy") return { title: "Prioridades do ciclo", detail: args.revenue > args.spend ? "Receita confirmada supera a mídia no período; consolidar a prioridade e encaminhar o próximo ciclo aos gestores." : "Consolidar mídia, pipeline e receita antes de decidir a próxima prioridade." };
+  if (args.area === "research") return { title: "Pesquisa orientada a sinais", detail: args.topCampaign ? `Usar ${args.topCampaign} como referência de mensagem e cruzar com demanda e conversão antes de abrir novos testes.` : "Ainda não há campanha com dados suficientes para orientar o benchmark." };
+  if (args.area === "creative") return { title: "Criativos para o próximo teste", detail: args.topCampaign ? `A campanha ${args.topCampaign} concentra o maior investimento; extrair hipóteses de mensagem e validar novas variações.` : "Sem exposição suficiente para priorizar uma hipótese criativa." };
+  if (args.area === "social") return { title: "Conteúdo conectado à demanda", detail: args.impressions > 0 ? `Usar os sinais de alcance e CTR do período para organizar pautas que reforcem a mensagem com maior exposição.` : "Sem sinais de mídia para recomendar uma pauta conectada à operação." };
+  if (args.area === "analytics") return { title: "Leitura executiva", detail: `${args.deals} negócio(s), ${args.leads} lead(s) e ${brl.format(args.revenue)} de receita confirmada no escopo; validar a origem antes de concluir o diagnóstico.` };
+  if (args.area === "legal") return { title: "Conformidade operacional", detail: "Revisar permissões, integrações e mensagens antes de qualquer ação externa; a sala prepara e escala a decisão para aprovação." };
+  if (args.area === "inbox") return { title: "Triagem e encaminhamento", detail: args.deals > 0 ? `${args.deals} oportunidade(s) no período; priorizar mensagens que tenham próxima etapa registrada no CRM.` : "Sem negócios no período para orientar a triagem." };
   if (args.area === "finance") return { title: args.revenue > args.spend ? "Escala com margem protegida" : "Proteção de caixa", detail: `Receita ${brl.format(args.revenue)} versus mídia ${brl.format(args.spend)}; acompanhar resultado e orçamento diário.` };
   if (args.area === "brand") return { title: "Consistência de mensagem", detail: args.topCampaign ? `A mensagem mais exposta vem de ${args.topCampaign}; testar variações sem perder a promessa central.` : "Sem exposição suficiente para avaliar a consistência da marca." };
   return { title: args.activeSchedules > 0 ? "Playbooks automatizados ativos" : "Ativar rotina operacional", detail: args.activeSchedules > 0 ? `${args.activeSchedules} rotina(s) ativas para este escopo; monitorar a última execução.` : "Nenhuma rotina ativa vinculada a esta conta no período." };
@@ -200,7 +213,7 @@ export function buildCoreAccountSummaries(area: CoreAreaId, input: CoreSummaryIn
     const topSeller = [...sellerTotals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const activeSchedules = schedules.filter((schedule) => schedule.enabled).length;
     const targetCpl = number(account.target_cpl) || 0;
-    const strategy = inferStrategy({ area, spend, leads, cpl, targetCpl, revenue, activeCampaigns, topCampaign: topCampaignEntry?.[0] || null, topObjective: topCampaignEntry?.[1].objective || null, wonDeals, deals, activeSchedules, topSeller, agentConfigs: configs });
+    const strategy = inferStrategy({ area, spend, impressions, leads, cpl, targetCpl, revenue, activeCampaigns, topCampaign: topCampaignEntry?.[0] || null, topObjective: topCampaignEntry?.[1].objective || null, wonDeals, deals, activeSchedules, topSeller, agentConfigs: configs });
     return {
       id: account.id,
       name: account.name,

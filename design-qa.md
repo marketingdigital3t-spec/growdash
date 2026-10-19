@@ -1,42 +1,46 @@
-# Design QA — funil RD
+# Design QA — Growdash OS / mapa de salas
 
 ## Source visual truth
 
-- Baseline screenshot supplied by the user: `/var/folders/h9/bngn7l491hl8tzl1w97rfpn80000gn/T/TemporaryItems/NSIRD_screencaptureui_FOfEBK/Captura de Tela 2026-10-16 às 20.59.15.png`
-- Source pixels: 1724 × 974.
-- The supplied image is the pre-fix visual baseline, not a requirement to preserve the metallic treatment.
+- Reference screenshot: `/Users/thiegojesus/Downloads/Captura de Tela 2026-10-17 à(s) 16.27.04.png`.
+- Source pixels: 1179 × 512.
+- Intended state: desktop, dark command map with the Growdash brain in the center and ten colored operating rooms around it.
 
 ## Rendered implementation
 
-- URL: `https://growdash.com.br/analise-de-funis?visual=updated`
-- Browser: authenticated Codex in-app browser, desktop viewport, dark theme and light theme checked.
-- The implementation was captured in the browser after the Cloudflare deployment `https://3c01d35b.growdash.pages.dev` became active.
-- The selected period in the authenticated session currently has no RD negotiations, so the data state differs from the baseline screenshot. The comparison therefore focuses on the funnel component geometry, hierarchy, contrast and responsive shell rather than numeric parity.
+- Target route: `/agentes`.
+- Local preview: `http://127.0.0.1:5173/agentes`.
+- Attempted implementation capture: `/tmp/growdash-agents-implementation-blocked.png`.
+- The local and production browser sessions available during this pass resolved to `/auth`; no authenticated workspace was available to render `/agentes`.
 
 ## Comparison evidence
 
-- Full view: the funnel now sits inside the existing analysis card without the old metallic black gradient or pointed `clip-path` edges.
-- Focused region: each stage is a rounded, descending surface with the count, percentage, stage name and secondary metrics inside the stage. The first stage remained visible in both dark and light captures; the dark screenshot uses white text on the red surface and the light screenshot preserves the same stage colors without inverted text.
-- No custom image asset is used by this component; it is a semantic data visualization driven by the existing RD values and design tokens.
+- Full-view comparison: blocked. The source is readable, but the authenticated implementation surface could not be opened.
+- Focused region comparison: blocked for the same reason. The implementation screenshot is the authentication screen, not the agent map, so it cannot be treated as evidence of the requested UI.
 
-## Findings and fixes
+## Findings
 
-- [P1] Metallic gradient and pointed edges made the funnel look like a decorative object instead of an analytics component. Fixed by replacing the fixed black gradient and polygon clip path with rounded token-based stage surfaces.
-- [P1] Values and metadata were too small and visually compressed. Fixed with a larger count hierarchy, an explicit percentage pill, readable stage label and wrapped secondary metrics.
-- [P2] Stage colors were only visible in the small dot while the body stayed gray. Fixed by applying the existing red → yellow → green stage scale to the stage surface, border and connector.
-- [P2] Light/dark contrast depended on hard-coded white text. Fixed by using the existing stage text-color helper and content-surface tokens in both themes.
+- [P1] Browser evidence unavailable. The route requires an authenticated workspace and the available sessions are signed out. This is a validation blocker, not a visual finding in the changed code.
+- Static review confirms the map now declares ten canonical rooms, a central Growdash node, real-agent status fallback, and room-level interaction. This is not a substitute for rendered visual QA.
 
-## Validation
+## Required fidelity surfaces
+
+- Fonts and typography: pending authenticated capture.
+- Spacing and layout rhythm: pending authenticated capture at desktop and mobile widths.
+- Colors and visual tokens: source and CSS tokens are available; rendered contrast remains pending capture.
+- Image quality and asset fidelity: the implementation uses existing icon components and CSS/SVG neural surfaces; no new raster asset was required by the reference.
+- Copy and content: the ten room labels and manager roles are present in the source.
+
+## Validation already completed
 
 - TypeScript: passed.
-- ESLint: passed with no errors.
-- Vitest: 94 files / 473 tests passed.
-- Vite build: passed; only the existing large-chunk warning remains.
+- ESLint: passed.
+- Vitest: 99 files / 491 tests passed.
+- Vite build: passed; existing large-chunk warning remains.
 - `git diff --check`: passed.
-- Production HTTP: `200`.
-- Production and preview asset hashes matched after deployment.
-- Dark and light authenticated visual states were inspected in the browser.
 
 ## Final result
 
-passed
+Authenticated browser evidence is required before visual handoff.
+
+blocked

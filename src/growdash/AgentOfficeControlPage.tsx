@@ -9,7 +9,7 @@ type AgentRow = { id: string; role: string; name: string; status: string; runtim
 type RunRow = { id: string; status: string; trigger: string; started_at: string; finished_at: string | null; summary: string | null };
 type FindingRow = { id: string; severity: string; category: string; description: string; status: string; created_at: string };
 
-const roleLabels: Record<string, string> = { ceo: "CEO Orquestrador", marketing: "Gestor de Marketing", commercial: "Diretor Comercial", finance: "CFO", legal: "Advogado", growth: "Helena · Growth", strategist: "Júlia · Estrategista", backend_security: "Dev Backend Segurança", backend_meta_rd: "Dev Backend Meta/RD", frontend: "Dev Frontend", designer: "Milo · Diretor Criativo" };
+const roleLabels: Record<string, string> = { ceo: "CEO Orquestrador", marketing: "Gestor de Tráfego", commercial: "Gestora de Vendas", finance: "Gestora Financeira", legal: "Gestora Jurídica", growth: "Helena · Growth", strategist: "Júlia · Estrategista", research: "Rafael · Pesquisa", social: "Sofia · Social", analytics: "Theo · Analytics", inbox: "Nina · Inbox", backend_security: "Dev Backend Segurança", backend_meta_rd: "Dev Backend Meta/RD", frontend: "Dev Frontend", designer: "Milo · Diretor Criativo" };
 
 export default function AgentOfficeControlPage() {
   const { data: workspace, isLoading: loadingWorkspace, error: workspaceError } = useWorkspace();

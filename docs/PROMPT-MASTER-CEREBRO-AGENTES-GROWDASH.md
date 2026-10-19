@@ -6,7 +6,7 @@ Você é um engenheiro sênior de produto, motion design, UX, acessibilidade e f
 
 Transforme a entrada do módulo de Agentes em um cérebro operacional vivo, inspirado visualmente em circuitos neurais dourados, interfaces JARVIS e grafos conectados semelhantes ao Obsidian. A experiência deve transmitir que toda a operação da empresa está conectada à Growdash.
 
-O cérebro não é apenas decorativo. Ele é a porta de entrada para a inteligência operacional. Ao clicar nele, a câmera deve realizar uma aproximação cinematográfica, atravessar o núcleo neural e revelar a Growdash no centro de um grafo vivo. Ao redor do núcleo devem surgir as áreas que sustentam a operação — Tráfego, CRM, Comercial, Financeiro, Marca e Automações — com suas estratégias e rotinas em pequenas ramificações conectadas.
+O cérebro não é apenas decorativo. Ele é a porta de entrada para a inteligência operacional. Ao clicar nele, a câmera deve realizar uma aproximação cinematográfica, atravessar o núcleo neural e revelar a Growdash no centro de um grafo vivo. Ao redor do núcleo devem surgir as dez salas canônicas — CEO/Estratégia, Pesquisa, Tráfego, Criativo, Social, Vendas, Analytics, Financeiro, Jurídico e Inbox — com um gestor, agentes executivos, tarefas e rotinas em pequenas ramificações conectadas. Os ids legados de CRM, Comercial, Marca e Automações continuam aceitos apenas para compatibilidade de dados antigos.
 
 ## Estado inicial — cérebro vivo
 
@@ -18,6 +18,10 @@ O cérebro não é apenas decorativo. Ele é a porta de entrada para a inteligê
 - Adicionar órbitas, partículas, varredura e paralaxe suave conforme o ponteiro se move.
 - O cérebro deve acompanhar a cor de destaque escolhida na Growdash, preservando contraste no tema escuro.
 - Exibir uma instrução clara e elegante: “Clique para entrar no núcleo”.
+
+## Salas canônicas do mapa
+
+Cada sala é uma unidade operacional visível no grafo. O cartão mostra o gestor persistido, o estado de execução retornado pelo Agent Office e as frentes da área. A sala só pode conversar com o usuário pelo gestor; agentes executivos e tarefas ficam subordinados a ele. Quando o registro persistido ainda não existe, a interface deve exibir “aguardando conexão”, nunca inventar atividade ou volume.
 
 ## Clique e entrada cinematográfica
 

@@ -7,10 +7,12 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { cn } from "@/lib/utils";
 import { businessDateKey } from "@/lib/businessDate";
 
-type DirectorRole = "ceo" | "marketing" | "commercial" | "finance" | "legal" | "growth" | "designer" | "strategist";
+type DirectorRole = "ceo" | "marketing" | "commercial" | "finance" | "legal" | "growth" | "designer" | "strategist" | "research" | "social" | "analytics" | "inbox";
 const FALLBACK = [
-  ["ceo", "CEO · Chief of Staff"], ["marketing", "Gestor de Marketing"], ["commercial", "Diretor Comercial"],
-  ["finance", "CFO"], ["legal", "Advogado"], ["growth", "Helena · Growth"], ["designer", "Milo · Designer"], ["strategist", "Júlia · Estrategista"],
+  ["ceo", "CEO · Chief of Staff"], ["marketing", "Gestor de Marketing"],
+  ["research", "Rafael · Pesquisa"], ["designer", "Milo · Criativo"], ["social", "Sofia · Social"],
+  ["finance", "Bianca · Financeiro"], ["legal", "Júlia · Jurídico"], ["commercial", "Camila · Vendas"],
+  ["analytics", "Theo · Analytics"], ["inbox", "Nina · Inbox"], ["growth", "Helena · Growth"], ["strategist", "Júlia · Estrategista"],
 ] as const;
 type ChatMessage = { id: string; role: "user" | "agent" | "system"; content: string; created_at?: string; sources?: Array<{ label: string }> };
 
@@ -42,7 +44,7 @@ export function AgentChatDock() {
   useEffect(() => {
     const handleOpenAgentChat = (event: Event) => {
       const requestedRole = (event as CustomEvent<{ role?: string }>).detail?.role;
-      if (requestedRole && ["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist"].includes(requestedRole)) setRole(requestedRole as DirectorRole);
+      if (requestedRole && ["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist", "research", "social", "analytics", "inbox"].includes(requestedRole)) setRole(requestedRole as DirectorRole);
       setOpen(true);
     };
     window.addEventListener("growdash:open-agent-chat", handleOpenAgentChat);
