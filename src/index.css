@@ -12551,3 +12551,21 @@ body:has(.brand-shell[data-dashboard-scene="true"])::-webkit-scrollbar {
     border-radius: 8px !important;
   }
 }
+
+/* Campaign hierarchy is a fixed segmented navigation row. It must never
+   become a second horizontal scroller when the page itself is locked. */
+.campaigns-workspace .campaign-tabs-header,
+.campaigns-workspace[data-scroll-mode="locked"] .campaign-tabs-header {
+  overflow-x: hidden !important;
+  overflow-y: hidden !important;
+}
+
+.campaigns-workspace .campaign-tabs-list {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.campaigns-workspace .campaign-tabs-header .campaign-hierarchy-tab {
+  min-width: 0 !important;
+  flex: 1 1 0 !important;
+}

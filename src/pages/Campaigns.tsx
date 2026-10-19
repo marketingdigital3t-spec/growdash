@@ -1097,15 +1097,15 @@ export default function Campaigns() {
 
       <MotionItem className={cn("campaigns-main-content", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("campaigns-main-tabs", !analysisMode && "md:flex md:h-full md:min-h-0 md:flex-col")}>
-          <div className="campaign-tabs-header growdash-scrollbar-hidden flex min-w-0 items-center overflow-x-auto border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
-            <TabsList className="campaign-tabs-list h-auto w-max min-w-0 shrink-0 justify-start rounded-xl bg-transparent p-1">
-              <TabsTrigger value="campaigns" className="campaign-hierarchy-tab h-10 min-w-[175px] shrink-0 justify-start gap-2 rounded-lg px-3 text-xs">
+          <div className="campaign-tabs-header growdash-scrollbar-hidden flex min-w-0 items-center overflow-hidden border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
+            <TabsList className="campaign-tabs-list h-auto w-full min-w-0 shrink justify-start rounded-xl bg-transparent p-1">
+              <TabsTrigger value="campaigns" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
                 <FolderKanban className="h-3.5 w-3.5" /> Campanhas ({filtered.length})
               </TabsTrigger>
-              <TabsTrigger value="adsets" className="campaign-hierarchy-tab h-10 min-w-[210px] shrink-0 justify-start gap-2 rounded-lg px-3 text-xs">
+              <TabsTrigger value="adsets" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
                 <Layers3 className="h-3.5 w-3.5" /> Conjuntos de anúncios ({selectedAdsets.length})
               </TabsTrigger>
-              <TabsTrigger value="ads" className="campaign-hierarchy-tab h-10 min-w-[160px] shrink-0 justify-start gap-2 rounded-lg px-3 text-xs">
+              <TabsTrigger value="ads" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
                 <RectangleHorizontal className="h-3.5 w-3.5" /> Anúncios ({selectedAds.length})
               </TabsTrigger>
             </TabsList>
