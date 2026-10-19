@@ -115,7 +115,7 @@ export function buildRDDealNote({ deal, meta, timezone = "America/Sao_Paulo" }: 
     `Estado: ${pick(rdData, meta, ["estado", "state", "uf"], deal.lead_state || meta?.state)}`,
     `Área de atuação: ${pick(rdData, meta, ["area de atuacao", "área de atuação", "area_atuacao", "occupation"])}`,
     `Faturamento atual: ${pick(rdData, meta, ["faturamento atual", "faturamento", "revenue", "monthly revenue"])}`,
-    `Data/hora do lead: ${formatDateTime(deal.lead_created_at || meta?.created_time || raw.created_at, timezone)}`,
+    `Data/hora do lead: ${formatDateTime(deal.lead_created_at || meta?.created_time || raw.created_at || null, timezone || "America/Sao_Paulo")}`,
     `Plataforma: ${platform}`,
     `Status: ${pick(rdData, meta, ["status", "lead status", "deal status"], raw.status || raw.deal_status)}`,
     `Orgânico: ${organic || "Não informado"}`,

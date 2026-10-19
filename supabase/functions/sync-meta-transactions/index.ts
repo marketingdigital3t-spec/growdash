@@ -48,8 +48,8 @@ async function fetchTransactions(metaAccountId: string, token: string, sinceUnix
     `&since=${sinceUnix}&limit=200&access_token=${token}`;
   let pages = 0;
   while (url && pages < 15) {
-    const res = await fetch(url);
-    const json = await res.json();
+    const res: Response = await fetch(url);
+    const json: any = await res.json();
     if (json.error) throw new Error(json.error.message || "Meta API error");
     if (Array.isArray(json.data)) all.push(...json.data);
     url = json.paging?.next ?? null;

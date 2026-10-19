@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
 });
 
 async function runControlled(args: {
-  admin: ReturnType<typeof createClient>;
+  admin: any;
   userId: string;
   provider: SyncProvider;
   scopeKey: string;
@@ -457,7 +457,7 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
   return last || { error: `${name} failed` };
 }
 
-async function listAccessibleFunnels(admin: ReturnType<typeof createClient>, userId: string, requestedFunnelIds?: string[]) {
+async function listAccessibleFunnels(admin: any, userId: string, requestedFunnelIds?: string[]) {
   // A CRM reader may use a funnel owned by another account through
   // user_rd_funnel_access. The previous owner-only query silently skipped
   // those funnels during automatic sync, while the CRM itself could display

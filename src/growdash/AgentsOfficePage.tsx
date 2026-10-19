@@ -42,6 +42,12 @@ import { NeuralCommandCore3D } from "@/growdash/NeuralCommandCore3D";
 
 type AgentStatus = "working" | "walking" | "free";
 type ChatMessage = { id: string; role: "agent" | "user"; text: string };
+type AgentOfficeQuery = {
+  select: (columns: string) => AgentOfficeQuery;
+  eq: (column: string, value: unknown) => AgentOfficeQuery;
+  order: (column: string) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
+type AgentOfficeClient = { from: (table: string) => AgentOfficeQuery };
 
 const LifeSimPage = lazy(() => import("@/growdash/LifeSimPage"));
 
@@ -358,7 +364,8 @@ function KnowledgeMap({ onOpenOffice, accounts, startDate, endDate }: { onOpenOf
     queryKey: ["agent-core-directors", workspace?.id],
     enabled: isCoreOpen && !!workspace?.id,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const agentClient = supabase as unknown as AgentOfficeClient;
+      const { data, error } = await agentClient
         .from("agent_office_agents")
         .select("id,role,name,status,runtime_status,is_visible")
         .eq("workspace_id", workspace!.id)

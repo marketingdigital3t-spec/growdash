@@ -92,9 +92,9 @@ Deno.serve(async (req) => {
       : admin.from("integrations").insert({ user_id: oauthState.user_id, provider: "instagram_business", ...integrationValues });
     const { error: integrationError } = await integrationOp;
     if (integrationError) throw integrationError;
-    const { error: accountError } = await admin.from("social_accounts").upsert({ user_id: oauthState.user_id, provider: "instagram", provider_account_id: profileId, username: profile.username ?? null, display_name: profile.name ?? profile.username ?? "Instagram", profile_picture_url: profile.profile_picture_url ?? null, followers_count: Number(profile.followers_count ?? 0), media_count: Number(profile.media_count ?? 0), connection_status: "connected", last_error: null, last_sync_at: new Date().toISOString() }, { onConflict: "user_id,provider,provider_account_id" });
+    const { data: socialAccount, error: accountError } = await admin.from("social_accounts").upsert({ user_id: oauthState.user_id, provider: "instagram", provider_account_id: profileId, username: profile.username ?? null, display_name: profile.name ?? profile.username ?? "Instagram", profile_picture_url: profile.profile_picture_url ?? null, followers_count: Number(profile.followers_count ?? 0), media_count: Number(profile.media_count ?? 0), connection_status: "connected", last_error: null, last_sync_at: new Date().toISOString() }, { onConflict: "user_id,provider,provider_account_id" }).select("id").single();
     if (accountError) throw accountError;
-    return page("success", `@${profile.username ?? "perfil"} foi conectado com segurança.`, account.id);
+    return page("success", `@${profile.username ?? "perfil"} foi conectado com segurança.`, socialAccount?.id);
   } catch (error) {
     console.error("instagram-oauth-callback", error);
     const message = error instanceof Error ? error.message : "Falha interna ao concluir a conexão.";

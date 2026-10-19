@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     const syncErrors: string[] = [];
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index] as unknown[];
-      const raw = Object.fromEntries(headers.map((header, column) => [header || `coluna_${column + 1}`, row[column] ?? ""]));
+      const raw = Object.fromEntries((headers as unknown[]).map((header: unknown, column: number) => [String(header || `coluna_${column + 1}`), row[column] ?? ""]));
       const name = String(mapped(raw, mapping, "name", ["nome", "aluna", "aluno", "paciente"])).trim();
       if (!name) continue;
       const cpf = String(mapped(raw, mapping, "cpf", ["cpf", "cpf_aluna"])).replace(/\D/g, "") || null;

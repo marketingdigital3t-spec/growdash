@@ -269,6 +269,7 @@ interface FieldConfig {
   key: string;
   rd_source: string;
   rd_field_label: string;
+  label?: string;
   rd_field_aliases: string[];
   field_type: string;
   options: any;
@@ -1727,14 +1728,14 @@ Deno.serve(async (req) => {
         if (!analytics_mode) return;
         const pending = buildPendingRDSyncCursors(analyticsSegments, startIndex, currentPage);
         for (const pendingSegment of pending) {
-          const scopeKey = `${cursorPrefix}|${pendingSegment.name}`;
+          const scopeKey = `${cursorPrefix}|${pendingSegment.segment}`;
           const { error } = await admin.from("rd_sync_cursors").upsert({
             scope_key: scopeKey,
             funnel_id: funnel.id,
             rd_connection_id: funnel.rd_connection_id,
             start_date: start_date || null,
             end_date: end_date || null,
-            segment: pendingSegment.name,
+            segment: pendingSegment.segment,
             next_page: pendingSegment.nextPage,
             status: "partial",
             last_error: null,

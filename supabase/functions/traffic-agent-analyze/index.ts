@@ -12,7 +12,7 @@ const headers = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 
-type Auth = { user: { id: string }; client: ReturnType<typeof createClient> };
+type Auth = { user: { id: string }; client: any };
 type Account = { id: string; account_id: string; name: string; access_token: string | null; connection_status: string | null };
 type Insight = { ad_id: string; spend: number | null; leads: number | null; date: string };
 type Deal = { utm_id: string | null; utm_campaign: string | null; stage_bucket: string | null; win: boolean; amount_total: number | null };

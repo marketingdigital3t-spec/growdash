@@ -71,7 +71,7 @@ async function collectFindings(workspace: { id: string; owner_id: string }): Pro
   if (accountsError) findings.push({ fingerprint: `meta-query:${workspace.id}`, severity: "high", category: "meta", source: "ad_accounts", description: "Não foi possível consultar as contas Meta.", evidence: { code: accountsError.code || "QUERY_ERROR" } });
   for (const account of accounts || []) {
     if (account.connection_status === "disconnected") continue;
-    if (account.connection_status !== "connected") findings.push({ fingerprint: `meta-status:${account.id}`, severity: "high", category: "meta", source: "ad_accounts", account_id: account.id, description: `Conta Meta ${account.name || account.id} está ${account.connection_status || "sem estado"}.`, evidence: { status: account.connection_status || null, last_error: account.last_error || null } });
+    if (account.connection_status !== "connected") findings.push({ fingerprint: `meta-status:${account.id}`, severity: "high", category: "meta", source: "ad_accounts", account_id: account.id, description: `Conta Meta ${account.name || account.id} está ${account.connection_status || "sem estado"}.`, evidence: { status: account.connection_status || null, last_error: account.last_sync_error || null } });
     if (account.last_sync_error) findings.push({ fingerprint: `meta-error:${account.id}:${String(account.last_sync_error).slice(0, 80)}`, severity: "medium", category: "meta", source: "ad_accounts", account_id: account.id, description: `A última sincronização da conta Meta registrou erro.`, evidence: { last_error: String(account.last_sync_error).slice(0, 500) } });
   }
 
@@ -83,7 +83,7 @@ async function collectFindings(workspace: { id: string; owner_id: string }): Pro
   }
   const { data: funnels, error: funnelError } = await admin.from("rd_funnels").select("id,rd_connection_id,name,is_active").eq("user_id", workspace.owner_id).eq("is_active", true);
   if (funnelError) findings.push({ fingerprint: `rd-funnels-query:${workspace.id}`, severity: "high", category: "rd", source: "rd_funnels", description: "Não foi possível consultar os funis RD.", evidence: { code: funnelError.code || "QUERY_ERROR" } });
-  if (!funnelError && (funnels || []).length === 0) findings.push({ fingerprint: `rd-no-funnels:${workspaceId}`, severity: "info", category: "rd", source: "rd_funnels", description: "Nenhum funil RD ativo foi encontrado para este workspace.", evidence: { count: 0 } });
+  if (!funnelError && (funnels || []).length === 0) findings.push({ fingerprint: `rd-no-funnels:${workspace.id}`, severity: "info", category: "rd", source: "rd_funnels", description: "Nenhum funil RD ativo foi encontrado para este workspace.", evidence: { count: 0 } });
 
   // daily_incremental_sync_runs is a global job ledger without workspace_id.
   // Do not project its latest row into a single workspace, which would leak

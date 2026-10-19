@@ -12,7 +12,7 @@ export function googleTokenErrorCode(error: unknown) {
   return /invalid_grant|revoked|unauthorized_client|invalid_client|consent|permission/i.test(message) ? "reauthorization_required" : "error";
 }
 
-export async function getFreshGoogleToken(admin: ReturnType<typeof createClient>, integration: { id: string; api_token?: string | null; token_expires_at?: string | null }, source: "health_check" | "api_request" = "api_request", forceRefresh = false): Promise<GoogleTokenResult> {
+export async function getFreshGoogleToken(admin: any, integration: { id: string; api_token?: string | null; token_expires_at?: string | null }, source: "health_check" | "api_request" = "api_request", forceRefresh = false): Promise<GoogleTokenResult> {
   let saved: GoogleCredential;
   try { saved = JSON.parse(String(integration.api_token || "{}")) as GoogleCredential; } catch { saved = {}; }
   if (!saved.access_token) throw Object.assign(new Error("A credencial Google está incompleta. Reconecte a conta Google."), { code: "reauthorization_required" });
@@ -26,7 +26,7 @@ export async function getFreshGoogleToken(admin: ReturnType<typeof createClient>
   try { return await refreshPromise; } finally { refreshLocks.delete(integration.id); }
 }
 
-async function refreshGoogleToken(admin: ReturnType<typeof createClient>, integrationId: string, fallbackRefreshToken: string, source: "health_check" | "api_request", forceRefresh: boolean): Promise<GoogleTokenResult> {
+async function refreshGoogleToken(admin: any, integrationId: string, fallbackRefreshToken: string, source: "health_check" | "api_request", forceRefresh: boolean): Promise<GoogleTokenResult> {
   const { data: latest } = await admin.from("integrations").select("id,api_token,token_expires_at").eq("id", integrationId).maybeSingle();
   let latestSaved: GoogleCredential = {};
   try { latestSaved = JSON.parse(String(latest?.api_token || "{}")) as GoogleCredential; } catch { latestSaved = {}; }

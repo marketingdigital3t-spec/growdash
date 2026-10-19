@@ -211,7 +211,11 @@ async function readCRMLeads(admin: any, userId: string, args: Record<string, unk
   if (status) query = query.eq("status", status);
   if (sourceProvider) query = query.eq("source_provider", sourceProvider);
   if (startDate) query = query.gte("first_received_at", `${startDate}T00:00:00.000Z`);
-  if (endDate) query = query.lt("first_received_at", `${endDate}T23:59:59.999Z`);
+  if (endDate) {
+    const nextDate = new Date(`${endDate}T12:00:00Z`);
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+    query = query.lt("first_received_at", `${nextDate.toISOString().slice(0, 10)}T00:00:00.000Z`);
+  }
   const limit = Math.max(1, Math.min(500, Number(args.limit) || 100));
   const leads = await readPages(query.limit(limit));
   return {
