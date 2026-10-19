@@ -295,6 +295,10 @@ export default function App() {
                     <Route path="analise-funis" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="funnels" element={<Navigate to="/analise-de-funis" replace />} />
                     <Route path="alertas" element={<RequirePage page="alerts">{analytics(<FullAlerts />)}</RequirePage>} />
+                    {/* Legacy sidebar links used the English segment. Keep it as
+                        a redirect so old bookmarks and cached menu chunks do
+                        not land on the dashboard by accident. */}
+                    <Route path="alerts" element={<Navigate to="/alertas" replace />} />
                     <Route path="agenda-turmas" element={<RequirePage page="classes">{analytics(<EventClasses />)}</RequirePage>} />
                     <Route path="classes" element={<Navigate to="/agenda-turmas" replace />} />
                     <Route path="leads-incompletos" element={<RequirePage page="leads">{analytics(<IncompleteLeads />)}</RequirePage>} />

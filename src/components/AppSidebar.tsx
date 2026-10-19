@@ -32,7 +32,9 @@ export function AppSidebar() {
     { title: "Business", url: "/business", icon: BriefcaseBusiness, show: perms.canCampaigns },
     { title: "Datas & Turmas", url: "/agenda-turmas", icon: CalendarDays, show: perms.canClasses },
     { title: "Leads incompletos", url: "/leads-incompletos", icon: AlertCircle, show: perms.isMaster },
-    { title: "Alertas", url: "/alerts", icon: Bell, show: perms.isMaster },
+    // Keep the sidebar link aligned with the canonical route used by the
+    // Growdash layout. The old `/alerts` path fell through to the dashboard.
+    { title: "Alertas", url: "/alertas", icon: Bell, show: perms.isMaster },
     { title: "Usuários", url: "/usuarios", icon: UsersIcon, show: perms.isMaster },
     { title: "Saúde dos Dados", url: "/saude-dos-dados", icon: HeartPulse, show: perms.isMaster },
     { title: "Configurações", url: "/configuracoes", icon: Settings, show: perms.isMaster },
