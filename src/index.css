@@ -12907,6 +12907,38 @@ html.dark .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campa
   border-radius: 8px !important;
 }
 
+/* The KPI content is intentionally centred on the Expert view. Keep the
+   utility icon anchored to the edge so it never shifts the metric's optical
+   centre or makes cards with different labels look misaligned. */
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  position: relative;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child {
+  display: flex !important;
+  width: 100% !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child {
+  align-items: center !important;
+  text-align: center !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:last-child {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:last-child {
+  justify-content: center !important;
+}
+
 .expert-dashboard .dashboard-glass-card {
   min-height: 240px !important;
 }
