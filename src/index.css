@@ -12953,6 +12953,11 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   color: var(--traffic-muted-text-dark) !important;
 }
 
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-metric-header > th > * * {
+  background: transparent !important;
+  color: inherit !important;
+}
+
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr {
   background: var(--traffic-surface-dark) !important;
 }
