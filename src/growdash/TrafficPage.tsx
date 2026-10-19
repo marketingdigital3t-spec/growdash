@@ -35,6 +35,7 @@ import { useBudgetHistory } from "@/hooks/useBudgetHistory";
 import { businessCalendarDate, businessDateKey } from "@/lib/businessDate";
 import CampaignsManager from "@/pages/Campaigns";
 import TrafficComparison from "@/components/campaigns/TrafficComparison";
+import { GlobalScopeToolbar } from "@/components/dashboard/GlobalScopeToolbar";
 import funnelCaptacaoDireta from "@/assets/zntt-funnels/01-captacao-direta.png";
 import funnelPilulaAulaGratuita from "@/assets/zntt-funnels/02-pilula-aula-gratuita.png";
 import funnelDemandaReprimida from "@/assets/zntt-funnels/03-demanda-reprimida.png";
@@ -110,6 +111,7 @@ export default function TrafficPage() {
       </aside>
 
       <div className="traffic-page-content min-w-0">
+        {activeTab === "comparison" && <GlobalScopeToolbar />}
         {activeTab === "campaigns" && <CampaignsManager />}
         {activeTab === "comparison" && <TrafficComparison />}
         {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}
