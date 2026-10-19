@@ -13228,3 +13228,65 @@ html:not(.dark) .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .e
   background: #ffffff !important;
   border-color: rgba(15, 23, 42, .12) !important;
 }
+
+/* Executive KPI layout: keep the ten indicators in a deliberate 5 x 2
+   matrix on desktop. A broad auto-fit rule above otherwise expands this
+   grid to six columns at large widths, leaving four cards stranded below.
+   The cards use the full canvas and the native left-to-right hierarchy so
+   labels and values remain easy to scan instead of looking compressed. */
+@media (min-width: 1200px) {
+  .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    grid-auto-rows: minmax(112px, auto) !important;
+    gap: 14px !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card,
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  height: 112px !important;
+  min-height: 112px !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  padding: 18px !important;
+  justify-content: center !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child {
+  justify-content: space-between !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child {
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:last-child {
+  position: static !important;
+  transform: none !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:first-child {
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  letter-spacing: .09em !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:last-child {
+  font-size: 1.55rem !important;
+  line-height: 1.15 !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+}
