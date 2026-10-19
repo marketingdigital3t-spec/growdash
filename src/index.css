@@ -13300,3 +13300,48 @@ html:not(.dark) .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .e
   height: 40px !important;
   border-radius: 10px !important;
 }
+
+/* Campaign table geometry follows the Meta Ads Manager reference: the
+   activation switch is a dedicated column before the campaign name, while
+   delivery state and row actions remain separate columns. */
+.campaigns-workspace [data-campaign-table-scroll] .campaign-name-link {
+  color: #1f66d1 !important;
+  cursor: pointer;
+  text-decoration: none;
+}
+.campaigns-workspace [data-campaign-table-scroll] .campaign-name-link:hover {
+  text-decoration: underline;
+}
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td.sticky,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td.campaign-name-cell {
+  background: #f4f5f7 !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(odd) > td,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(odd) > td.sticky,
+.campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(odd) > td.campaign-name-cell {
+  background: #fff !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-status-cell {
+  text-align: center !important;
+}
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-status-cell .campaign-row-toggle {
+  box-shadow: inset 0 0 0 1px rgba(28, 30, 33, .12);
+}
+.campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-status-cell button:hover .campaign-row-toggle {
+  box-shadow: inset 0 0 0 2px rgba(8, 102, 255, .28);
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] .campaign-name-link {
+  color: #76a9ff !important;
+}
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td.sticky,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td.campaign-name-cell {
+  background: var(--traffic-muted-dark) !important;
+}
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(odd) > td,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(odd) > td.sticky,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(odd) > td.campaign-name-cell {
+  background: var(--traffic-surface-dark) !important;
+}

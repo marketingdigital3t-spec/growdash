@@ -2,9 +2,9 @@ export type CampaignColumnKey = "check" | "name" | "delivery" | "deliveryStatus"
 export type MetaColumnPresetKey = "performance" | "vtsd" | "performance_clicks" | "delivery" | "engagement" | "video" | "awareness" | "traffic" | "leads" | "sales" | "setup";
 
 export const campaignColumnLabels: Record<CampaignColumnKey, string> = {
-  check: "Selecionar", name: "Campanha", delivery: "Status", deliveryStatus: "Veiculação", objective: "Objetivo", budget: "Orçamento",
+  check: "Selecionar", name: "Campanha", delivery: "Desativado", deliveryStatus: "Veiculação", objective: "Objetivo", budget: "Orçamento",
   spend: "Valor usado", impressions: "Impressões", reach: "Alcance", frequency: "Frequência", cpm: "CPM",
-  clicks: "Cliques no link", ctr: "CTR", cpc: "CPC", leads: "Leads atribuídos", cpl: "Custo por lead",
+  clicks: "Cliques no link", ctr: "CTR", cpc: "CPC", leads: "Resultados", cpl: "Custo por resultado",
   conversion: "Taxa de conversão", sales: "Vendas atribuídas", cpa: "Custo por venda", revenue: "Valor de conversão",
   linkClicks: "Cliques no link", linkCpc: "CPC (clique no link)", uniqueLinkCtr: "CTR único (clique no link)",
   landingPageViews: "Visualizações da página de destino", costPerLandingPageView: "Custo por visualização da página de destino",
@@ -14,7 +14,7 @@ export const campaignColumnLabels: Record<CampaignColumnKey, string> = {
 };
 
 export const metaColumnPresets: { id: MetaColumnPresetKey; label: string; description: string; columns: CampaignColumnKey[] }[] = [
-  { id: "performance", label: "Pré-definidas", description: "A mesma visão operacional usada no gerenciador de campanhas.", columns: ["name", "delivery", "budget", "spend", "leads", "cpl", "impressions", "cpm", "clicks", "cpc", "ctr"] },
+  { id: "performance", label: "Pré-definidas", description: "Visão operacional no mesmo padrão do gerenciador de campanhas.", columns: ["name", "delivery", "deliveryStatus", "actions", "objective", "leads", "reach", "frequency", "cpl", "budget"] },
   { id: "vtsd", label: "VTSD", description: "Tráfego, página de destino, checkout, compras e ROAS da Meta.", columns: ["name", "delivery", "deliveryStatus", "actions", "reach", "impressions", "frequency", "linkClicks", "linkCpc", "uniqueLinkCtr", "cpm", "budget", "leads", "cpl", "spend", "landingPageViews", "costPerLandingPageView", "checkouts", "costPerCheckout", "metaPurchases", "metaCostPerPurchase", "metaPurchaseRoas"] },
   { id: "performance_clicks", label: "Desempenho e cliques", description: "Entrega e eficiência de clique.", columns: ["name", "delivery", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpc", "cpm", "leads", "cpl"] },
   { id: "delivery", label: "Veiculação", description: "Status, objetivo, orçamento e distribuição.", columns: ["name", "delivery", "objective", "budget", "spend", "impressions", "reach", "frequency", "cpm"] },
