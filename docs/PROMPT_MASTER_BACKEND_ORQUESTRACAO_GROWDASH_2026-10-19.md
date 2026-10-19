@@ -160,3 +160,14 @@ Trabalhe nesta ordem, registrando evidências no repositório:
   UTMs, backfill de atribuição, RAG vivo e IA dos agentes permanecem
   `partial`/`unavailable` até haver execução autenticada bem-sucedida e contagens
   persistidas que confirmem a correção.
+
+## Evidência final de Pages — 19/10/2026
+
+- Os builds automáticos do Git para `c753198` e `1bb8e8a` apareceram como
+  `Failure` no histórico do Pages, apesar de `npm run build` passar localmente.
+  Esse sinal é de integração de build do Pages e não foi mascarado.
+- O mesmo `dist` foi publicado manualmente com sucesso no deployment
+  `https://c02e2e05.growdash.pages.dev/` (source `1bb8e8a`).
+- `growdash.com.br`, `www.growdash.com.br` e `c02e2e05.growdash.pages.dev` retornam
+  HTML byte-a-byte igual e o bundle SHA-256
+  `a69beb60bed8244640bbf3752dfe00ac6a6de7267ccf385b8fb822b68771ceb1`.
