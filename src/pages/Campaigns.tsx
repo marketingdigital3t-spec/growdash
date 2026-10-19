@@ -589,6 +589,10 @@ export default function Campaigns() {
       costPerResult: primaryResult > 0 ? campaign.spend / primaryResult : 0,
     };
   }), [actionData?.totalsByAd, actionData?.valueTotalsByAd, campaignRowsWithInsights, canonicalLeadRollup, lpConfigs]);
+  // Uma falha transitória no catálogo pode coexistir com linhas canônicas de
+  // Insights. Nesse caso a tabela continua utilizável em modo somente leitura
+  // e não deve pintar um erro global por cima de dados válidos.
+  const showCampaignLoadError = isError && campaigns.length === 0;
 
   // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
   // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
@@ -665,9 +669,9 @@ export default function Campaigns() {
   };
 
   useEffect(() => {
-    if (!isError) return;
+    if (!showCampaignLoadError) return;
     toast({ title: "Erro ao carregar campanhas", description: campaignError instanceof Error ? campaignError.message : "Tente novamente.", variant: "destructive" });
-  }, [campaignError, isError, toast]);
+  }, [campaignError, showCampaignLoadError, toast]);
 
   const campaignIds = useMemo(() => campaigns.map((campaign: any) => campaign.id), [campaigns]);
   const { data: campaignTargets = [] } = useQuery({
@@ -1095,7 +1099,7 @@ export default function Campaigns() {
         </div>
       </MotionItem>
 
-      {isError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
+      {showCampaignLoadError && <MotionItem className="border-b border-destructive/30 bg-destructive/5 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div><h2 className="font-black text-destructive">Erro ao carregar campanhas</h2><p className="text-xs text-muted-foreground">{campaignError instanceof Error ? campaignError.message : "Não foi possível consultar os dados."}</p></div><Button variant="outline" size="sm" className="sm:ml-auto" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div></MotionItem>}
       {actionIsError && <MotionItem className="border-b border-amber-500/30 bg-amber-500/5 p-3" role="alert"><p className="text-xs text-amber-700 dark:text-amber-300"><b>Não foi possível consultar as ações de resultado da Meta.</b> Os resultados por evento podem estar incompletos; os valores canônicos já salvos nos Insights permanecem em uso. {actionError instanceof Error ? actionError.message : "Tente atualizar os dados."}</p></MotionItem>}
 
       <MotionItem className={cn("campaigns-main-content", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
