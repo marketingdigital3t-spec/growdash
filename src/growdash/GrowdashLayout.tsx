@@ -343,7 +343,7 @@ export default function GrowdashLayout() {
             </div>
           </div>
         ) : <><TooltipProvider delayDuration={180}>
-        <nav className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4", showSidebarLabels ? "growdash-scrollbar" : "growdash-scrollbar-hidden")}>
+        <nav className="growdash-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4" aria-label="Navegação principal">
           {visibleSections.map((section) => {
             const isOpen = openSections[section.label] ?? true;
             const sectionContentId = `sidebar-section-${section.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
