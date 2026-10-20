@@ -7449,7 +7449,7 @@ html:not(.dark) .growdash-sidebar-tooltip {
   background: #d9dbde !important;
   box-shadow: 0 0 0 2px rgba(0,0,0,.26), 0 0 9px rgba(255,255,255,.48) !important;
 }
-.gd-funnel-stage:focus-visible { filter: drop-shadow(0 0 0 rgba(222,226,230,.58)) drop-shadow(0 0 0 rgba(222,226,230,.58)); box-shadow: inset 0 1px rgba(255,255,255,.76) !important; }
+.gd-funnel-stage:focus-visible { filter: drop-shadow(0 0 3px rgba(222,226,230,.9)) drop-shadow(0 0 1px rgba(222,226,230,.9)); box-shadow: inset 0 1px rgba(255,255,255,.76) !important; }
 .gd-funnel-stage:hover { filter: brightness(1.12) contrast(1.04); }
 @media (max-width: 640px) {
   .gd-funnel-stage { min-width: 0 !important; clip-path: polygon(0 0, 100% 0, calc(100% - 52px) 100%, 52px 100%); }
