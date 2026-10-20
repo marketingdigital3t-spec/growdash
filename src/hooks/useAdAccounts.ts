@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
 function canonicalMetaAccountId(value: unknown) {
   const normalized = String(value ?? "").trim().replace(/^act_/i, "");
@@ -44,18 +45,20 @@ export function isActiveMetaAccount(account: { connection_status?: string | null
 export function useAdAccounts(includeDisconnected = false) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:ad-accounts:${user.id}:${includeDisconnected ? "all" : "connected"}` : "";
+  const cachedAccounts = readLocalCache<any[]>(cacheKey);
   return useQuery({
     queryKey: ["ad_accounts", user?.id ?? "anonymous", includeDisconnected],
     enabled: !!user,
-    retry: 3,
-    retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 5_000),
+    retry: 1,
+    retryDelay: 1_000,
     refetchOnReconnect: true,
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     // Keep the Integrations status aligned with the server-side health/sync
     // worker without requiring a manual page reload.
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60_000,
     staleTime: 2 * 60_000,
+    placeholderData: cachedAccounts,
     queryFn: async () => {
       const { data, error } = await withRequestTimeout(supabase
         .from("ad_accounts")
@@ -64,7 +67,7 @@ export function useAdAccounts(includeDisconnected = false) {
       if (!error) {
         const normalized = dedupeMetaAccounts((data ?? []).filter((account) => !isProfileDisconnected(account)));
         const result = includeDisconnected ? normalized : normalized.filter(isActiveMetaAccount);
-        try { if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result ?? [])); } catch { /* cache is optional */ }
+        writeLocalCache(cacheKey, result ?? []);
         return result;
       }
       if (!/workspace_id|business_unit_id|schema cache/i.test(error.message)) throw error;
@@ -75,7 +78,7 @@ export function useAdAccounts(includeDisconnected = false) {
       if (legacy.error) throw legacy.error;
       const normalized = dedupeMetaAccounts((legacy.data ?? []).filter((account) => !isProfileDisconnected(account)).map((account) => ({ ...account, workspace_id: null, business_unit_id: "legacy-infoproduto", timezone_name: "America/Sao_Paulo", timezone_offset_hours_utc: -3, attribution_window: "account_default", oauth_health_status: "unchecked", oauth_checked_at: null, oauth_permissions: [] })));
       const result = includeDisconnected ? normalized : normalized.filter(isActiveMetaAccount);
-      try { if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* cache is optional */ }
+      writeLocalCache(cacheKey, result);
       return result;
     },
   });

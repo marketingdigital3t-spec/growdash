@@ -48,12 +48,12 @@ export function usePermissions() {
     // Permission reads can briefly fail while the Supabase session is being
     // refreshed. Retry boundedly before showing the global access error;
     // authorization is still fail-closed after all attempts are exhausted.
-    retry: 2,
-    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2_000),
+    retry: 1,
+    retryDelay: 1_000,
     queryFn: async () => withRequestTimeout((async () => {
-      const scopedPerm =
+      const scopedPermPromise =
         workspace?.id && !workspace.id.startsWith("legacy-")
-          ? await withRequestTimeout(
+          ? withRequestTimeout(
               (supabase as any)
                 .from("workspace_user_permissions")
                 .select("*")
@@ -61,45 +61,51 @@ export function usePermissions() {
                 .eq("user_id", user!.id)
                 .maybeSingle(),
             )
-          : { data: null, error: null };
-      if (scopedPerm.error) throw scopedPerm.error;
-      const legacyPerm = await withRequestTimeout(
+          : Promise.resolve({ data: null, error: null });
+      const legacyPermPromise = withRequestTimeout(
         supabase.from("user_permissions").select("*").eq("user_id", user!.id).maybeSingle(),
       );
+      const accsPromise =
+        workspace?.id && !workspace.id.startsWith("legacy-")
+          ? withRequestTimeout(
+              supabase
+                .from("user_ad_account_access")
+                .select("ad_account_id")
+                .eq("user_id", user!.id)
+                .eq("workspace_id", workspace.id),
+            )
+          : withRequestTimeout(
+              supabase
+                .from("user_ad_account_access")
+                .select("ad_account_id")
+                .eq("user_id", user!.id)
+                .is("workspace_id", null),
+            );
+      const funsPromise =
+        workspace?.id && !workspace.id.startsWith("legacy-")
+          ? withRequestTimeout(
+              supabase
+                .from("user_rd_funnel_access")
+                .select("rd_funnel_id")
+                .eq("user_id", user!.id)
+                .eq("workspace_id", workspace.id),
+            )
+          : withRequestTimeout(
+              supabase
+                .from("user_rd_funnel_access")
+                .select("rd_funnel_id")
+                .eq("user_id", user!.id)
+                .is("workspace_id", null),
+            );
+      const [scopedPerm, legacyPerm, accs, funs] = await Promise.all([
+        scopedPermPromise,
+        legacyPermPromise,
+        accsPromise,
+        funsPromise,
+      ]);
+      if (scopedPerm.error) throw scopedPerm.error;
       if (legacyPerm.error) throw legacyPerm.error;
-      const accs =
-        workspace?.id && !workspace.id.startsWith("legacy-")
-          ? await withRequestTimeout(
-              supabase
-                .from("user_ad_account_access")
-                .select("ad_account_id")
-                .eq("user_id", user!.id)
-                .eq("workspace_id", workspace.id),
-            )
-          : await withRequestTimeout(
-              supabase
-                .from("user_ad_account_access")
-                .select("ad_account_id")
-                .eq("user_id", user!.id)
-                .is("workspace_id", null),
-            );
       if (accs.error) throw accs.error;
-      const funs =
-        workspace?.id && !workspace.id.startsWith("legacy-")
-          ? await withRequestTimeout(
-              supabase
-                .from("user_rd_funnel_access")
-                .select("rd_funnel_id")
-                .eq("user_id", user!.id)
-                .eq("workspace_id", workspace.id),
-            )
-          : await withRequestTimeout(
-              supabase
-                .from("user_rd_funnel_access")
-                .select("rd_funnel_id")
-                .eq("user_id", user!.id)
-                .is("workspace_id", null),
-            );
       if (funs.error) throw funs.error;
       return {
         perm: scopedPerm.data ?? legacyPerm.data,

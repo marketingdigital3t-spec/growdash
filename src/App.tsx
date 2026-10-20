@@ -12,10 +12,18 @@ import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
 import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
-import GrowdashLayout from "@/growdash/GrowdashLayout";
-import BusinessWorkspacePage, { BusinessUnavailablePage } from "@/growdash/BusinessWorkspacePage";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
-import AgentsOfficePage from "@/growdash/AgentsOfficePage";
+
+// Keep the authenticated shell and the heavier workspace/agents modules out
+// of the initial bundle. The route-level Suspense boundary below gives the
+// user a stable shell while these modules are fetched on demand.
+const GrowdashLayout = lazyWithRetry(() => import("@/growdash/GrowdashLayout"), "layout");
+const BusinessWorkspacePage = lazyWithRetry(() => import("@/growdash/BusinessWorkspacePage"), "business-workspace");
+const BusinessUnavailablePage = lazyWithRetry(
+  () => import("@/growdash/BusinessWorkspacePage").then(({ BusinessUnavailablePage: Component }) => ({ default: Component })),
+  "business-unavailable",
+);
+const AgentsOfficePage = lazyWithRetry(() => import("@/growdash/AgentsOfficePage"), "agents");
 
 // Route modules must remain lazy here as well as in the layout preloader.
 // Statically importing them defeated code splitting and made one stale asset

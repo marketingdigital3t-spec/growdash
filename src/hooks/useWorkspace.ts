@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
 const fallbackPlans = [
   {
@@ -105,6 +106,8 @@ export interface WorkspaceAccessState {
 
 export function useWorkspace() {
   const { user } = useAuth();
+  const cacheKey = user?.id ? `growdash:workspace:${user.id}` : "";
+  const cachedWorkspace = readLocalCache<WorkspaceFoundation>(cacheKey);
 
   return useQuery({
     queryKey: ["workspace", user?.id],
@@ -114,17 +117,13 @@ export function useWorkspace() {
     // reexecutar o bootstrap e três consultas a cada troca de módulo.
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    // Paint the last known workspace immediately while the authenticated
+    // request revalidates. Cached data is never used as authorization.
+    placeholderData: cachedWorkspace,
     queryFn: async (): Promise<WorkspaceFoundation> => withRequestTimeout((async () => {
-      const cacheKey = `growdash:workspace:${user!.id}`;
       const cached = (): WorkspaceFoundation | null => {
-        try {
-          const raw = localStorage.getItem(cacheKey);
-          if (!raw) return null;
-          const value = JSON.parse(raw) as WorkspaceFoundation;
-          return value?.id && !value.id.startsWith("legacy-") ? value : null;
-        } catch {
-          return null;
-        }
+        const value = readLocalCache<WorkspaceFoundation>(cacheKey);
+        return value?.id && !value.id.startsWith("legacy-") ? value : null;
       };
       try {
         const { data: workspaceId, error: bootstrapError } = await withRequestTimeout(
@@ -171,11 +170,7 @@ export function useWorkspace() {
         if (memberError) throw memberError;
         if (unitsError) throw unitsError;
         const foundation = { ...workspace, role: membership.role, units: units ?? [] };
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify(foundation));
-        } catch {
-          /* cache é apenas uma otimização segura */
-        }
+        writeLocalCache(cacheKey, foundation);
         return foundation;
       } catch (err: any) {
         // Do not invent a legacy owner workspace after an authorization or

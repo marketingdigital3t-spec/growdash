@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
 export interface RDFunnel {
   id: string;
@@ -20,16 +21,18 @@ export interface RDFunnel {
 export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?: string[]) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:rd-funnels:${user.id}:${adAccountId ?? "all"}:${adAccountIds?.slice().sort().join(",") ?? ""}` : "";
+  const cachedFunnels = readLocalCache<RDFunnel[]>(cacheKey);
   return useQuery({
     // Do not retain a previous user's funnels while the session changes.
     queryKey: ["rd_funnels", user?.id ?? "anonymous", adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
     enabled: enabled && !!user,
-    retry: 3,
-    retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 5_000),
+    retry: 1,
+    retryDelay: 1_000,
     refetchOnReconnect: true,
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     staleTime: 2 * 60 * 1000,
+    placeholderData: cachedFunnels,
     queryFn: async () => {
       let q = supabase.from("rd_funnels").select("*").order("created_at", { ascending: true });
       if (adAccountId) q = q.eq("ad_account_id", adAccountId);
@@ -37,10 +40,9 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
       const { data, error } = await withRequestTimeout(q, 15_000);
       if (error) throw error;
       const result = data as RDFunnel[];
-      try { if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* cache is optional */ }
+      writeLocalCache(cacheKey, result);
       return result;
     },
-    staleTime: 60 * 1000,
   });
 }
 

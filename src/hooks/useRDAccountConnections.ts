@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { withRequestTimeout } from "@/lib/resilience";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
 export type RDAccountConnection = {
   id: string;
@@ -22,10 +23,15 @@ export type RDAccountConnection = {
 
 export function useRDAccountConnections(workspaceId?: string) {
   const { user } = useAuth();
+  const cacheKey = user?.id ? `growdash:rd-connections:${user.id}:${workspaceId ?? "owner-only"}` : "";
   return useQuery<RDAccountConnection[]>({
     queryKey: ["rd_account_connections", user?.id, workspaceId ?? "owner-only"],
     enabled: !!user,
-    retry: 2,
+    retry: 1,
+    retryDelay: 1_000,
+    refetchOnWindowFocus: false,
+    staleTime: 2 * 60_000,
+    placeholderData: readLocalCache<RDAccountConnection[]>(cacheKey),
     queryFn: async () => {
       if (workspaceId) {
         const { data, error } = await withRequestTimeout<{ data: RDAccountConnection[] | null; error: Error | null }>(
@@ -35,7 +41,9 @@ export function useRDAccountConnections(workspaceId?: string) {
         if (error) throw error;
         // The workspace RPC deliberately returns only IDs and display metadata;
         // never request or cache api_token in a member-visible query.
-        return (data ?? []) as RDAccountConnection[];
+        const result = (data ?? []) as RDAccountConnection[];
+        writeLocalCache(cacheKey, result);
+        return result;
       }
       const { data, error } = await withRequestTimeout<{ data: RDAccountConnection[] | null; error: Error | null }>(
         (supabase as any).from("rd_account_connections")
@@ -44,7 +52,9 @@ export function useRDAccountConnections(workspaceId?: string) {
         12_000,
       );
       if (error) throw error;
-      return (data ?? []) as RDAccountConnection[];
+      const result = (data ?? []) as RDAccountConnection[];
+      writeLocalCache(cacheKey, result);
+      return result;
     },
   });
 }
