@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SUPABASE_URL, supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
+import { edgeFunctionErrorDetails, getEdgeFunctionErrorMessage } from "@/lib/edgeFunctionError";
+import { withRequestTimeout } from "@/lib/resilience";
 
 export function useMetaOAuth() {
   const { user } = useAuth();
@@ -22,11 +23,31 @@ export function useMetaOAuth() {
       // In-app browsers frequently block popups. Keep the OAuth request
       // usable by falling back to a same-tab redirect after the URL is ready.
       oauthPopup.current = popup;
-      const { data, error } = await supabase.functions.invoke("meta-oauth-start", { body: {} });
+      let result = await supabase.functions.invoke("meta-oauth-start", { body: {} });
+      if (result.error) {
+        const details = await edgeFunctionErrorDetails(result.error);
+        if (details.status === 401) {
+          // A tab can keep a stale access token while the auth context still
+          // has a user. Refresh once before telling the user to log in again.
+          const refreshed = await withRequestTimeout(supabase.auth.refreshSession(), 10_000).catch(() => null);
+          if (refreshed?.data.session && !refreshed.error) {
+            result = await supabase.functions.invoke("meta-oauth-start", { body: {} });
+          } else {
+            popup?.close();
+            oauthPopup.current = null;
+            throw new Error("Sua sessão da Growdash expirou. Entre novamente para conectar a Meta.");
+          }
+        }
+      }
+      const { data, error } = result;
       if (error || !data?.authUrl) {
         popup?.close();
         oauthPopup.current = null;
         if (data?.error) throw new Error(`${data.error}${data.action ? ` ${data.action}` : ""}`);
+        const details = await edgeFunctionErrorDetails(error);
+        if (details.retryable || Number(details.status) >= 500) {
+          throw new Error("O serviço de autenticação da Growdash está temporariamente indisponível. Tente novamente em instantes.");
+        }
         throw new Error(await getEdgeFunctionErrorMessage(error, "Não foi possível iniciar a conexão com a Meta."));
       }
 
