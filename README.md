@@ -41,6 +41,13 @@ npm run test
 - `src/growdash/ModulePage.tsx`: páginas dos demais módulos;
 - `src/growdash/shared.tsx`: componentes visuais compartilhados.
 
+## Organização do projeto
+
+O mapa completo de Front End, Back End, banco, APIs e limites entre camadas
+está em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). A organização preserva
+os caminhos atuais para não quebrar imports, rotas ou o deploy; mudanças físicas
+de pastas devem ser feitas por domínio e validadas separadamente.
+
 ## Dados e integrações
 
 Os números atuais são demonstrativos e não representam dados reais. Meta Ads, RD Station e demais fontes devem ser conectadas no backend antes do uso em produção. Tokens privados nunca devem ser adicionados a variáveis `VITE_` ou enviados ao GitHub.
