@@ -343,7 +343,7 @@ export default function GrowdashLayout() {
             </div>
           </div>
         ) : <><TooltipProvider delayDuration={180}>
-        <nav className="growdash-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4" aria-label="Navegação principal">
+        <nav className="gd-sidebar-nav-list growdash-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4" aria-label="Navegação principal">
           {visibleSections.map((section) => {
             const isOpen = openSections[section.label] ?? true;
             const sectionContentId = `sidebar-section-${section.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
@@ -373,7 +373,7 @@ export default function GrowdashLayout() {
                       ? location.pathname === "/"
                       : location.pathname.startsWith(itemPathname);
                   const linkClassName = cn(
-                    "group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
+                    "gd-sidebar-nav-link group flex h-10 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
                     showSidebarLabels ? "gap-3 px-3" : "justify-center px-0",
                     !showSidebarLabels
                       ? "bg-transparent text-white/75 shadow-none hover:bg-white/[.06] hover:text-white"
@@ -389,7 +389,9 @@ export default function GrowdashLayout() {
                       aria-label={`${item.label} (abre em nova aba)`}
                       className={linkClassName}
                     >
-                      <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                      <span className="gd-sidebar-nav-chip" aria-hidden="true">
+                        <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                      </span>
                       {showSidebarLabels && <span className="truncate">{item.label}</span>}
                     </a>
                   ) : (
@@ -402,7 +404,9 @@ export default function GrowdashLayout() {
                       onPointerDown={() => preloadRoute(item.path)}
                       className={linkClassName}
                     >
-                      <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                      <span className="gd-sidebar-nav-chip" aria-hidden="true">
+                        <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+                      </span>
                       {showSidebarLabels && <span className="truncate">{item.label}</span>}
                     </NavLink>
                   );
