@@ -55,6 +55,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { WorkflowEditor } from "./automations/WorkflowEditor";
 
 const LifeSimPage = lazy(() => import("./LifeSimPage"));
 
@@ -249,9 +250,9 @@ function AutomationsModule() {
 
   return (
     <Page title="Automações" description="Crie gatilhos, condições e respostas usando os perfis profissionais conectados à Growdash." action={<Button className="gold-action" onClick={() => openEditor()}><Plus className="mr-2 h-4 w-4" /> Nova automação</Button>}>
-      <Tabs options={[{ id: "mine", label: "Minhas Automações" }, { id: "basic", label: "Templates Instagram" }, { id: "sequences", label: "Como funciona" }]} value={tab} onChange={setTab} />
+      <Tabs options={[{ id: "mine", label: "Minhas Automações" }, { id: "workflow", label: "Editor visual" }, { id: "basic", label: "Templates Instagram" }, { id: "sequences", label: "Como funciona" }]} value={tab} onChange={setTab} />
       {schemaMissing && <section className="gd-panel mb-4 border-amber-500/30 p-4"><b className="text-sm text-amber-500">Migration de automações pendente</b><p className="mt-1 text-xs text-muted-foreground">Aplique `20260809100000_instagram_automation_foundation.sql` no Supabase antes de ativar os fluxos.</p></section>}
-      {tab === "mine" ? <>
+      {tab === "workflow" ? <WorkflowEditor /> : tab === "mine" ? <>
         <Toolbar left={<label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-72"><Search className="h-4 w-4 text-muted-foreground" /><input aria-label="Buscar automação" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar automação" className="min-w-0 grow bg-transparent text-sm outline-none" /></label>} right={<Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button>} />
         {!accountsQuery.data?.length && <section className="gd-panel mb-4 flex flex-col gap-4 border-pink-500/20 p-5 sm:flex-row sm:items-center"><span className="grid h-12 w-12 place-items-center rounded-xl bg-pink-500/10 text-pink-500"><Instagram className="h-6 w-6" /></span><div className="grow"><b className="text-sm">Conecte o Instagram do expert</b><p className="mt-1 text-xs text-muted-foreground">A mesma conta usada na análise de posts será usada nos gatilhos e respostas da automação.</p></div><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}>Conectar agora</Button></section>}
         {automations.length ? <div className="grid gap-3 lg:grid-cols-2">{automations.map((automation) => {
