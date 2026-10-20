@@ -239,3 +239,29 @@ Trabalhe nesta ordem, registrando evidências no repositório:
   suíte passou em 99 arquivos/491 testes, ESLint e `git diff --check` passaram.
 - Commit desta rodada: `9e1e4bd`, enviado para `origin/main`. O checkout deve
   permanecer limpo e alinhado antes de qualquer nova publicação.
+
+## Rodada de teste Meta Lead Ads — 20/10/2026
+
+- A ferramenta Meta de Lead Ads confirmou o lead de teste
+  `1097534539857271` para a página `1202737319590526` e o formulário
+  `29262299960044149`, mas o payload de teste retornou `adgroup_id: null` e
+  `ad_id: null`. Esse tipo de teste não comprova conjunto, anúncio,
+  plataforma ou posicionamento; um lead real originado no anúncio é necessário
+  para esses campos.
+- O diagnóstico da Meta mostrou somente os apps RD Station e Make inscritos na
+  página. A Growdash não estava inscrita; por isso o lead não apareceu em
+  `meta_leads` e o sucesso exibido pela ferramenta não significava entrega ao
+  webhook Growdash.
+- `sync-meta-leads` agora tenta, de forma idempotente e não bloqueante, ativar a
+  assinatura global `page/leadgen`, inscrever as páginas administráveis em
+  `/{page_id}/subscribed_apps`, guardar `page_id` no catálogo de formulários e
+  continuar a leitura por `/{form_id}/leads` para recuperar leads que chegaram
+  antes do webhook. O OAuth passa a solicitar também
+  `pages_show_list`, `pages_read_engagement` e `pages_manage_metadata`.
+- As funções publicadas no Supabase são `sync-meta-leads` v43 e
+  `meta-oauth-start` v28. Build local e 492 testes passaram.
+- A confirmação viva ficou bloqueada no momento por `PGRST002` (schema cache do
+  PostgREST indisponível, HTTP 503) tanto no REST quanto na chamada autenticada
+  da Edge Function. Não marcar o CRM como corrigido até o banco voltar a
+  responder e a consulta confirmar o lead em `meta_leads`, o vínculo em
+  `rd_deals`/negociação RD e todos os IDs, nomes e UTMs esperados.

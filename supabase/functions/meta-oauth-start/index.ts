@@ -69,11 +69,23 @@ Deno.serve(async (req) => {
     const loginConfigId = Deno.env.get("META_LOGIN_CONFIG_ID")?.trim();
     const redirectUri = Deno.env.get("META_OAUTH_REDIRECT_URI")
       ?? `${supabaseUrl}/functions/v1/meta-oauth-callback`;
-    const scopes = Deno.env.get("META_OAUTH_SCOPES")
-      // Lead Ads are part of the CRM contract. Request the permission together
-      // with Ads access so a newly connected token can read Page lead forms;
-      // existing tokens remain unchanged until the account is reconnected.
-      ?? "ads_read,ads_management,business_management,leads_retrieval";
+    const configuredScopes = Deno.env.get("META_OAUTH_SCOPES")
+      ?.split(",")
+      .map((scope) => scope.trim())
+      .filter(Boolean) || [];
+    // Lead Ads are part of the CRM contract. Always include the Page scopes
+    // needed to subscribe the Growdash webhook, even when an older deployment
+    // left META_OAUTH_SCOPES configured without them.
+    const scopes = Array.from(new Set([
+      ...configuredScopes,
+      "ads_read",
+      "ads_management",
+      "business_management",
+      "leads_retrieval",
+      "pages_show_list",
+      "pages_read_engagement",
+      "pages_manage_metadata",
+    ])).join(",");
 
     const oauthUrl = new URL(`https://www.facebook.com/${graphVersion}/dialog/oauth`);
     oauthUrl.searchParams.set("client_id", appId);

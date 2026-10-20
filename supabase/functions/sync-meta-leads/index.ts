@@ -458,6 +458,9 @@ Deno.serve(async (req) => {
     let totalPages = 0;
     let lastCursor: string | null = null;
     const pageFormsByToken = new Map<string, Map<string, string[]>>();
+    const pageIdsByFormByToken = new Map<string, Map<string, string>>();
+    const pageSubscriptionWarningsByToken = new Map<string, string[]>();
+    const appSubscriptionByToken = new Map<string, string | null>();
     const formNamesByToken = new Map<string, Map<string, string>>();
     const permissionsByToken = new Map<string, Set<string> | null>();
 
@@ -486,27 +489,108 @@ Deno.serve(async (req) => {
       }
     }
 
+    async function ensureAppPageWebhook(token: string): Promise<string | null> {
+      if (appSubscriptionByToken.has(token)) return appSubscriptionByToken.get(token) || null;
+      const appId = Deno.env.get("META_APP_ID")?.trim();
+      const appSecret = Deno.env.get("META_APP_SECRET")?.trim();
+      const verifyToken = Deno.env.get("META_WEBHOOK_VERIFY_TOKEN")?.trim();
+      if (!appId || !appSecret || !verifyToken) {
+        const missing = [
+          !appId && "META_APP_ID",
+          !appSecret && "META_APP_SECRET",
+          !verifyToken && "META_WEBHOOK_VERIFY_TOKEN",
+        ].filter(Boolean).join(", ");
+        const warning = `Assinatura global Meta não configurada (${missing}); o webhook da Growdash precisa ser habilitado no app.`;
+        appSubscriptionByToken.set(token, warning);
+        return warning;
+      }
+      try {
+        const callbackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/meta-webhook`;
+        const body = new URLSearchParams({
+          object: "page",
+          callback_url: callbackUrl,
+          fields: "leadgen",
+          verify_token: verifyToken,
+          access_token: `${appId}|${appSecret}`,
+        });
+        const response = await fetch(`${GRAPH}/${encodeURIComponent(appId)}/subscriptions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.error || payload?.success === false) {
+          const message = payload?.error?.message || `HTTP ${response.status}`;
+          const warning = `A assinatura global leadgen da Meta não foi confirmada: ${message}`;
+          appSubscriptionByToken.set(token, warning);
+          return warning;
+        }
+        appSubscriptionByToken.set(token, null);
+        return null;
+      } catch (error) {
+        const warning = `A assinatura global leadgen da Meta falhou: ${error instanceof Error ? error.message : String(error)}`;
+        appSubscriptionByToken.set(token, warning);
+        return warning;
+      }
+    }
+
+    async function subscribePage(pageId: string, pageAccessToken: string, token: string) {
+      const warnings = pageSubscriptionWarningsByToken.get(token) || [];
+      try {
+        const body = new URLSearchParams({
+          subscribed_fields: "leadgen",
+          access_token: pageAccessToken,
+        });
+        const response = await fetch(`${GRAPH}/${encodeURIComponent(pageId)}/subscribed_apps`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.error || payload?.success === false) {
+          warnings.push(`Página ${pageId}: assinatura leadgen não confirmada (${payload?.error?.message || `HTTP ${response.status}`}).`);
+        }
+      } catch (error) {
+        warnings.push(`Página ${pageId}: falha ao ativar assinatura leadgen (${error instanceof Error ? error.message : String(error)}).`);
+      }
+      pageSubscriptionWarningsByToken.set(token, warnings);
+    }
+
     async function discoverPageForms(token: string): Promise<Map<string, string[]>> {
       const cached = pageFormsByToken.get(token);
       if (cached) return cached;
       const result = new Map<string, string[]>();
+      const pageIdsByForm = new Map<string, string>();
       const names = formNamesByToken.get(token) || new Map<string, string>();
       const pagesRes = await fetchAll(
-        `${GRAPH}/me/accounts?fields=id,leadgen_forms.limit(200){id,name,account_id}&limit=100&access_token=${token}`,
+        `${GRAPH}/me/accounts?fields=id,name,access_token,leadgen_forms.limit(200){id,name,account_id}&limit=100&access_token=${token}`,
       );
       if (!pagesRes.error) {
         for (const page of pagesRes.data || []) {
+          const pageId = String(page?.id || "");
+          const pageToken = String(page?.access_token || token);
           for (const form of page?.leadgen_forms?.data || []) {
             const accountKey = String(form?.account_id || "");
             if (!accountKey) continue;
             const list = result.get(accountKey) || [];
             if (form?.id) list.push(String(form.id));
             if (form?.id && form?.name) names.set(String(form.id), String(form.name));
+            if (form?.id && pageId) pageIdsByForm.set(String(form.id), pageId);
             result.set(accountKey, list);
           }
+          // The page owns the form and Meta's subscription is page-scoped, not
+          // ad-account-scoped. Subscribe every administrable page returned by
+          // this token; the form catalog below still routes each lead to its
+          // exact ad account and prevents cross-account attribution.
+          if (pageId) await subscribePage(pageId, pageToken, token);
         }
+      } else {
+        const warnings = pageSubscriptionWarningsByToken.get(token) || [];
+        warnings.push(`Páginas Meta não puderam ser consultadas: ${pagesRes.error}`);
+        pageSubscriptionWarningsByToken.set(token, warnings);
       }
       formNamesByToken.set(token, names);
+      pageIdsByFormByToken.set(token, pageIdsByForm);
       pageFormsByToken.set(token, result);
       return result;
     }
@@ -537,6 +621,8 @@ Deno.serve(async (req) => {
         }
         const formIds = new Set<string>();
         const discoveryWarnings: string[] = [];
+        const appSubscriptionWarning = await ensureAppPageWebhook(token);
+        if (appSubscriptionWarning) discoveryWarnings.push(appSubscriptionWarning);
         if (grantedPermissions && !grantedPermissions.has("leads_retrieval")) {
           discoveryWarnings.push(
             "Meta token sem a permissão leads_retrieval; reconecte a conta após aprovar essa permissão e o acesso às Páginas.",
@@ -578,6 +664,10 @@ Deno.serve(async (req) => {
           const pageForms = await discoverPageForms(token);
           for (const id of pageForms.get(raw.replace(/^act_/, "")) || []) formIds.add(id);
         }
+        if (!pageFormsByToken.has(token)) await discoverPageForms(token);
+        for (const warning of pageSubscriptionWarningsByToken.get(token) || []) {
+          if (!discoveryWarnings.includes(warning)) discoveryWarnings.push(warning);
+        }
         // An account-level endpoint error is non-fatal when creatives already
         // supplied form ids; the latter is the supported source for those ads.
         if (formsRes.error && formIds.size === 0) discoveryWarnings.push(`forms: ${formsRes.error}`);
@@ -588,9 +678,11 @@ Deno.serve(async (req) => {
         // Keep a server-side form -> account route so the webhook can resolve
         // a brand-new lead before the ad catalog has seen its ad/adset.
         if (formIds.size) {
+          const pageIdsByForm = pageIdsByFormByToken.get(token) || new Map<string, string>();
           const catalogRows = Array.from(formIds).map((formId) => ({
             form_id: formId,
             ad_account_id: acc.id,
+            page_id: pageIdsByForm.get(formId) || null,
             name: formNames.get(formId) || null,
             last_seen_at: new Date().toISOString(),
             raw: { source: "sync-meta-leads" },
