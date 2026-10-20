@@ -1096,6 +1096,17 @@ export default function Campaigns() {
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Pesquise para filtrar por: nome, identificação ou métrica" value={search} onChange={(e) => setSearch(e.target.value)} className="campaign-search-input h-8 border-border bg-background pl-9 text-xs" />
           </div>
+          <div className="campaign-date-filter shrink-0 lg:hidden">
+            <MetaDateRangePicker
+              preset={preset}
+              onPresetChange={setPreset}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+              startDate={startDate}
+              endDate={endDate}
+              className="campaign-date-pill h-8"
+            />
+          </div>
         </div>
       </MotionItem>
 
@@ -1116,8 +1127,7 @@ export default function Campaigns() {
                 <RectangleHorizontal className="h-3.5 w-3.5" /> Anúncios ({selectedAds.length})
               </TabsTrigger>
             </TabsList>
-            <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5">
-            </div>
+            <div className="campaign-date-filter ml-auto flex shrink-0 items-center px-2 py-1.5" aria-hidden="true" />
           </div>
 
           <div className="campaign-actions-toolbar growdash-scrollbar-hidden flex min-h-11 items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-border bg-card px-3 py-1.5 dark:border-[#2a271f] dark:bg-[#090908]">

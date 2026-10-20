@@ -13551,3 +13551,105 @@ html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data
   line-height: 1.1 !important;
   white-space: normal !important;
 }
+
+/* Final night-review contract -------------------------------------------
+   Keep the last layer small and semantic. Older visual phases remain in the
+   stylesheet for compatibility, but authenticated surfaces below are bound
+   to the shared theme tokens so a late utility cannot reintroduce white
+   dividers, clipped KPI values or blue/white active pills. */
+
+@media (min-width: 1280px) {
+  .brand-shell .dashboard-page .dashboard-glass-metrics {
+    grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+    overflow: visible !important;
+  }
+
+  .brand-shell .dashboard-page .dashboard-glass-metrics > :is(article, button),
+  .brand-shell .dashboard-page .dashboard-glass-metrics > :is(article, button) .gd-label,
+  .brand-shell .dashboard-page .dashboard-glass-metrics > :is(article, button) p:not(.gd-label) {
+    min-width: 0 !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+
+  .brand-shell .dashboard-page .dashboard-glass-metrics > button:focus-visible {
+    outline: 2px solid var(--gd-border-focus) !important;
+    outline-offset: -2px !important;
+  }
+}
+
+/* Expert tabs, platform tabs and cards use the same neutral active state in
+   both themes. The active thumb remains the only black control accent. */
+.brand-shell .expert-dashboard :is(.expert-dashboard-tabs > button, [role="tab"])[aria-selected="true"],
+.brand-shell .expert-dashboard [role="tab"][data-state="active"] {
+  border: 1px solid var(--gd-border-focus) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-content) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .08) !important;
+}
+
+.brand-shell .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .expert-ops-card) {
+  border-color: var(--gd-border-subtle) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-hierarchy-tab[data-state="active"],
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .meta-toolbar-button-active {
+  border-color: var(--gd-border-focus) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-content) !important;
+  box-shadow: inset 0 -2px hsl(var(--primary)), 0 2px 8px rgba(0, 0, 0, .18) !important;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .campaigns-workspace .campaign-filters-row { flex-wrap: wrap !important; }
+  .campaigns-workspace .campaign-scope-toolbar { flex: 1 1 100% !important; order: 1 !important; }
+  .campaigns-workspace .campaign-search-wrap { width: min(100%, 360px) !important; max-width: none !important; margin-left: 0 !important; order: 2 !important; }
+  .campaigns-workspace .campaign-date-filter { order: 3 !important; margin-left: auto !important; }
+  .campaigns-workspace .campaign-tabs-header { overflow-x: auto !important; }
+  .campaigns-workspace .campaign-tabs-list { min-width: 560px !important; }
+}
+
+/* Commercial and CRM were authored with an earlier navy surface contract.
+   Rebind only their authenticated panels; data and chart geometry stay the
+   same while the light theme regains hierarchy and the dark theme loses
+   bright white borders. */
+.commercial-ranking-shell .isolate {
+  border-color: var(--gd-border) !important;
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+}
+
+.commercial-ranking-shell .isolate :is(.rounded-2xl, .rounded-xl, .rounded-lg) {
+  border-color: var(--gd-border-subtle) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-content) !important;
+}
+
+.commercial-ranking-shell .isolate :is(.text-white, .text-slate-100, .text-slate-200) {
+  color: var(--gd-content) !important;
+}
+
+.commercial-ranking-shell .isolate :is(.text-slate-400, .text-slate-500) {
+  color: var(--gd-content-muted) !important;
+}
+
+.commercial-ranking-shell .isolate :is([class*="border-white"], [class*="border-[#d9a928]"]) {
+  border-color: var(--gd-border-subtle) !important;
+}
+
+.commercial-ranking-shell .isolate .bg-black\/65.text-white { color: #fff !important; }
+
+.brand-shell .crm-page .crm-filter-strip,
+.brand-shell .crm-page .crm-filter-strip > * {
+  border-color: var(--gd-border-subtle) !important;
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+}
+
+.brand-shell .crm-page .crm-filter-strip :is(.bg-muted\/30, .bg-muted\/40) {
+  background: var(--gd-surface-raised) !important;
+}

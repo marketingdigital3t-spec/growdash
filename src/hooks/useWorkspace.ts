@@ -129,6 +129,7 @@ export function useWorkspace() {
       try {
         const { data: workspaceId, error: bootstrapError } = await withRequestTimeout(
           (supabase as any).rpc("ensure_current_workspace"),
+          15_000,
         );
         if (bootstrapError) {
           throw bootstrapError;
@@ -144,6 +145,7 @@ export function useWorkspace() {
               .select("id, name, currency, timezone")
               .eq("id", workspaceId)
               .single(),
+            15_000,
           ),
           withRequestTimeout(
             (supabase as any)
@@ -152,6 +154,7 @@ export function useWorkspace() {
               .eq("workspace_id", workspaceId)
               .eq("user_id", user!.id)
               .single(),
+            15_000,
           ),
           withRequestTimeout(
             (supabase as any)
@@ -160,6 +163,7 @@ export function useWorkspace() {
               .eq("workspace_id", workspaceId)
               .eq("is_active", true)
               .order("kind"),
+            15_000,
           ),
         ]);
 
@@ -183,7 +187,7 @@ export function useWorkspace() {
         if (previous) return previous;
         throw err;
       }
-    })(), 10_000),
+    })(), 20_000),
   });
 }
 

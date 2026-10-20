@@ -115,7 +115,14 @@ type CrmMetricCardProps = {
   tone: "meta" | "rd" | "revenue" | "success";
 };
 
-function CrmMetricCard({ source, label, value, description, icon, tone: _tone }: CrmMetricCardProps) {
+function CrmMetricCard({ source, label, value, description, icon, tone }: CrmMetricCardProps) {
+  const toneClass = tone === "success"
+    ? "text-emerald-600 dark:text-emerald-400"
+    : tone === "revenue"
+      ? "text-primary"
+      : tone === "meta"
+        ? "text-sky-600 dark:text-sky-400"
+        : "text-foreground";
   return (
     <article className="gd-panel gd-metric-card gd-crm-metric-card min-w-0 overflow-hidden p-4">
       <div className="flex items-start justify-between gap-3">
@@ -125,9 +132,9 @@ function CrmMetricCard({ source, label, value, description, icon, tone: _tone }:
           </span>
           <h3 className="mt-2 text-xs font-black uppercase tracking-[.08em] text-muted-foreground">{label}</h3>
         </div>
-        <span className="gd-metric-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl">{icon}</span>
+        <span className={cn("gd-metric-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl", toneClass)}>{icon}</span>
       </div>
-      <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight text-foreground" title={value}>{value}</p>
+      <p className={cn("mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight", toneClass)} title={value}>{value}</p>
       <p className="mt-1 line-clamp-2 text-xs font-medium leading-4 text-muted-foreground">{description}</p>
     </article>
   );
@@ -271,7 +278,7 @@ export default function CrmPage() {
   // materially misleading in CRM. Fail closed until every account-scoped
   // source belongs to the selection.
   const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
-  const isLoadingSelectedScope = isChangingAccountScope || loadingDeals || loadingSales;
+  const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingFunnels || loadingDeals || loadingSales;
   const funnels = useMemo(() => isChangingAccountScope ? [] : funnelData, [funnelData, isChangingAccountScope]);
   const allDeals = useMemo(() => isChangingAccountScope ? [] : dealData, [dealData, isChangingAccountScope]);
   const canonicalSales = useMemo(() => isChangingAccountScope ? [] : salesData, [isChangingAccountScope, salesData]);
@@ -824,7 +831,7 @@ export default function CrmPage() {
             </div>
             <p className="text-xs text-muted-foreground">Cada card informa a fonte e o critério do dado.</p>
           </div>
-          <div className="gd-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="gd-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <CrmMetricCard
               source="RD Station CRM"
               label="Negociações criadas no período"

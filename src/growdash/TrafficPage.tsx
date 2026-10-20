@@ -111,7 +111,7 @@ export default function TrafficPage() {
       </aside>
 
       <div className="traffic-page-content min-w-0">
-        {activeTab === "comparison" && <GlobalScopeToolbar />}
+        {activeTab !== "campaigns" && <GlobalScopeToolbar />}
         {activeTab === "campaigns" && <CampaignsManager />}
         {activeTab === "comparison" && <TrafficComparison />}
         {activeTab === "budget" && <BudgetWorkspace accountId={adAccountIds.length === 1 ? adAccountIds[0] : "all"} selectedAccountIds={adAccountIds} accounts={visibleAccounts.map((item) => ({ id: item.id, name: item.name }))} startDate={startDate} endDate={endDate} />}

@@ -97,7 +97,7 @@ export function recoverLatestBuildOnce(scope: string, error: unknown) {
     // Use one global, short-lived recovery budget. A route-specific marker
     // could remain in an old tab and prevent a later route from refreshing
     // after the same deployment changed its chunk graph.
-    const recovery = consumeRecoveryAttempt("chunk-reload", 60_000, 1);
+    const recovery = consumeRecoveryAttempt("chunk-reload", 120_000, 2);
     if (recovery.blocked) return false;
     // reload() can reuse a cached HTML document which still points to the
     // deleted chunk. A harmless cache-busting parameter forces Pages/CDN and
