@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { withRequestTimeout } from "@/lib/resilience";
 
+const SESSION_CHECK_TIMEOUT_MS = 30_000;
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
@@ -36,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // login indevidas quando o token ainda estava sendo hidratado pelo Supabase.
     const timeout = window.setTimeout(() => {
       if (active) setStatus((current) => current === "hydrating" ? "unavailable" : current);
-    }, 10_000);
+    }, SESSION_CHECK_TIMEOUT_MS);
 
     const applySession = (nextSession: Session | null) => {
       if (!active) return;
@@ -78,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // A manual retry must have the same bounded behavior as the initial
       // boot. Without this timeout a flaky Supabase connection could return
       // the entire platform to an infinite loading state.
-      const { data } = await withRequestTimeout(supabase.auth.getSession(), 10_000);
+      const { data } = await withRequestTimeout(supabase.auth.getSession(), SESSION_CHECK_TIMEOUT_MS);
       const nextUserId = data.session?.user.id ?? null;
       if (userIdRef.current !== nextUserId) queryClient.clear();
       userIdRef.current = nextUserId;
