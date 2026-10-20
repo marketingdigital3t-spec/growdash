@@ -522,7 +522,7 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
-            {!isCampaignsRoute && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} />}
+            {!isCampaignsRoute && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} onSyncNow={() => void backgroundSync.refresh(true)} />}
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
               <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>

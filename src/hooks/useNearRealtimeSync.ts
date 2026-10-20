@@ -105,8 +105,10 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           includeRD: false,
           includeBalance: false,
           fast: true,
-          syncMode: "recent_window" as const,
-          recentHours: RECENT_SYNC_WINDOW_HOURS,
+          // A manual action must reconcile the exact visible calendar. The
+          // five-minute worker keeps using the cheaper recent watermark.
+          syncMode: force ? "selected_period" as const : "recent_window" as const,
+          recentHours: force ? undefined : RECENT_SYNC_WINDOW_HOURS,
           realtime: true,
           force,
         };
@@ -138,7 +140,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         // large CRM funnel must never delay or fail the visible ad snapshot;
         // its recent-window reconciliation still runs silently and Realtime
         // invalidates the CRM queries when rows arrive.
-        void supabase.functions.invoke("controlled-realtime-sync", {
+        const rdRefresh = supabase.functions.invoke("controlled-realtime-sync", {
           body: {
             ...selectedBody,
             includeMeta: false,
@@ -155,6 +157,10 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         }).catch((rdError) => {
           console.warn("[near-realtime-sync] RD reconciliation", rdError);
         });
+        // Keep the explicit “Sincronizar agora” action honest: it resolves
+        // only after the independent RD request has also returned. Automatic
+        // refreshes remain non-blocking so the dashboard never freezes.
+        if (force) await rdRefresh;
 
       } catch (error) {
         // Falha silenciosa: o histórico armazenado permanece visível e uma nova

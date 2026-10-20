@@ -607,10 +607,33 @@ Deno.serve(async (req) => {
         const campaignFilter = campaignIds.length
           ? `&filtering=${encodeURIComponent(JSON.stringify([{ field: "campaign.id", operator: "IN", value: campaignIds }]))}`
           : "";
-        const insightsRes = await fetchMetaInsightsByAdaptiveRange(
+        const insightsRes = await fetchMetaInsightsByMonthlyChunks(
           `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`,
           startDate,
           endDate,
+          async (completed, total) => {
+            // Persist chunk progress so the authenticated UI can show that a
+            // long historical sync is advancing while the final response is
+            // still pending. The JSON block is additive and keeps the last
+            // valid snapshot untouched until every chunk is complete.
+            await writeMetaScopeState(supabaseAdmin, {
+              accountId: account.id,
+              campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+              startDate,
+              endDate,
+              timezone: effectiveTimezone,
+              attributionWindow: effectiveAttributionWindow,
+              status: "syncing",
+              lastAttemptAt: attemptedAt,
+              pagesProcessed: accountPagesProcessed,
+              blockStatus: {
+                insights: { status: "syncing", progress: { completed, total, unit: "months" } },
+                actions: { status: "pending" },
+                hourly: { status: "pending" },
+                breakdowns: { status: "pending" },
+              },
+            });
+          },
         );
         recordPagination(insightsRes, "insights");
         if (insightsRes.error) {
@@ -1754,7 +1777,14 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
         payload = {};
       }
 
-      if (response.ok && !payload.error) return payload;
+      const usageDelay = metaUsageBackoffMs(response.headers);
+      if (response.ok && !payload.error) {
+        if (usageDelay > 0) {
+          console.log(`[meta-rate-limit] usage high; waiting ${usageDelay}ms before the next request`);
+          await sleep(usageDelay);
+        }
+        return payload;
+      }
 
       const metaError = payload.error || { message: `Meta retornou HTTP ${response.status}` };
       const code = Number(metaError.code);
@@ -1764,7 +1794,9 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
       if (retryable && attempt + 1 < maxAttempts) {
         const retryAfter = Number(response.headers.get("retry-after") || 0) * 1000;
         const exponential = 750 * (2 ** attempt) + Math.floor(Math.random() * 250);
-        await sleep(Math.min(15_000, Math.max(retryAfter, exponential)));
+        const waitMs = Math.min(15_000, Math.max(retryAfter, exponential, usageDelay));
+        console.log(`[meta-rate-limit] retryable response; waiting ${waitMs}ms (attempt ${attempt + 1}/${maxAttempts})`);
+        await sleep(waitMs);
         continue;
       }
 
@@ -1778,6 +1810,37 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
     }
   }
   return { error: { message: lastMessage, is_transient: true }, __retryable: true };
+}
+
+/**
+ * The Graph API exposes account/app pressure in X-App-Usage and
+ * X-Business-Use-Case-Usage. A high watermark is a signal to back off even
+ * when the HTTP response is still 200; otherwise a long historical walk can
+ * create a 429 cascade. Never log the header contents because they may contain
+ * business identifiers; only the derived delay is recorded.
+ */
+function metaUsageBackoffMs(headers: Headers): number {
+  const percentages: number[] = [];
+  const read = (name: string) => {
+    const raw = headers.get(name);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      const visit = (value: unknown) => {
+        if (typeof value === "number" && Number.isFinite(value)) percentages.push(value);
+        else if (Array.isArray(value)) value.forEach(visit);
+        else if (value && typeof value === "object") Object.values(value as Record<string, unknown>).forEach(visit);
+      };
+      visit(parsed);
+    } catch {
+      // A malformed provider header must never fail the sync.
+    }
+  };
+  read("x-app-usage");
+  read("x-business-use-case-usage");
+  const pressure = Math.max(...percentages, 0);
+  if (pressure < 80) return 0;
+  return Math.min(15_000, 1_000 + Math.round((pressure - 80) * 350));
 }
 
 // Segue paging.next até o fim, retornando erro estruturado sem expor token.
@@ -1859,6 +1922,80 @@ async function fetchMetaInsightsByAdaptiveRange(
   const right = await fetchMetaInsightsByAdaptiveRange(withRange(rightStartDate, endDate), rightStartDate, endDate, depth + 1);
   if (right.error || right.truncated || right.repeatedCursor) return { ...right, data: [...left.data, ...right.data], pages: left.pages + right.pages };
   return { data: [...left.data, ...right.data], pages: left.pages + right.pages };
+}
+
+type InsightChunkProgress = (completed: number, total: number) => Promise<void> | void;
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await mapper(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, () => worker()));
+  return results;
+}
+
+function monthChunks(startDate: string, endDate: string): Array<{ startDate: string; endDate: string }> {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const chunks: Array<{ startDate: string; endDate: string }> = [];
+  for (let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1)); cursor <= end; cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))) {
+    const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0));
+    const left = cursor < start ? start : cursor;
+    const right = monthEnd > end ? end : monthEnd;
+    chunks.push({ startDate: left.toISOString().slice(0, 10), endDate: right.toISOString().slice(0, 10) });
+  }
+  return chunks.length ? chunks : [{ startDate, endDate }];
+}
+
+/**
+ * Long ranges are intentionally split by civil month before calling Graph.
+ * Three chunks may be in flight at once; each chunk still drains its own
+ * cursor and uses adaptive bisection if Meta reports an oversized response.
+ */
+async function fetchMetaInsightsByMonthlyChunks(
+  url: string,
+  startDate: string,
+  endDate: string,
+  onProgress?: InsightChunkProgress,
+): Promise<Awaited<ReturnType<typeof fetchMetaPaginated>> & { chunksTotal?: number; chunksCompleted?: number }> {
+  const chunks = monthChunks(startDate, endDate);
+  if (chunks.length === 1) {
+    const result = await fetchMetaInsightsByAdaptiveRange(url, startDate, endDate);
+    await onProgress?.(1, 1);
+    return { ...result, chunksTotal: 1, chunksCompleted: 1 };
+  }
+
+  let completed = 0;
+  const results = await mapWithConcurrency(chunks, 3, async (chunk) => {
+    const rangedUrl = new URL(url);
+    rangedUrl.searchParams.set("time_range", JSON.stringify({ since: chunk.startDate, until: chunk.endDate }));
+    const result = await fetchMetaInsightsByAdaptiveRange(rangedUrl.toString(), chunk.startDate, chunk.endDate);
+    completed += 1;
+    await onProgress?.(completed, chunks.length);
+    return result;
+  });
+  const failed = results.find((result) => result.error || result.truncated || result.repeatedCursor);
+  return {
+    data: results.flatMap((result) => result.data || []),
+    pages: results.reduce((sum, result) => sum + Number(result.pages || 0), 0),
+    lastCursor: results.at(-1)?.lastCursor,
+    ...(failed ? {
+      error: failed.error || "Paginação mensal incompleta",
+      errorCode: failed.errorCode,
+      errorSubcode: failed.errorSubcode,
+      httpStatus: failed.httpStatus,
+      retryable: failed.retryable,
+      truncated: failed.truncated,
+      repeatedCursor: failed.repeatedCursor,
+    } : {}),
+    chunksTotal: chunks.length,
+    chunksCompleted: completed,
+  };
 }
 
 function sleep(ms: number) {
