@@ -265,3 +265,7 @@ Trabalhe nesta ordem, registrando evidências no repositório:
   da Edge Function. Não marcar o CRM como corrigido até o banco voltar a
   responder e a consulta confirmar o lead em `meta_leads`, o vínculo em
   `rd_deals`/negociação RD e todos os IDs, nomes e UTMs esperados.
+- O Pages automático associado ao commit `abb2c02` apareceu como `Failure`; o
+  último deployment estático bem-sucedido continua sendo o anterior. Como esta
+  rodada alterou somente Edge Functions e OAuth, nenhum build estático foi
+  promovido manualmente nem foi usado como prova de validação do rastreamento.
