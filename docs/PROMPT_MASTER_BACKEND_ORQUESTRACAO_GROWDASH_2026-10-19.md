@@ -87,6 +87,21 @@ Trabalhe nesta ordem, registrando evidências no repositório:
   em camadas separadas; pendências de OAuth, SMS, credenciais ou paridade real
   ficam explícitas.
 
+## Contrato de atribuição Meta → RD → CRM
+
+- `campaign_id`, `adset_id`, `ad_id` e `form_id` são as chaves canônicas; nomes,
+  plataforma e posicionamento são snapshots devolvidos pela Meta.
+- Macros literais como `{{adset_name}}`, `{{ad_name}}` e `${platform_position}`
+  não são dados: devem ser descartadas em toda entrada, espelho e apresentação.
+- O sync RD deve persistir `meta_form_id` e os snapshots `meta_*` quando o
+  payload os trouxer; a resolução por nome só pode usar UTMs completas e uma
+  correspondência inequívoca no mesmo ad account.
+- Atribuição incompleta permanece `partial`; nunca preencher conjunto,
+  criativo, formulário, plataforma ou posicionamento por inferência de texto.
+- O teste de aceite exige um lead novo com todos os IDs/nomes esperados no
+  `meta_leads`, `rd_deals`, negociação RD e CRM; uma campanha exibida sozinha
+  não comprova o rastreamento.
+
 ## Execução inicial — 19/10/2026
 
 - Checkout: `/Users/thiegojesus/Documents/Codex/PROJETOS – APP/Growdash`.

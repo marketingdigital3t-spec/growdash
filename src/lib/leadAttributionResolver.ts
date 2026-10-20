@@ -41,7 +41,11 @@ type AttributionDeal = {
   meta_attribution_method?: string | null;
 };
 
-const text = (value: unknown) => String(value ?? "").trim();
+const text = (value: unknown) => {
+  const valueText = String(value ?? "").trim();
+  if (!valueText || /^\{\{[^{}]+\}\}$/.test(valueText) || /^\$\{[^{}]+\}$/.test(valueText)) return "";
+  return valueText;
+};
 const same = (a: unknown, b: unknown) => text(a).toLocaleLowerCase("pt-BR") === text(b).toLocaleLowerCase("pt-BR") && text(a) !== "";
 
 export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightRow[]): LeadAttribution {

@@ -49,4 +49,23 @@ describe("resolveLeadAttribution", () => {
       isOrganic: false,
     });
   });
+
+  it("não exibe placeholders de macro como se fossem atribuição", () => {
+    const result = resolveLeadAttribution({
+      ad_account_id: "acc-1",
+      utm_campaign: "Campanha 1",
+      utm_term: "{{adset_name}}",
+      utm_content: "{{ad_name}}",
+      meta_platform: "{{site_source_name}}",
+      meta_placement: "${platform_position}",
+    }, []);
+    expect(result).toMatchObject({
+      campaignName: "Campanha 1",
+      adsetName: null,
+      adName: null,
+      platform: null,
+      placement: null,
+      status: "partial",
+    });
+  });
 });

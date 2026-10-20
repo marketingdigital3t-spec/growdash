@@ -89,6 +89,20 @@ function pickTrackingValue(direct: any, merged: Record<string, unknown>, customS
   return cleanTrackingValue(findCustomField(customSources, aliases));
 }
 
+function sanitizeTrackingCustomFields(fields: Record<string, string>): Record<string, string> {
+  const next = { ...fields };
+  const trackingKeys = new Set([
+    "utmsource", "utmmedium", "utmcampaign", "utmterm", "utmcontent", "utmid",
+    "metacampaignid", "metaadsetid", "metaadid", "metaformid",
+    "metacampaignname", "metaadsetname", "metaadname", "metaformname",
+    "metaplatform", "metaplacement",
+  ]);
+  for (const [key, value] of Object.entries(next)) {
+    if (trackingKeys.has(keyNorm(key)) && !cleanTrackingValue(value)) delete next[key];
+  }
+  return next;
+}
+
 /**
  * Retains every RD custom field received with the deal. Keys are readable and
  * stable. When a contact and a deal use the same label, the source is added so
@@ -1225,6 +1239,13 @@ Deno.serve(async (req) => {
       const meta_campaign_id = pickTrackingValue(d.meta_campaign_id, trackingSources, cfSources, ["campaign_id", "gd_campaign_id", "meta_campaign_id"]);
       const meta_adset_id = pickTrackingValue(d.meta_adset_id, trackingSources, cfSources, ["adset_id", "gd_adset_id", "meta_adset_id"]);
       const meta_ad_id = pickTrackingValue(d.meta_ad_id, trackingSources, cfSources, ["ad_id", "gd_ad_id", "meta_ad_id"]) || utm_id;
+      const meta_form_id = pickTrackingValue(d.meta_form_id, trackingSources, cfSources, ["form_id", "gd_form_id", "meta_form_id"]);
+      const meta_campaign_name = pickTrackingValue(d.meta_campaign_name, trackingSources, cfSources, ["meta_campaign_name", "campaign_name", "utm_campaign", "nome campanha", "nome da campanha"]);
+      const meta_adset_name = pickTrackingValue(d.meta_adset_name, trackingSources, cfSources, ["meta_adset_name", "adset_name", "utm_term", "nome conjunto", "nome do conjunto"]);
+      const meta_ad_name = pickTrackingValue(d.meta_ad_name, trackingSources, cfSources, ["meta_ad_name", "ad_name", "utm_content", "nome anuncio", "nome anúncio"]);
+      const meta_form_name = pickTrackingValue(d.meta_form_name, trackingSources, cfSources, ["meta_form_name", "form_name", "nome formulario", "nome formulário"]);
+      const meta_platform = pickTrackingValue(d.meta_platform, trackingSources, cfSources, ["meta_platform", "platform", "publisher_platform", "site_source_name", "plataforma"]);
+      const meta_placement = pickTrackingValue(d.meta_placement, trackingSources, cfSources, ["meta_placement", "placement", "platform_position", "posicionamento"]);
 
       const leadEntryDate = d.created_at
         ? new Date(d.created_at).toISOString().split("T")[0]
@@ -1240,7 +1261,7 @@ Deno.serve(async (req) => {
       const allCustomFields = extractAllCustomFields(dealCustomFields, contactCustomFields);
       observeCustomFields(observedFields, "deal", dealCustomFields);
       observeCustomFields(observedFields, "contact", contactCustomFields);
-      const customFields = { ...allCustomFields, ...customFieldsExtracted };
+      const customFields = sanitizeTrackingCustomFields({ ...allCustomFields, ...customFieldsExtracted });
 
       // Upsert rd_deals (todos os deals, não apenas ganhos)
       try {
@@ -1267,9 +1288,16 @@ Deno.serve(async (req) => {
             utm_content,
             utm_term,
             utm_id,
+            meta_form_id,
             meta_campaign_id,
             meta_adset_id,
             meta_ad_id,
+            meta_campaign_name,
+            meta_adset_name,
+            meta_ad_name,
+            meta_form_name,
+            meta_platform,
+            meta_placement,
             contact_name: contactName,
             contact_phone: contactPhone,
             contact_email: contactEmail,
@@ -1533,12 +1561,14 @@ Deno.serve(async (req) => {
         const dealFields = Array.isArray(d.deal_custom_fields || d.custom_fields) ? (d.deal_custom_fields || d.custom_fields) : [];
         observeCustomFields(observedFields, "deal", dealFields);
         observeCustomFields(observedFields, "contact", contactFields);
-        const customFields = Object.keys(storedProfile.custom_fields || {}).length && !dealFields.length
-          ? storedProfile.custom_fields
-          : {
+        const customFields = sanitizeTrackingCustomFields(
+          Object.keys(storedProfile.custom_fields || {}).length && !dealFields.length
+            ? storedProfile.custom_fields
+            : {
             ...extractAllCustomFields(dealFields, contactFields),
             ...extractConfiguredFields(fieldConfigs, dealFields, contactFields),
-          };
+            },
+        );
         const allCfSources = [dealFields, contactFields];
         const contactState =
           contact.state ||
@@ -1581,9 +1611,16 @@ Deno.serve(async (req) => {
           utm_term: pickUtm("term", ["utmterm", "utm_term", "term", "termo"]),
           utm_content: pickUtm("content", ["utmcontent", "utm_content", "content", "creative", "creative_id", "criativo", "id criativo", "ad_name", "nome anuncio", "nome anúncio", "conteudo", "conteúdo"]),
           utm_id: pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "id anuncio", "id anúncio", "anuncioid", "anúncioid"]),
+          meta_form_id: pickTrackingValue(d.meta_form_id, trackingSources, allCfSources, ["form_id", "gd_form_id", "meta_form_id"]),
           meta_campaign_id: pickTrackingValue(d.meta_campaign_id, trackingSources, allCfSources, ["campaign_id", "gd_campaign_id", "meta_campaign_id"]),
           meta_adset_id: pickTrackingValue(d.meta_adset_id, trackingSources, allCfSources, ["adset_id", "gd_adset_id", "meta_adset_id"]),
           meta_ad_id: pickTrackingValue(d.meta_ad_id, trackingSources, allCfSources, ["ad_id", "gd_ad_id", "meta_ad_id"]) || pickUtm("id", ["utmid", "utm_id", "adid", "ad_id", "gd_ad_id"]),
+          meta_campaign_name: pickTrackingValue(d.meta_campaign_name, trackingSources, allCfSources, ["meta_campaign_name", "campaign_name", "utm_campaign", "nome campanha", "nome da campanha"]),
+          meta_adset_name: pickTrackingValue(d.meta_adset_name, trackingSources, allCfSources, ["meta_adset_name", "adset_name", "utm_term", "nome conjunto", "nome do conjunto"]),
+          meta_ad_name: pickTrackingValue(d.meta_ad_name, trackingSources, allCfSources, ["meta_ad_name", "ad_name", "utm_content", "nome anuncio", "nome anúncio"]),
+          meta_form_name: pickTrackingValue(d.meta_form_name, trackingSources, allCfSources, ["meta_form_name", "form_name", "nome formulario", "nome formulário"]),
+          meta_platform: pickTrackingValue(d.meta_platform, trackingSources, allCfSources, ["meta_platform", "platform", "publisher_platform", "site_source_name", "plataforma"]),
+          meta_placement: pickTrackingValue(d.meta_placement, trackingSources, allCfSources, ["meta_placement", "placement", "platform_position", "posicionamento"]),
         };
         if (contactState) row.lead_state = contactState;
         if (contactCity) row.lead_city = contactCity;
