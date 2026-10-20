@@ -13589,6 +13589,22 @@ html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data
   box-shadow: 0 2px 8px rgba(15, 23, 42, .08) !important;
 }
 
+/* The legacy shell tab rule carries :has(.campaigns-workspace) specificity;
+   keep this explicit authority for the Expert view in both themes. */
+html.dark body .brand-shell:not(:has(.campaigns-workspace)) .growdash-main .expert-dashboard .expert-dashboard-tabs > button[aria-selected="true"] {
+  border-color: var(--gd-border-focus) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-content) !important;
+  box-shadow: none !important;
+}
+
+html:not(.dark) body .brand-shell:not(:has(.campaigns-workspace)) .growdash-main .expert-dashboard .expert-dashboard-tabs > button[aria-selected="true"] {
+  border-color: var(--gd-border-focus) !important;
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+}
+
 .brand-shell .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .expert-ops-card) {
   border-color: var(--gd-border-subtle) !important;
   box-shadow: var(--gd-shadow-card) !important;
