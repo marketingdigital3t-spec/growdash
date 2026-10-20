@@ -13605,6 +13605,22 @@ html:not(.dark) body .brand-shell:not(:has(.campaigns-workspace)) .growdash-main
   box-shadow: var(--gd-shadow-card) !important;
 }
 
+html.dark body .brand-shell .expert-dashboard .gd-platform-tabs [data-state="active"],
+html.dark body .brand-shell .expert-dashboard .gd-platform-tabs [aria-selected="true"] {
+  border: 1px solid var(--gd-border-focus) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-content) !important;
+  box-shadow: none !important;
+}
+
+html:not(.dark) body .brand-shell .expert-dashboard .gd-platform-tabs [data-state="active"],
+html:not(.dark) body .brand-shell .expert-dashboard .gd-platform-tabs [aria-selected="true"] {
+  border: 1px solid var(--gd-border-focus) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-content) !important;
+  box-shadow: none !important;
+}
+
 .brand-shell .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .expert-ops-card) {
   border-color: var(--gd-border-subtle) !important;
   box-shadow: var(--gd-shadow-card) !important;
