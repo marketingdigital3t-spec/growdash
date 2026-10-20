@@ -182,6 +182,8 @@ export default function CrmPage() {
   // RD remains its own source; global account selection scopes it only through
   // the explicit RD-connection-to-Meta-account mapping in GlobalFiltersContext.
   const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope, isError: funnelsError, error: funnelsQueryError, refetch: refetchFunnels } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
+  const isTemporaryBackendError = (error: unknown) => error instanceof Error && /Tempo de carregamento excedido|PGRST002|schema cache|503|indisponível/i.test(error.message);
+  const backendUnavailable = isTemporaryBackendError(funnelsQueryError);
   const availableFunnels = useMemo(
     () => funnelData.filter((funnel) => funnel.is_active && !!funnel.rd_funnel_id),
     [funnelData],
@@ -876,9 +878,13 @@ export default function CrmPage() {
         </section>
       )}
 
-      {funnelsError ? (
+      {funnelsError && !backendUnavailable ? (
         <section role="alert" className="gd-panel mt-4 grid min-h-48 place-items-center p-6 text-center">
           <div className="max-w-md"><UsersRound className="mx-auto h-9 w-9 text-destructive" /><h2 className="mt-4 font-black">Não foi possível carregar os funis RD</h2><p className="mt-2 text-sm text-muted-foreground">{funnelsQueryError instanceof Error ? funnelsQueryError.message : "A consulta dos funis falhou. Verifique a conexão RD e tente novamente."}</p><Button className="mt-4" variant="outline" onClick={() => void refetchFunnels()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
+        </section>
+      ) : backendUnavailable ? (
+        <section role="status" className="gd-panel mt-4 grid min-h-48 place-items-center p-6 text-center">
+          <div className="max-w-lg"><Clock3 className="mx-auto h-9 w-9 text-amber-500" /><h2 className="mt-4 font-black">Sincronização RD aguardando</h2><p className="mt-2 text-sm text-muted-foreground">O serviço de dados está temporariamente indisponível. A Growdash manteve o shell utilizável e tentará novamente quando a conexão voltar.</p><Button className="mt-4" variant="outline" onClick={() => void refetchFunnels()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button></div>
         </section>
       ) : isLoadingSelectedScope ? <CRMLoading /> : dealsError ? (
         <section className="gd-panel mt-4 grid min-h-64 place-items-center p-6 text-center">

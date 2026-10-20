@@ -26,8 +26,10 @@ export function useRDFunnels(adAccountId?: string, enabled = true, adAccountIds?
     // Do not retain a previous user's funnels while the session changes.
     queryKey: ["rd_funnels", user?.id ?? "anonymous", adAccountId ?? "all", adAccountIds?.slice().sort().join(",") ?? ""],
     enabled: enabled && !!user,
-    retry: 1,
-    retryDelay: 1_000,
+    // A 503/PGRST002 means PostgREST cannot reach the database. Retrying the
+    // same request immediately only doubles the visible loading delay; the
+    // manual action and reconnect listener remain available for recovery.
+    retry: false,
     refetchOnReconnect: true,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
