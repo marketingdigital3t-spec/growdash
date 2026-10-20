@@ -115,7 +115,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                           >
                             <span className="pointer-events-none absolute inset-x-6 top-0 h-px rounded-full bg-white/45" aria-hidden="true" />
                             <span className="relative z-10 flex max-w-full items-center justify-center gap-2 text-[10px] font-extrabold uppercase leading-none tracking-[0.08em]" style={{ color: "var(--funnel-stage-text)" }}>
-                              <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-black/10" style={{ background: "var(--funnel-stage-accent)" }} aria-hidden="true" />
+                              <span className="gd-funnel-stage-dot h-2 w-2 shrink-0 rounded-full ring-2 ring-black/10" style={{ background: "var(--funnel-stage-accent)" }} aria-hidden="true" />
                               <span className="max-w-full break-words">{stage.name}</span>
                             </span>
                             <span className="relative z-10 mt-1 flex items-baseline justify-center gap-2 tabular-nums" style={{ color: "var(--funnel-stage-text)" }}>
