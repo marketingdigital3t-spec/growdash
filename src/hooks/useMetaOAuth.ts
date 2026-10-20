@@ -29,12 +29,22 @@ export function useMetaOAuth() {
         if (details.status === 401) {
           // A tab can keep a stale access token while the auth context still
           // has a user. Refresh once before telling the user to log in again.
-          const refreshed = await withRequestTimeout(supabase.auth.refreshSession(), 10_000).catch(() => null);
+          let refreshed: Awaited<ReturnType<typeof supabase.auth.refreshSession>> | null = null;
+          let refreshFailedByNetwork = false;
+          try {
+            refreshed = await withRequestTimeout(supabase.auth.refreshSession(), 10_000);
+          } catch {
+            refreshFailedByNetwork = true;
+          }
           if (refreshed?.data.session && !refreshed.error) {
             result = await supabase.functions.invoke("meta-oauth-start", { body: {} });
           } else {
             popup?.close();
             oauthPopup.current = null;
+            const refreshStatus = Number((refreshed?.error as { status?: unknown } | null)?.status);
+            if (refreshFailedByNetwork || !Number.isFinite(refreshStatus) || refreshStatus >= 500) {
+              throw new Error("O serviço de autenticação da Growdash está temporariamente indisponível. Tente novamente em instantes.");
+            }
             throw new Error("Sua sessão da Growdash expirou. Entre novamente para conectar a Meta.");
           }
         }
