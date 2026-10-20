@@ -251,7 +251,12 @@ Deno.serve(async (req) => {
             created_time: lead.created_time ?? new Date().toISOString(),
             field_data: fieldData,
             email: pickField(fieldData, ["email", "e-mail"]),
-            phone: pickField(fieldData, ["phone_number", "phone", "telefone", "whatsapp"]),
+            // Native Meta forms often use custom labels such as
+            // `digite_aqui_seu_whats` instead of the provider's canonical
+            // `phone_number`. Include the common Portuguese variants so the
+            // lead can be matched to its RD negotiation by phone when the
+            // email is absent or formatted differently.
+            phone: pickField(fieldData, ["phone_number", "phone", "telefone", "whatsapp", "whats", "celular", "mobile", "contato", "tel"]),
             full_name: pickField(fieldData, ["full_name", "name", "nome"]),
             lead_city: pickField(fieldData, ["city", "cidade"]),
             campaign_name: lead.campaign_name ?? null,

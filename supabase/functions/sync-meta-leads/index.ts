@@ -46,7 +46,11 @@ const PHONE_KEYS = [
   "phone",
   "telefone",
   "whatsapp",
+  "whats",
   "celular",
+  "mobile",
+  "contato",
+  "tel",
   "número",
 ];
 const NAME_KEYS = ["full_name", "name", "nome", "nome completo"];
