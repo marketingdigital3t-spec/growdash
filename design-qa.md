@@ -62,7 +62,7 @@
 - `npx tsc --noEmit`: aprovado
 - `npm run lint -- --quiet`: aprovado
 - `npm run build`: aprovado
-- Domínio principal retornou HTML 200 com `assets/app-Bp5Qkvd-.js` e `assets/index-CndQTfo4.css`.
+- Domínio principal retornou HTML 200 com `assets/app-DccJZzo0.js` e `assets/index-U_x13zdm.css`.
 - Screenshot live confirmou laterais diagonais retas, rails cromados e a base do funil; os dados visíveis permaneceram `4 negociações`, `Lead Novo 1`, `Sem contato 1` e `Venda Realizada 2`.
 
 ### Histórico de correções
