@@ -139,7 +139,7 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
                     );
                   })}
                 </TooltipProvider>
-                <div className="mt-0.5 h-2 w-12 rounded-b-md border-x border-b border-white/50 bg-gradient-to-r from-slate-500 via-slate-100 to-slate-600 shadow-[0_4px_8px_-5px_rgba(0,0,0,.9)]" aria-hidden="true" />
+                <div className="gd-funnel-stage-endcap mt-0.5 h-2 w-12 rounded-b-md" aria-hidden="true" />
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

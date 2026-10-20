@@ -7377,48 +7377,41 @@ html:not(.dark) .growdash-sidebar-tooltip {
   height: auto !important;
 }
 
-/* The RD funnel follows the reference's dark, brushed-metal silhouette while
-   keeping every stage interactive and data-driven. The visual treatment is
-   intentionally scoped to this component; the table and chart modes retain
-   the existing semantic colors and data contract. */
+/* Light, data-driven funnel visualization. The taper remains semantic while
+   the surface follows the active product theme instead of forcing black metal. */
 .gd-funnel-visual {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  border-color: rgba(174, 178, 184, .24) !important;
+  border-color: hsl(var(--border) / .72) !important;
   background:
-    radial-gradient(circle at 50% -12%, rgba(255,255,255,.14), transparent 32%),
-    radial-gradient(circle at 50% 110%, rgba(255,255,255,.08), transparent 30%),
-    linear-gradient(180deg, #17191c 0%, #090a0c 58%, #050506 100%) !important;
-  box-shadow: inset 0 1px rgba(255,255,255,.12), inset 0 -24px 48px rgba(0,0,0,.34), 0 18px 42px -34px rgba(0,0,0,.95);
+    radial-gradient(circle at 50% -20%, hsl(var(--primary) / .10), transparent 38%),
+    linear-gradient(180deg, hsl(var(--card)), hsl(var(--muted) / .28)) !important;
+  box-shadow: inset 0 1px hsl(var(--background) / .8), 0 12px 28px -24px hsl(var(--foreground) / .3);
 }
 .gd-funnel-visual::before {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 5px);
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / .06), transparent);
   content: "";
-  opacity: .28;
   pointer-events: none;
 }
-.gd-funnel-visual-stack { gap: 0 !important; padding-block: .8rem 1.15rem; }
+.gd-funnel-visual-stack { gap: .3rem !important; padding-block: .8rem 1.15rem; }
 .gd-funnel-stage {
   min-height: 68px;
-  --funnel-stage-text: #f4f5f6 !important;
-  border: 1px solid rgba(223, 225, 228, .68) !important;
-  border-radius: 0;
-  /* Straight 45-degree shoulders: the stage is wider at the top and narrows
-     by roughly its height at the bottom, matching the reference funnel. */
+  border: 1px solid color-mix(in srgb, var(--funnel-stage-accent) 48%, hsl(var(--border))) !important;
+  border-radius: .65rem;
+  /* Wide at the top, narrower at the bottom: a real funnel silhouette. */
   clip-path: polygon(0 0, 100% 0, calc(100% - 68px) 100%, 68px 100%);
   background:
-    linear-gradient(180deg, #f7f7f7 0%, #aeb1b5 4%, #55585c 11%, #111214 25%, #030304 67%, #27292c 86%, #b4b7bb 96%, #3d3f42 100%) !important;
-  color: #f4f5f6 !important;
+    linear-gradient(180deg, color-mix(in srgb, var(--funnel-stage-accent) 86%, white), var(--funnel-stage-accent)) !important;
+  color: var(--funnel-stage-text) !important;
   box-shadow:
-    0 16px 22px -17px rgba(0,0,0,.98),
-    inset 0 1px rgba(255,255,255,.76),
-    inset 0 8px 12px -10px rgba(255,255,255,.56),
-    inset 0 -9px 12px -10px rgba(0,0,0,.9) !important;
-  text-shadow: 0 1px 2px rgba(0,0,0,.75);
+    0 8px 14px -12px hsl(var(--foreground) / .45),
+    inset 0 1px hsl(var(--background) / .6),
+    inset 0 -8px 12px -12px hsl(var(--foreground) / .35) !important;
+  text-shadow: none;
 }
 .gd-funnel-stage::before {
   position: absolute;
@@ -7427,8 +7420,7 @@ html:not(.dark) .growdash-sidebar-tooltip {
   left: 0;
   height: 7px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.78) 18%, rgba(255,255,255,.18) 50%, rgba(255,255,255,.78) 82%, transparent);
-  box-shadow: 0 1px 2px rgba(0,0,0,.7);
+  background: linear-gradient(90deg, transparent, hsl(var(--background) / .62) 20%, transparent 80%);
   content: "";
   opacity: .86;
 }
@@ -7438,19 +7430,24 @@ html:not(.dark) .growdash-sidebar-tooltip {
   bottom: 0;
   left: 0;
   height: 9px;
-  border: 1px solid rgba(228, 230, 232, .54);
-  border-radius: 0;
-  background: linear-gradient(180deg, #d8dadd 0%, #5b5e62 35%, #0a0b0c 72%, #9b9ea2 100%);
-  box-shadow: inset 0 1px rgba(255,255,255,.72), 0 4px 7px rgba(0,0,0,.72);
+  border: 1px solid hsl(var(--background) / .45);
+  border-radius: 0 0 .35rem .35rem;
+  background: linear-gradient(180deg, hsl(var(--background) / .42), transparent);
+  box-shadow: inset 0 1px hsl(var(--background) / .62), 0 3px 7px hsl(var(--foreground) / .16);
   content: "";
-  opacity: .94;
+  opacity: .72;
 }
 .gd-funnel-stage-dot {
-  background: #d9dbde !important;
-  box-shadow: 0 0 0 2px rgba(0,0,0,.26), 0 0 9px rgba(255,255,255,.48) !important;
+  background: var(--funnel-stage-accent) !important;
+  box-shadow: 0 0 0 2px hsl(var(--background) / .5), 0 0 8px color-mix(in srgb, var(--funnel-stage-accent) 55%, transparent) !important;
 }
-.gd-funnel-stage:focus-visible { filter: drop-shadow(0 0 3px rgba(222,226,230,.9)) drop-shadow(0 0 1px rgba(222,226,230,.9)); box-shadow: inset 0 1px rgba(255,255,255,.76) !important; }
-.gd-funnel-stage:hover { filter: brightness(1.12) contrast(1.04); }
+.gd-funnel-stage:focus-visible { filter: drop-shadow(0 0 3px hsl(var(--ring) / .65)); }
+.gd-funnel-stage:hover { filter: brightness(1.04) saturate(1.06); }
+.gd-funnel-stage-endcap {
+  border: 1px solid hsl(var(--border) / .72);
+  background: linear-gradient(180deg, hsl(var(--muted)), hsl(var(--primary) / .35));
+  box-shadow: 0 4px 8px -5px hsl(var(--foreground) / .35);
+}
 @media (max-width: 640px) {
   .gd-funnel-stage { min-width: 0 !important; clip-path: polygon(0 0, 100% 0, calc(100% - 52px) 100%, 52px 100%); }
   .gd-funnel-stage .text-xl { font-size: 1.15rem; }
