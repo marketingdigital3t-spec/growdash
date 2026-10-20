@@ -88,16 +88,28 @@ const queryClient = new QueryClient({
 
 function LoadingModule() {
   const [slow, setSlow] = useState(false);
+  const [reloading, setReloading] = useState(false);
   useEffect(() => {
     const timeout = window.setTimeout(() => setSlow(true), 8000);
     return () => window.clearTimeout(timeout);
   }, []);
 
+  const reloadLatestBuild = () => {
+    setReloading(true);
+    // A stale tab can keep the previous HTML/chunk graph after a Pages
+    // deployment. Request the same route with a one-time cache key so the
+    // browser receives the current shell without losing the user's context.
+    window.location.replace(latestBuildRecoveryUrl(window.location.href));
+  };
+
   return <div className="grid min-h-[40vh] place-items-center px-4 text-center" role="status" aria-live="polite">
     {slow ? <div className="max-w-sm rounded-2xl border border-border bg-card/80 p-6 shadow-xl">
       <p className="font-bold">A Growdash está demorando para responder.</p>
-      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. A página não será recarregada automaticamente.</p>
-      <button type="button" onClick={() => window.location.assign("/auth")} className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90">Abrir acesso</button>
+      <p className="mt-2 text-sm text-muted-foreground">A conexão ou uma atualização foi interrompida. Sua sessão não foi removida.</p>
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        <button type="button" onClick={reloadLatestBuild} disabled={reloading} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70">{reloading ? "Atualizando…" : "Atualizar aplicação"}</button>
+        <button type="button" onClick={() => window.location.assign("/auth")} className="rounded-lg border border-border bg-background px-4 py-2 text-sm font-bold transition hover:bg-muted">Abrir acesso</button>
+      </div>
     </div> : <div className="h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-label="Carregando" />}
   </div>;
 }
