@@ -111,8 +111,12 @@ export function usePermissions() {
 
   const workspaceRole = workspace?.role ?? null;
   const canAdmin = isMaster || workspaceRole === "owner" || workspaceRole === "admin";
-  const canEdit = canAdmin || workspaceRole === "analyst" || workspaceRole === "financial";
   const configuredAccessRole = data?.perm?.access_role as "admin" | "editor" | "viewer" | "financial" | "analyst" | undefined;
+  // `editor` is the user-facing access profile. Older memberships may still
+  // carry the structural `member` role, so mutation UI must not infer
+  // read-only access from that structural value alone.
+  const isEditorProfile = configuredAccessRole === "editor" || (!configuredAccessRole && workspaceRole === "analyst");
+  const canEdit = canAdmin || isEditorProfile || workspaceRole === "financial";
   const accessRole = canAdmin ? "admin" : configuredAccessRole ?? (canEdit ? "editor" : "viewer");
 
   // A missing permission record is not authority. Keep owners/admins working,
@@ -133,7 +137,7 @@ export function usePermissions() {
   // Page visibility and mutation authority are separate contracts. An
   // Editor must have the Datas & Turmas page enabled; Analyst, Financial and
   // Viewer profiles remain read-only even if they can open the page.
-  const canManageClasses = canAdmin || (configuredAccessRole === "editor" && canClasses);
+  const canManageClasses = canAdmin || (isEditorProfile && canClasses);
 
   return {
     // Owners/admins already have authority through the workspace membership;
