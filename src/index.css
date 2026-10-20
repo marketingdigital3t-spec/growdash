@@ -13508,3 +13508,29 @@ html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .d
   border-color: var(--gd-border) !important;
   background: var(--gd-surface-card) !important;
 }
+
+/* Light traffic table authority: sticky cells inherit legacy `bg-card`
+   utilities and can stay charcoal after switching themes. Rebind both the
+   fixed and scrolling cells to the light surface without touching table
+   geometry or the page/rail scroll model. */
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.sticky,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-name-cell,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-status-cell,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td.campaign-check-cell {
+  background: #ffffff !important;
+  color: #1c1e21 !important;
+  border-color: #e4e7ec !important;
+}
+
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td.sticky,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(even) > td.campaign-name-cell {
+  background: #f7f8fa !important;
+}
+
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:hover > td,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:hover > td.sticky,
+html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:hover > td.campaign-name-cell {
+  background: #eef3f8 !important;
+}
