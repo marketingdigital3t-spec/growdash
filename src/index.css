@@ -13534,3 +13534,20 @@ html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data
 html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:hover > td.campaign-name-cell {
   background: #eef3f8 !important;
 }
+
+/* Dashboard summary readability: keep the eight compact metrics scannable
+   without ellipses when a source is still synchronizing. Numeric values keep
+   their hierarchy, while long labels/statuses may wrap inside their card. */
+.brand-shell .dashboard-page .dashboard-summary-strip .gd-glass-metric .gd-label {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  line-height: 1.15 !important;
+}
+
+.brand-shell .dashboard-page .dashboard-summary-strip .gd-glass-metric p[title="Aguardando sincronização"],
+.brand-shell .dashboard-page .dashboard-summary-strip .gd-glass-metric p[title="Indisponível"] {
+  font-size: clamp(.78rem, 1vw, 1.05rem) !important;
+  line-height: 1.1 !important;
+  white-space: normal !important;
+}
