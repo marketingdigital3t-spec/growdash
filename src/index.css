@@ -13345,3 +13345,166 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr:nth-child(odd) > td.campaign-name-cell {
   background: var(--traffic-surface-dark) !important;
 }
+
+/* -------------------------------------------------------------------------
+   Growdash visual contract (final authenticated layer)
+
+   The stylesheet contains several historical theme phases. This final,
+   deliberately small layer binds authenticated surfaces to the semantic
+   tokens in tokens.css so later phase rules cannot bring back bright white
+   dividers, blue-marinho panels or oversized glass effects.
+   ------------------------------------------------------------------------- */
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *) {
+  border: 1px solid var(--gd-border) !important;
+  border-radius: var(--gd-radius-card) !important;
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+}
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *)::before,
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *)::after {
+  display: none !important;
+}
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *) :is(.border-border, [class*="border-white"], [class*="border-slate-"]) {
+  border-color: var(--gd-border-subtle) !important;
+}
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *) :is(.text-white, .text-slate-100, .text-slate-200) {
+  color: var(--gd-content) !important;
+}
+
+.brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *) :is(.text-slate-400, .text-slate-500, .text-muted-foreground) {
+  color: var(--gd-content-muted) !important;
+}
+
+.brand-shell :is(.gd-metric-card, .dashboard-glass-card) :is(.bg-white\/\[\.045\], .bg-white\/\[\.035\], .bg-black\/20, .bg-black\/15) {
+  background: var(--gd-surface-raised) !important;
+}
+
+.brand-shell .gd-metric-card,
+.brand-shell .gd-metric-card-content {
+  min-height: 108px !important;
+}
+
+.brand-shell .gd-metric-card-content {
+  padding: 16px 18px !important;
+}
+
+.brand-shell .gd-metric-card .gd-metric-icon,
+.brand-shell .gd-glass-metric-icon {
+  border: 1px solid var(--gd-border-subtle) !important;
+  background: var(--gd-surface-raised) !important;
+  color: var(--gd-content-muted) !important;
+  box-shadow: none !important;
+}
+
+.brand-shell .expert-dashboard .expert-kpi-grid {
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+}
+
+.brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card,
+.brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  height: 112px !important;
+  min-height: 112px !important;
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .brand-shell .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  .brand-shell .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+.brand-shell .expert-dashboard .expert-dashboard-tabs {
+  border: 1px solid var(--gd-border-subtle) !important;
+  border-radius: var(--gd-radius-control) !important;
+  background: var(--gd-surface-raised) !important;
+  padding: 4px !important;
+}
+
+.brand-shell .expert-dashboard .expert-dashboard-tabs > button[aria-selected="true"] {
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .10) !important;
+}
+
+/* Commercial ranking: keep gold for emphasis, not as a competing panel
+   surface. This also neutralises the legacy navy gradient in dark mode. */
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) {
+  border-color: var(--gd-border) !important;
+  background: var(--gd-surface-card) !important;
+  color: var(--gd-content) !important;
+}
+
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) > .pointer-events-none {
+  display: none !important;
+}
+
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) .rounded-2xl,
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) .rounded-xl,
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) .rounded-lg {
+  border-color: var(--gd-border-subtle) !important;
+  background: var(--gd-surface-raised) !important;
+}
+
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) :is(.text-white, .text-slate-100, .text-slate-200) {
+  color: var(--gd-content) !important;
+}
+
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) :is(.text-slate-400, .text-slate-500) {
+  color: var(--gd-content-muted) !important;
+}
+
+.commercial-ranking-shell .commercial-ranking-control,
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) select {
+  border-color: var(--gd-border-subtle) !important;
+  background: var(--gd-surface-control) !important;
+  color: var(--gd-content) !important;
+}
+
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) [class*="border-white"],
+.commercial-ranking-shell :is(section[role="dialog"], section.isolate) [class*="border-[#d9a928]"] {
+  border-color: var(--gd-border-subtle) !important;
+}
+
+.brand-shell:has(.traffic-page-shell) .traffic-page-content :is(.gd-panel, .traffic-comparison-shell, .traffic-comparison-metric) {
+  border-color: var(--gd-border) !important;
+  background: var(--gd-surface-card) !important;
+  box-shadow: var(--gd-shadow-card) !important;
+}
+
+.brand-shell:has(.traffic-page-shell) .traffic-page-content :is(.border-white, [class*="border-white\/"], [class*="border-slate-"]) {
+  border-color: var(--gd-border-subtle) !important;
+}
+
+.brand-shell:has(.traffic-page-shell) .traffic-nav-item.traffic-area-tab-active {
+  border-color: var(--gd-border-focus) !important;
+  background: color-mix(in srgb, hsl(var(--primary)) 12%, var(--gd-surface-raised)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* Active status switches use a black thumb in dark mode, including the
+   Meta-style campaign table switch and Radix switches used in settings. */
+html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] > span,
+html.dark .brand-shell [role="switch"][data-state="checked"] > span,
+html.dark .brand-shell button[data-state="checked"] > span {
+  background: var(--gd-control-active-thumb) !important;
+}
+
+html.dark .brand-shell .campaign-row-toggle[class*="bg-[#f3f4f6]"] {
+  border-color: var(--gd-border-focus) !important;
+  background: hsl(var(--primary)) !important;
+}
+
+html.dark .brand-shell :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-widget-shell > *) {
+  border-color: var(--gd-border) !important;
+  background: var(--gd-surface-card) !important;
+}

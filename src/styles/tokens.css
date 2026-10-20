@@ -27,6 +27,22 @@
   --gd-radius-pill: 999px;
   --gd-radius-modal: 20px;
 
+  /* Shared authenticated-surface contract. Keep these semantic aliases
+   * independent from the legacy accent/phase variables so a theme change
+   * cannot reintroduce bright white dividers or blue/gold surfaces. */
+  --gd-surface-page: #f7f8fa;
+  --gd-surface-card: #ffffff;
+  --gd-surface-raised: #f1f3f5;
+  --gd-surface-control: #ffffff;
+  --gd-border: rgba(15, 23, 42, .12);
+  --gd-border-subtle: rgba(15, 23, 42, .08);
+  --gd-border-focus: rgba(37, 99, 235, .42);
+  --gd-content: #172033;
+  --gd-content-muted: #667085;
+  --gd-content-faint: #8a94a6;
+  --gd-shadow-card: 0 10px 30px rgba(15, 23, 42, .08);
+  --gd-control-active-thumb: #ffffff;
+
   --gd-elevation-0: 0 0 0 1px hsl(var(--border));
   --gd-elevation-1: 0 2px 8px rgba(0, 0, 0, .14);
   --gd-elevation-2: 0 12px 40px rgba(0, 0, 0, .28);
@@ -45,6 +61,21 @@
   --gd-status-initial: #3498db;
   --gd-status-healthy: #2ecc71;
   --gd-status-inactive: #95a5a6;
+}
+
+html.dark {
+  --gd-surface-page: #0f1115;
+  --gd-surface-card: #151922;
+  --gd-surface-raised: #1b202a;
+  --gd-surface-control: #171c25;
+  --gd-border: rgba(255, 255, 255, .10);
+  --gd-border-subtle: rgba(255, 255, 255, .06);
+  --gd-border-focus: rgba(148, 163, 184, .46);
+  --gd-content: #f2f4f7;
+  --gd-content-muted: #a1aab8;
+  --gd-content-faint: #7d8796;
+  --gd-shadow-card: 0 14px 34px rgba(0, 0, 0, .28);
+  --gd-control-active-thumb: #050505;
 }
 
 /* Keep the focus treatment available to every primitive introduced later. */
