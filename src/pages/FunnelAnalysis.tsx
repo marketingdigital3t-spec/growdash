@@ -3,7 +3,7 @@ import { differenceInCalendarDays, format, subDays } from "date-fns";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDDeals, useRDClosedDeals, useFunnelStagesForIds, useRDDealStageHistory, computeFunnelAnalytics, rdDealWonDate } from "@/hooks/useRDDeals";
-import { useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
+import { useRDWonDealsForPeriod, type RDDealLite } from "@/hooks/useRDDealsForPeriod";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { MotionPage, MotionItem } from "@/components/motion/MotionContainer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,6 +46,7 @@ import { AskAICard } from "@/components/dashboard/AskAICard";
 import { FunnelAudienceProfile } from "@/components/funnel-analysis/FunnelAudienceProfile";
 import { FunnelOpportunityProfile } from "@/components/funnel-analysis/FunnelOpportunityProfile";
 import { analyticsScopeFingerprint, type AnalyticsScope } from "@/lib/analyticsScope";
+import { mergeRDPeriodDeals } from "@/lib/rdPeriodScope";
 
 const blockHelp = {
   media: ["Meta Ads × RD Station", "Compara investimento e resultados da Meta com os leads e vendas encontrados no RD Station para a mesma seleção.", "Use a cobertura para identificar diferenças de atribuição, UTMs ou sincronização entre as fontes."],
@@ -315,11 +316,10 @@ export default function FunnelAnalysis() {
   )), [periodClosedDeals, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState]);
   const operationalClosedDeals = useMemo(() => filterOperationalRDDeals(closedDeals, activeFunnels), [activeFunnels, closedDeals]);
   const operationalPeriodClosedDeals = useMemo(() => filterOperationalRDDeals(filteredPeriodClosedDeals, activeFunnels), [activeFunnels, filteredPeriodClosedDeals]);
-  const operationalPeriodFunnelDeals = useMemo(() => {
-    const byId = new Map<string, (typeof operationalPeriodDeals)[number]>();
-    for (const deal of [...operationalPeriodDeals, ...operationalPeriodClosedDeals]) byId.set(deal.rd_deal_id, deal);
-    return Array.from(byId.values());
-  }, [operationalPeriodClosedDeals, operationalPeriodDeals]);
+  const operationalPeriodFunnelDeals = useMemo(
+    () => mergeRDPeriodDeals(operationalPeriodDeals, operationalPeriodClosedDeals),
+    [operationalPeriodClosedDeals, operationalPeriodDeals],
+  );
   const operationalStages = useMemo(() => filterOperationalRDFunnelStages(stages, activeFunnels), [activeFunnels, stages]);
   const excludedDealIds = useMemo(() => excludedOperationalRDDealIds(deals, activeFunnels), [activeFunnels, deals]);
 
@@ -340,8 +340,11 @@ export default function FunnelAnalysis() {
 
   const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
-    () => computeFunnelAnalytics(operationalPeriodDeals, operationalStages, operationalPeriodClosedDeals, { startDate, endDate }, stageHistory),
-    [endDate, operationalPeriodClosedDeals, operationalPeriodDeals, operationalStages, stageHistory, startDate],
+    // O recorte de leads usa a data de entrada, mas uma venda pertence ao dia
+    // em que foi fechada. Incluímos a união deduplicada para que uma venda de
+    // lead antigo não desapareça da etapa "Venda Realizada".
+    () => computeFunnelAnalytics(operationalPeriodFunnelDeals, operationalStages, operationalPeriodClosedDeals as unknown as typeof operationalPeriodDeals, { startDate, endDate }, stageHistory),
+    [endDate, operationalPeriodClosedDeals, operationalPeriodFunnelDeals, operationalStages, stageHistory, startDate],
   );
   // RD é a fonte canônica do funil: vendas, receita, etapas e evolução usam
   // o mesmo snapshot de negócios ganhos. A tabela `sales` fica restrita à
@@ -579,7 +582,7 @@ export default function FunnelAnalysis() {
         metaResult = { status: "rejected", reason };
       }
 
-      const rdResults = await Promise.all(funnelsToSync.map(async (funnel): PromiseSettledResult<unknown> => {
+      const rdResults = await Promise.all(funnelsToSync.map(async (funnel): Promise<PromiseSettledResult<unknown>> => {
         try {
           const syncBody = {
             funnel_id: funnel.id,
@@ -758,7 +761,7 @@ export default function FunnelAnalysis() {
                       ? "A distribuição usa as etapas salvas nas negociações; o histórico de movimentações entre etapas continua indisponível. O período acima continua sendo usado para comparar a mídia Meta."
                     : rdPeriodError
                       ? `${rdPeriodErrorMessage || "A consulta expirou ou a sincronização está incompleta."} O snapshot anterior foi preservado; não exibiremos zero como se fosse ausência de negociações.`
-                      : "O período acima filtra os dados de CRM pela data de criação e compara a mídia Meta no mesmo intervalo."}
+                      : "O período acima usa a data de entrada para leads e a data de fechamento para vendas, comparando a mídia Meta no mesmo intervalo."}
                   </p>
                 </div>
                 <Button onClick={handleSync} disabled={syncing || (!funnelId && visibleAccounts.length === 0)} size="sm" variant="outline" className="shrink-0">
@@ -823,7 +826,7 @@ export default function FunnelAnalysis() {
 
           <MotionItem>
             <div className="gd-aligned-grid grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-              <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals} /></HelpBlock>
+              <HelpBlock help={["Mapa de calor de conversão", "Cruza o dia da semana e a faixa de horário do fechamento para revelar o melhor momento de conversão."]} className="h-auto min-w-0"><FunnelConversionHeatmap closedDeals={operationalPeriodClosedDeals as unknown as typeof operationalPeriodDeals} /></HelpBlock>
               <HelpBlock help={blockHelp.attribution} className="h-auto min-w-0"><FunnelSalesAttribution sales={periodFunnelSales} deals={operationalPeriodFunnelDeals} insights={[...scopedInsights, ...hierarchyRows]} /></HelpBlock>
             </div>
           </MotionItem>
@@ -840,11 +843,12 @@ export default function FunnelAnalysis() {
                 adAccountId: effectiveAdAccountId,
                 insights: funnelTableInsights,
                 sales: periodFunnelSales,
-                rdDeals: operationalPeriodDeals,
-                revenueDeals: operationalPeriodDeals,
+                rdDeals: operationalPeriodFunnelDeals as unknown as RDDealLite[],
+                revenueDeals: operationalPeriodFunnelDeals as unknown as RDDealLite[],
                 alerts: [],
                 campaigns: visibleCampaignRows,
                 adAccounts: visibleAccounts,
+                products: [],
                 isLoading: loadingInsights || funnelMeta.isLoading,
               }}>
                 <div className="space-y-6">

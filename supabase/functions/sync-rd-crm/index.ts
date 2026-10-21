@@ -115,6 +115,17 @@ Deno.serve(async (req) => {
       }),
     });
     const result = await response.json().catch(() => ({}));
+    // RD retries a webhook when it receives a non-2xx response. A duplicate
+    // execution is expected while the per-funnel sync lock is held; accepting
+    // it here prevents a retry storm without pretending that this event was
+    // written twice.
+    if (response.status === 409 && result?.status === "already_running") {
+      await admin.from("rd_account_connections").update({
+        last_error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", connection.id);
+      return json({ ok: true, status: "already_running", run_id: result.run_id || null });
+    }
     if (!response.ok) {
       console.error("rd webhook sync failed", response.status, result);
       await admin.from("rd_account_connections").update({ last_error: `Falha ao atualizar negócio recebido pelo RD (HTTP ${response.status}).`, updated_at: new Date().toISOString() }).eq("id", connection.id);

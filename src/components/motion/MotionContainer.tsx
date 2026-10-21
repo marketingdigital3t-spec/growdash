@@ -27,6 +27,7 @@ const itemVariants = {
 interface MotionContainerProps {
   children: ReactNode;
   className?: string;
+  role?: string;
   "data-scroll-mode"?: "locked" | "content";
 }
 
@@ -46,9 +47,9 @@ export function MotionPage({ children, className, "data-scroll-mode": dataScroll
 }
 
 /** Each direct child item that should animate in sequence */
-export function MotionItem({ children, className }: MotionContainerProps) {
+export function MotionItem({ children, className, role }: MotionContainerProps) {
   return (
-    <motion.div variants={itemVariants} className={className}>
+    <motion.div variants={itemVariants} className={className} role={role}>
       {children}
     </motion.div>
   );

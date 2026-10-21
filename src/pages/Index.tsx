@@ -86,13 +86,20 @@ const Index = () => {
   // o usuário marca/desmarca campanhas, para que o popover continue listando todas.
   // O filtro por campanha é aplicado em memória porque este universo completo já é
   // obrigatório para o seletor; assim evitamos uma segunda consulta idêntica ao banco.
+  // Never start the legacy catalog-wide Insights query while the account
+  // scope is still resolving. That request is both much larger and capable of
+  // returning an empty catalog when RLS/account metadata is still pending,
+  // which made the dashboard show zero while Análise de Funis already had a
+  // valid account snapshot. The visible account list is the authoritative
+  // consolidated scope when the user has not selected a single account.
+  const insightsAccountIds = selectedAccountIds.length ? selectedAccountIds : scopedAccountIds;
   const { data: allInsights = [], isLoading } = useInsights({
-    adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
-    adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
+    adAccountId: insightsAccountIds.length === 1 ? insightsAccountIds[0] : undefined,
+    adAccountIds: insightsAccountIds.length > 1 ? insightsAccountIds : undefined,
     attributionWindowsByAccount: Object.fromEntries(visibleAccounts.map((account) => [account.id, account.attribution_window || "account_default"])),
     startDate,
     endDate,
-    enabled: true,
+    enabled: !loadingAdAccounts && insightsAccountIds.length > 0,
   });
   const dashboardMeta = useMetaTrafficMetrics({
     adAccountIds: selectedAccountIds.length ? selectedAccountIds : scopedAccountIds,
@@ -111,14 +118,14 @@ const Index = () => {
   // e vendas pelo momento do fechamento. A leitura de vendas é explícita para
   // não depender do carregamento completo do Kanban e não misturar registros
   // financeiros extras ao total de negócios ganhos.
-  const { data: rdDeals = [] } = useRDDealsForPeriod({
+  const { data: rdDeals = [], isError: rdDealsError, error: rdDealsQueryError, refetch: refetchRDDeals } = useRDDealsForPeriod({
     startDate,
     endDate,
     adAccountIds: scopedAccountIds,
     funnelIds: scopedRDfunnelIds,
     enabled: isRDScopeReady,
   });
-  const { data: rdWonDeals = [] } = useRDWonDealsForPeriod({
+  const { data: rdWonDeals = [], isError: rdWonDealsError, refetch: refetchRDWonDeals } = useRDWonDealsForPeriod({
     startDate,
     endDate,
     adAccountIds: scopedAccountIds,
@@ -143,7 +150,7 @@ const Index = () => {
   }, [endDate, scopedAccountIds, scopedRDfunnelIds, selectedAccountIds, selectedCampaignIds, startDate, visibleAccounts]);
   const dashboardScopeKey = useMemo(() => analyticsScopeFingerprint(dashboardAnalyticsScope), [dashboardAnalyticsScope]);
 
-  const { data: activeView } = useGlobalView();
+  const { data: activeView, isError: dashboardViewError, refetch: refetchDashboardView } = useGlobalView();
   const { canEdit: canEditWorkspace } = usePermissions();
   const saveView = useSaveView();
   const canEditDashboard = Boolean(
@@ -220,6 +227,19 @@ const Index = () => {
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;
   const glassRoas = glassSpend > 0 ? glassSales.totalNet / glassSpend : 0;
+  // A confirmed Insights snapshot and the lead/action watermark are separate
+  // provider blocks. Keep spend visible while actions are still reconciling,
+  // but never render a missing lead block as a legitimate zero.
+  const glassMetaAvailability = useMemo(() => {
+    const leadAvailable = dashboardMeta.data.metricAvailability.leads?.available === true;
+    return {
+      spend: hasMetaSnapshot,
+      leads: leadAvailable,
+      conversations: leadAvailable,
+      cpl: leadAvailable,
+      roas: hasMetaSnapshot,
+    };
+  }, [dashboardMeta.data.metricAvailability.leads, hasMetaSnapshot]);
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
 
@@ -366,8 +386,19 @@ const Index = () => {
         </div>
       </MotionItem>
 
+      {dashboardViewError && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300" role="status">
+        <span className="min-w-0 grow">Não foi possível carregar sua visualização salva. O layout padrão continua disponível e seus dados permanecem isolados.</span>
+        <button type="button" className="font-bold underline underline-offset-2" onClick={() => void refetchDashboardView()}>Tentar novamente</button>
+      </div>}
+
+      {(rdDealsError || rdWonDealsError) && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300" role="status">
+        <span className="min-w-0 grow">Não foi possível consultar o RD Station para o período selecionado. Os valores do RD não foram convertidos em zero.</span>
+        <span className="max-w-full truncate text-[10px]" title={rdDealsQueryError instanceof Error ? rdDealsQueryError.message : undefined}>{rdDealsQueryError instanceof Error ? rdDealsQueryError.message : "Backend RD temporariamente indisponível."}</span>
+        <button type="button" className="font-bold underline underline-offset-2" onClick={() => { void refetchRDDeals(); void refetchRDWonDeals(); }}>Tentar novamente</button>
+      </div>}
+
       <div>
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot && !dashboardMeta.isLoading} unavailableReason={dashboardMeta.data.unavailableReason} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} metricAvailability={glassMetaAvailability} unavailableReason={dashboardMeta.data.unavailableReason} />
       </div>
 
       <div>

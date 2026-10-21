@@ -21,12 +21,12 @@ export type RDAccountConnection = {
   updated_at: string;
 };
 
-export function useRDAccountConnections(workspaceId?: string) {
+export function useRDAccountConnections(workspaceId?: string, options?: { enabled?: boolean }) {
   const { user } = useAuth();
   const cacheKey = user?.id ? `growdash:rd-connections:${user.id}:${workspaceId ?? "owner-only"}` : "";
   return useQuery<RDAccountConnection[]>({
     queryKey: ["rd_account_connections", user?.id, workspaceId ?? "owner-only"],
-    enabled: !!user,
+    enabled: (options?.enabled ?? true) && !!user,
     retry: 1,
     retryDelay: 1_000,
     refetchOnWindowFocus: false,

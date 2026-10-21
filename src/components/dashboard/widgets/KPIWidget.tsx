@@ -5,7 +5,7 @@ import { METRIC_LABELS, type WidgetConfig, type WidgetMetric } from "@/lib/widge
 import { Activity } from "lucide-react";
 
 export function KPIWidget({ title, config }: { title: string; config: WidgetConfig }) {
-  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, metricOverrides } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, metricOverrides, revenueUnavailableReason } = useDashboard();
   const metric = (config.metric ?? "leads") as WidgetMetric;
   const k = computeKpi(metric, insights, sales, revenueDeals, leadBreakdown);
   if (metricOverrides?.[metric] !== undefined) k.value = metricOverrides[metric]!;
@@ -21,6 +21,7 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
   const leadTooltip = includesConversationLeads && leadBreakdown
     ? `Forms: ${leadBreakdown.forms} · Site: ${leadBreakdown.site} · Conversas iniciadas: ${leadBreakdown.conversations} · Total: ${leadBreakdown.total}`
     : undefined;
+  const revenueMetric = ["revenue_net", "revenue_gross", "sales_count", "roas", "roi", "profit", "profit_margin", "receivables", "average_ticket"].includes(metric);
   return (
     <div className="h-full min-w-0">
       <MetricCard
@@ -31,6 +32,7 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
         decimals={k.decimals}
         icon={<Activity className="h-4 w-4" />}
         tooltip={leadTooltip}
+        unavailableReason={revenueMetric ? revenueUnavailableReason : null}
       />
     </div>
   );

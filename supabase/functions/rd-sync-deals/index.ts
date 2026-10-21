@@ -4,6 +4,7 @@ import { stagesFromRDDealSnapshot } from "../_shared/rdStageSnapshot.ts";
 import {
   buildPendingRDSyncCursors,
   shouldHydrateRDAnalyticsDeal,
+  shouldHydrateRDAnalyticsItem,
 } from "../_shared/rdSyncCursor.ts";
 import { rdDealStageId, rdDealStageName } from "../_shared/rdDealStage.ts";
 
@@ -589,6 +590,12 @@ Deno.serve(async (req) => {
       skip_enrichment = false,
       trigger_source,
     } = body || {};
+    // The integrations and background paths are bounded snapshots. Treat
+    // their trigger explicitly as realtime even when an older caller omitted
+    // the boolean flag, otherwise the function walks the complete RD archive
+    // and hydrates every row before returning to the UI.
+    const boundedRealtime = realtime === true || ["auto_realtime", "integrations_realtime"].includes(String(trigger_source || ""));
+    const effectiveSkipEnrichment = skip_enrichment === true || boundedRealtime;
     let deal_ids = body?.deal_ids;
     if (!funnel_id) {
       return new Response(JSON.stringify({ error: "funnel_id obrigatório" }), {
@@ -746,7 +753,7 @@ Deno.serve(async (req) => {
         status: "running",
         trigger_source: isReprocess
           ? "reprocess"
-          : trigger_source || (realtime ? "auto_realtime" : "manual"),
+          : trigger_source || (boundedRealtime ? "auto_realtime" : "manual"),
       })
       .select("id")
       .single();
@@ -1196,7 +1203,7 @@ Deno.serve(async (req) => {
       // Nunca use "agora" como data de uma venda histórica. O fechamento é
       // a fonte oficial; os fallbacks preservam a data original do negócio.
       const saleTimestamp =
-        d.closed_at || d.updated_at || d.last_activity_at || d.created_at || new Date().toISOString();
+        d.closed_at || d.stage_updated_at || d.updated_at || d.last_activity_at || d.created_at || new Date().toISOString();
       const saleDate = toBrtDateString(saleTimestamp);
 
       let productId: string | null = null;
@@ -1304,7 +1311,7 @@ Deno.serve(async (req) => {
             lead_state: contactState,
             lead_city: contactCity,
             lead_created_at: d.created_at || null,
-            stage_updated_at: d.updated_at || d.last_activity_at || null,
+            stage_updated_at: d.stage_updated_at || d.updated_at || d.last_activity_at || null,
             closed_at: d.closed_at || null,
             raw: d,
             custom_fields: customFields,
@@ -1335,6 +1342,7 @@ Deno.serve(async (req) => {
         .select(
           "id, payment_method, payment_method_source, notes, lead_state, lead_city, utm_source, utm_medium, utm_campaign, utm_term, utm_content, ad_id, contact_name, contact_phone, contact_email, lead_entry_date, campaign_ids, matched_campaign_id, match_method, manual_override",
         )
+        .eq("user_id", userId!)
         .eq("rd_deal_id", rdDealId)
         .maybeSingle();
       if (existingSalesError) throw existingSalesError;
@@ -1400,7 +1408,7 @@ Deno.serve(async (req) => {
           update.payment_method = rdPayment;
           update.payment_method_source = "rd";
         }
-        const { error: salesUpdateError } = await admin.from("sales").update(update).eq("rd_deal_id", rdDealId);
+        const { error: salesUpdateError } = await admin.from("sales").update(update).eq("user_id", userId!).eq("rd_deal_id", rdDealId);
         if (salesUpdateError) throw salesUpdateError;
         totalUpdated++;
       } else {
@@ -1435,11 +1443,12 @@ Deno.serve(async (req) => {
       // CRM record. The rd_deals trigger then propagates the same amount to
       // canonical sales, which is what Comercial displays.
       const hydratedItems: any[] = [];
-      if (shouldHydrateRDAnalyticsDeal({
-        analyticsMode: analytics_mode,
-        skipEnrichment: skip_enrichment,
-        fullHistoryRequested,
-      })) {
+      if (analytics_mode && !fullHistoryRequested) {
+        const hydrateByDefault = shouldHydrateRDAnalyticsDeal({
+          analyticsMode: analytics_mode,
+          skipEnrichment: effectiveSkipEnrichment,
+          fullHistoryRequested,
+        });
         // Reuse complete local profiles in incremental cycles. Only new or
         // incomplete deals call the RD detail/contact endpoints.
         const existingProfiles = new Map<string, any>();
@@ -1464,12 +1473,22 @@ Deno.serve(async (req) => {
             // whole run before the remaining pages were persisted. Changed
             // rows (or incomplete local profiles) still go through the detail
             // endpoint; unchanged rows are reconciled by identity below.
-            return complete ? { ...item, _storedProfile: profile } : processDeal(item);
+            const stageId = rdDealStageId(item);
+            const likelyWon = Boolean(stageId && stageWonMap.get(stageId)) || isWonDeal(item);
+            const needsAuthoritativeClose = shouldHydrateRDAnalyticsItem({
+              analyticsMode: analytics_mode,
+              skipEnrichment: effectiveSkipEnrichment,
+              fullHistoryRequested,
+              likelyWon,
+              hasClosedAt: Boolean(item?.closed_at),
+            });
+            const shouldHydrate = hydrateByDefault || needsAuthoritativeClose;
+            return complete && !shouldHydrate ? { ...item, _storedProfile: profile } : shouldHydrate ? processDeal(item) : { ...item, _storedProfile: profile };
           }));
           hydratedItems.push(...resolved);
           if (index + HYDRATION_BATCH_SIZE < items.length) await sleep(120);
         }
-      } else if (refresh_amounts && !skip_enrichment) {
+      } else if (refresh_amounts && !effectiveSkipEnrichment) {
         const HYDRATION_BATCH_SIZE = 4;
         for (let index = 0; index < items.length; index += HYDRATION_BATCH_SIZE) {
           const batch = items.slice(index, index + HYDRATION_BATCH_SIZE);
@@ -1599,7 +1618,7 @@ Deno.serve(async (req) => {
           win: won,
           amount_total: parseFloat(d.amount_total || d.amount || "0") || 0,
           lead_created_at: d.created_at || null,
-          stage_updated_at: d.updated_at || d.stage_updated_at || null,
+          stage_updated_at: d.stage_updated_at || d.updated_at || null,
           closed_at: d.closed_at || null,
           contact_email: contactEmail,
           contact_phone: contactPhone,
@@ -1683,17 +1702,17 @@ Deno.serve(async (req) => {
         // budget even when triggered by the near-realtime orchestrator;
         // limiting it to one page silently dropped older deals in every
         // funnel as soon as a pipeline exceeded 200 records.
-        : analytics_mode
-          ? (Number.isFinite(requestedPages) && requestedPages > 0 ? requestedPages : Number.POSITIVE_INFINITY)
-          : realtime
-            ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
+        : boundedRealtime
+          ? Math.max(1, Math.min(Number.isFinite(requestedPages) ? requestedPages : 1, 3))
+          : analytics_mode
+            ? (Number.isFinite(requestedPages) && requestedPages > 0 ? requestedPages : Number.POSITIVE_INFINITY)
             : 50;
       const startMs = start_date ? new Date(`${start_date}T00:00:00-03:00`).getTime() : null;
       const endMs = end_date ? new Date(`${end_date}T23:59:59.999-03:00`).getTime() : null;
       // A full-history reconciliation must drain every RD page. The API itself
       // is the boundary; an arbitrary page/deal ceiling silently loses leads.
       const maxAnalyticsDeals = analytics_mode
-        ? Number.POSITIVE_INFINITY
+        ? (boundedRealtime ? Math.max(1, Math.min(Number(max_deals) || 60, 200)) : Number.POSITIVE_INFINITY)
         : Math.max(1, Math.min(Number(max_deals) || 10_000, 10_000));
       const periodParams =
         analytics_mode && !fullHistoryRequested && start_date && end_date
@@ -1780,6 +1799,11 @@ Deno.serve(async (req) => {
           // large for the gateway. Cursors keep the remaining segments for
           // the next invocation.
           if (analytics_mode && Number.isFinite(requestedPages) && requestedPages > 0 && pagesProcessed >= requestedPages) {
+            analyticsRangeComplete = false;
+            await persistPendingCursors(segmentIndex, page);
+            break segmentLoop;
+          }
+          if (analytics_mode && Number.isFinite(maxAnalyticsDeals) && totalDeals >= maxAnalyticsDeals) {
             analyticsRangeComplete = false;
             await persistPendingCursors(segmentIndex, page);
             break segmentLoop;
@@ -1972,7 +1996,7 @@ Deno.serve(async (req) => {
           }
 
           const realtimeLimit = Math.max(1, Math.min(Number(max_deals) || 60, 200));
-          const dealsToProcess = realtime
+          const dealsToProcess = boundedRealtime
             ? deals.slice(0, Math.max(0, realtimeLimit - totalDeals))
             : deals;
           totalDeals += dealsToProcess.length;
@@ -1984,7 +2008,7 @@ Deno.serve(async (req) => {
             await sleep(BATCH_PAUSE_MS);
           }
 
-          if (deals.length < 200 || (realtime && totalDeals >= realtimeLimit)) break;
+          if (deals.length < 200 || (boundedRealtime && totalDeals >= realtimeLimit)) break;
           page++;
         }
 

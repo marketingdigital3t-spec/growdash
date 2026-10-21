@@ -12,9 +12,11 @@ import { useRDDealsForPeriod, useRDWonDealsForPeriod } from "@/hooks/useRDDealsF
 import { DashboardWidgetHelp } from "@/components/dashboard/DashboardWidgetHelp";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { getExpertDashboardMetrics } from "@/lib/expertDashboardMetrics";
+import { mergeCanonicalExpertSales } from "@/lib/expertRevenueSales";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { ExpertOperationsView } from "@/components/expert/ExpertOperationsView";
+import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
 
 
 function expertGreeting(name: string) {
@@ -58,9 +60,12 @@ export default function ExpertDashboard() {
     [accounts, selectedAccountIds],
   );
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, attributionWindowsByAccount, startDate, endDate });
-  const { data: sales = [] } = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
-  const { data: rdDeals = [] } = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
-  const { data: revenueDeals = [] } = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const salesQuery = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const rdDealsQuery = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const revenueDealsQuery = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
+  const sales = useMemo(() => salesQuery.data ?? [], [salesQuery.data]);
+  const rdDeals = useMemo(() => rdDealsQuery.data ?? [], [rdDealsQuery.data]);
+  const revenueDeals = useMemo(() => revenueDealsQuery.data ?? [], [revenueDealsQuery.data]);
   const [view, setView] = useState<"executive" | "operations">("executive");
   // useInsights keeps the previous query result while a filter changes. Always
   // reapply the permitted account scope so the all-accounts total can never
@@ -88,22 +93,37 @@ export default function ExpertDashboard() {
     () => Array.from(new Set(permittedInsights.map((insight) => insight.ad_id).filter(Boolean))),
     [permittedInsights],
   );
-  const { data: actionData } = useActionTotalsByAds(
+  const actionQuery = useActionTotalsByAds(
     actionAdIds,
     startDate,
     endDate,
     actionAccountMap,
     { adAccountIds: selectedAccountIds, attributionWindowsByAccount },
   );
+  const actionData = actionQuery.data;
+  const scopedRevenueDeals = useMemo(
+    () => revenueDeals.filter((deal) => isDealInRDAccountOrFunnelScope(deal, selectedAccountIds, revenueDealsQuery.resolvedFunnelIds ?? [])),
+    [revenueDeals, revenueDealsQuery.resolvedFunnelIds, selectedAccountIds],
+  );
+  // The RD snapshot is canonical for a won deal. Materialize a temporary
+  // read-only row when the financial `sales` mirror is still catching up so
+  // KPIs, payment and platform widgets cannot disagree during sync.
+  const canonicalSales = useMemo(
+    () => mergeCanonicalExpertSales(permittedSales, scopedRevenueDeals),
+    [permittedSales, scopedRevenueDeals],
+  );
+  const revenueUnavailableReason = revenueDealsQuery.isError && !revenueDealsQuery.dataUpdatedAt
+    ? "Não foi possível consultar o RD Station neste momento."
+    : null;
   const expertLeadActions = useMemo(() => actionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [actionData?.metaLeadActions]);
   const expertMetrics = useMemo(
-    () => getExpertDashboardMetrics(permittedInsights, rdDeals, permittedSales, {
+    () => getExpertDashboardMetrics(permittedInsights, rdDeals, canonicalSales, {
       nativeFormLeads: expertLeadActions.forms,
       siteLeads: expertLeadActions.site,
       conversations: expertLeadActions.conversations,
       total: expertLeadActions.total,
     }),
-    [expertLeadActions, permittedInsights, permittedSales, rdDeals],
+    [canonicalSales, expertLeadActions, permittedInsights, rdDeals],
   );
   const leadBreakdown = useMemo(() => ({
     forms: expertMetrics.forms,
@@ -111,7 +131,7 @@ export default function ExpertDashboard() {
     conversations: expertMetrics.conversations,
     total: expertMetrics.metaLeads,
   }), [expertMetrics]);
-  const isLoading = loadingAccounts || loadingInsights;
+  const isLoading = loadingAccounts || loadingInsights || salesQuery.isLoading || rdDealsQuery.isLoading || revenueDealsQuery.isLoading || actionQuery.isLoading;
 
   return (
     <MotionPage className="expert-dashboard gd-module-shell min-w-0 space-y-3 sm:space-y-4">
@@ -134,7 +154,7 @@ export default function ExpertDashboard() {
       {view === "operations" && <MotionItem><ExpertOperationsView /></MotionItem>}
 
       {view === "executive" && <DashboardProvider value={{
-        startDate, endDate, adAccountId: selectedId, insights: permittedInsights, sales: permittedSales, rdDeals, revenueDeals,
+        startDate, endDate, adAccountId: selectedId, insights: permittedInsights, sales: canonicalSales, rdDeals, revenueDeals: scopedRevenueDeals, revenueUnavailableReason,
         alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading,
         metricOverrides: { leads: expertMetrics.leads, conversion_rate: expertMetrics.conversionRate, cpl: expertMetrics.cpl },
         leadBreakdown,

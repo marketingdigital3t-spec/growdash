@@ -11,7 +11,7 @@ import { firstAllowedPath, type PagePermission, usePermissions } from "@/hooks/u
 import { DashboardEditorProvider } from "@/contexts/DashboardEditorContext";
 import { useAccentTheme } from "@/hooks/useAccentTheme";
 import { RouteErrorBoundary } from "@/components/resilience/RouteErrorBoundary";
-import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
+import { clearRecoveryAttempts, consumeRecoveryAttempt, lazyWithRetry, latestBuildRecoveryUrl, recordRuntimeDiagnostic, recoverLatestBuildOnce } from "@/lib/resilience";
 import { MfaChallengeGate } from "@/components/auth/MfaChallengeGate";
 
 // Keep the authenticated shell and the heavier workspace/agents modules out
@@ -139,7 +139,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
   state: AppErrorBoundaryState = { failed: false, retryBlocked: false, attempts: 0 };
 
   static getDerivedStateFromError(): AppErrorBoundaryState {
-    return { failed: true };
+    return { failed: true, retryBlocked: false, attempts: 0 };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {

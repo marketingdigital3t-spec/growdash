@@ -11,6 +11,16 @@ export type RDAnalyticsHydrationOptions = {
   fullHistoryRequested: boolean;
 };
 
+export type RDAnalyticsItemHydrationOptions = RDAnalyticsHydrationOptions & {
+  /**
+   * A bounded realtime list may omit `closed_at`. Won deals still need one
+   * authoritative detail read so the sales date cannot silently fall back to
+   * the lead creation date.
+   */
+  likelyWon: boolean;
+  hasClosedAt: boolean;
+};
+
 /**
  * A full-history reconciliation mirrors the provider list payload. Hydrating
  * every deal through detail/contact endpoints can exhaust the Edge runtime
@@ -23,6 +33,17 @@ export function shouldHydrateRDAnalyticsDeal({
   fullHistoryRequested,
 }: RDAnalyticsHydrationOptions): boolean {
   return analyticsMode && !skipEnrichment && !fullHistoryRequested;
+}
+
+export function shouldHydrateRDAnalyticsItem({
+  analyticsMode,
+  skipEnrichment,
+  fullHistoryRequested,
+  likelyWon,
+  hasClosedAt,
+}: RDAnalyticsItemHydrationOptions): boolean {
+  if (shouldHydrateRDAnalyticsDeal({ analyticsMode, skipEnrichment, fullHistoryRequested })) return true;
+  return analyticsMode && !fullHistoryRequested && likelyWon && !hasClosedAt;
 }
 
 /**

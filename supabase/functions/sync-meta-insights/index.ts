@@ -26,7 +26,6 @@ const SITE_ACTIONS = [...SITE_ACTION_TYPES];
 // connections and replies stay out of the lead evidence set.
 const TRACKED_META_LEAD_ACTIONS = [...META_LEAD_ACTION_TYPES];
 const PURCHASE_ACTIONS = ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"];
-
 function preferredAction(actions: any[], aliases: string[]) {
   const values = aliases
     .map((alias) => actions.find((item: any) => item.action_type === alias))
@@ -117,6 +116,10 @@ Deno.serve(async (req) => {
     const requestedBreakdownStartDate = typeof body.breakdownStartDate === "string" ? body.breakdownStartDate : undefined;
     const requestedBreakdownEndDate = typeof body.breakdownEndDate === "string" ? body.breakdownEndDate : undefined;
     const incremental = body.incremental === true;
+    // Keep this request-local. Edge isolates can serve overlapping requests;
+    // a module-level flag made one user's fast sync change the retry policy of
+    // another user's historical sync.
+    const fastMode = body.fast === true;
     const syncMode = body.syncMode === "recent_window" ? "recent_window" : "selected_period";
     const recentHours = Number.isFinite(Number(body.recentHours)) ? Math.max(1, Math.min(24, Number(body.recentHours))) : 5;
     // A sincronização sem intervalo é sempre incremental. Backfills continuam
@@ -339,7 +342,9 @@ Deno.serve(async (req) => {
           value: ["ACTIVE", "PAUSED", "DELETED", "ARCHIVED", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "IN_PROCESS", "WITH_ISSUES"],
         }]));
         const campaignsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/campaigns?fields=id,name,objective,effective_status,daily_budget,lifetime_budget&filtering=${campaignStatusFilter}&access_token=${accessToken}&limit=200`
+          `${graphBase}/${metaAccountId}/campaigns?fields=id,name,objective,effective_status,daily_budget,lifetime_budget&filtering=${campaignStatusFilter}&access_token=${accessToken}&limit=200`,
+          Number.POSITIVE_INFINITY,
+          fastMode,
         );
         recordPagination(campaignsRes);
         if (campaignsRes.error) {
@@ -411,7 +416,9 @@ Deno.serve(async (req) => {
 
         // 2. Fetch adsets (incluindo arquivadas)
         const adsetsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type,optimization_goal&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`
+          `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type,optimization_goal&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`,
+          Number.POSITIVE_INFINITY,
+          fastMode,
         );
         recordPagination(adsetsRes);
         if (adsetsRes.error) {
@@ -463,7 +470,9 @@ Deno.serve(async (req) => {
 
         // 3. Fetch ads (incluindo arquivados)
         const adsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${adStatusFilter}&access_token=${accessToken}&limit=200`
+          `${graphBase}/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${adStatusFilter}&access_token=${accessToken}&limit=200`,
+          Number.POSITIVE_INFINITY,
+          fastMode,
         );
         recordPagination(adsRes);
         if (adsRes.error) {
@@ -538,7 +547,7 @@ Deno.serve(async (req) => {
               break;
             }
             seenActivityPages.add(activitiesUrl);
-            const actData = await fetchMeta(activitiesUrl);
+            const actData = await fetchMeta(activitiesUrl, 4, fastMode);
             if (actData.error) {
               const message = `Conta ${account.name} atividades: ${actData.error.message}`;
               errors.push(message);
@@ -634,6 +643,7 @@ Deno.serve(async (req) => {
               },
             });
           },
+          fastMode,
         );
         recordPagination(insightsRes, "insights");
         if (insightsRes.error) {
@@ -747,7 +757,9 @@ Deno.serve(async (req) => {
         // unavailable. This is especially important for the current day.
         if (allInsights.length === 0 && startDate === endDate) {
           const aggregateRes = await fetchMetaPaginated(
-            `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`
+            `${graphBase}/${metaAccountId}/insights?fields=ad_id,ad_name,adset_id,campaign_id,spend,impressions,reach,clicks,inline_link_clicks,unique_inline_link_clicks,ctr,cpm,frequency,actions,action_values&level=ad&time_range=${encodeURIComponent(JSON.stringify({ since: startDate, until: endDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true${campaignFilter}&access_token=${accessToken}&limit=500`,
+            Number.POSITIVE_INFINITY,
+            fastMode,
           );
           aggregatePages = aggregateRes.pages || 0;
           recordPagination(aggregateRes, "insights fallback");
@@ -988,7 +1000,9 @@ Deno.serve(async (req) => {
             for (const adId of missingAdIds) {
               try {
                 const detail = await fetchMeta(
-                  `${graphBase}/${adId}?fields=id,name,effective_status,creative{id,thumbnail_url,image_url},adset{id,name,campaign_id,effective_status,daily_budget,destination_type,optimization_goal},campaign{id,name,objective,effective_status}&access_token=${accessToken}`
+                  `${graphBase}/${adId}?fields=id,name,effective_status,creative{id,thumbnail_url,image_url},adset{id,name,campaign_id,effective_status,daily_budget,destination_type,optimization_goal},campaign{id,name,objective,effective_status}&access_token=${accessToken}`,
+                  4,
+                  fastMode,
                 );
                 if (detail.error || !detail.id) continue;
                 const camp = detail.campaign;
@@ -1511,7 +1525,9 @@ Deno.serve(async (req) => {
           }
           for (const breakdown of breakdownRequests) {
             const bRes = await fetchMetaPaginated(
-              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`
+              `${graphBase}/${metaAccountId}/insights?fields=campaign_id,spend,impressions,clicks,actions&level=campaign&breakdowns=${breakdown.apiBreakdowns}&time_increment=1&time_range=${encodeURIComponent(JSON.stringify({ since: breakdownStartDate, until: breakdownEndDate }))}${attributionParam}&action_report_time=impression&use_unified_attribution_setting=true&access_token=${accessToken}&limit=500`,
+              Number.POSITIVE_INFINITY,
+              fastMode,
             );
             recordPagination(bRes, `breakdown ${breakdown.type}`);
             if (bRes.error) {
@@ -1764,11 +1780,19 @@ type MetaFetchResult = Record<string, any> & {
   __retryable?: boolean;
 };
 
-async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult> {
+async function fetchMeta(url: string, maxAttempts = 4, fastMode = false): Promise<MetaFetchResult> {
+  const attempts = fastMode ? 1 : maxAttempts;
+  const requestTimeoutMs = fastMode ? 6_000 : 10_000;
   let lastMessage = "Falha ao consultar a Graph API";
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const controller = new AbortController();
+    // The Graph API occasionally leaves a request open when a token/account
+    // is unhealthy. Without a per-request deadline the whole Edge Function
+    // reaches the platform timeout and the browser only receives the opaque
+    // "non-2xx" error. Return a structured partial result instead.
+    const requestTimeout = setTimeout(() => controller.abort(), requestTimeoutMs);
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal });
       const raw = await response.text();
       let payload: MetaFetchResult = {};
       try {
@@ -1791,7 +1815,7 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
       const retryable = response.status === 429 || response.status >= 500 || metaError.is_transient === true || RETRYABLE_META_CODES.has(code);
       lastMessage = metaError.message || `Meta retornou HTTP ${response.status}`;
 
-      if (retryable && attempt + 1 < maxAttempts) {
+      if (retryable && attempt + 1 < attempts) {
         const retryAfter = Number(response.headers.get("retry-after") || 0) * 1000;
         const exponential = 750 * (2 ** attempt) + Math.floor(Math.random() * 250);
         const waitMs = Math.min(15_000, Math.max(retryAfter, exponential, usageDelay));
@@ -1802,11 +1826,15 @@ async function fetchMeta(url: string, maxAttempts = 4): Promise<MetaFetchResult>
 
       return { ...payload, error: { ...metaError, message: lastMessage }, __httpStatus: response.status, __retryable: retryable };
     } catch (error) {
-      lastMessage = error instanceof Error ? error.message : "Falha de rede ao consultar a Meta";
-      if (attempt + 1 < maxAttempts) {
+      const timedOut = error instanceof DOMException && error.name === "AbortError";
+      lastMessage = timedOut ? `A Meta não respondeu em ${requestTimeoutMs / 1000} segundos; o snapshot anterior foi preservado.` : error instanceof Error ? error.message : "Falha de rede ao consultar a Meta";
+      if (timedOut) return { error: { message: lastMessage, is_transient: true }, __retryable: true };
+      if (attempt + 1 < attempts) {
         await sleep(750 * (2 ** attempt));
         continue;
       }
+    } finally {
+      clearTimeout(requestTimeout);
     }
   }
   return { error: { message: lastMessage, is_transient: true }, __retryable: true };
@@ -1844,7 +1872,7 @@ function metaUsageBackoffMs(headers: Headers): number {
 }
 
 // Segue paging.next até o fim, retornando erro estruturado sem expor token.
-async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY): Promise<{
+async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINITY, fastMode = false): Promise<{
   data: any[];
   pages: number;
   lastCursor?: string;
@@ -1869,7 +1897,7 @@ async function fetchMetaPaginated(url: string, maxPages = Number.POSITIVE_INFINI
       return { data: all, pages, lastCursor, repeatedCursor: true };
     }
     seen.add(next);
-    const res = await fetchMeta(next);
+    const res = await fetchMeta(next, 4, fastMode);
     if (res.error) {
       return {
         data: all,
@@ -1902,8 +1930,9 @@ async function fetchMetaInsightsByAdaptiveRange(
   startDate: string,
   endDate: string,
   depth = 0,
+  fastMode = false,
 ): Promise<Awaited<ReturnType<typeof fetchMetaPaginated>>> {
-  const result = await fetchMetaPaginated(url);
+  const result = await fetchMetaPaginated(url, Number.POSITIVE_INFINITY, fastMode);
   const requiresSmallerRange = result.error && /reduce the amount of data|too much data/i.test(result.error);
   if (!requiresSmallerRange || startDate >= endDate || depth >= 16) return result;
 
@@ -1917,9 +1946,9 @@ async function fetchMetaInsightsByAdaptiveRange(
     rangedUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
     return rangedUrl.toString();
   };
-  const left = await fetchMetaInsightsByAdaptiveRange(withRange(startDate, leftEnd), startDate, leftEnd, depth + 1);
+  const left = await fetchMetaInsightsByAdaptiveRange(withRange(startDate, leftEnd), startDate, leftEnd, depth + 1, fastMode);
   if (left.error || left.truncated || left.repeatedCursor) return left;
-  const right = await fetchMetaInsightsByAdaptiveRange(withRange(rightStartDate, endDate), rightStartDate, endDate, depth + 1);
+  const right = await fetchMetaInsightsByAdaptiveRange(withRange(rightStartDate, endDate), rightStartDate, endDate, depth + 1, fastMode);
   if (right.error || right.truncated || right.repeatedCursor) return { ...right, data: [...left.data, ...right.data], pages: left.pages + right.pages };
   return { data: [...left.data, ...right.data], pages: left.pages + right.pages };
 }
@@ -1962,10 +1991,11 @@ async function fetchMetaInsightsByMonthlyChunks(
   startDate: string,
   endDate: string,
   onProgress?: InsightChunkProgress,
+  fastMode = false,
 ): Promise<Awaited<ReturnType<typeof fetchMetaPaginated>> & { chunksTotal?: number; chunksCompleted?: number }> {
   const chunks = monthChunks(startDate, endDate);
   if (chunks.length === 1) {
-    const result = await fetchMetaInsightsByAdaptiveRange(url, startDate, endDate);
+    const result = await fetchMetaInsightsByAdaptiveRange(url, startDate, endDate, 0, fastMode);
     await onProgress?.(1, 1);
     return { ...result, chunksTotal: 1, chunksCompleted: 1 };
   }
@@ -1974,7 +2004,7 @@ async function fetchMetaInsightsByMonthlyChunks(
   const results = await mapWithConcurrency(chunks, 3, async (chunk) => {
     const rangedUrl = new URL(url);
     rangedUrl.searchParams.set("time_range", JSON.stringify({ since: chunk.startDate, until: chunk.endDate }));
-    const result = await fetchMetaInsightsByAdaptiveRange(rangedUrl.toString(), chunk.startDate, chunk.endDate);
+    const result = await fetchMetaInsightsByAdaptiveRange(rangedUrl.toString(), chunk.startDate, chunk.endDate, 0, fastMode);
     completed += 1;
     await onProgress?.(completed, chunks.length);
     return result;

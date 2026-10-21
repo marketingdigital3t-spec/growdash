@@ -6,7 +6,7 @@ import { Bot, CheckCircle2, Cloud, Code2, DatabaseZap, Facebook, FileText, Folde
 import { Link, useSearchParams } from "react-router-dom";
 import { PageHeading } from "./shared";
 import { cn } from "@/lib/utils";
-import { recordRuntimeDiagnostic } from "@/lib/resilience";
+import { recordRuntimeDiagnostic, withRequestTimeout } from "@/lib/resilience";
 import { useAdAccounts } from "@/hooks/useAdAccounts";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
 import { useRDFunnels } from "@/hooks/useRDFunnels";
@@ -181,16 +181,16 @@ function IntegrationsContent() {
     queryKey: ["social_accounts", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("social_accounts").select("id,username,display_name,connection_status,last_sync_at").order("created_at", { ascending: false });
+      const { data, error } = await withRequestTimeout(supabase.from("social_accounts").select("id,username,display_name,connection_status,last_sync_at").order("created_at", { ascending: false }), 12_000);
       if (error) throw error;
       return data ?? [];
     },
     retry: false,
   });
-  const { data: googleIntegration } = useQuery({
+  const { data: googleIntegration } = useQuery<{ id: string; is_active: boolean; updated_at?: string; permission_health?: string | null; last_permission_check_at?: string | null; last_health_error?: string | null; token_refreshed_at?: string | null } | null>({
     queryKey: ["google_workspace_integration"], enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("integrations").select("id,provider,is_active,updated_at,permission_health,last_permission_check_at,last_health_error,token_refreshed_at").eq("provider", "google_workspace").maybeSingle();
+      const { data, error } = await withRequestTimeout(supabase.from("integrations").select("id,provider,is_active,updated_at,permission_health,last_permission_check_at,last_health_error").eq("provider", "google_workspace").maybeSingle(), 12_000);
       if (error) throw error;
       return data;
     },
@@ -258,10 +258,13 @@ function IntegrationsContent() {
             adAccountIds: syncableMetaAccounts.map((account) => account.id),
             startDate: syncStart,
             endDate: syncEnd,
-            // Keep audience delivery data available for every campaign type.
-            includeBreakdowns: true,
-            breakdownStartDate: syncStart,
-            breakdownEndDate: syncEnd,
+            // Keep the interactive action bounded. Breakdowns, lead forms and
+            // hourly data are reconciled by the background worker; requesting
+            // all of them together here made the Edge Function exceed its
+            // runtime limit and surfaced only a generic non-2xx error.
+            includeBreakdowns: false,
+            fast: true,
+            force: true,
           });
           completed.push("Meta Ads");
         } catch (error) {
@@ -283,21 +286,30 @@ function IntegrationsContent() {
                 body: {
                   funnel_id: funnel.id,
                   analytics_mode: true,
-                  full_history: true,
-                  refresh_amounts: true,
-                  trigger_source: "integrations_full_history",
+                  // The interactive action must finish within the Edge
+                  // runtime. Full historical pagination remains available in
+                  // the dedicated backfill/reconciliation jobs.
+                  full_history: false,
+                  refresh_amounts: false,
+                  trigger_source: "integrations_realtime",
                 },
               });
               if (error) throw new Error(await getEdgeFunctionErrorMessage(error, `Não foi possível sincronizar o funil ${funnel.name}.`));
-              if (data?.error || data?.success === false || data?.partial || data?.status === "partial") throw new Error(data?.error || `Snapshot incompleto (${data?.pages_processed ?? 0} páginas processadas).`);
-              return { funnel, ok: true, error: null };
+              if (data?.error || data?.success === false) throw new Error(data?.error || `Não foi possível concluir a sincronização do funil ${funnel.name}.`);
+              // A bounded realtime cycle may legitimately persist the newest
+              // page and leave older pages for the reconciliation worker. Do
+              // not turn that useful snapshot into a hard failure or show
+              // zero data; surface the incomplete coverage as a warning.
+              return { funnel, ok: true, partial: data?.partial === true || data?.status === "partial", error: null };
             } catch (error) {
-              return { funnel, ok: false, error: error instanceof Error ? error.message : "falha na sincronização" };
+              return { funnel, ok: false, partial: false, error: error instanceof Error ? error.message : "falha na sincronização" };
             }
           });
           for (const result of funnelResults) {
-            if (result.ok) syncedFunnels += 1;
-            else failures.push(`RD Station (${result.funnel.name}): ${result.error}`);
+            if (result.ok) {
+              syncedFunnels += 1;
+              if (result.partial) failures.push(`RD Station (${result.funnel.name}) foi atualizado parcialmente; a reconciliação histórica continuará em segundo plano.`);
+            } else failures.push(`RD Station (${result.funnel.name}): ${result.error}`);
           }
           if (syncedFunnels) completed.push(`RD Station (${syncedFunnels} funil${syncedFunnels > 1 ? "is" : ""})`);
         }
@@ -386,12 +398,12 @@ function IntegrationsContent() {
 
       {(metaLoadFailed || rdLoadFailed) && <section className="mb-4 flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert">
         <div className="min-w-0"><b className="text-destructive">Não foi possível verificar todas as integrações.</b><p className="mt-1 break-words text-xs text-muted-foreground">{metaLoadFailed ? `Meta Ads: ${metaLoadError instanceof Error ? metaLoadError.message : "erro de consulta"}. ` : ""}{rdLoadFailed ? `RD Station: ${rdLoadError instanceof Error ? rdLoadError.message : "erro de consulta"}.` : ""}</p></div>
-        <div className="flex shrink-0 gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { if (metaLoadFailed) void refetchMeta(); if (rdLoadFailed) void refetchRD(); }}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar novamente</Button></div>
+        <div className="flex shrink-0 gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { if (metaLoadFailed) void refetchMeta(); if (rdLoadFailed) void refetchRD(); if (rdConnectionsFailed) void refetchRDConnections(); }}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar novamente</Button></div>
       </section>}
 
       <div className="gd-panel mb-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
         <form role="search" autoComplete="off" onSubmit={(event) => event.preventDefault()} className="relative grow"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input ref={searchInputRef} aria-label="Buscar provedor ou recurso" name="integration-resource-filter" type="text" inputMode="search" autoComplete="new-password" autoCorrect="off" spellCheck={false} value={search} onChange={(event) => setSearch(event.target.value)} onFocus={(event) => { if (!search && event.currentTarget.value.includes("@")) event.currentTarget.value = ""; }} className="pl-9" placeholder="Buscar provedor ou recurso…" /></form>
-        <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><StatusDot tone="connected" label={`${adAccounts.length} conta(s) Meta`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /><label className="flex items-center gap-2">Ordenar<select aria-label="Ordenar contas de anúncio" value={accountOrder} onChange={(event) => setAccountOrder(event.target.value as typeof accountOrder)} className="h-8 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="name-asc">A–Z</option><option value="name-desc">Z–A</option><option value="status">Ativas</option></select></label></div>
+        <div className="flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground"><StatusDot tone={metaLoadFailed ? "available" : "connected"} label={metaLoadFailed ? "Meta indisponível" : `${adAccounts.length} conta(s) Meta`} /><StatusDot tone={rdConnected ? "connected" : "available"} label={rdConnected ? "RD conectado" : "RD disponível"} /><label className="flex items-center gap-2">Ordenar<select aria-label="Ordenar contas de anúncio" value={accountOrder} onChange={(event) => setAccountOrder(event.target.value as typeof accountOrder)} className="h-8 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground"><option value="name-asc">A–Z</option><option value="name-desc">Z–A</option><option value="status">Ativas</option></select></label></div>
       </div>
 
       <Tabs value={tab} onValueChange={changeTab} className="space-y-4">
@@ -401,7 +413,7 @@ function IntegrationsContent() {
 
         <TabsContent value="paid" className="space-y-4">
           <IntegrationPanelGuard name="Meta Ads e atribuição">
-          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="Conecte seu perfil Meta uma única vez e ative somente as contas de anúncio que deseja usar na Growdash." status={loadingMeta ? "Verificando" : metaConnected ? "Perfil conectado" : "Disponível"} connected={metaConnected} /><div className="growdash-scrollbar max-h-[420px] overflow-y-auto p-3"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => { const active = account.connection_status !== "disconnected"; const unhealthy = account.connection_status === "error" || account.connection_status === "expired"; return <div key={account.id} className={cn("rounded-lg border p-3 transition", active ? "border-primary/30 bg-muted/20" : "border-border bg-muted/10 opacity-75")}><div className="flex items-start gap-2"><div className="min-w-0 grow"><b className="block truncate text-sm">{account.name}</b><p className="truncate text-[10px] text-muted-foreground">{account.account_id}</p></div>{unhealthy ? <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" /> : <CheckCircle2 className={cn("h-4 w-4 shrink-0", active ? "text-emerald-500" : "text-muted-foreground")} />}<Switch checked={active} disabled={toggleMetaAccount.isPending} onCheckedChange={(checked) => toggleMetaAccount.mutate({ id: account.id, active: checked })} aria-label={`${active ? "Desativar" : "Ativar"} ${account.name}`} /></div><div className="mt-2">{active ? <AccountConnectionStatus status={account.connection_status} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} tokenExpiresAt={account.token_expires_at} onReconnect={() => reconnectStoredMetaToken.mutate({ id: account.id, name: account.name })} /> : <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">Desativada</span>{account.last_sync_success_at && <span>Última sync preservada</span>}</div>}</div><p className="mt-2 text-[10px] text-muted-foreground">{active ? "Ativa nos módulos e sincronizações" : "Desativada nos módulos; perfil Meta permanece conectado"}</p></div>; })}{!loadingMeta && !adAccounts.length && <EmptyState text="Nenhuma conta Meta disponível para este perfil." />}</div></div><div className="p-4"><MetaManualConnectionCard onConnected={() => queryClient.invalidateQueries({ queryKey: ["ad_accounts"] })} /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Conectar / atualizar perfil Meta"}</Button><Button type="button" variant="outline" onClick={() => disconnectMeta.mutate()} disabled={disconnectMeta.isPending || !adAccounts.length}>{disconnectMeta.isPending ? "Desconectando…" : "Desconectar perfil Meta"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Última sincronização: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
+          {providerFilter("Meta Ads") && <section className="gd-panel overflow-hidden"><SectionHeader icon={<Facebook />} title="Meta Ads" description="Conecte seu perfil Meta uma única vez e ative somente as contas de anúncio que deseja usar na Growdash." status={loadingMeta ? "Verificando" : metaLoadFailed ? "Indisponível" : metaConnected ? "Perfil conectado" : "Disponível"} connected={metaConnected && !metaLoadFailed} /><div className="growdash-scrollbar max-h-[420px] overflow-y-auto p-3"><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{adAccounts.map((account) => { const active = account.connection_status !== "disconnected"; const unhealthy = account.connection_status === "error" || account.connection_status === "expired"; return <div key={account.id} className={cn("rounded-lg border p-3 transition", active ? "border-primary/30 bg-muted/20" : "border-border bg-muted/10 opacity-75")}><div className="flex items-start gap-2"><div className="min-w-0 grow"><b className="block truncate text-sm">{account.name}</b><p className="truncate text-[10px] text-muted-foreground">{account.account_id}</p></div>{unhealthy ? <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" /> : <CheckCircle2 className={cn("h-4 w-4 shrink-0", active ? "text-emerald-500" : "text-muted-foreground")} />}<Switch checked={active} disabled={toggleMetaAccount.isPending} onCheckedChange={(checked) => toggleMetaAccount.mutate({ id: account.id, active: checked })} aria-label={`${active ? "Desativar" : "Ativar"} ${account.name}`} /></div><div className="mt-2">{active ? <AccountConnectionStatus status={account.connection_status} errorMessage={account.last_sync_error} errorCode={account.last_sync_error_code} lastAttemptAt={account.last_sync_attempt_at} lastSuccessAt={account.last_sync_success_at} tokenExpiresAt={account.token_expires_at} onReconnect={() => reconnectStoredMetaToken.mutate({ id: account.id, name: account.name })} /> : <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">Desativada</span>{account.last_sync_success_at && <span>Última sync preservada</span>}</div>}</div><p className="mt-2 text-[10px] text-muted-foreground">{active ? "Ativa nos módulos e sincronizações" : "Desativada nos módulos; perfil Meta permanece conectado"}</p></div>; })}{!loadingMeta && !metaLoadFailed && !adAccounts.length && <EmptyState text="Nenhuma conta Meta disponível para este perfil." />}{!loadingMeta && metaLoadFailed && !adAccounts.length && <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm"><b className="text-destructive">Não foi possível consultar as contas Meta.</b><p className="mt-1 text-xs text-muted-foreground">Os dados não foram convertidos em zero. Tente novamente ou reconecte o perfil Meta.</p><Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => void refetchMeta()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Tentar consultar novamente</Button></div>}</div></div><div className="p-4"><MetaManualConnectionCard onConnected={() => queryClient.invalidateQueries({ queryKey: ["ad_accounts"] })} /></div><div className="flex flex-wrap items-center gap-2 border-t border-border p-4"><Button onClick={() => connectMeta.mutate()} disabled={connectMeta.isPending}><Facebook className="mr-2 h-4 w-4" />{connectMeta.isPending ? "Abrindo Meta…" : "Conectar / atualizar perfil Meta"}</Button><Button type="button" variant="outline" onClick={() => disconnectMeta.mutate()} disabled={disconnectMeta.isPending || !adAccounts.length}>{disconnectMeta.isPending ? "Desconectando…" : "Desconectar perfil Meta"}</Button><span className="ml-auto self-center text-[10px] text-muted-foreground">Última sincronização: {relativeDate(latestMetaSync as string | null)}</span></div></section>}
           <div className="grid gap-4 md:grid-cols-2">{providerFilter("Google Ads") && <ProviderCard name="Google Ads" description="Pesquisa, Performance Max, vídeo, conversões e orçamento." status="Preparar OAuth" />}{providerFilter("TikTok Ads") && <ProviderCard name="TikTok Ads" description="Campanhas, criativos, conversões e custo por resultado." status="Preparar OAuth" />}</div>
           <IntegrationAccordion title="Padrão de UTMs" description="Padronize a identificação de campanhas e origens." defaultOpen={false}><IntegrationPanelGuard name="Padrão de UTMs"><UTMConventionCard /></IntegrationPanelGuard></IntegrationAccordion>
           <IntegrationAccordion title="Mapeamento de UTMs" description="Revise como os parâmetros são associados aos dados." defaultOpen={false}><IntegrationPanelGuard name="Mapeamento de UTMs"><UTMMappingCard /></IntegrationPanelGuard></IntegrationAccordion>

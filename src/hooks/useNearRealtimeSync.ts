@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { businessDateKey } from "@/lib/businessDate";
 import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
 import { withInFlightScope } from "@/lib/inFlightByScope";
+import { withRequestTimeout } from "@/lib/resilience";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -59,6 +60,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [rdSyncError, setRdSyncError] = useState<string | null>(null);
   const startDateKey = startDate ? businessDateKey(startDate, timezone || undefined) : "today";
   const endDateKey = endDate ? businessDateKey(endDate, timezone || undefined) : "today";
   const scope = `${adAccountId || adAccountIds?.slice().sort().join(",") || "all"}:${campaignIds?.slice().sort().join(",") || "all-campaigns"}:${funnelIds?.slice().sort().join(",") || "all-funnels"}:${startDateKey}:${endDateKey}:${timezone || "account"}:${attributionWindow || "account_default"}`;
@@ -112,9 +114,10 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           realtime: true,
           force,
         };
-        const { data, error } = await supabase.functions.invoke("controlled-realtime-sync", {
-          body: selectedBody,
-        });
+        const { data, error } = await withRequestTimeout(
+          supabase.functions.invoke("controlled-realtime-sync", { body: selectedBody }),
+          50_000,
+        );
         const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
         if (error || data?.error || ["failed", "error"].includes(metaStatus)) {
           throw error || new Error(data?.error || "A atualização em segundo plano falhou.");
@@ -127,6 +130,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
           : "";
         if (isCurrentScope()) {
           setSyncError(auxiliaryWarnings || null);
+          setRdSyncError(null);
           if (data?.synced_at) setLastSyncAt(new Date(data.synced_at));
           setLastUpdatedAt(new Date());
           setState(metaStatus === "partial" ? "partial" : ["failed", "error"].includes(metaStatus) ? "error" : "fresh");
@@ -140,22 +144,35 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         // large CRM funnel must never delay or fail the visible ad snapshot;
         // its recent-window reconciliation still runs silently and Realtime
         // invalidates the CRM queries when rows arrive.
-        const rdRefresh = supabase.functions.invoke("controlled-realtime-sync", {
-          body: {
-            ...selectedBody,
-            includeMeta: false,
-            includeRD: true,
-            includeBalance: false,
-            fast: false,
-          },
-        }).then(({ data: rdData, error: rdError }) => {
+        const rdRefresh = withRequestTimeout(
+          supabase.functions.invoke("controlled-realtime-sync", {
+            body: {
+              ...selectedBody,
+              includeMeta: false,
+              includeRD: true,
+              includeBalance: false,
+              fast: false,
+            },
+          }),
+          50_000,
+        ).then(({ data: rdData, error: rdError }) => {
           if (rdError || rdData?.error || rdData?.rd_status === "failed") {
-            console.warn("[near-realtime-sync] RD reconciliation", rdError || rdData?.error);
+            const message = String(rdError || rdData?.error || "O RD Station não concluiu a sincronização.");
+            console.warn("[near-realtime-sync] RD reconciliation", message);
+            if (isCurrentScope()) {
+              setRdSyncError(message);
+              setState((current) => current === "error" ? current : "partial");
+            }
             return;
           }
+          if (isCurrentScope()) setRdSyncError(null);
           invalidateLiveQueries();
         }).catch((rdError) => {
           console.warn("[near-realtime-sync] RD reconciliation", rdError);
+          if (isCurrentScope()) {
+            setRdSyncError(rdError instanceof Error ? rdError.message : String(rdError));
+            setState((current) => current === "error" ? current : "partial");
+          }
         });
         // Keep the explicit “Sincronizar agora” action honest: it resolves
         // only after the independent RD request has also returned. Automatic
@@ -212,5 +229,5 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
     };
   }, [enabled, invalidateLiveQueries, scope]);
 
-  return { state, lastUpdatedAt, lastSyncAt, syncError, refresh };
+  return { state, lastUpdatedAt, lastSyncAt, syncError, rdSyncError, refresh };
 }

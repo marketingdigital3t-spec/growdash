@@ -12,6 +12,8 @@ export interface DashboardContextValue {
   sales: Sale[];
   rdDeals: RDDealLite[];
   revenueDeals?: RDDealLite[];
+  /** Set only when the canonical RD revenue query failed without a snapshot. */
+  revenueUnavailableReason?: string | null;
   alerts: any[];
   campaigns: any[];
   adAccounts: any[];

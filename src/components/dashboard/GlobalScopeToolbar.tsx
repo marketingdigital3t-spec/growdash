@@ -10,7 +10,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /** Shared scope controls rendered by the authenticated shell on every module. */
-export function GlobalScopeToolbar({ syncing = false, lastSyncAt = null, syncState = "idle", onSyncNow = null }: { syncing?: boolean; lastSyncAt?: Date | null; syncState?: string; onSyncNow?: (() => void) | null }) {
+export function GlobalScopeToolbar({ syncing = false, lastSyncAt = null, syncState = "idle", syncError = null, onSyncNow = null }: { syncing?: boolean; lastSyncAt?: Date | null; syncState?: string; syncError?: string | null; onSyncNow?: (() => void) | null }) {
   const { adAccountIds, setAdAccountIds, preset, setPreset, customRange, setCustomRange, startDate, endDate } = useGlobalFilters();
   const { data: accounts = [] } = useAdAccounts();
 
@@ -45,7 +45,12 @@ export function GlobalScopeToolbar({ syncing = false, lastSyncAt = null, syncSta
       )}
       {!syncing && syncState === "error" && (
         <span role="status" className="gd-scope-refresh-status order-last inline-flex items-center rounded-md px-2 py-1 text-[10px] text-amber-700 sm:order-none">
-          Snapshot anterior preservado · nova tentativa automática
+          {syncError || "Snapshot anterior preservado · nova tentativa automática"}
+        </span>
+      )}
+      {!syncing && syncState === "partial" && syncError && (
+        <span role="status" className="gd-scope-refresh-status order-last inline-flex max-w-full items-center truncate rounded-md px-2 py-1 text-[10px] text-amber-700 sm:order-none" title={syncError}>
+          Sincronização parcial: {syncError}
         </span>
       )}
       {onSyncNow && (

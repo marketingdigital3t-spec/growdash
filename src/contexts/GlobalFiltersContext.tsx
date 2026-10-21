@@ -54,8 +54,13 @@ function readStored() {
 
 export function GlobalFiltersProvider({ children }: { children: ReactNode }) {
   const { data: workspace, isLoading: loadingWorkspace } = useWorkspace();
-  const { data: rdFunnels = [], isLoading: loadingRDFunnels } = useRDFunnels(undefined, true);
-  const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections(workspace?.id);
+  // Resolve the workspace first. Starting the owner-wide RD query before the
+  // workspace RPC returns caused a duplicate request on every cold session
+  // (owner list, then workspace-scoped list), competing with the first route
+  // data request. Settings screens that intentionally omit workspaceId keep
+  // the hook's original behavior.
+  const { data: rdFunnels = [], isLoading: loadingRDFunnels } = useRDFunnels(undefined, !loadingWorkspace);
+  const { data: rdConnections = [], isLoading: loadingRDConnections } = useRDAccountConnections(workspace?.id, { enabled: !loadingWorkspace });
   const { data: adAccounts = [], isLoading: loadingAdAccounts } = useAdAccounts();
   const accountScopeReady = !loadingWorkspace && !!workspace?.id && !loadingRDFunnels && !loadingRDConnections && !loadingAdAccounts;
   const stored = typeof window === "undefined" ? null : readStored();

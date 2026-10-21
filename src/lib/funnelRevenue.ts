@@ -48,6 +48,7 @@ export interface FunnelSaleFilters {
   excludedDealIds?: Set<string>;
   source?: string;
   campaign?: string;
+  campaigns?: string[];
   state?: string;
   product?: string;
   allowedDealIds?: Set<string>;
@@ -87,9 +88,12 @@ export function filterCanonicalFunnelSales(sales: Sale[], filters: FunnelSaleFil
     }
     if (filters.allowedDealIds && (!sale.rd_deal_id || !filters.allowedDealIds.has(sale.rd_deal_id))) return false;
     if (filters.source && filters.source !== "all" && normalized(sale.utm_source) !== normalized(filters.source)) return false;
-    if (filters.campaign && filters.campaign !== "all") {
-      const expected = normalized(filters.campaign);
-      if (![sale.utm_campaign, sale.rd_campaign_name].some((value) => normalized(value) === expected)) return false;
+    const campaignFilters = filters.campaigns?.length
+      ? filters.campaigns
+      : filters.campaign && filters.campaign !== "all" ? [filters.campaign] : [];
+    if (campaignFilters.length) {
+      const expected = campaignFilters.map(normalized);
+      if (![sale.utm_campaign, sale.rd_campaign_name].some((value) => expected.includes(normalized(value)))) return false;
     }
     const saleState = sale.lead_state || (sale.rd_deal_id ? filters.stateByDealId?.get(sale.rd_deal_id) : null);
     if (filters.state && filters.state !== "all" && normalizeUF(saleState) !== normalizeUF(filters.state)) return false;

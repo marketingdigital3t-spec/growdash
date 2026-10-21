@@ -41,6 +41,10 @@ export function useGlobalView() {
     // otherwise React Query can briefly show the previous user's cached view.
     queryKey: ["dashboard_view_global", user?.id ?? "anonymous"],
     enabled: !!user,
+    // Paint a safe, user-independent layout while the persisted view is
+    // loading. The placeholder is never written back and is replaced as soon
+    // as the scoped query resolves, so another user's layout cannot flash.
+    placeholderData: fallbackGlobalView,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("dashboard_views")
@@ -49,10 +53,7 @@ export function useGlobalView() {
         .order("is_default", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (error) {
-        console.warn("Não foi possível carregar a visualização do dashboard; usando o layout padrão.", error);
-        return fallbackGlobalView;
-      }
+      if (error) throw error;
       return ensureDefaultDashboardContent((data as DashboardView | null) ?? fallbackGlobalView);
     },
   });

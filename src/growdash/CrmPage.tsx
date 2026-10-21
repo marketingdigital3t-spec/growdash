@@ -373,7 +373,7 @@ export default function CrmPage() {
     funnelIds: funnelScopeIds,
     startDate,
     endDate,
-    dateRule: "lead_created_at",
+    dateRule: "created_at_for_open_closed_at_for_won",
   }), [accountScopeIds, endDate, funnelScopeIds, startDate]);
   // O quadro e os indicadores usam o mesmo recorte do calendário. A exceção
   // é o preset "Máximo", que solicita explicitamente todo o histórico.
@@ -776,7 +776,7 @@ export default function CrmPage() {
         title="Negociações"
         description={preset === "max"
           ? "Pipeline completo do RD Station, com todo o histórico disponível."
-          : "Negociações do RD Station criadas no período selecionado no calendário."}
+          : "Negociações do RD Station no período selecionado: abertas pela criação e ganhas pela data de fechamento."}
         actions={(
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1" role="tablist" aria-label="Visualização das negociações">
@@ -813,7 +813,7 @@ export default function CrmPage() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">
-          <span>{number.format(deals.length)} negociação(ões) no quadro · {preset === "max" ? "histórico completo" : `${number.format(dealsInSelectedPeriod.length)} criada(s) no período selecionado`}{isConsolidatedView ? " · pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? ` · funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? ` · ${funnelScopeIds.length} funis selecionados` : " · nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
+          <span>{number.format(deals.length)} negociação(ões) no quadro · {preset === "max" ? "histórico completo" : `${number.format(dealsInSelectedPeriod.length)} no período selecionado`}{isConsolidatedView ? " · pipeline consolidado das contas selecionadas" : funnelScopeIds.length === 1 ? ` · funil vinculado: ${connectedFunnels[0]?.name}` : funnelScopeIds.length > 1 ? ` · ${funnelScopeIds.length} funis selecionados` : " · nenhum funil RD vinculado"}{!rdEnabled && connectedFunnels.length ? " · dados compartilhados pelo proprietário do funil" : ""}</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" /> {isFetching || syncing ? "Atualizando em segundo plano…" : lastUpdatedAt ? `Atualizado ${formatDistanceToNow(new Date(lastUpdatedAt), { addSuffix: true, locale: ptBR })}` : "Aguardando primeira sincronização"}</span>
         </div>
       </section>

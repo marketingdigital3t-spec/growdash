@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPendingRDSyncCursors,
   shouldHydrateRDAnalyticsDeal,
+  shouldHydrateRDAnalyticsItem,
 } from "../../supabase/functions/_shared/rdSyncCursor";
 
 describe("RD resumable sync cursors", () => {
@@ -49,6 +50,30 @@ describe("RD resumable sync cursors", () => {
       analyticsMode: true,
       skipEnrichment: true,
       fullHistoryRequested: false,
+    })).toBe(false);
+  });
+
+  it("hydrates only a won item without closed_at during a fast realtime pass", () => {
+    expect(shouldHydrateRDAnalyticsItem({
+      analyticsMode: true,
+      skipEnrichment: true,
+      fullHistoryRequested: false,
+      likelyWon: true,
+      hasClosedAt: false,
+    })).toBe(true);
+    expect(shouldHydrateRDAnalyticsItem({
+      analyticsMode: true,
+      skipEnrichment: true,
+      fullHistoryRequested: false,
+      likelyWon: true,
+      hasClosedAt: true,
+    })).toBe(false);
+    expect(shouldHydrateRDAnalyticsItem({
+      analyticsMode: true,
+      skipEnrichment: true,
+      fullHistoryRequested: false,
+      likelyWon: false,
+      hasClosedAt: false,
     })).toBe(false);
   });
 });

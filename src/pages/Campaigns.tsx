@@ -86,6 +86,7 @@ import { addInsightOnlyCampaignRows } from "@/lib/metaCampaignLeadRollup";
 import { BrandLogo } from "@/components/BrandLogo";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
+import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues, fetchCampaignPages, resolveCampaignAccountScope } from "@/lib/campaignQuery";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -146,7 +147,7 @@ function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date, attribu
   const totals = { spend: 0, leads: 0, formLeads: 0, siteLeads: 0, conversations: 0, legacyLeads: 0, hasCanonicalLeadParts: true, clicks: 0, impressions: 0, reach: 0 };
 
   for (const ad of ads || []) {
-    const scopedInsights = dedupeDailyMetaInsights((ad.insights || [])
+    const scopedInsights: any[] = dedupeDailyMetaInsights((ad.insights || [])
       .filter((insight: any) => matchesMetaAttributionWindow(insight.attribution_window, attributionWindow))
       .map((insight: any) => ({ ...insight, ad_id: String(ad.id) })));
     for (const insight of scopedInsights) {
@@ -167,18 +168,6 @@ function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date, attribu
   }
 
   return totals;
-}
-
-async function fetchAllPages(query: any, pageSize = 1000, maxPages = 20) {
-  const rows: any[] = [];
-  for (let page = 0; page < maxPages; page++) {
-    const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
-    if (error) throw error;
-    const batch = data ?? [];
-    rows.push(...batch);
-    if (batch.length < pageSize) break;
-  }
-  return rows;
 }
 
 const CAMP_DEFAULTS: Record<CampColKey, number> = {
@@ -326,12 +315,6 @@ export default function Campaigns() {
   const leadScopeAccountIds = selectedAccount !== "all"
     ? [selectedAccount]
     : selectedAccountIds.length ? selectedAccountIds : visibleAdAccounts.map((account) => account.id);
-  const { data: canonicalLeadRollup } = useMetaCampaignLeadRollup(
-    leadScopeAccountIds,
-    startDate,
-    endDate,
-    attributionWindowsByAccount,
-  );
 
   useEffect(() => {
     const requestedAccount = searchParams.get("conta");
@@ -395,63 +378,131 @@ export default function Campaigns() {
 
   const { data: campaignBaseRows = [], isLoading, isFetching, isError, error: campaignError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["campaigns_full", selectedAccount, visibleAdAccounts.map((account) => account.id).join(","), JSON.stringify(attributionWindowsByAccount), startDate?.toISOString(), endDate?.toISOString(), salesUpdatedAt],
-    // A consulta anterior podia ficar pendurada por vários minutos ao abrir
-    // períodos longos porque o embed trazia todo o histórico de insights de
-    // cada anúncio. O abort explícito garante que a tela saia do skeleton e
-    // ofereça uma ação clara ao usuário quando o backend não responder.
-    retry: 0,
+    // A carga é dividida em páginas e relações independentes. Assim, nenhum
+    // join aninhado fica responsável por materializar a árvore inteira de
+    // campanhas e o timeout de uma página não mantém o skeleton infinito.
+    retry: (failureCount, error) => failureCount < 2 && /timeout|tempo de carregamento|demorou mais de|network|fetch|5\d\d|503|502|504/i.test(error instanceof Error ? error.message : String(error)),
+    retryDelay: (attempt) => Math.min(1_500 * 2 ** attempt, 5_000),
+    staleTime: 30_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    // Do not send a broad empty-scope request while the global account
+    // catalog is still hydrating. That request was cheap on the client but
+    // still occupied a PostgREST worker and caused a second full fetch when
+    // the catalog arrived.
+    enabled: visibleAdAccounts.length > 0 || selectedAccountIds.length > 0,
     queryFn: async ({ signal }) => {
-      const timeoutController = new AbortController();
-      let timedOut = false;
-      const timeoutId = window.setTimeout(() => {
-        timedOut = true;
-        timeoutController.abort();
-      }, 15000);
-      const abortFromQuery = () => timeoutController.abort();
-      signal?.addEventListener("abort", abortFromQuery, { once: true });
+      const accountScope = resolveCampaignAccountScope(selectedAccount, visibleAdAccounts.map((account) => account.id));
 
-      try {
-      let query = supabase
-        .from("campaigns")
-        .select(`
-          id, name, ad_account_id, status, objective, daily_budget, lifetime_budget, created_at,
-          adsets(
-            id, name, daily_budget, status,
-            ads(
-              id, name, thumbnail_url, status,
-              insights(spend, leads, form_leads, site_leads, conversations, clicks, inline_link_clicks, unique_inline_link_clicks, impressions, reach, ctr, cpm, cpl, frequency, conversion_rate, health_score, date, attribution_window)
-            )
-          )
-        `)
-        .order("created_at", { ascending: false });
+      const campaigns = await fetchCampaignPages(
+        () => (supabase as any)
+          .from("campaigns")
+          .select("id,name,ad_account_id,status,objective,daily_budget,lifetime_budget,created_at")
+          .in("ad_account_id", accountScope)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true }),
+        signal,
+        CAMPAIGN_PAGE_SIZE,
+        "A lista de campanhas",
+      );
+      if (!campaigns.length) return [];
 
-      // Insights fora do período selecionado não participam de nenhum cálculo
-      // desta tela. Filtrar a relação no PostgREST reduz drasticamente a
-      // resposta e evita que uma conta com histórico grande congele a tabela.
-      if (startDate) query = query.gte("adsets.ads.insights.date", formatApiDate(startDate));
-      if (endDate) query = query.lte("adsets.ads.insights.date", formatApiDate(endDate));
-
-      if (selectedAccount !== "all") {
-        query = query.eq("ad_account_id", selectedAccount);
-      } else {
-        const visibleIds = visibleAdAccounts.map((account) => account.id);
-        query = query.in("ad_account_id", visibleIds.length ? visibleIds : ["00000000-0000-0000-0000-000000000000"]);
+      const adsetsByCampaign = new Map<string, any[]>();
+      const campaignIds = campaigns.map((campaign) => String(campaign.id)).filter(Boolean);
+      for (const campaignIdChunk of chunkValues(campaignIds, RELATION_PAGE_SIZE)) {
+        const adsetRows = await fetchCampaignPages(
+          () => (supabase as any)
+            .from("adsets")
+            .select("id,name,daily_budget,status,campaign_id")
+            .in("campaign_id", campaignIdChunk)
+            .order("name", { ascending: true })
+            .order("id", { ascending: true }),
+          signal,
+          RELATION_PAGE_SIZE,
+          "A lista de conjuntos de anúncios",
+        );
+        for (const adset of adsetRows) {
+          const key = String(adset.campaign_id || "");
+          if (!key) continue;
+          const rows = adsetsByCampaign.get(key) || [];
+          rows.push(adset);
+          adsetsByCampaign.set(key, rows);
+        }
       }
 
-      query = query.abortSignal(timeoutController.signal);
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data || []).map((c: any) => {
+      const adsByAdset = new Map<string, any[]>();
+      const adsetIds = Array.from(new Set(Array.from(adsetsByCampaign.values()).flat().map((adset: any) => String(adset.id)).filter(Boolean)));
+      for (const adsetIdChunk of chunkValues(adsetIds, RELATION_PAGE_SIZE)) {
+        const adRows = await fetchCampaignPages(
+          () => (supabase as any)
+            .from("ads")
+            .select("id,name,thumbnail_url,status,adset_id")
+            .in("adset_id", adsetIdChunk)
+            .order("name", { ascending: true })
+            .order("id", { ascending: true }),
+          signal,
+          RELATION_PAGE_SIZE,
+          "A lista de anúncios",
+        );
+        for (const ad of adRows) {
+          const key = String(ad.adset_id || "");
+          if (!key) continue;
+          const rows = adsByAdset.get(key) || [];
+          rows.push(ad);
+          adsByAdset.set(key, rows);
+        }
+      }
+
+      const adIds = Array.from(new Set(Array.from(adsByAdset.values()).flat().map((ad: any) => String(ad.id)).filter(Boolean)));
+      const insightsByAd = new Map<string, any[]>();
+      if (adIds.length) {
+        for (const adBatch of chunkValues(adIds, 500)) {
+          const insightRows = await fetchCampaignPages(
+            () => {
+              let insightQuery = (supabase as any)
+                .from("insights")
+                .select("ad_id,ad_account_id,spend,form_leads,site_leads,conversations,clicks,inline_link_clicks,unique_inline_link_clicks,impressions,reach,date,attribution_window")
+                .in("ad_id", adBatch)
+                // The ad ids came from campaigns already scoped to the visible
+                // accounts. Keeping the ownership filter on the hierarchy and
+                // RLS here also preserves legacy insight rows whose
+                // backfilled `ad_account_id` is still null.
+                .order("date", { ascending: true })
+                .order("ad_id", { ascending: true })
+                .order("attribution_window", { ascending: true });
+              if (startDate) insightQuery = insightQuery.gte("date", formatApiDate(startDate));
+              if (endDate) insightQuery = insightQuery.lte("date", formatApiDate(endDate));
+              return insightQuery;
+            },
+            signal,
+            INSIGHT_PAGE_SIZE,
+            "Os insights das campanhas",
+          );
+          for (const row of insightRows) {
+            const key = String(row.ad_id || "");
+            if (!key) continue;
+            const rows = insightsByAd.get(key) || [];
+            rows.push(row);
+            insightsByAd.set(key, rows);
+          }
+        }
+      }
+
+      return campaigns.map((c: any) => {
+        const hydratedAdsets = (adsetsByCampaign.get(String(c.id)) || []).map((adset: any) => ({
+          ...adset,
+          ads: (adsByAdset.get(String(adset.id)) || []).map((ad: any) => ({ ...ad, insights: insightsByAd.get(String(ad.id)) || [] })),
+        }));
         let spend = 0, leads = 0, formLeads = 0, siteLeads = 0, conversations = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
         const hasCanonicalLeadParts = true;
-        const adsets = c.adsets || [];
+        const adsets = hydratedAdsets;
         let adsetBudget = 0;
 
         for (const adset of adsets) {
           adsetBudget += adset.daily_budget ?? 0;
           for (const ad of adset.ads || []) {
             const expectedWindow = attributionWindowsByAccount[c.ad_account_id] || "account_default";
-            const scopedInsights = dedupeDailyMetaInsights((ad.insights || [])
+            const scopedInsights: any[] = dedupeDailyMetaInsights((ad.insights || [])
               .filter((i: any) => matchesMetaAttributionWindow(i.attribution_window, expectedWindow))
               .map((i: any) => ({ ...i, ad_id: String(ad.id) })));
             for (const i of scopedInsights) {
@@ -498,15 +549,6 @@ export default function Campaigns() {
         const budget = Number(c.daily_budget || 0) > 0 ? Number(c.daily_budget) : adsetBudget;
         return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads: 0, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
       });
-      } catch (error) {
-        if (timedOut) {
-          throw new Error("A consulta de campanhas demorou mais de 15 segundos. Tente novamente ou reduza o período selecionado.", { cause: error });
-        }
-        throw error;
-      } finally {
-        window.clearTimeout(timeoutId);
-        signal?.removeEventListener("abort", abortFromQuery);
-      }
     },
   });
 
@@ -514,10 +556,20 @@ export default function Campaigns() {
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => currentAd.id))), [campaignBaseRows]);
   const campaignAdAccountMap = useMemo(() => Object.fromEntries(campaignBaseRows.flatMap((campaign: any) =>
     (campaign.adsets || []).flatMap((currentAdset: any) => (currentAdset.ads || []).map((currentAd: any) => [currentAd.id, campaign.ad_account_id])))), [campaignBaseRows]);
-  const { data: actionData, error: actionError, isError: actionIsError } = useActionTotalsByAds(campaignAdIds, startDate, endDate, campaignAdAccountMap, {
+  const { data: actionData, error: actionError, isError: actionIsError, isFetching: isActionFetching } = useActionTotalsByAds(campaignAdIds, startDate, endDate, campaignAdAccountMap, {
     adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : [selectedAccount],
     attributionWindowsByAccount,
   });
+  // A carga canônica de ações é secundária para a primeira pintura: os fatos
+  // diários já vêm da consulta principal. Só inicia depois que a hierarquia e
+  // o rollup de ações terminaram, evitando duas leituras grandes simultâneas.
+  const { data: canonicalLeadRollup } = useMetaCampaignLeadRollup(
+    leadScopeAccountIds,
+    startDate,
+    endDate,
+    attributionWindowsByAccount,
+    { enabled: campaignBaseRows.length > 0 && !isActionFetching },
+  );
   const campaignRowsWithInsights = useMemo(
     () => addInsightOnlyCampaignRows(campaignBaseRows, canonicalLeadRollup?.deliveryByCampaign || {}, canonicalLeadRollup?.byCampaign || {}),
     [campaignBaseRows, canonicalLeadRollup?.byCampaign, canonicalLeadRollup?.deliveryByCampaign],
@@ -599,7 +651,8 @@ export default function Campaigns() {
   // de campanhas. A seleção serve exclusivamente como filtro descendente.
   const { data: accountAdsets = [], isLoading: isLoadingAdsets } = useQuery({
     queryKey: ["meta-adsets-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
-    queryFn: async () => {
+    enabled: activeTab === "adsets",
+    queryFn: async ({ signal }) => {
       let query = supabase
         .from("adsets")
         .select("id,name,daily_budget,status,campaign_id,campaigns!inner(id,name,ad_account_id)")
@@ -609,13 +662,14 @@ export default function Campaigns() {
         const accountIds = visibleAdAccounts.map((account) => account.id);
         query = query.in("campaigns.ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
       }
-      return fetchAllPages(query);
+      return fetchCampaignPages(() => query, signal, 1000, "Os conjuntos de anúncios");
     },
   });
 
   const { data: accountAds = [], isLoading: isLoadingAds } = useQuery({
     queryKey: ["meta-ads-independent", selectedAccount, visibleAdAccounts.map((account) => account.id).join(",")],
-    queryFn: async () => {
+    enabled: activeTab === "ads",
+    queryFn: async ({ signal }) => {
       let query = supabase
         .from("ads")
         .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,objective,ad_account_id))")
@@ -625,7 +679,7 @@ export default function Campaigns() {
         const accountIds = visibleAdAccounts.map((account) => account.id);
         query = query.in("adsets.campaigns.ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
       }
-      return fetchAllPages(query);
+      return fetchCampaignPages(() => query, signal, 1000, "Os anúncios");
     },
   });
 
@@ -1332,7 +1386,7 @@ export default function Campaigns() {
                             </TableCell>}
                             <TableCell style={{ ...cellW("name"), left: camp.colWidths.check + camp.colWidths.delivery }} className={cn("campaign-name-cell sticky z-20 border-r border-border/80 font-medium shadow-[8px_0_14px_-14px_rgba(0,0,0,.18)] transition-colors group-hover:bg-muted", stickySurface)}>
                               <div className="flex min-w-0 items-center gap-3">
-                                <span className="campaign-name-link block min-w-0 truncate font-medium" title={c.catalogMissing ? `${c.name} · somente Insights; metadados de catálogo indisponíveis` : c.name}>{c.name}{c.catalogMissing && <span className="ml-2 text-[9px] font-normal text-amber-600">Somente Insights · catálogo indisponível</span>}</span>
+                                <span className="campaign-name-link block min-w-0 truncate font-medium text-foreground" title={c.catalogMissing ? `${c.name} · somente Insights; metadados de catálogo indisponíveis` : c.name}>{c.name}{c.catalogMissing && <span className="ml-2 text-[9px] font-normal text-amber-600">Somente Insights · catálogo indisponível</span>}</span>
                                 {!c.catalogMissing && <Pencil className="campaign-row-edit ml-auto h-4 w-4 shrink-0" aria-hidden="true" />}
                               </div>
                             </TableCell>

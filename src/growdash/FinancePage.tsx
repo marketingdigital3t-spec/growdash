@@ -81,8 +81,12 @@ export default function FinancePage() {
   const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: metaInsightsStartDate, endDate });
   const metaTraffic = useMetaTrafficMetrics({ adAccountIds: accounts.map((account) => account.id), startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) }, accounts.length > 0);
   const { data: sales = [], isLoading: loadingSales } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate, endDate });
-  const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth });
-  const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate: twelveMonthsAgo, endDate: futureMonth });
+  // Historical charts are secondary content. Start them only after the
+  // current-period facts are ready so the finance route can paint its primary
+  // KPIs without competing with two additional paginated queries.
+  const historyEnabled = !loadingAccounts && !loadingInsights && !loadingSales;
+  const { data: historicalInsights = [] } = useInsights({ adAccountId: accountFilter, adAccountIds, startDate: twelveMonthsAgo, endDate: futureMonth, enabled: historyEnabled });
+  const { data: historicalSales = [] } = useSales({ adAccountId: accountFilter, adAccountIds, funnelIds, startDate: twelveMonthsAgo, endDate: futureMonth, enabled: historyEnabled });
 
   const { data: balanceEvents = [], isLoading: loadingBalanceEvents } = useQuery({
     queryKey: ["finance-balance-events", accountIds, businessDateKey(startDate), businessDateKey(endDate)],

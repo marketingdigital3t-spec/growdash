@@ -4,6 +4,7 @@ import { AnimatedNumber } from "@/components/AnimatedNumber";
 
 interface PaymentChartProps {
   byPayment: { pix: number; cartao: number; boleto: number; outros: number };
+  unknownPaymentRevenue?: number;
 }
 
 const COLORS: Record<string, string> = {
@@ -20,9 +21,9 @@ const LABELS: Record<string, string> = {
   outros: "Outros",
 };
 
-export function PaymentChart({ byPayment }: PaymentChartProps) {
+export function PaymentChart({ byPayment, unknownPaymentRevenue = 0 }: PaymentChartProps) {
   const data = Object.entries(byPayment)
-    .map(([key, value]) => ({ key, name: LABELS[key], value }))
+    .map(([key, value]) => ({ key, name: key === "outros" && unknownPaymentRevenue > 0 ? "Não informado" : LABELS[key], value }))
     .filter((d) => d.value > 0);
 
   const total = data.reduce((s, d) => s + d.value, 0);
@@ -34,7 +35,7 @@ export function PaymentChart({ byPayment }: PaymentChartProps) {
           <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          Nenhuma venda registrada
+          {unknownPaymentRevenue > 0 ? `Venda RD confirmada: R$ ${unknownPaymentRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Nenhuma venda registrada"}
         </CardContent>
       </Card>
     );

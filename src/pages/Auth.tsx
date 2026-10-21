@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { BarChart3, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { setAuthPersistence, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandLogo";
@@ -45,6 +45,7 @@ export default function Auth() {
     if (mode === "register" && !legalAccepted) { toast({ title: "Aceite os documentos legais", description: "Leia e aceite os Termos de Uso e a Política de Privacidade para criar sua conta.", variant: "destructive" }); return; }
     setLoading(true);
     if (mode === "login") {
+      setAuthPersistence(remember);
       let error: { status?: number; message?: string } | null = null;
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
@@ -100,6 +101,7 @@ export default function Auth() {
   async function sendAccessLink() {
     const email = (forgotEmail || identifier).trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast({ title: "Informe um email válido", variant: "destructive" }); return; }
+    setAuthPersistence(remember);
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -111,6 +113,7 @@ export default function Auth() {
   }
 
   async function social(provider: "google" | "apple") {
+    setAuthPersistence(remember);
     const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}${window.location.pathname}` } });
     if (error) toast({ title: `Login ${provider === "google" ? "Google" : "Apple"} indisponível`, description: "Confira se o provedor está habilitado no Supabase.", variant: "destructive" });
   }
@@ -131,7 +134,7 @@ export default function Auth() {
     <motion.section initial={{ opacity: 0, y: 16, scale: .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: .5, ease: "easeOut" }} className="auth-card-premium">
       <div className="auth-card-symbol" aria-hidden="true"><BrandMark /></div>
       <div className="auth-card-top"><div><h1>{mode === "login" && <span className="sr-only">Entrar na Growdash. </span>}{mode === "login" ? "Seja Bem-Vindo(a)" : "Criar conta"}</h1><p aria-hidden="true">{mode === "login" ? "Acesse sua operação Growdash." : "Crie o acesso da sua operação."}</p></div></div>
-      {mode === "register" && <div className="auth-mode-switch" role="tablist" aria-label="Tipo de acesso"><button type="button" role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")}>Entrar</button><button type="button" role="tab" aria-selected className="is-active">Cadastrar</button></div>}
+      {mode === "register" && <div className="auth-mode-switch" role="tablist" aria-label="Tipo de acesso"><button type="button" role="tab" aria-selected={false} onClick={() => setMode("login")}>Entrar</button><button type="button" role="tab" aria-selected className="is-active">Cadastrar</button></div>}
       <form onSubmit={handleSubmit} className="auth-form-premium">
         {mode === "register" && <PremiumInput icon={<UserRound />} type="text" value={name} onChange={setName} placeholder="Nome completo" autoComplete="name" />}
         <PremiumInput label="E-mail" icon={<Mail />} type="email" value={identifier} onChange={setIdentifier} placeholder="seu@email.com" autoComplete="email" />

@@ -5,6 +5,7 @@ import { normalizeMetaAttributionWindow, matchesMetaAttributionWindow } from "@/
 import { businessDateKey } from "@/lib/businessDate";
 import { isSameQueryScope } from "@/lib/queryScope";
 import { buildConversationEligibleMetaAdScopes } from "@/lib/metaLeadScope";
+import { fetchCampaignPages } from "@/lib/campaignQuery";
 
 export interface ActionTotalsResult {
   /** Sum across all ads, keyed by action_type. */
@@ -79,7 +80,7 @@ export function useActionTotalsByAds(
   return useQuery({
     queryKey,
     enabled: sortedIds.length > 0 || scopedAccounts.length > 0 || scopedCampaigns.length > 0,
-    queryFn: async (): Promise<ActionTotalsResult> => {
+    queryFn: async ({ signal }): Promise<ActionTotalsResult> => {
       const totals: Record<string, number> = {};
       const totalsByAccount: Record<string, Record<string, number>> = {};
       const dailyByAccount: Record<string, Record<string, Record<string, number>>> = {};
@@ -116,29 +117,30 @@ export function useActionTotalsByAds(
       const adsetByAd: Record<string, string> = {};
       for (let i = 0; i < resolvedSortedIds.length; i += CHUNK_IDS) {
         const chunk = resolvedSortedIds.slice(i, i + CHUNK_IDS);
-        const { data, error } = await supabase
-          .from("ads")
-          .select("id, adset_id")
-          .in("id", chunk);
-        if (error) throw error;
-        for (const r of (data || []) as any[]) adsetByAd[r.id] = r.adset_id;
+        const data = await fetchCampaignPages(
+          () => supabase.from("ads").select("id, adset_id").in("id", chunk),
+          signal,
+          chunk.length || CHUNK_IDS,
+          "Os anúncios para calcular as ações",
+          2,
+        );
+        for (const r of data as any[]) adsetByAd[r.id] = r.adset_id;
       }
       const adsetIds = Array.from(new Set(Object.values(adsetByAd)));
-      const campaignByAdset: Record<string, string> = {};
       const destinationTypeByAdset: Record<string, string | null> = {};
       for (let i = 0; i < adsetIds.length; i += CHUNK_IDS) {
         const chunk = adsetIds.slice(i, i + CHUNK_IDS);
-        const { data, error } = await supabase
-          .from("adsets")
-          .select("id, campaign_id, destination_type")
-          .in("id", chunk);
-        if (error) throw error;
-        for (const r of (data || []) as any[]) {
-          campaignByAdset[r.id] = r.campaign_id;
+        const data = await fetchCampaignPages(
+          () => supabase.from("adsets").select("id, destination_type").in("id", chunk),
+          signal,
+          chunk.length || CHUNK_IDS,
+          "Os conjuntos para calcular as ações",
+          2,
+        );
+        for (const r of data as any[]) {
           destinationTypeByAdset[r.id] = r.destination_type || null;
         }
       }
-      const campaignIds = Array.from(new Set(Object.values(campaignByAdset)));
       // Historical Meta results remain valid even when the parent campaign is
       // archived/deleted. Never discard those action rows by current status.
       const allowedIds = resolvedSortedIds;
@@ -173,17 +175,21 @@ export function useActionTotalsByAds(
       for (const group of actionGroups.values()) {
         for (let i = 0; i < group.ids.length; i += CHUNK) {
           const chunk = group.ids.slice(i, i + CHUNK);
-          for (let from = 0; ; from += PAGE) {
-          let q = supabase
-            .from("insight_actions" as any)
-            .select("ad_account_id, ad_id, action_type, value, value_amount, date, attribution_window")
-            .eq("ad_account_id", group.accountId)
-            .in("ad_id", chunk);
-          if (start) q = q.gte("date", start);
-          if (end) q = q.lte("date", end);
-          const { data, error } = await q.range(from, from + PAGE - 1);
-          if (error) throw error;
-          const rows = (data || []) as any[];
+          const rows = await fetchCampaignPages(
+            () => {
+              let q = supabase
+                .from("insight_actions" as any)
+                .select("ad_account_id, ad_id, action_type, value, value_amount, date, attribution_window")
+                .eq("ad_account_id", group.accountId)
+                .in("ad_id", chunk);
+              if (start) q = q.gte("date", start);
+              if (end) q = q.lte("date", end);
+              return q;
+            },
+            signal,
+            PAGE,
+            "As ações Meta das campanhas",
+          ) as any[];
           for (const r of rows) {
             if (!matchesMetaAttributionWindow(r.attribution_window, group.window)) continue;
             const factKey = `${r.ad_id}|${r.date}|${r.action_type}|${normalizeMetaAttributionWindow(r.attribution_window)}`;
@@ -208,16 +214,19 @@ export function useActionTotalsByAds(
                 (dailyByAccount[acc][r.date][r.action_type] || 0) + v;
             }
           }
-          if (rows.length < PAGE) break;
-          }
         }
       }
       const accountIds = Array.from(new Set(allowedIds.map((id) => resolvedAccountByAd[id]).filter(Boolean))) as string[];
       const lpByAccount: Record<string, string> = {};
       if (accountIds.length > 0) {
-        const { data: configs, error } = await supabase.from("account_lp_config").select("ad_account_id, action_type").in("ad_account_id", accountIds);
-        if (error) throw error;
-        for (const config of (configs || []) as Array<{ ad_account_id: string; action_type: string | null }>) {
+        const configs = await fetchCampaignPages(
+          () => supabase.from("account_lp_config").select("ad_account_id, action_type").in("ad_account_id", accountIds),
+          signal,
+          accountIds.length,
+          "As configurações de atribuição das contas",
+          2,
+        );
+        for (const config of configs as Array<{ ad_account_id: string; action_type: string | null }>) {
           if (config.action_type) lpByAccount[config.ad_account_id] = config.action_type;
         }
       }

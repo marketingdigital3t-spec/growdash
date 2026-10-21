@@ -12,13 +12,16 @@ import { aggregateSales } from "@/hooks/useSales";
 import { aggregateMetrics } from "@/lib/metrics";
 import { PLATFORM_COLORS } from "@/lib/platformColors";
 import { buildPlatformBreakdown, type PlatformBreakdownRow } from "@/lib/platformBreakdown";
+import { aggregateRevenueSources } from "@/lib/revenueAggregation";
 
 type PlatformRow = PlatformBreakdownRow;
 
 /** A standalone widget so payment and attribution blocks can be edited independently. */
 export function PaymentChartWidget() {
-  const { sales } = useDashboard();
-  return <PaymentChart byPayment={aggregateSales(sales).byPayment} />;
+  const { sales, revenueDeals = [] } = useDashboard();
+  const salesTotals = aggregateSales(sales);
+  const rdTotals = aggregateRevenueSources(sales, revenueDeals);
+  return <PaymentChart byPayment={{ ...salesTotals.byPayment, outros: salesTotals.byPayment.outros + rdTotals.rdOnlyRevenue }} unknownPaymentRevenue={rdTotals.rdOnlyRevenue} />;
 }
 
 /**
@@ -26,7 +29,7 @@ export function PaymentChartWidget() {
  * but makes the whole block a first-class grid item with its own resize/move handle.
  */
 export function PlatformDistributionWidget() {
-  const { sales, rdDeals, leadBreakdown, insights } = useDashboard();
+  const { sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, insights } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const [drilldown, setDrilldown] = useState<TopPlatform | null>(null);
   const [platformView, setPlatformView] = useState<"leads" | "revenue" | "conv">("leads");
@@ -35,8 +38,9 @@ export function PlatformDistributionWidget() {
     metaLeads: leadBreakdown?.total ?? aggregateMetrics(insights).totalLeads,
     rdDeals,
     sales,
+    revenueDeals,
     platformRules,
-  }), [insights, leadBreakdown?.total, platformRules, rdDeals, sales]);
+  }), [insights, leadBreakdown?.total, platformRules, rdDeals, revenueDeals, sales]);
 
   const totalSales = platformBreakdown.reduce((sum, row) => sum + row.sales, 0);
   const totalRevenue = platformBreakdown.reduce((sum, row) => sum + row.revenue, 0);

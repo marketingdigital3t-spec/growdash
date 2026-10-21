@@ -289,7 +289,14 @@ export function useRDWonDealsForPeriod({ startDate, endDate, adAccountId, adAcco
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
   });
-  return { ...query, isLoading: query.isLoading || rdScope.loading, isFetching: query.isFetching || rdScope.loading, isError: query.isError || Boolean(rdScope.error), error: query.error ?? rdScope.error };
+  return {
+    ...query,
+    resolvedFunnelIds,
+    isLoading: query.isLoading || rdScope.loading,
+    isFetching: query.isFetching || rdScope.loading,
+    isError: query.isError || Boolean(rdScope.error),
+    error: query.error ?? rdScope.error,
+  };
 }
 
 /**
@@ -321,9 +328,12 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
           .order("stage_updated_at", { ascending: false, nullsFirst: false })
           .order("lead_created_at", { ascending: false, nullsFirst: false });
         if (periodBounds) {
-          query = query
-            .gte("lead_created_at", periodBounds.start)
-            .lte("lead_created_at", periodBounds.end);
+          // Match RD Station's calendar semantics: open deals are included
+          // by creation date, while won deals are included by closing date
+          // (falling back to the stage transition for legacy rows).
+          query = query.or(
+            `and(lead_created_at.gte.${periodBounds.start},lead_created_at.lte.${periodBounds.end}),and(closed_at.gte.${periodBounds.start},closed_at.lte.${periodBounds.end}),and(closed_at.is.null,stage_updated_at.gte.${periodBounds.start},stage_updated_at.lte.${periodBounds.end})`,
+          );
         }
         const usableFunnelIds = (resolvedFunnelIds ?? []).filter((id) => id !== NO_LINKED_RD_FUNNEL_SCOPE_ID);
         const scopeFilters = [
@@ -351,7 +361,16 @@ export function useRDCRMDeals({ adAccountId, adAccountIds, funnelIds, startDate,
         if (batch.length < pageSize) break;
       }
 
-      return dedupeRDDeals(all);
+      const scoped = periodBounds
+        ? all.filter((deal) => isRDDealInScopePeriod(deal, {
+          accountIds: [],
+          funnelIds: [],
+          startDate: startDate!,
+          endDate: endDate!,
+          dateRule: "created_at_for_open_closed_at_for_won",
+        }))
+        : all;
+      return dedupeRDDeals(scoped);
     },
     staleTime: 5 * 60 * 1_000,
     gcTime: 24 * 60 * 60 * 1_000,

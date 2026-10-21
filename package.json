@@ -110,9 +110,17 @@
     "wrangler": "^4.120.0"
   },
   "overrides": {
+    "@excalidraw/excalidraw": {
+      "nanoid": "^3.3.20",
+      "sass": "^1.105.2"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "nanoid": "^5.1.16"
+    },
     "d3-color": "^3.1.0",
     "d3-interpolate": "^3.0.1",
     "d3-transition": "^3.0.1",
-    "d3-zoom": "^3.0.0"
+    "d3-zoom": "^3.0.0",
+    "source-map-js": "^1.2.2"
   }
 }

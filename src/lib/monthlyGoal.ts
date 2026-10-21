@@ -31,3 +31,11 @@ export function goalColorForPercentage(percentage: number) {
     : interpolateColor(GOAL_YELLOW, GOAL_GREEN, Math.min((safePercentage - 50) / 30, 1));
   return `rgb(${color.r} ${color.g} ${color.b})`;
 }
+
+export type GoalRevenueDisplayState = "pending" | "unavailable" | "stale" | "ready";
+
+export function goalRevenueDisplayState({ loading, error, snapshot }: { loading: boolean; error: boolean; snapshot: boolean }): GoalRevenueDisplayState {
+  if (error) return snapshot ? "stale" : "unavailable";
+  if (loading && !snapshot) return "pending";
+  return "ready";
+}

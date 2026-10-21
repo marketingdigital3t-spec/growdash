@@ -133,6 +133,7 @@ Deno.serve(async (req) => {
             attributionWindow: body.attributionWindow,
             syncMode,
             recentHours,
+            fast,
             // Omitting dates lets sync-meta-insights resolve "today" in each
             incremental: true,
             includeBreakdowns: false,
@@ -142,7 +143,26 @@ Deno.serve(async (req) => {
           // Leads/forms are an auxiliary Meta resource. Run it after the
           // daily snapshot, but do not invalidate daily KPIs when its token,
           // permission or form discovery is temporarily unavailable.
-          if (fast && syncMode !== "recent_window") {
+          if (fast && syncMode === "recent_window") {
+            return {
+              data: {
+                success: true,
+                status: insights.data?.status || "success",
+                synced: Number(insights.data?.synced || 0),
+                warnings: [
+                  insights.data?.errors,
+                  "Leads/forms, hourly, breakdowns, saldo e RD continuarão em segundo plano.",
+                ].filter(Boolean),
+                block_status: {
+                  insights: insights.data?.status || "success",
+                  leads: "pending",
+                  hourly: "pending",
+                },
+                synced_at: insights.data?.synced_at,
+              },
+            };
+          }
+          if (fast) {
             // Ações/leads alimentam os cards de conversão e CPL. Elas precisam
             // seguir a confirmação do Insights do recorte selecionado, mas o
             // hourly e os breakdowns ficam para a reconciliação global em
@@ -426,19 +446,28 @@ async function runControlled(args: {
 }
 
 async function invokeFunction(supabaseUrl: string, authHeader: string, name: string, body: Record<string, unknown>) {
-  const delays = [800, 2_000, 5_000];
+  // A slow RD reconciliation must not occupy the coordinator for several
+  // minutes. It is serialized per funnel and the next cycle retries it, while
+  // Meta keeps the more patient retry window.
+  const isRD = name === "rd-sync-deals";
+  const delays = isRD ? [800, 2_000] : [800, 2_000, 5_000];
+  const timeoutMs = isRD ? 30_000 : 45_000;
   let last: { error?: unknown; data?: any } | null = null;
   for (let attempt = 0; attempt < delays.length; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45_000);
-      const response = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
-        method: "POST",
-        headers: { Authorization: authHeader, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      let response: Response;
+      try {
+        response = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+          method: "POST",
+          headers: { Authorization: authHeader, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
       const data = await response.json().catch(() => null);
       if (response.ok) return { data };
       if (response.status === 409 && data?.status === "already_running") {
@@ -449,7 +478,7 @@ async function invokeFunction(supabaseUrl: string, authHeader: string, name: str
       const retryAfter = Number(response.headers.get("Retry-After") || 0);
       await sleep(retryAfter > 0 ? retryAfter * 1_000 : delays[attempt]);
     } catch (error) {
-      last = { error: error instanceof DOMException && error.name === "AbortError" ? `${name} excedeu 45s; snapshot anterior preservado.` : (error as Error).message };
+      last = { error: error instanceof DOMException && error.name === "AbortError" ? `${name} excedeu ${Math.round(timeoutMs / 1000)}s; snapshot anterior preservado.` : (error as Error).message };
       if (attempt === delays.length - 1) break;
       await sleep(delays[attempt]);
     }

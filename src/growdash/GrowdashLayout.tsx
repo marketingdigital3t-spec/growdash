@@ -18,7 +18,7 @@ import {
   BadgeDollarSign,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { endOfMonth, startOfMonth } from "date-fns";
+import { businessMonthRange, aggregateMonthlyGoalRevenue } from "@/lib/monthlyGoalRevenue";
 import { NAV_SECTIONS } from "./navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,8 +29,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { BrandLogo, BrandMark } from "@/components/BrandLogo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner";
-import { aggregateSales, useSales } from "@/hooks/useSales";
 import { useSalesGoals } from "@/hooks/useSalesGoals";
+import { useRDWonDealsForPeriod } from "@/hooks/useRDDealsForPeriod";
 import { TopbarMonthlyGoal } from "@/components/dashboard/DashboardGoalProgress";
 import { useNearRealtimeSync } from "@/hooks/useNearRealtimeSync";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
@@ -161,20 +161,36 @@ export default function GrowdashLayout() {
   // Mantém a mesma referência de mês durante toda a sessão do layout. Assim,
   // atualizações de UI não criam novas chaves de consulta para a meta mensal.
   const currentMonth = useMemo(() => new Date(), []);
-  const monthlyRange = useMemo(() => ({
-    startDate: startOfMonth(currentMonth),
-    endDate: endOfMonth(currentMonth),
-  }), [currentMonth]);
-  const { data: monthlySales = [], isError: monthlySalesError, dataUpdatedAt: monthlySalesUpdatedAt } = useSales({
+  const monthlyRange = useMemo(() => businessMonthRange(currentMonth), [currentMonth]);
+  const goalAccountIds = useMemo(
+    () => adAccountId === "all"
+      ? (adAccountIds.length ? adAccountIds.filter((id) => visibleAccountIds.has(id)).sort() : Array.from(visibleAccountIds).sort())
+      : [adAccountId],
+    [adAccountId, adAccountIds, visibleAccountIds],
+  );
+  const goalVisibleAccountIds = useMemo(() => new Set(goalAccountIds), [goalAccountIds]);
+  const goalAccountScopeReady = !loadingAdAccounts
+    && (adAccountId === "all" ? visibleAccountIds.size > 0 : visibleAccountIds.has(adAccountId));
+  const monthlyWonDealsQuery = useRDWonDealsForPeriod({
     startDate: monthlyRange.startDate,
     endDate: monthlyRange.endDate,
     adAccountId: adAccountId === "all" ? undefined : adAccountId,
-    adAccountIds: adAccountIds.length > 1 ? adAccountIds : undefined,
-    enabled: loadBackgroundData,
+    adAccountIds: goalAccountIds,
+    // Resolve funnels from the exact account scope instead of reusing a
+    // global funnel list that could include another business unit.
+    funnelIds: undefined,
+    enabled: loadBackgroundData && goalAccountScopeReady && goalAccountIds.length > 0,
   });
-  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(currentMonth, { enabled: loadBackgroundData });
-  const goalRevenue = useMemo(() => aggregateSales(monthlySales.filter((sale) => !!sale.ad_account_id && visibleAccountIds.has(sale.ad_account_id) && (adAccountId === "all" || sale.ad_account_id === adAccountId))).totalNet, [adAccountId, monthlySales, visibleAccountIds]);
-  const goalTarget = useMemo(() => (goalData?.rows ?? []).filter((goal) => visibleAccountIds.has(goal.ad_account_id) && (adAccountId === "all" || goal.ad_account_id === adAccountId)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0), [adAccountId, goalData?.rows, visibleAccountIds]);
+  const { data: goalData, isLoading: loadingGoals } = useSalesGoals(monthlyRange.startDate, { enabled: loadBackgroundData });
+  const monthlyWonDeals = useMemo(() => monthlyWonDealsQuery.data ?? [], [monthlyWonDealsQuery.data]);
+  const goalRevenue = useMemo(() => aggregateMonthlyGoalRevenue(monthlyWonDeals, {
+    startDate: monthlyRange.startDate,
+    endDate: monthlyRange.endDate,
+    visibleAccountIds: goalVisibleAccountIds,
+    selectedAccountId: adAccountId,
+    funnelIds: monthlyWonDealsQuery.resolvedFunnelIds,
+  }), [adAccountId, goalVisibleAccountIds, monthlyRange.endDate, monthlyRange.startDate, monthlyWonDeals, monthlyWonDealsQuery.resolvedFunnelIds]);
+  const goalTarget = useMemo(() => (goalData?.rows ?? []).filter((goal) => goalVisibleAccountIds.has(goal.ad_account_id)).reduce((sum, goal) => sum + Number(goal.target_revenue), 0), [goalData?.rows, goalVisibleAccountIds]);
   const goalAccountLabel = adAccountId === "all"
     ? `Meta mensal · todas as contas · ${segment === "saas" ? "SaaS" : "Infoproduto"}`
     : `Meta mensal · ${visibleAccounts.find((account) => account.id === adAccountId)?.name || "Conta selecionada"}`;
@@ -506,7 +522,7 @@ export default function GrowdashLayout() {
             <PanelLeftClose className={cn("h-4 w-4 transition-transform", effectiveCollapsed && "rotate-180")} />
           </button>
           <div className="order-3 w-full min-w-0 grow lg:order-none lg:w-auto">
-            <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} revenueError={monthlySalesError} revenueSnapshotAvailable={monthlySalesUpdatedAt > 0} />
+            <TopbarMonthlyGoal realized={goalRevenue} target={goalTarget} accountLabel={goalAccountLabel} schemaReady={goalData?.schemaReady ?? false} loading={loadingGoals} revenueLoading={monthlyWonDealsQuery.isLoading || loadingAdAccounts} revenueError={monthlyWonDealsQuery.isError} revenueSnapshotAvailable={monthlyWonDealsQuery.dataUpdatedAt > 0} />
           </div>
         </header>
         <main
@@ -526,7 +542,7 @@ export default function GrowdashLayout() {
             )}
           >
             <GlobalAnnouncementBanner />
-            {!isCampaignsRoute && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} onSyncNow={() => void backgroundSync.refresh(true)} />}
+            {!isCampaignsRoute && <GlobalScopeToolbar syncing={backgroundSync.state === "refreshing"} lastSyncAt={backgroundSync.lastSyncAt || backgroundSync.lastUpdatedAt} syncState={backgroundSync.state} syncError={backgroundSync.rdSyncError || backgroundSync.syncError} onSyncNow={() => void backgroundSync.refresh(true)} />}
             {/* A falha de uma tela não pode desmontar o shell, a sessão ou o menu. */}
             <RouteErrorBoundary resetKey={`${pathname}${search}`} scope={pathname}>
               <PageTransition className={cn("gd-page-transition", isCampaignsWorkspace && "md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden")}>
