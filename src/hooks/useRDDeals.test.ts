@@ -99,6 +99,8 @@ describe("RD deals date scope", () => {
       "Lead Novo → Venda Realizada",
       "Leads novos → Venda Realizada",
     ]);
+    expect(analytics.stageConversion.map((item) => item.funnelId)).toEqual(["aluna", "modelo"]);
+    expect(analytics.stageConversion.map((item) => [item.fromCount, item.toCount])).toEqual([[2, 1], [2, 1]]);
 
     const consolidated = consolidateFunnelStages(stages);
     expect(consolidated.sourceToCanonicalId.get("a-lead")).toBe("new-leads");
@@ -135,6 +137,39 @@ describe("RD deals date scope", () => {
     const analytics = computeFunnelAnalytics([deal("deal-1", "won", true)], stages, [deal("deal-1", "won", true)], { startDate: new Date("2026-09-01T00:00:00Z"), endDate: new Date("2026-09-03T23:59:59Z") }, history);
     expect(analytics.stageConversion[0]).toMatchObject({ from: "Novo lead", to: "Em contato", rate: 100 });
     expect(analytics.evolution.some((day) => day.opportunities > 0)).toBe(true);
+  });
+
+  it("uses the visible pipeline snapshot as the denominator when history is partial", () => {
+    const stages: FunnelStage[] = [
+      { rd_funnel_id: "pipeline-a", rd_stage_id: "lead", name: "Novo lead", order: 1, is_won: false, is_lost: false },
+      { rd_funnel_id: "pipeline-a", rd_stage_id: "contact", name: "Em contato", order: 2, is_won: false, is_lost: false },
+      { rd_funnel_id: "pipeline-a", rd_stage_id: "won", name: "Venda realizada", order: 3, is_won: true, is_lost: false },
+    ];
+    const deal = (id: string, stageId: string): RDDeal => ({
+      id, rd_deal_id: id, rd_connection_id: "connection-a", ad_account_id: "account-a", rd_funnel_id: "pipeline-a",
+      rd_stage_id: stageId, rd_stage_name: stages.find((stage) => stage.rd_stage_id === stageId)!.name,
+      rd_stage_order: stages.find((stage) => stage.rd_stage_id === stageId)!.order, deal_owner_name: null,
+      rd_product_name: null, stage_bucket: stageId === "won" ? "client" : "lead", win: stageId === "won", lost_reason: null,
+      amount_total: 0, utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null,
+      utm_id: null, lead_state: null, lead_city: null, lead_created_at: "2026-10-01T12:00:00Z", stage_updated_at: null, closed_at: null,
+    });
+    const analytics = computeFunnelAnalytics([
+      deal("lead-1", "lead"),
+      deal("contact-1", "contact"),
+      deal("won-1", "won"),
+    ], stages, [], undefined, [{
+      id: "history-1", rd_deal_id: "contact-1", rd_funnel_id: "pipeline-a", from_stage_id: "lead", from_stage_name: "Novo lead",
+      from_stage_bucket: "lead", to_stage_id: "contact", to_stage_name: "Em contato", to_stage_bucket: "lead", changed_at: "2026-10-02T12:00:00Z",
+    }]);
+
+    expect(analytics.stageConversionMode).toBe("history");
+    expect(analytics.stageConversion[0]).toMatchObject({
+      funnelId: "pipeline-a",
+      fromCount: 3,
+      toCount: 2,
+      rate: expect.closeTo(66.666, 2),
+      lost: 1,
+    });
   });
 
   it("does not create an advancement pair from stages that belong to different funnels", () => {

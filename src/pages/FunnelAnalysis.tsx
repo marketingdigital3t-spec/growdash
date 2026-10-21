@@ -321,6 +321,10 @@ export default function FunnelAnalysis() {
     [operationalPeriodClosedDeals, operationalPeriodDeals],
   );
   const operationalStages = useMemo(() => filterOperationalRDFunnelStages(stages, activeFunnels), [activeFunnels, stages]);
+  const funnelNames = useMemo(
+    () => Object.fromEntries(activeFunnels.map((funnel) => [funnel.rd_funnel_id!, funnel.name])),
+    [activeFunnels],
+  );
   const excludedDealIds = useMemo(() => excludedOperationalRDDealIds(deals, activeFunnels), [activeFunnels, deals]);
 
   const sources = useMemo(() => Array.from(new Set(operationalFilterDeals.map((d) => d.utm_source).filter(Boolean) as string[])).sort(), [operationalFilterDeals]);
@@ -338,13 +342,13 @@ export default function FunnelAnalysis() {
     if (selectedProduct !== "all" && !products.includes(selectedProduct)) setSelectedProduct("all");
   }, [loadingFilterDeals, owners, products, rdCampaigns, selectedCampaigns, selectedOwner, selectedProduct, selectedSource, selectedState, sources, states]);
 
-  const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals), [operationalClosedDeals, operationalDeals, operationalStages]);
+  const baseAnalytics = useMemo(() => computeFunnelAnalytics(operationalDeals, operationalStages, operationalClosedDeals, undefined, [], funnelNames), [funnelNames, operationalClosedDeals, operationalDeals, operationalStages]);
   const periodBaseAnalytics = useMemo(
     // O recorte de leads usa a data de entrada, mas uma venda pertence ao dia
     // em que foi fechada. Incluímos a união deduplicada para que uma venda de
     // lead antigo não desapareça da etapa "Venda Realizada".
-    () => computeFunnelAnalytics(operationalPeriodFunnelDeals, operationalStages, operationalPeriodClosedDeals as unknown as typeof operationalPeriodDeals, { startDate, endDate }, stageHistory),
-    [endDate, operationalPeriodClosedDeals, operationalPeriodFunnelDeals, operationalStages, stageHistory, startDate],
+    () => computeFunnelAnalytics(operationalPeriodFunnelDeals, operationalStages, operationalPeriodClosedDeals as unknown as typeof operationalPeriodDeals, { startDate, endDate }, stageHistory, funnelNames),
+    [endDate, funnelNames, operationalPeriodClosedDeals, operationalPeriodFunnelDeals, operationalStages, stageHistory, startDate],
   );
   // RD é a fonte canônica do funil: vendas, receita, etapas e evolução usam
   // o mesmo snapshot de negócios ganhos. A tabela `sales` fica restrita à

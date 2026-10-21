@@ -450,9 +450,13 @@ export interface FunnelAnalytics {
     valueInNegotiation: number;
   }[];
   stageConversion: {
+    funnelId: string;
+    funnelName: string;
     from: string;
     to: string;
     label: string;
+    fromCount: number;
+    toCount: number;
     rate: number;          // %
     lost: number;          // leads perdidos na passagem
     lossPct: number;
@@ -510,6 +514,7 @@ export function computeFunnelAnalytics(
   closedDeals: RDDeal[] = deals.filter((deal) => deal.win),
   dateRange?: { startDate: Date; endDate: Date },
   stageHistory: RDDealStageHistory[] = [],
+  funnelNames: Record<string, string> = {},
 ): FunnelAnalytics {
   const totalLeads = deals.length;
 
@@ -614,7 +619,15 @@ export function computeFunnelAnalytics(
   // movimentações, a progressão é inferida pelo estágio atual, mas somente
   // dentro da sequência real do funil daquele negócio.
   const cumulativeByCanonicalStage = new Map<string, number>();
-  const pairCounts = new Map<string, { from: string; to: string; fromCount: number; toCount: number; order: number }>();
+  type TransitionAccumulator = {
+    funnelId: string;
+    from: string;
+    to: string;
+    fromDeals: Set<string>;
+    toDeals: Set<string>;
+    order: number;
+  };
+  const pairCounts = new Map<string, TransitionAccumulator>();
   const stagesByFunnel = new Map<string, FunnelStage[]>();
   for (const stage of analyticsStages) {
     const list = stagesByFunnel.get(stage.rd_funnel_id) || [];
@@ -622,10 +635,15 @@ export function computeFunnelAnalytics(
     stagesByFunnel.set(stage.rd_funnel_id, list);
   }
   const dealsByFunnel = new Map<string, RDDeal[]>();
+  const dealKeysByFunnelAndRDId = new Map<string, string[]>();
   for (const deal of deals) {
     const list = dealsByFunnel.get(deal.rd_funnel_id) || [];
     list.push(deal);
     dealsByFunnel.set(deal.rd_funnel_id, list);
+    const scopeKey = `${deal.rd_funnel_id || "unknown"}:${deal.rd_deal_id}`;
+    const keys = dealKeysByFunnelAndRDId.get(scopeKey) || [];
+    keys.push(`${deal.rd_connection_id || "unknown"}:${deal.rd_deal_id}`);
+    dealKeysByFunnelAndRDId.set(scopeKey, keys);
   }
   for (const [funnelId, funnelDeals] of dealsByFunnel) {
     // Use native RD stage IDs for this fallback. The consolidated IDs used by
@@ -661,13 +679,21 @@ export function computeFunnelAnalytics(
         const fromStage = funnelSequence[position];
         const toStage = funnelSequence[position + 1];
         const key = `${funnelId}:${fromStage.rd_stage_id}:${toStage.rd_stage_id}`;
-        const current = pairCounts.get(key) || { from: fromStage.name, to: toStage.name, fromCount: 0, toCount: 0, order: position };
+        const current = pairCounts.get(key) || {
+          funnelId,
+          from: fromStage.name,
+          to: toStage.name,
+          fromDeals: new Set<string>(),
+          toDeals: new Set<string>(),
+          order: position,
+        };
+        const dealKey = `${deal.rd_connection_id || "unknown"}:${deal.rd_deal_id}`;
         // The same canonical pair can exist in more than one RD funnel. Keep
         // its earliest native position so the aggregated view preserves the
         // RD sequence instead of falling back to alphabetical label order.
         current.order = Math.min(current.order, position);
-        current.fromCount += 1;
-        if (index >= position + 1) current.toCount += 1;
+        current.fromDeals.add(dealKey);
+        if (index >= position + 1) current.toDeals.add(dealKey);
         pairCounts.set(key, current);
       }
     }
@@ -704,7 +730,8 @@ export function computeFunnelAnalytics(
   // Taxa de avanço: cada par é agregado apenas entre funis que contêm as
   // duas etapas adjacentes, sem criar uma sequência global entre contas.
   const stageConversion: FunnelAnalytics["stageConversion"] = [];
-  const historyPairs = new Map<string, { from: string; to: string; fromCount: Set<string>; toCount: Set<string>; order: number }>();
+  const historyPairs = new Map<string, TransitionAccumulator>();
+  let hasHistoricalEvidence = false;
   const nativeStageByKey = new Map(analyticsStages.map((stage) => [`${stage.rd_funnel_id}:${stage.rd_stage_id}`, stage]));
   for (const event of stageHistory) {
     if (!event.from_stage_id || !event.to_stage_id) continue;
@@ -713,22 +740,55 @@ export function computeFunnelAnalytics(
     const fromStage = nativeStageByKey.get(`${event.rd_funnel_id}:${event.from_stage_id}`);
     const toStage = nativeStageByKey.get(`${event.rd_funnel_id}:${event.to_stage_id}`);
     const order = toStage?.order ?? 9999;
-    const key = `${fromId}:${toId}`;
-    const pair = historyPairs.get(key) || { from: fromStage?.name || event.from_stage_name || fromId, to: toStage?.name || event.to_stage_name || toId, fromCount: new Set<string>(), toCount: new Set<string>(), order };
-    pair.fromCount.add(event.rd_deal_id);
-    pair.toCount.add(event.rd_deal_id);
+    // History is fetched by funnel/date, while the visible deals are scoped
+    // by account and funnel. Ignore events without a matching visible deal so
+    // another account can never inflate this pipeline's denominator.
+    const scopedDealKeys = dealKeysByFunnelAndRDId.get(`${event.rd_funnel_id}:${event.rd_deal_id}`) || [];
+    if (scopedDealKeys.length === 0) continue;
+    hasHistoricalEvidence = true;
+    const funnelKey = event.rd_funnel_id;
+    // Pair keys use native stage IDs so the event evidence merges with the
+    // same pipeline transition built from the current snapshot, even when
+    // multiple funnels are being consolidated for the visual distribution.
+    const key = `${funnelKey}:${event.from_stage_id}:${event.to_stage_id}`;
+    const pair = historyPairs.get(key) || {
+      funnelId: funnelKey,
+      from: fromStage?.name || event.from_stage_name || fromId,
+      to: toStage?.name || event.to_stage_name || toId,
+      fromDeals: new Set<string>(),
+      toDeals: new Set<string>(),
+      order,
+    };
+    scopedDealKeys.forEach((dealKey) => {
+      pair.fromDeals.add(dealKey);
+      pair.toDeals.add(dealKey);
+    });
     pair.order = Math.min(pair.order, order);
     historyPairs.set(key, pair);
   }
-  const historicalPairs = Array.from(historyPairs.values()).map((pair) => ({
+  // Start with the current RD snapshot for every transition. This supplies
+  // the denominator even when the history endpoint returned only a subset of
+  // movements during the selected period. Historical events then add deals
+  // that advanced but are no longer represented by the current stage alone.
+  for (const [key, pair] of pairCounts) {
+    const historical = historyPairs.get(key);
+    if (!historical) {
+      historyPairs.set(key, pair);
+      continue;
+    }
+    historical.fromDeals.forEach((dealKey) => pair.fromDeals.add(dealKey));
+    historical.toDeals.forEach((dealKey) => pair.toDeals.add(dealKey));
+    historyPairs.set(key, pair);
+  }
+  const conversionPairs = Array.from(historyPairs.values()).map((pair) => ({
+    funnelId: pair.funnelId,
     from: pair.from,
     to: pair.to,
-    fromCount: pair.fromCount.size,
-    toCount: pair.toCount.size,
+    fromCount: pair.fromDeals.size,
+    toCount: pair.toDeals.size,
     order: pair.order,
   }));
-  const conversionPairs = historicalPairs.length > 0 ? historicalPairs : Array.from(pairCounts.values());
-  const stageConversionMode: FunnelAnalytics["stageConversionMode"] = historicalPairs.length > 0
+  const stageConversionMode: FunnelAnalytics["stageConversionMode"] = hasHistoricalEvidence
     ? "history"
     : conversionPairs.length > 0
       ? "estimated"
@@ -738,9 +798,13 @@ export function computeFunnelAnalytics(
     const lost = Math.max(0, pair.fromCount - pair.toCount);
     const lossPct = pair.fromCount > 0 ? (lost / pair.fromCount) * 100 : 0;
     stageConversion.push({
+      funnelId: pair.funnelId,
+      funnelName: funnelNames[pair.funnelId] || pair.funnelId,
       from: pair.from,
       to: pair.to,
       label: `${pair.from} → ${pair.to}`,
+      fromCount: pair.fromCount,
+      toCount: pair.toCount,
       rate,
       lost,
       lossPct,
