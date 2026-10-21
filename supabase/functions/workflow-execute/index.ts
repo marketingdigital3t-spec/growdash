@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
       user = authResult.data.user;
       if (!user) return json({ error: "Não autorizado" }, 401);
     }
-    const { data: automation, error: automationError } = await admin.from("growdash_automations").select("id,workspace_id,created_by,name,status,workflow_definition,workflow_version,error_policy").eq("id", workflowId).maybeSingle();
+    const { data: automation, error: automationError } = await admin.from("growdash_automations").select("id,workspace_id,created_by,name,status,run_count,workflow_definition,workflow_version,error_policy").eq("id", workflowId).maybeSingle();
     if (automationError) throw automationError;
     if (!automation) return json({ error: "Workflow não encontrado." }, 404);
     const actorId = internalCall ? String(automation.created_by || "") : user!.id;
@@ -399,7 +399,7 @@ Deno.serve(async (req) => {
     const status = visited.size >= MAX_STEPS ? "error" : "success";
     const finalError = status === "error" ? "Limite de 100 etapas atingido." : null;
     await admin.from("growdash_automation_runs").update({ status, actions_executed: executed, error_message: finalError, finished_at: new Date().toISOString() }).eq("id", run.id);
-    await admin.from("growdash_automations").update({ run_count: (automation as any).run_count ? Number((automation as any).run_count) + 1 : 1, last_run_at: new Date().toISOString(), last_error: finalError }).eq("id", workflowId);
+    await admin.from("growdash_automations").update({ run_count: Number(automation.run_count || 0) + 1, last_run_at: new Date().toISOString(), last_error: finalError }).eq("id", workflowId);
     return json({ ok: status === "success", run_id: run.id, status, output: redact(outputs), steps: executed });
   } catch (error) { console.error("workflow-execute", error); return json({ error: error instanceof Error ? error.message : "Erro interno do executor." }, 500); }
 });
