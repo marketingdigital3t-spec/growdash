@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { addDays, format } from "date-fns";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -227,7 +227,6 @@ export default function Campaigns() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const syncMeta = useSyncMeta();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
@@ -709,14 +708,6 @@ export default function Campaigns() {
         startDate: formatApiDate(startDate),
         endDate: formatApiDate(endDate),
       }));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["campaigns_full"] }),
-        queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
-        queryClient.invalidateQueries({ queryKey: ["meta-adsets-independent"] }),
-        queryClient.invalidateQueries({ queryKey: ["meta-ads-independent"] }),
-        queryClient.invalidateQueries({ queryKey: ["insights"] }),
-        queryClient.invalidateQueries({ queryKey: ["ad_accounts"] }),
-      ]);
     } catch {
       // useSyncMeta already shows the actionable Meta/HTTP error.
     }
@@ -1130,8 +1121,8 @@ export default function Campaigns() {
               className="campaign-date-pill hidden lg:flex"
             />
             <span className="hidden text-xs text-muted-foreground xl:inline">Atualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
-            <Button variant="outline" size="icon" onClick={handleSync} disabled={isFetching || syncMeta.isPending} className="campaign-header-icon h-9 w-9" title="Atualizar dados">
-              <RefreshCw className={cn("h-4 w-4", (isFetching || syncMeta.isPending) && "animate-spin")} />
+            <Button variant="outline" size="icon" onClick={handleSync} disabled={isLoading || syncMeta.isPending} className="campaign-header-icon h-9 w-9" title="Atualizar dados">
+              <RefreshCw className={cn("h-4 w-4", (isLoading || syncMeta.isPending) && "animate-spin")} />
             </Button>
             <Button variant="default" size="sm" disabled className="campaign-publish-button h-9 px-4"><Send className="h-4 w-4" />Conferir e publicar</Button>
             <Button variant="outline" size="icon" className="campaign-header-icon h-9 w-9" title="Mais opções"><MoreHorizontal className="h-4 w-4" /></Button>
