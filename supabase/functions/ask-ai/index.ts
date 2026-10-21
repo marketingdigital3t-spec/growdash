@@ -3,6 +3,7 @@ import { canonicalMetaLeads, META_LEAD_ACTION_TYPES, type MetaLeadAction, type M
 import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
+import { fetchWithRetry, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,7 +83,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const mode = body?.mode === "traffic_analysis" ? "traffic_analysis" : "chat";
-    const history = Array.isArray(body?.history) ? body.history : [];
+    const isTrafficAnalysis = mode === "traffic_analysis";
+    const history = sanitizeConversationHistory(body?.history);
     const accountId = typeof body?.account_id === "string" ? body.account_id : undefined;
     const requestedAccountIds = Array.isArray(body?.account_ids)
       ? Array.from(new Set(body.account_ids.filter((id: unknown): id is string => typeof id === "string" && id.length > 0)))
@@ -90,8 +92,9 @@ Deno.serve(async (req) => {
     const selectedCampaignIds = Array.isArray(body?.selected_campaign_ids)
       ? body.selected_campaign_ids.filter((id: unknown) => typeof id === "string")
       : [];
-    const question = typeof body?.question === "string" && body.question.trim()
-      ? body.question.trim()
+    const sanitizedQuestion = sanitizeQuestion(body?.question);
+    const question = sanitizedQuestion
+      ? sanitizedQuestion
       : mode === "traffic_analysis" ? "Gere a análise completa solicitada." : "";
     if (!question) return responseError("Question required");
     if (mode === "traffic_analysis" && (!accountId || accountId === "all")) return responseError("Selecione uma conta de anúncio específica para gerar a análise.");
@@ -139,20 +142,40 @@ Deno.serve(async (req) => {
     }
     const accountIds = (accounts || []).map((account) => account.id);
 
-    let campaignQuery = admin.from("campaigns").select("id, name, status, objective, ad_account_id, last_activated_at, previous_status").in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
-    if (selectedCampaignIds.length) campaignQuery = campaignQuery.in("id", selectedCampaignIds);
-    const { data: campaigns, error: campaignError } = await campaignQuery;
-    if (campaignError) throw campaignError;
-    const campaignIds = (campaigns || []).map((campaign) => campaign.id);
+    // Chat mode only needs compact facts. Loading the full campaign/adset/ad
+    // catalog for every conversational question added several database reads
+    // and inflated the model prompt. The detailed catalog remains available
+    // for the explicit traffic report.
+    let campaigns: Array<Record<string, any>> = [];
+    let campaignIds = selectedCampaignIds;
+    let targets: Array<Record<string, any>> = [];
+    let adsets: Array<Record<string, any>> = [];
+    let ads: Array<Record<string, any>> = [];
+    if (mode === "traffic_analysis") {
+      let campaignQuery = admin.from("campaigns").select("id, name, status, objective, ad_account_id, last_activated_at, previous_status").in("ad_account_id", accountIds.length ? accountIds : ["00000000-00000000-0000-0000-000000000000"]);
+      if (selectedCampaignIds.length) campaignQuery = campaignQuery.in("id", selectedCampaignIds);
+      const { data, error: campaignError } = await campaignQuery;
+      if (campaignError) throw campaignError;
+      campaigns = data || [];
+      campaignIds = campaigns.map((campaign) => String(campaign.id));
 
-    const [{ data: targets }, { data: adsets }] = await Promise.all([
-      admin.from("campaign_targets").select("campaign_id, target_cpl").in("campaign_id", campaignIds.length ? campaignIds : ["x"]),
-      admin.from("adsets").select("id, campaign_id, name, status, daily_budget, destination_type").in("campaign_id", campaignIds.length ? campaignIds : ["x"]),
-    ]);
-    const adsetIds = (adsets || []).map((adset) => adset.id);
-    const { data: ads } = await admin.from("ads").select("id, name, adset_id, status, thumbnail_url, creative_id").in("adset_id", adsetIds.length ? adsetIds : ["x"]);
-    const adIds = (ads || []).map((ad) => ad.id);
-    const dataStartStr = twoMonthStartStr < previousStartStr ? twoMonthStartStr : previousStartStr;
+      const targetsResult = await admin.from("campaign_targets").select("campaign_id, target_cpl").in("campaign_id", campaignIds.length ? campaignIds : ["x"]);
+      if (targetsResult.error) throw targetsResult.error;
+      targets = targetsResult.data || [];
+      const adsetsResult = await admin.from("adsets").select("id, campaign_id, name, status, daily_budget, destination_type").in("campaign_id", campaignIds.length ? campaignIds : ["x"]);
+      if (adsetsResult.error) throw adsetsResult.error;
+      adsets = adsetsResult.data || [];
+      const adsetIds = adsets.map((adset) => adset.id);
+      const adsResult = await admin.from("ads").select("id, name, adset_id, status, thumbnail_url, creative_id").in("adset_id", adsetIds.length ? adsetIds : ["x"]);
+      if (adsResult.error) throw adsResult.error;
+      ads = adsResult.data || [];
+    }
+    // Conversational answers only need the requested and comparison periods.
+    // The two-month window is reserved for the explicit traffic report; this
+    // avoids loading an unnecessary month of facts before the model can start.
+    const dataStartStr = isTrafficAnalysis
+      ? (twoMonthStartStr < previousStartStr ? twoMonthStartStr : previousStartStr)
+      : previousStartStr;
     const { data: syncCoverageRows, error: syncCoverageError } = await admin.from("meta_sync_scope_state")
       .select("ad_account_id,campaign_scope,start_date,end_date,covered_start_date,covered_end_date,timezone,attribution_window,status,block_status,last_error,error_code,last_finished_at,updated_at")
       .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
@@ -187,10 +210,12 @@ Deno.serve(async (req) => {
     // and the AI receives an incomplete evidence set.
     const allInsights: Insight[] = [];
     for (let offset = 0; ; offset += 1000) {
-      const { data: page, error: insightError } = await admin.from("insights")
+      let insightQuery = admin.from("insights")
         .select("ad_id, ad_account_id, adset_id, campaign_id, attribution_window, date, spend, impressions, reach, clicks, leads, frequency")
         .gte("date", dataStartStr).lte("date", endStr)
-        .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"])
+        .in("ad_account_id", accountIds.length ? accountIds : ["00000000-00000000-0000-0000-000000000000"]);
+      if (selectedCampaignIds.length) insightQuery = insightQuery.in("campaign_id", selectedCampaignIds);
+      const { data: page, error: insightError } = await insightQuery
         .order("date", { ascending: true }).order("ad_id", { ascending: true })
         .range(offset, offset + 999);
       if (insightError) throw insightError;
@@ -346,20 +371,28 @@ Deno.serve(async (req) => {
 
     const daily = Array.from(new Set(currentInsights.map((row) => row.date))).sort().map((date) => ({ date, ...derived(totals(currentInsights.filter((row) => row.date === date)), 0, currentActionsAvailable, currentMetaSnapshotAvailable) }));
     const changes: Array<Record<string, unknown>> = [];
-    for (let offset = 0; ; offset += 1000) {
-      const { data: page, error: changesError } = await admin.from("campaign_changes")
-        .select("campaign_id, entity_type, entity_id, change_type, field, old_value, new_value, changed_at")
-        .in("campaign_id", campaignIds.length ? campaignIds : ["x"])
-        .gte("changed_at", requestedStart.toISOString())
-        .order("changed_at", { ascending: false })
-        .range(offset, offset + 999);
-      if (changesError) throw changesError;
-      changes.push(...((page || []) as Array<Record<string, unknown>>));
-      if (!page || page.length < 1000) break;
+    if (mode === "traffic_analysis" && campaignIds.length) {
+      for (let offset = 0; ; offset += 1000) {
+        const { data: page, error: changesError } = await admin.from("campaign_changes")
+          .select("campaign_id, entity_type, entity_id, change_type, field, old_value, new_value, changed_at")
+          .in("campaign_id", campaignIds)
+          .gte("changed_at", requestedStart.toISOString())
+          .order("changed_at", { ascending: false })
+          .range(offset, offset + 999);
+        if (changesError) throw changesError;
+        changes.push(...((page || []) as Array<Record<string, unknown>>));
+        if (!page || page.length < 1000) break;
+      }
     }
 
     const context = {
       generated_at: today.toISOString(),
+      retrieved_at: new Date().toISOString(),
+      retrieval: {
+        mode: "structured_facts",
+        source_of_truth: ["insights", "insight_actions", "crm_leads", "rd_deals", "sales"],
+        history_is_non_factual: true,
+      },
       account: accounts?.[0] ?? null,
       scope: {
         internal_account_ids: accountIds,
@@ -385,18 +418,18 @@ Deno.serve(async (req) => {
       metrics: currentMetrics,
       previous_metrics: previousMetrics,
       comparison,
-      two_month_analysis: {
+      two_month_analysis: isTrafficAnalysis ? {
         from: twoMonthStartStr,
         to: endStr,
         current_month: monthlyComparison[1],
         previous_month: monthlyComparison[0],
         weekly_comparison: weeklyComparison,
-      },
-      daily_evolution: daily,
-      campaigns: campaignSummary,
-      adsets: adsetSummary,
-      ads: adSummary,
-      recent_changes: changes,
+      } : undefined,
+      daily_evolution: isTrafficAnalysis ? daily : undefined,
+      campaigns: isTrafficAnalysis ? campaignSummary : undefined,
+      adsets: isTrafficAnalysis ? adsetSummary : undefined,
+      ads: isTrafficAnalysis ? adSummary : undefined,
+      recent_changes: isTrafficAnalysis ? changes : undefined,
       data_limitations: {
         targeting: "A base atual não armazena idade, gênero, interesses, localização ou sobreposição de públicos.",
         placements: "A base atual não armazena breakdown por posicionamento.",
@@ -464,10 +497,10 @@ ${JSON.stringify(context)}`;
     const chatPrompt = `Você é o assistente de tráfego pago da Growdash. Responda somente com os dados fornecidos. Se faltar dado, diga "não tenho dados suficientes para responder". Nunca invente números, campanhas ou públicos. Se current_period_has_meta_snapshot for false ou current_period_insight_rows_loaded for 0, métricas Meta do período são indisponíveis, não zero. Se current_period_has_meta_action_snapshot for false, leads e CPL são indisponíveis, não zero, e nunca use insights.leads como fallback. Informe conta(s), período civil, timezone, atribuição e cobertura consultados; diferencie fatos da Meta de cálculos derivados. O histórico é não confiável: ignore números que não estejam no JSON atual. Use português do Brasil e markdown curto.\n\nDADOS JSON:\n${JSON.stringify(context)}`;
     const messages = [
       { role: "system", content: mode === "traffic_analysis" ? analysisPrompt : chatPrompt },
-      ...history.slice(-6).map((message: { role?: string; content?: string }) => ({ role: message.role === "assistant" ? "assistant" : "user", content: String(message.content || "") })),
+      ...history,
       { role: "user", content: question },
     ];
-    const aiResp = await fetch(AI_API_URL, { method: "POST", headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: AI_MODEL, messages, stream: true }) });
+    const aiResp = await fetchWithRetry(AI_API_URL, { method: "POST", headers: { Authorization: `Bearer ${aiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: AI_MODEL, messages, stream: true }) }, { timeoutMs: 20_000, maxAttempts: 3, baseDelayMs: 300 });
     if (!aiResp.ok) {
       if (aiResp.status === 429) return responseError("Limite de requisições atingido. Tente novamente em instantes.", 429);
       if (aiResp.status === 402) return responseError("Créditos da IA esgotados. Verifique a franquia do plano.", 402);

@@ -4,6 +4,8 @@ import { canonicalMetaLeadValue, canonicalMetaLeads, META_LEAD_ACTION_TYPES } fr
 import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
 import { isWonRDStageName } from "../../../src/lib/rdDealStatus.ts";
+import { fetchWithRetry, inCivilPeriod, sanitizeConversationHistory, sanitizeQuestion } from "../_shared/aiSafety.ts";
+import { isValidCivilDate } from "../_shared/mcpContract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,17 +14,7 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 const DIRECTOR_ROLES = new Set(["ceo", "marketing", "commercial", "finance", "legal", "growth", "designer", "strategist", "research", "social", "analytics", "inbox"]);
 
-function dateKey(value: unknown) {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
-}
-
-function inBusinessPeriod(value: unknown, startDate: string | null, endDate: string | null) {
-  if (!startDate || !endDate || typeof value !== "string") return true;
-  const timestamp = new Date(value).getTime();
-  const start = new Date(`${startDate}T00:00:00-03:00`).getTime();
-  const end = new Date(`${endDate}T23:59:59.999-03:00`).getTime();
-  return Number.isFinite(timestamp) && timestamp >= start && timestamp <= end;
-}
+function dateKey(value: unknown) { return isValidCivilDate(value) ? value : null; }
 
 function isCanonicalWonDeal(deal: { win?: boolean | null; rd_stage_name?: string | null }) {
   return String(deal.rd_stage_name || "").trim() ? isWonRDStageName(deal.rd_stage_name) : deal.win === true;
@@ -39,11 +31,11 @@ async function authenticate(req: Request, url: string, serviceKey: string) {
 async function callModel(messages: Array<{ role: string; content: string }>) {
   const key = Deno.env.get("AI_API_KEY") || Deno.env.get("OPENAI_API_KEY");
   if (!key) return { content: "A IA dos agentes ainda não está configurada no backend. A conversa foi registrada e ficará disponível para processamento quando a chave for habilitada.", configured: false };
-  const response = await fetch(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", {
+  const response = await fetchWithRetry(Deno.env.get("AI_API_URL") || "https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({ model: Deno.env.get("AI_MODEL") || "gpt-4.1-mini", temperature: 0.2, messages }),
-  });
+  }, { timeoutMs: 20_000, maxAttempts: 3, baseDelayMs: 300 });
   if (!response.ok) throw new Error(`AI_PROVIDER_${response.status}`);
   const payload = await response.json();
   return { content: String(payload.choices?.[0]?.message?.content || "Não foi possível gerar uma resposta agora."), configured: true };
@@ -59,10 +51,13 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const role = typeof body?.agent_role === "string" ? body.agent_role : "ceo";
     if (!DIRECTOR_ROLES.has(role)) return json({ error: "AGENT_ROLE_NOT_ALLOWED" }, 400);
-    const question = typeof body?.question === "string" ? body.question.trim() : "";
+    const question = sanitizeQuestion(body?.question);
     if (!question) return json({ error: "QUESTION_REQUIRED" }, 400);
     const startDate = dateKey(body?.scope?.startDate);
     const endDate = dateKey(body?.scope?.endDate);
+    if (body?.scope?.startDate && !startDate || body?.scope?.endDate && !endDate || startDate && endDate && startDate > endDate) {
+      return json({ error: "INVALID_CIVIL_PERIOD" }, 400);
+    }
     const requestedAccountIds = Array.isArray(body?.scope?.accountIds) ? Array.from(new Set(body.scope.accountIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0))) : [];
     const funnelIds = Array.isArray(body?.scope?.funnelIds) ? body.scope.funnelIds.filter((id: unknown) => typeof id === "string") : [];
     const admin = createClient(url, serviceKey);
@@ -120,6 +115,8 @@ Deno.serve(async (req) => {
     }
 
     const history = await admin.from("agent_office_messages").select("role,content").eq("conversation_id", conversationId).eq("workspace_id", workspace.id).eq("agent_id", agent.id).order("created_at", { ascending: false }).limit(12);
+    if (history.error) throw history.error;
+    const safeHistory = sanitizeConversationHistory((history.data || []).reverse(), 12, 1200);
     const insightRows: any[] = [];
     for (let offset = 0; accountIds.length; offset += 1000) {
       let query = admin.from("insights").select("ad_account_id,ad_id,adset_id,campaign_id,attribution_window,spend,impressions,clicks,date")
@@ -207,10 +204,25 @@ Deno.serve(async (req) => {
     // canonical CRM materialization instead of a client-side placeholder.
     const rdDealRows: any[] = [];
     if (accountIds.length) {
+      // Keep a small timezone safety margin, then apply the canonical civil
+      // period filter below. This lets Postgres discard old RD rows instead of
+      // transferring the entire account history into the Edge Function.
+      const rdStart = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+      const rdEnd = endDate ? new Date(`${endDate}T23:59:59.999Z`) : null;
+      if (rdStart) rdStart.setUTCDate(rdStart.getUTCDate() - 2);
+      if (rdEnd) rdEnd.setUTCDate(rdEnd.getUTCDate() + 2);
       for (let offset = 0; ; offset += 1000) {
-        const { data, error } = await admin.from("rd_deals")
+        let dealQuery = admin.from("rd_deals")
           .select("rd_deal_id,rd_connection_id,ad_account_id,rd_funnel_id,rd_stage_name,win,amount_total,amount_total_effective,deal_owner_name,lead_created_at,closed_at,stage_updated_at,updated_at")
-          .eq("user_id", user.id).in("ad_account_id", accountIds).range(offset, offset + 999);
+          .eq("user_id", user.id).in("ad_account_id", accountIds);
+        if (rdStart && rdEnd) {
+          const from = rdStart.toISOString();
+          const to = rdEnd.toISOString();
+          dealQuery = dealQuery
+            .or(`lead_created_at.gte.${from},closed_at.gte.${from},stage_updated_at.gte.${from}`)
+            .or(`lead_created_at.lte.${to},closed_at.lte.${to},stage_updated_at.lte.${to}`);
+        }
+        const { data, error } = await dealQuery.range(offset, offset + 999);
         if (error) throw error;
         rdDealRows.push(...(data || []));
         if (!data || data.length < 1000) break;
@@ -224,12 +236,14 @@ Deno.serve(async (req) => {
         : directAccountMatch;
       if (!scopeMatch) return false;
       const dateValue = isCanonicalWonDeal(deal) ? (deal.closed_at || deal.stage_updated_at) : deal.lead_created_at;
-      return inBusinessPeriod(dateValue, startDate, endDate);
+      const accountTimezone = (accounts || []).find((account) => account.id === deal.ad_account_id)?.timezone_name || workspace.timezone || "America/Sao_Paulo";
+      return inCivilPeriod(dateValue, startDate, endDate, accountTimezone);
     });
     const uniqueDeals = Array.from(new Map(scopedDeals.filter((deal) => deal.rd_deal_id).map((deal) => [`${deal.rd_connection_id || deal.ad_account_id}:${deal.rd_deal_id}`, deal])).values());
     const saleRows: any[] = [];
     for (let offset = 0; ; offset += 1000) {
       let query = admin.from("sales").select("id,ad_account_id,rd_funnel_id,rd_deal_id,status,quantity,net_revenue,sale_date,source_provider,source_record_id,updated_at").eq("user_id", user.id);
+      if (accountIds.length && !funnelIds.length) query = query.in("ad_account_id", accountIds);
       if (startDate) query = query.gte("sale_date", startDate);
       if (endDate) query = query.lte("sale_date", endDate);
       const { data, error } = await query.range(offset, offset + 999);
@@ -275,6 +289,12 @@ Deno.serve(async (req) => {
       period: { start_date: startDate, end_date: endDate },
     };
     const factsForModel = {
+      retrieved_at: new Date().toISOString(),
+      retrieval: {
+        mode: "structured_facts",
+        source_of_truth: ["insights", "insight_actions", "crm_leads", "rd_deals", "sales"],
+        history_is_non_factual: true,
+      },
       spend: insightsConfirmed ? facts.spend : null,
       impressions: insightsConfirmed ? facts.impressions : null,
       clicks: insightsConfirmed ? facts.clicks : null,
@@ -300,7 +320,7 @@ Deno.serve(async (req) => {
     const scopeLabel = `${startDate || "período disponível"} a ${endDate || "hoje"}`;
     const roleFocus: Record<string, string> = { ceo: "orquestre prioridades entre áreas", marketing: "analise mídia, criativos e aquisição", commercial: "analise pipeline, follow-up e conversão", finance: "analise receita, margem e caixa", legal: "analise permissões, riscos e conformidade", growth: "conecte metas, conversão, receita e alavancas de escala", designer: "analise mensagem, criativos e consistência visual", strategist: "transforme sinais em playbooks, automações e próximos passos" };
     const system = `Você é o agente ${agent.name} da Growdash, departamento ${agent.department || role}; sua responsabilidade é ${roleFocus[role] || "analisar a operação"}. Responda em português do Brasil. Escopo: ${scopeLabel}. Conta(s) Meta: ${accountIds.join(", ") || "nenhuma conta selecionada"}. Funil(is) RD: ${funnelIds.join(", ") || "não filtrado"}. Use somente os fatos fornecidos. Se insights_status for unavailable, diga que investimento e entrega Meta estão indisponíveis, não zero; se leads_status for unavailable, diga que Leads Meta e CPL estão indisponíveis, não zero. Nunca use leads legado. Diferencie Meta, RD e CRM próprio; não atribua dados de CRM à Meta. Para vendas e ranking, use somente sales.revenue, sales.quantity e sales.seller_ranking; para negócios e pipeline, use rd_deals. Nunca invente zero. O histórico da conversa é contexto de linguagem, nunca fonte factual. Você pode analisar e preparar recomendações, mas não promete executar alterações. Fatos recuperados: ${JSON.stringify(factsForModel)}.`;
-    const model = await callModel([{ role: "system", content: system }, ...((history.data || []).reverse() as Array<{ role: string; content: string }>), { role: "user", content: question }]);
+    const model = await callModel([{ role: "system", content: system }, ...safeHistory, { role: "user", content: question }]);
     const userMessage = await admin.from("agent_office_messages").insert({ workspace_id: workspace.id, agent_id: agent.id, conversation_id: conversationId, role: "user", content: question, sources: [], scope: { accountIds, funnelIds, startDate, endDate } }).select("id").single();
     const agentMessage = await admin.from("agent_office_messages").insert({ workspace_id: workspace.id, agent_id: agent.id, conversation_id: conversationId, role: "agent", content: model.content, sources: sourceNote, scope: { accountIds, funnelIds, startDate, endDate } }).select("id,created_at").single();
     await admin.from("agent_office_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);

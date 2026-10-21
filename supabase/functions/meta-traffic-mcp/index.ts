@@ -3,6 +3,7 @@ import { canonicalMetaLeads, META_LEAD_ACTION_TYPES } from "../_shared/metaLeadM
 import { loadSiteEligibleMetaAdScopes } from "../_shared/metaLeadScope.ts";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "../../../src/lib/metaSyncCoverage.ts";
 import { normalizeMetaAttributionWindow } from "../../../src/lib/metaInsightFacts.ts";
+import { CRM_LEAD_STATUSES, isValidCivilDate, isValidDateRange, isValidUuid, parseMcpLimit } from "../_shared/mcpContract.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,19 +13,34 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 const protocolVersion = "2025-03-26";
 const PAGE_SIZE = 1000;
+const TOOL_CACHE_TTL_MS = 30_000;
+const TOOL_CACHE_MAX_ENTRIES = 32;
+const toolCache = new Map<string, { expiresAt: number; value: unknown }>();
+
+function toolCacheKey(userId: string, name: string, args: Record<string, unknown>) {
+  return `${userId}:${name}:${JSON.stringify(args, Object.keys(args).sort())}`;
+}
+
+function readToolCache(key: string) {
+  const cached = toolCache.get(key);
+  if (!cached) return undefined;
+  if (cached.expiresAt <= Date.now()) {
+    toolCache.delete(key);
+    return undefined;
+  }
+  return cached.value;
+}
+
+function writeToolCache(key: string, value: unknown) {
+  if (toolCache.size >= TOOL_CACHE_MAX_ENTRIES) {
+    const oldestKey = toolCache.keys().next().value;
+    if (oldestKey) toolCache.delete(oldestKey);
+  }
+  toolCache.set(key, { expiresAt: Date.now() + TOOL_CACHE_TTL_MS, value });
+}
 
 function rpcError(id: unknown, code: number, message: string) {
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
-}
-
-function validDate(value: unknown): value is string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T12:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-function validUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function actionTypes(siteActions: string[]) {
@@ -60,8 +76,8 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
   const startDate = args.start_date;
   const endDate = args.end_date;
   if (!accountIds.length) throw new Error("account_ids precisa conter pelo menos um UUID interno autorizado.");
-  if (accountIds.some((id) => !validUuid(id))) throw new Error("account_ids precisa conter somente UUIDs internos válidos.");
-  if (!validDate(startDate) || !validDate(endDate) || startDate > endDate) throw new Error("start_date e end_date devem ser datas civis válidas e inclusivas (YYYY-MM-DD).");
+  if (accountIds.some((id) => !isValidUuid(id))) throw new Error("account_ids precisa conter somente UUIDs internos válidos.");
+  if (!isValidDateRange(startDate, endDate)) throw new Error("start_date e end_date devem ser datas civis válidas e inclusivas (YYYY-MM-DD).");
 
   const { data: memberships, error: membershipError } = await admin.from("workspace_members")
     .select("workspace_id").eq("user_id", userId).eq("status", "active");
@@ -185,6 +201,8 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
     const conversations = canonical.reduce((sum, row) => sum + Number(row.conversations || 0), 0);
   return {
     source: "Meta Marketing API snapshots",
+    retrieved_at: new Date().toISOString(),
+    retrieval: { mode: "structured_facts", sync_state_table: "meta_sync_scope_state", historical_rows_are_not_fallback: true },
     scope: { account_ids: accountIds, campaign_ids: campaignIds, start_date: startDate, end_date: endDate, attribution_window_by_account: Object.fromEntries((accounts || []).map((account: any) => [account.id, account.attribution_window || "account_default"])), timezone_by_account: Object.fromEntries((accounts || []).map((account: any) => [account.id, account.timezone_name || "America/Sao_Paulo"])) },
     status: !allInsightsConfirmed ? "unavailable" : allActionsConfirmed ? "available" : "partial",
     coverage_by_account: accountCoverage,
@@ -203,21 +221,28 @@ async function readMetaMetrics(admin: any, userId: string, args: Record<string, 
       cpl: { value: allInsightsConfirmed && allActionsConfirmed && forms + site + conversations > 0 ? spend / (forms + site + conversations) : null, available: allInsightsConfirmed && allActionsConfirmed && forms + site + conversations > 0 },
     },
     completeness: { insight_rows: insights.length, action_rows: actions.length, legacy_insights_leads_used: false },
+    coverage: {
+      complete: allInsightsConfirmed && allActionsConfirmed,
+      insights: allInsightsConfirmed ? "confirmed" : "unavailable",
+      actions: allActionsConfirmed ? "confirmed" : "partial_or_unavailable",
+    },
   };
 }
 
 async function readCRMLeads(admin: any, userId: string, args: Record<string, unknown>) {
   const workspaceId = typeof args.workspace_id === "string" ? args.workspace_id : "";
-  if (!workspaceId) throw new Error("workspace_id é obrigatório para consultar leads do CRM.");
+  if (!isValidUuid(workspaceId)) throw new Error("workspace_id deve ser um UUID interno válido.");
   const { data: membership, error: membershipError } = await admin.from("workspace_members")
     .select("workspace_id").eq("workspace_id", workspaceId).eq("user_id", userId).eq("status", "active").maybeSingle();
   if (membershipError) throw membershipError;
   if (!membership) throw new Error("Workspace não autorizado.");
   const status = typeof args.status === "string" ? args.status : "";
+  if (status && !CRM_LEAD_STATUSES.includes(status as typeof CRM_LEAD_STATUSES[number])) throw new Error("status de lead inválido.");
   const sourceProvider = typeof args.source_provider === "string" ? args.source_provider : "";
-  const startDate = validDate(args.start_date) ? args.start_date as string : null;
-  const endDate = validDate(args.end_date) ? args.end_date as string : null;
+  const startDate = isValidCivilDate(args.start_date) ? args.start_date as string : null;
+  const endDate = isValidCivilDate(args.end_date) ? args.end_date as string : null;
   if (args.start_date && !startDate || args.end_date && !endDate) throw new Error("start_date/end_date devem ser datas civis válidas (YYYY-MM-DD).");
+  if (startDate && endDate && !isValidDateRange(startDate, endDate)) throw new Error("start_date não pode ser posterior a end_date.");
   let query = admin.from("crm_leads")
     .select("id,workspace_id,source_provider,external_id,full_name,email,phone,lead_city,lead_state,status,utm_source,utm_medium,utm_campaign,utm_content,utm_term,fbclid,gclid,ttclid,landing_page,referrer,ad_account_id,campaign_id,adset_id,ad_id,first_received_at,last_received_at,created_at,updated_at")
     .eq("workspace_id", workspaceId).order("first_received_at", { ascending: false });
@@ -229,14 +254,18 @@ async function readCRMLeads(admin: any, userId: string, args: Record<string, unk
     nextDate.setUTCDate(nextDate.getUTCDate() + 1);
     query = query.lt("first_received_at", `${nextDate.toISOString().slice(0, 10)}T00:00:00.000Z`);
   }
-  const limit = Math.max(1, Math.min(500, Number(args.limit) || 100));
+  const limit = parseMcpLimit(args.limit);
+  if (limit === null) throw new Error("limit deve ser um inteiro entre 1 e 500.");
   const leads = await readPages(query.limit(limit));
   return {
     source: "Growdash CRM leads",
+    retrieved_at: new Date().toISOString(),
+    retrieval: { mode: "structured_facts", historical_rows_are_not_fallback: true },
     scope: { workspace_id: workspaceId, source_provider: sourceProvider || "all", status: status || "all", start_date: startDate, end_date: endDate },
     status: "available",
     count: leads.length,
     truncated: leads.length >= limit,
+    coverage: { requested_limit: limit, returned_rows: leads.length, complete: leads.length < limit },
     leads,
   };
 }
@@ -257,12 +286,12 @@ Deno.serve(async (req) => {
     const id = rpc?.id ?? null;
     if (rpc?.jsonrpc !== "2.0" || typeof rpc?.method !== "string") return json(rpcError(id, -32600, "Invalid JSON-RPC request"), 400);
     if (rpc.method === "notifications/initialized") return new Response(null, { status: 202, headers: corsHeaders });
-    if (rpc.method === "initialize") return json({ jsonrpc: "2.0", id, result: { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "growdash-meta-traffic", version: "1.0.0" } } });
+    if (rpc.method === "initialize") return json({ jsonrpc: "2.0", id, result: { protocolVersion, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "growdash-meta-traffic", version: "1.1.0" } } });
     if (rpc.method === "ping") return json({ jsonrpc: "2.0", id, result: {} });
     if (rpc.method === "tools/list") return json({ jsonrpc: "2.0", id, result: { tools: [
       {
         name: "get_meta_traffic_metrics",
-        description: "Consulta snapshots Meta por UUID interno de conta, campanhas opcionais e intervalo civil inclusivo. Leads = formulários + site + conversas iniciadas, com aliases equivalentes deduplicados. Nunca usa insights.leads.",
+        description: "Consulta fatos estruturados dos snapshots Meta por UUID interno de conta, campanhas opcionais e intervalo civil inclusivo. O resultado informa fonte, escopo, cobertura e retrieved_at. Leads = formulários + site + conversas iniciadas, com aliases equivalentes deduplicados. Nunca usa insights.leads.",
         inputSchema: { type: "object", additionalProperties: false, required: ["account_ids", "start_date", "end_date"], properties: {
           account_ids: { type: "array", minItems: 1, items: { type: "string", format: "uuid" }, description: "UUIDs internos de ad_accounts que o usuário autenticado pode acessar." },
           campaign_ids: { type: "array", items: { type: "string" }, description: "IDs de campanha Meta internos/externos conforme persistidos em insights.campaign_id." },
@@ -272,7 +301,7 @@ Deno.serve(async (req) => {
       },
       {
         name: "get_crm_leads",
-        description: "Consulta leads normalizados do CRM próprio por workspace, origem, status e período. Não retorna o payload bruto; informa escopo e quantidade para rastreabilidade.",
+        description: "Consulta leads normalizados do CRM próprio por workspace, origem, status e período. O resultado informa fonte, escopo, cobertura, truncamento e retrieved_at; falha não vira zero.",
         inputSchema: { type: "object", additionalProperties: false, required: ["workspace_id"], properties: {
           workspace_id: { type: "string", format: "uuid" },
           source_provider: { type: "string" },
@@ -286,11 +315,21 @@ Deno.serve(async (req) => {
     if (rpc.method === "tools/call") {
       const params = rpc.params || {};
       if (!["get_meta_traffic_metrics", "get_crm_leads"].includes(params.name)) return json(rpcError(id, -32602, "Unknown tool"), 400);
+      if (params.arguments !== undefined && params.arguments !== null && (typeof params.arguments !== "object" || Array.isArray(params.arguments))) {
+        return json(rpcError(id, -32602, "Tool arguments must be a JSON object"), 400);
+      }
       try {
-        const admin = createClient(url, serviceKey);
-        const result = params.name === "get_crm_leads"
-          ? await readCRMLeads(admin, userData.user.id, params.arguments || {})
-          : await readMetaMetrics(admin, userData.user.id, params.arguments || {});
+        const args = (params.arguments || {}) as Record<string, unknown>;
+        const cacheKey = toolCacheKey(userData.user.id, params.name, args);
+        const cached = readToolCache(cacheKey);
+        const result = cached ?? await (async () => {
+          const admin = createClient(url, serviceKey);
+          const fresh = params.name === "get_crm_leads"
+            ? await readCRMLeads(admin, userData.user.id, args)
+            : await readMetaMetrics(admin, userData.user.id, args);
+          writeToolCache(cacheKey, fresh);
+          return fresh;
+        })();
         return json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result, isError: false } });
       } catch (error) {
         const message = error instanceof Error ? error.message : "META_METRICS_QUERY_FAILED";
