@@ -86,7 +86,7 @@ const icons: Record<WorkflowNodeType, typeof Webhook> = {
   "error.fallback": Zap,
   "approval.manual": CheckCircle2,
 };
-const storageKey = "growdash:automation-workflow:draft";
+const storageKey = (workspaceId?: string | null) => `growdash:automation-workflow:draft:${workspaceId || "anonymous"}`;
 type AutomationRunRow = { id: string; status: string; created_at: string; error_message?: string | null };
 
 function newNode(type: WorkflowNodeType, index: number): WorkflowNode {
@@ -114,7 +114,7 @@ export function WorkflowEditor() {
   const { data: workspace } = useWorkspace();
   const { user } = useAuth();
   const [workflow, setWorkflow] = useState<WorkflowDefinition>(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey) || "") as WorkflowDefinition; } catch { return emptyWorkflow(); }
+    try { return JSON.parse(localStorage.getItem(storageKey()) || "") as WorkflowDefinition; } catch { return emptyWorkflow(); }
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -122,6 +122,7 @@ export function WorkflowEditor() {
   const [runResult, setRunResult] = useState<{ status?: string; run_id?: string; error?: string } | null>(null);
   const [runs, setRuns] = useState<Array<{ id: string; status: string; created_at: string; error_message?: string | null }>>([]);
   const [loadedWorkspace, setLoadedWorkspace] = useState<string | null>(null);
+  const [connectionDraft, setConnectionDraft] = useState({ source: "", target: "", sourcePort: "" });
   const selected = workflow.nodes.find((node) => node.id === selectedId) ?? null;
   const validation = useMemo(() => validateWorkflowDefinition(workflow), [workflow]);
   const StatusIcon = workflow.active ? Pause : Play;
@@ -146,7 +147,7 @@ export function WorkflowEditor() {
       const saved = data?.workflow_definition;
       if (saved && validateWorkflowDefinition(saved).ok) {
         const next = { ...saved, active: data.status === "active", version: Number(data.workflow_version || saved.version || 1) } as WorkflowDefinition;
-        setWorkflow(next); localStorage.setItem(storageKey, JSON.stringify(next));
+        setWorkflow(next); localStorage.setItem(storageKey(workspace.id), JSON.stringify(next));
       }
     })();
   }, [workspace?.id, user?.id, loadedWorkspace]);
@@ -160,17 +161,36 @@ export function WorkflowEditor() {
   };
   const updateSelected = (parameters: Record<string, unknown>) => setWorkflow((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === selectedId ? { ...node, parameters } : node) }));
   const removeSelected = () => { if (!selectedId) return; setWorkflow((current) => ({ ...current, nodes: current.nodes.filter((node) => node.id !== selectedId), connections: current.connections.filter((edge) => edge.source !== selectedId && edge.target !== selectedId) })); setSelectedId(null); };
+  const addConnection = () => {
+    const { source, target, sourcePort } = connectionDraft;
+    if (!source || !target || source === target) return;
+    setWorkflow((current) => current.connections.some((edge) => edge.source === source && edge.target === target && edge.sourcePort === (sourcePort || undefined))
+      ? current
+      : { ...current, connections: [...current.connections, { source, target, ...(sourcePort ? { sourcePort } : {}) }] });
+  };
+  const removeConnection = (index: number) => setWorkflow((current) => ({ ...current, connections: current.connections.filter((_, itemIndex) => itemIndex !== index) }));
   const save = async (nextStatus?: "draft" | "active" | "paused") => {
     if (!validation.ok) { setMessage(validation.errors.join(" ")); return; }
-    localStorage.setItem(storageKey, JSON.stringify(workflow));
+    localStorage.setItem(storageKey(workspace?.id), JSON.stringify(workflow));
     if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-")) { setMessage("Rascunho salvo neste navegador; conecte um workspace para persistir na conta."); return; }
     const client = supabase as unknown as { from: (table: string) => { upsert: (values: Record<string, unknown>, options: { onConflict: string }) => Promise<{ error: { message: string } | null }> } };
     const status = nextStatus || (workflow.active ? "active" : "draft");
     const nextWorkflow = { ...workflow, active: status === "active" };
     setWorkflow(nextWorkflow);
-    const { error } = await client.from("growdash_automations").upsert({ id: workflow.id, workspace_id: workspace.id, created_by: user.id, name: workflow.name.trim(), description: "Workflow visual Growdash", trigger_type: "manual", trigger_config: {}, actions: [], status, workflow_definition: nextWorkflow, workflow_version: workflow.version, published_at: status === "active" ? new Date().toISOString() : null }, { onConflict: "id" });
+    const trigger = workflow.nodes.find((node) => node.type.endsWith(".trigger"));
+    const triggerType = trigger?.type === "webhook.trigger" ? "manual" : trigger?.type === "lead.trigger" ? "new_lead" : trigger?.type === "instagram.message.trigger" ? "instagram_message" : trigger?.type === "instagram.trigger" ? "instagram_comment" : "manual";
+    const triggerConfig = trigger?.parameters || {};
+    const { error } = await client.from("growdash_automations").upsert({ id: workflow.id, workspace_id: workspace.id, created_by: user.id, name: workflow.name.trim(), description: "Workflow visual Growdash", trigger_type: triggerType, trigger_config: triggerConfig, actions: [], status, workflow_definition: nextWorkflow, workflow_version: workflow.version, current_version: workflow.version, published_at: status === "active" ? new Date().toISOString() : null }, { onConflict: "id" });
     if (!error) {
       await client.from("growdash_workflow_versions").upsert({ workflow_id: workflow.id, workspace_id: workspace.id, version: workflow.version, definition: nextWorkflow, status: status === "active" ? "published" : "draft", created_by: user.id }, { onConflict: "workflow_id,version" });
+      if (trigger?.type === "webhook.trigger" && status === "active") {
+        const pathToken = String(trigger.parameters.pathToken || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "");
+        const secret = String(trigger.parameters.secret || "").trim() || null;
+        const secretHash = secret ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret))), (byte) => byte.toString(16).padStart(2, "0")).join("") : null;
+        const webhookClient = supabase as unknown as { from: (table: string) => { upsert: (values: Record<string, unknown>, options: { onConflict: string }) => Promise<unknown> } };
+        await webhookClient.from("growdash_workflow_webhooks").upsert({ workflow_id: workflow.id, workspace_id: workspace.id, path_token: pathToken, secret_hash: secretHash, status: "active" }, { onConflict: "workflow_id" });
+        setMessage(`Workflow salvo. Webhook: /functions/v1/workflow-webhook/${pathToken}`);
+      }
     }
     setMessage(error ? `Rascunho local salvo. Banco: ${error.message}` : "Workflow salvo no workspace.");
   };
@@ -187,7 +207,7 @@ export function WorkflowEditor() {
     } catch (error) { setRunResult({ status: "error", error: error instanceof Error ? error.message : "Falha na execução" }); setMessage(error instanceof Error ? error.message : "Falha na execução"); }
     finally { setRunning(false); }
   };
-  const duplicate = () => { const suffix = `-copy-${Date.now()}`; const idMap = new Map(workflow.nodes.map((node) => [node.id, `${node.id}${suffix}`])); const copy = { ...workflow, id: crypto.randomUUID(), name: `${workflow.name} — cópia`, version: 1, active: false, nodes: workflow.nodes.map((node) => ({ ...node, id: idMap.get(node.id)! })), connections: workflow.connections.map((edge) => ({ ...edge, source: idMap.get(edge.source) || edge.source, target: idMap.get(edge.target) || edge.target })) }; localStorage.setItem(storageKey, JSON.stringify(copy)); setWorkflow(copy); setSelectedId(null); setMessage("Cópia criada como rascunho."); };
+  const duplicate = () => { const suffix = `-copy-${Date.now()}`; const idMap = new Map(workflow.nodes.map((node) => [node.id, `${node.id}${suffix}`])); const copy = { ...workflow, id: crypto.randomUUID(), name: `${workflow.name} — cópia`, version: 1, active: false, nodes: workflow.nodes.map((node) => ({ ...node, id: idMap.get(node.id)! })), connections: workflow.connections.map((edge) => ({ ...edge, source: idMap.get(edge.source) || edge.source, target: idMap.get(edge.target) || edge.target })) }; localStorage.setItem(storageKey(workspace?.id), JSON.stringify(copy)); setWorkflow(copy); setSelectedId(null); setMessage("Cópia criada como rascunho."); };
 
   return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
     <section className="gd-panel min-h-[560px] overflow-hidden p-4">
@@ -203,6 +223,7 @@ export function WorkflowEditor() {
     </section>
     <aside className="space-y-4">
       <section className="gd-panel p-4"><h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">Adicionar nó</h3><div className="mt-3 grid gap-2">{(Object.keys(labels) as WorkflowNodeType[]).map((type) => { const Icon = icons[type]; return <Button key={type} variant="outline" className="justify-start" onClick={() => addNode(type)}><Plus className="mr-2 h-4 w-4" /><Icon className="mr-2 h-4 w-4 text-primary" />{labels[type]}</Button>; })}</div></section>
+      <section className="gd-panel p-4"><h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">Conexões</h3><div className="mt-3 grid gap-2"><select className="h-9 rounded-md border border-border bg-background px-2 text-xs" aria-label="Nó de origem" value={connectionDraft.source} onChange={(event) => setConnectionDraft((current) => ({ ...current, source: event.target.value }))}><option value="">Origem</option>{workflow.nodes.map((node) => <option key={node.id} value={node.id}>{labels[node.type]} · {node.id.slice(-6)}</option>)}</select><select className="h-9 rounded-md border border-border bg-background px-2 text-xs" aria-label="Nó de destino" value={connectionDraft.target} onChange={(event) => setConnectionDraft((current) => ({ ...current, target: event.target.value }))}><option value="">Destino</option>{workflow.nodes.map((node) => <option key={node.id} value={node.id}>{labels[node.type]} · {node.id.slice(-6)}</option>)}</select><select className="h-9 rounded-md border border-border bg-background px-2 text-xs" aria-label="Saída da conexão" value={connectionDraft.sourcePort} onChange={(event) => setConnectionDraft((current) => ({ ...current, sourcePort: event.target.value }))}><option value="">Saída padrão</option><option value="true">true</option><option value="false">false</option><option value="default">default</option></select><Button type="button" size="sm" variant="outline" onClick={addConnection} disabled={!connectionDraft.source || !connectionDraft.target}>Adicionar conexão</Button></div><div className="mt-3 grid gap-1.5">{workflow.connections.map((edge, index) => <div key={`${edge.source}-${edge.target}-${index}`} className="flex items-center gap-2 text-[10px]"><span className="min-w-0 grow truncate">{edge.source.slice(-6)} → {edge.target.slice(-6)}{edge.sourcePort ? ` (${edge.sourcePort})` : ""}</span><button type="button" className="text-destructive" onClick={() => removeConnection(index)} aria-label="Remover conexão">×</button></div>)}</div></section>
       <section className="gd-panel p-4"><div className="flex items-center justify-between"><h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">Configuração</h3>{selected && <Button variant="ghost" size="icon" onClick={removeSelected} aria-label="Excluir nó"><Trash2 className="h-4 w-4 text-destructive" /></Button>}</div>{selected ? <NodeForm node={selected} onChange={updateSelected} /> : <p className="mt-3 text-xs text-muted-foreground">Selecione um nó no canvas.</p>}</section>
     </aside>
   </div>;
@@ -211,12 +232,18 @@ export function WorkflowEditor() {
 function NodeForm({ node, onChange }: { node: WorkflowNode; onChange: (parameters: Record<string, unknown>) => void }) {
   if (node.type === "http.request") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">URL<Input value={String(node.parameters.url || "")} onChange={(event) => onChange({ ...node.parameters, url: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Método<Input value={String(node.parameters.method || "POST")} onChange={(event) => onChange({ ...node.parameters, method: event.target.value.toUpperCase() })} /></label><label className="grid gap-1 text-xs font-bold">Corpo JSON<Textarea value={String(node.parameters.body || "")} onChange={(event) => onChange({ ...node.parameters, body: event.target.value })} placeholder='{"lead_id":"{{id}}"}' /></label></div>;
   if (node.type === "google.sheets.append") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID da planilha<Input value={String(node.parameters.spreadsheetId || "")} onChange={(event) => onChange({ ...node.parameters, spreadsheetId: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Aba<Input value={String(node.parameters.sheetName || "Leads")} onChange={(event) => onChange({ ...node.parameters, sheetName: event.target.value })} /></label></div>;
+  if (node.type === "google.sheets.lookup") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID da planilha<Input value={String(node.parameters.spreadsheetId || "")} onChange={(event) => onChange({ ...node.parameters, spreadsheetId: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Aba<Input value={String(node.parameters.sheetName || "Leads")} onChange={(event) => onChange({ ...node.parameters, sheetName: event.target.value })} /></label></div>;
   if (node.type === "instagram.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Evento<Input value={String(node.parameters.event || "comment")} onChange={(event) => onChange({ ...node.parameters, event: event.target.value })} placeholder="comment ou message" /></label><label className="grid gap-1 text-xs font-bold">Palavra-chave opcional<Input value={String(node.parameters.keyword || "")} onChange={(event) => onChange({ ...node.parameters, keyword: event.target.value })} /></label></div>;
+  if (node.type === "webhook.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Token do caminho<Input value={String(node.parameters.pathToken || "")} onChange={(event) => onChange({ ...node.parameters, pathToken: event.target.value })} placeholder="gerado ao ativar" /></label><label className="grid gap-1 text-xs font-bold">Secret opcional<Input type="password" value={String(node.parameters.secret || "")} onChange={(event) => onChange({ ...node.parameters, secret: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Envie o secret no cabeçalho <code>x-workflow-secret</code>.</p></div>;
   if (node.type === "instagram.reply") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Usa a conta Instagram conectada à Growdash e as permissões aprovadas pela Meta.</p></div>;
+  if (node.type === "instagram.send") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID do destinatário<Input value={String(node.parameters.recipientId || "")} onChange={(event) => onChange({ ...node.parameters, recipientId: event.target.value })} placeholder="{{trigger.sender_id}}" /></label><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label></div>;
   if (node.type === "whatsapp.send") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Telefone ou campo dinâmico<Input value={String(node.parameters.phone || "")} onChange={(event) => onChange({ ...node.parameters, phone: event.target.value })} placeholder="{{lead.whatsapp}}" /></label><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">O envio usa a conexão oficial de WhatsApp configurada no workspace.</p></div>;
   if (node.type === "google.drive.upload") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Arquivo ou URL dinâmica<Input value={String(node.parameters.fileUrl || "")} onChange={(event) => onChange({ ...node.parameters, fileUrl: event.target.value })} placeholder="{{arquivo.url}}" /></label><label className="grid gap-1 text-xs font-bold">Pasta do Drive (opcional)<Input value={String(node.parameters.folderId || "")} onChange={(event) => onChange({ ...node.parameters, folderId: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Usa a conta Google Workspace conectada à Growdash.</p></div>;
+  if (node.type === "google.drive.lookup") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Nome ou busca no Drive<Input value={String(node.parameters.query || "")} onChange={(event) => onChange({ ...node.parameters, query: event.target.value })} placeholder="contrato" /></label></div>;
+  if (node.type === "gmail.send") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Destinatário<Input type="email" value={String(node.parameters.to || "")} onChange={(event) => onChange({ ...node.parameters, to: event.target.value })} placeholder="{{lead.email}}" /></label><label className="grid gap-1 text-xs font-bold">Assunto<Input value={String(node.parameters.subject || "")} onChange={(event) => onChange({ ...node.parameters, subject: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Mensagem HTML<Textarea value={String(node.parameters.html || "")} onChange={(event) => onChange({ ...node.parameters, html: event.target.value })} /></label></div>;
   if (node.type === "agent.run") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Instrução do agente<Textarea value={String(node.parameters.prompt || "")} onChange={(event) => onChange({ ...node.parameters, prompt: event.target.value })} placeholder="Analise o lead e classifique o próximo passo." /></label><label className="grid gap-1 text-xs font-bold">Saída<Input value={String(node.parameters.output || "text")} onChange={(event) => onChange({ ...node.parameters, output: event.target.value })} placeholder="text ou json" /></label></div>;
   if (node.type === "condition.if") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Campo dinâmico<Input value={String(node.parameters.field || "")} onChange={(event) => onChange({ ...node.parameters, field: event.target.value })} placeholder="lead.interesse" /></label><label className="grid gap-1 text-xs font-bold">Operador<Input value={String(node.parameters.operator || "contains")} onChange={(event) => onChange({ ...node.parameters, operator: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Valor<Input value={String(node.parameters.value || "")} onChange={(event) => onChange({ ...node.parameters, value: event.target.value })} /></label></div>;
+  if (node.type === "logic.switch") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Campo dinâmico<Input value={String(node.parameters.field || "")} onChange={(event) => onChange({ ...node.parameters, field: event.target.value })} placeholder="lead.status" /></label><label className="grid gap-1 text-xs font-bold">Casos JSON<Textarea value={String(node.parameters.cases ? JSON.stringify(node.parameters.cases, null, 2) : "[]")} onChange={(event) => { try { onChange({ ...node.parameters, cases: JSON.parse(event.target.value) }); } catch { /* mantém o último JSON válido */ } }} placeholder='[{"value":"won","port":"won"}]' /></label></div>;
   if (node.type === "delay.wait") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Segundos<Input type="number" min="1" value={String(node.parameters.seconds || 60)} onChange={(event) => onChange({ ...node.parameters, seconds: Number(event.target.value) })} /></label></div>;
-  return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Rota<Input value={String(node.parameters.path || "/webhook/lead")} onChange={(event) => onChange({ ...node.parameters, path: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Método<Input value={String(node.parameters.method || "POST")} onChange={(event) => onChange({ ...node.parameters, method: event.target.value.toUpperCase() })} /></label></div>;
+  return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Parâmetros JSON<Textarea value={JSON.stringify(node.parameters, null, 2)} onChange={(event) => { try { onChange(JSON.parse(event.target.value)); } catch { /* mantém o último JSON válido */ } }} /></label><p className="text-[10px] text-muted-foreground">Use variáveis como <code>{"{{lead.email}}"}</code> para dados do evento.</p></div>;
 }

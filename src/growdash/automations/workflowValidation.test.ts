@@ -8,5 +8,6 @@ describe("validateWorkflowDefinition", () => {
   it("rejects duplicate nodes", () => expect(validateWorkflowDefinition({ ...base, nodes: [base.nodes[0], base.nodes[0]] }).ok).toBe(false));
   it("rejects missing connection targets", () => expect(validateWorkflowDefinition({ ...base, connections: [{ source: "a", target: "missing" }] }).ok).toBe(false));
   it("rejects unsupported types", () => expect(validateWorkflowDefinition({ ...base, nodes: [{ ...base.nodes[0], type: "code" }] }).ok).toBe(false));
+  it("accepts branch ports for IF connections", () => expect(validateWorkflowDefinition({ ...base, nodes: [{ ...base.nodes[0], type: "condition.if" }, base.nodes[1], { id: "c", type: "http.request", position: { x: 480, y: 0 }, parameters: { url: "https://example.com" } }], connections: [{ source: "a", target: "b", sourcePort: "true" }, { source: "a", target: "c", sourcePort: "false" }] }).ok).toBe(true));
   it("rejects cycles", () => expect(validateWorkflowDefinition({ ...base, connections: [{ source: "a", target: "b" }, { source: "b", target: "a" }] }).ok).toBe(false));
 });
