@@ -13,7 +13,7 @@ describe("Growdash sidebar navigation", () => {
       .every((label) => ALL_MODULES.some((module) => module.label === label))).toBe(true);
     expect(ALL_MODULES.some((module) => module.label === "Quadro")).toBe(false);
     expect(ALL_MODULES.some((module) => module.label === "Business")).toBe(false);
-    expect(ALL_MODULES.some((module) => module.label === "Automação" && module.external && module.path === "https://automation.growdash.com.br")).toBe(true);
+    expect(ALL_MODULES.some((module) => module.label === "Automação" && !module.external && module.path === "/automacoes")).toBe(true);
   });
 
   it("uses a unique route for every sidebar item", () => {

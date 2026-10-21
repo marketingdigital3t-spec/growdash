@@ -201,10 +201,13 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         label: "Automação",
-        path: "https://automation.growdash.com.br",
-        external: true,
+        // Use the published visual automation editor inside Growdash. The
+        // former external n8n shortcut depended on an unprovisioned DNS/VPS
+        // at automation.growdash.com.br and therefore opened a blank/error
+        // tab for users.
+        path: "/automacoes",
         icon: Workflow,
-        description: "Abra o n8n para conectar tarefas e sistemas da operação.",
+        description: "Monte fluxos visuais para conectar tarefas e sistemas da operação.",
         metrics: [],
         highlights: ["Fluxos ativos", "Execuções", "Taxa de sucesso"],
       },
