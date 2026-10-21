@@ -119,10 +119,18 @@ export function WorkflowEditor() {
   const [message, setMessage] = useState("");
   const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<{ status?: string; run_id?: string; error?: string } | null>(null);
+  const [runs, setRuns] = useState<Array<{ id: string; status: string; created_at: string; error_message?: string | null }>>([]);
   const [loadedWorkspace, setLoadedWorkspace] = useState<string | null>(null);
   const selected = workflow.nodes.find((node) => node.id === selectedId) ?? null;
   const validation = useMemo(() => validateWorkflowDefinition(workflow), [workflow]);
   const StatusIcon = workflow.active ? Pause : Play;
+
+  const loadRuns = async () => {
+    if (!workspace?.id || workspace.id.startsWith("legacy-")) return;
+    const client = supabase as any;
+    const { data } = await client.from("growdash_automation_runs").select("id,status,created_at,error_message").eq("automation_id", workflow.id).order("created_at", { ascending: false }).limit(5);
+    setRuns(data || []);
+  };
 
   useEffect(() => {
     if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-") || loadedWorkspace === workspace.id) return;
@@ -137,6 +145,7 @@ export function WorkflowEditor() {
       }
     })();
   }, [workspace?.id, user?.id, loadedWorkspace]);
+  useEffect(() => { void loadRuns(); }, [workspace?.id, workflow.id]);
 
   const addNode = (type: WorkflowNodeType) => {
     const node = newNode(type, workflow.nodes.length);
@@ -169,6 +178,7 @@ export function WorkflowEditor() {
       const { data, error } = await supabase.functions.invoke("workflow-execute", { body: { workflow_id: workflow.id, mode: "test", input: { source: "manual_test", timestamp: new Date().toISOString() }, idempotency_key: `manual-test:${Date.now()}` } });
       if (error || data?.error) throw new Error(error?.message || data?.error);
       setRunResult(data); setMessage(`Execução ${data?.status === "success" ? "concluída" : "finalizada com erro"}. Run: ${data?.run_id || "-"}`);
+      await loadRuns();
     } catch (error) { setRunResult({ status: "error", error: error instanceof Error ? error.message : "Falha na execução" }); setMessage(error instanceof Error ? error.message : "Falha na execução"); }
     finally { setRunning(false); }
   };
@@ -183,6 +193,7 @@ export function WorkflowEditor() {
       </div>
       {message && <p className="mt-3 rounded-lg bg-primary/10 p-3 text-xs text-primary">{message}</p>}
       {runResult && <div className={cn("mt-3 rounded-lg p-3 text-xs", runResult.status === "success" ? "bg-emerald-500/10 text-emerald-700" : "bg-destructive/10 text-destructive")}><strong>Última execução: {runResult.status}</strong>{runResult.error && <span className="ml-2">{runResult.error}</span>}</div>}
+      {runs.length > 0 && <div className="mt-3 rounded-lg border border-border p-3"><div className="mb-2 flex items-center justify-between"><span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Histórico recente</span><button type="button" className="text-[10px] text-primary" onClick={() => void loadRuns()}>Atualizar</button></div><div className="grid gap-1.5">{runs.map((run) => <div key={run.id} className="flex items-center justify-between gap-2 text-[10px]"><span className={cn("rounded px-1.5 py-0.5 font-bold", run.status === "success" ? "bg-emerald-500/15 text-emerald-700" : run.status === "error" ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground")}>{run.status}</span><span className="truncate text-muted-foreground">{new Date(run.created_at).toLocaleString("pt-BR")}</span><code className="hidden truncate text-muted-foreground sm:block">{run.id.slice(0, 8)}</code></div>)}</div></div>}
       {!validation.ok && workflow.nodes.length > 0 && <p className="mt-3 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{validation.errors.join(" ")}</p>}
     </section>
     <aside className="space-y-4">
