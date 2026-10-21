@@ -49,6 +49,7 @@ async function listActivities(token: string, dealId: string) {
     url.searchParams.set("deal_id", dealId);
     url.searchParams.set("page", String(page));
     url.searchParams.set("page_size", String(pageSize));
+    url.searchParams.set("limit", String(pageSize));
     const response = await fetch(url, { headers: { Accept: "application/json" } });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(`RD activities HTTP ${response.status}`);
