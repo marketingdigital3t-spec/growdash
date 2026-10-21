@@ -403,7 +403,10 @@ export default function GrowdashLayout() {
                       target="_blank"
                       rel="noreferrer"
                       aria-label={`${item.label} (abre em nova aba)`}
-                      onClick={() => void backgroundSync.refresh(true)}
+                      // Sidebar navigation triggers only the lightweight
+                      // recent-window refresh; the explicit toolbar action
+                      // remains the path for an exact selected-period sync.
+                      onClick={() => void backgroundSync.refresh(false)}
                       className={linkClassName}
                     >
                       <span className="gd-sidebar-nav-chip" aria-hidden="true">
@@ -416,7 +419,7 @@ export default function GrowdashLayout() {
                       to={item.path}
                       end={itemPathname === "/"}
                       aria-label={item.label}
-                      onClick={() => void backgroundSync.refresh(true)}
+                      onClick={() => void backgroundSync.refresh(false)}
                       onPointerEnter={() => preloadRoute(item.path)}
                       onFocus={() => preloadRoute(item.path)}
                       onPointerDown={() => preloadRoute(item.path)}

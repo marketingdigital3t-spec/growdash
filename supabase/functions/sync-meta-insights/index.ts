@@ -341,11 +341,22 @@ Deno.serve(async (req) => {
           operator: "IN",
           value: ["ACTIVE", "PAUSED", "DELETED", "ARCHIVED", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "IN_PROCESS", "WITH_ISSUES"],
         }]));
-        const campaignsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/campaigns?fields=id,name,objective,effective_status,daily_budget,lifetime_budget&filtering=${campaignStatusFilter}&access_token=${accessToken}&limit=200`,
-          Number.POSITIVE_INFINITY,
-          fastMode,
-        );
+        // The fast snapshot already has the persisted catalog available for
+        // joins. Fetching all three catalogs on every navigation was the
+        // largest avoidable delay before the Insights request even started.
+        const campaignsRes = fastMode
+          ? await (async () => {
+            const { data, error } = await supabaseAdmin
+              .from("campaigns")
+              .select("id,name,objective,status,ad_account_id")
+              .eq("ad_account_id", account.id);
+            return { data: data || [], pages: 0, lastCursor: undefined, error: error?.message };
+          })()
+          : await fetchMetaPaginated(
+            `${graphBase}/${metaAccountId}/campaigns?fields=id,name,objective,effective_status,daily_budget,lifetime_budget&filtering=${campaignStatusFilter}&access_token=${accessToken}&limit=200`,
+            Number.POSITIVE_INFINITY,
+            fastMode,
+          );
         recordPagination(campaignsRes);
         if (campaignsRes.error) {
           const message = `Conta ${account.name} catálogo de campanhas: ${campaignsRes.error}`;
@@ -368,7 +379,7 @@ Deno.serve(async (req) => {
 
           const campaignChanges: any[] = [];
           const upsertRows = campaigns.map((c: any) => {
-            const newStatus = c.effective_status || null;
+            const newStatus = c.effective_status ?? c.status ?? null;
             const prev = prevMap.get(c.id);
             const prevStatus = prev?.status ?? null;
             let last_activated_at = prev?.last_activated_at ?? null;
@@ -415,11 +426,21 @@ Deno.serve(async (req) => {
         }
 
         // 2. Fetch adsets (incluindo arquivadas)
-        const adsetsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type,optimization_goal&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`,
-          Number.POSITIVE_INFINITY,
-          fastMode,
-        );
+        const adsetsRes = fastMode
+          ? await (async () => {
+            const storedCampaignIds = campaigns.map((campaign: any) => String(campaign.id || "")).filter(Boolean);
+            if (!storedCampaignIds.length) return { data: [] as any[], pages: 0, lastCursor: undefined, error: undefined };
+            const { data, error } = await supabaseAdmin
+              .from("adsets")
+              .select("id,name,campaign_id,daily_budget,status,destination_type,optimization_goal")
+              .in("campaign_id", storedCampaignIds);
+            return { data: data || [], pages: 0, lastCursor: undefined, error: error?.message };
+          })()
+          : await fetchMetaPaginated(
+            `${graphBase}/${metaAccountId}/adsets?fields=id,name,campaign_id,daily_budget,effective_status,destination_type,optimization_goal&filtering=${adsetStatusFilter}&access_token=${accessToken}&limit=200`,
+            Number.POSITIVE_INFINITY,
+            fastMode,
+          );
         recordPagination(adsetsRes);
         if (adsetsRes.error) {
           const message = `Conta ${account.name} conjuntos: ${adsetsRes.error}`;
@@ -435,7 +456,7 @@ Deno.serve(async (req) => {
           const prevMap = new Map((prev || []).map((a: any) => [a.id, a]));
           const changes: any[] = [];
           const rows = adsetsList.map((a: any) => {
-            const newStatus = a.effective_status || null;
+            const newStatus = a.effective_status ?? a.status ?? null;
             const p = prevMap.get(a.id);
             const prevStatus = p?.status ?? null;
             let last_activated_at = p?.last_activated_at ?? null;
@@ -469,11 +490,13 @@ Deno.serve(async (req) => {
         }
 
         // 3. Fetch ads (incluindo arquivados)
-        const adsRes = await fetchMetaPaginated(
-          `${graphBase}/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${adStatusFilter}&access_token=${accessToken}&limit=200`,
-          Number.POSITIVE_INFINITY,
-          fastMode,
-        );
+        const adsRes = fastMode
+          ? { data: [] as any[], pages: 0, lastCursor: undefined, error: undefined }
+          : await fetchMetaPaginated(
+            `${graphBase}/${metaAccountId}/ads?fields=id,name,adset_id,effective_status,creative{id,thumbnail_url,image_url}&filtering=${adStatusFilter}&access_token=${accessToken}&limit=200`,
+            Number.POSITIVE_INFINITY,
+            fastMode,
+          );
         recordPagination(adsRes);
         if (adsRes.error) {
           const message = `Conta ${account.name} anúncios: ${adsRes.error}`;

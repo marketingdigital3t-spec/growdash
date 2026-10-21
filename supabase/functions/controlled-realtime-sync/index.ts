@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
-import { canRunSelectedMetaLeadSync, selectedMetaSyncIsPartial } from "../../../src/lib/controlledMetaSync.ts";
+import { canRunSelectedMetaLeadSync } from "../../../src/lib/controlledMetaSync.ts";
 import { recentWindowForTimezone } from "../_shared/metaInsightReconciliation.ts";
 
 const corsHeaders = {
@@ -163,34 +163,21 @@ Deno.serve(async (req) => {
             };
           }
           if (fast) {
-            // Ações/leads alimentam os cards de conversão e CPL. Elas precisam
-            // seguir a confirmação do Insights do recorte selecionado, mas o
-            // hourly e os breakdowns ficam para a reconciliação global em
-            // segundo plano para não bloquear a primeira renderização.
-            const leads = await invokeFunction(supabaseUrl, authHeader, "sync-meta-leads", {
-              adAccountId: body.adAccountId,
-              adAccountIds: body.adAccountIds,
-              ...(syncMode === "selected_period" ? { startDate: syncStartDate, endDate: syncEndDate } : {}),
-              recentStartAt: recentWindow?.startAt,
-              recentEndAt: recentWindow?.endAt,
-              triggerSource: "controlled_realtime_selected",
-            });
-            const leadStatus = String(leads.data?.status || (leads.error || leads.data?.error ? "error" : "success"));
-            const leadPartial = ["partial", "failed", "error", "blocked"].includes(leadStatus);
+            // Leads/forms are reconciled after the primary response by the
+            // client in a separate background request. Waiting for that
+            // paginated Graph resource here made every manual refresh feel
+            // blocked even though the KPI snapshot was already available.
             return {
               data: {
                 success: true,
-                status: selectedMetaSyncIsPartial(insights, leads) ? "partial" : "success",
+                status: insights.data?.status || "success",
                 synced: Number(insights.data?.synced || 0),
                 warnings: [
-                  leads.error || leads.data?.error,
-                  leads.data?.errors,
-                  leadPartial ? "Leads/forms Meta não tiveram cobertura completa confirmada." : null,
-                  "Hourly, breakdowns, saldo e RD continuarão em segundo plano.",
+                  "Leads/forms Meta, hourly, breakdowns, saldo e RD continuarão em segundo plano.",
                 ].filter(Boolean),
                 block_status: {
                   insights: insights.data?.status || "success",
-                  leads: leadStatus,
+                  leads: "pending",
                   hourly: "pending",
                 },
                 synced_at: insights.data?.synced_at,

@@ -140,6 +140,24 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         }
         invalidateLiveQueries();
 
+        // Lead/form reconciliation is intentionally decoupled from the fast
+        // KPI response. It can paginate through Meta without keeping the
+        // navigation button disabled; Realtime invalidation refreshes the
+        // lead cards as soon as the rows are persisted.
+        void supabase.functions.invoke("sync-meta-leads", {
+          body: {
+            adAccountId,
+            adAccountIds,
+            ...(force ? { startDate: startDateKey, endDate: endDateKey } : {}),
+            ...(force ? {} : { recentStartAt: selectedBody.recentHours ? new Date(Date.now() - selectedBody.recentHours * 3600_000).toISOString() : undefined, recentEndAt: new Date().toISOString() }),
+            timezone,
+            attributionWindow,
+            triggerSource: "near_realtime_background",
+          },
+        }).catch((leadError) => {
+          console.warn("[near-realtime-sync] leads em segundo plano", leadError);
+        });
+
         // RD is intentionally isolated from the selected Meta response. A
         // large CRM funnel must never delay or fail the visible ad snapshot;
         // its recent-window reconciliation still runs silently and Realtime
@@ -174,10 +192,10 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
             setState((current) => current === "error" ? current : "partial");
           }
         });
-        // Keep the explicit “Sincronizar agora” action honest: it resolves
-        // only after the independent RD request has also returned. Automatic
-        // refreshes remain non-blocking so the dashboard never freezes.
-        if (force) await rdRefresh;
+        // The selected Meta snapshot is the response that unblocks the UI.
+        // RD continues independently and invalidates CRM queries when it
+        // finishes, so a large funnel cannot keep the sync button locked.
+        void rdRefresh;
 
       } catch (error) {
         // Falha silenciosa: o histórico armazenado permanece visível e uma nova
