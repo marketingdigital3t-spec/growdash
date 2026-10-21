@@ -98,14 +98,27 @@ Deno.serve(async (req) => {
     const nextManual = useAutomatic ? {} : tracking;
     const before = { manual_tracking: deal.manual_tracking || {}, deal_custom_fields: fields };
     const patched = patchFields(fields, useAutomatic ? automaticTracking(deal) : tracking);
-    if (patched.missing.length && !useAutomatic) return json({ error: `Configure no RD os campos personalizados de rastreamento antes de salvar: ${patched.missing.join(", ")}`, code: "RD_TRACKING_FIELDS_MISSING", missing: patched.missing }, 422);
     const after = { manual_tracking: nextManual, deal_custom_fields: patched.next };
     if (JSON.stringify(before) === JSON.stringify(after)) return json({ ok: true, noop: true, deal_id: deal.id });
-    const result = await executeRDWrite({ admin, userId, connectionId, action: "update_deal", target: { rd_deal_id: rdDealId, tracking: true }, before, after, correlationId, method: "PUT", path: `/deals/${encodeURIComponent(rdDealId)}`, body: { deal: { deal_custom_fields: patched.next } } });
+    const providerFieldsChanged = JSON.stringify(fields) !== JSON.stringify(patched.next);
+    let auditId: string | undefined;
+    let skipped = false;
+    if (providerFieldsChanged) {
+      const result = await executeRDWrite({ admin, userId, connectionId, action: "update_deal", target: { rd_deal_id: rdDealId, tracking: true }, before, after, correlationId: `${correlationId}:fields`, method: "PUT", path: `/deals/${encodeURIComponent(rdDealId)}`, body: { deal: { deal_custom_fields: patched.next } } });
+      auditId = result.auditId;
+      skipped = result.skipped;
+    }
+    if (patched.missing.length) {
+      const noteTracking = useAutomatic ? automaticTracking(deal) : tracking;
+      const lines = [useAutomatic ? "Rastreamento automático restaurado — Growdash" : "Rastreamento manual atualizado — Growdash", ...TRACKING_KEYS.map((key) => `${key}: ${noteTracking[key] == null ? "Não informado" : String(noteTracking[key])}`), `Campos sem campo personalizado correspondente no RD: ${patched.missing.join(", ")}`];
+      const noteResult = await executeRDWrite({ admin, userId, connectionId, action: "add_note", target: { rd_deal_id: rdDealId, tracking: true }, before: {}, after: { body: lines.join("\n") }, correlationId: `${correlationId}:note`, method: "POST", path: "/activities", body: { deal_id: rdDealId, type: "note", description: lines.join("\n") } });
+      auditId ||= noteResult.auditId;
+      skipped = skipped && noteResult.skipped;
+    }
     const nextRaw = { ...raw, deal: { ...rawDeal, deal_custom_fields: patched.next }, deal_custom_fields: patched.next };
     const { error: mirrorError } = await admin.from("rd_deals").update({ manual_tracking: nextManual, manual_tracking_updated_at: useAutomatic ? null : new Date().toISOString(), raw: nextRaw, updated_at: new Date().toISOString() }).eq("id", deal.id).eq("rd_connection_id", connectionId);
-    if (mirrorError) return json({ ok: true, partial: true, audit_id: result.auditId, error: "O RD foi atualizado, mas o espelho local aguarda reconciliação." }, 202);
-    return json({ ok: true, audit_id: result.auditId, skipped: result.skipped, deal_id: deal.id, tracking: nextManual, automatic: useAutomatic });
+    if (mirrorError) return json({ ok: true, partial: true, audit_id: auditId, error: "O RD foi atualizado, mas o espelho local aguarda reconciliação." }, 202);
+    return json({ ok: true, audit_id: auditId, skipped, deal_id: deal.id, tracking: nextManual, automatic: useAutomatic, rd_unmapped: patched.missing });
   } catch (error) {
     if (error instanceof RDWriteError) return json({ error: error.message, code: error.code }, error.status);
     console.error("rd-update-tracking", error);
