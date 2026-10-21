@@ -4435,6 +4435,8 @@ export type Database = {
           manual_override_by: string | null
           manual_override_enabled: boolean
           manual_override_reason: string | null
+          manual_tracking: Json
+          manual_tracking_updated_at: string | null
           meta_ad_id: string | null
           meta_adset_id: string | null
           meta_attributed_at: string | null
@@ -4506,6 +4508,8 @@ export type Database = {
           manual_override_by?: string | null
           manual_override_enabled?: boolean
           manual_override_reason?: string | null
+          manual_tracking?: Json
+          manual_tracking_updated_at?: string | null
           meta_ad_id?: string | null
           meta_adset_id?: string | null
           meta_attributed_at?: string | null
@@ -4577,6 +4581,8 @@ export type Database = {
           manual_override_by?: string | null
           manual_override_enabled?: boolean
           manual_override_reason?: string | null
+          manual_tracking?: Json
+          manual_tracking_updated_at?: string | null
           meta_ad_id?: string | null
           meta_adset_id?: string | null
           meta_attributed_at?: string | null

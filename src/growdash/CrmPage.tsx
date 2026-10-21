@@ -55,6 +55,7 @@ import { isWonRDStageName } from "@/lib/rdDealStatus";
 import { useInsights } from "@/hooks/useInsights";
 import { useLeadAttributionCatalog } from "@/hooks/useLeadAttributionCatalog";
 import { resolveLeadAttribution, type LeadAttribution } from "@/lib/leadAttributionResolver";
+import { normalizeTrackingDraft, type ManualTracking } from "@/lib/leadTracking";
 import { buildRDDealUpdate, serializeRDDealUpdate, statusFromRDDeal, type DealEditDraft, type DealEditStatus } from "@/lib/rdDealEdit";
 import { useRDDealNotes, useCreateRDDealNote } from "@/hooks/useRDDealNotes";
 import { PageHeading } from "./shared";
@@ -268,6 +269,7 @@ export default function CrmPage() {
   const selectedAdIds = useMemo(() => selectedDeal ? [selectedDeal.meta_ad_id, selectedDeal.utm_id].filter((value): value is string => Boolean(value)) : [], [selectedDeal]);
   const { data: historicalAttributionInsights = [] } = useLeadAttributionCatalog(selectedDeal?.ad_account_id, selectedAdIds);
   const selectedAttribution = useMemo<LeadAttribution | null>(() => selectedDeal ? resolveLeadAttribution(selectedDeal, [...attributionInsights, ...historicalAttributionInsights]) : null, [attributionInsights, historicalAttributionInsights, selectedDeal]);
+  const selectedAutomaticAttribution = useMemo<LeadAttribution | null>(() => selectedDeal ? resolveLeadAttribution({ ...selectedDeal, manual_tracking: null }, [...attributionInsights, ...historicalAttributionInsights]) : null, [attributionInsights, historicalAttributionInsights, selectedDeal]);
 
   useEffect(() => {
     const next = selectedFunnelIds.filter((id) => id === NO_LINKED_RD_FUNNEL_SCOPE_ID || availableFunnelIds.has(id));
@@ -741,6 +743,30 @@ export default function CrmPage() {
     }
   }
 
+  async function updateRDTracking(deal: RDDealLite, tracking: ManualTracking, useAutomatic = false) {
+    if (!rdIntegration?.write_enabled) {
+      toast.error("Habilite a escrita governada no card de integração do RD Station.");
+      return;
+    }
+    const connectionId = deal.rd_connection_id || connectedFunnels.find((funnel) => funnel.id === deal.rd_funnel_id)?.rd_connection_id;
+    if (!connectionId) {
+      toast.error("Esta negociação não tem uma conexão RD identificada.");
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke("rd-update-tracking", {
+        body: { rd_connection_id: connectionId, rd_deal_id: deal.rd_deal_id, tracking: normalizeTrackingDraft(tracking), use_automatic: useAutomatic, correlation_id: crypto.randomUUID() },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }), queryClient.invalidateQueries({ queryKey: ["rd_deals"] })]);
+      setSelectedDeal(null);
+      toast.success(useAutomatic ? "Rastreamento automático restaurado no RD Station." : "Rastreamento atualizado no Growdash e no RD Station.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o rastreamento no RD Station.");
+    }
+  }
+
   async function updateRDContact(deal: RDDealLite, fields: Record<string, unknown>) {
     if (!rdIntegration?.write_enabled) {
       toast.error("Habilite a escrita governada no card de integração do RD Station.");
@@ -925,12 +951,14 @@ export default function CrmPage() {
       <DealDetails
         deal={selectedDeal}
         attribution={selectedAttribution}
+        automaticAttribution={selectedAutomaticAttribution}
         funnelName={selectedDeal?.rd_funnel_id ? funnelNames.get(selectedDeal.rd_funnel_id) : undefined}
         funnels={editableFunnels}
         stages={editableStages as EditableStage[]}
         getOpportunityAmount={getOpportunityAmount}
         onClose={() => setSelectedDeal(null)}
         onUpdate={(deal, fields) => void updateRDDeal(deal, fields)}
+        onTrackingUpdate={(deal, tracking, useAutomatic) => void updateRDTracking(deal, tracking, useAutomatic)}
         onContactUpdate={(deal, fields) => void updateRDContact(deal, fields)}
         onMove={(deal, destination) => void moveRDDeal(deal, destination)}
         onActivateWrite={() => { window.location.href = "/integracoes?tab=crm"; }}
@@ -1057,15 +1085,17 @@ function DealsList({ deals, funnels, page, pageCount, total, getOpportunityAmoun
   );
 }
 
-function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpportunityAmount, onClose, onUpdate, onContactUpdate, onMove, onActivateWrite, canWrite }: {
+function DealDetails({ deal, attribution, automaticAttribution, funnelName, funnels, stages, getOpportunityAmount, onClose, onUpdate, onTrackingUpdate, onContactUpdate, onMove, onActivateWrite, canWrite }: {
   deal: RDDealLite | null;
   attribution: LeadAttribution | null;
+  automaticAttribution: LeadAttribution | null;
   funnelName?: string;
   funnels: EditablePipeline[];
   stages: EditableStage[];
   getOpportunityAmount: (deal: RDDealLite) => number;
   onClose: () => void;
   onUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void;
+  onTrackingUpdate: (deal: RDDealLite, tracking: ManualTracking, useAutomatic: boolean) => void;
   onContactUpdate: (deal: RDDealLite, fields: Record<string, unknown>) => void;
   onMove: (deal: RDDealLite, stage: PipelineStage) => void;
   onActivateWrite: () => void;
@@ -1082,6 +1112,7 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
   const [note, setNote] = useState("");
   const [selectedFunnelId, setSelectedFunnelId] = useState("");
   const [selectedStageId, setSelectedStageId] = useState("");
+  const [trackingDraft, setTrackingDraft] = useState<ManualTracking>({});
   const initialEdit = useRef<DealEditDraft | null>(null);
   const notes = useRDDealNotes(deal?.id ?? null);
   const createNote = useCreateRDDealNote();
@@ -1125,7 +1156,18 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
     setNote("");
     setSelectedFunnelId(deal.rd_funnel_id || "");
     setSelectedStageId(deal.rd_stage_id || "");
-  }, [deal]);
+    const source = attribution || automaticAttribution;
+    setTrackingDraft(source ? {
+      source: source.source,
+      campaign: source.campaignName,
+      adset: source.adsetName,
+      creative: source.adName,
+      form: source.formName || source.formId,
+      platform: source.platform,
+      placement: source.placement,
+      isOrganic: source.isOrganic,
+    } : {});
+  }, [attribution, automaticAttribution, deal]);
 
   if (!deal) return null;
   const fields = Object.entries(deal.custom_fields || {}).filter(([, value]) => value != null && String(value).trim());
@@ -1143,6 +1185,7 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
   };
   const fieldsToUpdate = initialEdit.current ? buildRDDealUpdate(initialEdit.current, draft) : {};
   const canSaveDeal = canWrite && !!dealName.trim() && Object.keys(fieldsToUpdate).length > 0;
+  const hasManualTracking = Object.keys(deal.manual_tracking || {}).length > 0;
 
   const saveDealFields = () => {
     if (!canWrite) return onActivateWrite();
@@ -1193,6 +1236,16 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
         </section>
 
         <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
+          <div className="flex items-center justify-between gap-3"><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Editar rastreamento</h3><p className="mt-1 text-[10px] text-muted-foreground">A origem automática é puxada do RD/Meta. Ao salvar, o mesmo valor é escrito no RD e no espelho Growdash.</p></div><Target className="h-4 w-4 text-primary" /></div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {([['source', 'Origem'], ['campaign', 'Campanha'], ['adset', 'Conjunto'], ['creative', 'Criativo'], ['form', 'Formulário Meta'], ['platform', 'Plataforma Meta'], ['placement', 'Posicionamento']] as const).map(([key, label]) => <label key={key} className="grid gap-1.5 text-xs font-bold"><span>{label}</span><Input value={String(trackingDraft[key] ?? '')} onChange={(event) => setTrackingDraft((current) => ({ ...current, [key]: event.target.value }))} disabled={!canWrite} placeholder={String((automaticAttribution && ({ source: automaticAttribution.source, campaign: automaticAttribution.campaignName, adset: automaticAttribution.adsetName, creative: automaticAttribution.adName, form: automaticAttribution.formName || automaticAttribution.formId, platform: automaticAttribution.platform, placement: automaticAttribution.placement } as Record<string, string | null>)[key]) || 'Não informado')} /></label>)}
+            <label className="grid gap-1.5 text-xs font-bold"><span>Origem orgânica</span><select value={trackingDraft.isOrganic == null ? '' : trackingDraft.isOrganic ? 'true' : 'false'} onChange={(event) => setTrackingDraft((current) => ({ ...current, isOrganic: event.target.value === '' ? null : event.target.value === 'true' }))} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="">Não informado</option><option value="true">Sim</option><option value="false">Não</option></select></label>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2"><Button type="button" disabled={!canWrite} onClick={() => onTrackingUpdate(deal, trackingDraft, false)}>Salvar rastreamento no RD</Button><Button type="button" variant="outline" disabled={!canWrite || !hasManualTracking} onClick={() => onTrackingUpdate(deal, {}, true)}>Usar rastreamento automático</Button></div>
+          <p className="mt-2 text-[10px] text-muted-foreground">{hasManualTracking ? 'Modo manual ativo. O botão ao lado remove o override e volta a exibir o rastreamento automático.' : 'Modo automático ativo.'}</p>
+        </section>
+
+        <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
           <div className="flex items-center gap-2"><Columns3 className="h-4 w-4 text-primary" /><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Mover no RD Station</h3><p className="mt-1 text-[10px] text-muted-foreground">A etapa destino define automaticamente o pipeline no RD.</p></div></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5 text-xs font-bold"><span>Pipeline</span><select value={selectedFunnelId} onChange={(event) => { setSelectedFunnelId(event.target.value); setSelectedStageId(""); }} disabled={!canWrite || !funnels.length} className="h-10 rounded-lg border border-border bg-background px-3">{!funnels.length && <option value="">Pipeline não disponível</option>}{funnels.map((funnel) => <option key={funnel.id} value={funnel.id}>{funnel.name}</option>)}</select></label>
@@ -1226,7 +1279,7 @@ function DealDetails({ deal, attribution, funnelName, funnels, stages, getOpport
           <DetailRow icon={<Target />} label="Plataforma Meta" value={attribution?.platform || "Não informado"} />
           <DetailRow icon={<Target />} label="Posicionamento" value={attribution?.placement || "Não informado por lead"} />
           <DetailRow icon={<Target />} label="Origem orgânica" value={attribution?.isOrganic == null ? "Não informado" : attribution.isOrganic ? "Sim" : "Não"} />
-          <DetailRow icon={<Target />} label="Rastreamento" value={attribution?.status === "attributed" ? (attribution.method === "meta_id" ? "Atribuído pelo ID do anúncio" : "Atribuído pelas UTMs") : attribution?.status === "partial" ? "Parâmetros recebidos, anúncio não encontrado" : "Sem parâmetros de rastreamento"} />
+          <DetailRow icon={<Target />} label="Rastreamento" value={attribution?.method === "manual" ? "Editado manualmente (sincronizado com o RD)" : attribution?.status === "attributed" ? (attribution.method === "meta_id" ? "Atribuído pelo ID do anúncio" : "Atribuído pelas UTMs") : attribution?.status === "partial" ? "Parâmetros recebidos, anúncio não encontrado" : "Sem parâmetros de rastreamento"} />
           <DetailRow icon={<CalendarClock />} label="Criado em" value={fullDate(deal.lead_created_at)} />
           <DetailRow icon={<Clock3 />} label="Última movimentação" value={fullDate(deal.stage_updated_at || deal.updated_at)} />
           {deal.lost_reason && <DetailRow icon={<XCircle />} label="Motivo da perda" value={deal.lost_reason} danger />}

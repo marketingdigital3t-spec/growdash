@@ -1,6 +1,7 @@
 import type { InsightRow } from "@/hooks/useInsights";
+import { mergeManualTracking, type ManualTracking } from "@/lib/leadTracking";
 
-export type LeadAttributionMethod = "meta_id" | "utm" | "touch" | "unmatched";
+export type LeadAttributionMethod = "meta_id" | "utm" | "touch" | "manual" | "unmatched";
 export type LeadAttributionStatus = "attributed" | "partial" | "unavailable";
 
 export interface LeadAttribution {
@@ -39,6 +40,7 @@ type AttributionDeal = {
   meta_placement?: string | null;
   meta_is_organic?: boolean | null;
   meta_attribution_method?: string | null;
+  manual_tracking?: ManualTracking | null;
 };
 
 const text = (value: unknown) => {
@@ -75,8 +77,37 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
     : undefined;
   const hit = byAd || byIds || byNames || byCampaignCreative || byCampaign;
   const hasAny = Boolean(adId || campaign || adset || creative || campaignId || adsetId);
-  if (!hit) {
+  const manual = deal.manual_tracking && typeof deal.manual_tracking === "object" ? deal.manual_tracking : null;
+  const hasManual = !!manual && Object.keys(manual).length > 0;
+  const applyManual = (automatic: LeadAttribution): LeadAttribution => {
+    if (!hasManual) return automatic;
+    const draft = mergeManualTracking({
+      source: automatic.source,
+      campaign: automatic.campaignName,
+      adset: automatic.adsetName,
+      creative: automatic.adName,
+      form: automatic.formName || automatic.formId,
+      platform: automatic.platform,
+      placement: automatic.placement,
+      isOrganic: automatic.isOrganic,
+    }, manual);
     return {
+      ...automatic,
+      source: draft.source == null ? null : String(draft.source),
+      campaignName: draft.campaign == null ? null : String(draft.campaign),
+      adsetName: draft.adset == null ? null : String(draft.adset),
+      adName: draft.creative == null ? null : String(draft.creative),
+      formName: draft.form == null ? null : String(draft.form),
+      formId: manual.form === undefined ? automatic.formId : null,
+      platform: draft.platform == null ? null : String(draft.platform),
+      placement: draft.placement == null ? null : String(draft.placement),
+      isOrganic: typeof draft.isOrganic === "boolean" ? draft.isOrganic : null,
+      method: "manual",
+      status: "attributed",
+    };
+  };
+  if (!hit) {
+    return applyManual({
       source,
       platform: text(deal.meta_platform) || null,
       placement: text(deal.meta_placement) || null,
@@ -91,9 +122,9 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
       adName: text(deal.meta_ad_name) || creative || null,
       method: hasAny ? "unmatched" : "unmatched",
       status: hasAny ? "partial" : "unavailable",
-    };
+    });
   }
-  return {
+  return applyManual({
     source,
     platform: text(deal.meta_platform) || null,
     placement: text(deal.meta_placement) || null,
@@ -108,5 +139,5 @@ export function resolveLeadAttribution(deal: AttributionDeal, insights: InsightR
     adName: text(deal.meta_ad_name) || hit.ad_name || creative || null,
     method: byAd || byIds ? "meta_id" : "utm",
     status: "attributed",
-  };
+  });
 }
