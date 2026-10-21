@@ -761,7 +761,8 @@ export default function CrmPage() {
       if (data?.error) throw new Error(data.error);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["rd_crm_deals"] }), queryClient.invalidateQueries({ queryKey: ["rd_deals"] })]);
       setSelectedDeal(null);
-      toast.success(useAutomatic ? "Rastreamento automático restaurado no RD Station." : "Rastreamento atualizado no Growdash e no RD Station.");
+      if (Array.isArray(data?.rd_unmapped) && data.rd_unmapped.length) toast.warning(`Rastreamento salvo nos dois lados. O RD recebeu uma anotação para: ${data.rd_unmapped.join(", ")}.`);
+      else toast.success(useAutomatic ? "Rastreamento automático restaurado no RD Station." : "Rastreamento atualizado no Growdash e no RD Station.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o rastreamento no RD Station.");
     }
