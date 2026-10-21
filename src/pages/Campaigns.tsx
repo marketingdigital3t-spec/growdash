@@ -87,6 +87,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues, fetchCampaignPages, resolveCampaignAccountScope } from "@/lib/campaignQuery";
+import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -702,13 +703,12 @@ export default function Campaigns() {
       return;
     }
     try {
-      await syncMeta.mutateAsync({
+      await syncMeta.mutateAsync(buildFastManualSyncRequest({
         adAccountId: selectedAccount === "all" ? undefined : selectedAccount,
         adAccountIds: selectedAccount === "all" ? visibleAdAccounts.map((account) => account.id) : undefined,
         startDate: formatApiDate(startDate),
         endDate: formatApiDate(endDate),
-        force: true,
-      });
+      }));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campaigns_full"] }),
         queryClient.invalidateQueries({ queryKey: ["campaigns"] }),

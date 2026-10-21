@@ -126,6 +126,32 @@ export function useSyncMeta() {
       // caused races, inflated API usage and occasional non-2xx responses.
       const insights = await invokeSyncFunction("sync-meta-insights", body);
       if (params.fast) {
+        // The primary Insights snapshot is enough to unlock the visible KPI
+        // grid. Reconcile the slower action and hourly resources in sequence
+        // without keeping the manual refresh button blocked.
+        void (async () => {
+          try {
+            await invokeAuxiliaryWithRetry("sync-meta-leads", {
+              adAccountId: params.adAccountId,
+              adAccountIds: params.adAccountIds,
+              startDate: params.startDate,
+              endDate: params.endDate,
+              force: params.force === true,
+              attributionWindow: params.attributionWindow,
+              timezone: params.timezone,
+            });
+          } catch (error) {
+            console.warn("[sync-meta] leads em segundo plano", error);
+          }
+          try {
+            await invokeAuxiliaryWithRetry("sync-meta-hourly", body);
+          } catch (error) {
+            console.warn("[sync-meta] distribuição horária em segundo plano", error);
+          }
+          void queryClient.invalidateQueries({ queryKey: ["meta_leads"] });
+          void queryClient.invalidateQueries({ queryKey: ["insights_hourly"] });
+          void queryClient.invalidateQueries({ queryKey: ["action-totals-by-ads"] });
+        })();
         return {
           ...insights,
           status: insights.status || "success",
