@@ -13331,6 +13331,48 @@ html:not(.dark) .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .e
   border-color: rgba(15, 23, 42, .12) !important;
 }
 
+/* Expert dashboard composition: keep the desktop canvas centered and let
+   each analytical group align to the same width without changing its data. */
+.expert-dashboard-shell {
+  width: 100%;
+  max-width: 1680px;
+  margin-inline: auto;
+}
+
+.expert-dashboard .expert-dashboard-header,
+.expert-dashboard .expert-dashboard-tabs,
+.expert-dashboard .expert-operations-layout,
+.expert-dashboard .expert-charts-grid {
+  min-width: 0;
+}
+
+.expert-dashboard .expert-dashboard-header > :first-child {
+  min-width: 0;
+}
+
+.expert-dashboard .expert-dashboard-tabs {
+  align-self: flex-start;
+}
+
+.expert-dashboard .expert-operations-layout {
+  width: 100%;
+}
+
+.expert-dashboard .expert-operations-layout .expert-operations-view {
+  min-width: 0;
+  gap: 1rem !important;
+}
+
+.expert-dashboard .expert-charts-grid {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr) !important;
+}
+
+.expert-dashboard .expert-charts-grid > * {
+  min-width: 0;
+  height: 100%;
+}
+
 /* Executive KPI layout: cards share one stable geometry and reflow before
    their content becomes too narrow. The metric value stays on one line, while
    its data-value-size attribute provides the compact type scale for long
@@ -13406,15 +13448,21 @@ html:not(.dark) .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .e
   }
 }
 
-@media (min-width: 1200px) and (max-width: 1535px) {
+@media (min-width: 1200px) and (max-width: 1439px) {
   .expert-dashboard .expert-kpi-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
 
-@media (min-width: 1536px) {
+@media (min-width: 1440px) {
   .expert-dashboard .expert-kpi-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .expert-dashboard .expert-charts-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }
 

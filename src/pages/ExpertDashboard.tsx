@@ -134,9 +134,9 @@ export default function ExpertDashboard() {
   const isLoading = loadingAccounts || loadingInsights || salesQuery.isLoading || rdDealsQuery.isLoading || revenueDealsQuery.isLoading || actionQuery.isLoading;
 
   return (
-    <MotionPage className="expert-dashboard gd-module-shell min-w-0 space-y-3 sm:space-y-4">
+    <MotionPage className="expert-dashboard expert-dashboard-shell gd-module-shell min-w-0 space-y-3 sm:space-y-4">
       <MotionItem>
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="expert-dashboard-header flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 text-primary"><BarChart3 className="h-5 w-5" /><span className="text-xs font-black uppercase tracking-[.16em]">Growdash</span></div>
             <h1 className="mt-1 text-2xl font-bold">{expertGreeting(selectedAccountName)}</h1>
@@ -151,7 +151,7 @@ export default function ExpertDashboard() {
         <button type="button" role="tab" aria-selected={view === "operations"} onClick={() => setView("operations")} className={`rounded-lg px-4 py-2 text-xs font-bold transition ${view === "operations" ? "gd-expert-tab-active bg-emerald-500 text-[#062015] shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Operação</button>
       </div>
 
-      {view === "operations" && <MotionItem><ExpertOperationsView /></MotionItem>}
+      {view === "operations" && <MotionItem className="expert-operations-layout"><ExpertOperationsView /></MotionItem>}
 
       {view === "executive" && <DashboardProvider value={{
         startDate, endDate, adAccountId: selectedId, insights: permittedInsights, sales: canonicalSales, rdDeals, revenueDeals: scopedRevenueDeals, revenueUnavailableReason,
@@ -178,7 +178,7 @@ export default function ExpertDashboard() {
         <MotionItem>
           <section aria-labelledby="expert-charts-title" className="gd-module-section">
             <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Leitura visual</p><h2 id="expert-charts-title">Distribuição dos resultados</h2></div><p className="dashboard-section-description">Compare pagamentos e plataformas sem misturar fontes.</p></div>
-            <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+            <div className="expert-charts-grid grid min-w-0 gap-4 xl:grid-cols-2">
             <DashboardWidgetHelp type="payment_chart" title="Vendas por Pagamento" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PaymentChartWidget /></DashboardWidgetHelp>
             <DashboardWidgetHelp type="platform_distribution" title="Distribuição por Plataforma" className="h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><PlatformDistributionWidget /></DashboardWidgetHelp>
             </div>
