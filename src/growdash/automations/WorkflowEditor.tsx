@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Link2, Plus, Save, Trash2, Webhook, Globe2, FileSpreadsheet } from "lucide-react";
+import { ArrowRight, Bot, Clock3, FileSpreadsheet, FolderUp, Globe2, Instagram, MessageCircle, Plus, Save, Split, Trash2, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,12 +10,51 @@ import { useAuth } from "@/contexts/AuthContext";
 import { emptyWorkflow, type WorkflowDefinition, type WorkflowNode, type WorkflowNodeType } from "./workflowTypes";
 import { validateWorkflowDefinition } from "./workflowValidation";
 
-const labels: Record<WorkflowNodeType, string> = { "webhook.trigger": "Webhook", "http.request": "HTTP Request", "google.sheets.append": "Google Sheets" };
-const icons: Record<WorkflowNodeType, typeof Webhook> = { "webhook.trigger": Webhook, "http.request": Globe2, "google.sheets.append": FileSpreadsheet };
+const labels: Record<WorkflowNodeType, string> = {
+  "webhook.trigger": "Webhook",
+  "http.request": "HTTP Request",
+  "google.sheets.append": "Google Sheets",
+  "instagram.trigger": "Instagram — gatilho",
+  "instagram.reply": "Instagram — resposta",
+  "whatsapp.send": "WhatsApp — enviar",
+  "google.drive.upload": "Google Drive — arquivo",
+  "agent.run": "Agente IA",
+  "condition.if": "Condição IF",
+  "delay.wait": "Aguardar",
+};
+const icons: Record<WorkflowNodeType, typeof Webhook> = {
+  "webhook.trigger": Webhook,
+  "http.request": Globe2,
+  "google.sheets.append": FileSpreadsheet,
+  "instagram.trigger": Instagram,
+  "instagram.reply": Instagram,
+  "whatsapp.send": MessageCircle,
+  "google.drive.upload": FolderUp,
+  "agent.run": Bot,
+  "condition.if": Split,
+  "delay.wait": Clock3,
+};
 const storageKey = "growdash:automation-workflow:draft";
 
 function newNode(type: WorkflowNodeType, index: number): WorkflowNode {
-  return { id: `${type.split(".")[0]}-${Date.now()}-${index}`, type, position: { x: index * 250, y: 80 }, parameters: type === "http.request" ? { method: "POST", url: "https://" } : {} };
+  const parameters: Record<string, unknown> = type === "http.request"
+    ? { method: "POST", url: "https://" }
+    : type === "instagram.trigger"
+      ? { event: "comment", keyword: "" }
+      : type === "instagram.reply"
+        ? { message: "" }
+        : type === "whatsapp.send"
+          ? { phone: "", message: "" }
+          : type === "google.drive.upload"
+            ? { fileUrl: "", folderId: "" }
+            : type === "agent.run"
+              ? { prompt: "", output: "text" }
+              : type === "condition.if"
+                ? { field: "", operator: "contains", value: "" }
+                : type === "delay.wait"
+                  ? { seconds: 60 }
+                  : {};
+  return { id: `${type.split(".")[0]}-${Date.now()}-${index}`, type, position: { x: index * 250, y: 80 }, parameters };
 }
 
 export function WorkflowEditor() {
@@ -51,7 +90,7 @@ export function WorkflowEditor() {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3"><div><h2 className="font-black">Editor visual</h2><p className="text-xs text-muted-foreground">Monte o fluxo e configure cada nó.</p></div><div className="flex gap-2"><Input className="h-9 w-44" value={workflow.name} onChange={(event) => setWorkflow((current) => ({ ...current, name: event.target.value }))} aria-label="Nome do workflow" /><Button size="sm" onClick={save}><Save className="mr-2 h-3.5 w-3.5" />Salvar</Button></div></div>
       <div className="mt-4 flex min-h-[440px] flex-wrap content-start items-start gap-4 rounded-xl border border-dashed border-border bg-background/40 p-6">
         {workflow.nodes.length === 0 && <div className="m-auto max-w-sm text-center text-sm text-muted-foreground">Adicione um nó à esquerda para começar.</div>}
-        {workflow.nodes.map((node, index) => { const Icon = icons[node.type]; return <div key={node.id} className="flex items-center gap-3"><button type="button" onClick={() => setSelectedId(node.id)} className={cn("w-48 rounded-xl border p-4 text-left transition", selectedId === node.id ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border bg-card hover:border-primary/50")}><span className="flex items-center gap-2 text-xs font-black"><Icon className="h-4 w-4 text-primary" />{labels[node.type]}</span><span className="mt-2 block truncate text-[10px] text-muted-foreground">{node.type === "http.request" ? String(node.parameters.url || "URL não configurada") : node.type === "google.sheets.append" ? "Adicionar linha" : "Receber evento"}</span></button>{index < workflow.nodes.length - 1 && <ArrowRight className="h-4 w-4 text-muted-foreground" />}</div>; })}
+        {workflow.nodes.map((node, index) => { const Icon = icons[node.type]; return <div key={node.id} className="flex items-center gap-3"><button type="button" onClick={() => setSelectedId(node.id)} className={cn("w-48 rounded-xl border p-4 text-left transition", selectedId === node.id ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border bg-card hover:border-primary/50")}><span className="flex items-center gap-2 text-xs font-black"><Icon className="h-4 w-4 text-primary" />{labels[node.type]}</span><span className="mt-2 block truncate text-[10px] text-muted-foreground">{node.type === "http.request" ? String(node.parameters.url || "URL não configurada") : node.type === "whatsapp.send" ? "Enviar mensagem" : node.type === "agent.run" ? "Executar instrução" : node.type === "condition.if" ? "Avaliar condição" : node.type === "delay.wait" ? `${String(node.parameters.seconds || 0)} segundos` : node.type.endsWith("trigger") ? "Receber evento" : "Executar ação"}</span></button>{index < workflow.nodes.length - 1 && <ArrowRight className="h-4 w-4 text-muted-foreground" />}</div>; })}
       </div>
       {message && <p className="mt-3 rounded-lg bg-primary/10 p-3 text-xs text-primary">{message}</p>}
       {!validation.ok && workflow.nodes.length > 0 && <p className="mt-3 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">{validation.errors.join(" ")}</p>}
@@ -66,5 +105,12 @@ export function WorkflowEditor() {
 function NodeForm({ node, onChange }: { node: WorkflowNode; onChange: (parameters: Record<string, unknown>) => void }) {
   if (node.type === "http.request") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">URL<Input value={String(node.parameters.url || "")} onChange={(event) => onChange({ ...node.parameters, url: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Método<Input value={String(node.parameters.method || "POST")} onChange={(event) => onChange({ ...node.parameters, method: event.target.value.toUpperCase() })} /></label><label className="grid gap-1 text-xs font-bold">Corpo JSON<Textarea value={String(node.parameters.body || "")} onChange={(event) => onChange({ ...node.parameters, body: event.target.value })} placeholder='{"lead_id":"{{id}}"}' /></label></div>;
   if (node.type === "google.sheets.append") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">ID da planilha<Input value={String(node.parameters.spreadsheetId || "")} onChange={(event) => onChange({ ...node.parameters, spreadsheetId: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Aba<Input value={String(node.parameters.sheetName || "Leads")} onChange={(event) => onChange({ ...node.parameters, sheetName: event.target.value })} /></label></div>;
+  if (node.type === "instagram.trigger") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Evento<Input value={String(node.parameters.event || "comment")} onChange={(event) => onChange({ ...node.parameters, event: event.target.value })} placeholder="comment ou message" /></label><label className="grid gap-1 text-xs font-bold">Palavra-chave opcional<Input value={String(node.parameters.keyword || "")} onChange={(event) => onChange({ ...node.parameters, keyword: event.target.value })} /></label></div>;
+  if (node.type === "instagram.reply") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Usa a conta Instagram conectada à Growdash e as permissões aprovadas pela Meta.</p></div>;
+  if (node.type === "whatsapp.send") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Telefone ou campo dinâmico<Input value={String(node.parameters.phone || "")} onChange={(event) => onChange({ ...node.parameters, phone: event.target.value })} placeholder="{{lead.whatsapp}}" /></label><label className="grid gap-1 text-xs font-bold">Mensagem<Textarea value={String(node.parameters.message || "")} onChange={(event) => onChange({ ...node.parameters, message: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">O envio usa a conexão oficial de WhatsApp configurada no workspace.</p></div>;
+  if (node.type === "google.drive.upload") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Arquivo ou URL dinâmica<Input value={String(node.parameters.fileUrl || "")} onChange={(event) => onChange({ ...node.parameters, fileUrl: event.target.value })} placeholder="{{arquivo.url}}" /></label><label className="grid gap-1 text-xs font-bold">Pasta do Drive (opcional)<Input value={String(node.parameters.folderId || "")} onChange={(event) => onChange({ ...node.parameters, folderId: event.target.value })} /></label><p className="text-[10px] text-muted-foreground">Usa a conta Google Workspace conectada à Growdash.</p></div>;
+  if (node.type === "agent.run") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Instrução do agente<Textarea value={String(node.parameters.prompt || "")} onChange={(event) => onChange({ ...node.parameters, prompt: event.target.value })} placeholder="Analise o lead e classifique o próximo passo." /></label><label className="grid gap-1 text-xs font-bold">Saída<Input value={String(node.parameters.output || "text")} onChange={(event) => onChange({ ...node.parameters, output: event.target.value })} placeholder="text ou json" /></label></div>;
+  if (node.type === "condition.if") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Campo dinâmico<Input value={String(node.parameters.field || "")} onChange={(event) => onChange({ ...node.parameters, field: event.target.value })} placeholder="lead.interesse" /></label><label className="grid gap-1 text-xs font-bold">Operador<Input value={String(node.parameters.operator || "contains")} onChange={(event) => onChange({ ...node.parameters, operator: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Valor<Input value={String(node.parameters.value || "")} onChange={(event) => onChange({ ...node.parameters, value: event.target.value })} /></label></div>;
+  if (node.type === "delay.wait") return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Segundos<Input type="number" min="1" value={String(node.parameters.seconds || 60)} onChange={(event) => onChange({ ...node.parameters, seconds: Number(event.target.value) })} /></label></div>;
   return <div className="mt-3 grid gap-3"><label className="grid gap-1 text-xs font-bold">Rota<Input value={String(node.parameters.path || "/webhook/lead")} onChange={(event) => onChange({ ...node.parameters, path: event.target.value })} /></label><label className="grid gap-1 text-xs font-bold">Método<Input value={String(node.parameters.method || "POST")} onChange={(event) => onChange({ ...node.parameters, method: event.target.value.toUpperCase() })} /></label></div>;
 }

@@ -1,4 +1,15 @@
-export const WORKFLOW_NODE_TYPES = ["webhook.trigger", "http.request", "google.sheets.append"] as const;
+export const WORKFLOW_NODE_TYPES = [
+  "webhook.trigger",
+  "http.request",
+  "google.sheets.append",
+  "instagram.trigger",
+  "instagram.reply",
+  "whatsapp.send",
+  "google.drive.upload",
+  "agent.run",
+  "condition.if",
+  "delay.wait",
+] as const;
 
 export type WorkflowNodeType = (typeof WORKFLOW_NODE_TYPES)[number];
 
