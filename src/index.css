@@ -14444,3 +14444,30 @@ html:not(.dark) .brand-shell :is(.gd-metric-card, .gd-panel, .dashboard-glass-ca
 
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] { border-left: 2px solid #ef4444 !important; }
 .brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] { border-left: 2px solid var(--gd-accent) !important; }
+
+/* Finance navigation uses the shared Radix Tabs primitives, whose default
+   active token can still resolve to the legacy blue primary colour. Keep the
+   tab strip neutral and reserve emerald for the selected view, matching the
+   platform-wide content selection contract. */
+.brand-shell .finance-page [role="tablist"] {
+  border-color: var(--gd-content-border) !important;
+  background: var(--gd-content-panel) !important;
+}
+.brand-shell .finance-page [role="tab"] {
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--gd-content-muted) !important;
+  box-shadow: none !important;
+}
+.brand-shell .finance-page [role="tab"]:hover:not([data-state="active"]),
+.brand-shell .finance-page [role="tab"]:focus-visible:not([data-state="active"]) {
+  background: color-mix(in srgb, var(--gd-accent) 10%, transparent) !important;
+  color: var(--gd-content-text) !important;
+}
+.brand-shell .finance-page [role="tab"][data-state="active"],
+.brand-shell .finance-page button[data-state="active"] {
+  border-color: var(--gd-accent) !important;
+  background: var(--gd-accent) !important;
+  color: #062015 !important;
+  box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
+}
