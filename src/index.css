@@ -7664,7 +7664,13 @@ html:not(.dark) .brand-shell .gd-funnel-kpi :is(.gd-funnel-kpi-label, .gd-funnel
   }
 }
 
-@media (min-width: 768px) {
+@media (max-width: 767px) {
+  .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
   .campaigns-workspace {
     box-sizing: border-box !important;
     background: transparent !important;
@@ -8479,11 +8485,6 @@ html:not(.dark) .brand-shell .growdash-content-shell :is(.dashboard-page, .gd-mo
 .gd-date-range-popover button[aria-pressed="true"] > span:first-child > span {
   background: #0b83c9 !important;
 }
-
-/* Expert KPI cards use the same compact footprint as the standard executive
-   metric strip: six cards across on desktop, with the remaining four below. */
-.expert-dashboard .expert-kpi-grid .gd-metric-card { min-height: 96px !important; }
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content { min-height: 96px !important; padding: 16px !important; }
 
 /* Meta Ads-style date picker surface. Interaction and date semantics stay in
    MetaDateRangePicker; these rules only reproduce its visual hierarchy. */
@@ -13139,53 +13140,6 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   gap: 10px !important;
 }
 
-.expert-dashboard .expert-kpi-grid .gd-metric-card,
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
-  min-height: 78px !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
-  padding: 10px !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-icon {
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 8px !important;
-}
-
-/* The KPI content is intentionally centred on the Expert view. Keep the
-   utility icon anchored to the edge so it never shifts the metric's optical
-   centre or makes cards with different labels look misaligned. */
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
-  position: relative;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child {
-  display: flex !important;
-  width: 100% !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child {
-  align-items: center !important;
-  text-align: center !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:last-child {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:last-child {
-  justify-content: center !important;
-}
-
 .expert-dashboard .dashboard-glass-card {
   min-height: 240px !important;
 }
@@ -13279,66 +13233,97 @@ html:not(.dark) .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card, .e
   border-color: rgba(15, 23, 42, .12) !important;
 }
 
-/* Executive KPI layout: keep the ten indicators in a deliberate 5 x 2
-   matrix on desktop. A broad auto-fit rule above otherwise expands this
-   grid to six columns at large widths, leaving four cards stranded below.
-   The cards use the full canvas and the native left-to-right hierarchy so
-   labels and values remain easy to scan instead of looking compressed. */
-@media (min-width: 1200px) {
-  .expert-dashboard .expert-kpi-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    grid-auto-rows: minmax(112px, auto) !important;
-    gap: 14px !important;
-  }
+/* Executive KPI layout: cards share one stable geometry and reflow before
+   their content becomes too narrow. The metric value stays on one line, while
+   its data-value-size attribute provides the compact type scale for long
+   currency and percentage values. */
+.expert-dashboard .expert-kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-rows: minmax(104px, auto) !important;
+  gap: 12px !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card,
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  height: 104px !important;
+  min-height: 104px !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
+  padding: 14px !important;
+  justify-content: center !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child {
+  min-width: 0 !important;
+  justify-content: space-between !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child {
+  min-width: 0 !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:first-child {
+  max-width: 100% !important;
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+  letter-spacing: .08em !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:last-child {
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: clamp(1.1rem, 1.7vw, 1.55rem) !important;
+  line-height: 1.15 !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:last-child[data-value-size="medium"] {
+  font-size: clamp(1rem, 1.45vw, 1.3rem) !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:last-child[data-value-size="long"] {
+  font-size: clamp(.92rem, 1.25vw, 1.1rem) !important;
+}
+
+.expert-dashboard .dashboard-terra-metric-value {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.expert-dashboard .expert-kpi-grid .gd-metric-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 9px !important;
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
   .expert-dashboard .expert-kpi-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 12px !important;
   }
 }
 
-.expert-dashboard .expert-kpi-grid .gd-metric-card,
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
-  height: 112px !important;
-  min-height: 112px !important;
+@media (min-width: 1200px) and (max-width: 1535px) {
+  .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
 }
 
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content {
-  padding: 18px !important;
-  justify-content: center !important;
+@media (min-width: 1536px) {
+  .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
 }
 
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child {
-  justify-content: space-between !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child {
-  align-items: flex-start !important;
-  text-align: left !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:last-child {
-  position: static !important;
-  transform: none !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:first-child {
-  font-size: 11px !important;
-  line-height: 1.25 !important;
-  letter-spacing: .09em !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-card-content > div:first-child > div:first-child > p:last-child {
-  font-size: 1.55rem !important;
-  line-height: 1.15 !important;
-}
-
-.expert-dashboard .expert-kpi-grid .gd-metric-icon {
-  width: 40px !important;
-  height: 40px !important;
-  border-radius: 10px !important;
+@media (max-width: 479px) {
+  .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
 }
 
 /* Campaign table geometry follows the Meta Ads Manager reference: the
@@ -13448,29 +13433,6 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   background: var(--gd-surface-raised) !important;
   color: var(--gd-content-muted) !important;
   box-shadow: none !important;
-}
-
-.brand-shell .expert-dashboard .expert-kpi-grid {
-  grid-template-columns: 1fr !important;
-  gap: 14px !important;
-}
-
-.brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card,
-.brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card-content {
-  height: 112px !important;
-  min-height: 112px !important;
-}
-
-@media (min-width: 768px) and (max-width: 1199px) {
-  .brand-shell .expert-dashboard .expert-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-}
-
-@media (min-width: 1200px) {
-  .brand-shell .expert-dashboard .expert-kpi-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-  }
 }
 
 .brand-shell .expert-dashboard .expert-dashboard-tabs {
@@ -13610,7 +13572,9 @@ html:not(.dark) .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data
 
 @media (min-width: 1280px) {
   .brand-shell .dashboard-page .dashboard-glass-metrics {
-    grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+    /* There are seven executive KPIs. The previous eighth track created a
+       large empty block on the right of the strip at desktop widths. */
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     overflow: visible !important;
   }
 

@@ -26,7 +26,7 @@ export function MetricCard({ title, value, variation, icon, prefix, suffix, deci
   const formattedLength = unavailable ? 14 : `${prefix ?? ""}${Math.abs(value).toLocaleString("pt-BR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix ?? ""}`.length;
   const valueSize = formattedLength > 17
     ? "text-sm sm:text-base 2xl:text-lg"
-    : formattedLength > 13
+    : formattedLength > 12
       ? "text-base sm:text-lg 2xl:text-xl"
       : "text-lg sm:text-xl 2xl:text-2xl";
 
@@ -36,7 +36,7 @@ export function MetricCard({ title, value, variation, icon, prefix, suffix, deci
         <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="flex min-w-0 flex-col items-start justify-center gap-1 text-left">
             <p className="line-clamp-2 max-w-full break-words text-[9px] font-bold uppercase leading-[1.18] tracking-[.08em] text-muted-foreground sm:text-[10px] xl:text-xs" title={title}>{title}</p>
-            <p data-value-size={formattedLength > 17 ? "long" : formattedLength > 13 ? "medium" : "regular"} className={cn("dashboard-terra-metric-value min-w-0 max-w-full break-words font-bold leading-tight tabular-nums", valueSize, unavailable && "text-muted-foreground", !unavailable && valueTone === "positive" && "text-emerald-500 dark:text-emerald-400", !unavailable && valueTone === "negative" && "text-red-500 dark:text-red-400")} title={unavailableReason || `${prefix ?? ""}${value}${suffix ?? ""}`}>
+            <p data-value-size={formattedLength > 17 ? "long" : formattedLength > 12 ? "medium" : "regular"} className={cn("dashboard-terra-metric-value min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-bold leading-tight tabular-nums", valueSize, unavailable && "text-muted-foreground", !unavailable && valueTone === "positive" && "text-emerald-500 dark:text-emerald-400", !unavailable && valueTone === "negative" && "text-red-500 dark:text-red-400")} title={unavailableReason || `${prefix ?? ""}${value}${suffix ?? ""}`}>
               {unavailable ? "Indisponível" : <AnimatedNumber value={value} prefix={prefix} suffix={suffix} decimals={decimals} duration={700} />}
             </p>
           </div>
