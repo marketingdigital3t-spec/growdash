@@ -200,6 +200,10 @@ export function WorkflowEditor() {
     if (!validation.ok) { setMessage(validation.errors.join(" ")); return; }
     setRunning(true); setRunResult(null);
     try {
+      // A execução de teste sempre usa a definição atual, mesmo quando o
+      // usuário ainda não clicou em Salvar. Isso evita o 404 de workflow_id
+      // inexistente e mantém o comportamento esperado de um editor n8n-like.
+      await save("draft");
       const { data, error } = await supabase.functions.invoke("workflow-execute", { body: { workflow_id: workflow.id, mode: "test", input: { source: "manual_test", timestamp: new Date().toISOString() }, idempotency_key: `manual-test:${Date.now()}` } });
       if (error || data?.error) throw new Error(error?.message || data?.error);
       setRunResult(data); setMessage(`Execução ${data?.status === "success" ? "concluída" : "finalizada com erro"}. Run: ${data?.run_id || "-"}`);
