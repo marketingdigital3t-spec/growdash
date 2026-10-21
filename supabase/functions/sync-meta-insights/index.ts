@@ -1318,6 +1318,88 @@ Deno.serve(async (req) => {
           totalSynced += chunk.length;
         }
 
+        // A fast/manual refresh only needs the fresh Graph snapshot persisted
+        // before returning. The full read-after-write proof and stale-fact
+        // reconciliation below are intentionally reserved for the regular
+        // sync: they perform several paginated database reads and were keeping
+        // a seven-day refresh open for minutes on accounts with many ads.
+        // The next incremental cycle still runs the complete verification.
+        if (fastMode) {
+          const requestedSpend = insightRows.reduce((sum: number, row: any) => sum + Number(row.spend || 0), 0);
+          const fastErrors = auxiliaryErrors.join("; ");
+          await supabaseAdmin.from("ad_accounts").update({
+            connection_status: "connected",
+            last_sync_error: fastErrors || null,
+            last_sync_error_code: null,
+            last_sync_attempt_at: attemptedAt,
+            last_sync_success_at: attemptedAt,
+          }).eq("id", account.id).neq("connection_status", "disconnected");
+          await writeMetaScopeState(supabaseAdmin, {
+            accountId: account.id,
+            campaignScope: campaignIds.slice().sort().join(",") || "all-campaigns",
+            startDate,
+            endDate,
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            status: "fresh",
+            lastAttemptAt: attemptedAt,
+            lastSuccessAt: attemptedAt,
+            lastValidSnapshotAt: attemptedAt,
+            coveredStartDate: startDate,
+            coveredEndDate: endDate,
+            pagesProcessed: totalPages,
+            errorMessage: fastErrors || null,
+            blockStatus: {
+              insights: {
+                status: "fresh",
+                coveredScope: { startDate, endDate },
+                pagesProcessed: insightsRes.pages || 0,
+                rowsPersisted: insightRows.length,
+                spendPersisted: requestedSpend,
+                evidenceVersion: 2,
+                responseComplete: true,
+                persistenceVerified: false,
+                verificationDeferred: true,
+              },
+              actions: {
+                status: "fresh",
+                sourceInsightRows: insightRows.length,
+                rowsPersisted: uniqueActionRows.length,
+                leadRowsPersisted: persistedLeadActionRows.length,
+                allActionRowsPersisted: uniqueActionRows.length,
+                allActionRowsExpected: uniqueActionRows.length,
+                evidenceVersion: 2,
+                responseComplete: true,
+                persistenceVerified: false,
+                verificationDeferred: true,
+              },
+              hourly: { status: "pending" },
+              breakdowns: { status: "pending" },
+            },
+          });
+          await updateMetaRun("completed", fastErrors || null);
+          accountResults.push({
+            internalAccountId: account.id,
+            externalAccountId: metaAccountId,
+            requestedPeriod: { startDate, endDate },
+            coveredPeriod: { startDate, endDate },
+            timezone: effectiveTimezone,
+            attributionWindow: effectiveAttributionWindow,
+            pagesProcessed: insightsRes.pages || 0,
+            rowsPersisted: insightRows.length,
+            spendPersisted: requestedSpend,
+            status: "fresh",
+            lastSuccessAt: attemptedAt,
+            errors: auxiliaryErrors,
+            verificationDeferred: true,
+          });
+          if (accountLockAcquired && accountLockScopeKey) {
+            await supabaseAdmin.from("realtime_sync_state").update({ locked_until: null, updated_at: new Date().toISOString() })
+              .eq("user_id", account.user_id).eq("provider", "meta").eq("scope_key", accountLockScopeKey);
+          }
+          continue;
+        }
+
         // A successful PostgREST upsert response is not enough to mark a
         // snapshot fresh. Re-read the exact account/date/window facts and
         // prove that every requested ad/day key became visible under the

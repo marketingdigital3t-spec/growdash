@@ -127,12 +127,15 @@ export function useSyncMeta() {
       };
       // Hourly reconciliation reads the daily rows. Running both in parallel
       // caused races, inflated API usage and occasional non-2xx responses.
-      const insights = await invokeSyncFunction("sync-meta-insights", body);
+      // A manual fast refresh is stale-while-revalidate: launch the complete
+      // sync, immediately release the toolbar, then invalidate the dependent
+      // queries when the background request really finishes. Waiting for the
+      // Edge Function here made the button stay blocked for minutes when Meta
+      // paginated a busy account, even though the existing snapshot was still
+      // valid and safe to display.
+      const insightsPromise = invokeSyncFunction("sync-meta-insights", body);
       if (params.fast) {
-        // The primary Insights snapshot is enough to unlock the visible KPI
-        // grid. Reconcile the slower action and hourly resources in sequence
-        // without keeping the manual refresh button blocked.
-        void (async () => {
+        void insightsPromise.then(async (insights) => {
           try {
             await invokeAuxiliaryWithRetry("sync-meta-leads", {
               adAccountId: params.adAccountId,
@@ -154,23 +157,28 @@ export function useSyncMeta() {
           void queryClient.invalidateQueries({ queryKey: ["meta_leads"] });
           void queryClient.invalidateQueries({ queryKey: ["insights_hourly"] });
           void queryClient.invalidateQueries({ queryKey: ["action-totals-by-ads"] });
-        })();
+          void queryClient.invalidateQueries({ queryKey: ["insights"] });
+          void queryClient.invalidateQueries({ queryKey: ["campaigns_full"] });
+          void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+        }).catch((error) => {
+          console.warn("[sync-meta] sincronização principal em segundo plano", error);
+          toast({
+            title: "Sincronização em segundo plano falhou",
+            description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
+            variant: "destructive",
+          });
+        });
         return {
-          ...insights,
-          status: insights.status || "success",
-          success: insights.success !== false,
-          synced: Number(insights.synced ?? 0),
-          errors: insights.errors ?? [],
-          warnings: ["Leads e distribuição horária continuarão em segundo plano."],
-          block_status: {
-            insights: insights.status || "success",
-            leads: "pending",
-            hourly: "pending",
-          },
-          synced_at: insights.synced_at || new Date().toISOString(),
-          scope: insights.scope,
+          status: "stale_snapshot",
+          success: true,
+          synced: 0,
+          accounts: accountIds.length,
+          warnings: ["A sincronização continua em segundo plano."],
+          block_status: { insights: "pending", leads: "pending", hourly: "pending" },
+          synced_at: new Date().toISOString(),
         };
       }
+      const insights = await insightsPromise;
       let leads: SyncResponse = {};
       let leadsWarning: string | undefined;
       try {
@@ -244,8 +252,12 @@ export function useSyncMeta() {
       void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
       const warningText = data.warnings?.length ? ` Avisos: ${data.warnings.join(" · ")}` : "";
       toast({
-        title: data.status === "partial" ? "Sincronização parcial dos KPIs principais" : "Sincronização concluída",
-        description: `${data.synced} registros diários e ${data.hourly_synced} horários em ${data.accounts} conta(s).${warningText}`,
+        title: data.status === "stale_snapshot"
+          ? "Sincronização iniciada em segundo plano"
+          : data.status === "partial" ? "Sincronização parcial dos KPIs principais" : "Sincronização concluída",
+        description: data.status === "stale_snapshot"
+          ? "Os dados atuais continuam disponíveis e serão atualizados assim que a Meta concluir a consulta."
+          : `${data.synced} registros diários e ${data.hourly_synced} horários em ${data.accounts} conta(s).${warningText}`,
         variant: data.status === "partial" ? "destructive" : undefined,
       });
     },
