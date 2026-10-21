@@ -30,7 +30,7 @@ export function MetricCard({ label, value, change, emphasis }: { label: string; 
     <div className={cn("gd-panel gd-metric-card min-w-0 cursor-default overflow-hidden p-4", emphasis && "gd-metric-card-emphasis")} title={metricDescription(label)} aria-label={`${label}. ${metricDescription(label)}`}>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
         <span className="gd-metric-card-label min-w-0 break-words text-[11px] font-semibold leading-tight" title={label}>{label}</span>
-        <span className={cn("inline-flex shrink-0 items-center gap-0.5 text-[10px] font-bold", negative ? "text-[#b95b51]" : "text-[#43845c]")}>
+        <span className={cn("inline-flex shrink-0 items-center gap-0.5 text-[10px] font-bold", negative ? "text-destructive" : "text-success")}>
           {negative ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
           {change}
         </span>
@@ -54,7 +54,7 @@ export function MiniBars({ values = [45, 68, 52, 86, 64, 92, 78, 100, 84, 96] }:
   return (
     <div className="flex h-32 items-end gap-2">
       {values.map((value, index) => (
-        <div key={`${value}-${index}`} className="flex h-full flex-1 items-end rounded-md bg-[#f0ede7]">
+        <div key={`${value}-${index}`} className="flex h-full flex-1 items-end rounded-md bg-muted">
           <div
             className="premium-meter w-full rounded-md"
             style={{ height: `${value}%` }}

@@ -85,6 +85,7 @@ export default function ResetPassword() {
                 <Input
                   type={show ? "text" : "password"}
                   placeholder="Nova senha"
+                  aria-label="Nova senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="new-password"
@@ -92,7 +93,8 @@ export default function ResetPassword() {
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={show ? "Ocultar nova senha" : "Mostrar nova senha"}
+                  className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:text-foreground"
                   onClick={() => setShow(!show)}
                 >
                   {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -101,6 +103,7 @@ export default function ResetPassword() {
               <Input
                 type={show ? "text" : "password"}
                 placeholder="Confirmar nova senha"
+                aria-label="Confirmar nova senha"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"

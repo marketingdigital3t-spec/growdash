@@ -47,7 +47,7 @@ export function MetaManualConnectionCard({ onConnected }: { onConnected?: () => 
   return (
     <div className="space-y-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#eaf1ff] text-[#2469da]">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
           <KeyRound className="h-5 w-5" />
         </span>
         <div>
