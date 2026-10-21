@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, Bot, CheckCircle2, Clock3, Copy, FileSpreadsheet, FolderUp, Globe2, Instagram, Mail, MessageCircle, Pause, Play, Plus, Save, Split, Tag, Trash2, UserPlus, Webhook, Workflow, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +87,7 @@ const icons: Record<WorkflowNodeType, typeof Webhook> = {
   "approval.manual": CheckCircle2,
 };
 const storageKey = "growdash:automation-workflow:draft";
+type AutomationRunRow = { id: string; status: string; created_at: string; error_message?: string | null };
 
 function newNode(type: WorkflowNodeType, index: number): WorkflowNode {
   const parameters: Record<string, unknown> = type === "http.request"
@@ -125,17 +126,21 @@ export function WorkflowEditor() {
   const validation = useMemo(() => validateWorkflowDefinition(workflow), [workflow]);
   const StatusIcon = workflow.active ? Pause : Play;
 
-  const loadRuns = async () => {
+  const loadRuns = useCallback(async () => {
     if (!workspace?.id || workspace.id.startsWith("legacy-")) return;
+    // These tables are newer than the generated Supabase type snapshot.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = supabase as any;
     const { data } = await client.from("growdash_automation_runs").select("id,status,created_at,error_message").eq("automation_id", workflow.id).order("created_at", { ascending: false }).limit(5);
-    setRuns(data || []);
-  };
+    setRuns((data || []) as AutomationRunRow[]);
+  }, [workflow.id, workspace?.id]);
 
   useEffect(() => {
     if (!workspace?.id || !user?.id || workspace.id.startsWith("legacy-") || loadedWorkspace === workspace.id) return;
     setLoadedWorkspace(workspace.id);
     void (async () => {
+      // These tables are newer than the generated Supabase type snapshot.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = supabase as any;
       const { data } = await client.from("growdash_automations").select("id,name,status,workflow_definition,workflow_version").eq("workspace_id", workspace.id).order("updated_at", { ascending: false }).limit(1).maybeSingle();
       const saved = data?.workflow_definition;
@@ -145,7 +150,7 @@ export function WorkflowEditor() {
       }
     })();
   }, [workspace?.id, user?.id, loadedWorkspace]);
-  useEffect(() => { void loadRuns(); }, [workspace?.id, workflow.id]);
+  useEffect(() => { void loadRuns(); }, [loadRuns]);
 
   const addNode = (type: WorkflowNodeType) => {
     const node = newNode(type, workflow.nodes.length);

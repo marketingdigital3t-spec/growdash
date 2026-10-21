@@ -1,6 +1,6 @@
 import { ArrowUpRight, CircleDollarSign, LayoutDashboard, MousePointerClick, Target, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import { MetricCard, MiniBars, PageHeading } from "./shared";
+import { MetricCard, PageHeading } from "./shared";
 
 // This legacy shell is kept for compatibility, but must never present
 // fabricated business metrics. The data-backed dashboard is /dashboard.
@@ -32,48 +32,48 @@ export default function DashboardPage() {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="font-black">Crescimento de receita</h2>
-              <p className="text-xs text-[#817b74]">Evolução dos últimos 10 períodos</p>
+              <p className="text-xs text-muted-foreground">Evolução dos últimos 10 períodos</p>
             </div>
-            <span className="rounded-full bg-[#f8edc9] px-3 py-1 text-[11px] font-bold text-[#86630e]">+24,8%</span>
+            <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">Sem dados</span>
           </div>
-          <MiniBars />
-          <div className="mt-3 flex justify-between text-[9px] font-bold uppercase tracking-wide text-[#9a948c]">
+          <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-border text-xs text-muted-foreground">Nenhuma série oficial disponível nesta visão.</div>
+          <div className="mt-3 flex justify-between text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
             <span>Início</span><span>Período atual</span>
           </div>
         </section>
         <section className="gd-panel overflow-hidden">
-          <div className="border-b border-[#e7e2da] p-5">
+          <div className="border-b border-border p-5">
             <h2 className="font-black">Atividade recente</h2>
-            <p className="text-xs text-[#817b74]">Atualizações das integrações</p>
+            <p className="text-xs text-muted-foreground">Atualizações das integrações</p>
           </div>
-          <div className="divide-y divide-[#eeeae4]">
+          <div className="divide-y divide-border">
             {activities.length ? activities.map(([source, text, time]) => (
               <div key={text} className="flex items-start gap-3 p-4">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <div className="min-w-0 grow">
                   <p className="text-xs font-bold">{source}</p>
-                  <p className="truncate text-[11px] text-[#77716a]">{text}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{text}</p>
                 </div>
-                <span className="shrink-0 text-[9px] text-[#9c958d]">{time}</span>
+                <span className="shrink-0 text-[9px] text-muted-foreground">{time}</span>
               </div>
-            )) : <p className="p-5 text-xs text-[#77716a]">Nenhuma atividade oficial disponível nesta visão.</p>}
+            )) : <p className="p-5 text-xs text-muted-foreground">Nenhuma atividade oficial disponível nesta visão.</p>}
           </div>
         </section>
       </div>
 
       <div className="gd-auto-grid mt-4 gap-3">
         {[
-          [Target, "Conversão do funil", "18,4%", "+2,1%"],
-          [UsersRound, "Oportunidades", "214", "+8%"],
-          [MousePointerClick, "CTR médio", "1,56%", "+0,3%"],
-          [CircleDollarSign, "Custo por lead", "R$ 14,42", "-6%"],
+          [Target, "Conversão do funil", "—", "sem dados"],
+          [UsersRound, "Oportunidades", "—", "sem dados"],
+          [MousePointerClick, "CTR médio", "—", "sem dados"],
+          [CircleDollarSign, "Custo por lead", "—", "sem dados"],
         ].map(([Icon, label, value, change]) => {
           const IconComponent = Icon as typeof Target;
           return (
             <article key={label as string} className="gd-panel flex items-center gap-4 p-4">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#fbf0cd] text-[#9b7417]"><IconComponent className="h-5 w-5" /></span>
-              <div><p className="text-[10px] font-semibold text-[#807970]">{label as string}</p><p className="text-lg font-black">{value as string}</p></div>
-              <span className="ml-auto flex items-center text-[10px] font-bold text-[#3f8359]"><ArrowUpRight className="h-3 w-3" />{change as string}</span>
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><IconComponent className="h-5 w-5" /></span>
+              <div><p className="text-[10px] font-semibold text-muted-foreground">{label as string}</p><p className="text-lg font-black">{value as string}</p></div>
+              <span className="ml-auto flex items-center text-[10px] font-bold text-muted-foreground"><ArrowUpRight className="h-3 w-3" />{change as string}</span>
             </article>
           );
         })}

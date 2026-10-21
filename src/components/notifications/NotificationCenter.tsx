@@ -59,9 +59,9 @@ export function NotificationCenter() {
 
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 z-[110] flex h-14 items-center gap-3 rounded-2xl border border-primary/35 bg-[#080808]/95 px-4 text-white shadow-[0_24px_75px_-22px_rgba(0,0,0,.95)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-primary/60" aria-label={`${center.unread.length} alertas inteligentes não lidos`}>
+        <button type="button" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 z-[110] flex h-14 items-center gap-3 rounded-2xl border border-primary/35 bg-card/95 px-4 text-card-foreground shadow-[0_24px_75px_-22px_rgba(0,0,0,.35)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-primary/60" aria-label={`${center.unread.length} alertas inteligentes não lidos`}>
           <span className="relative grid h-9 w-9 place-items-center rounded-xl bg-primary/15 text-primary"><Bell className="h-4 w-4" />{center.unread.length > 0 && <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{Math.min(99, center.unread.length)}</span>}</span>
-          <span className="hidden text-left sm:block"><b className="block text-xs">Alertas inteligentes</b><small className="mt-0.5 block text-[9px] text-white/45">{center.unread.length ? `${center.unread.length} ponto(s) para agir` : "Operação monitorada"}</small></span>
+          <span className="hidden text-left sm:block"><b className="block text-xs">Alertas inteligentes</b><small className="mt-0.5 block text-[9px] text-muted-foreground">{center.unread.length ? `${center.unread.length} ponto(s) para agir` : "Operação monitorada"}</small></span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="top" sideOffset={12} collisionPadding={12} className="z-[140] w-[min(430px,calc(100vw-1rem))] overflow-hidden p-0">
