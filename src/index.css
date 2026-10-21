@@ -14393,5 +14393,6 @@ html:not(.dark) .brand-shell :is(.gd-metric-card, .gd-panel, .dashboard-glass-ca
   .dashboard-video-glass, .dashboard-terra-card) :is(h1, h2, h3, h4, h5, p, span, strong, b, td, th, label) {
   color: var(--gd-content-text);
 }
-.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] { border-left-color: #ef4444 !important; }
-.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] { border-left-color: var(--gd-accent) !important; }
+
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="negative"] { border-left: 2px solid #ef4444 !important; }
+.brand-shell .gd-funnel-analysis .gd-funnel-kpi[data-kpi-tone="positive"] { border-left: 2px solid var(--gd-accent) !important; }
