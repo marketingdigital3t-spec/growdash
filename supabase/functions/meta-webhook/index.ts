@@ -186,6 +186,23 @@ async function validSignature(raw: string, signature: string | null) {
   return crypto.subtle.verify("HMAC", key, expected, new TextEncoder().encode(raw));
 }
 
+async function dispatchLeadWorkflows(admin: any, workspaceId: string | null, lead: Record<string, unknown>, eventId: string) {
+  if (!workspaceId) return [];
+  const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") ?? "";
+  if (internalSecret.length < 24) return [{ status: "skipped", reason: "AUTOMATION_INTERNAL_SECRET não configurado" }];
+  const { data: automations, error } = await admin.from("growdash_automations").select("id,name,workflow_definition").eq("workspace_id", workspaceId).eq("status", "active");
+  if (error) throw error;
+  const results: Array<Record<string, unknown>> = [];
+  for (const automation of automations || []) {
+    const definition = automation.workflow_definition as { nodes?: Array<{ type?: string }> } | null;
+    if (!definition?.nodes?.some((node) => node.type === "lead.trigger")) continue;
+    const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { source: "meta_lead", meta_lead_id: lead.meta_lead_id, lead, event_id: eventId }, idempotency_key: `meta-lead:${automation.id}:${String(lead.meta_lead_id || eventId)}` }) });
+    const payload = await response.json().catch(() => ({}));
+    results.push({ automation_id: automation.id, automation_name: automation.name, status: response.ok ? payload?.status || "processed" : "failed", detail: payload?.error ?? null });
+  }
+  return results;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const url = new URL(req.url);
@@ -218,6 +235,7 @@ Deno.serve(async (req) => {
     let processed = 0;
     const errors: string[] = [];
     const rdTracking: unknown[] = [];
+    const workflowTracking: unknown[] = [];
     for (const event of events) {
       const eventPayload = JSON.stringify(event.payload);
       const value = event.payload?.value ?? {};
@@ -276,6 +294,7 @@ Deno.serve(async (req) => {
           // negotiation. If RD is not linked or writes are disabled, the lead
           // remains safely stored and the next RD webhook can retry it.
           rdTracking.push(await syncMetaLeadToRD(admin, String(lead.id ?? leadId)));
+          workflowTracking.push(...await dispatchLeadWorkflows(admin, account.workspace_id, lead, event.provider_event_id));
           await admin.from("meta_webhook_events").update({ processed_at: new Date().toISOString(), error_message: null }).eq("id", data.id);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -284,7 +303,7 @@ Deno.serve(async (req) => {
         }
       }
     }
-    return json({ ok: true, received: events.length, inserted, processed, duplicate: events.length - inserted, errors, rd_tracking: rdTracking }, 200);
+    return json({ ok: true, received: events.length, inserted, processed, duplicate: events.length - inserted, errors, rd_tracking: rdTracking, workflow_tracking: workflowTracking }, 200);
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Falha ao processar webhook Meta" }, 500);
   }

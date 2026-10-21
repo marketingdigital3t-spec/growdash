@@ -47,9 +47,23 @@ Deno.serve(async (req) => {
         incoming.push({ type: "instagram_message", id: String(message.message?.mid ?? ""), sender_id: String(message.sender?.id ?? ""), text: String(message.message?.text ?? ""), raw: message });
       }
       if (!incoming.length) continue;
-      const { data: automations } = await admin.from("growdash_automations").select("id,name,trigger_type,trigger_config").eq("workspace_id", account.workspace_id).eq("status", "active");
+      const { data: automations } = await admin.from("growdash_automations").select("id,name,trigger_type,trigger_config,workflow_definition").eq("workspace_id", account.workspace_id).eq("status", "active");
       for (const event of incoming) {
         for (const automation of automations ?? []) {
+          if (automation.workflow_definition) {
+            const definition = automation.workflow_definition as { nodes?: Array<{ type?: string; parameters?: Record<string, unknown> }> };
+            const expectedType = event.type === "instagram_message" ? "instagram.message.trigger" : "instagram.trigger";
+            const trigger = (definition.nodes || []).find((node) => node.type === expectedType);
+            if (!trigger) continue;
+            const triggerEvent = String(trigger.parameters?.event || (event.type === "instagram_message" ? "message" : "comment"));
+            if (triggerEvent !== (event.type === "instagram_message" ? "message" : "comment")) continue;
+            const keyword = String(trigger.parameters?.keyword || "").trim().toLocaleLowerCase("pt-BR");
+            if (keyword && !String(event.text ?? "").toLocaleLowerCase("pt-BR").includes(keyword)) continue;
+            const response = await fetch(`${supabaseUrl}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { ...event, social_account_id: account.id, provider_account_id: providerAccountId }, idempotency_key: `instagram:${automation.id}:${event.id || crypto.randomUUID()}` }) });
+            const data = await response.json().catch(() => ({}));
+            results.push({ automation_id: automation.id, automation_name: automation.name, event: event.type, status: response.ok ? data?.status || "processed" : "failed", detail: data?.error ?? null });
+            continue;
+          }
           if (automation.trigger_type !== event.type) continue;
           const config = automation.trigger_config ?? {};
           if (config.social_account_id && config.social_account_id !== account.id) continue;
