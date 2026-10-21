@@ -99,6 +99,12 @@ verify_jwt = false
 [functions.daily-reconciliation]
 verify_jwt = false
 
+[functions.workflow-execute]
+verify_jwt = true
+
+[functions.workflow-webhook]
+verify_jwt = false
+
 [functions.rd-resync-cron]
 verify_jwt = false
 
