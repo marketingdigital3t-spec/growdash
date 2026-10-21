@@ -55,6 +55,7 @@ Resultado: **não auditadas visualmente nesta sessão** por bloqueio de autentic
 - `tests/visual/__screenshots__/growdash.spec.ts/tablet/auth.png` — login em 820px.
 - `tests/visual/__screenshots__/growdash.spec.ts/desktop/auth.png` — login em 1440px.
 - As três capturas passaram no teste de ausência de overflow horizontal.
+- Uma checagem adicional em 375px, 414px e 768px também retornou `overflow=0` na tela de autenticação.
 - A sessão autenticada das telas internas continua indisponível; as rotas protegidas foram marcadas como não verificadas visualmente, não como aprovadas.
 
 ### Novos achados e correções
