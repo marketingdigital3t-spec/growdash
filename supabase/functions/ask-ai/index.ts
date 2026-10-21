@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     let adsets: Array<Record<string, any>> = [];
     let ads: Array<Record<string, any>> = [];
     if (mode === "traffic_analysis") {
-      let campaignQuery = admin.from("campaigns").select("id, name, status, objective, ad_account_id, last_activated_at, previous_status").in("ad_account_id", accountIds.length ? accountIds : ["00000000-00000000-0000-0000-000000000000"]);
+      let campaignQuery = admin.from("campaigns").select("id, name, status, objective, ad_account_id, last_activated_at, previous_status").in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
       if (selectedCampaignIds.length) campaignQuery = campaignQuery.in("id", selectedCampaignIds);
       const { data, error: campaignError } = await campaignQuery;
       if (campaignError) throw campaignError;
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
       let insightQuery = admin.from("insights")
         .select("ad_id, ad_account_id, adset_id, campaign_id, attribution_window, date, spend, impressions, reach, clicks, leads, frequency")
         .gte("date", dataStartStr).lte("date", endStr)
-        .in("ad_account_id", accountIds.length ? accountIds : ["00000000-00000000-0000-0000-000000000000"]);
+        .in("ad_account_id", accountIds.length ? accountIds : ["00000000-0000-0000-0000-000000000000"]);
       if (selectedCampaignIds.length) insightQuery = insightQuery.in("campaign_id", selectedCampaignIds);
       const { data: page, error: insightError } = await insightQuery
         .order("date", { ascending: true }).order("ad_id", { ascending: true })
