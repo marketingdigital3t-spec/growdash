@@ -105,6 +105,9 @@ verify_jwt = true
 [functions.workflow-webhook]
 verify_jwt = false
 
+[functions.workflow-scheduler]
+verify_jwt = false
+
 [functions.rd-resync-cron]
 verify_jwt = false
 

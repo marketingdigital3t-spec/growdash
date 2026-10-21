@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { getFreshGoogleToken } from "../_shared/googleToken.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
+import { normalizeSellerNotification, normalizeTagAssignment, normalizeTask } from "../_shared/automationActions.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -211,6 +212,49 @@ async function executeRDNode(admin: any, actorId: string, type: string, paramete
   throw new Error(`Nó RD não suportado: ${type}`);
 }
 
+async function assertWorkspaceUser(admin: any, workspaceId: string, userId: string, label: string) {
+  const { data, error } = await admin.from("workspace_members").select("user_id").eq("workspace_id", workspaceId).eq("user_id", userId).eq("status", "active").maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error(`${label} não pertence ao workspace ativo.`);
+}
+
+async function executeInternalAction(admin: any, automation: { id: string; workspace_id: string }, runId: string, actorId: string, type: string, parameters: Record<string, unknown>) {
+  if (type === "task.create") {
+    const task = normalizeTask(parameters);
+    if (task.assignee_user_id) await assertWorkspaceUser(admin, automation.workspace_id, task.assignee_user_id, "O responsável da tarefa");
+    const { data, error } = await admin.from("growdash_automation_tasks").insert({ ...task, workspace_id: automation.workspace_id, automation_id: automation.id, run_id: runId, created_by: actorId }).select("id,title,status,priority,assignee_user_id,due_at,entity_type,entity_id,created_at").single();
+    if (error) throw error;
+    return { task: data };
+  }
+  if (type === "tag.add") {
+    const assignment = normalizeTagAssignment(parameters);
+    let { data: tag, error: tagError } = await admin.from("growdash_automation_tags").select("id,name,color").eq("workspace_id", automation.workspace_id).ilike("name", assignment.name).maybeSingle();
+    if (tagError) throw tagError;
+    if (!tag) {
+      const created = await admin.from("growdash_automation_tags").insert({ workspace_id: automation.workspace_id, name: assignment.name, color: assignment.color }).select("id,name,color").single();
+      if (created.error && String(created.error.code || "") === "23505") {
+        const retry = await admin.from("growdash_automation_tags").select("id,name,color").eq("workspace_id", automation.workspace_id).ilike("name", assignment.name).maybeSingle();
+        if (retry.error || !retry.data) throw retry.error || new Error("Não foi possível obter a tag criada.");
+        tag = retry.data;
+      } else {
+        if (created.error || !created.data) throw created.error || new Error("Não foi possível criar a tag.");
+        tag = created.data;
+      }
+    }
+    const { data, error } = await admin.from("growdash_automation_tag_assignments").upsert({ workspace_id: automation.workspace_id, tag_id: tag.id, entity_type: assignment.entity_type, entity_id: assignment.entity_id, automation_id: automation.id, run_id: runId }, { onConflict: "workspace_id,tag_id,entity_type,entity_id" }).select("id,tag_id,entity_type,entity_id,created_at").single();
+    if (error) throw error;
+    return { tag, assignment: data };
+  }
+  if (type === "seller.notify") {
+    const notification = normalizeSellerNotification(parameters);
+    await assertWorkspaceUser(admin, automation.workspace_id, notification.recipient_user_id, "O destinatário");
+    const { data, error } = await admin.from("growdash_automation_notifications").insert({ ...notification, workspace_id: automation.workspace_id, automation_id: automation.id, run_id: runId }).select("id,recipient_user_id,title,message,link,created_at").single();
+    if (error) throw error;
+    return { notification: data };
+  }
+  throw new Error(`Ação interna não suportada: ${type}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
@@ -223,7 +267,7 @@ Deno.serve(async (req) => {
     const workflowId = typeof body.workflow_id === "string" ? body.workflow_id : "";
     if (!workflowId) return json({ error: "workflow_id é obrigatório." }, 400);
     const internalCall = isInternalCall(req);
-    if (internalCall && body.mode !== "webhook") return json({ error: "A chamada interna só pode disparar workflows por webhook." }, 403);
+    if (internalCall && !["webhook", "schedule"].includes(String(body.mode || ""))) return json({ error: "A chamada interna só pode disparar workflows por webhook ou agendamento." }, 403);
     let user: { id: string } | null = null;
     if (!internalCall) {
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
@@ -310,7 +354,7 @@ Deno.serve(async (req) => {
           const response = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: String(p.model || "gpt-4o-mini"), temperature: Number(p.temperature ?? 0.2), max_tokens: Math.min(2000, Number(p.maxTokens || 500)), messages: [{ role: "user", content: resolve(prompt, context) }] }) });
           const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error?.message || "Falha no agente IA."); const text = result.choices?.[0]?.message?.content || ""; return p.output === "json" ? JSON.parse(text) : text;
         }
-        case "task.create": case "tag.add": case "seller.notify": throw new Error(`Nó ${node.type} requer uma ação interna configurada no workspace.`);
+        case "task.create": case "tag.add": case "seller.notify": return executeInternalAction(admin, { id: workflowId, workspace_id: automation.workspace_id }, run.id, actorId, node.type, p);
         default: throw new Error(`Nó não suportado: ${node.type}`);
       }
     };
