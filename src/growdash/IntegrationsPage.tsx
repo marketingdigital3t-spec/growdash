@@ -254,19 +254,27 @@ function IntegrationsContent() {
         try {
           const syncStart = format(subDays(new Date(), 30), "yyyy-MM-dd");
           const syncEnd = format(new Date(), "yyyy-MM-dd");
-          await syncMeta.mutateAsync({
-            adAccountIds: syncableMetaAccounts.map((account) => account.id),
-            startDate: syncStart,
-            endDate: syncEnd,
-            // Keep the interactive action bounded. Breakdowns, lead forms and
-            // hourly data are reconciled by the background worker; requesting
-            // all of them together here made the Edge Function exceed its
-            // runtime limit and surfaced only a generic non-2xx error.
-            includeBreakdowns: false,
-            fast: true,
-            force: true,
-          });
-          completed.push("Meta Ads");
+          // A função percorre cada conta sequencialmente e consulta catálogo
+          // + Insights. Enviar dezenas de contas numa única invocação excede
+          // o limite da Edge Function. Lotes pequenos preservam o snapshot
+          // de cada conta e permitem que uma conta lenta não invalide as
+          // demais.
+          const accountIds = syncableMetaAccounts.map((account) => account.id);
+          const batchSize = 3;
+          let syncedMetaAccounts = 0;
+          for (let index = 0; index < accountIds.length; index += batchSize) {
+            const batch = accountIds.slice(index, index + batchSize);
+            await syncMeta.mutateAsync({
+              adAccountIds: batch,
+              startDate: syncStart,
+              endDate: syncEnd,
+              includeBreakdowns: false,
+              fast: true,
+              force: true,
+            });
+            syncedMetaAccounts += batch.length;
+          }
+          completed.push(`Meta Ads (${syncedMetaAccounts} conta${syncedMetaAccounts === 1 ? "" : "s"})`);
         } catch (error) {
           failures.push(`Meta Ads: ${error instanceof Error ? error.message : "falha na sincronização"}`);
         }
