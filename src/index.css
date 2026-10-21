@@ -2348,6 +2348,101 @@ html:not(.dark) {
   }
 }
 
+/* Emerald content contract -------------------------------------------------
+   The shell stays black; every authenticated content surface shares the
+   Growdash green accent. This final layer intentionally wins over legacy
+   Terra/blue and monochrome declarations without changing data behavior. */
+:root {
+  --gd-emerald: #10b981;
+  --gd-emerald-bright: #34d399;
+  --gd-emerald-deep: #047857;
+  --gd-emerald-soft: rgba(16, 185, 129, .14);
+  --gd-emerald-border: rgba(16, 185, 129, .28);
+}
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
+  --primary: 160 84% 39% !important;
+  --primary-foreground: 160 42% 7% !important;
+  --ring: 158 64% 52% !important;
+  --gd-semantic-primary: var(--gd-emerald) !important;
+  --gd-content-selection: var(--gd-emerald) !important;
+}
+
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
+  background: linear-gradient(135deg, #07120b 0%, #08130d 52%, #0a1711 100%) !important;
+  color: #f5f7f6 !important;
+}
+
+html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
+  background: linear-gradient(135deg, #f5fbf7 0%, #ffffff 55%, #edf8f0 100%) !important;
+}
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card,
+      .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi,
+      .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) {
+  border-color: var(--gd-emerald-border) !important;
+}
+
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card,
+      .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi,
+      .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) {
+  background: linear-gradient(145deg, rgba(18, 37, 25, .96), rgba(10, 24, 16, .96)) !important;
+  box-shadow: inset 0 1px rgba(52, 211, 153, .08), 0 14px 32px rgba(0, 0, 0, .24) !important;
+}
+
+html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card,
+      .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi,
+      .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) {
+  background: rgba(255, 255, 255, .94) !important;
+  box-shadow: 0 12px 28px rgba(16, 80, 40, .08) !important;
+}
+
+/* Blue/cyan/violet utilities in content are legacy brand colors. Semantic
+   red/amber states are intentionally not touched. */
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(
+  [class*="text-blue"], [class*="text-sky"], [class*="text-cyan"], [class*="text-violet"], [class*="text-indigo"],
+  [class*="border-blue"], [class*="border-sky"], [class*="border-cyan"], [class*="border-violet"], [class*="border-indigo"],
+  [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]
+) {
+  color: var(--gd-emerald) !important;
+  border-color: var(--gd-emerald-border) !important;
+}
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(
+  [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]
+) { background-color: var(--gd-emerald-soft) !important; }
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) {
+  background: var(--gd-emerald) !important;
+  border-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+}
+
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell)
+  :is(.text-primary, [class*="text-primary"], .text-emerald-400, .text-emerald-500, .text-emerald-600) {
+  color: var(--gd-emerald-bright) !important;
+}
+
+/* Commercial ranking had a self-contained blue/gold palette. Keep its
+   hierarchy, but bind all visible surfaces, controls and accents to emerald. */
+.brand-shell .commercial-ranking-shell :is([class*="bg-[#071124"], [class*="bg-[#08152b"], [class*="bg-[#0b172c"], [class*="bg-[#050b18"], [class*="bg-[#081226"], [class*="bg-[#0d1830"], [class*="bg-[#151b20"], [class*="bg-[#0e1a2c"], [class*="bg-[#1b1520"]) {
+  background: #0c1b12 !important;
+}
+.brand-shell .commercial-ranking-shell :is([class*="text-[#f6c94c"], [class*="text-[#d9a928"], [class*="text-[#f5deb0"], [class*="text-[#ed8a36"], [class*="text-[#d5dae3"], [class*="border-[#f6c94c"], [class*="border-[#d9a928"]) {
+  color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-emerald-border) !important;
+}
+.brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) {
+  background-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+}
+.brand-shell .commercial-ranking-shell :is([class*="border-white"], [class*="bg-white"], [class*="text-slate-"]) {
+  border-color: rgba(52, 211, 153, .18) !important;
+}
+
 /* Spatial phase shell: decorative only, keeping all content and controls above it. */
 .space-phase-bg { --phase-color: #2e86de; --phase-glow: rgba(0,212,255,.18); position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #050505; opacity: .92; transition: background-color .8s ease; }
 .space-phase-bg[data-phase="orbita"] { --phase-color: #ffc107; --phase-glow: rgba(255,193,7,.2); }
@@ -3643,19 +3738,22 @@ html:not(.dark) {
   --gd-card-padding: 20px;
 }
 
-/* Legacy accent preferences are retained for storage compatibility only. */
-html[data-accent] {
-  --primary: 0 0% 18% !important;
-  --ring: 0 0% 35% !important;
-  --accent: 0 0% 93% !important;
-  --accent-foreground: 0 0% 12% !important;
-  --sidebar-primary: 0 0% 100% !important;
-  --sidebar-icon-active: 0 0% 100% !important;
-  --sidebar-ring: 0 0% 70% !important;
-  --brand-gold: #ffffff !important;
-  --brand-gold-light: #ffffff !important;
-  --brand-bronze: #777777 !important;
-  --brand-accent-rgb: 255, 255, 255 !important;
+/* Legacy accent preferences are retained for storage compatibility only.
+   The active platform accent is emerald; metallic-gold remains opt-in. */
+html[data-accent="emerald"],
+html[data-accent="monochrome"] {
+  --primary: 160 84% 39% !important;
+  --primary-foreground: 160 42% 7% !important;
+  --ring: 158 64% 52% !important;
+  --accent: 158 38% 16% !important;
+  --accent-foreground: 151 78% 88% !important;
+  --sidebar-primary: 160 84% 39% !important;
+  --sidebar-icon-active: 158 64% 52% !important;
+  --sidebar-ring: 158 64% 52% !important;
+  --brand-gold: #10b981 !important;
+  --brand-gold-light: #6ee7b7 !important;
+  --brand-bronze: #047857 !important;
+  --brand-accent-rgb: 16, 185, 129 !important;
 }
 
 .dark {
@@ -14131,4 +14229,58 @@ html:not(.dark) .brand-shell {
   .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link:active {
     transform: none;
   }
+}
+
+/* Final emerald content contract. Keep this block last so legacy phase and
+   monochrome layers cannot repaint dashboard, expert, CRM or commercial. */
+:root {
+  --gd-emerald: #10b981;
+  --gd-emerald-bright: #34d399;
+  --gd-emerald-deep: #047857;
+  --gd-emerald-soft: rgba(16, 185, 129, .14);
+  --gd-emerald-border: rgba(16, 185, 129, .28);
+}
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) {
+  --primary: 160 84% 39% !important;
+  --primary-foreground: 160 42% 7% !important;
+  --ring: 158 64% 52% !important;
+  --gd-semantic-primary: var(--gd-emerald) !important;
+  --gd-content-selection: var(--gd-emerald) !important;
+}
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) { background: linear-gradient(135deg, #07120b 0%, #08130d 52%, #0a1711 100%) !important; color: #f5f7f6 !important; }
+html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) { background: linear-gradient(135deg, #f5fbf7 0%, #fff 55%, #edf8f0 100%) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { border-color: var(--gd-emerald-border) !important; }
+html.dark .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { background: linear-gradient(145deg, rgba(18,37,25,.96), rgba(10,24,16,.96)) !important; box-shadow: inset 0 1px rgba(52,211,153,.08), 0 14px 32px rgba(0,0,0,.24) !important; }
+html:not(.dark) .brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.gd-panel, .gd-metric-card, .dashboard-glass-card, .dashboard-video-glass, .dashboard-terra-card, .dashboard-primary-kpis > *, .dashboard-financial-overview > *, .dashboard-reference-kpi, .dashboard-reference-funnel, .dashboard-reference-radar, .rounded-2xl.border, .rounded-xl.border) { background: rgba(255,255,255,.94) !important; box-shadow: 0 12px 28px rgba(16,80,40,.08) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="text-blue"], [class*="text-sky"], [class*="text-cyan"], [class*="text-violet"], [class*="text-indigo"], [class*="border-blue"], [class*="border-sky"], [class*="border-cyan"], [class*="border-violet"], [class*="border-indigo"], [class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { color: var(--gd-emerald) !important; border-color: var(--gd-emerald-border) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is([class*="bg-blue"], [class*="bg-sky"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-indigo"]) { background-color: var(--gd-emerald-soft) !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(button[data-state="active"], [role="tab"][aria-selected="true"], [role="tab"][data-state="active"], .is-active) { background: var(--gd-emerald) !important; border-color: var(--gd-emerald) !important; color: #062015 !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) :is(.text-primary, [class*="text-primary"], .text-emerald-400, .text-emerald-500, .text-emerald-600) { color: var(--gd-emerald-bright) !important; }
+.brand-shell .commercial-ranking-shell :is([class*="bg-[#071124"], [class*="bg-[#08152b"], [class*="bg-[#0b172c"], [class*="bg-[#050b18"], [class*="bg-[#081226"], [class*="bg-[#0d1830"], [class*="bg-[#151b20"], [class*="bg-[#0e1a2c"], [class*="bg-[#1b1520"]) { background: #0c1b12 !important; }
+.brand-shell .commercial-ranking-shell :is([class*="text-[#f6c94c"], [class*="text-[#d9a928"], [class*="text-[#f5deb0"], [class*="text-[#ed8a36"], [class*="text-[#d5dae3"], [class*="border-[#f6c94c"], [class*="border-[#d9a928"]) { color: var(--gd-emerald-bright) !important; border-color: var(--gd-emerald-border) !important; }
+.brand-shell .commercial-ranking-shell :is([class*="bg-[#d9a928"], [class*="from-[#d9a928"], [class*="to-[#ffe692"]) { background-color: var(--gd-emerald) !important; color: #062015 !important; }
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .dashboard-summary-strip-surface,
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-glass-metric {
+  border-color: var(--gd-emerald-border) !important;
+  background: linear-gradient(145deg, rgba(18,37,25,.96), rgba(10,24,16,.96)) !important;
+}
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-glass-metric-icon,
+.brand-shell :is(.dashboard-page, .expert-dashboard, .crm-page, .commercial-ranking-shell) .gd-metric-icon {
+  background: var(--gd-emerald-soft) !important;
+  color: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-emerald-border) !important;
+}
+.brand-shell .expert-dashboard-tabs button[aria-selected="true"],
+.brand-shell .commercial-ranking-tabs button.is-active,
+.brand-shell .crm-page [role="tab"][aria-selected="true"] {
+  background: var(--gd-emerald) !important;
+  color: #062015 !important;
+  border-color: var(--gd-emerald) !important;
+  box-shadow: 0 0 0 1px rgba(52,211,153,.2), 0 8px 18px rgba(16,185,129,.18) !important;
+}
+.gd-expert-tab-active,
+.gd-commercial-tab-active {
+  background: #10b981 !important;
+  color: #062015 !important;
+  border-color: #10b981 !important;
 }

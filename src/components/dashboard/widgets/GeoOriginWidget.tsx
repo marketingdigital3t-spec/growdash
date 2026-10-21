@@ -21,10 +21,10 @@ function fmtPct(v: number) { return `${v.toFixed(1).replace(".", ",")}%`; }
 
 function KpiCard({ icon: Icon, title, value, footer, scheme }: { icon: any; title: string; value: string; footer: string; scheme: "blue" | "green" | "violet" | "emerald" }) {
   const bg = {
-    blue: "bg-blue-50 text-blue-600",
+    blue: "bg-emerald-50 text-emerald-600",
     green: "bg-emerald-50 text-emerald-600",
-    violet: "bg-violet-50 text-violet-600",
-    emerald: "bg-teal-50 text-teal-600",
+    violet: "bg-emerald-50 text-emerald-600",
+    emerald: "bg-emerald-50 text-emerald-600",
   }[scheme];
   return (
     <Card>
@@ -238,7 +238,7 @@ export function GeoOriginWidget() {
                       .map((r, i) => (
                       <tr key={r.uf} className="border-b last:border-0 hover:bg-muted/40">
                         <td className="py-2 px-3">
-                          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${mode === "leads" ? "bg-blue-500" : "bg-emerald-500"}`}>
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
                             {i + 1}
                           </span>
                         </td>

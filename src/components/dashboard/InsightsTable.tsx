@@ -291,7 +291,7 @@ export function InsightsTable({ data }: InsightsTableProps) {
             </SelectItem>
             <SelectItem value="IN_PROCESS">
               <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-blue-500" /> Em análise
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Em análise
               </span>
             </SelectItem>
           </SelectContent>

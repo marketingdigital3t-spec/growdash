@@ -9,9 +9,9 @@ interface PaymentChartProps {
 
 const COLORS: Record<string, string> = {
   pix: "#16a34a",
-  cartao: "#2563eb",
+  cartao: "#10b981",
   boleto: "#f59e0b",
-  outros: "#8b5cf6",
+  outros: "#047857",
 };
 
 const LABELS: Record<string, string> = {

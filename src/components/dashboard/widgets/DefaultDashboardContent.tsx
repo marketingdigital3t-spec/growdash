@@ -446,7 +446,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       { title: "Taxa de Conversão", value: tabConv, suffix: "%", decimals: 2, icon: <ArrowRightLeft className="h-4 w-4" /> },
     ];
     funnelSteps = [
-      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-600" },
+      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
       { key: "link_clicks", label: "Cliques no link", value: clickRef, icon: <MousePointerClick className="h-5 w-5" />, color: "from-violet-500/20 to-violet-500/5", text: "text-violet-600" },
       { key: "leads", label: "Leads", value: tabLeads, icon: <Users className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
       { key: "sales", label: "Vendas", value: confirmedCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
@@ -463,7 +463,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       { title: "Conversão", value: clickRef > 0 ? (nativeLeads / clickRef) * 100 : 0, suffix: "%", decimals: 2, icon: <ArrowRightLeft className="h-4 w-4" /> },
     ];
     funnelSteps = [
-      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-600" },
+      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
       { key: "link_clicks", label: "Cliques no link", value: clickRef, icon: <MousePointerClick className="h-5 w-5" />, color: "from-violet-500/20 to-violet-500/5", text: "text-violet-600" },
       { key: "leads", label: "Leads", value: nativeLeads, icon: <Users className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
       { key: "sales", label: "Vendas", value: confirmedCount, icon: <ShoppingBag className="h-5 w-5" />, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-600" },
@@ -482,7 +482,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       { title: "Conversão LP→Lead", value: lpConv, suffix: "%", decimals: 2, icon: <ArrowRightLeft className="h-4 w-4" /> },
     ];
     funnelSteps = [
-      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-600" },
+      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
       { key: "link_clicks", label: "Cliques no link", value: clickRef, icon: <MousePointerClick className="h-5 w-5" />, color: "from-violet-500/20 to-violet-500/5", text: "text-violet-600" },
       { key: "lp_view", label: "LP View", value: lpViews, icon: <Globe className="h-5 w-5" />, color: "from-cyan-500/20 to-cyan-500/5", text: "text-cyan-600" },
       { key: "leads", label: "Concluiu Forms", value: lpLeads, icon: <Users className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
@@ -499,7 +499,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       { title: "Conversão", value: conv, suffix: "%", decimals: 2, icon: <ArrowRightLeft className="h-4 w-4" /> },
     ];
     funnelSteps = [
-      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-600" },
+      { key: "impressions", label: "Impressões", value: totalImpressions, icon: <Eye className="h-5 w-5" />, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-600" },
       { key: "link_clicks", label: "Cliques no link", value: clickRef, icon: <MousePointerClick className="h-5 w-5" />, color: "from-violet-500/20 to-violet-500/5", text: "text-violet-600" },
       { key: "messages", label: "Mensagens", value: messages, icon: <MessageCircle className="h-5 w-5" />, color: "from-pink-500/20 to-pink-500/5", text: "text-pink-600" },
     ];
@@ -745,11 +745,11 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
 
       {/* 5. Gráficos diários */}
       <div className="dashboard-daily-charts mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div><ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="#38bdf8" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
+        <div><ChartCard title="CPL Diário" data={dailyData} type="line" dataKey="cpl" color="#10b981" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
         <div><ChartCard title="Investimento Diário" data={dailyData} type="bar" dataKey="spend" color="#facc15" formatLabel={(v: any) => `R$ ${Number(v).toFixed(2)}`} /></div>
         <div><ChartCard title={objective === "messages" ? "Mensagens por Dia" : "Leads por Dia"} data={dailyData} type="line" dataKey="leads" color="#22c55e" /></div>
-        <div><ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
-        <div className="md:col-span-2"><ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="#38bdf8" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
+        <div><ChartCard title={objective === "messages" ? "Conversão Clique → Mensagem" : "Conversão Clique → Lead"} data={dailyData} type="line" dataKey="conversion" color="#10b981" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
+        <div className="md:col-span-2"><ChartCard title="CTR por Criativo" data={creativeData} type="bar" dataKey="ctr" xKey="name" color="#10b981" formatLabel={(v: any) => `${Number(v).toFixed(2)}%`} /></div>
       </div></section>
       </>}
     </div>

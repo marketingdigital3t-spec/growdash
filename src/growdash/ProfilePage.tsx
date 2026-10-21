@@ -177,10 +177,10 @@ export default function ProfilePage() {
           </div>
           <div className="mt-7 border-t border-border pt-6">
             <h2 className="font-black">Paleta da plataforma</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Escolha entre prata e dourado. As duas paletas usam metal escovado, superfícies de leitura neutras e contraste garantido nos modos claro e escuro.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Escolha entre verde esmeralda e dourado. As duas paletas mantêm superfícies pretas/brancas de leitura e bordas sutis.</p>
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               {([
-                ["monochrome", "Prata metálica", "Grafite, cromo escovado e reflexos prateados", "profile-palette-mono"],
+                ["emerald", "Verde esmeralda", "Preto, branco e sinais de ação em verde Growdash", "profile-palette-emerald"],
                 ["metallic-gold", "Ônix dourado", "Preto profundo, ouro metálico e bordas luminosas", "profile-palette-gold"],
               ] as [AccentTheme, string, string, string][]).map(([value, label, description, previewClass]) => (
                 <button key={value} type="button" onClick={() => setAccent(value)} aria-pressed={accent === value} className={`profile-palette-choice ${previewClass} ${accent === value ? "is-active" : ""}`}>
