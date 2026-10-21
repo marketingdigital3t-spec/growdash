@@ -8,6 +8,8 @@ export type RDDealNote = {
   author_name: string;
   body: string;
   created_at: string;
+  source: "rd" | "growdash";
+  activity_type?: string;
 };
 
 export function useRDDealNotes(dealId: string | null) {
@@ -21,7 +23,32 @@ export function useRDDealNotes(dealId: string | null) {
         .eq("rd_deal_id", dealId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as RDDealNote[];
+      const local = ((data ?? []) as Omit<RDDealNote, "source">[]).map((item) => ({ ...item, source: "growdash" as const }));
+      const { data: deal, error: dealError } = await (supabase as any)
+        .from("rd_deals")
+        .select("rd_connection_id, rd_deal_id")
+        .eq("id", dealId)
+        .maybeSingle();
+      if (dealError || !deal?.rd_connection_id || !deal?.rd_deal_id) return local;
+      try {
+        const result = await supabase.functions.invoke("rd-list-deal-activities", {
+          body: { rd_connection_id: deal.rd_connection_id, rd_deal_id: deal.rd_deal_id },
+        });
+        if (result.error || !Array.isArray(result.data?.activities)) return local;
+        const remote = result.data.activities as RDDealNote[];
+        const merged = [...remote, ...local];
+        const seen = new Set<string>();
+        return merged
+          .filter((item) => {
+            const key = `${String(item.body || "").trim().toLocaleLowerCase()}|${String(item.created_at || "").slice(0, 16)}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      } catch {
+        return local;
+      }
     },
   });
 }
