@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { edgeFunctionErrorDetails, formatEdgeFunctionError } from "@/lib/edgeFunctionError";
 import { summarizeMetaSyncBlocks } from "@/lib/syncStatus";
+import { shouldRefreshStoredMetaToken } from "@/lib/syncRequestPlan";
 
 interface SyncParams {
   adAccountId?: string;
@@ -100,11 +101,13 @@ export function useSyncMeta() {
         ...(params.adAccountIds ?? []),
         ...(params.adAccountId ? [params.adAccountId] : []),
       ].filter(Boolean)));
-      for (const accountId of accountIds) {
-        try {
-          await supabase.functions.invoke("meta-reconnect-stored-token", { body: { account_id: accountId } });
-        } catch {
-          // The main sync reports the authoritative Meta error below.
+      if (shouldRefreshStoredMetaToken(Boolean(params.fast))) {
+        for (const accountId of accountIds) {
+          try {
+            await supabase.functions.invoke("meta-reconnect-stored-token", { body: { account_id: accountId } });
+          } catch {
+            // The main sync reports the authoritative Meta error below.
+          }
         }
       }
       const body = {

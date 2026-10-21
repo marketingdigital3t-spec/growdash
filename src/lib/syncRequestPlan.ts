@@ -16,3 +16,7 @@ export function buildFastManualSyncRequest(input: Omit<FastManualSyncRequest, "f
     syncMode: "selected_period",
   };
 }
+
+export function shouldRefreshStoredMetaToken(fast: boolean): boolean {
+  return !fast;
+}

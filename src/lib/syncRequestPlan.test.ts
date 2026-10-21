@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFastManualSyncRequest } from "./syncRequestPlan";
+import { buildFastManualSyncRequest, shouldRefreshStoredMetaToken } from "./syncRequestPlan";
 
 describe("buildFastManualSyncRequest", () => {
   it("keeps the selected period but marks the manual refresh as fast", () => {
@@ -15,5 +15,12 @@ describe("buildFastManualSyncRequest", () => {
       fast: true,
       syncMode: "selected_period",
     });
+  });
+});
+
+describe("shouldRefreshStoredMetaToken", () => {
+  it("does not block a fast refresh on token health revalidation", () => {
+    expect(shouldRefreshStoredMetaToken(true)).toBe(false);
+    expect(shouldRefreshStoredMetaToken(false)).toBe(true);
   });
 });
