@@ -14573,3 +14573,27 @@ html[data-accent="metallic-gold"] {
   background: var(--gd-emerald-bright) !important;
   border-color: var(--gd-emerald-bright) !important;
 }
+
+/* The default shadcn Button carries the legacy `gd-highlight-action` class.
+   Its older, more-specific lime rule used to win over the token aliases
+   above, which left cards such as Agenda & Turmas neon-lime. Keep this
+   compatibility selector at the final layer so every primary action uses the
+   same emerald surface as the KPI borders and active navigation. */
+.brand-shell button.gd-highlight-action,
+.brand-shell button.premium-button.gd-highlight-action,
+.growdash-main button.gd-highlight-action {
+  background: var(--gd-emerald) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+  box-shadow: 0 8px 22px -14px rgba(16, 185, 129, .95) !important;
+}
+.brand-shell button.gd-highlight-action:hover:not(:disabled),
+.brand-shell button.gd-highlight-action:focus-visible:not(:disabled),
+.growdash-main button.gd-highlight-action:hover:not(:disabled),
+.growdash-main button.gd-highlight-action:focus-visible:not(:disabled) {
+  background: var(--gd-emerald-bright) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald-bright) !important;
+  color: #062015 !important;
+}
