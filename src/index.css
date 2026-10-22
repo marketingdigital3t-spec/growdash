@@ -14983,3 +14983,36 @@ html[data-accent="metallic-gold"] {
     flex: 1;
   }
 }
+
+/* Campaign table dark-mode controls: the platform-wide white button
+   contract must not leak into the graphite traffic table. Keep the actions
+   affordance on a raised surface and the status hit area transparent so the
+   row surface remains continuous. */
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-row-actions {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-raised-dark) !important;
+  background-image: none !important;
+  color: var(--traffic-text-dark) !important;
+  box-shadow: none !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-row-actions:hover,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-row-actions:focus-visible {
+  border-color: var(--traffic-text-dark) !important;
+  background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button {
+  border-color: transparent !important;
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--traffic-text-dark) !important;
+  box-shadow: none !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button:hover,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button:focus-visible {
+  background: var(--traffic-muted-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}

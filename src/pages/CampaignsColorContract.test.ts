@@ -15,5 +15,11 @@ describe("dark campaign color contract", () => {
     expect(indexCss).toContain(
       "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals] > td",
     );
+    expect(indexCss).toContain(
+      "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-row-actions",
+    );
+    expect(indexCss).toContain(
+      "html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button",
+    );
   });
 });
