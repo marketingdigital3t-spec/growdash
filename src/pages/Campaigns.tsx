@@ -79,7 +79,7 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useAccountLpConfigs } from "@/hooks/useAccountPixels";
 import { resolveMetaActionMetrics } from "@/lib/metaActionMetrics";
 import { friendlyActionLabel } from "@/hooks/useCustomMetrics";
-import { resolveCampaignPrimaryResult, resolveCampaignResults } from "@/lib/campaignResultEvents";
+import { resolveCampaignPrimaryResult, resolveCampaignResults, selectOfficialCampaignResult } from "@/lib/campaignResultEvents";
 import { useMetaCampaignLeadRollup } from "@/hooks/useMetaCampaignLeadRollup";
 import { isMetaMessagingDestination } from "@/lib/metaLeadScope";
 import { addInsightOnlyCampaignRows } from "@/lib/metaCampaignLeadRollup";
@@ -131,7 +131,10 @@ function campaignPrimaryResult(campaign: any) {
   return resolveCampaignPrimaryResult(campaign.objective, {
     leadCount: Math.max(0, Number((campaign.results?.leadCount ?? campaign.leads) || 0)),
     conversations: Math.max(0, Number(campaign.results?.conversations || 0)),
-  });
+    landingPageViews: Math.max(0, Number(campaign.landingPageViews || 0)),
+    purchases: Math.max(0, Number(campaign.metaPurchases || 0)),
+    reach: Math.max(0, Number(campaign.reach || 0)),
+  }, campaign.metaResultType ? { type: campaign.metaResultType, value: campaign.metaResultValue } : undefined);
 }
 
 function formatApiDate(date: Date) {
@@ -145,7 +148,7 @@ function firstRelation(value: any) {
 function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date, attributionWindow = "account_default") {
   const start = startDate ? formatApiDate(startDate) : null;
   const end = endDate ? formatApiDate(endDate) : null;
-  const totals = { spend: 0, leads: 0, formLeads: 0, siteLeads: 0, conversations: 0, legacyLeads: 0, hasCanonicalLeadParts: true, clicks: 0, impressions: 0, reach: 0 };
+  const totals = { spend: 0, leads: 0, formLeads: 0, siteLeads: 0, conversations: 0, legacyLeads: 0, hasCanonicalLeadParts: true, clicks: 0, impressions: 0, reach: 0, officialResults: {} as Record<string, number>, optimizationGoal: null as string | null };
 
   for (const ad of ads || []) {
     const scopedInsights: any[] = dedupeDailyMetaInsights((ad.insights || [])
@@ -165,6 +168,11 @@ function aggregateInsights(ads: any[], startDate?: Date, endDate?: Date, attribu
       totals.clicks += insight.clicks ?? 0;
       totals.impressions += insight.impressions ?? 0;
       totals.reach += insight.reach ?? 0;
+      if (insight.result_type) {
+        const type = String(insight.result_type);
+        totals.officialResults[type] = (totals.officialResults[type] || 0) + Math.max(0, Number(insight.result_value || 0));
+      }
+      if (!totals.optimizationGoal && insight.optimization_goal) totals.optimizationGoal = String(insight.optimization_goal);
     }
   }
 
@@ -254,7 +262,6 @@ export default function Campaigns() {
   const [breakdown, setBreakdown] = useState(() => localStorage.getItem("growdash:meta-breakdown") || "none");
   const [campaignPage, setCampaignPage] = useState(0);
   const campaignTableScrollRef = useRef<HTMLDivElement | null>(null);
-  const campaignTotalsScrollRef = useRef<HTMLDivElement | null>(null);
   const [healthFilter, setHealthFilter] = useState<CampaignHealth | "all">("all");
   const [analysisPanel, setAnalysisPanel] = useState<"alerts" | "intelligence" | null>(() => {
     const requested = searchParams.get("analise");
@@ -421,7 +428,7 @@ export default function Campaigns() {
         const adsetRows = await fetchCampaignPages(
           () => (supabase as any)
             .from("adsets")
-            .select("id,name,daily_budget,status,campaign_id")
+            .select("id,name,daily_budget,status,campaign_id,destination_type,optimization_goal")
             .in("campaign_id", campaignIdChunk)
             .order("name", { ascending: true })
             .order("id", { ascending: true }),
@@ -469,7 +476,7 @@ export default function Campaigns() {
             () => {
               let insightQuery = (supabase as any)
                 .from("insights")
-                .select("ad_id,ad_account_id,spend,form_leads,site_leads,conversations,clicks,inline_link_clicks,unique_inline_link_clicks,impressions,reach,date,attribution_window")
+                .select("ad_id,ad_account_id,spend,form_leads,site_leads,conversations,clicks,inline_link_clicks,unique_inline_link_clicks,impressions,reach,date,attribution_window,result_type,result_value,optimization_goal")
                 .in("ad_id", adBatch)
                 // The ad ids came from campaigns already scoped to the visible
                 // accounts. Keeping the ownership filter on the hierarchy and
@@ -502,6 +509,8 @@ export default function Campaigns() {
           ads: (adsByAdset.get(String(adset.id)) || []).map((ad: any) => ({ ...ad, insights: insightsByAd.get(String(ad.id)) || [] })),
         }));
         let spend = 0, leads = 0, formLeads = 0, siteLeads = 0, conversations = 0, clicks = 0, linkClicks = 0, uniqueLinkClicks = 0, impressions = 0, reach = 0;
+        const officialResults: Record<string, number> = {};
+        let optimizationGoal: string | null = null;
         const hasCanonicalLeadParts = true;
         const adsets = hydratedAdsets;
         let adsetBudget = 0;
@@ -529,6 +538,11 @@ export default function Campaigns() {
               uniqueLinkClicks += i.unique_inline_link_clicks ?? 0;
               impressions += i.impressions ?? 0;
               reach += i.reach ?? 0;
+              if (i.result_type) {
+                const type = String(i.result_type);
+                officialResults[type] = (officialResults[type] || 0) + Math.max(0, Number(i.result_value || 0));
+              }
+              if (!optimizationGoal && i.optimization_goal) optimizationGoal = String(i.optimization_goal);
             }
           }
         }
@@ -555,7 +569,8 @@ export default function Campaigns() {
         const uniqueLinkCtr = reach > 0 ? uniqueLinkClicks / reach * 100 : 0;
 
         const budget = Number(c.daily_budget || 0) > 0 ? Number(c.daily_budget) : adsetBudget;
-        return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads: 0, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate };
+        const officialResult = selectOfficialCampaignResult(c.objective, optimizationGoal, officialResults);
+        return { ...c, adsets, budget, spend, leads, formLeads, siteLeads, conversations, legacyLeads: 0, hasCanonicalLeadParts, clicks, linkClicks, uniqueLinkClicks, linkCpc, uniqueLinkCtr, impressions, reach, frequency, salesCount, revenue, profit, roi, roas, cpa, cpl, ctr, cpc, cpm, conversionRate, metaResultType: officialResult?.type || null, metaResultValue: officialResult?.value ?? null, optimizationGoal };
       });
     },
   });
@@ -623,7 +638,7 @@ export default function Campaigns() {
       legacyLeads: campaign.legacyLeads,
       conversationDestinationConfirmed: false,
     } : undefined);
-    const primaryResult = resolveCampaignPrimaryResult(campaign.objective, results).value;
+    const primaryResult = resolveCampaignPrimaryResult(campaign.objective, { ...results, landingPageViews: actionMetrics.landingPageViews, purchases: actionMetrics.purchases, reach: campaign.reach }, campaign.metaResultType ? { type: campaign.metaResultType, value: campaign.metaResultValue } : undefined).value;
     return {
       ...campaign,
       // Todas as métricas de aquisição usam a mesma definição operacional de
@@ -663,7 +678,7 @@ export default function Campaigns() {
     queryFn: async ({ signal }) => {
       let query = supabase
         .from("adsets")
-        .select("id,name,daily_budget,status,campaign_id,campaigns!inner(id,name,ad_account_id)")
+        .select("id,name,daily_budget,status,campaign_id,destination_type,optimization_goal,campaigns!inner(id,name,objective,ad_account_id)")
         .order("name", { ascending: true });
       if (selectedAccount !== "all") query = query.eq("campaigns.ad_account_id", selectedAccount);
       else {
@@ -680,7 +695,7 @@ export default function Campaigns() {
     queryFn: async ({ signal }) => {
       let query = supabase
         .from("ads")
-        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,campaigns!inner(id,name,objective,ad_account_id))")
+        .select("id,name,thumbnail_url,status,adset_id,adsets!inner(id,name,campaign_id,destination_type,optimization_goal,campaigns!inner(id,name,objective,ad_account_id))")
         .order("name", { ascending: true });
       if (selectedAccount !== "all") query = query.eq("adsets.campaigns.ad_account_id", selectedAccount);
       else {
@@ -988,6 +1003,18 @@ export default function Campaigns() {
         const embeddedAdset = embeddedAdsetsById.get(currentAdset.id);
         const accountId = String(campaign?.ad_account_id || "");
         const metrics = aggregateInsights(embeddedAdset?.ads || [], startDate, endDate, attributionWindowsByAccount[accountId] || "account_default");
+        const adsetActionTotals = (embeddedAdset?.ads || []).reduce((totals: Record<string, number>, currentAd: any) => {
+          for (const [type, value] of Object.entries(actionData?.totalsByAd[currentAd.id] || {})) totals[type] = (totals[type] || 0) + Number(value || 0);
+          return totals;
+        }, {});
+        const results = resolveCampaignResults(metrics.leads, adsetActionTotals, lpConfigs[accountId]?.action_type, {
+          forms: metrics.formLeads,
+          site: metrics.siteLeads,
+          conversations: metrics.conversations,
+          conversationDestinationConfirmed: isMetaMessagingDestination(currentAdset.destination_type),
+        });
+        const official = selectOfficialCampaignResult(campaign?.objective, metrics.optimizationGoal || currentAdset.optimization_goal, metrics.officialResults);
+        const primary = resolveCampaignPrimaryResult(campaign?.objective, { ...results }, official);
         const saleMetrics = (embeddedAdset?.ads || []).reduce((sum: { count: number; revenue: number }, currentAd: any) => {
           const value = salesForAd.get(currentAd.id);
           return { count: sum.count + (value?.count || 0), revenue: sum.revenue + (value?.revenue || 0) };
@@ -997,6 +1024,10 @@ export default function Campaigns() {
           ...metrics,
           campaignId: currentAdset.campaign_id,
           campaignName: campaign?.name || "Campanha sem nome",
+          leads: primary.value,
+          results,
+          resultLabel: primary.label,
+          costPerResult: primary.value > 0 ? metrics.spend / primary.value : 0,
           sales: saleMetrics.count,
           revenue: saleMetrics.revenue,
         };
@@ -1005,7 +1036,7 @@ export default function Campaigns() {
       .filter((currentAdset: any) => statusFilter === "all" || normalizeStatus(currentAdset.status) === statusFilter)
       .filter((currentAdset: any) => !query || currentAdset.name.toLowerCase().includes(query) || currentAdset.campaignName.toLowerCase().includes(query));
     return sortLevelRows(rows, adsetSortKey, adsetSortAsc);
-  }, [accountAdsets, adsetSortAsc, adsetSortKey, attributionWindowsByAccount, descendantCampaignIds, embeddedAdsetsById, endDate, salesForAd, search, startDate, statusFilter]);
+  }, [accountAdsets, actionData?.totalsByAd, adsetSortAsc, adsetSortKey, attributionWindowsByAccount, descendantCampaignIds, embeddedAdsetsById, endDate, lpConfigs, salesForAd, search, startDate, statusFilter]);
 
   const selectedAds = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1026,7 +1057,8 @@ export default function Campaigns() {
           legacyLeads: metrics.legacyLeads,
           conversationDestinationConfirmed: isMetaMessagingDestination(currentAdset?.destination_type),
         } : undefined);
-        const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results);
+        const official = selectOfficialCampaignResult(campaign?.objective, metrics.optimizationGoal || currentAdset?.optimization_goal, metrics.officialResults);
+        const primaryResult = resolveCampaignPrimaryResult(campaign?.objective, results, official);
         const saleMetrics = salesForAd.get(currentAd.id) ?? { count: 0, revenue: 0 };
         return {
           ...currentAd,
@@ -1053,36 +1085,6 @@ export default function Campaigns() {
 
   const adsetTotals = useMemo(() => aggregateLevelTotals(selectedAdsets), [selectedAdsets]);
   const adTotals = useMemo(() => aggregateLevelTotals(selectedAds), [selectedAds]);
-  useEffect(() => {
-    const table = campaignTableScrollRef.current;
-    const totals = campaignTotalsScrollRef.current;
-    if (!table || !totals || activeTab !== "campaigns") return;
-
-    const syncFromTable = () => { totals.scrollLeft = table.scrollLeft; };
-    const syncFromTotals = () => { table.scrollLeft = totals.scrollLeft; };
-    const matchViewportWidth = () => {
-      // The campaign list has a vertical scrollbar; reserve that same width in
-      // the separate totals block so both horizontal viewports finish together.
-      totals.style.marginRight = `${Math.max(0, table.offsetWidth - table.clientWidth)}px`;
-      const totalsTable = totals.querySelector("table");
-      if (totalsTable) {
-        const contentWidth = Math.max(table.scrollWidth, table.clientWidth);
-        totalsTable.style.width = `${contentWidth}px`;
-        totalsTable.style.minWidth = `${contentWidth}px`;
-      }
-      syncFromTable();
-    };
-    matchViewportWidth();
-    table.addEventListener("scroll", syncFromTable, { passive: true });
-    totals.addEventListener("scroll", syncFromTotals, { passive: true });
-    const observer = new ResizeObserver(matchViewportWidth);
-    observer.observe(table);
-    return () => {
-      table.removeEventListener("scroll", syncFromTable);
-      totals.removeEventListener("scroll", syncFromTotals);
-      observer.disconnect();
-    };
-  }, [activeTab, camp.colWidths, filtered.length, visibleColumns]);
   const colorClass = (v: number) => v > 0 ? "text-emerald-600" : v < 0 ? "text-red-500" : "";
   const sortBg = (k: CampSortKey) => sortKey === k ? "bg-primary/5" : "";
   // Seleção, nome e status são colunas estruturais da tabela. Mesmo que uma
@@ -1424,7 +1426,7 @@ export default function Campaigns() {
                           </tr>
                         );})}
                     </TableBody>
-                    {activeTab === "legacy-totals" && (() => {
+                    {(() => {
                       const footer = <TableFooter className="sticky bottom-0 z-40">
                       <TableRow data-campaign-totals className="sticky bottom-0 z-40 h-14 border-0 bg-card hover:bg-card dark:border-[#2a271f] dark:bg-[#070706] dark:hover:bg-[#070706] [&>td]:px-3 [&>td]:py-1">
                         <CampaignTotalCell width={camp.colWidths.check} stickyLeft={0} />
@@ -1472,42 +1474,9 @@ export default function Campaigns() {
                       </TableRow>
                     </TableFooter>;
 
-                      // The summary belongs to the same scroll container as
-                      // the data rows. This keeps it visible while scrolling
-                      // vertically and precisely aligned with every column.
                       return footer;
                     })()}
                   </table>
-                </div>
-                <div
-                  ref={campaignTotalsScrollRef}
-                  data-campaign-totals-bar
-                  className="growdash-scrollbar-hidden hidden shrink-0 overflow-x-auto overflow-y-hidden bg-card md:block dark:bg-[#070706]"
-                  aria-label="Totais das campanhas filtradas"
-                >
-                  <Table className="[&_td]:overflow-hidden [&_td]:whitespace-nowrap" style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}>
-                    <TableBody>
-                      <CampaignTotalsRow
-                        widths={camp.colWidths}
-                        visibleColumns={visibleColumns}
-                        count={filtered.length}
-                        totals={displayedTotals}
-                        totalCpm={totalCpm}
-                        totalCpl={totalCpl}
-                        totalCpc={totalCpc}
-                        totalCtr={totalCtr}
-                        totalRoas={totalRoas}
-                        totalLinkCpc={totalLinkCpc}
-                        totalUniqueLinkCtr={totalUniqueLinkCtr}
-                        totalCostPerLandingPageView={totalCostPerLandingPageView}
-                        totalCostPerCheckout={totalCostPerCheckout}
-                        totalMetaCostPerPurchase={totalMetaCostPerPurchase}
-                        totalMetaPurchaseRoas={totalMetaPurchaseRoas}
-                        totalResultRate={totalResultRate}
-                        leadPartsLabel={leadPartsLabel}
-                      />
-                    </TableBody>
-                  </Table>
                 </div>
                 {!analysisMode && pageCount > 1 && <div className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 px-3 dark:border-[#24221c]"><span className="text-[9px] text-muted-foreground">Exibindo {campaignPage * pageSize + 1}–{Math.min((campaignPage + 1) * pageSize, filtered.length)} de {filtered.length}</span><div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.max(0, page - 1))} disabled={campaignPage === 0}><ChevronLeft className="h-3.5 w-3.5" /></Button><span className="min-w-16 text-center text-[9px]">{campaignPage + 1} / {pageCount}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCampaignPage((page) => Math.min(pageCount - 1, page + 1))} disabled={campaignPage + 1 >= pageCount}><ChevronRight className="h-3.5 w-3.5" /></Button></div></div>}
               </Card>
