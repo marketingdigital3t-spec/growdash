@@ -395,12 +395,20 @@ export default function Campaigns() {
       const accountScope = resolveCampaignAccountScope(selectedAccount, visibleAdAccounts.map((account) => account.id));
 
       const campaigns = await fetchCampaignPages(
-        () => (supabase as any)
-          .from("campaigns")
-          .select("id,name,ad_account_id,status,objective,daily_budget,lifetime_budget,created_at")
-          .in("ad_account_id", accountScope)
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: true }),
+        () => {
+          const query = (supabase as any)
+            .from("campaigns")
+            .select("id,name,ad_account_id,status,objective,daily_budget,lifetime_budget,created_at");
+          // A single-account filter is the normal path for this screen. Using
+          // eq instead of a one-item IN lets PostgREST use the account index
+          // directly and avoids a broad RLS scan on large workspaces.
+          const scopedQuery = accountScope.length === 1
+            ? query.eq("ad_account_id", accountScope[0])
+            : query.in("ad_account_id", accountScope);
+          return scopedQuery
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: true });
+        },
         signal,
         CAMPAIGN_PAGE_SIZE,
         "A lista de campanhas",
