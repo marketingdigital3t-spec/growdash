@@ -169,7 +169,7 @@ export default function LeadsIncompletos() {
               <thead className="bg-muted/40">
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="px-3 py-2 w-8">
-                    <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                    <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos os leads incompletos" />
                   </th>
                   <th className="px-3 py-2 font-medium">Lead</th>
                   <th className="px-3 py-2 font-medium">Fechamento</th>
@@ -189,7 +189,7 @@ export default function LeadsIncompletos() {
                     update.mutateAsync({ id: s.id, [field]: v } as any);
                   return (
                     <tr key={s.id} className="border-t hover:bg-muted/20">
-                      <td className="px-3 py-2"><Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} /></td>
+                      <td className="px-3 py-2"><Checkbox checked={selected.has(s.id)} onCheckedChange={() => toggle(s.id)} aria-label={`Selecionar ${s.contact_name || s.contact_email || s.id}`} /></td>
                       <td className="px-3 py-2 font-medium">{s.contact_name || "—"}</td>
                       <td className="px-3 py-2 text-muted-foreground">{fmtDate(s.sale_date)}</td>
                       <td className="px-3 py-2"><EditableIfEmpty value={s.lead_state} onSave={save("lead_state")} type="uf" placeholder="UF" /></td>

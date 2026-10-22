@@ -10800,6 +10800,7 @@ body:has(.traffic-page-shell[data-scroll-mode="locked"]) {
 
   .campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame > .space-y-2 {
     min-height: 0;
+    max-height: none !important;
     flex: 1 1 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -15015,4 +15016,44 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
 html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campaign-status-cell > button:focus-visible {
   background: var(--traffic-muted-dark) !important;
   color: var(--traffic-text-dark) !important;
+}
+
+/* Mobile traffic pages must expose the card stack instead of inheriting the
+   desktop locked-canvas flex height. The old cascade reduced the frame to a
+   2px strip after the toolbar, leaving every campaign card below the fold. */
+@media (max-width: 767px) {
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .growdash-main,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .growdash-content-frame,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .gd-page-transition,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .traffic-page-shell,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .campaigns-workspace,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .campaigns-main-content,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .campaigns-main-tabs,
+  .brand-shell:has(.traffic-page-shell[data-scroll-mode="locked"]) .campaigns-campaigns-tab {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+  }
+
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame { height: auto !important; min-height: 320px !important; max-height: none !important; flex: 0 0 auto !important; overflow: visible !important; }
+  .campaigns-workspace[data-scroll-mode="locked"] .campaign-table-frame > .space-y-2 { max-height: none !important; min-height: 320px !important; overflow: visible !important; }
+  html:has(.traffic-page-shell[data-scroll-mode="locked"]),
+  body:has(.traffic-page-shell[data-scroll-mode="locked"]) { overflow-x: hidden !important; overflow-y: auto !important; }
+}
+
+/* The shared premium-button layer is intentionally bright for primary CTAs,
+   but the Business sidebar toggle is a neutral chrome control. */
+.brand-shell .business-secondary-sidebar button.premium-button {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--foreground)) !important;
+  box-shadow: none !important;
+}
+.brand-shell .business-secondary-sidebar button.premium-button:hover,
+.brand-shell .business-secondary-sidebar button.premium-button:focus-visible {
+  background: hsl(var(--muted)) !important;
+  color: hsl(var(--foreground)) !important;
 }
