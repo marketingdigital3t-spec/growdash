@@ -330,6 +330,7 @@ Deno.serve(async (req) => {
     const visited = new Set<string>(resumed?.visited || []); const outputs: Record<string, unknown> = {}; const executed: unknown[] = Array.isArray(run.actions_executed) ? [...run.actions_executed] : [];
     const log = async (level: string, message: string, details: Record<string, unknown> = {}) => { await admin.from("growdash_workflow_logs").insert({ run_id: run.id, workspace_id: automation.workspace_id, level, message, context: redact(details) }); };
     const mergeInputs = new Map<string, Record<string, unknown>>();
+    let blockedMerge = false;
     const executeNode = async (node: Node): Promise<unknown> => {
       const p = resolveObject(node.parameters || {}, context) as Record<string, unknown>;
       switch (node.type) {
@@ -393,7 +394,7 @@ Deno.serve(async (req) => {
         const hasVisitedNode = (parent: string) => [...visited].some((key) => key === parent || key.startsWith(`${parent}:loop:`));
         if (parents.some((parent) => !hasVisitedNode(parent))) {
           queue.push(item);
-          if (queue.every((queued) => queued.nodeId === node.id)) break;
+          if (queue.every((queued) => queued.nodeId === node.id)) { blockedMerge = true; break; }
           continue;
         }
         mergeInputs.set(node.id, Object.fromEntries(parents.map((parent) => [parent, (context.node as Record<string, unknown>)[parent]])));
@@ -442,10 +443,10 @@ Deno.serve(async (req) => {
         await admin.from("growdash_automation_runs").update({ status: "error", actions_executed: executed, error_message: message, finished_at: new Date().toISOString() }).eq("id", run.id); return json({ ok: false, run_id: run.id, error: message, steps: executed }, 422);
       }
     }
-    const status = visited.size >= MAX_STEPS ? "error" : "success";
-    const finalError = status === "error" ? "Limite de 100 etapas atingido." : null;
+    const status = visited.size >= MAX_STEPS ? "error" : blockedMerge ? "partial" : "success";
+    const finalError = status === "error" ? "Limite de 100 etapas atingido." : blockedMerge ? "Merge aguardando entradas de todos os caminhos." : null;
     await admin.from("growdash_automation_runs").update({ status, actions_executed: executed, error_message: finalError, finished_at: new Date().toISOString() }).eq("id", run.id);
     await admin.from("growdash_automations").update({ run_count: Number(automation.run_count || 0) + 1, last_run_at: new Date().toISOString(), last_error: finalError }).eq("id", workflowId);
-    return json({ ok: status === "success", run_id: run.id, status, output: redact(outputs), steps: executed });
+    return json({ ok: status === "success", run_id: run.id, status, waiting_for_merge: blockedMerge, output: redact(outputs), steps: executed });
   } catch (error) { console.error("workflow-execute", error); return json({ error: error instanceof Error ? error.message : "Erro interno do executor." }, 500); }
 });
