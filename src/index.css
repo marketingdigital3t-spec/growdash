@@ -13307,6 +13307,41 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   background: var(--traffic-muted-dark) !important;
 }
 
+/* Result controls and the in-table totals row are rendered outside the
+   generic dark table selectors.  Without an explicit dark contract, the
+   browser's button surface and the legacy light totals rules win, producing
+   white blocks with light text in the graphite table. */
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td button[aria-label*="resultado"] {
+  border: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-table-scroll] tbody tr > td button[aria-label*="resultado"] span.text-muted-foreground {
+  color: var(--traffic-muted-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals] {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-muted-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals] > td,
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals] > td.sticky {
+  border-color: var(--traffic-border-dark) !important;
+  background: var(--traffic-surface-dark) !important;
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals] > td strong {
+  color: var(--traffic-text-dark) !important;
+}
+
+html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-campaign-totals] > td span {
+  color: var(--traffic-muted-text-dark) !important;
+}
+
 /* Monochrome chrome contract: the sidebar selection and theme toggle must
    never inherit the legacy blue primary/ring, including keyboard focus. */
 .brand-shell .brand-sidebar nav a[aria-current="page"],
