@@ -57,7 +57,7 @@ export default function SettingsPage() {
       <MotionItem className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /><div><h2 className="font-black">Aparência rápida</h2><p className="text-xs text-muted-foreground">Aplicada em toda a plataforma.</p></div></div>
-          <div className="mt-5 flex items-center justify-between rounded-xl border border-border p-4"><span className="text-sm">Modo escuro</span><Switch checked={theme === "dark"} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} /></div>
+          <div className="mt-5 flex items-center justify-between rounded-xl border border-border p-4"><span className="text-sm">Modo escuro</span><Switch aria-label="Ativar modo escuro" checked={theme === "dark"} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} /></div>
         </section>
         <section className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-3"><Bell className="h-5 w-5 text-primary" /><div><h2 className="font-black">Notificações</h2><p className="text-xs text-muted-foreground">Alertas críticos e resumos da operação.</p></div></div>

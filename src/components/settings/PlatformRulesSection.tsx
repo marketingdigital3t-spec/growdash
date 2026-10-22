@@ -48,10 +48,10 @@ function RuleRow({ rule }: { rule: PlatformRule }) {
       <Input className="col-span-3 h-8" value={draft.pattern} onChange={(e) => setDraft({ ...draft, pattern: e.target.value })} placeholder="padrão" />
       <Input className="col-span-1 h-8" type="number" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })} title="Prioridade (menor = primeiro)" />
       <div className="col-span-1 flex justify-center" title="Ativa">
-        <Switch checked={draft.is_active} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />
+        <Switch aria-label="Ativar regra" checked={draft.is_active} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />
       </div>
       <div className="col-span-1 flex justify-center" title="Fallback: só roda se nenhuma regra principal casar">
-        <Switch checked={draft.is_fallback === true} onCheckedChange={(v) => setDraft({ ...draft, is_fallback: v })} />
+        <Switch aria-label="Usar como fallback" checked={draft.is_fallback === true} onCheckedChange={(v) => setDraft({ ...draft, is_fallback: v })} />
       </div>
       <div className="col-span-1 flex gap-1 justify-end">
         {dirty && <Button size="sm" className="h-7 px-2" onClick={() => upsert.mutate(draft)}>Salvar</Button>}

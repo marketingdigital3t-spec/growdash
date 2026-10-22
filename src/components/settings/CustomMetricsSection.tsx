@@ -316,6 +316,7 @@ export function CustomMetricsSection() {
                     <p className="text-xs text-muted-foreground">Substitui o card "Leads" e o CPL global.</p>
                   </div>
                   <Switch
+                    aria-label="Usar como Lead padrão"
                     checked={!!editing.is_default_lead}
                     onCheckedChange={(v) => setEditing({ ...editing, is_default_lead: v })}
                   />

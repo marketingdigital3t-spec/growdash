@@ -65,7 +65,7 @@ export function TopBar({
       <button type="button" onClick={onToggleSnap} className={cn("growdash-flow-control h-9 shrink-0 rounded-xl px-2 text-[10px] font-black uppercase tracking-wide", snapToGrid && "growdash-flow-control-active")} title="Encaixar na grade">Snap</button>
       <Button variant="ghost" size="icon" className={controlClass} onClick={onToggleMaximize} title={isMaximized ? "Sair da tela maximizada" : "Maximizar tela"} aria-label={isMaximized ? "Sair da tela maximizada" : "Maximizar tela"} aria-pressed={isMaximized}>{isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
       <AlertDialog>
-        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="growdash-flow-danger-control h-9 w-9 shrink-0" title="Limpar quadro"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="growdash-flow-danger-control h-9 w-9 shrink-0" title="Limpar quadro" aria-label="Limpar quadro"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Limpar todo o quadro?</AlertDialogTitle><AlertDialogDescription>Todos os elementos serão removidos. Você ainda poderá usar Desfazer enquanto permanecer nesta tela.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={onClear}>Limpar tudo</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
       <DropdownMenu>
