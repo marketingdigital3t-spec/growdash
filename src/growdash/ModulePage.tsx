@@ -159,7 +159,7 @@ function AutomationsModule() {
 
   const accountsQuery = useQuery({
     queryKey: ["automation-social-accounts", workspace?.id, user?.id],
-    enabled: workspaceReady && !!user,
+    enabled: workspaceReady && !!user && tab !== "workflow",
     placeholderData: workspace?.id ? readLocalCache<any[]>(instagramAccountsCacheKey(workspace.id)) : undefined,
     queryFn: async () => {
       const { data, error } = await withRequestTimeout<{ data: any[] | null; error: any | null }>(
@@ -176,7 +176,7 @@ function AutomationsModule() {
   });
   const automationsQuery = useQuery({
     queryKey: ["growdash-automations", workspace?.id],
-    enabled: workspaceReady,
+    enabled: workspaceReady && tab !== "workflow",
     placeholderData: workspace?.id ? readLocalCache<AutomationRow[]>(automationCacheKey(workspace.id)) : undefined,
     queryFn: async () => {
       const { data, error } = await withRequestTimeout<{ data: any[] | null; error: any | null }>(
@@ -268,8 +268,8 @@ function AutomationsModule() {
   return (
     <Page title="Automações" description="Crie gatilhos, condições e respostas usando os perfis profissionais conectados à Growdash." action={<Button className="gold-action" onClick={() => openEditor()}><Plus className="mr-2 h-4 w-4" /> Nova automação</Button>}>
       <Tabs options={[{ id: "mine", label: "Minhas Automações" }, { id: "workflow", label: "Editor visual" }, { id: "basic", label: "Templates Instagram" }, { id: "sequences", label: "Como funciona" }]} value={tab} onChange={setTab} />
-      {schemaMissing && !automationsQuery.data?.length && <section className="gd-panel mb-4 border-amber-500/30 p-4"><b className="text-sm text-amber-500">Estrutura de automações indisponível</b><p className="mt-1 text-xs text-muted-foreground">A tabela de automações ainda não está disponível neste ambiente. Aplique as migrations de automação e tente novamente.</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void automationsQuery.refetch()}>Tentar novamente</Button></section>}
-      {automationsQuery.isError && !schemaMissing && !automationsQuery.data?.length && <section className="gd-panel mb-4 border-destructive/30 p-4"><b className="text-sm text-destructive">Não foi possível carregar as automações</b><p className="mt-1 text-xs text-muted-foreground">{(automationsQuery.error as Error).message || "O backend não respondeu."}</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void automationsQuery.refetch()}>Tentar novamente</Button></section>}
+      {tab !== "workflow" && schemaMissing && !automationsQuery.data?.length && <section className="gd-panel mb-4 border-amber-500/30 p-4"><b className="text-sm text-amber-500">Estrutura de automações indisponível</b><p className="mt-1 text-xs text-muted-foreground">A tabela de automações ainda não está disponível neste ambiente. Aplique as migrations de automação e tente novamente.</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void automationsQuery.refetch()}>Tentar novamente</Button></section>}
+      {tab !== "workflow" && automationsQuery.isError && !schemaMissing && !automationsQuery.data?.length && <section className="gd-panel mb-4 border-destructive/30 p-4"><b className="text-sm text-destructive">Não foi possível carregar as automações</b><p className="mt-1 text-xs text-muted-foreground">{(automationsQuery.error as Error).message || "O backend não respondeu."}</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void automationsQuery.refetch()}>Tentar novamente</Button></section>}
       {tab === "workflow" ? <WorkflowEditor /> : tab === "mine" ? <>
         <Toolbar left={<label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-72"><Search className="h-4 w-4 text-muted-foreground" /><input aria-label="Buscar automação" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar automação" className="min-w-0 grow bg-transparent text-sm outline-none" /></label>} right={<Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button>} />
         {!accountsQuery.data?.length && <section className="gd-panel mb-4 flex flex-col gap-4 border-pink-500/20 p-5 sm:flex-row sm:items-center"><span className="grid h-12 w-12 place-items-center rounded-xl bg-pink-500/10 text-pink-500"><Instagram className="h-6 w-6" /></span><div className="grow"><b className="text-sm">Conecte o Instagram do expert</b><p className="mt-1 text-xs text-muted-foreground">A mesma conta usada na análise de posts será usada nos gatilhos e respostas da automação.</p></div><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}>Conectar agora</Button></section>}
