@@ -10,6 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { emptyWorkflow, type WorkflowDefinition, type WorkflowNode, type WorkflowNodeType } from "./workflowTypes";
 import { validateWorkflowDefinition } from "./workflowValidation";
 import { connectionFromHandles, edgePath, moveWorkflowNode, nodeById, WORKFLOW_NODE_HEIGHT, WORKFLOW_NODE_WIDTH } from "./workflowCanvas";
+import { automationTriggerType } from "./automationRuntime";
+import { withRequestTimeout } from "@/lib/resilience";
 
 const labels: Record<WorkflowNodeType, string> = {
   "webhook.trigger": "Webhook",
@@ -150,7 +152,8 @@ export function WorkflowEditor() {
     // These tables are newer than the generated Supabase type snapshot.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = supabase as any;
-    const { data } = await client.from("growdash_automation_runs").select("id,status,created_at,error_message").eq("automation_id", workflow.id).order("created_at", { ascending: false }).limit(5);
+    const { data, error } = await withRequestTimeout<{ data: AutomationRunRow[] | null; error: { message?: string } | null }>(client.from("growdash_automation_runs").select("id,status,created_at,error_message").eq("automation_id", workflow.id).order("created_at", { ascending: false }).limit(5), 12_000);
+    if (error) { setMessage(error.message || "Não foi possível carregar o histórico."); return; }
     setRuns((data || []) as AutomationRunRow[]);
   }, [workflow.id, workspace?.id]);
   const loadApprovals = useCallback(async () => {
@@ -158,7 +161,8 @@ export function WorkflowEditor() {
     // These tables are newer than the generated Supabase type snapshot.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = supabase as any;
-    const { data } = await client.from("growdash_workflow_approvals").select("id,run_id,node_id,status,requested_at").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", { ascending: false }).limit(10);
+    const { data, error } = await withRequestTimeout<{ data: WorkflowApprovalRow[] | null; error: { message?: string } | null }>(client.from("growdash_workflow_approvals").select("id,run_id,node_id,status,requested_at").eq("workspace_id", workspace.id).eq("status", "pending").order("requested_at", { ascending: false }).limit(10), 12_000);
+    if (error) { setMessage(error.message || "Não foi possível carregar as aprovações."); return; }
     setApprovals((data || []) as WorkflowApprovalRow[]);
   }, [workspace?.id]);
 
@@ -169,10 +173,12 @@ export function WorkflowEditor() {
       // These tables are newer than the generated Supabase type snapshot.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = supabase as any;
-      const { data } = await client.from("growdash_automations").select("id,name,status,workflow_definition,workflow_version").eq("workspace_id", workspace.id).order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      const { data, error } = await withRequestTimeout<{ data: { workflow_definition?: unknown; status?: string; workflow_version?: number } | null; error: { message?: string } | null }>(client.from("growdash_automations").select("id,name,status,workflow_definition,workflow_version").eq("workspace_id", workspace.id).order("updated_at", { ascending: false }).limit(1).maybeSingle(), 12_000);
+      if (error) { setMessage(error.message || "Não foi possível carregar o workflow salvo."); return; }
       const saved = data?.workflow_definition;
       if (saved && validateWorkflowDefinition(saved).ok) {
-        const next = { ...saved, active: data.status === "active", version: Number(data.workflow_version || saved.version || 1) } as WorkflowDefinition;
+        const savedDefinition = saved as WorkflowDefinition;
+        const next = { ...savedDefinition, active: data.status === "active", version: Number(data.workflow_version || savedDefinition.version || 1) } as WorkflowDefinition;
         setWorkflow(next); localStorage.setItem(storageKey(workspace.id), JSON.stringify(next));
       }
     })();
@@ -229,9 +235,14 @@ export function WorkflowEditor() {
     const nextWorkflow = { ...workflow, active: status === "active" };
     setWorkflow(nextWorkflow);
     const trigger = workflow.nodes.find((node) => node.type.endsWith(".trigger"));
-    const triggerType = trigger?.type === "webhook.trigger" ? "manual" : trigger?.type === "schedule.trigger" ? "manual" : trigger?.type === "lead.trigger" ? "new_lead" : trigger?.type === "instagram.message.trigger" ? "instagram_message" : trigger?.type === "instagram.trigger" ? "instagram_comment" : "manual";
+    // The legacy column keeps its original check constraint for backwards
+    // compatibility. New trigger kinds are still represented by the full
+    // workflow_definition and use a descriptive value when the column allows
+    // it; the executor always matches the definition first.
+    const triggerType = automationTriggerType(trigger?.type);
     const triggerConfig = trigger?.parameters || {};
-    const { error } = await client.from("growdash_automations").upsert({ id: workflow.id, workspace_id: workspace.id, created_by: user.id, name: workflow.name.trim(), description: "Workflow visual Growdash", trigger_type: triggerType, trigger_config: triggerConfig, actions: [], status, workflow_definition: nextWorkflow, workflow_version: workflow.version, current_version: workflow.version, published_at: status === "active" ? new Date().toISOString() : null }, { onConflict: "id" });
+    const legacyTriggerType = ["new_lead", "instagram_message", "instagram_comment", "manual"].includes(triggerType) ? triggerType : "manual";
+    const { error } = await client.from("growdash_automations").upsert({ id: workflow.id, workspace_id: workspace.id, created_by: user.id, name: workflow.name.trim(), description: "Workflow visual Growdash", trigger_type: legacyTriggerType, trigger_config: triggerConfig, actions: [], status, workflow_definition: nextWorkflow, workflow_version: workflow.version, current_version: workflow.version, published_at: status === "active" ? new Date().toISOString() : null }, { onConflict: "id" });
     if (!error) {
       await client.from("growdash_workflow_versions").upsert({ workflow_id: workflow.id, workspace_id: workspace.id, version: workflow.version, definition: nextWorkflow, status: status === "active" ? "published" : "draft", created_by: user.id }, { onConflict: "workflow_id,version" });
       if (trigger?.type === "webhook.trigger" && status === "active") {

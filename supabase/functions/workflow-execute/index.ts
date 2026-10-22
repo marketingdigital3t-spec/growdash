@@ -265,7 +265,14 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY) return json({ error: "Payload excede o limite de 256 KB." }, 413);
+    let body: Record<string, any>;
+    try {
+      body = JSON.parse(rawBody || "{}");
+    } catch {
+      return json({ error: "Payload JSON inválido." }, 400);
+    }
     const workflowId = typeof body.workflow_id === "string" ? body.workflow_id : "";
     if (!workflowId) return json({ error: "workflow_id é obrigatório." }, 400);
     const internalCall = isInternalCall(req);
@@ -310,6 +317,14 @@ Deno.serve(async (req) => {
       const { data: existing } = await admin.from("growdash_automation_runs").select("id,status,created_at").eq("automation_id", workflowId).eq("workspace_id", automation.workspace_id).eq("idempotency_key", idempotencyKey).maybeSingle();
       if (existing) return json({ ok: true, duplicate: true, run_id: existing.id, status: existing.status });
       const { data: createdRun, error: runError } = await admin.from("growdash_automation_runs").insert({ automation_id: workflowId, workspace_id: automation.workspace_id, trigger_event: redact(input), actions_executed: [], status: "partial", idempotency_key: idempotencyKey, started_at: new Date().toISOString() }).select("id,actions_executed").single();
+      if (runError?.code === "23505") {
+        // A provider can deliver the same webhook concurrently. The unique
+        // index is the source of truth; return the already-created run instead
+        // of surfacing a transient 500 or executing side effects twice.
+        const { data: duplicateRun, error: duplicateError } = await admin.from("growdash_automation_runs").select("id,status,created_at,actions_executed").eq("automation_id", workflowId).eq("workspace_id", automation.workspace_id).eq("idempotency_key", idempotencyKey).maybeSingle();
+        if (duplicateError || !duplicateRun) throw duplicateError || runError;
+        return json({ ok: true, duplicate: true, run_id: duplicateRun.id, status: duplicateRun.status });
+      }
       if (runError || !createdRun) throw runError || new Error("Não foi possível iniciar a execução.");
       run = createdRun;
     }

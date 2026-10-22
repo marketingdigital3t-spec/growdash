@@ -56,6 +56,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { WorkflowEditor } from "./automations/WorkflowEditor";
+import { isAutomationSchemaError, isTransientAutomationError } from "./automations/automationRuntime";
+import { withRequestTimeout } from "@/lib/resilience";
+import { readLocalCache, writeLocalCache } from "@/lib/localCache";
 
 const LifeSimPage = lazy(() => import("./LifeSimPage"));
 
@@ -114,6 +117,9 @@ type AutomationRow = {
   updated_at: string;
 };
 
+const automationCacheKey = (workspaceId: string) => `growdash:automations:${workspaceId}`;
+const instagramAccountsCacheKey = (workspaceId: string) => `growdash:automation-instagram-accounts:${workspaceId}`;
+
 const automationTriggerLabel: Record<AutomationRow["trigger_type"], string> = {
   instagram_comment: "Comentário no Instagram",
   instagram_message: "Mensagem no Instagram",
@@ -153,25 +159,39 @@ function AutomationsModule() {
 
   const accountsQuery = useQuery({
     queryKey: ["automation-social-accounts", workspace?.id, user?.id],
-    enabled: !!user,
+    enabled: workspaceReady && !!user,
+    placeholderData: workspace?.id ? readLocalCache<any[]>(instagramAccountsCacheKey(workspace.id)) : undefined,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("social_accounts").select("id,username,display_name,connection_status,workspace_id").eq("provider", "instagram").order("created_at", { ascending: false });
+      const { data, error } = await withRequestTimeout<{ data: any[] | null; error: any | null }>(
+        (supabase as any).from("social_accounts").select("id,username,display_name,connection_status,workspace_id").eq("workspace_id", workspace!.id).eq("provider", "instagram").order("created_at", { ascending: false }),
+        12_000,
+      );
       if (error) throw error;
-      return data ?? [];
+      const accounts = data ?? [];
+      writeLocalCache(instagramAccountsCacheKey(workspace!.id), accounts);
+      return accounts;
     },
-    retry: false,
+    retry: (failureCount, error) => !isAutomationSchemaError(error) && isTransientAutomationError(error) && failureCount < 2,
+    retryDelay: (attempt) => Math.min(4_000, 800 * (2 ** attempt)),
   });
   const automationsQuery = useQuery({
     queryKey: ["growdash-automations", workspace?.id],
     enabled: workspaceReady,
+    placeholderData: workspace?.id ? readLocalCache<AutomationRow[]>(automationCacheKey(workspace.id)) : undefined,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("growdash_automations").select("*").eq("workspace_id", workspace!.id).order("updated_at", { ascending: false });
+      const { data, error } = await withRequestTimeout<{ data: any[] | null; error: any | null }>(
+        (supabase as any).from("growdash_automations").select("id,name,description,trigger_type,trigger_config,actions,status,run_count,last_run_at,last_error,updated_at").eq("workspace_id", workspace!.id).order("updated_at", { ascending: false }),
+        12_000,
+      );
       if (error) throw error;
-      return (data ?? []) as AutomationRow[];
+      const automations = (data ?? []) as AutomationRow[];
+      writeLocalCache(automationCacheKey(workspace!.id), automations);
+      return automations;
     },
-    retry: false,
+    retry: (failureCount, error) => !isAutomationSchemaError(error) && isTransientAutomationError(error) && failureCount < 2,
+    retryDelay: (attempt) => Math.min(4_000, 800 * (2 ** attempt)),
   });
-  const schemaMissing = automationsQuery.error && /growdash_automations|schema cache|relation/i.test((automationsQuery.error as Error).message);
+  const schemaMissing = isAutomationSchemaError(automationsQuery.error);
 
   const saveAutomation = useMutation({
     mutationFn: async ({ activate }: { activate: boolean }) => {
@@ -181,10 +201,7 @@ function AutomationsModule() {
       if (draft.actionType === "instagram_reply" && !draft.response.trim()) throw new Error("Escreva a resposta automática.");
       if (draft.actionType === "webhook" && !/^https:\/\//i.test(draft.webhookUrl.trim())) throw new Error("Use uma URL HTTPS válida para o webhook.");
       const account = (accountsQuery.data ?? []).find((item: any) => item.id === draft.socialAccountId);
-      if (account && account.workspace_id !== workspace!.id) {
-        const { error: accountError } = await (supabase as any).from("social_accounts").update({ workspace_id: workspace!.id }).eq("id", account.id);
-        if (accountError) throw accountError;
-      }
+      if (account && account.workspace_id !== workspace!.id) throw new Error("A conta do Instagram pertence a outro workspace.");
       const action = draft.actionType === "instagram_reply"
         ? { type: "instagram_reply", message: draft.response.trim() }
         : draft.actionType === "webhook"
@@ -251,7 +268,8 @@ function AutomationsModule() {
   return (
     <Page title="Automações" description="Crie gatilhos, condições e respostas usando os perfis profissionais conectados à Growdash." action={<Button className="gold-action" onClick={() => openEditor()}><Plus className="mr-2 h-4 w-4" /> Nova automação</Button>}>
       <Tabs options={[{ id: "mine", label: "Minhas Automações" }, { id: "workflow", label: "Editor visual" }, { id: "basic", label: "Templates Instagram" }, { id: "sequences", label: "Como funciona" }]} value={tab} onChange={setTab} />
-      {schemaMissing && <section className="gd-panel mb-4 border-amber-500/30 p-4"><b className="text-sm text-amber-500">Migration de automações pendente</b><p className="mt-1 text-xs text-muted-foreground">Aplique `20260809100000_instagram_automation_foundation.sql` no Supabase antes de ativar os fluxos.</p></section>}
+      {schemaMissing && !automationsQuery.data?.length && <section className="gd-panel mb-4 border-amber-500/30 p-4"><b className="text-sm text-amber-500">Estrutura de automações indisponível</b><p className="mt-1 text-xs text-muted-foreground">A tabela de automações ainda não está disponível neste ambiente. Aplique as migrations de automação e tente novamente.</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void automationsQuery.refetch()}>Tentar novamente</Button></section>}
+      {automationsQuery.isError && !schemaMissing && !automationsQuery.data?.length && <section className="gd-panel mb-4 border-destructive/30 p-4"><b className="text-sm text-destructive">Não foi possível carregar as automações</b><p className="mt-1 text-xs text-muted-foreground">{(automationsQuery.error as Error).message || "O backend não respondeu."}</p><Button className="mt-3" size="sm" variant="outline" onClick={() => void automationsQuery.refetch()}>Tentar novamente</Button></section>}
       {tab === "workflow" ? <WorkflowEditor /> : tab === "mine" ? <>
         <Toolbar left={<label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 sm:min-w-72"><Search className="h-4 w-4 text-muted-foreground" /><input aria-label="Buscar automação" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar automação" className="min-w-0 grow bg-transparent text-sm outline-none" /></label>} right={<Button variant="outline" onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}><Instagram className="mr-2 h-4 w-4" />{connectInstagram.isPending ? "Conectando…" : "Conectar Instagram"}</Button>} />
         {!accountsQuery.data?.length && <section className="gd-panel mb-4 flex flex-col gap-4 border-pink-500/20 p-5 sm:flex-row sm:items-center"><span className="grid h-12 w-12 place-items-center rounded-xl bg-pink-500/10 text-pink-500"><Instagram className="h-6 w-6" /></span><div className="grow"><b className="text-sm">Conecte o Instagram do expert</b><p className="mt-1 text-xs text-muted-foreground">A mesma conta usada na análise de posts será usada nos gatilhos e respostas da automação.</p></div><Button onClick={() => connectInstagram.mutate()} disabled={connectInstagram.isPending}>Conectar agora</Button></section>}
