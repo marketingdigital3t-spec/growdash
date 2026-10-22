@@ -74,6 +74,14 @@ Adicionar/validar testes para:
 - falha parcial sem apagar o último dado válido;
 - isolamento entre workspaces.
 
+## Fase 4.1 — Advisor e privilégios
+
+- Aplicar `20261022191059_harden_internal_rpcs_and_duplicate_indexes.sql`.
+- Confirmar por consulta remota que RPCs internos não são executáveis por `anon`/`PUBLIC` e que `sync_expert_sale_from_rd_deal` só é executável por `service_role`.
+- Reexecutar o Advisor e separar alertas intencionais de endpoints públicos token-based dos alertas internos e de performance.
+- Não revogar em massa funções `SECURITY DEFINER` autenticadas sem mapear todos os consumidores e testar regressão.
+- Habilitar a proteção contra senhas comprometidas no painel de Auth/Password Security; registrar essa configuração separadamente da migration.
+
 ## Fase 5 — Publicação controlada
 
 1. Aplicar migration no projeto Supabase correto.
@@ -104,3 +112,4 @@ Adicionar/validar testes para:
 - A validação real Meta/RD exige sessão autenticada, contas conectadas e segredo de cron.
 - A publicação Supabase exige acesso ao projeto e CLI/credenciais de deploy.
 - Sem esses acessos, só é possível confirmar a correção estática e a validação local; não declarar produção concluída.
+- O Advisor ainda mantém avisos de performance (`auth_rls_initplan` e políticas permissivas múltiplas); eles ficam como lote separado para evitar regressão de RLS.

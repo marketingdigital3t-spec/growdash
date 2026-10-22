@@ -5,12 +5,13 @@ Escopo: Edge Functions, migrations, autenticação, idempotência, concorrência
 
 ## Evidências e limites
 
-- `npm test`: 119 arquivos, 561 testes aprovados.
+- `npm test`: 120 arquivos, 562 testes aprovados.
 - `npx tsc --noEmit`: aprovado.
 - `npm run build`: aprovado; apenas aviso de chunks grandes.
 - ESLint direcionado às funções alteradas: aprovado.
 - `npm run lint` geral não concluiu no tempo de diagnóstico; a configuração já ignora `dist`, portanto não foi classificado como defeito de runtime.
 - A verificação de dados reais ficou bloqueada sem sessão/segredo: chamadas a `daily-incremental-sync` e `controlled-realtime-sync` retornaram 401, comportamento esperado.
+- O backend não possui estado de tema claro/escuro; essa dimensão é não aplicável às Edge Functions, migrations e políticas. Contratos de erro e payload foram revisados para não depender de apresentação visual.
 
 ## Achados confirmados
 
@@ -30,6 +31,17 @@ As funções de sincronização já implementam retries/backoff, locks de sincro
 
 - `lead_report_share_rate_limits` não tinha RLS, mas possui `REVOKE ALL` para `PUBLIC`, `anon` e `authenticated`, com acesso exclusivo a `service_role`; não há exposição imediata.
 - Aviso de chunks do Vite é otimização de build, não falha de backend.
+
+## Auditoria Supabase Advisor (22/10/2026)
+
+Após aplicar `supabase/migrations/20261022191059_harden_internal_rpcs_and_duplicate_indexes.sql`, a migration remota está confirmada (`npx supabase db push --dry-run` retorna `upToDate: true`). A consulta remota de privilégios confirmou:
+
+- `consume_workspace_usage`, `get_workspace_access_state` e `record_legal_consent`: `PUBLIC`/`anon` removidos; execução limitada a `authenticated` e `service_role`.
+- `sync_expert_sale_from_rd_deal`: execução limitada a `service_role`.
+- `traffic_proposal_requires_approval`: execução revogada para papéis expostos.
+- Os dois índices duplicados de campanhas/insights foram removidos.
+
+O Advisor agora reporta 315 avisos: 7 funções públicas token-based intencionais, 47 funções `SECURITY DEFINER` internas chamadas por usuários autenticados, 211 avisos de `auth_rls_initplan`, 49 grupos de políticas permissivas múltiplas e 1 configuração de proteção contra senhas comprometidas. Os 7 RPCs públicos permanecem porque são endpoints de formulários/compartilhamentos protegidos por token; revogá-los quebraria fluxos externos. Os 47 RPCs autenticados exigem revisão individual de autorização e não foram revogados em massa, pois vários são usados legitimamente pela aplicação. Os avisos de performance RLS devem ser tratados em lote separado, com testes de regressão. A proteção contra senhas comprometidas deve ser habilitada no painel de Auth/Password Security (não é uma migration SQL segura).
 
 ## Pendências de produção
 
