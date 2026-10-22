@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
+import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -75,6 +76,7 @@ Deno.serve(async (req) => {
     let upserted = 0;
     const seenKeys: string[] = [];
     const syncErrors: string[] = [];
+    const syncedEvents: Array<{ id: string; raw: Record<string, unknown> }> = [];
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index] as unknown[];
       const raw = Object.fromEntries((headers as unknown[]).map((header: unknown, column: number) => [String(header || `coluna_${column + 1}`), row[column] ?? ""]));
@@ -93,17 +95,31 @@ Deno.serve(async (req) => {
       if (!matchedClass && (sourceClassId || className)) syncErrors.push(`Linha ${index + 2}: turma ${className || sourceClassId} não foi vinculada (${classMatchStatus}).`);
       const sourceRowKey = cpf || `${norm(name)}|${sourceClassId || norm(className || "")}|${saleDate || ""}`;
       const rowHash = await hashRow(raw);
+      syncedEvents.push({ id: rowHash, raw });
       seenKeys.push(sourceRowKey);
       const { error } = await admin.from("expert_sales").upsert({ expert_id: connection.expert_id, sheet_connection_id: connection.id, participant_type: connection.source_type === "sales" ? "student" : connection.participant_type, source_row_hash: rowHash, source_row_key: sourceRowKey, source_row_number: index + 2, name, cpf, phone, sale_date: saleDate, paid_at: saleDate, class_date: classDate, source_class_id: sourceClassId, event_class_id: matchedClass?.id || null, class_name: className, class_match_status: classMatchStatus, gross_amount_cents: cents(mapped(raw, mapping, "gross_amount", ["valor_bruto", "valor_da_venda", "valor", "valor_total"])), cash_received_cents: cents(mapped(raw, mapping, "cash_received", ["valor_recebido", "caixa_real_entrada", "caixa_real", "valor_pago", "pago"])), future_revenue_cents: cents(mapped(raw, mapping, "future_revenue", ["faturamento_futuro", "faturamento_futuro_e_estorno"])), installment_number: integerValue(mapped(raw, mapping, "installment_number", ["parcela", "parcelas"])), installment_condition: String(mapped(raw, mapping, "installment_condition", ["condicao", "condição"])).trim() || null, reconciliation_status: String(mapped(raw, mapping, "reconciliation_status", ["conciliacao_financeira", "conciliação_financeira"])).trim() || null, product: String(mapped(raw, mapping, "product", ["produto"])).trim() || null, contract_signed: boolValue(mapped(raw, mapping, "contract_signed", ["contrato_assinado"])), status: String(mapped(raw, mapping, "status", ["status"] ) || "confirmed").trim() || "confirmed", seller_name: String(mapped(raw, mapping, "seller_name", ["vendedor", "responsavel"])).trim() || null, payment_method: String(mapped(raw, mapping, "payment_method", ["forma_pagamento", "pagamento", "cartao_pix_boleto"])).trim() || null, utm_campaign: String(mapped(raw, mapping, "utm_campaign", ["utm_campaign", "campanha"])).trim() || null, utm_content: String(mapped(raw, mapping, "utm_content", ["utm_content", "criativo"])).trim() || null, notes: String(mapped(raw, mapping, "notes", ["observacoes", "obs"])).trim() || null, source_active: true, last_seen_at: new Date().toISOString(), raw_row: raw, source_updated_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "sheet_connection_id,source_row_key" });
       if (error) throw error;
       upserted += 1;
+    }
+    const { data: automations } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("workspace_id", expert?.workspace_id || "").eq("status", "active").limit(100);
+    const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") || "";
+    const workflowResults: Array<Record<string, unknown>> = [];
+    if (internalSecret.length >= 24 && automations?.length) {
+      for (const synced of syncedEvents.slice(0, 200)) {
+        const event = { type: "google_sheets_row" as const, id: synced.id, text: String(synced.raw.name || synced.raw.email || ""), integration_id: connection.id, spreadsheet_id: connection.spreadsheet_id, raw: synced.raw };
+        for (const automation of matchingWorkflowAutomations(automations, event)) {
+          const response = await fetch(`${base}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: event, idempotency_key: `google-sheets:${connection.id}:${synced.id}` }) });
+          const result = await response.json().catch(() => ({}));
+          workflowResults.push({ automation_id: automation.id, row_id: synced.id, status: response.ok ? result?.status || "processed" : "failed", detail: result?.error || null });
+        }
+      }
     }
     if (seenKeys.length) await admin.from("expert_sales").update({ source_active: false }).eq("sheet_connection_id", connection.id).not("source_row_key", "in", `(${seenKeys.map((key) => `"${key.replaceAll('"', '""')}"`).join(",")})`);
     const finished = new Date().toISOString();
     const finalStatus = syncErrors.length ? "partial" : "success";
     await admin.from("expert_sheet_connections").update({ status: "fresh", last_sync_at: finished, last_valid_snapshot_at: finished, last_error: syncErrors.length ? syncErrors.slice(0, 20).join(" ") : null, last_header_signature: await hashRow(headers), updated_at: finished }).eq("id", connection.id);
     await admin.from("expert_sales_sync_runs").update({ status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, finished_at: finished }).eq("id", runId);
-    return json({ success: true, status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, synced_at: finished });
+    return json({ success: true, status: finalStatus, rows_read: rows.length, rows_upserted: upserted, errors: syncErrors, synced_at: finished, workflows: workflowResults });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao sincronizar planilha.";
     const failure = googleTokenFailure(error);

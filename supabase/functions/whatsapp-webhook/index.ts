@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "x-whatsapp-verify-token, x-hub-signature-256, authorization, content-type" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -28,6 +29,9 @@ Deno.serve(async (req) => {
   }
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const payload = JSON.parse(rawBody || "{}");
+  const workflowUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/workflow-execute`;
+  const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") ?? "";
+  const results: Array<Record<string, unknown>> = [];
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       if (change.field !== "messages") continue;
@@ -36,15 +40,26 @@ Deno.serve(async (req) => {
       if (!phoneNumberId) continue;
       const { data: number } = await admin.from("whatsapp_numbers").select("id,workspace_id").eq("phone_number_id", phoneNumberId).maybeSingle();
       if (!number) continue;
+      const { data: automations } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("workspace_id", number.workspace_id).eq("status", "active");
       for (const message of value.messages || []) {
         const contact = (value.contacts || []).find((item: any) => item.wa_id === message.from);
         const text = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || null;
         const { data: conversation } = await admin.from("whatsapp_conversations").upsert({ workspace_id: number.workspace_id, whatsapp_number_id: number.id, wa_contact_id: message.from, contact_name: contact?.profile?.name || null, contact_phone: message.from, unread_count: 1, last_message_at: new Date(Number(message.timestamp || 0) * 1000).toISOString(), updated_at: new Date().toISOString() }, { onConflict: "whatsapp_number_id,wa_contact_id" }).select("id").single();
         if (!conversation) continue;
         await admin.from("whatsapp_messages").upsert({ workspace_id: number.workspace_id, conversation_id: conversation.id, wamid: message.id, direction: "inbound", message_type: message.type || "text", body: text, raw: message, sent_at: new Date(Number(message.timestamp || 0) * 1000).toISOString() }, { onConflict: "wamid" });
+        const matching = matchingWorkflowAutomations(automations || [], { type: "whatsapp_message", id: String(message.id || ""), text: text || "", whatsapp_number_id: String(number.id), phone_number_id: String(phoneNumberId) });
+        if (matching.length && internalSecret.length < 24) {
+          results.push({ event_id: message.id, status: "error", error: "AUTOMATION_INTERNAL_SECRET não configurado" });
+          continue;
+        }
+        for (const automation of matching) {
+          const response = await fetch(workflowUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: { type: "whatsapp_message", id: message.id, text, whatsapp_number_id: number.id, phone_number_id: phoneNumberId, from: message.from, message_type: message.type, raw: message }, idempotency_key: `whatsapp:${automation.id}:${message.id}` }) });
+          const data = await response.json().catch(() => ({}));
+          results.push({ automation_id: automation.id, event_id: message.id, status: response.ok ? data?.status || "processed" : "failed", detail: data?.error || null });
+        }
       }
       await admin.from("whatsapp_numbers").update({ last_webhook_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", number.id);
     }
   }
-  return json({ received: true });
+  return json({ received: true, processed_workflows: results.length, results });
 });

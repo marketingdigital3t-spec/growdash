@@ -102,6 +102,9 @@ verify_jwt = false
 [functions.workflow-execute]
 verify_jwt = true
 
+[functions.workflow-approval]
+verify_jwt = true
+
 [functions.workflow-webhook]
 verify_jwt = false
 

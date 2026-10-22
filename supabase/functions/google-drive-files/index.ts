@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
 import { getFreshGoogleToken, googleTokenFailure } from "../_shared/googleToken.ts";
+import { matchingWorkflowAutomations } from "../_shared/automationTrigger.ts";
 
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -87,7 +88,20 @@ Deno.serve(async (req) => {
         const { error: persistError } = await admin.from("google_drive_files").upsert(batch, { onConflict: "integration_id,provider_file_id" });
         if (persistError) throw persistError;
       }
-      return json({ files, truncated: Boolean(pageToken) });
+      const { data: automations } = await admin.from("growdash_automations").select("id,status,trigger_type,trigger_config,workflow_definition").eq("created_by", user.id).eq("status", "active").limit(100);
+      const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") || "";
+      const workflowResults: Array<Record<string, unknown>> = [];
+      if (internalSecret.length >= 24 && automations?.length) {
+        for (const file of files.slice(0, 200)) {
+          const event = { type: "google_drive_file" as const, id: String(file.id || ""), text: String(file.name || ""), integration_id: integration.id, file };
+          for (const automation of matchingWorkflowAutomations(automations, event)) {
+            const response = await fetch(`${supabaseUrl}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: automation.id, mode: "webhook", input: event, idempotency_key: `google-drive:${integration.id}:${file.id}:${file.modifiedTime || ""}` }) });
+            const result = await response.json().catch(() => ({}));
+            workflowResults.push({ automation_id: automation.id, file_id: file.id, status: response.ok ? result?.status || "processed" : "failed", detail: result?.error || null });
+          }
+        }
+      }
+      return json({ files, truncated: Boolean(pageToken), workflows: workflowResults });
     }
     if (input.action === "upload") {
       const name = String(input.name ?? "").trim();

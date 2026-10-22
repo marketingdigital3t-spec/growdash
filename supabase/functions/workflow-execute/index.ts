@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.97.0";
+import { resumeWorkflow } from "../_shared/workflowResume.ts";
 import { getFreshGoogleToken } from "../_shared/googleToken.ts";
 import { resolveRDConnection } from "../_shared/rdConnection.ts";
 import { normalizeSellerNotification, normalizeTagAssignment, normalizeTask } from "../_shared/automationActions.ts";
@@ -15,6 +16,7 @@ const MAX_DELAY_SECONDS = 60;
 type Node = { id: string; type: string; parameters?: Record<string, unknown> };
 type Edge = { source: string; target: string; sourcePort?: string; targetPort?: string };
 type Definition = { id?: string; name?: string; version?: number; nodes: Node[]; connections: Edge[] };
+type QueueItem = { nodeId: string; key: string; loopContext?: { item: unknown; index: number; items: unknown[] } };
 
 const INTERNAL_SECRET = Deno.env.get("AUTOMATION_INTERNAL_SECRET") ?? "";
 const isInternalCall = (req: Request) => INTERNAL_SECRET.length >= 24 && req.headers.get("x-growdash-automation-secret") === INTERNAL_SECRET;
@@ -267,7 +269,7 @@ Deno.serve(async (req) => {
     const workflowId = typeof body.workflow_id === "string" ? body.workflow_id : "";
     if (!workflowId) return json({ error: "workflow_id é obrigatório." }, 400);
     const internalCall = isInternalCall(req);
-    if (internalCall && !["webhook", "schedule"].includes(String(body.mode || ""))) return json({ error: "A chamada interna só pode disparar workflows por webhook ou agendamento." }, 403);
+    if (internalCall && !["webhook", "schedule", "resume"].includes(String(body.mode || ""))) return json({ error: "A chamada interna só pode disparar workflows por webhook, agendamento ou retomada aprovada." }, 403);
     let user: { id: string } | null = null;
     if (!internalCall) {
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
@@ -288,20 +290,46 @@ Deno.serve(async (req) => {
     const definition = (automation.workflow_definition || {}) as Definition;
     const errors = validate(definition);
     if (errors.length) return json({ error: "Workflow inválido.", details: errors }, 422);
-    const input = body.input && typeof body.input === "object" ? body.input : {};
-    const eventKey = String(body.idempotency_key || input.leadgen_id || input.id || JSON.stringify(input));
-    const idempotencyKey = await sha(`${workflowId}:${automation.workflow_version || definition.version || 1}:${eventKey}`);
-    const { data: existing } = await admin.from("growdash_automation_runs").select("id,status,created_at").eq("automation_id", workflowId).eq("workspace_id", automation.workspace_id).eq("idempotency_key", idempotencyKey).maybeSingle();
-    if (existing) return json({ ok: true, duplicate: true, run_id: existing.id, status: existing.status });
-    const { data: run, error: runError } = await admin.from("growdash_automation_runs").insert({ automation_id: workflowId, workspace_id: automation.workspace_id, trigger_event: redact(input), actions_executed: [], status: "partial", idempotency_key: idempotencyKey, started_at: new Date().toISOString() }).select("id").single();
-    if (runError || !run) throw runError || new Error("Não foi possível iniciar a execução.");
+    let input = body.input && typeof body.input === "object" ? body.input : {};
+    const resumeApprovalId = body.mode === "resume" ? String(body.approval_id || "") : "";
+    let resumeNodeId: string | null = null;
+    let run: { id: string; actions_executed?: unknown[] | null };
+    if (resumeApprovalId) {
+      const { data: approval, error: approvalError } = await admin.from("growdash_workflow_approvals").select("id,run_id,node_id,status").eq("id", resumeApprovalId).eq("workspace_id", automation.workspace_id).maybeSingle();
+      if (approvalError) throw approvalError;
+      if (!approval || approval.status !== "approved") return json({ error: "A aprovação ainda não está aprovada ou não existe." }, 409);
+      const { data: existingRun, error: existingRunError } = await admin.from("growdash_automation_runs").select("id,status,trigger_event,actions_executed").eq("id", approval.run_id).eq("automation_id", workflowId).maybeSingle();
+      if (existingRunError) throw existingRunError;
+      if (!existingRun || existingRun.status !== "partial") return json({ error: "A execução não está aguardando aprovação." }, 409);
+      input = existingRun.trigger_event && typeof existingRun.trigger_event === "object" ? existingRun.trigger_event : {};
+      run = existingRun;
+      resumeNodeId = String(approval.node_id);
+    } else {
+      const eventKey = String(body.idempotency_key || input.leadgen_id || input.id || JSON.stringify(input));
+      const idempotencyKey = await sha(`${workflowId}:${automation.workflow_version || definition.version || 1}:${eventKey}`);
+      const { data: existing } = await admin.from("growdash_automation_runs").select("id,status,created_at").eq("automation_id", workflowId).eq("workspace_id", automation.workspace_id).eq("idempotency_key", idempotencyKey).maybeSingle();
+      if (existing) return json({ ok: true, duplicate: true, run_id: existing.id, status: existing.status });
+      const { data: createdRun, error: runError } = await admin.from("growdash_automation_runs").insert({ automation_id: workflowId, workspace_id: automation.workspace_id, trigger_event: redact(input), actions_executed: [], status: "partial", idempotency_key: idempotencyKey, started_at: new Date().toISOString() }).select("id,actions_executed").single();
+      if (runError || !createdRun) throw runError || new Error("Não foi possível iniciar a execução.");
+      run = createdRun;
+    }
     const context: Record<string, unknown> = { trigger: input, lead: input.lead || input, date: { now: new Date().toISOString() }, node: {} };
+    if (resumeNodeId) {
+      const { data: previousSteps } = await admin.from("growdash_workflow_run_steps").select("node_id,output").eq("run_id", run.id).eq("status", "success").order("created_at", { ascending: true });
+      for (const step of previousSteps || []) {
+        (context.node as Record<string, unknown>)[step.node_id] = { output: step.output };
+      }
+    }
     const byId = new Map(definition.nodes.map((node) => [node.id, node]));
-    const incoming = new Set(definition.connections.map((edge) => edge.target));
-    const queue = definition.nodes.filter((node) => !incoming.has(node.id)).map((node) => node.id);
-    const visited = new Set<string>(); const outputs: Record<string, unknown> = {}; const executed: unknown[] = [];
-    const log = async (level: string, message: string, details: Record<string, unknown> = {}) => { await admin.from("growdash_workflow_logs").insert({ run_id: run.id, workspace_id: automation.workspace_id, level, message, context: redact(details) }); };
     const edgesFrom = (nodeId: string) => definition.connections.filter((edge) => edge.source === nodeId);
+    const incoming = new Set(definition.connections.map((edge) => edge.target));
+    const resumed = resumeNodeId ? resumeWorkflow(definition.connections, resumeNodeId) : null;
+    const queue: QueueItem[] = resumed
+      ? resumed.queue.map((nodeId) => ({ nodeId, key: nodeId }))
+      : definition.nodes.filter((node) => !incoming.has(node.id)).map((node) => ({ nodeId: node.id, key: node.id }));
+    const visited = new Set<string>(resumed?.visited || []); const outputs: Record<string, unknown> = {}; const executed: unknown[] = Array.isArray(run.actions_executed) ? [...run.actions_executed] : [];
+    const log = async (level: string, message: string, details: Record<string, unknown> = {}) => { await admin.from("growdash_workflow_logs").insert({ run_id: run.id, workspace_id: automation.workspace_id, level, message, context: redact(details) }); };
+    const mergeInputs = new Map<string, Record<string, unknown>>();
     const executeNode = async (node: Node): Promise<unknown> => {
       const p = resolveObject(node.parameters || {}, context) as Record<string, unknown>;
       switch (node.type) {
@@ -323,7 +351,7 @@ Deno.serve(async (req) => {
           const match = cases.find((item: any) => compare(actual, String(item?.operator || "equals"), item?.value));
           return { value: actual, branch: String(match?.port || match?.label || "default") };
         }
-        case "logic.merge": return { merged: true, input: context.node };
+        case "logic.merge": return { merged: true, inputs: mergeInputs.get(node.id) || context.node };
         case "logic.loop": {
           const items = Array.isArray(p.items) ? p.items : getPath(context, String(p.itemsPath || "lead.items"));
           if (!Array.isArray(items)) throw new Error("Loop exige uma lista em items ou itemsPath.");
@@ -359,9 +387,20 @@ Deno.serve(async (req) => {
       }
     };
     while (queue.length && visited.size < MAX_STEPS) {
-      const nodeId = queue.shift()!; if (visited.has(nodeId)) continue; const node = byId.get(nodeId); if (!node) continue;
+      const item = queue.shift()!; const nodeId = item.nodeId; if (visited.has(item.key)) continue; const node = byId.get(nodeId); if (!node) continue;
+      if (node.type === "logic.merge") {
+        const parents = definition.connections.filter((edge) => edge.target === node.id).map((edge) => edge.source);
+        const hasVisitedNode = (parent: string) => [...visited].some((key) => key === parent || key.startsWith(`${parent}:loop:`));
+        if (parents.some((parent) => !hasVisitedNode(parent))) {
+          queue.push(item);
+          if (queue.every((queued) => queued.nodeId === node.id)) break;
+          continue;
+        }
+        mergeInputs.set(node.id, Object.fromEntries(parents.map((parent) => [parent, (context.node as Record<string, unknown>)[parent]])));
+      }
+      if (item.loopContext) context.loop = item.loopContext; else delete context.loop;
       const started = new Date().toISOString(); const stepBase = { run_id: run.id, workspace_id: automation.workspace_id, node_id: node.id, node_type: node.type, input: redact(context), status: "running", started_at: started, attempt: 1 };
-      await admin.from("growdash_workflow_run_steps").insert(stepBase);
+      const { data: stepRow } = await admin.from("growdash_workflow_run_steps").insert(stepBase).select("id").single();
       try {
         const policyRetry = Number((automation.error_policy as any)?.retry || 0);
         const nodeRetry = Number((node.parameters as any)?.retryAttempts || 0);
@@ -377,8 +416,9 @@ Deno.serve(async (req) => {
           }
         }
         if (lastError) throw lastError;
-        outputs[node.id] = output; context.node = { ...context.node, [node.id]: { output } }; visited.add(node.id); executed.push({ node_id: node.id, type: node.type, status: "success" });
-        await admin.from("growdash_workflow_run_steps").update({ status: "success", output: redact(output), finished_at: new Date().toISOString() }).eq("run_id", run.id).eq("node_id", node.id).eq("status", "running");
+        outputs[node.id] = output; context.node = { ...context.node, [node.id]: { output } }; visited.add(item.key); executed.push({ node_id: node.id, type: node.type, status: "success", ...(item.loopContext ? { loop_index: item.loopContext.index } : {}) });
+        const stepQuery = admin.from("growdash_workflow_run_steps").update({ status: "success", output: redact(output), finished_at: new Date().toISOString() });
+        await (stepRow?.id ? stepQuery.eq("id", stepRow.id) : stepQuery.eq("run_id", run.id).eq("node_id", node.id).eq("status", "running"));
         await log("info", `Nó ${node.type} concluído`, { node_id: node.id });
         if ((output as any)?.status === "pending" && node.type === "approval.manual") {
           await admin.from("growdash_automation_runs").update({ status: "partial", actions_executed: executed, error_message: "Aguardando aprovação manual.", finished_at: null }).eq("id", run.id);
@@ -388,11 +428,17 @@ Deno.serve(async (req) => {
           const branch = (output as any)?.branch;
           if (["condition.if", "logic.filter", "logic.switch"].includes(node.type) && edge.sourcePort && edge.sourcePort !== branch) continue;
           if (node.type === "logic.stop") continue;
-          queue.push(edge.target);
+          const items = node.type === "logic.loop" && Array.isArray((output as any)?.items) ? (output as any).items as unknown[] : null;
+          if (items) {
+            items.forEach((loopItem, index) => queue.push({ nodeId: edge.target, key: `${edge.target}:loop:${index}`, loopContext: { item: loopItem, index, items } }));
+          } else {
+            queue.push({ nodeId: edge.target, key: item.loopContext ? `${edge.target}:loop:${item.loopContext.index}` : edge.target, loopContext: item.loopContext });
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Erro desconhecido"; executed.push({ node_id: node.id, type: node.type, status: "error", error: message });
-        await admin.from("growdash_workflow_run_steps").update({ status: "error", error_message: message, finished_at: new Date().toISOString() }).eq("run_id", run.id).eq("node_id", node.id).eq("status", "running"); await log("error", message, { node_id: node.id });
+        const stepQuery = admin.from("growdash_workflow_run_steps").update({ status: "error", error_message: message, finished_at: new Date().toISOString() });
+        await (stepRow?.id ? stepQuery.eq("id", stepRow.id) : stepQuery.eq("run_id", run.id).eq("node_id", node.id).eq("status", "running")); await log("error", message, { node_id: node.id });
         await admin.from("growdash_automation_runs").update({ status: "error", actions_executed: executed, error_message: message, finished_at: new Date().toISOString() }).eq("id", run.id); return json({ ok: false, run_id: run.id, error: message, steps: executed }, 422);
       }
     }
