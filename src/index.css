@@ -14597,3 +14597,45 @@ html[data-accent="metallic-gold"] {
   border-color: var(--gd-emerald-bright) !important;
   color: #062015 !important;
 }
+
+/* Final compatibility sweep for older page components that still expose the
+   previous lime palette through an arbitrary Tailwind class, a legacy gold
+   class, or an inline color. Keep this scoped to the product shell so public
+   presentation pages and semantic warning states are not affected. */
+.brand-shell :is(
+  button, a, [role="button"], [role="tab"]
+):is(
+  [class*="b7ff00"], [class*="B7FF00"], [class*="lime"], [class*="gold-action"],
+  [class*="gd-highlight-action"], [class*="premium-button"]
+) {
+  background: var(--gd-emerald) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+}
+.brand-shell :is(
+  button, a, [role="button"], [role="tab"]
+):is(
+  [class*="b7ff00"], [class*="B7FF00"], [class*="lime"], [class*="gold-action"],
+  [class*="gd-highlight-action"], [class*="premium-button"]
+):hover:not(:disabled),
+.brand-shell :is(
+  button, a, [role="button"], [role="tab"]
+):is(
+  [class*="b7ff00"], [class*="B7FF00"], [class*="lime"], [class*="gold-action"],
+  [class*="gd-highlight-action"], [class*="premium-button"]
+):focus-visible:not(:disabled) {
+  background: var(--gd-emerald-bright) !important;
+  background-image: none !important;
+  border-color: var(--gd-emerald-bright) !important;
+  color: #062015 !important;
+}
+.brand-shell :is(
+  [class*="bg-[#b7ff00"], [class*="bg-[#B7FF00"],
+  [class*="text-[#b7ff00"], [class*="text-[#B7FF00"],
+  [style*="b7ff00"], [style*="B7FF00"], [style*="183, 255, 0"]
+) {
+  color: var(--gd-emerald-bright) !important;
+  background-color: var(--gd-emerald-soft) !important;
+  border-color: var(--gd-emerald-border) !important;
+}
