@@ -235,6 +235,10 @@ export function WorkflowEditor() {
     const nextWorkflow = { ...workflow, active: status === "active" };
     setWorkflow(nextWorkflow);
     const trigger = workflow.nodes.find((node) => node.type.endsWith(".trigger"));
+    if (trigger?.type === "webhook.trigger" && status === "active" && !String(trigger.parameters.secret || "").trim()) {
+      setMessage("Para ativar um webhook, informe um segredo de autenticação.");
+      return;
+    }
     // The legacy column keeps its original check constraint for backwards
     // compatibility. New trigger kinds are still represented by the full
     // workflow_definition and use a descriptive value when the column allows

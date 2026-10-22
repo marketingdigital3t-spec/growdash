@@ -53,8 +53,22 @@ Deno.serve(async (req) => {
   for (const schedule of schedules || []) {
     try {
       const nextRunAt = nextOccurrence(schedule.cron_expression, schedule.timezone || "America/Sao_Paulo", now);
-      const { error: claimError } = await admin.from("growdash_workflow_schedules").update({ next_run_at: nextRunAt, last_run_at: now.toISOString() }).eq("id", schedule.id).eq("status", "active");
+      // Claim only while the row is still due. This makes concurrent cron
+      // invocations safe: exactly one invocation receives the updated row and
+      // is allowed to execute the workflow.
+      const { data: claimed, error: claimError } = await admin
+        .from("growdash_workflow_schedules")
+        .update({ next_run_at: nextRunAt, last_run_at: now.toISOString() })
+        .eq("id", schedule.id)
+        .eq("status", "active")
+        .or(`next_run_at.is.null,next_run_at.lte.${now.toISOString()}`)
+        .select("id")
+        .maybeSingle();
       if (claimError) throw claimError;
+      if (!claimed) {
+        results.push({ workflow_id: schedule.workflow_id, status: "skipped", reason: "Agendamento já reivindicado por outra execução." });
+        continue;
+      }
       const internalSecret = Deno.env.get("AUTOMATION_INTERNAL_SECRET") || "";
       if (internalSecret.length < 24) throw new Error("AUTOMATION_INTERNAL_SECRET não configurado");
       const response = await fetch(`${url}/functions/v1/workflow-execute`, { method: "POST", headers: { "Content-Type": "application/json", "x-growdash-automation-secret": internalSecret }, body: JSON.stringify({ workflow_id: schedule.workflow_id, mode: "schedule", input: { source: "schedule", scheduled_at: now.toISOString(), schedule_id: schedule.id }, idempotency_key: `schedule:${schedule.id}:${now.toISOString().slice(0, 16)}` }) });
