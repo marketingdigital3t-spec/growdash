@@ -74,7 +74,9 @@ export default function AgentsOfficePage() {
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null);
   // The command map is the primary agent surface. The 3D office remains
   // available as a secondary workspace for presence and status controls.
-  const [view, setView] = useState<"map" | "office">("map");
+  // O escritório 3D é a superfície principal da área de agentes. O mapa
+  // neural continua disponível como uma visão complementar.
+  const [view, setView] = useState<"map" | "office">("office");
   const showLegacyOfficePreview = window.location.hash === "#legacy-office";
   const [officeAngle, setOfficeAngle] = useState(0);
   const officeDragStart = useRef<number | null>(null);
@@ -172,9 +174,14 @@ export default function AgentsOfficePage() {
         startDate={startDate}
         endDate={endDate}
       /> : <>
-        <Suspense fallback={<div className="grid min-h-[620px] place-items-center rounded-2xl border border-primary/25 bg-[#161108] text-sm text-primary">Carregando escritório 3D…</div>}>
-          <LifeSimPage />
-        </Suspense>
+        <div className="agents-office-3d-shell">
+          <Suspense fallback={<div className="grid min-h-[620px] place-items-center rounded-2xl border border-primary/25 bg-[#161108] text-sm text-primary">Carregando escritório 3D…</div>}>
+            <LifeSimPage />
+          </Suspense>
+          <button type="button" className="agents-office-map-switch" onClick={() => setView("map")}>
+            <Network className="h-3.5 w-3.5" /> Mapa da inteligência
+          </button>
+        </div>
         {showLegacyOfficePreview && <div className="agent-office-shell office-3d-stage relative min-h-[660px] overflow-hidden rounded-2xl border border-primary/20 bg-[#070706] shadow-2xl">
         <div className="office-sim-topbar">
           <div className="office-sim-brand"><span className="office-sim-brand-mark"><Bot className="h-3.5 w-3.5" /></span><span><b>GROWDASH LIFE</b><small>AGENT OPERATIONS</small></span></div>
