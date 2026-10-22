@@ -14681,3 +14681,196 @@ html[data-accent="metallic-gold"] {
   border-color: var(--gd-emerald) !important;
   color: #062015 !important;
 }
+
+/* Canonical Expert dashboard composition. This is the single final authority
+   for the page after the historical theme layers above. */
+.brand-shell .expert-dashboard {
+  width: 100%;
+  max-width: 1680px;
+  margin-inline: auto;
+  gap: 16px !important;
+  overflow-x: clip;
+}
+.brand-shell .expert-dashboard .expert-dashboard-header {
+  align-items: center !important;
+  min-width: 0;
+  padding: 4px 0;
+}
+.brand-shell .expert-dashboard .expert-dashboard-header > :first-child,
+.brand-shell .expert-dashboard .dashboard-section-heading > :first-child {
+  min-width: 0;
+}
+.brand-shell .expert-dashboard .expert-dashboard-tabs {
+  display: inline-flex !important;
+  align-self: flex-start;
+  gap: 4px !important;
+  border: 1px solid var(--gd-content-border) !important;
+  border-radius: 12px !important;
+  background: var(--gd-content-surface) !important;
+  padding: 4px !important;
+}
+.brand-shell .expert-dashboard .expert-dashboard-tabs > button {
+  min-height: 36px;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #0b0b0b !important;
+  padding: 8px 14px !important;
+}
+.brand-shell .expert-dashboard .expert-dashboard-tabs > button[aria-selected="true"] {
+  border-color: var(--gd-emerald-border) !important;
+  background: #fff !important;
+  color: #0b0b0b !important;
+  box-shadow: inset 0 -2px var(--gd-emerald), 0 2px 8px rgba(0, 0, 0, .16) !important;
+}
+.brand-shell .expert-dashboard .expert-dashboard-tabs > button[aria-selected="false"] {
+  color: var(--gd-content-muted) !important;
+}
+.brand-shell .expert-dashboard .gd-module-section {
+  min-width: 0;
+  margin-inline: 0 !important;
+}
+.brand-shell .expert-dashboard .dashboard-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+.brand-shell .expert-dashboard .dashboard-section-description {
+  max-width: 420px;
+  margin: 0;
+  text-align: right;
+}
+.brand-shell .expert-dashboard .expert-kpi-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px !important;
+  min-width: 0;
+}
+.brand-shell .expert-dashboard .expert-kpi-grid > *,
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid > * {
+  min-width: 0;
+  height: 112px;
+}
+.brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card,
+.brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card-content,
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid .gd-metric-card,
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid .gd-metric-card-content {
+  height: 100% !important;
+  min-height: 112px !important;
+}
+.brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card-content,
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid .gd-metric-card-content {
+  padding: 16px !important;
+}
+.brand-shell .expert-dashboard .expert-kpi-grid .dashboard-terra-metric-value,
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid .dashboard-terra-metric-value {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  letter-spacing: -.025em;
+  font-size: clamp(.95rem, 1.35vw, 1.45rem) !important;
+}
+.brand-shell .expert-dashboard .expert-kpi-grid [data-value-size="medium"] .dashboard-terra-metric-value,
+.brand-shell .expert-dashboard .expert-kpi-grid .dashboard-terra-metric-value[data-value-size="medium"],
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid .dashboard-terra-metric-value[data-value-size="medium"] {
+  font-size: clamp(.88rem, 1.15vw, 1.22rem) !important;
+}
+.brand-shell .expert-dashboard .expert-kpi-grid .dashboard-terra-metric-value[data-value-size="long"],
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid .dashboard-terra-metric-value[data-value-size="long"] {
+  font-size: clamp(.8rem, 1vw, 1.05rem) !important;
+}
+.brand-shell .expert-dashboard .expert-secondary-kpi-section {
+  margin-top: 16px;
+}
+.brand-shell .expert-dashboard .expert-secondary-kpi-heading {
+  margin-bottom: 8px;
+}
+.brand-shell .expert-dashboard .expert-secondary-kpi-heading h3 {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.brand-shell .expert-dashboard .expert-secondary-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px !important;
+}
+.brand-shell .expert-dashboard .expert-charts-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-items: stretch;
+  gap: 16px !important;
+}
+.brand-shell .expert-dashboard .expert-charts-grid > * {
+  min-width: 0;
+  min-height: 360px;
+  height: 100%;
+}
+.brand-shell .expert-dashboard .expert-charts-grid .dashboard-glass-card {
+  min-height: 360px !important;
+  height: 100% !important;
+}
+.brand-shell .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card) {
+  border: 1px solid var(--gd-content-border) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--gd-shadow-card) !important;
+}
+.brand-shell .expert-dashboard :is(.gd-metric-card, .dashboard-glass-card):hover {
+  border-color: var(--gd-emerald-border) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .18) !important;
+}
+@media (min-width: 768px) {
+  .brand-shell .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1200px) {
+  .brand-shell .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1440px) {
+  .brand-shell .expert-dashboard .expert-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1023px) {
+  .brand-shell .expert-dashboard .expert-charts-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 767px) {
+  .brand-shell .expert-dashboard .expert-dashboard-header,
+  .brand-shell .expert-dashboard .dashboard-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .brand-shell .expert-dashboard .dashboard-section-description {
+    max-width: none;
+    text-align: left;
+  }
+  .brand-shell .expert-dashboard .expert-secondary-kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .brand-shell .expert-dashboard .expert-kpi-grid > *,
+  .brand-shell .expert-dashboard .expert-secondary-kpi-grid > * {
+    height: 104px;
+  }
+  .brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card,
+  .brand-shell .expert-dashboard .expert-kpi-grid .gd-metric-card-content,
+  .brand-shell .expert-dashboard .expert-secondary-kpi-grid .gd-metric-card,
+  .brand-shell .expert-dashboard .expert-secondary-kpi-grid .gd-metric-card-content {
+    min-height: 104px !important;
+  }
+}
+@media (max-width: 479px) {
+  .brand-shell .expert-dashboard .expert-dashboard-tabs {
+    width: 100%;
+  }
+  .brand-shell .expert-dashboard .expert-dashboard-tabs > button {
+    flex: 1;
+  }
+}

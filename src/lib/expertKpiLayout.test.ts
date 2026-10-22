@@ -12,12 +12,16 @@ describe("Expert dashboard KPI layout contract", () => {
     expect(indexCss).toContain(".expert-dashboard .dashboard-terra-metric-value");
   });
 
-  it("uses a deliberate responsive grid for the ten KPI cards", () => {
+  it("uses a deliberate responsive grid for the eight primary KPI cards", () => {
     expect(indexCss).toMatch(/@media \(min-width: 1440px\)[\s\S]*?\.expert-dashboard \.expert-kpi-grid[\s\S]*?repeat\(5, minmax\(0, 1fr\)\)/);
     expect(indexCss).toMatch(/@media \(min-width: 1200px\) and \(max-width: 1439px\)[\s\S]*?\.expert-dashboard \.expert-kpi-grid[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
-    expect(indexCss).toMatch(/@media \(min-width: 768px\) and \(max-width: 1199px\)[\s\S]*?\.expert-dashboard \.expert-kpi-grid[\s\S]*?repeat\(3, minmax\(0, 1fr\)\)/);
+    expect(indexCss).toMatch(/@media \(min-width: 768px\) and \(max-width: 1199px\)[\s\S]*?\.expert-dashboard \.expert-kpi-grid[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
     expect(indexCss).toMatch(/@media \(max-width: 767px\)[\s\S]*?\.expert-dashboard \.expert-kpi-grid[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
     expect(indexCss).toMatch(/@media \(max-width: 479px\)[\s\S]*?\.expert-dashboard \.expert-kpi-grid[\s\S]*?repeat\(1, minmax\(0, 1fr\)\)/);
+    expect(expertDashboardSource).toContain("expert-secondary-kpi-section");
+    expect(expertDashboardSource).toContain("expert-secondary-kpi-grid");
+    expect(expertDashboardSource).toContain('["Recebíveis", "receivables"]');
+    expect(expertDashboardSource).toContain('["CTR", "ctr"]');
   });
 
   it("uses a centered desktop shell and named sections for aligned composition", () => {

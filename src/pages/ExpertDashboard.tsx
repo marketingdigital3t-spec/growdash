@@ -162,15 +162,24 @@ export default function ExpertDashboard() {
         <MotionItem>
           <section aria-labelledby="expert-kpis-title" className="gd-module-section">
             <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Visão executiva</p><h2 id="expert-kpis-title">Indicadores principais</h2></div><p className="dashboard-section-description">Resultados consolidados do período e das contas autorizadas.</p></div>
-            <div className="expert-kpi-grid gd-kpi-grid grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            <div className="expert-kpi-grid gd-kpi-grid grid">
             {[
               ["Faturamento bruto", "revenue_gross"], ["Investimento em tráfego", "spend"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
             <DashboardWidgetHelp type="kpi" title="Leads Meta" className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><MetricCard title="Leads Meta" value={expertMetrics.metaLeads} icon={<UsersRound className="h-4 w-4" />} decimals={0} tooltip={`Formulários: ${expertMetrics.forms.toLocaleString("pt-BR")} · Site: ${expertMetrics.siteLeads.toLocaleString("pt-BR")} · Conversas: ${expertMetrics.conversations.toLocaleString("pt-BR")}.`} /></DashboardWidgetHelp>
             {[
               ["CPL", "cpl"], ["ROAS", "roas"],
-              ["Lucro", "profit"], ["Margem", "profit_margin"], ["Recebíveis", "receivables"], ["CTR", "ctr"], ["Taxa de conversão", "conversion_rate"],
+              ["Lucro", "profit"], ["Margem", "profit_margin"], ["Taxa de conversão", "conversion_rate"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
+            </div>
+            <div className="expert-secondary-kpi-section">
+              <div className="dashboard-section-heading expert-secondary-kpi-heading">
+                <div><p className="dashboard-section-eyebrow">Indicadores complementares</p><h3>Recebíveis e aquisição</h3></div>
+                <p className="dashboard-section-description">Detalhes para leitura financeira e de mídia.</p>
+              </div>
+              <div className="expert-secondary-kpi-grid grid">
+                {[["Recebíveis", "receivables"], ["CTR", "ctr"]].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
+              </div>
             </div>
           </section>
         </MotionItem>
