@@ -81,6 +81,7 @@ Adicionar/validar testes para:
 - Reexecutar o Advisor e separar alertas intencionais de endpoints públicos token-based dos alertas internos e de performance.
 - Não revogar em massa funções `SECURITY DEFINER` autenticadas sem mapear todos os consumidores e testar regressão.
 - Habilitar a proteção contra senhas comprometidas no painel de Auth/Password Security; registrar essa configuração separadamente da migration.
+- Aplicar `20261022200000_optimize_rls_auth_initplan.sql` e confirmar que os predicados continuam idênticos, com `(select auth.uid())` avaliado uma vez por statement.
 
 ## Fase 5 — Publicação controlada
 
@@ -112,4 +113,4 @@ Adicionar/validar testes para:
 - A validação real Meta/RD exige sessão autenticada, contas conectadas e segredo de cron.
 - A publicação Supabase exige acesso ao projeto e CLI/credenciais de deploy.
 - Sem esses acessos, só é possível confirmar a correção estática e a validação local; não declarar produção concluída.
-- O Advisor ainda mantém avisos de performance (`auth_rls_initplan` e políticas permissivas múltiplas); eles ficam como lote separado para evitar regressão de RLS.
+- O Advisor não deve mais reportar `auth_rls_initplan`. As 49 políticas permissivas múltiplas permanecem como regras distintas de autorização e só devem ser consolidadas após testes por workspace, papel e ação.
