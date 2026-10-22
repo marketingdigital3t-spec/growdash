@@ -14299,17 +14299,17 @@ html:not(.dark) .brand-shell {
   transition-duration: 80ms;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] {
-  background-color: rgba(183, 255, 0, .14) !important;
-  color: #B7FF00 !important;
-  box-shadow: inset 3px 0 0 #B7FF00 !important;
+  background-color: var(--gd-emerald-soft) !important;
+  color: var(--gd-emerald-bright) !important;
+  box-shadow: inset 3px 0 0 var(--gd-emerald) !important;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] .gd-sidebar-nav-chip {
-  background-color: rgba(183, 255, 0, .2) !important;
-  color: #B7FF00 !important;
+  background-color: rgba(16, 185, 129, .2) !important;
+  color: var(--gd-emerald-bright) !important;
 }
 .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link[aria-current="page"] svg {
-  color: #B7FF00 !important;
-  stroke: #B7FF00 !important;
+  color: var(--gd-emerald-bright) !important;
+  stroke: var(--gd-emerald-bright) !important;
 }
 @media (prefers-reduced-motion: reduce) {
   .brand-shell .brand-sidebar nav.gd-sidebar-nav-list .gd-sidebar-nav-link {
@@ -14514,4 +14514,62 @@ html:not(.dark) .brand-shell :is(.gd-metric-card, .gd-panel, .dashboard-glass-ca
   background: var(--gd-accent) !important;
   color: #062015 !important;
   box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
+}
+
+/* Platform-wide emerald accent normalization. Legacy lime/green utility
+   classes are presentation aliases only; semantic red and amber states stay
+   untouched. */
+html,
+html[data-accent],
+html[data-accent="monochrome"],
+html[data-accent="metallic-gold"] {
+  --growdash-green: #10B981 !important;
+  --brand-accent-rgb: 16, 185, 129 !important;
+  --brand-gold: #10B981 !important;
+  --brand-gold-light: #34D399 !important;
+  --brand-bronze: #047857 !important;
+  --color-accent: #10B981 !important;
+  --color-accent-hover: #34D399 !important;
+  --color-focus: #10B981 !important;
+  --primary: 160 84% 39% !important;
+  --primary-foreground: 160 42% 7% !important;
+  --primary-soft: 152 76% 90% !important;
+  --ring: 158 64% 52% !important;
+  --sidebar-primary: 160 84% 39% !important;
+  --sidebar-primary-foreground: 160 42% 7% !important;
+  --sidebar-icon-active: 158 64% 52% !important;
+  --sidebar-ring: 158 64% 52% !important;
+}
+.brand-shell,
+.brand-shell .growdash-main,
+.brand-shell .dashboard-page,
+.brand-shell .crm-page,
+.brand-shell .traffic-page-shell,
+.brand-shell .commercial-page,
+.brand-shell .integrations-page {
+  --gd-semantic-primary: var(--gd-emerald) !important;
+  --gd-semantic-primary-foreground: #062015 !important;
+  --gd-content-selection: var(--gd-emerald) !important;
+  --primary: 160 84% 39% !important;
+  --primary-foreground: 160 42% 7% !important;
+  --ring: 158 64% 52% !important;
+}
+.brand-shell :is(
+  [class*="text-lime"], [class*="text-green-400"], [class*="text-green-500"], [class*="text-green-600"],
+  [class*="text-emerald-400"], [class*="text-emerald-500"], [class*="text-emerald-600"]
+) { color: var(--gd-emerald-bright) !important; }
+.brand-shell :is(
+  [class*="border-lime"], [class*="border-green"], [class*="border-emerald"]
+) { border-color: var(--gd-emerald-border) !important; }
+.brand-shell :is(
+  [class*="bg-lime"], [class*="bg-green"], [class*="bg-emerald"]
+) { background-color: var(--gd-emerald-soft) !important; }
+.brand-shell :is(button.bg-primary, .gold-action, .gd-primary-action, [role="tab"][data-state="active"], [aria-selected="true"]) {
+  background: var(--gd-emerald) !important;
+  border-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+}
+.brand-shell :is(button.bg-primary, .gold-action, .gd-primary-action, [role="tab"][data-state="active"], [aria-selected="true"]):hover {
+  background: var(--gd-emerald-bright) !important;
+  border-color: var(--gd-emerald-bright) !important;
 }
