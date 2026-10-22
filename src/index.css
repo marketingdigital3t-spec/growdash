@@ -13944,29 +13944,29 @@ html,
 html[data-accent],
 html[data-accent="monochrome"],
 html[data-accent="metallic-gold"] {
-  --growdash-green: #B7FF00;
+  --growdash-green: #10B981;
   --button-text: #0B1304;
-  --brand-accent-rgb: 183, 255, 0;
+  --brand-accent-rgb: 16, 185, 129;
   --brand-black: #050709;
   --brand-surface: #0D1319;
-  --brand-gold: #B7FF00;
-  --brand-gold-light: #B7FF00;
+  --brand-gold: #10B981;
+  --brand-gold-light: #10B981;
   --brand-bronze: #6C9900;
   --brand-ivory: #F5F7F6;
-  --color-accent: #B7FF00;
-  --color-accent-hover: #D0FF66;
+  --color-accent: #10B981;
+  --color-accent-hover: #34D399;
   --color-accent-soft: #EAF9C7;
-  --color-focus: #B7FF00;
-  --primary: 79 100% 50%;
-  --primary-foreground: 96 67% 4%;
+  --color-focus: #10B981;
+  --primary: 160 84% 39%;
+  --primary-foreground: 160 42% 7%;
   --primary-soft: 79 100% 88%;
-  --ring: 79 100% 50%;
+  --ring: 160 84% 39%;
   --accent: 79 42% 92%;
-  --accent-foreground: 96 67% 4%;
-  --sidebar-primary: 79 100% 50%;
-  --sidebar-primary-foreground: 96 67% 4%;
-  --sidebar-icon-active: 79 100% 50%;
-  --sidebar-ring: 79 100% 50%;
+  --accent-foreground: 160 42% 7%;
+  --sidebar-primary: 160 84% 39%;
+  --sidebar-primary-foreground: 160 42% 7%;
+  --sidebar-icon-active: 160 84% 39%;
+  --sidebar-ring: 160 84% 39%;
   --border: 210 16% 84%;
   --input: 210 16% 80%;
   --gd-content-bg-light: #F5F7F6;
@@ -13985,13 +13985,13 @@ html[data-accent="metallic-gold"] {
 
 html:not(.dark) {
   --background: 156 14% 97%;
-  --foreground: 96 67% 4%;
+  --foreground: 160 42% 7%;
   --card: 0 0% 100%;
-  --card-foreground: 96 67% 4%;
+  --card-foreground: 160 42% 7%;
   --popover: 0 0% 100%;
-  --popover-foreground: 96 67% 4%;
+  --popover-foreground: 160 42% 7%;
   --secondary: 195 18% 94%;
-  --secondary-foreground: 96 67% 4%;
+  --secondary-foreground: 160 42% 7%;
   --muted: 195 18% 94%;
   --muted-foreground: 204 17% 30%;
   --border: 195 18% 84%;
@@ -14128,18 +14128,18 @@ html.dark .brand-shell:has(.traffic-page-shell) {
 
 .brand-shell :is(button, a)[data-state="active"],
 .brand-shell [role="tab"][aria-selected="true"] {
-  border-color: rgba(183, 255, 0, .5) !important;
+  border-color: rgba(16, 185, 129, .5) !important;
 }
 
 /* The legacy visual layer contains !important monochrome/blue fallbacks.
    Override those semantic variables at the actual shell scopes as well. */
 html[data-accent] {
-  --brand-accent-rgb: 183, 255, 0 !important;
-  --brand-gold: #B7FF00 !important;
-  --brand-gold-light: #D0FF66 !important;
-  --primary: 79 100% 50% !important;
-  --primary-foreground: 96 67% 4% !important;
-  --ring: 79 100% 50% !important;
+  --brand-accent-rgb: 16, 185, 129 !important;
+  --brand-gold: #10B981 !important;
+  --brand-gold-light: #34D399 !important;
+  --primary: 160 84% 39% !important;
+  --primary-foreground: 160 42% 7% !important;
+  --ring: 160 84% 39% !important;
 }
 
 .brand-shell,
@@ -14150,30 +14150,30 @@ html[data-accent] {
 .brand-shell .traffic-page-shell,
 .brand-shell .commercial-page,
 .brand-shell .integrations-page {
-  --gd-semantic-primary: #B7FF00 !important;
+  --gd-semantic-primary: #10B981 !important;
   --gd-semantic-primary-foreground: #0B1304 !important;
-  --gd-content-selection: #B7FF00 !important;
-  --primary: 79 100% 50% !important;
-  --primary-foreground: 96 67% 4% !important;
-  --ring: 79 100% 50% !important;
+  --gd-content-selection: #10B981 !important;
+  --primary: 160 84% 39% !important;
+  --primary-foreground: 160 42% 7% !important;
+  --ring: 160 84% 39% !important;
 }
 
 .brand-shell :is(.text-primary, [class*="text-primary"]),
 .brand-shell :is(.bg-primary, [class~="bg-primary"], .gold-action, .premium-button, .meta-toolbar-primary) {
   color: #0B1304 !important;
-  background-color: #B7FF00 !important;
-  border-color: rgba(183, 255, 0, .65) !important;
+  background-color: #10B981 !important;
+  border-color: rgba(16, 185, 129, .65) !important;
 }
 
 .brand-shell :is(.text-primary, [class*="text-primary"]) {
-  color: #B7FF00 !important;
+  color: #10B981 !important;
   background-color: transparent !important;
 }
 
 .brand-shell :is(.gd-highlight-action, .meta-toolbar-primary, .gold-action, .premium-button.bg-primary) {
-  background: #B7FF00 !important;
+  background: #10B981 !important;
   color: #0B1304 !important;
-  border-color: #B7FF00 !important;
+  border-color: #10B981 !important;
 }
 
 /* Primary actions must remain unmistakably green even when a component adds
@@ -14184,10 +14184,10 @@ html[data-accent] {
 .growdash-main button.gd-highlight-action,
 .growdash-main button.premium-button.bg-primary,
 .growdash-main button[class~="bg-primary"] {
-  background-color: #B7FF00 !important;
+  background-color: #10B981 !important;
   background-image: none !important;
   color: #0B1304 !important;
-  border-color: #B7FF00 !important;
+  border-color: #10B981 !important;
 }
 
 .brand-shell button.gd-highlight-action:hover,
@@ -14196,7 +14196,7 @@ html[data-accent] {
 .growdash-main button.gd-highlight-action:hover,
 .growdash-main button.premium-button.bg-primary:hover,
 .growdash-main button[class~="bg-primary"]:hover {
-  background-color: #D0FF66 !important;
+  background-color: #34D399 !important;
   color: #0B1304 !important;
 }
 
@@ -14217,7 +14217,7 @@ html.dark .brand-shell {
   --gd-content-bg: #071007 !important;
   --gd-content-surface: #0e190f !important;
   --gd-content-panel: #142116 !important;
-  --gd-content-border: rgba(183, 255, 0, .17) !important;
+  --gd-content-border: rgba(16, 185, 129, .17) !important;
   --gd-content-muted: #9eafa2 !important;
 }
 
@@ -14631,8 +14631,8 @@ html[data-accent="metallic-gold"] {
   color: #062015 !important;
 }
 .brand-shell :is(
-  [class*="bg-[#b7ff00"], [class*="bg-[#B7FF00"],
-  [class*="text-[#b7ff00"], [class*="text-[#B7FF00"],
+  [class*="bg-[#10b981"], [class*="bg-[#10B981"],
+  [class*="text-[#10b981"], [class*="text-[#10B981"],
   [style*="b7ff00"], [style*="B7FF00"], [style*="183, 255, 0"]
 ) {
   color: var(--gd-emerald-bright) !important;
