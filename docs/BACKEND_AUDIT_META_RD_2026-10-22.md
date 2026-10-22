@@ -33,4 +33,6 @@ As funções de sincronização já implementam retries/backoff, locks de sincro
 
 ## Pendências de produção
 
-Com sessão autenticada e segredos operacionais, executar uma janela controlada e registrar: conta Meta, período, último sync bem-sucedido, filas, erros 4xx/5xx, token/escopo, volume Meta/RD e divergências comparando o mesmo escopo e definição de evento.
+Migration aplicada no projeto Supabase `cixnvosxqlacjbpymjha` e as funções `workflow-webhook` e `workflow-scheduler` estão ativas. O build está publicado no Cloudflare Pages no deployment `80b5386a`, associado ao commit `8549bf0`.
+
+A execução real do `daily-incremental-sync` não foi considerada aprovada: chamadas sem autenticação retornam 401 corretamente e os valores exibidos pela listagem de secrets não são utilizáveis como credencial de execução. Ainda é necessário executar uma janela controlada com a sessão/segredo operacional real e registrar: conta Meta, período, último sync bem-sucedido, filas, erros 4xx/5xx, token/escopo, volume Meta/RD e divergências comparando o mesmo escopo e definição de evento.
