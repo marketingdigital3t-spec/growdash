@@ -62,8 +62,8 @@ export function PlatformDistributionWidget() {
       : `Conv. média ${averageConversion.toFixed(2)}%`;
 
   return <>
-    <Card className="dashboard-glass-card h-full min-h-[320px] min-w-0 overflow-hidden">
-      <CardHeader className="space-y-3 pb-3">
+    <Card className="dashboard-glass-card expert-chart-card expert-platform-chart-card h-full min-w-0 overflow-hidden">
+      <CardHeader className="expert-chart-card-header space-y-3 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base"><Globe2 className="h-4 w-4" />Distribuição por Plataforma</CardTitle>
           <span className="text-xs tabular-nums text-muted-foreground">{headerLabel}</span>
@@ -76,7 +76,7 @@ export function PlatformDistributionWidget() {
           </TabsList>
         </Tabs>
       </CardHeader>
-      <CardContent>
+      <CardContent className="expert-chart-card-content">
         <div className="flex flex-col items-center gap-4 md:flex-row">
           {!isConversion && <div className="relative h-[188px] w-[188px] shrink-0">
             <ResponsiveContainer width="100%" height="100%">

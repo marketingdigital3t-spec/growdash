@@ -30,8 +30,8 @@ export function PaymentChart({ byPayment, unknownPaymentRevenue = 0 }: PaymentCh
 
   if (total === 0) {
     return (
-      <Card className="dashboard-terra-card dashboard-glass-card h-full">
-        <CardHeader className="pb-2">
+      <Card className="dashboard-terra-card dashboard-glass-card expert-chart-card h-full">
+        <CardHeader className="expert-chart-card-header pb-2">
           <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -42,12 +42,12 @@ export function PaymentChart({ byPayment, unknownPaymentRevenue = 0 }: PaymentCh
   }
 
   return (
-    <Card className="dashboard-terra-card dashboard-glass-card flex h-full flex-col">
-      <CardHeader className="pb-2">
+    <Card className="dashboard-terra-card dashboard-glass-card expert-chart-card flex h-full flex-col">
+      <CardHeader className="expert-chart-card-header pb-2">
         <CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-center">
-        <div className="relative h-48 shrink-0">
+        <div className="expert-payment-chart relative h-48 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie

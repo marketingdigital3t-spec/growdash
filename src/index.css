@@ -11589,6 +11589,80 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   padding: 10px !important;
 }
 
+/* Final Expert chart composition: compact cards with an intentional visual
+   center and one neutral treatment for every chart control. */
+.brand-shell .expert-dashboard .expert-charts-grid > * {
+  height: 380px !important;
+  min-height: 380px !important;
+}
+.brand-shell .expert-dashboard .expert-chart-card {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+.brand-shell .expert-dashboard .expert-chart-card-header {
+  flex: 0 0 auto;
+  padding: 16px 18px 10px !important;
+}
+.brand-shell .expert-dashboard .expert-chart-card-content {
+  min-height: 0;
+  padding: 12px 18px 18px !important;
+}
+.brand-shell .expert-dashboard .expert-chart-card .expert-payment-chart {
+  height: 220px !important;
+}
+.brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex {
+  height: 100%;
+  align-items: center;
+  gap: 20px;
+}
+.brand-shell .expert-dashboard .expert-platform-chart-card .relative {
+  width: 220px !important;
+  height: 220px !important;
+}
+.brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tablist"] {
+  gap: 6px !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"] {
+  min-height: 38px;
+  border: 1px solid var(--gd-content-border) !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #222 !important;
+  box-shadow: none !important;
+}
+.brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"][data-state="active"] {
+  border-color: var(--gd-emerald-border) !important;
+  background: #fff !important;
+  color: #111 !important;
+  box-shadow: inset 0 -2px var(--gd-emerald) !important;
+}
+.brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"]:hover:not([data-state="active"]) {
+  background: #fff !important;
+  border-color: var(--gd-emerald-border) !important;
+}
+.brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 button,
+.brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 > div {
+  background: var(--gd-content-surface) !important;
+  border: 1px solid var(--gd-content-border);
+}
+@media (max-width: 767px) {
+  .brand-shell .expert-dashboard .expert-charts-grid > * {
+    height: 360px !important;
+    min-height: 360px !important;
+  }
+  .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex {
+    gap: 10px;
+  }
+  .brand-shell .expert-dashboard .expert-platform-chart-card .relative {
+    width: 180px !important;
+    height: 180px !important;
+  }
+}
+
 .brand-shell .dashboard-page .gd-glass-metric-icon {
   width: 30px !important;
   height: 30px !important;
