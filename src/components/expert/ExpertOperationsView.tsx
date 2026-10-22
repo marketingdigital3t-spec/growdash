@@ -357,7 +357,7 @@ function ClassCard({
           </div>
           <div className="mt-auto grid gap-1 pt-2">
             <Button
-              className="h-7 w-full text-[11px]"
+              className="expert-operations-action h-7 w-full text-[11px]"
               size="sm"
               variant="outline"
               onClick={() => openMembers("student")}
@@ -365,7 +365,7 @@ function ClassCard({
               ◉ Aluna ({students.length})
             </Button>
             <Button
-              className="h-7 w-full text-[11px]"
+              className="expert-operations-action h-7 w-full text-[11px]"
               size="sm"
               variant="outline"
               onClick={() => openMembers("model_patient")}
@@ -373,7 +373,7 @@ function ClassCard({
               ◉ Paciente Modelo ({patients.length})
             </Button>
             <Button
-              className="h-7 w-full text-[11px]"
+              className="expert-operations-action h-7 w-full text-[11px]"
               size="sm"
               onClick={() => setDetailsOpen(true)}
             >
