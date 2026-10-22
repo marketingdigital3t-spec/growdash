@@ -14651,3 +14651,33 @@ html[data-accent="metallic-gold"] {
   color: #0b0b0b !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .98), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 8px 22px -18px rgba(255, 255, 255, .7) !important;
 }
+
+/* Platform button contract: controls are neutral white by default. Emerald
+   is reserved for active/highlighted controls inside the 3D experiences. */
+.brand-shell .growdash-main :is(button, [role="button"], a.gd-button, a.gd-primary-action) {
+  background: #ffffff !important;
+  background-image: none !important;
+  border-color: rgba(255, 255, 255, .78) !important;
+  color: #0b0b0b !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .98), inset 0 -1px 0 rgba(0, 0, 0, .12), 0 8px 22px -18px rgba(255, 255, 255, .64) !important;
+}
+.brand-shell .growdash-main :is(button, [role="button"], a.gd-button, a.gd-primary-action):hover:not(:disabled),
+.brand-shell .growdash-main :is(button, [role="button"], a.gd-button, a.gd-primary-action):focus-visible:not(:disabled) {
+  background: #f3f4f6 !important;
+  border-color: #ffffff !important;
+  color: #0b0b0b !important;
+}
+
+/* 3D highlight controls keep the emerald signal. */
+.brand-shell :is(
+  .life-sim-mode-switch button.is-active,
+  .life-sim-roster button.is-active,
+  .life-sim-catalog button.is-active,
+  .office-life-mode button.is-active,
+  .office-life-speed button.is-active,
+  .office-life-autonomy.is-active
+) {
+  background: var(--gd-emerald) !important;
+  border-color: var(--gd-emerald) !important;
+  color: #062015 !important;
+}
