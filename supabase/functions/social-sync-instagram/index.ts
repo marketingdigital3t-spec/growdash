@@ -39,24 +39,55 @@ async function profileJson(base: string, accountId: string, token: string) {
   throw lastError instanceof Error ? lastError : new Error("Não foi possível ler o perfil do Instagram.");
 }
 
-async function mediaInsights(base: string, mediaId: string, token: string) {
-  const metrics = ["reach", "saved", "shares", "total_interactions", "views", "ig_reels_avg_watch_time", "ig_reels_video_view_total_time", "video_retention_rate"];
+async function mediaInsights(base: string, mediaId: string, token: string, isVideo: boolean) {
+  // A single unsupported metric makes the whole Instagram Insights request
+  // fail. Keep the stable metrics separate from the optional Reel metrics so
+  // an unsupported video metric can never erase reach/interactions.
+  const metricGroups = [
+    ["reach", "saved", "shares", "total_interactions"],
+    ...(isVideo ? [["views", "ig_reels_avg_watch_time", "ig_reels_video_view_total_time", "video_retention_rate"] as string[]] : []),
+  ];
   const result: Record<string, number> = {};
-  const combined = new URL(`${base}/${mediaId}/insights`);
-  combined.searchParams.set("metric", metrics.join(","));
-  combined.searchParams.set("access_token", token);
-  try {
-    const payload = await graphJson(combined);
+  const readGroup = async (metrics: string[]) => {
+    const request = new URL(`${base}/${mediaId}/insights`);
+    request.searchParams.set("metric", metrics.join(","));
+    request.searchParams.set("access_token", token);
+    const payload = await graphJson(request);
     for (const item of payload.data ?? []) result[item.name] = Number(item.values?.[0]?.value ?? item.value ?? 0);
-    return result;
-  } catch {
-    // Instagram exposes different insight sets for posts, reels and older
-    // media. Retrying every unsupported metric individually could turn one
-    // profile sync into hundreds of Graph calls and time out before posts were
-    // saved. Preserve the publication and leave unavailable metrics at zero;
-    // the next sync can enrich it when Meta makes them available.
-    return result;
+  };
+  for (const metrics of metricGroups) {
+    try {
+      await readGroup(metrics);
+    } catch {
+      // If one metric is not supported for this media, retry the members one
+      // by one. This preserves the supported values instead of converting the
+      // complete publication to zeros.
+      if (metrics.length > 1) {
+        for (const metric of metrics) {
+          try { await readGroup([metric]); } catch { /* metric unavailable */ }
+        }
+      }
+    }
   }
+  return result;
+}
+
+async function mediaPages(base: string, accountId: string, token: string) {
+  const fields = "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
+  const items: Record<string, unknown>[] = [];
+  let next: string | null = null;
+  do {
+    const request = next ? new URL(next) : new URL(`${base}/${accountId}/media`);
+    if (!next) {
+      request.searchParams.set("fields", fields);
+      request.searchParams.set("limit", "25");
+      request.searchParams.set("access_token", token);
+    }
+    const payload = await graphJson(request);
+    if (Array.isArray(payload.data)) items.push(...payload.data);
+    next = typeof payload.paging?.next === "string" ? payload.paging.next : null;
+  } while (next && items.length < 100);
+  return items.slice(0, 100);
 }
 
 Deno.serve(async (req) => {
@@ -85,16 +116,14 @@ Deno.serve(async (req) => {
     const version = Deno.env.get("INSTAGRAM_GRAPH_API_VERSION") ?? "v25.0";
     const base = `https://graph.instagram.com/${version}`;
     const profile = await profileJson(base, account.provider_account_id, token);
-    const mediaUrl = new URL(`${base}/${account.provider_account_id}/media`);
-    mediaUrl.searchParams.set("fields", "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count");
-    mediaUrl.searchParams.set("limit", "25");
-    mediaUrl.searchParams.set("access_token", token);
-    const mediaPayload = await graphJson(mediaUrl);
-    const media = Array.isArray(mediaPayload.data) ? mediaPayload.data : [];
+    const media = await mediaPages(base, account.provider_account_id, token);
     let totalReach = 0;
     let totalInteractions = 0;
     for (const item of media) {
-      const insights = await mediaInsights(base, String(item.id), token);
+      const rawMediaType = String(item.media_type ?? "").toUpperCase();
+      const rawProductType = String(item.media_product_type ?? "").toUpperCase();
+      const isVideo = rawMediaType === "VIDEO" || rawProductType === "REELS";
+      const insights = await mediaInsights(base, String(item.id), token, isVideo);
       const likes = Number(item.like_count ?? 0);
       const comments = Number(item.comments_count ?? 0);
       const saves = Number(insights.saved ?? 0);
@@ -103,9 +132,7 @@ Deno.serve(async (req) => {
       const interactions = Number(insights.total_interactions ?? likes + comments + saves + shares);
       totalReach += reach;
       totalInteractions += interactions;
-      const rawMediaType = String(item.media_type ?? "").toUpperCase();
-      const rawProductType = String(item.media_product_type ?? "").toUpperCase();
-      const mediaType = rawMediaType === "VIDEO" || rawProductType === "REELS"
+      const mediaType = isVideo
         ? "reels"
         : rawMediaType.toLowerCase() || rawProductType.toLowerCase() || "post";
       const { error } = await admin.from("social_media").upsert({
@@ -118,7 +145,10 @@ Deno.serve(async (req) => {
         thumbnail_url: item.thumbnail_url ?? null,
         published_at: item.timestamp ?? null,
         reach,
-        impressions: Number(insights.views ?? 0),
+        // The Instagram API exposes `views` for video, not ad-style
+        // impressions. Keep impressions at zero when the provider does not
+        // expose that metric instead of presenting video views as impressions.
+        impressions: 0,
         likes,
         comments,
         saves,

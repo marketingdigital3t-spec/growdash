@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualTextColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageStageTone, funnelStageTransitionRate } from "@/lib/funnelStageDistribution";
 
 const stage = (count: number) => ({
   rd_stage_id: `stage-${count}`,
@@ -23,36 +23,25 @@ describe("FunnelStageDistribution", () => {
     expect(funnelStageDistributionTotal(selectedPeriod)).not.toBe(funnelStageDistributionTotal(historical));
   });
 
-  it("creates a descending funnel width from the first to the last stage", () => {
-    const widths = [0, 1, 2, 3].map((index) => funnelStageVisualWidth(index, 4));
-
-    expect(widths).toEqual([100, 76, 52, 28]);
-    expect(widths).toEqual([...widths].sort((a, b) => b - a));
+  it("calculates the next-stage rate from the current stage", () => {
+    expect(funnelStageTransitionRate(10, 4)).toBe(40);
+    expect(funnelStageTransitionRate(3, 1)).toBeCloseTo(33.3, 1);
   });
 
-  it("keeps a single or empty funnel stage valid", () => {
-    expect(funnelStageVisualWidth(0, 0)).toBe(100);
-    expect(funnelStageVisualWidth(0, 1)).toBe(100);
-    expect(funnelStageVisualWidth(8, 3)).toBe(28);
+  it("does not invent a conversion rate when the current stage is empty", () => {
+    expect(funnelStageTransitionRate(0, 4)).toBeNull();
   });
 
-  it("transitions the visual palette from red through yellow to green", () => {
-    expect(funnelStageVisualColor(0, 3)).toBe("hsl(0 84% 56%)");
-    expect(funnelStageVisualColor(1, 3)).toBe("hsl(71 84% 56%)");
-    expect(funnelStageVisualColor(2, 3)).toBe("hsl(142 84% 56%)");
-  });
-
-  it("uses readable text across the bright part of the funnel", () => {
-    expect(funnelStageVisualTextColor(0, 3)).toBe("hsl(0 0% 100%)");
-    expect(funnelStageVisualTextColor(1, 3)).toBe("hsl(222 47% 11%)");
-    expect(funnelStageVisualTextColor(2, 3)).toBe("hsl(222 47% 11%)");
+  it("keeps won and lost stages semantically distinct from neutral stages", () => {
+    expect(funnelStageStageTone({ is_won: true, is_lost: false })).toBe("won");
+    expect(funnelStageStageTone({ is_won: false, is_lost: true })).toBe("lost");
+    expect(funnelStageStageTone({ is_won: false, is_lost: false })).toBe("neutral");
   });
 
   it("keeps the selected-period total independent from the funnel shape", () => {
     const selectedPeriod = { stages: [stage(80), stage(20), stage(0)] };
 
     expect(funnelStageDistributionTotal(selectedPeriod)).toBe(100);
-    expect(funnelStageVisualWidth(0, selectedPeriod.stages.length)).toBe(100);
-    expect(funnelStageVisualWidth(2, selectedPeriod.stages.length)).toBe(28);
+    expect(funnelStageTransitionRate(80, 20)).toBe(25);
   });
 });

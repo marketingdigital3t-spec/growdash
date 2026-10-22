@@ -133,7 +133,7 @@ export default function SocialMediaPage() {
   });
   const liveAccounts = accountsQuery.data ?? [];
   const accounts = demoMode ? [DEMO_ACCOUNT] : liveAccounts;
-  const selectedId = demoMode ? DEMO_ACCOUNT.id : accountId || accounts[0]?.id || "";
+  const selectedId = demoMode ? DEMO_ACCOUNT.id : (accounts.some((account) => account.id === accountId) ? accountId : accounts[0]?.id || "");
   const selected = accounts.find((account) => account.id === selectedId);
 
   const mediaQuery = useQuery({
@@ -169,7 +169,11 @@ export default function SocialMediaPage() {
   });
 
   const allMedia = useMemo(() => demoMode ? DEMO_MEDIA : mediaQuery.data ?? [], [demoMode, mediaQuery.data]);
-  const periodMedia = useMemo(() => allMedia.filter((item) => !item.published_at || (new Date(item.published_at) >= startDate && new Date(item.published_at) <= endOfDay(endDate))), [allMedia, endDate, startDate]);
+  const periodMedia = useMemo(() => allMedia.filter((item) => {
+    if (!item.published_at) return false;
+    const publishedAt = new Date(item.published_at);
+    return !Number.isNaN(publishedAt.getTime()) && publishedAt >= startDate && publishedAt <= endOfDay(endDate);
+  }), [allMedia, endDate, startDate]);
   // Do not make a connected profile look empty only because the global
   // dashboard interval excludes its latest publication. Period metrics still
   // use periodMedia; the content gallery falls back to the latest real posts.
@@ -177,17 +181,21 @@ export default function SocialMediaPage() {
   const showingOutsidePeriod = !demoMode && periodMedia.length === 0 && allMedia.length > 0;
   const sortedMedia = useMemo(() => [...media].sort((a, b) => Number(b[contentSort] || 0) - Number(a[contentSort] || 0)), [contentSort, media]);
   const daily = demoMode ? DEMO_DAILY : dailyQuery.data ?? [];
-  const totals = useMemo(() => media.reduce((sum, item) => ({ reach: sum.reach + Number(item.reach), interactions: sum.interactions + Number(item.interactions), likes: sum.likes + Number(item.likes), comments: sum.comments + Number(item.comments), saves: sum.saves + Number(item.saves), shares: sum.shares + Number(item.shares) }), { reach: 0, interactions: 0, likes: 0, comments: 0, saves: 0, shares: 0 }), [media]);
+  // `media` may intentionally fall back to recent publications so the gallery
+  // never looks broken when the selected period has no posts. KPIs, ranking
+  // and recommendations must remain strictly scoped to the selected period.
+  const metricMedia = demoMode ? media : periodMedia;
+  const totals = useMemo(() => metricMedia.reduce((sum, item) => ({ reach: sum.reach + Number(item.reach || 0), interactions: sum.interactions + Number(item.interactions || 0), likes: sum.likes + Number(item.likes || 0), comments: sum.comments + Number(item.comments || 0), saves: sum.saves + Number(item.saves || 0), shares: sum.shares + Number(item.shares || 0) }), { reach: 0, interactions: 0, likes: 0, comments: 0, saves: 0, shares: 0 }), [metricMedia]);
   const engagement = totals.reach > 0 ? (totals.interactions / totals.reach) * 100 : 0;
   const followersGained = daily.reduce((sum, row) => sum + Math.max(Number(row.follower_delta || 0), 0), 0);
   const followersLost = Math.abs(daily.reduce((sum, row) => sum + Math.min(Number(row.follower_delta || 0), 0), 0));
-  const videoRows = media.filter((item) => ["VIDEO", "REELS"].includes(String(item.media_type).toUpperCase()));
+  const videoRows = metricMedia.filter((item) => ["VIDEO", "REELS"].includes(String(item.media_type).toUpperCase()));
   const videoViews = videoRows.reduce((sum, item) => sum + Number(item.video_views || 0), 0);
   const retentionSamples = videoRows.filter((item) => Number(item.video_retention_rate || 0) > 0);
   const videoRetention = retentionSamples.length ? retentionSamples.reduce((sum, item) => sum + Number(item.video_retention_rate || 0), 0) / retentionSamples.length : 0;
   const watchTimeSamples = videoRows.filter((item) => Number(item.average_watch_time || 0) > 0);
   const averageWatchTime = watchTimeSamples.length ? watchTimeSamples.reduce((sum, item) => sum + Number(item.average_watch_time || 0), 0) / watchTimeSamples.length : 0;
-  const best = [...media].sort((a, b) => b.interactions - a.interactions)[0];
+  const best = [...metricMedia].sort((a, b) => Number(b.interactions || 0) - Number(a.interactions || 0))[0];
   const chart = daily.map((row) => ({ ...row, label: format(new Date(`${row.insight_date}T12:00:00`), "dd/MM") }));
 
   const schemaMissing = !demoMode && accountsQuery.error && /social_accounts|schema cache|relation/i.test((accountsQuery.error as Error).message);
@@ -309,7 +317,7 @@ function SocialMediaDetailSheet({ media, onOpenChange, demoMode }: { media: Soci
             <div className="flex items-baseline justify-between gap-3"><h3 className="font-black">Desempenho</h3><span className="text-xs text-muted-foreground">Por publicação</span></div>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               <Mini label="Alcance" value={number.format(reach)} />
-              <Mini label="Impressões" value={number.format(impressions)} />
+              <Mini label="Impressões" value={impressions > 0 ? number.format(impressions) : "Não disponível"} />
               <Mini label="Interações" value={number.format(interactions)} />
               <Mini label="Engajamento" value={`${engagement.toFixed(2).replace(".", ",")}%`} />
               <Mini label="Visualizações" value={media.video_views == null ? "Não disponível" : number.format(Number(media.video_views))} />

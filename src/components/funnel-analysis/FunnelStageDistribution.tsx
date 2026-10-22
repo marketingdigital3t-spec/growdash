@@ -1,12 +1,13 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip as StageTooltip, TooltipContent as StageTooltipContent, TooltipProvider, TooltipTrigger as StageTooltipTrigger } from "@/components/ui/tooltip";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { ArrowDown } from "lucide-react";
 import type { FunnelAnalytics } from "@/hooks/useRDDeals";
-import { funnelStageDistributionTotal, funnelStageVisualColor, funnelStageVisualTextColor, funnelStageVisualWidth } from "@/lib/funnelStageDistribution";
+import { funnelStageDistributionTotal, funnelStageStageTone, funnelStageTransitionRate } from "@/lib/funnelStageDistribution";
 
 interface Props {
   a: FunnelAnalytics;
@@ -44,7 +45,6 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
   // The funnel is the primary representation. The table remains available
   // for users who need a dense, row-by-row comparison.
   const [visualMode, setVisualMode] = useState(true);
-  const visualStageCount = stages.length;
 
   const data = stages.map((s, i) => ({
     name: s.name,
@@ -89,57 +89,69 @@ export function FunnelStageDistribution({ a, liveState = "idle", lastUpdatedAt, 
       </CardHeader>
       <CardContent>
         {visualMode ? (
-          <div className="flex flex-col items-center gap-2 py-1" aria-label="Funil visual por etapa">
-            <div className="gd-funnel-visual w-full rounded-2xl border border-border/50 bg-background/30 px-2 py-3 sm:px-4 sm:py-4">
-              <div className="gd-funnel-visual-stack mx-auto flex w-full max-w-[560px] flex-col items-center gap-1.5">
+          <div className="flex flex-col gap-3 py-1" aria-label="Cards do funil por etapa">
+            <div className="gd-funnel-visual w-full rounded-2xl border border-border/50 bg-background/30 p-3 sm:p-4">
+              <div className="gd-funnel-stage-grid">
                 <TooltipProvider delayDuration={250}>
                   {stages.map((stage, index) => {
-                    const width = funnelStageVisualWidth(index, visualStageCount);
-                    const accentColor = funnelStageVisualColor(index, visualStageCount);
-                    const textColor = funnelStageVisualTextColor(index, visualStageCount);
+                    const nextStage = stages[index + 1];
+                    const transitionRate = nextStage ? funnelStageTransitionRate(stage.count, nextStage.count) : null;
+                    const tone = funnelStageStageTone(stage);
                     const avgTime = stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} dias` : "Indisponível";
                     const negotiationValue = stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Nenhum valor";
                     const accessibleDescription = `${stage.name}: ${stage.count} leads, ${stage.pct.toFixed(1)}% do total. Tempo médio: ${avgTime}. Valor em negociação: ${negotiationValue}.`;
                     return (
-                      <StageTooltip key={stage.rd_stage_id}>
-                        <StageTooltipTrigger asChild>
-                          <div
-                            tabIndex={0}
-                            className="gd-funnel-stage group relative z-10 flex min-h-[64px] cursor-help flex-col items-center justify-center overflow-hidden px-3 py-2.5 text-center outline-none transition-[width,filter,transform] duration-200 hover:z-20 hover:-translate-y-0.5 hover:brightness-105 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[70px] sm:px-5"
-                            style={{
-                              width: `max(${width}%, 210px)`,
-                              "--funnel-stage-accent": accentColor,
-                              "--funnel-stage-text": textColor,
-                            } as CSSProperties}
-                            aria-label={accessibleDescription}
-                          >
-                            <span className="pointer-events-none absolute inset-x-6 top-0 h-px rounded-full bg-white/45" aria-hidden="true" />
-                            <span className="relative z-10 flex max-w-full items-center justify-center gap-2 text-[10px] font-extrabold uppercase leading-none tracking-[0.08em]" style={{ color: "var(--funnel-stage-text)" }}>
-                              <span className="gd-funnel-stage-dot h-2 w-2 shrink-0 rounded-full ring-2 ring-black/10" style={{ background: "var(--funnel-stage-accent)" }} aria-hidden="true" />
-                              <span className="max-w-full break-words">{stage.name}</span>
-                            </span>
-                            <span className="relative z-10 mt-1 flex items-baseline justify-center gap-2 tabular-nums" style={{ color: "var(--funnel-stage-text)" }}>
-                              <span className="text-xl font-black leading-none sm:text-2xl">{stage.count}</span>
-                              <span className="text-[9px] font-bold uppercase tracking-[0.08em] opacity-70">leads</span>
-                              <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[9px] font-bold">{stage.pct.toFixed(1)}%</span>
-                            </span>
-                            <span className="relative z-10 mt-1 flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[9px] font-semibold leading-tight opacity-70" style={{ color: "var(--funnel-stage-text)" }}>
-                              <span>{stage.avgDaysInStage > 0 ? `${stage.avgDaysInStage.toFixed(1)} d médio` : "Tempo indisponível"}</span>
-                              <span>{stage.valueInNegotiation > 0 ? fmtBRL(stage.valueInNegotiation) : "Sem valor"}</span>
-                            </span>
+                      <div className="gd-funnel-stage-slot" key={stage.rd_stage_id}>
+                        <StageTooltip>
+                          <StageTooltipTrigger asChild>
+                            <div
+                              tabIndex={0}
+                              className="gd-funnel-stage-card group relative cursor-help rounded-xl border p-4 text-left outline-none transition duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              data-stage-tone={tone}
+                              aria-label={accessibleDescription}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="gd-funnel-stage-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                                  <span className="truncate text-sm font-semibold text-foreground">{stage.name}</span>
+                                </div>
+                                {stage.is_won && <Badge variant="outline" className="shrink-0 border-emerald-500/40 text-[10px] text-emerald-500">Ganho</Badge>}
+                                {stage.is_lost && <Badge variant="outline" className="shrink-0 border-red-500/40 text-[10px] text-red-500">Perda</Badge>}
+                              </div>
+                              <div className="mt-4 flex items-end justify-between gap-3">
+                                <div>
+                                  <div className="flex items-baseline gap-2 tabular-nums">
+                                    <span className="text-3xl font-bold leading-none text-foreground">{stage.count}</span>
+                                    <span className="text-xs font-medium text-muted-foreground">leads</span>
+                                  </div>
+                                  <p className="mt-1 text-xs text-muted-foreground">{stage.pct.toFixed(1)}% do funil</p>
+                                </div>
+                                <span className="gd-funnel-stage-share rounded-full px-2 py-1 text-xs font-semibold tabular-nums">{stage.pct.toFixed(1)}%</span>
+                              </div>
+                              <div className="gd-funnel-stage-progress mt-4" aria-hidden="true"><span style={{ width: `${Math.min(100, Math.max(0, stage.pct))}%` }} /></div>
+                              <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                <div><p className="text-muted-foreground">Tempo médio</p><p className="mt-1 font-medium text-foreground">{avgTime}</p></div>
+                                <div className="text-right"><p className="text-muted-foreground">Em negociação</p><p className="mt-1 font-medium text-foreground">{negotiationValue}</p></div>
+                              </div>
+                            </div>
+                          </StageTooltipTrigger>
+                          <StageTooltipContent side="top" className="max-w-xs space-y-1.5 px-3 py-2.5 text-xs">
+                            <p className="font-semibold text-foreground">{stage.name}</p>
+                            <p>{stage.count} leads · {stage.pct.toFixed(1)}% do total</p>
+                            <p>Tempo médio: {avgTime}</p>
+                            <p>Valor em negociação: {negotiationValue}</p>
+                          </StageTooltipContent>
+                        </StageTooltip>
+                        {nextStage ? (
+                          <div className="gd-funnel-stage-transition" aria-label={transitionRate === null ? `Próxima etapa: sem base em ${stage.name}` : `${transitionRate.toFixed(1)}% chegaram à próxima etapa`}>
+                            <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>{transitionRate === null ? "Sem base" : `${transitionRate.toFixed(1)}% para próxima`}</span>
                           </div>
-                        </StageTooltipTrigger>
-                        <StageTooltipContent side="top" className="max-w-xs space-y-1.5 px-3 py-2.5 text-xs">
-                          <p className="font-semibold text-foreground">{stage.name}</p>
-                          <p>{stage.count} leads · {stage.pct.toFixed(1)}% do total</p>
-                          <p>Tempo médio: {avgTime}</p>
-                          <p>Valor em negociação: {negotiationValue}</p>
-                        </StageTooltipContent>
-                      </StageTooltip>
+                        ) : <div className="gd-funnel-stage-transition gd-funnel-stage-transition-final">Etapa final</div>}
+                      </div>
                     );
                   })}
                 </TooltipProvider>
-                <div className="gd-funnel-stage-endcap mt-0.5 h-2 w-12 rounded-b-md" aria-hidden="true" />
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

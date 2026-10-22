@@ -3,7 +3,7 @@ const LIVE_QUERY_PREFIXES = new Set([
   "meta-action-sync-coverage", "action-totals-by-ads",
   "insights", "insights_hourly", "daily_spend_by_account", "daily_budget_active_by_account",
   "rd_deals", "rd_crm_deals", "rd_deals_period", "rd_closed_deals", "rd_won_deals_period", "rd_funnel_stages", "rd_deal_stage_history",
-  "sales", "alerts", "social_accounts", "social_media", "social_insights_daily",
+  "sales", "expert_sales", "alerts", "social_accounts", "social_media", "social_insights_daily",
   "financial-entries", "financial-history", "kanban_boards", "kanban_board_details", "workspace-files",
 ]);
 

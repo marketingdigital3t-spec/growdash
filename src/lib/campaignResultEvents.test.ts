@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveCampaignPrimaryResult, resolveCampaignResults } from "./campaignResultEvents";
+import { resolveCampaignPrimaryResult, resolveCampaignResults, selectOfficialCampaignResult } from "./campaignResultEvents";
 
 describe("resolveCampaignResults", () => {
   it("mantém leads Meta e conversas iniciadas separados", () => {
@@ -40,24 +40,37 @@ describe("resolveCampaignResults", () => {
     expect(campaignA.total + campaignB.total).toBe(4);
   });
 
-  it("mostra o maior evento mesmo em campanha de geração de leads", () => {
+  it("prioriza o objetivo de leads mesmo quando conversas têm maior volume", () => {
     const results = resolveCampaignResults(0, { "onsite_conversion.messaging_conversation_started_7d": 4 });
-    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Conversas iniciadas", value: 4 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", { ...results, leadCount: 0 })).toEqual({ label: "Leads", value: 0 });
   });
 
-  it("mostra apenas conversas iniciadas para campanha que não é de leads", () => {
+  it("usa conversas para campanha de mensagens/engajamento", () => {
     const results = resolveCampaignResults(0, { "onsite_conversion.messaging_conversation_started_7d": 4 });
     expect(resolveCampaignPrimaryResult("OUTCOME_ENGAGEMENT", results)).toEqual({ label: "Conversas iniciadas", value: 4 });
   });
 
-  it("mantém o único evento disponível como resultado exibido", () => {
+  it("mantém o objetivo de leads mesmo sem lead registrado", () => {
     const results = resolveCampaignResults(0, { "onsite_conversion.messaging_conversation_started_7d": 18 });
-    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Conversas iniciadas", value: 18 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", { ...results, leadCount: 0 })).toEqual({ label: "Leads", value: 0 });
   });
 
-  it("prioriza conversas quando elas são o maior resultado", () => {
+  it("não troca leads por conversas quando leads é o objetivo oficial", () => {
     const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 18 });
-    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Conversas iniciadas", value: 18 });
+    // `insights.leads` é um agregado legado e não é evidência de formulário.
+    // Sem uma ação canônica de Lead Ads, o resultado oficial é zero leads.
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results)).toEqual({ label: "Leads", value: 0 });
+  });
+
+  it("aceita o resultado oficial persistido pela Meta", () => {
+    const results = resolveCampaignResults(12, { "onsite_conversion.messaging_conversation_started_7d": 18 });
+    expect(resolveCampaignPrimaryResult("OUTCOME_LEADS", results, { type: "conversations", value: 18 })).toEqual({ label: "Conversas iniciadas", value: 18 });
+  });
+
+  it("seleciona o tipo oficial compatível com objetivo, nunca o maior evento alternativo", () => {
+    expect(selectOfficialCampaignResult("OUTCOME_LEADS", null, { conversations: 18, leads: 2 })).toEqual({ type: "leads", value: 2 });
+    expect(selectOfficialCampaignResult("OUTCOME_LEADS", null, { conversations: 18 })).toBeUndefined();
+    expect(selectOfficialCampaignResult("OUTCOME_ENGAGEMENT", null, { conversations: 18, leads: 40 })).toEqual({ type: "conversations", value: 18 });
   });
 
   it("compõe formulários e conversas sem somar aliases duplicados", () => {

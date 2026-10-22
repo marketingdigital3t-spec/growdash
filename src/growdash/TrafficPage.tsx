@@ -377,7 +377,11 @@ function AIAndLeadReports({ accountId, accountIds, accounts }: { accountId: stri
       const actions = metaTraffic.data.leadBreakdownByAd[adKey];
       row.spend += Number(item.spend || 0);
       if (!seen.has(adKey)) {
-        row.leads += Number(actions?.totalLeads || 0);
+        // `leadBreakdownByAd` follows the canonical action contract and
+        // exposes `total` (forms + site + conversations). Reading the old
+        // `totalLeads` name made the campaign report show zero leads while
+        // the account KPI was populated.
+        row.leads += Number(actions?.total || 0);
         row.conversations += Number(actions?.conversations || 0);
         seen.add(adKey);
       }

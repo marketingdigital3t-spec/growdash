@@ -72,3 +72,18 @@
 3. Segmentos encostados e rails reposicionados para reproduzir a referência sem alterar o contrato de dados.
 
 final result: passed
+
+## Current pass — cards executivos do funil
+
+- Fonte: `/var/folders/h9/bngn7l491hl8tzl1w97rfpn80000gn/T/TemporaryItems/NSIRD_screencaptureui_1qTKh0/Captura de Tela 2026-10-21 às 13.42.33.png`
+- Implementação: `http://127.0.0.1:4173/analise-de-funis`
+- Estado: preview local redirecionou para `/auth`; nenhum `GROWDASH_AUTH_STATE`, `E2E_EMAIL` ou `E2E_PASSWORD` estava disponível.
+- Comparação: bloqueada antes da captura equivalente; o redesign foi validado por testes, build, lint focado, `git diff --check` e snapshots do login em desktop/tablet/mobile, mas ainda precisa de uma sessão autenticada para QA visual final do funil.
+
+### Alterações observáveis previstas
+
+- Cards responsivos em 1/2/4 colunas, com nome, leads, percentual, tempo médio, valor e barra de proporção.
+- Indicador entre etapas com percentual para a próxima etapa; sem percentual inventado quando a etapa atual é zero.
+- Verde para progresso/ganho, vermelho somente para perda e superfícies grafite/branco; tabela detalhada continua disponível pelo switch.
+
+final result: blocked

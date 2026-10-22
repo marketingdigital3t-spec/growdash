@@ -84,17 +84,29 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
   const filteredSales = useMemo(() => sales.filter((row) => row.sale_date >= reportFrom && row.sale_date <= reportTo), [sales, reportFrom, reportTo]);
   const adIds = useMemo(() => Array.from(new Set(filteredInsights.map((row) => row.ad_id).filter(Boolean))), [filteredInsights]);
   const adAccountByAdId = useMemo(() => Object.fromEntries(filteredInsights.map((row) => [row.ad_id, row.ad_account_id])), [filteredInsights]);
-  const { data: actionData } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId, {
+  const { data: actionData, isLoading: loadingActions } = useActionTotalsByAds(adIds, startDate, endDate, adAccountByAdId, {
     adAccountIds: accountId === "all" ? accounts.map((account) => account.id) : [accountId],
     attributionWindowsByAccount: Object.fromEntries(accounts.map((account) => [account.id, account.attribution_window || "account_default"])),
   });
   const metaLeadActions = actionData?.metaLeadActions;
   const conversations = metaLeadActions?.conversations || 0;
   const totals = useMemo(() => calculate(filteredInsights, filteredDeals, filteredSales, metaLeadActions), [filteredDeals, filteredInsights, filteredSales, metaLeadActions]);
-  const canonicalLeadsByDate = useMemo(() => Object.values(actionData?.dailyMetaLeadByAccount || {}).reduce((all, accountDays) => {
-    for (const [date, counts] of Object.entries(accountDays)) all[date] = (all[date] || 0) + Number(counts.total || 0);
-    return all;
-  }, {} as Record<string, number>), [actionData?.dailyMetaLeadByAccount]);
+  const canonicalLeadsByDate = useMemo(() => {
+    if (actionData) {
+      return Object.values(actionData.dailyMetaLeadByAccount || {}).reduce((all, accountDays) => {
+        for (const [date, counts] of Object.entries(accountDays)) all[date] = (all[date] || 0) + Number(counts.total || 0);
+        return all;
+      }, {} as Record<string, number>);
+    }
+    // Keep the preview coherent while the action facts are still loading.
+    // This fallback uses only canonical fields already persisted in Insights;
+    // it never reads the ambiguous legacy `insights.leads` aggregate.
+    return filteredInsights.reduce((all, row) => {
+      if (!row.date) return all;
+      all[row.date] = (all[row.date] || 0) + Number(row.form_leads || 0) + Number(row.site_leads || 0) + Number(row.conversations || 0);
+      return all;
+    }, {} as Record<string, number>);
+  }, [actionData, filteredInsights]);
   const daily = useMemo(() => dailyRows(filteredInsights, canonicalLeadsByDate), [canonicalLeadsByDate, filteredInsights]);
   const weekly = useMemo(() => weeklyRows(daily), [daily]);
   const analysisFromDate = useMemo(() => startOfMonth(subMonths(endDate, 1)), [endDate]);
@@ -160,7 +172,7 @@ export function LeadReportStudio({ accountId, accountName, accounts, onAccountCh
         <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(220px,320px)_minmax(280px,auto)_auto_auto] 2xl:ml-auto">
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(event) => upload(event.target.files?.[0])} />
           <Button variant="outline" className="h-10" onClick={() => inputRef.current?.click()}><ImageUp className="mr-2 h-4 w-4" />Banner</Button>
-          <Button className="gold-action h-10" disabled={saving || analysisLoading || audienceLoading || !selected.length || accountId === "all"} onClick={generate}><Sparkles className="mr-2 h-4 w-4" />{saving ? "Publicando…" : analysisLoading ? "Analisando 2 meses…" : audienceLoading ? "Carregando público…" : "Gerar página"}</Button>
+          <Button className="gold-action h-10" disabled={saving || loadingActions || analysisLoading || audienceLoading || !selected.length || accountId === "all"} onClick={generate}><Sparkles className="mr-2 h-4 w-4" />{saving ? "Publicando…" : loadingActions ? "Carregando leads…" : analysisLoading ? "Analisando 2 meses…" : audienceLoading ? "Carregando público…" : "Gerar página"}</Button>
         </div>
       </header>
       <div className="p-4">
@@ -321,9 +333,14 @@ function formatAnalysisMetric(id: TwoMonthAnalysis["metricComparisons"][number][
 
 function calculate(insights: InsightRow[], deals: RDDealLite[], saleRows: Sale[], metaLeadActions?: { forms: number; site: number; conversations: number; total: number }): ReportTotals {
   const spend = insights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-  const conversations = metaLeadActions?.conversations || 0;
+  const fallback = insights.reduce((total, row) => ({
+    forms: total.forms + Number(row.form_leads || 0),
+    site: total.site + Number(row.site_leads || 0),
+    conversations: total.conversations + Number(row.conversations || 0),
+  }), { forms: 0, site: 0, conversations: 0 });
+  const conversations = metaLeadActions?.conversations ?? fallback.conversations;
   // The legacy `insights.leads` aggregate is intentionally not a fallback.
-  const leads = Number(metaLeadActions?.total || 0);
+  const leads = metaLeadActions ? Number(metaLeadActions.total || 0) : fallback.forms + fallback.site + fallback.conversations;
   const impressions = insights.reduce((sum, row) => sum + Number(row.impressions || 0), 0);
   const clicks = insights.reduce((sum, row) => sum + Number(row.clicks || 0), 0);
   const reach = insights.reduce((sum, row) => sum + Number(row.reach || 0), 0);
