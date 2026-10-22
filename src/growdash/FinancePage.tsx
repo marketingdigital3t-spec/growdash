@@ -1,9 +1,9 @@
 /* New tenant tables are queried through the Supabase client before generated types are refreshed. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addMonths, differenceInCalendarDays, eachDayOfInterval, eachMonthOfInterval, endOfMonth, format, startOfMonth, startOfWeek, subMonths } from "date-fns";
-import { Building2, CircleDollarSign, CreditCard, Download, Landmark, Plus, ReceiptText, Sparkles, TrendingUp, WalletCards, ChevronDown } from "lucide-react";
+import { Building2, CircleDollarSign, CreditCard, Download, Landmark, Plus, ReceiptText, RefreshCw, Sparkles, TrendingUp, WalletCards, ChevronDown } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { businessDateKey } from "@/lib/businessDate";
@@ -26,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { TrafficInvestmentPlanner } from "@/components/finance/TrafficInvestmentPlanner";
 import { InvoicePdfStudio } from "@/components/finance/InvoicePdfStudio";
-import { calculateTrafficFundsAdded } from "@/lib/trafficFunding";
+import { buildTrafficFundingSummary, calculateTrafficFundsAdded, normalizeMetaPaymentMethod } from "@/lib/trafficFunding";
 import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -36,13 +36,16 @@ type EntryType = "revenue" | "expense";
 interface FinancialEntry {
   id: string; entry_type: EntryType; description: string; amount: number; competence_date: string;
   due_date?: string | null; paid_at?: string | null; status: string; recurrence: string; notes?: string | null;
+  source_provider?: string | null; source_external_id?: string | null; payment_method?: string | null; ad_account_id?: string | null;
   financial_categories?: { name: string } | null;
 }
 interface FinancialAccount { id: string; name: string; account_type: string; institution_name?: string | null; last_four?: string | null; balance?: number | null; status: string; last_synced_at?: string | null; }
 interface Company { id: string; name: string; legal_name?: string | null; expert_name?: string | null; status: string; }
 interface FinancialTransaction { id: string; amount: number; description: string; occurred_at: string; transaction_type: string; matched_entry_id?: string | null; }
 interface AccountBalanceEvent { ad_account_id: string; delta: number; event_at: string; }
-interface AccountFundingTransaction { ad_account_id: string; amount: number; time: string; payment_method?: string | null; status?: string | null; }
+interface AccountFundingTransaction { ad_account_id: string; amount: number; time: string; payment_method?: string | null; status?: string | null; billing_reason?: string | null; reference?: string | null; }
+
+const isMetaFundingEntry = (entry: FinancialEntry) => entry.source_provider === "meta_ads";
 
 function csvCell(value: unknown) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 
@@ -64,6 +67,7 @@ export default function FinancePage() {
   const accountFilter = adAccountIds.length === 1 ? adAccountIds[0] : undefined;
   const [entryOpen, setEntryOpen] = useState(false);
   const [includeMetaTax, setIncludeMetaTax] = useState(true);
+  const [lastFundingSyncAt, setLastFundingSyncAt] = useState<Date | null>(null);
   const [entry, setEntry] = useState({ entry_type: "expense" as EntryType, description: "", amount: "", competence_date: format(new Date(), "yyyy-MM-dd"), due_date: "", status: "pending", recurrence: "none", notes: "" });
   const twelveMonthsAgo = startOfMonth(subMonths(new Date(), 11));
   const futureMonth = endOfMonth(new Date());
@@ -110,7 +114,7 @@ export default function FinancePage() {
     enabled: accountIds.length > 0,
     queryFn: async (): Promise<AccountFundingTransaction[]> => {
       const { data, error } = await (supabase as any).from("account_transactions")
-        .select("ad_account_id,amount,time,payment_method,status")
+        .select("ad_account_id,amount,time,payment_method,status,billing_reason,reference")
         .in("ad_account_id", accountIds)
         .gte("time", `${businessDateKey(startDate)}T00:00:00`)
         .lte("time", `${businessDateKey(endDate)}T23:59:59`);
@@ -122,11 +126,37 @@ export default function FinancePage() {
     },
   });
 
+  const syncFunding = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("sync-meta-transactions", { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      setLastFundingSyncAt(new Date());
+      void queryClient.invalidateQueries({ queryKey: ["finance-pix-funding"] });
+      void queryClient.invalidateQueries({ queryKey: ["financial-entries"] });
+      void queryClient.invalidateQueries({ queryKey: ["financial-history"] });
+      void queryClient.invalidateQueries({ queryKey: ["ad_accounts"] });
+    },
+  });
+
+  const accountIdsKey = accountIds.join(",");
+  useEffect(() => {
+    if (!accountIdsKey) return;
+    void syncFunding.mutateAsync().catch(() => undefined);
+    const interval = window.setInterval(() => { void syncFunding.mutateAsync().catch(() => undefined); }, 5 * 60_000);
+    return () => window.clearInterval(interval);
+    // The account key is the only trigger: mutation identity changes on render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountIdsKey]);
+
   const { data: entries = [], isLoading: loadingEntries } = useQuery({
     queryKey: ["financial-entries", workspace?.id, businessUnitId, businessDateKey(startDate), businessDateKey(endDate)],
     enabled: !!workspace?.id,
     queryFn: async (): Promise<FinancialEntry[]> => {
-      let request = (supabase as any).from("financial_entries").select("id, entry_type, description, amount, competence_date, due_date, paid_at, status, recurrence, notes, financial_categories(name)").eq("workspace_id", workspace!.id).gte("competence_date", businessDateKey(startDate)).lte("competence_date", businessDateKey(endDate)).order("competence_date", { ascending: false });
+      let request = (supabase as any).from("financial_entries").select("id, entry_type, description, amount, competence_date, due_date, paid_at, status, recurrence, notes, source_provider, source_external_id, payment_method, ad_account_id, financial_categories(name)").eq("workspace_id", workspace!.id).gte("competence_date", businessDateKey(startDate)).lte("competence_date", businessDateKey(endDate)).order("competence_date", { ascending: false });
       if (businessUnitId) request = request.eq("business_unit_id", businessUnitId);
       const { data, error } = await request;
       if (error) {
@@ -139,7 +169,7 @@ export default function FinancePage() {
 
   const { data: historicalEntries = [] } = useQuery({
     queryKey: ["financial-history", workspace?.id, businessUnitId], enabled: !!workspace?.id,
-    queryFn: async (): Promise<FinancialEntry[]> => { let request = (supabase as any).from("financial_entries").select("id, entry_type, description, amount, competence_date, due_date, paid_at, status, recurrence, notes").eq("workspace_id", workspace!.id).gte("competence_date", format(twelveMonthsAgo, "yyyy-MM-dd")).lte("competence_date", format(futureMonth, "yyyy-MM-dd")); if (businessUnitId) request = request.eq("business_unit_id", businessUnitId); const { data, error } = await request; if (error) { if (error.code === "42P01" || /financial_entries|schema cache|does not exist/i.test(error.message)) return []; throw error; } return data ?? []; },
+    queryFn: async (): Promise<FinancialEntry[]> => { let request = (supabase as any).from("financial_entries").select("id, entry_type, description, amount, competence_date, due_date, paid_at, status, recurrence, notes, source_provider, source_external_id, payment_method, ad_account_id").eq("workspace_id", workspace!.id).gte("competence_date", format(twelveMonthsAgo, "yyyy-MM-dd")).lte("competence_date", format(futureMonth, "yyyy-MM-dd")); if (businessUnitId) request = request.eq("business_unit_id", businessUnitId); const { data, error } = await request; if (error) { if (error.code === "42P01" || /financial_entries|schema cache|does not exist/i.test(error.message)) return []; throw error; } return data ?? []; },
   });
 
   const { data: financialAccounts = [] } = useQuery({
@@ -184,8 +214,10 @@ export default function FinancePage() {
   const visibleInsights = insights.filter((item) => unitAccountIds.has(item.ad_account_id));
   const visibleSales = sales.filter((item) => !item.ad_account_id || unitAccountIds.has(item.ad_account_id));
   const spend = metaTraffic.data.spend;
+  const balance = accounts.reduce((sum, account) => sum + Number(account.remaining_balance || 0), 0);
+  const fundingSummary = buildTrafficFundingSummary(fundingTransactions, spend, balance);
   const otherRevenue = entries.filter((item) => item.entry_type === "revenue" && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0);
-  const expenses = entries.filter((item) => item.entry_type === "expense" && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0);
+  const expenses = entries.filter((item) => item.entry_type === "expense" && item.status !== "canceled" && !isMetaFundingEntry(item)).reduce((sum, item) => sum + Number(item.amount), 0);
   const totalRevenue = aggregateSales(visibleSales).totalNet + otherRevenue;
   const metaTaxRate = 0.1215;
   const adjustedSpend = spend * (includeMetaTax ? 1 + metaTaxRate : 1);
@@ -193,7 +225,6 @@ export default function FinancePage() {
   const balanceAddedTax = includeMetaTax ? balanceAdded * metaTaxRate : 0;
   const result = totalRevenue - adjustedSpend - expenses;
   const margin = totalRevenue > 0 ? result / totalRevenue : 0;
-  const balance = accounts.reduce((sum, account) => sum + Number(account.remaining_balance || 0), 0);
   const roas = adjustedSpend > 0 ? aggregateSales(visibleSales).totalNet / adjustedSpend : 0;
   const isLoading = loadingAccounts || loadingInsights || loadingSales || loadingEntries || loadingTransactions || loadingBalanceEvents || loadingFundingTransactions;
 
@@ -208,7 +239,7 @@ export default function FinancePage() {
     return { account, spend: accountSpend, balance: Number(account.remaining_balance || 0), leads: metaTraffic.data.leadBreakdownByAccount[account.id]?.totalLeads ?? 0, sales: saleTotals.totalQuantity, revenue, roas: accountSpend > 0 ? revenue / accountSpend : 0 };
   }), [accounts, funnelIds, metaTraffic.data.leadBreakdownByAccount, metaTraffic.data.spendByAccount, visibleSales]);
 
-  const monthlyHistory = useMemo(() => eachMonthOfInterval({ start: twelveMonthsAgo, end: new Date() }).map((month) => { const key = format(month, "yyyy-MM"); const revenue = aggregateSales(historicalSales.filter((sale) => (!sale.ad_account_id || unitAccountIds.has(sale.ad_account_id)) && String(sale.sale_date).startsWith(key))).totalNet + historicalEntries.filter((item) => item.entry_type === "revenue" && item.competence_date.startsWith(key) && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0); const mediaOriginal = historicalInsights.filter((item) => unitAccountIds.has(item.ad_account_id) && String(item.date).startsWith(key)).reduce((sum, item) => sum + Number(item.spend || 0), 0); const media = mediaOriginal * (includeMetaTax ? 1 + metaTaxRate : 1); const operational = historicalEntries.filter((item) => item.entry_type === "expense" && item.competence_date.startsWith(key) && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0); return { key, label: format(month, "MM/yy"), revenue, media, operational, expense: media + operational, result: revenue - media - operational }; }), [historicalEntries, historicalInsights, historicalSales, includeMetaTax, twelveMonthsAgo, unitAccountIds]);
+  const monthlyHistory = useMemo(() => eachMonthOfInterval({ start: twelveMonthsAgo, end: new Date() }).map((month) => { const key = format(month, "yyyy-MM"); const revenue = aggregateSales(historicalSales.filter((sale) => (!sale.ad_account_id || unitAccountIds.has(sale.ad_account_id)) && String(sale.sale_date).startsWith(key))).totalNet + historicalEntries.filter((item) => item.entry_type === "revenue" && item.competence_date.startsWith(key) && item.status !== "canceled").reduce((sum, item) => sum + Number(item.amount), 0); const mediaOriginal = historicalInsights.filter((item) => unitAccountIds.has(item.ad_account_id) && String(item.date).startsWith(key)).reduce((sum, item) => sum + Number(item.spend || 0), 0); const media = mediaOriginal * (includeMetaTax ? 1 + metaTaxRate : 1); const operational = historicalEntries.filter((item) => item.entry_type === "expense" && item.competence_date.startsWith(key) && item.status !== "canceled" && !isMetaFundingEntry(item)).reduce((sum, item) => sum + Number(item.amount), 0); return { key, label: format(month, "MM/yy"), revenue, media, operational, expense: media + operational, result: revenue - media - operational }; }), [historicalEntries, historicalInsights, historicalSales, includeMetaTax, twelveMonthsAgo, unitAccountIds]);
   const avgRevenue = monthlyHistory.reduce((sum, month) => sum + month.revenue, 0) / Math.max(monthlyHistory.length, 1);
   const avgExpense = monthlyHistory.reduce((sum, month) => sum + month.expense, 0) / Math.max(monthlyHistory.length, 1);
   const forecast = useMemo(() => {
@@ -281,7 +312,7 @@ export default function FinancePage() {
   ].map(({ label, months }) => { const baseRevenue = forecast.slice(0, months).reduce((sum, item) => sum + item.revenue, 0); const baseExpense = forecast.slice(0, months).reduce((sum, item) => sum + item.expense, 0); return { label, base: baseRevenue - baseExpense, revenue: baseRevenue, expense: baseExpense, optimistic: baseRevenue * 1.10 - baseExpense * 0.97, pessimistic: baseRevenue * 0.90 - baseExpense * 1.08 }; });
   const chartForecast = [...monthlyHistory.map((item) => ({ ...item, realRevenue: item.revenue, realExpense: item.expense, forecastRevenue: null, forecastExpense: null })), ...forecast.map((item) => ({ ...item, realRevenue: null, realExpense: null, forecastRevenue: item.revenue, forecastExpense: item.expense }))];
   const grossRevenue = aggregateSales(visibleSales).totalGross + otherRevenue;
-  const classifyExpense = (keywords: string[]) => entries.filter((item) => item.entry_type === "expense" && item.status !== "canceled" && keywords.some((keyword) => `${item.financial_categories?.name ?? ""} ${item.description}`.toLowerCase().includes(keyword))).reduce((sum, item) => sum + Number(item.amount), 0);
+  const classifyExpense = (keywords: string[]) => entries.filter((item) => item.entry_type === "expense" && item.status !== "canceled" && !isMetaFundingEntry(item) && keywords.some((keyword) => `${item.financial_categories?.name ?? ""} ${item.description}`.toLowerCase().includes(keyword))).reduce((sum, item) => sum + Number(item.amount), 0);
   const otherTaxes = aggregateSales(visibleSales).totalTax + classifyExpense(["imposto", "taxa", "tribut"]);
   const payroll = classifyExpense(["folha", "equipe", "salário", "salario", "freela", "prestador"]);
   const software = classifyExpense(["software", "saas", "assinatura", "ferramenta"]);
@@ -304,7 +335,7 @@ export default function FinancePage() {
 
   return (
     <div className="finance-page gd-module-shell mx-auto w-full max-w-[1920px] space-y-5">
-      <PageHeading eyebrow="Gestão" title="Financeiro" description={`DRE, caixa, previsões e mídia da unidade ${segment === "saas" ? "SaaS" : "Infoproduto"}, com dados reais e filtros globais.`} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={exportCsv} disabled={!rows.length}><Download className="mr-2 h-4 w-4" />Exportar</Button><Button onClick={() => setEntryOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo lançamento</Button></div>} />
+      <PageHeading eyebrow="Gestão" title="Financeiro" description={`DRE, caixa, previsões e mídia da unidade ${segment === "saas" ? "SaaS" : "Infoproduto"}, com dados reais e filtros globais.`} actions={<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => syncFunding.mutate()} disabled={syncFunding.isPending || !accountIds.length}><RefreshCw className={`mr-2 h-4 w-4 ${syncFunding.isPending ? "animate-spin" : ""}`} />{syncFunding.isPending ? "Sincronizando aportes…" : "Sincronizar aportes"}</Button><Button variant="outline" onClick={exportCsv} disabled={!rows.length}><Download className="mr-2 h-4 w-4" />Exportar</Button><Button onClick={() => setEntryOpen(true)}><Plus className="mr-2 h-4 w-4" />Novo lançamento</Button></div>} />
 
       <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"><span className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">Unidade ativa: {segment === "saas" ? "SaaS" : "Infoproduto"}</span><div className="flex items-center gap-3"><div className="text-right"><b className="block text-xs">Incluir imposto Meta</b><span className="text-[10px] text-muted-foreground">Simulação de 12,15%; o dado bruto permanece intacto.</span></div><Switch checked={includeMetaTax} onCheckedChange={setIncludeMetaTax} /></div></div>
 
@@ -326,12 +357,14 @@ export default function FinancePage() {
             <DreRow label="Margem líquida" value={dreMargin} percentage />
             <div className="border-t border-border bg-muted/35 p-5">
               <p className="text-[10px] font-black uppercase tracking-[.14em] text-primary">Conciliação do investimento em mídia</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <ReconciliationMetric label="Fundos adicionados nas contas" value={balanceAdded} accent />
                 <ReconciliationMetric label="Valor investido no período" value={spend} />
+                <ReconciliationMetric label="Aportes pendentes" value={fundingSummary.pendingTotal} />
+                <ReconciliationMetric label="Saldo disponível agora" value={balance} strong />
                 <ReconciliationMetric label="Imposto sobre saldo adicionado" value={balanceAddedTax} strong />
               </div>
-              <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Fundos incluem aumentos positivos de saldo e aportes pagos por PIX no período, sem duplicar a confirmação da Meta. O valor investido vem do gasto sincronizado da Meta; o imposto incide somente sobre os fundos adicionados. Saldo atual disponível: {brl.format(balance)}.</p>
+              <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">Aportes confirmados vêm das transações liquidadas da Meta e dos aumentos positivos de saldo, sem duplicidade. O valor investido vem do gasto sincronizado da Meta; pendências ficam separadas e o imposto incide somente sobre aportes confirmados. {lastFundingSyncAt ? `Última sincronização: ${lastFundingSyncAt.toLocaleTimeString("pt-BR")}.` : "Aguardando a primeira sincronização de aportes."}</p>
             </div>
           </section>
           <section className="gd-panel overflow-hidden">
@@ -348,9 +381,9 @@ export default function FinancePage() {
 
         <TabsContent value="accounts" className="space-y-4"><AccountTable rows={rows} loading={isLoading} /><section className="gd-panel p-5"><div className="flex items-center gap-3"><WalletCards className="h-5 w-5 text-primary" /><div><h2 className="font-black">Saldo e autonomia</h2><p className="text-xs text-muted-foreground">Saldo consolidado {brl.format(balance)}; valores informados por conta.</p></div></div><div className="mt-4 grid gap-3 md:grid-cols-3">{accounts.map((account) => { const daily = Number(account.daily_budget || 0); const remaining = Number(account.remaining_balance || 0); return <div key={account.id} className="rounded-xl border border-border p-4"><p className="truncate text-[10px] font-black">{account.name}</p><p className="mt-3 text-xl font-black">{brl.format(remaining)}</p><p className="text-[10px] text-muted-foreground">{daily > 0 ? `${Math.floor(remaining / daily)} dia(s) com orçamento atual` : "Orçamento diário não informado"}</p></div>; })}</div></section></TabsContent>
 
-        <TabsContent value="traffic" className="space-y-4"><TrafficInvestmentPlanner workspaceId={workspace?.id} businessUnitId={businessUnitId} accounts={accounts} /><ChartPanel title="Gasto real semanal sincronizado"><ResponsiveContainer width="100%" height={280}><BarChart data={weeklyInvestment}><CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" /><XAxis dataKey="label" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} tickFormatter={compactCurrency} /><Tooltip formatter={currencyTooltip} /><Bar dataKey="investment" name="Gasto real" fill="hsl(var(--primary))" radius={[5,5,0,0]} /></BarChart></ResponsiveContainer></ChartPanel><section className="gd-panel overflow-hidden"><PanelTitle icon={<TrendingUp />} title="Gasto real mensal" subtitle={`${includeMetaTax ? "Inclui simulação de imposto Meta de 12,15%" : "Valores originais sincronizados da Meta"}.`} /><TrafficMonthlyTable rows={monthlyHistory} /></section></TabsContent>
+        <TabsContent value="traffic" className="space-y-4"><TrafficInvestmentPlanner workspaceId={workspace?.id} businessUnitId={businessUnitId} accounts={accounts} /><section className="gd-panel overflow-hidden"><PanelTitle icon={<WalletCards />} title="Aportes e saldo da conta Meta" subtitle="Créditos confirmados, pendências e saldo disponível no período selecionado." /><FundingTable rows={fundingTransactions} accounts={accounts} /></section><ChartPanel title="Gasto real semanal sincronizado"><ResponsiveContainer width="100%" height={280}><BarChart data={weeklyInvestment}><CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" /><XAxis dataKey="label" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} tickFormatter={compactCurrency} /><Tooltip formatter={currencyTooltip} /><Bar dataKey="investment" name="Gasto real" fill="hsl(var(--primary))" radius={[5,5,0,0]} /></BarChart></ResponsiveContainer></ChartPanel><section className="gd-panel overflow-hidden"><PanelTitle icon={<TrendingUp />} title="Gasto real mensal" subtitle={`${includeMetaTax ? "Inclui simulação de imposto Meta de 12,15%" : "Valores originais sincronizados da Meta"}.`} /><TrafficMonthlyTable rows={monthlyHistory} /></section></TabsContent>
 
-        <TabsContent value="entries"><section className="gd-panel overflow-hidden"><PanelTitle icon={<Landmark />} title="Lançamentos manuais" subtitle="Receitas e despesas sem duplicar vendas ou mídia importada." /><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[800px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr>{["Data", "Descrição", "Categoria", "Tipo", "Status", "Recorrência", "Valor"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{entries.map((item) => <tr key={item.id}><td className="px-4 py-3">{format(new Date(`${item.competence_date}T12:00:00`), "dd/MM/yyyy")}</td><td className="px-4 py-3 font-bold">{item.description}</td><td className="px-4 py-3">{item.financial_categories?.name ?? "Sem categoria"}</td><td className="px-4 py-3">{item.entry_type === "revenue" ? "Receita" : "Despesa"}</td><td className="px-4 py-3">{statusLabel(item.status)}</td><td className="px-4 py-3">{item.recurrence === "monthly" ? "Mensal" : item.recurrence === "yearly" ? "Anual" : "Único"}</td><td className={`px-4 py-3 font-black ${item.entry_type === "revenue" ? "text-emerald-500" : "text-rose-500"}`}>{item.entry_type === "expense" ? "-" : "+"}{brl.format(Number(item.amount))}</td></tr>)}</tbody></table></div><div className="divide-y divide-border md:hidden">{entries.map((item) => <div key={item.id} className="p-4"><div className="flex justify-between gap-3"><div><b className="text-sm">{item.description}</b><p className="text-[10px] text-muted-foreground">{format(new Date(`${item.competence_date}T12:00:00`), "dd/MM/yyyy")} · {statusLabel(item.status)}</p></div><b className={item.entry_type === "revenue" ? "text-emerald-500" : "text-rose-500"}>{item.entry_type === "expense" ? "-" : "+"}{brl.format(Number(item.amount))}</b></div></div>)}</div>{!entries.length && !loadingEntries && <div className="p-10 text-center text-xs text-muted-foreground">Nenhum lançamento neste período. Use “Novo lançamento”.</div>}</section></TabsContent>
+        <TabsContent value="entries"><section className="gd-panel overflow-hidden"><PanelTitle icon={<Landmark />} title="Lançamentos financeiros" subtitle="Registros manuais e aportes importados automaticamente da Meta." /><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[800px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr>{["Data", "Descrição", "Categoria", "Origem", "Status", "Forma", "Valor"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{entries.map((item) => <tr key={item.id}><td className="px-4 py-3">{format(new Date(`${item.competence_date}T12:00:00`), "dd/MM/yyyy")}</td><td className="px-4 py-3 font-bold">{item.description}</td><td className="px-4 py-3">{item.financial_categories?.name ?? "Sem categoria"}</td><td className="px-4 py-3">{isMetaFundingEntry(item) ? "Meta Ads" : "Manual"}</td><td className="px-4 py-3">{statusLabel(item.status)}</td><td className="px-4 py-3">{item.payment_method ? (item.payment_method === "pix" ? "Pix" : item.payment_method === "cartao" ? "Cartão" : item.payment_method === "boleto" ? "Boleto" : item.payment_method === "saldo_pre_pago" ? "Saldo pré-pago" : "Não informada") : "—"}</td><td className={`px-4 py-3 font-black ${item.entry_type === "revenue" ? "text-emerald-500" : "text-rose-500"}`}>{item.entry_type === "expense" ? "-" : "+"}{brl.format(Number(item.amount))}</td></tr>)}</tbody></table></div><div className="divide-y divide-border md:hidden">{entries.map((item) => <div key={item.id} className="p-4"><div className="flex justify-between gap-3"><div><b className="text-sm">{item.description}</b><p className="text-[10px] text-muted-foreground">{format(new Date(`${item.competence_date}T12:00:00`), "dd/MM/yyyy")} · {isMetaFundingEntry(item) ? "Meta Ads" : "Manual"} · {statusLabel(item.status)}</p></div><b className={item.entry_type === "revenue" ? "text-emerald-500" : "text-rose-500"}>{item.entry_type === "expense" ? "-" : "+"}{brl.format(Number(item.amount))}</b></div></div>)}</div>{!entries.length && !loadingEntries && <div className="p-10 text-center text-xs text-muted-foreground">Nenhum lançamento neste período. Use “Novo lançamento”.</div>}</section></TabsContent>
 
         <TabsContent value="invoices"><InvoicePdfStudio companies={companies} sales={visibleSales} workspaceId={workspace?.id} userId={user?.id} /></TabsContent>
 
@@ -371,6 +404,7 @@ function ReconciliationMetric({ label, value, accent, strong }: { label: string;
 function AccountTable({ rows, loading }: { rows: any[]; loading: boolean }) { return <section className="gd-panel overflow-hidden"><PanelTitle icon={<TrendingUp />} title="Mídia x faturamento líquido" subtitle="Cruzamento por conta de anúncio." /><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[850px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr>{["Conta", "Plataforma", "Investimento", "Leads", "Vendas", "Faturamento líquido", "ROAS"].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody className="divide-y divide-border">{rows.map((row) => <tr key={row.account.id}><td className="px-4 py-4 font-black">{row.account.name}</td><td className="px-4 py-4">Meta Ads</td><td className="px-4 py-4">{brl.format(row.spend)}</td><td className="px-4 py-4">{row.leads}</td><td className="px-4 py-4">{row.sales}</td><td className="px-4 py-4 font-black">{brl.format(row.revenue)}</td><td className="px-4 py-4 font-black text-emerald-500">{row.roas.toFixed(2)}x</td></tr>)}</tbody></table></div><div className="divide-y divide-border md:hidden">{rows.map((row) => <div key={row.account.id} className="p-4"><b className="text-sm">{row.account.name}</b><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><span>Investimento <b className="block">{brl.format(row.spend)}</b></span><span>Faturamento líquido <b className="block">{brl.format(row.revenue)}</b></span><span>Leads <b className="block">{row.leads}</b></span><span>ROAS <b className="block text-emerald-500">{row.roas.toFixed(2)}x</b></span></div></div>)}</div>{!loading && !rows.length && <div className="p-10 text-center text-xs text-muted-foreground">Nenhuma conta conectada para esta unidade.</div>}</section>; }
 function MonthlyTable({ rows }: { rows: { label: string; revenue: number; expense: number; result: number }[] }) { const [collapsed, setCollapsed] = useState(false); return <section className="gd-panel overflow-hidden"><header className="flex items-center justify-between border-b border-border px-4 py-2.5"><div><h3 className="text-xs font-black">Detalhamento mensal</h3><p className="text-[10px] text-muted-foreground">Entradas, saídas e resultado</p></div><Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => setCollapsed((value) => !value)} aria-expanded={!collapsed}>{collapsed ? "Expandir" : "Minimizar"}<ChevronDown className={`ml-1 h-3.5 w-3.5 transition-transform ${collapsed ? "-rotate-90" : ""}`} /></Button></header>{!collapsed && <div className="max-h-[260px] overflow-auto"><table className="w-full min-w-[620px] text-left text-[11px]"><thead className="sticky top-0 bg-muted/95 text-[10px] text-muted-foreground"><tr><th className="px-3 py-2">Mês</th><th className="px-3 py-2">Entradas</th><th className="px-3 py-2">Saídas</th><th className="px-3 py-2">Resultado</th><th className="px-3 py-2">Margem</th></tr></thead><tbody className="divide-y divide-border">{rows.map((row) => <tr key={row.label}><td className="px-3 py-2 font-black">{row.label}</td><td className="px-3 py-2 text-emerald-500">{brl.format(row.revenue)}</td><td className="px-3 py-2 text-rose-500">{brl.format(row.expense)}</td><td className={`px-3 py-2 font-black ${row.result < 0 ? "text-rose-500" : "text-emerald-500"}`}>{brl.format(row.result)}</td><td className="px-3 py-2">{row.revenue > 0 ? pct.format(row.result / row.revenue) : "—"}</td></tr>)}</tbody></table></div>}</section>; }
 function CashMovementTable({ movements }: { movements: Array<{ id: string; date: string; description: string; amount: number; type: "in" | "out"; source: string }> }) { return <div className="max-h-[380px] overflow-y-auto divide-y divide-border">{movements.slice().sort((a, b) => b.date.localeCompare(a.date)).map((item) => <div key={item.id} className="flex items-center justify-between gap-3 px-5 py-3"><div className="min-w-0"><b className="block truncate text-xs">{item.description}</b><p className="mt-0.5 text-[10px] text-muted-foreground">{format(new Date(`${item.date.slice(0, 10)}T12:00:00`), "dd/MM/yyyy")} · {item.source}</p></div><b className={`shrink-0 text-xs ${item.type === "in" ? "text-emerald-500" : "text-rose-500"}`}>{item.type === "in" ? "+" : "−"}{brl.format(item.amount)}</b></div>)}{!movements.length && <div className="p-10 text-center text-xs text-muted-foreground">Nenhuma movimentação realizada no período selecionado.</div>}</div>; }
+function FundingTable({ rows, accounts }: { rows: AccountFundingTransaction[]; accounts: Array<{ id: string; name: string }> }) { const names = new Map(accounts.map((account) => [account.id, account.name])); return <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Conta</th><th className="px-4 py-3">Forma</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Valor</th></tr></thead><tbody className="divide-y divide-border">{rows.slice().sort((a, b) => b.time.localeCompare(a.time)).map((row, index) => { const method = normalizeMetaPaymentMethod(row.payment_method); const pending = /pending|pendente|processing|open|await/i.test(row.status ?? ""); return <tr key={`${row.ad_account_id}-${row.time}-${row.reference ?? index}`}><td className="px-4 py-3">{new Date(row.time).toLocaleString("pt-BR")}</td><td className="px-4 py-3 font-bold">{names.get(row.ad_account_id) ?? "Conta Meta"}</td><td className="px-4 py-3">{method === "pix" ? "Pix" : method === "cartao" ? "Cartão" : method === "boleto" ? "Boleto" : method === "saldo_pre_pago" ? "Saldo pré-pago" : "Não informada"}</td><td className={`px-4 py-3 font-semibold ${pending ? "text-amber-500" : "text-emerald-500"}`}>{pending ? "Pendente" : row.status || "Confirmado"}</td><td className="px-4 py-3 text-right font-black">{brl.format(Number(row.amount || 0))}</td></tr>; })}</tbody></table>{!rows.length && <div className="p-8 text-center text-xs text-muted-foreground">Nenhum aporte ou pendência retornado pela Meta neste período.</div>}</div>; }
 function TrafficMonthlyTable({ rows }: { rows: Array<{ label: string; media: number; operational: number }> }) { return <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead className="bg-muted/60 text-[10px] text-muted-foreground"><tr><th className="px-4 py-3">Mês</th><th className="px-4 py-3">Tráfego</th><th className="px-4 py-3">Outras despesas</th><th className="px-4 py-3">Saída total</th></tr></thead><tbody className="divide-y divide-border">{rows.map((row) => <tr key={row.label}><td className="px-4 py-3 font-black">{row.label}</td><td className="px-4 py-3 text-primary">{brl.format(row.media)}</td><td className="px-4 py-3">{brl.format(row.operational)}</td><td className="px-4 py-3 font-black text-rose-500">{brl.format(row.media + row.operational)}</td></tr>)}</tbody></table></div>; }
 function ChartPanel({ title, children }: { title: string; children: React.ReactNode }) { return <section className="gd-panel p-4 sm:p-5"><h2 className="mb-5 font-black">{title}</h2><div className="min-w-0">{children}</div></section>; }
 function trendSlope(values: number[]) { if (values.length < 2) return 0; const n = values.length; const xMean = (n - 1) / 2; const yMean = values.reduce((sum, value) => sum + value, 0) / n; const numerator = values.reduce((sum, value, index) => sum + (index - xMean) * (value - yMean), 0); const denominator = values.reduce((sum, _value, index) => sum + (index - xMean) ** 2, 0); return denominator ? numerator / denominator : 0; }

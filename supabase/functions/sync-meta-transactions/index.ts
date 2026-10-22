@@ -10,13 +10,20 @@ const MAX_TRANSACTION_PAGES = 100;
 function mapPaymentMethod(option?: string | null): string | null {
   if (!option) return null;
   const o = String(option).toLowerCase();
+  if (o.includes("pix")) return "pix";
+  if (o.includes("boleto")) return "boleto";
   if (o.includes("prepay") || o.includes("pre_pay") || o.includes("pre-pay") || o.includes("prepaid") || o.includes("funding"))
-    return "Saldo pré-pago";
-  if (o.includes("manual") || o.includes("pix") || o.includes("boleto") || o.includes("bank"))
-    return "Pagamento manual";
+    return "saldo_pre_pago";
   if (o.includes("auto") || o.includes("card") || o.includes("credit") || o.includes("debit"))
-    return "Cartão";
-  return option;
+    return "cartao";
+  return "nao_informado";
+}
+
+function isConfirmedStatus(status?: string | null) {
+  if (!status) return true;
+  const normalized = status.trim().toLowerCase();
+  return ["paid", "success", "successful", "completed", "com_fundos", "with_funds"]
+    .some((value) => normalized === value || normalized.includes(value));
 }
 
 function parseAmount(amountObj: any): number {
@@ -126,7 +133,7 @@ Deno.serve(async (req) => {
       isMaster = master === true;
     }
 
-    let q = admin.from("ad_accounts").select("id, account_id, name, access_token, user_id, workspace_id");
+    let q = admin.from("ad_accounts").select("id, account_id, name, access_token, user_id, workspace_id, business_unit_id, timezone_name");
     if (onlyAccountId) q = q.eq("id", onlyAccountId);
     else if (!isService && userId && !isMaster) {
       const safeDelegatedIds = Array.from(delegatedIds).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
@@ -207,6 +214,44 @@ Deno.serve(async (req) => {
             errors.push(`${acc.name}: ${error.message}`);
           } else {
             totalUpserted += slice.length;
+          }
+        }
+
+        // Only settled credits enter the DRE. Pending or failed Meta records
+        // stay in account_transactions so Finance can show them separately.
+        if (acc.workspace_id) {
+          const { data: category, error: categoryError } = await admin
+            .from("financial_categories")
+            .upsert({ workspace_id: acc.workspace_id, name: "Tráfego pago", entry_type: "expense", color: "#d5a62a" }, { onConflict: "workspace_id,name,entry_type" })
+            .select("id")
+            .single();
+          if (categoryError) {
+            errors.push(`${acc.name}: categoria financeira não disponível: ${categoryError.message}`);
+          } else {
+            const confirmedRows = rows.filter((row: any) => Number(row.amount) > 0 && isConfirmedStatus(row.status));
+            for (const row of confirmedRows) {
+              const competenceDate = new Date(row.time).toLocaleDateString("en-CA", { timeZone: acc.timezone_name || "America/Sao_Paulo" });
+              const { error: entryError } = await admin.from("financial_entries").upsert({
+                workspace_id: acc.workspace_id,
+                business_unit_id: acc.business_unit_id || null,
+                user_id: acc.user_id,
+                category_id: category.id,
+                entry_type: "expense",
+                description: `Aporte Meta Ads · ${acc.name}`,
+                amount: Number(row.amount),
+                competence_date: competenceDate,
+                due_date: null,
+                paid_at: competenceDate,
+                status: "paid",
+                recurrence: "none",
+                notes: `Importado automaticamente da Meta. Transação ${row.id}.`,
+                source_provider: "meta_ads",
+                source_external_id: row.id,
+                payment_method: row.payment_method,
+                ad_account_id: acc.id,
+              }, { onConflict: "workspace_id,source_provider,source_external_id" });
+              if (entryError) errors.push(`${acc.name}: lançamento ${row.id}: ${entryError.message}`);
+            }
           }
         }
         perAccount[acc.name] = rows.length;
