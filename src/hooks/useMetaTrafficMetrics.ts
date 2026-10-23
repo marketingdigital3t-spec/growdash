@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
@@ -10,6 +10,7 @@ import { parseBusinessDate } from "@/lib/businessDate";
 import { metaMetricContract, type MetaMetricContract } from "@/lib/analyticsContract";
 import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
+import { resolveMetaSnapshotDuringRefresh } from "@/lib/metaSnapshot";
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; metrics: MetaMetricContract; isLoading: boolean; insightsLoading: boolean; actionsLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
@@ -133,7 +134,7 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
       ? `Insights sem sincronização confirmada para: ${syncCoverage.data.insightGaps.map(({ account }) => account.name).join(", ")}.`
       : !insightCoverageComplete ? "Cobertura de Insights ainda não confirmada para todas as contas selecionadas." : null;
   const coverageReason = [insightCoverageReason, actionCoverageReason].filter(Boolean).join(" ") || null;
-  const data = useMemo(() => {
+  const computedData = useMemo(() => {
     const base = aggregateMetaTrafficMetrics(rows, {
       ...actions.data,
       // Persisted canonical lead actions from this exact account/date scope
@@ -145,6 +146,34 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     }, syncedAt, errors, Date.now(), { attributionWindow, timezone: scope.timezone || scopedAccounts[0]?.timezone_name || null, scopeConfirmed: effectiveInsightScopeConfirmed, coverageReason });
     return isLoading ? { ...base, status: "syncing" as const } : base;
   }, [actionCoverageReason, actions.data, actions.error, actions.isError, actions.isLoading, attributionWindow, breakdowns.data, coverageComplete, coverageReason, effectiveInsightScopeConfirmed, errors, isLoading, rows, scope.timezone, scopedAccounts, syncedAt]);
+  const snapshotScopeKey = useMemo(() => JSON.stringify({
+    accounts: effectiveAccountIds.slice().sort(),
+    campaigns: (scope.campaignIds || []).slice().sort(),
+    startDate: scope.startDate,
+    endDate: scope.endDate,
+    attributionWindow,
+    timezone: scope.timezone || null,
+  }), [attributionWindow, effectiveAccountIds, scope.campaignIds, scope.endDate, scope.startDate, scope.timezone]);
+  const lastConfirmedSnapshot = useRef<{ scopeKey: string; data: MetaTrafficMetrics } | null>(null);
+  const previousSnapshot = lastConfirmedSnapshot.current;
+  const snapshotResolution = resolveMetaSnapshotDuringRefresh({
+    current: computedData,
+    previous: previousSnapshot?.scopeKey === snapshotScopeKey ? previousSnapshot.data : undefined,
+    isRefreshing: isLoading,
+    sameScope: previousSnapshot?.scopeKey === snapshotScopeKey,
+    previousUsable: Boolean(previousSnapshot?.data.available || previousSnapshot?.data.metricAvailability.spend?.available),
+  });
+  const data = snapshotResolution.preserved
+    ? { ...snapshotResolution.value, status: "stale" as const }
+    : computedData;
+  useEffect(() => {
+    if (computedData.available || computedData.metricAvailability.spend?.available) {
+      lastConfirmedSnapshot.current = { scopeKey: snapshotScopeKey, data: computedData };
+    } else if (lastConfirmedSnapshot.current?.scopeKey !== snapshotScopeKey) {
+      lastConfirmedSnapshot.current = null;
+    }
+  }, [computedData, snapshotScopeKey]);
   const metrics = useMemo(() => metaMetricContract(data), [data]);
-  return { data, metrics, isLoading, insightsLoading: insights.isPending || accounts.isPending, actionsLoading: actions.isPending || syncCoverage.isPending, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError || syncCoverage.isError), error: insights.error || actions.error || accounts.error || breakdowns.error || syncCoverage.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); await syncCoverage.refetch(); } };
+  const snapshotPreserved = snapshotResolution.preserved;
+  return { data, metrics, isLoading: isLoading && !snapshotPreserved, insightsLoading: (insights.isPending || accounts.isPending) && !snapshotPreserved, actionsLoading: (actions.isPending || syncCoverage.isPending) && !snapshotPreserved, isError: Boolean(insights.isError || actions.isError || accounts.isError || breakdowns.isError || syncCoverage.isError), error: insights.error || actions.error || accounts.error || breakdowns.error || syncCoverage.error, refetch: async () => { await insights.refetch(); await actions.refetch(); await accounts.refetch(); await breakdowns.refetch(); await syncCoverage.refetch(); } };
 }
