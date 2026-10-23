@@ -1100,6 +1100,9 @@ export default function Campaigns() {
   const showColumn = (key: CampaignColumnKey) => ["check", "name", "delivery"].includes(key) || visibleColumns.has(key);
   const availableColumnFilters = useMemo(() => CAMPAIGN_COLUMN_FILTERS.filter((item) => !item.column || visibleColumns.has(item.column)), [visibleColumns]);
   const activeColumnFilterCount = Object.values(columnFilters).filter((value) => value.trim()).length;
+  const campaignCountLabel = dataUpdatedAt > 0
+    ? `Campanhas (${filtered.length})`
+    : (isLoading || isFetching ? "Campanhas (carregando…)" : "Campanhas");
   const cellW = (k: CampColKey) => ({ width: camp.colWidths[k], minWidth: camp.colWidths[k], maxWidth: camp.colWidths[k] });
   const adsetCellW = (k: AdsetColKey) => ({ width: adset.colWidths[k], minWidth: adset.colWidths[k], maxWidth: adset.colWidths[k] });
   const adCellW = (k: AdColKey) => ({ width: ad.colWidths[k], minWidth: ad.colWidths[k], maxWidth: ad.colWidths[k] });
@@ -1180,7 +1183,7 @@ export default function Campaigns() {
           <div className="campaign-tabs-header growdash-scrollbar-hidden flex min-w-0 items-center overflow-hidden border-b border-border bg-card dark:border-[#2a271f] dark:bg-[#070706]">
             <TabsList className="campaign-tabs-list h-auto w-full min-w-0 shrink justify-start rounded-xl bg-transparent p-1">
               <TabsTrigger value="campaigns" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
-                <FolderKanban className="h-3.5 w-3.5" /> Campanhas ({filtered.length})
+                <FolderKanban className="h-3.5 w-3.5" /> {campaignCountLabel}
               </TabsTrigger>
               <TabsTrigger value="adsets" className="campaign-hierarchy-tab h-10 min-w-0 flex-1 justify-start gap-2 rounded-lg px-3 text-xs">
                 <Layers3 className="h-3.5 w-3.5" /> Conjuntos de anúncios ({selectedAdsets.length})
