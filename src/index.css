@@ -14626,6 +14626,18 @@ html:not(.dark) .brand-shell :is(.gd-metric-card, .gd-panel, .dashboard-glass-ca
   box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
 }
 
+/* The finance tabs also inherit a legacy light-blue active utility from the
+   shared Radix/Tailwind primitive. The semantic hook and higher-specificity
+   selector keep DRE and the other finance views emerald in both themes. */
+html.dark body .brand-shell .finance-page .finance-tab[role="tab"][data-state="active"],
+html:not(.dark) body .brand-shell .finance-page .finance-tab[role="tab"][data-state="active"] {
+  border-color: var(--gd-accent) !important;
+  background: var(--gd-accent) !important;
+  background-image: none !important;
+  color: #062015 !important;
+  box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
+}
+
 /* Platform-wide emerald accent normalization. Legacy lime/green utility
    classes are presentation aliases only; semantic red and amber states stay
    untouched. */
