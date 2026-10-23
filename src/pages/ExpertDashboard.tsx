@@ -172,15 +172,6 @@ export default function ExpertDashboard() {
               ["Lucro", "profit"], ["Margem", "profit_margin"], ["Taxa de conversão", "conversion_rate"],
             ].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
             </div>
-            <div className="expert-secondary-kpi-section">
-              <div className="dashboard-section-heading expert-secondary-kpi-heading">
-                <div><p className="dashboard-section-eyebrow">Indicadores complementares</p><h3>Recebíveis e aquisição</h3></div>
-                <p className="dashboard-section-description">Detalhes para leitura financeira e de mídia.</p>
-              </div>
-              <div className="expert-secondary-kpi-grid grid">
-                {[["Recebíveis", "receivables"], ["CTR", "ctr"]].map(([title, metric]) => <DashboardWidgetHelp key={metric} type="kpi" title={title} className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/70"><KPIWidget title={title} config={{ metric: metric as any }} /></DashboardWidgetHelp>)}
-              </div>
-            </div>
           </section>
         </MotionItem>
 
