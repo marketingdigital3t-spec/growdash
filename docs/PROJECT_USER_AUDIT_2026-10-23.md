@@ -1,7 +1,7 @@
 # Growdash — auditoria de problemas percebidos pelo usuário
 
 Data: 2026-10-23 (America/Sao_Paulo). Escopo: front-end, fluxos autenticados, contratos de métricas, integrações visíveis e confiabilidade de carregamento.
-Status: correções front-end aplicadas localmente; banco, integrações externas e produção não foram alterados/verificados.
+Status: correção do refetch Meta durante troca de tema aplicada localmente; validação automatizada concluída; publicação autenticada ainda pendente nesta rodada.
 
 ## Resumo executivo
 
@@ -91,6 +91,15 @@ Produção responde HTTP 200 e tem headers de segurança, mas não foi possível
 - Campanhas exibe skeleton enquanto a consulta ou o catálogo de contas ainda está pendente; “0 campanhas” só aparece após resposta concluída.
 - Testes novos: `metricAvailability`, `pagination` e `campaignLoading`; a suíte completa passou com 124 arquivos e 572 testes.
 
+### Continuação — 2026-10-23
+
+- `src/lib/metaSnapshot.ts` centraliza a decisão de preservar um snapshot confirmado durante um refetch do mesmo escopo.
+- `src/hooks/useMetaTrafficMetrics.ts` agora guarda o último snapshot confirmado por conta/campanha/período/janela/timezone; durante refetch ele expõe esse snapshot como `stale`, mantém `isLoading` falso para os consumidores e não converte Leads/CPL/conversão em “Aguardando sincronização”. Primeiro carregamento e escopo diferente continuam sem reutilização.
+- Regressão adicionada em `src/lib/metaSnapshot.test.ts`: snapshot existente + refetch, ausência de snapshot e escopo diferente.
+- Suíte atual: 125 arquivos / 576 testes aprovados; TypeScript e lint direcionado aprovados; lint completo terminou com 0 erros e 21 avisos preexistentes de Fast Refresh.
+- Build atual aprovado; chunks maiores: 1,82 MB, 1,02 MB, 684 KB, 662 KB e 621 KB. O split existente mantém Charts/Layout/Supabase separados. Tentativa de separar Excalidraw/Three aumentou um chunk para 4,83 MB e foi revertida; não há fronteira segura adicional sem refatoração da rota Quadro/3D.
+- Testes visuais públicos reexecutados com servidor aquecido: 6 passaram e 3 foram pulados por falta de credenciais autenticadas. A primeira execução fria teve 8 timeouts durante a compilação inicial do Vite; isso não foi classificado como regressão do front-end.
+
 ## Evidência por rota
 
 1. `/` — carregou, mas apresentou a divergência de KPIs descrita em UX-001.
@@ -114,7 +123,7 @@ Produção responde HTTP 200 e tem headers de segurança, mas não foi possível
 - UX-003 não foi atribuído ao CSS; só a perda de disponibilidade durante o rerender foi reproduzida.
 - Correções locais aplicadas: disponibilidade financeira, preservação/copy de snapshot RD, escopo e paginação da Saúde dos Dados, loading de Campanhas e testes puros de regressão.
 - Performance: build continua alertando chunks acima de 500 KB; não foi feita refatoração especulativa sem uma fronteira de import segura.
-- Ainda pendente: validação visual autenticada em claro/escuro, paridade real Meta/RD e publicação/manifesto de produção.
+- Ainda pendente: nova validação visual autenticada em claro/escuro após este commit, paridade real Meta/RD e publicação/manifesto de produção.
 
 ## Prompt de correção recomendado
 
