@@ -15110,3 +15110,27 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   background: hsl(var(--muted)) !important;
   color: hsl(var(--foreground)) !important;
 }
+
+/* Final Finance tabs authority: the broad platform button contract is loaded
+   after the historical finance rules, so keep this page's inactive tabs on a
+   graphite surface and the selected tab emerald at the final cascade layer. */
+.brand-shell .growdash-main .finance-page .finance-tab[role="tab"]:not([data-state="active"]) {
+  background: var(--gd-content-panel) !important;
+  background-image: none !important;
+  border-color: var(--gd-content-border) !important;
+  color: var(--gd-content-muted) !important;
+  box-shadow: none !important;
+}
+.brand-shell .growdash-main .finance-page .finance-tab[role="tab"]:not([data-state="active"]):hover,
+.brand-shell .growdash-main .finance-page .finance-tab[role="tab"]:not([data-state="active"]):focus-visible {
+  background: color-mix(in srgb, var(--gd-accent) 10%, var(--gd-content-panel)) !important;
+  border-color: var(--gd-accent-border) !important;
+  color: var(--gd-content-text) !important;
+}
+.brand-shell .growdash-main .finance-page .finance-tab[role="tab"][data-state="active"] {
+  background: var(--gd-accent) !important;
+  background-image: none !important;
+  border-color: var(--gd-accent) !important;
+  color: #062015 !important;
+  box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
+}

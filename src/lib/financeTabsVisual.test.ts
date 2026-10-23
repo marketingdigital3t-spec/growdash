@@ -16,5 +16,6 @@ describe("Finance tabs visual contract", () => {
     expect(stylesheet).toContain('.brand-shell .finance-page [role="tablist"]');
     expect(stylesheet).toContain("background: var(--gd-content-panel) !important;");
     expect(stylesheet).toContain("color: var(--gd-content-muted) !important;");
+    expect(stylesheet).toContain('.brand-shell .growdash-main .finance-page .finance-tab[role="tab"]');
   });
 });
