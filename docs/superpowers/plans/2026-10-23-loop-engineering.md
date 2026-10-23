@@ -127,10 +127,10 @@
 - Modify: `docs/superpowers/plans/2026-10-23-loop-engineering.md` marcando tarefas concluídas.
 - Create: `reports/loop-engineering-final.json` apenas como artefato local não versionado, se necessário.
 
-- [ ] Executar teste unitário completo: `npm test`.
-- [ ] Executar lint e build: `npm run lint`, `npm run build`.
-- [ ] Executar `node scripts/loop-engineering.mjs --mode detect` e `git diff --check`.
-- [ ] Validar smoke visual público e, se `GROWDASH_AUTH_STATE` existir, rotas autenticadas.
-- [ ] Conferir `git status`, `git fetch origin`, divergência com `origin/main` e deployment Cloudflare antes do commit.
-- [ ] Criar commit isolado, fazer push, publicar build validado e confirmar domínio/manifesto/rotas no navegador.
-- [ ] Registrar no relatório final o que foi implementado, testado, publicado, verificado e o que depende de credenciais/ambiente externo.
+- [x] Executar teste unitário completo: `npm test` — 137 arquivos / 600 testes aprovados.
+- [x] Executar lint e build: `npm run lint`, `npm run build` — 0 erros, 20 avisos preexistentes; build aprovado com alerta de chunks grandes.
+- [x] Executar `node scripts/loop-engineering.mjs --mode detect` e `git diff --check` — relatório `detected`, 0 achados.
+- [x] Validar smoke visual público e sessão autenticada disponível — `/crm`, `/painel-expert`, `/campanhas`, `/agenda-turmas` e `/saude-dos-dados` abriram sem logs de console; Campanhas saiu de “carregando…” para 48 registros.
+- [x] Conferir `git status`, `git fetch origin`, divergência com `origin/main` e deployment Cloudflare antes do commit — branch alinhada antes do push; deployment final conferido pelo domínio.
+- [x] Criar commit isolado, fazer push, publicar build validado e confirmar domínio/manifesto/rotas no navegador — commit `48cf617`, deployment `917742cd.growdash.pages.dev`, domínio principal serviu os mesmos assets.
+- [x] Registrar no relatório final o que foi implementado, testado, publicado, verificado e o que depende de credenciais/ambiente externo.
