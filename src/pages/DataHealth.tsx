@@ -21,6 +21,7 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
 import { shouldFetchNextPage } from "@/lib/pagination";
 import { businessDateKey } from "@/lib/businessDate";
+import { dataHealthScopeKey, resolveDataHealthState, throwOnQueryError } from "@/lib/dataHealth";
 
 interface HealthData {
   orphanSales: number;
@@ -42,11 +43,12 @@ function formatSafeDate(value: string | Date | null | undefined, pattern: string
 function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate }: { workspaceId?: string; adAccountId: string; adAccountIds: string[]; startDate: Date; endDate: Date }) {
   const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
   return useQuery({
-    queryKey: ["data-health", workspaceId ?? null, scopedAccountIds.slice().sort().join(","), businessDateKey(startDate), businessDateKey(endDate)],
+    queryKey: ["data-health", dataHealthScopeKey({ workspaceId, adAccountIds: scopedAccountIds, startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) })],
     queryFn: async (): Promise<HealthData> => {
       let linkedFunnelIds: string[] = [];
       if (scopedAccountIds.length) {
-        const { data: funnels } = await supabase.from("rd_funnels").select("id").in("ad_account_id", scopedAccountIds);
+        const { data: funnels, error } = await supabase.from("rd_funnels").select("id").in("ad_account_id", scopedAccountIds);
+        throwOnQueryError(error, "rd_funnels");
         linkedFunnelIds = (funnels ?? []).map((funnel: any) => String(funnel.id)).filter(Boolean);
       }
       const rdScopeFilters = scopedAccountIds.length
@@ -57,10 +59,13 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
         .from("sales")
         .select("rd_deal_id")
         .eq("status", "confirmed")
-        .not("rd_deal_id", "is", null);
+        .not("rd_deal_id", "is", null)
+        .gte("sale_date", businessDateKey(startDate))
+        .lte("sale_date", businessDateKey(endDate));
       if (rdScopeFilters.length > 1) salesQuery = salesQuery.or(rdScopeFilters.join(","));
       else if (scopedAccountIds.length) salesQuery = salesQuery.in("ad_account_id", scopedAccountIds);
-      const { data: sales } = await salesQuery;
+      const { data: sales, error: salesError } = await salesQuery;
+      throwOnQueryError(salesError, "sales");
       const dealIds = (sales || []).map((s: any) => s.rd_deal_id).filter(Boolean);
       let orphanSales = 0;
       if (dealIds.length > 0) {
@@ -71,7 +76,8 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
           let rdQuery = supabase.from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
           if (rdScopeFilters.length > 1) rdQuery = rdQuery.or(rdScopeFilters.join(","));
           else if (scopedAccountIds.length) rdQuery = rdQuery.in("ad_account_id", scopedAccountIds);
-          const { data: rd } = await rdQuery;
+          const { data: rd, error: rdError } = await rdQuery;
+          throwOnQueryError(rdError, "rd_deals por vínculo");
           for (const r of (rd || []) as any[]) matched.add(r.rd_deal_id);
         }
         orphanSales = dealIds.filter((id) => !matched.has(id)).length;
@@ -87,8 +93,10 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
         missingQuery = missingQuery.in("ad_account_id", scopedAccountIds);
         totalQuery = totalQuery.in("ad_account_id", scopedAccountIds);
       }
-      const { count: missing } = await missingQuery;
-      const { count: total } = await totalQuery;
+      const { count: missing, error: missingError } = await missingQuery;
+      throwOnQueryError(missingError, "rd_deals sem estado");
+      const { count: total, error: totalError } = await totalQuery;
+      throwOnQueryError(totalError, "rd_deals total");
 
       // Days with spend > 0 but no leads in the selected calendar scope.
       const since = businessDateKey(startDate);
@@ -99,7 +107,8 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
         .lte("date", businessDateKey(endDate))
         .gt("spend", 0);
       if (scopedAccountIds.length) insightsQuery = insightsQuery.in("ad_account_id", scopedAccountIds);
-      const { data: ins } = await insightsQuery;
+      const { data: ins, error: insightsError } = await insightsQuery;
+      throwOnQueryError(insightsError, "insights");
       const byDate = new Map<string, { spend: number; leads: number }>();
       for (const r of (ins || []) as any[]) {
         const cur = byDate.get(r.date) || { spend: 0, leads: 0 };
@@ -116,23 +125,27 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
         .eq("connection_status", "connected");
       if (workspaceId) accountsQuery = accountsQuery.eq("workspace_id", workspaceId);
       if (scopedAccountIds.length) accountsQuery = accountsQuery.in("id", scopedAccountIds);
-      const { data: accounts } = await accountsQuery;
+      const { data: accounts, error: accountsError } = await accountsQuery;
+      throwOnQueryError(accountsError, "ad_accounts");
       let oauthQuery = supabase
         .from("integrations")
         .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
         .order("updated_at", { ascending: false });
       if (workspaceId) oauthQuery = oauthQuery.eq("workspace_id", workspaceId);
-      const { data: oauthIntegrations } = await oauthQuery;
+      const { data: oauthIntegrations, error: oauthError } = await oauthQuery;
+      throwOnQueryError(oauthError, "integrations");
       let lpQuery = supabase.from("account_lp_config").select("ad_account_id, action_type");
       if (scopedAccountIds.length) lpQuery = lpQuery.in("ad_account_id", scopedAccountIds);
-      const { data: lpRows } = await lpQuery;
+      const { data: lpRows, error: lpError } = await lpQuery;
+      throwOnQueryError(lpError, "account_lp_config");
       let rdAuditQuery = (supabase as any)
         .from("rd_metric_reconciliation_audits")
         .select("id, funnel_id, status, rd_won_count, linked_sale_count, missing_sale_count, checked_at")
         .order("checked_at", { ascending: false })
         .limit(100);
       if (scopedAccountIds.length) rdAuditQuery = rdAuditQuery.in("account_id", scopedAccountIds);
-      const { data: rdMetricAudits } = await rdAuditQuery;
+      const { data: rdMetricAudits, error: rdAuditError } = await rdAuditQuery;
+      throwOnQueryError(rdAuditError, "rd_metric_reconciliation_audits");
       const lpMap = new Map((lpRows || []).map((r: any) => [r.ad_account_id, r.action_type]));
       const accountsMissingLpConfig = (accounts || [])
         .filter((a: any) => !lpMap.get(a.id))
@@ -152,15 +165,19 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
   });
 }
 
-function useOperationalAudit(adAccountId: string, startDate: Date, endDate: Date) {
+function useOperationalAudit(adAccountId: string, adAccountIds: string[], startDate: Date, endDate: Date) {
+  const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
   return useQuery({
-    queryKey: ["rd-operational-audit", adAccountId, startDate.toISOString(), endDate.toISOString()],
+    queryKey: ["rd-operational-audit", dataHealthScopeKey({ adAccountIds: scopedAccountIds, startDate: startDate.toISOString(), endDate: endDate.toISOString() })],
     queryFn: async () => {
       const pageSize = 1000;
       let rows: any[] = [];
       for (let page = 0; ; page += 1) {
         let query = supabase.from("rd_deals").select("rd_deal_id,rd_connection_id,rd_funnel_id,ad_account_id,win,rd_stage_name,lead_created_at,closed_at,stage_updated_at");
-        if (adAccountId !== "all") query = query.eq("ad_account_id", adAccountId);
+        if (scopedAccountIds.length) query = query.in("ad_account_id", scopedAccountIds);
+        const start = startDate.toISOString();
+        const end = endDate.toISOString();
+        query = query.or(`and(closed_at.gte.${start},closed_at.lte.${end}),and(stage_updated_at.gte.${start},stage_updated_at.lte.${end})`);
         const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
         if (error) throw error;
         const batch = (data ?? []) as any[];
@@ -186,8 +203,8 @@ function useOperationalAudit(adAccountId: string, startDate: Date, endDate: Date
 
 export default function DataHealth() {
   const { adAccountId, adAccountIds, startDate, endDate, workspaceId } = useGlobalFilters();
-  const { data, isLoading, refetch } = useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate });
-  const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, startDate, endDate);
+  const { data, isLoading, isFetching, error: healthError, refetch } = useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate });
+  const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, adAccountIds, startDate, endDate);
   const [enriching, setEnriching] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [syncingLeads, setSyncingLeads] = useState(false);
@@ -252,10 +269,26 @@ export default function DataHealth() {
     }
   };
 
-  if (isLoading || !data) {
+  const healthState = resolveDataHealthState({ isLoading, hasData: Boolean(data), error: healthError });
+  if (healthState === "loading") {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (healthState === "error" || !data) {
+    return (
+      <div className="container mx-auto space-y-4 p-4 md:p-6">
+        <Card>
+          <CardContent className="flex flex-col items-start gap-3 p-6">
+            <div className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-5 w-5" /><h1 className="text-lg font-bold">Saúde dos Dados indisponível</h1></div>
+            <p className="text-sm text-muted-foreground">A consulta falhou e não foi convertida em contagens vazias. Tente novamente para validar o escopo selecionado.</p>
+            <p className="text-xs text-destructive">{healthError instanceof Error ? healthError.message : "Falha ao consultar as fontes de dados."}</p>
+            <Button variant="outline" onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Tentar novamente</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -269,9 +302,9 @@ export default function DataHealth() {
           <h1 className="text-2xl font-bold">Saúde dos Dados</h1>
           <p className="text-sm text-muted-foreground">Diagnóstico e reparo das fontes Meta Ads + RD Station</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className="mr-2 h-4 w-4" />
-          Atualizar
+          {isFetching ? "Atualizando…" : "Atualizar"}
         </Button>
       </div>
 

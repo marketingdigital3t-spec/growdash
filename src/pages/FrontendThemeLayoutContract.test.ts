@@ -46,6 +46,10 @@ const flowTopBar = readFileSync(
   fileURLToPath(new URL("../components/GrowdashFlow/components/TopBar.tsx", import.meta.url)),
   "utf8",
 );
+const expertDashboard = readFileSync(
+  fileURLToPath(new URL("./ExpertDashboard.tsx", import.meta.url)),
+  "utf8",
+);
 
 describe("frontend theme and responsive contracts", () => {
   it("keeps the campaign card stack measurable on mobile", () => {
@@ -78,5 +82,12 @@ describe("frontend theme and responsive contracts", () => {
     expect(platformRules).toContain('aria-label="Usar como fallback"');
     expect(customMetrics).toContain('aria-label="Usar como Lead padrão"');
     expect(flowTopBar).toContain('aria-label="Limpar quadro"');
+  });
+
+  it("keeps the Expert brand and read-only badge legible in the light theme", () => {
+    expect(expertDashboard).toContain("expert-dashboard-brand");
+    expect(expertDashboard).toContain("expert-dashboard-readonly-badge");
+    expect(css).toContain("html:not(.dark) .brand-shell .expert-dashboard .expert-dashboard-brand");
+    expect(css).toContain("html:not(.dark) .brand-shell .expert-dashboard .expert-dashboard-readonly-badge");
   });
 });

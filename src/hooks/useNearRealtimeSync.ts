@@ -5,6 +5,7 @@ import { businessDateKey } from "@/lib/businessDate";
 import { shouldInvalidateLiveQuery } from "@/lib/liveQueryInvalidation";
 import { withInFlightScope } from "@/lib/inFlightByScope";
 import { withRequestTimeout } from "@/lib/resilience";
+import { describeSyncFailure } from "@/lib/syncStatus";
 
 // Realtime database writes keep visible data current. The external Meta/RD
 // reconciliation is deliberately less frequent so it does not monopolise the
@@ -19,6 +20,8 @@ const STORAGE_PREFIX = "growdash:last-background-sync";
 // for a quiet window prevents each write from reloading the same heavy traffic
 // queries and making every tab appear to refresh continuously.
 const REALTIME_UI_BATCH_MS = 1_000;
+const FAST_SYNC_TIMEOUT_MS = 12_000;
+const RD_RECONCILIATION_TIMEOUT_MS = 15_000;
 
 const LIVE_TABLES = [
   "ad_accounts", "campaigns", "adsets", "ads", "insights", "insights_hourly",
@@ -82,6 +85,11 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
   const refresh = useCallback(async (force = false) => {
     if (!enabled || !navigator.onLine || document.visibilityState === "hidden") return;
     const isCurrentScope = () => activeScope.current === scope;
+    const hasCachedSnapshot = () => queryClient.getQueryCache().getAll().some((query) =>
+      shouldInvalidateLiveQuery(query.queryKey)
+      && query.state.data !== undefined
+      && query.state.dataUpdatedAt > 0,
+    );
 
     const storageKey = `${STORAGE_PREFIX}:${scope}`;
     const previousAttempt = Number(window.localStorage.getItem(storageKey) || 0);
@@ -116,7 +124,7 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         };
         const { data, error } = await withRequestTimeout(
           supabase.functions.invoke("controlled-realtime-sync", { body: selectedBody }),
-          50_000,
+          FAST_SYNC_TIMEOUT_MS,
         );
         const metaStatus = String(data?.meta_status || data?.results?.find?.((result: any) => result?.provider === "meta")?.status || data?.status || "success");
         if (error || data?.error || ["failed", "error"].includes(metaStatus)) {
@@ -172,14 +180,15 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
               fast: false,
             },
           }),
-          50_000,
+          RD_RECONCILIATION_TIMEOUT_MS,
         ).then(({ data: rdData, error: rdError }) => {
           if (rdError || rdData?.error || rdData?.rd_status === "failed") {
             const message = String(rdError || rdData?.error || "O RD Station não concluiu a sincronização.");
             console.warn("[near-realtime-sync] RD reconciliation", message);
             if (isCurrentScope()) {
-              setRdSyncError(message);
-              setState((current) => current === "error" ? current : "partial");
+              const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "RD", message });
+              setRdSyncError(failure.message);
+              setState((current) => current === "error" ? current : failure.state);
             }
             return;
           }
@@ -188,8 +197,10 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         }).catch((rdError) => {
           console.warn("[near-realtime-sync] RD reconciliation", rdError);
           if (isCurrentScope()) {
-            setRdSyncError(rdError instanceof Error ? rdError.message : String(rdError));
-            setState((current) => current === "error" ? current : "partial");
+            const message = rdError instanceof Error ? rdError.message : String(rdError);
+            const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "RD", message });
+            setRdSyncError(failure.message);
+            setState((current) => current === "error" ? current : failure.state);
           }
         });
         // The selected Meta snapshot is the response that unblocks the UI.
@@ -202,8 +213,10 @@ export function useNearRealtimeSync({ adAccountId, adAccountIds, campaignIds, fu
         // tentativa ocorrerá ao recuperar foco ou no próximo ciclo.
         console.warn("[near-realtime-sync]", error);
         if (isCurrentScope()) {
-          setSyncError(error instanceof Error ? error.message : String(error));
-          setState("error");
+          const message = error instanceof Error ? error.message : String(error);
+          const failure = describeSyncFailure({ hasSnapshot: hasCachedSnapshot(), provider: "Meta", message });
+          setSyncError(failure.message);
+          setState(failure.state);
         }
       }
     });

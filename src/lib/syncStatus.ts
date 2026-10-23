@@ -25,3 +25,15 @@ export function summarizeMetaSyncBlocks(blocks: {
     warnings: Array.from(new Set(warnings)),
   };
 }
+
+export type SyncFailureState = "partial" | "error";
+
+export function describeSyncFailure({ hasSnapshot, provider, message = "" }: { hasSnapshot: boolean; provider: string; message?: string }) {
+  const isTimeout = /tempo|timeout|excedido/i.test(message);
+  return {
+    state: (hasSnapshot ? "partial" : "error") as SyncFailureState,
+    message: hasSnapshot
+      ? `${provider} ${isTimeout ? "não respondeu a tempo" : "não concluiu a atualização"}. Último snapshot válido preservado; tente novamente para atualizar.`
+      : `${provider} indisponível neste momento. Tente novamente para carregar os dados.`,
+  };
+}

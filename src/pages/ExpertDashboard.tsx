@@ -204,11 +204,11 @@ export default function ExpertDashboard() {
       <MotionItem>
         <div className="expert-dashboard-header flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-primary"><BarChart3 className="h-5 w-5" /><span className="text-xs font-black uppercase tracking-[.16em]">Growdash</span></div>
+            <div className="expert-dashboard-brand flex items-center gap-2 text-primary"><BarChart3 className="h-5 w-5" /><span className="text-xs font-black uppercase tracking-[.16em]">Growdash</span></div>
             <h1 className="mt-1 text-2xl font-bold">{expertGreeting(selectedAccountName)}</h1>
             <p className="mt-1 text-sm text-muted-foreground">Resultados autorizados para acompanhamento da operação.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[.07] px-3 py-1.5 text-xs font-semibold text-primary"><ShieldCheck className="h-3.5 w-3.5" />Somente leitura</div>
+          <div className="expert-dashboard-readonly-badge flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[.07] px-3 py-1.5 text-xs font-semibold text-primary"><ShieldCheck className="h-3.5 w-3.5" />Somente leitura</div>
         </div>
       </MotionItem>
 
