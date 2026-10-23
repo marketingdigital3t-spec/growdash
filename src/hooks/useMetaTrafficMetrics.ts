@@ -163,9 +163,9 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
     sameScope: previousSnapshot?.scopeKey === snapshotScopeKey,
     previousUsable: Boolean(previousSnapshot?.data.available || previousSnapshot?.data.metricAvailability.spend?.available),
   });
-  const data = snapshotResolution.preserved
+  const data = useMemo(() => snapshotResolution.preserved
     ? { ...snapshotResolution.value, status: "stale" as const }
-    : computedData;
+    : computedData, [computedData, snapshotResolution.preserved, snapshotResolution.value]);
   useEffect(() => {
     if (computedData.available || computedData.metricAvailability.spend?.available) {
       lastConfirmedSnapshot.current = { scopeKey: snapshotScopeKey, data: computedData };
