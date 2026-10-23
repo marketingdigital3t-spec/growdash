@@ -23,4 +23,13 @@ describe("loop engineering CLI", () => {
     expect(report.status).toBe("detected");
     expect(content).toBe("return undefined;");
   });
+
+  it("runs only allowlisted commands declared by a remediation plan", async () => {
+    const calls: string[] = [];
+    const plan = { findingSignatures: ["*"], files: ["supabase/migrations/fix.sql"], patches: [], commands: ["supabase db advisors"], backup: "snapshot", rollback: "restore", tests: ["npm test"], abortWhen: ["advisor failure"] };
+    const report = await runLoop({ mode: "repair", commands: [], plan, fileSystem: { readFile: async () => "migration", writeFile: async () => undefined }, runCommand: async (command) => { calls.push(command); return { exitCode: 0, signal: null, timedOut: false, stdout: "ok", stderr: "" }; } });
+
+    expect(report.status).toBe("detected");
+    expect(calls).toEqual(["supabase db advisors"]);
+  });
 });

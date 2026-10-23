@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 const execFile = promisify(execFileCallback);
 const DEFAULT_COMMANDS = ["npm test", "npm run lint", "npm run build", "git diff --check"];
 const ALLOWED_COMMANDS = new Set([...DEFAULT_COMMANDS, "npm run test:visual"]);
+const ALLOWED_PLAN_COMMANDS = new Set([...ALLOWED_COMMANDS, "supabase db advisors", "supabase migration list", "supabase db push --dry-run"]);
 
 export function sanitizeText(value) {
   return String(value ?? "")
@@ -53,11 +54,16 @@ export function validatePlan(plan) {
   return { valid: reasons.length === 0, reasons };
 }
 
-async function applyPlan(plan, fileSystem) {
+async function applyPlan(plan, fileSystem, runCommand) {
   const validation = validatePlan(plan);
   if (!validation.valid) return { status: "blocked", reasons: validation.reasons };
   const previous = new Map();
   try {
+    for (const command of plan.commands ?? []) {
+      if (!ALLOWED_PLAN_COMMANDS.has(command)) return { status: "blocked", reasons: [`comando não permitido: ${command}`] };
+      const result = await runCommand(command);
+      if (result.exitCode !== 0 || result.timedOut) return { status: "blocked", reasons: [`comando falhou: ${command}`] };
+    }
     for (const patch of plan.patches ?? []) {
       const current = previous.get(patch.file) ?? await fileSystem.readFile(patch.file);
       if (!current.includes(patch.expected)) throw new Error(`Pré-condição não encontrada em ${patch.file}`);
@@ -103,7 +109,7 @@ export async function runLoop({ mode = "detect", output = "reports/loop-engineer
   }
   if (mode !== "detect" && !plan) findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: "Plano de remediação obrigatório" }, severity: "high", category: "authorization", title: "Plano de remediação ausente" }), remediation: "blocked" });
   if (mode !== "detect" && plan) {
-    const remediation = await applyPlan(plan, fileSystem);
+    const remediation = await applyPlan(plan, fileSystem, runCommand);
     if (remediation.status === "blocked") {
       findings.push({ ...finding({ command: "--plan", result: { exitCode: 2, signal: null, timedOut: false, stdout: "", stderr: remediation.reasons.join("; ") }, severity: "high", category: "authorization", title: "Remediação bloqueada" }), remediation: "blocked" });
     } else {
