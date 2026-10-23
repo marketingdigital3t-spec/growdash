@@ -46,7 +46,7 @@ const tabs = [
   { id: "campaigns", label: "Campanhas", icon: Megaphone },
   { id: "comparison", label: "Comparação", icon: GitCompareArrows },
   { id: "budget", label: "Orçamento (BM)", icon: WalletCards },
-  { id: "ai", label: "IA & Relatórios de Leads", icon: Bot },
+  { id: "ai", label: "Relatórios", icon: FileBarChart },
   { id: "funnels", label: "Funis de Tráfego", icon: GitBranch },
   { id: "audiences", label: "Padronizar públicos", icon: Tag },
   { id: "tools", label: "Ferramentas Meta", icon: Wrench },
@@ -395,7 +395,7 @@ function AIAndLeadReports({ accountId, accountIds, accounts }: { accountId: stri
   return <div className="space-y-4">
     <section className="gd-panel p-4 sm:p-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div><p className="text-[10px] font-black uppercase tracking-[.16em] text-muted-foreground">Relatórios por conta</p><h2 className="mt-1 text-lg font-black">IA e relatórios de leads</h2><p className="mt-1 text-xs text-muted-foreground">Cada conta tem métricas, geração e histórico próprios no período selecionado.</p></div>
+        <div><p className="text-[10px] font-black uppercase tracking-[.16em] text-muted-foreground">Tráfego Pago · Relatórios</p><h2 className="mt-1 text-lg font-black">Relatório de qualidade de leads</h2><p className="mt-1 text-xs text-muted-foreground">Mídia, funil e vendas no mesmo escopo de conta, período e atribuição.</p></div>
         <span className="rounded-full border border-border bg-background/60 px-3 py-1 text-[10px] font-bold text-muted-foreground">{scopedAccounts.length} conta(s) no escopo</span>
       </header>
       <div className="mt-4 space-y-4"><TrafficAIAnalysis accountId={accountId} accountName={scopedAccounts.length === 1 ? scopedAccounts[0].name : "Contas selecionadas"} startDate={startDate} endDate={endDate} selectedCampaignIds={[]} /><FunnelAudienceProfile deals={deals} campaignIds={audienceCampaignIds} accountIds={accountIds} startDate={startDate} endDate={endDate} data={audience.data} loading={audience.isLoading} /></div>
