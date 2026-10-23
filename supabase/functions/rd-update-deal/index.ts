@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 const ALLOWED_FIELDS = new Set([
   "name",
+  "amount",
   "deal_lost_note",
   "deal_lost_reason_id",
   "hold",
@@ -41,6 +42,7 @@ Deno.serve(async (req) => {
     const unknown = Object.keys(fields).filter((field) => !ALLOWED_FIELDS.has(field));
     if (unknown.length) return json({ error: `Campos não permitidos: ${unknown.join(", ")}`, code: "RD_DEAL_FIELD_NOT_ALLOWED" }, 422);
     if ("name" in fields && (typeof fields.name !== "string" || fields.name.trim().length === 0)) return json({ error: "name deve ser um texto não vazio" }, 422);
+    if ("amount" in fields && (typeof fields.amount !== "number" || !Number.isFinite(fields.amount) || fields.amount < 0)) return json({ error: "amount deve ser um número maior ou igual a zero" }, 422);
     if ("win" in fields && fields.win !== null && typeof fields.win !== "boolean") return json({ error: "win deve ser booleano ou nulo" }, 422);
     if ("hold" in fields && fields.hold !== null && typeof fields.hold !== "boolean") return json({ error: "hold deve ser booleano ou nulo" }, 422);
     if ("rating" in fields && fields.rating !== null && (typeof fields.rating !== "number" || fields.rating < 0 || fields.rating > 5)) return json({ error: "rating deve estar entre 0 e 5" }, 422);
@@ -76,6 +78,7 @@ Deno.serve(async (req) => {
     });
     const nextRaw = { ...raw, deal: after };
     const update: Record<string, unknown> = { raw: nextRaw, updated_at: new Date().toISOString() };
+    if (typeof fields.amount === "number") update.amount_total = fields.amount;
     if (typeof fields.win === "boolean") update.win = fields.win;
     const { error: mirrorError } = await admin.from("rd_deals").update(update).eq("id", deal.id).eq("rd_connection_id", connectionId);
     if (mirrorError) return json({ ok: true, partial: true, audit_id: result.auditId, error: "O RD foi atualizado, mas o espelho local aguarda reconciliação." }, 202);

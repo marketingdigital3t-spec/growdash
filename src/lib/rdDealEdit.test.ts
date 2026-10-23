@@ -3,6 +3,7 @@ import { buildRDDealUpdate, serializeRDDealUpdate, statusFromRDDeal, type DealEd
 
 const snapshot: DealEditSnapshot = {
   name: "Lead aberto",
+  amount: "0",
   status: "open",
   hold: false,
   rating: "1",
@@ -31,5 +32,11 @@ describe("rdDealEdit", () => {
       fields: { deal_lost_note: "Sem retorno", win: false },
       confirm_loss: true,
     });
+  });
+
+  it("serializes the invested amount as the RD deal amount", () => {
+    const update = buildRDDealUpdate(snapshot, { ...snapshot, amount: "12.500,00" });
+    expect(update).toEqual({ amount: 12500 });
+    expect(serializeRDDealUpdate(update)).toEqual({ fields: { amount: 12500 }, confirm_loss: false });
   });
 });

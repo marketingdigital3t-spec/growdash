@@ -2,6 +2,7 @@ export type DealEditStatus = "open" | "won" | "lost";
 
 export type DealEditDraft = {
   name: string;
+  amount: string;
   status: DealEditStatus;
   hold: boolean;
   rating: string;
@@ -10,6 +11,23 @@ export type DealEditDraft = {
 };
 
 export type DealEditSnapshot = DealEditDraft;
+
+export function parseDealAmount(value: string): number | null {
+  const input = value.trim().replace(/[R$\s]/g, "");
+  if (!input) return 0;
+  const normalized = input.includes(",")
+    ? input.replace(/\./g, "").replace(",", ".")
+    : input.replace(/,/g, "");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+export function formatDealAmountInput(value: number | null | undefined): string {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0
+    ? amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "";
+}
 
 export function statusFromRDDeal(deal: {
   win?: boolean | null;
@@ -33,6 +51,9 @@ export function buildRDDealUpdate(initial: DealEditSnapshot, draft: DealEditDraf
   const fields: Record<string, unknown> = {};
   const name = draft.name.trim();
   if (name !== initial.name.trim() && name) fields.name = name;
+  const initialAmount = parseDealAmount(initial.amount);
+  const nextAmount = parseDealAmount(draft.amount);
+  if (nextAmount !== null && nextAmount !== initialAmount) fields.amount = nextAmount;
   if (draft.hold !== initial.hold) fields.hold = draft.hold;
   if (draft.rating.trim() !== initial.rating.trim()) {
     fields.rating = draft.rating.trim() ? Number(draft.rating) : null;

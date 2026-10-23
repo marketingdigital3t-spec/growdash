@@ -57,7 +57,7 @@ import { useInsights } from "@/hooks/useInsights";
 import { useLeadAttributionCatalog } from "@/hooks/useLeadAttributionCatalog";
 import { resolveLeadAttribution, type LeadAttribution } from "@/lib/leadAttributionResolver";
 import { normalizeTrackingDraft, type ManualTracking } from "@/lib/leadTracking";
-import { buildRDDealUpdate, serializeRDDealUpdate, statusFromRDDeal, type DealEditDraft, type DealEditStatus } from "@/lib/rdDealEdit";
+import { buildRDDealUpdate, formatDealAmountInput, parseDealAmount, serializeRDDealUpdate, statusFromRDDeal, type DealEditDraft, type DealEditStatus } from "@/lib/rdDealEdit";
 import { useRDDealNotes, useCreateRDDealNote } from "@/hooks/useRDDealNotes";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
@@ -1105,6 +1105,7 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
 }) {
   const [winValue, setWinValue] = useState<DealEditStatus>("open");
   const [dealName, setDealName] = useState("");
+  const [dealAmount, setDealAmount] = useState("");
   const [holdValue, setHoldValue] = useState("false");
   const [rating, setRating] = useState("");
   const [predictionDate, setPredictionDate] = useState("");
@@ -1140,6 +1141,7 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
     const nextStatus = statusFromRDDeal(deal);
     const nextDraft: DealEditDraft = {
       name: String(rawDeal.name || deal.contact_name || ""),
+      amount: formatDealAmountInput(Number(rawDeal.amount ?? rawDeal.amount_total ?? deal.amount_total ?? 0)),
       status: nextStatus,
       hold: rawDeal.hold === true,
       rating: rawDeal.rating == null ? "" : String(rawDeal.rating),
@@ -1149,6 +1151,7 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
     initialEdit.current = nextDraft;
     setWinValue(nextStatus);
     setDealName(nextDraft.name);
+    setDealAmount(nextDraft.amount);
     setHoldValue(nextDraft.hold ? "true" : "false");
     setRating(nextDraft.rating);
     setPredictionDate(nextDraft.predictionDate);
@@ -1179,6 +1182,7 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
   const noteConnectionId = deal.rd_connection_id || selectedFunnel?.rd_connection_id || "";
   const draft: DealEditDraft = {
     name: dealName,
+    amount: dealAmount,
     status: winValue,
     hold: holdValue === "true",
     rating,
@@ -1186,7 +1190,8 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
     lostNote,
   };
   const fieldsToUpdate = initialEdit.current ? buildRDDealUpdate(initialEdit.current, draft) : {};
-  const canSaveDeal = canWrite && !!dealName.trim() && Object.keys(fieldsToUpdate).length > 0;
+  const invalidDealAmount = parseDealAmount(dealAmount) === null;
+  const canSaveDeal = canWrite && !invalidDealAmount && !!dealName.trim() && Object.keys(fieldsToUpdate).length > 0;
   const hasManualTracking = Object.keys(deal.manual_tracking || {}).length > 0;
 
   const saveDealFields = () => {
@@ -1224,15 +1229,17 @@ function DealDetails({ deal, attribution, automaticAttribution, funnelName, funn
         </div>
 
         <section className="mt-5 rounded-2xl border border-border bg-muted/20 p-4">
-          <div className="flex items-center justify-between gap-3"><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">Campos permitidos pela API oficial do RD. O valor financeiro é somente leitura no RD v1.</p></div><Pencil className="h-4 w-4 text-primary" /></div>
+          <div className="flex items-center justify-between gap-3"><div><h3 className="text-xs font-black uppercase tracking-wide text-muted-foreground">Editar negociação</h3><p className="mt-1 text-[10px] text-muted-foreground">Atualize o valor investido e os demais campos diretamente no RD Station.</p></div><Pencil className="h-4 w-4 text-primary" /></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5 text-xs font-bold sm:col-span-2"><span>Nome da negociação</span><Input value={dealName} onChange={(event) => setDealName(event.target.value)} disabled={!canWrite} /></label>
+            <label className="grid gap-1.5 text-xs font-bold"><span>Valor investido (R$)</span><Input inputMode="decimal" value={dealAmount} onChange={(event) => setDealAmount(event.target.value)} disabled={!canWrite} placeholder="0,00" /></label>
             <label className="grid gap-1.5 text-xs font-bold"><span>Situação</span><select value={winValue} onChange={(event) => setWinValue(event.target.value as DealEditStatus)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="open">Em aberto</option><option value="won">Venda ganha</option><option value="lost">Venda perdida</option></select></label>
             <label className="grid gap-1.5 text-xs font-bold"><span>Em espera</span><select value={holdValue} onChange={(event) => setHoldValue(event.target.value)} disabled={!canWrite} className="h-10 rounded-lg border border-border bg-background px-3"><option value="false">Não</option><option value="true">Sim</option></select></label>
             <label className="grid gap-1.5 text-xs font-bold"><span>Classificação (0–5)</span><Input inputMode="decimal" value={rating} onChange={(event) => setRating(event.target.value)} disabled={!canWrite} placeholder="Não informado" /></label>
             <label className="grid gap-1.5 text-xs font-bold"><span>Data prevista</span><Input type="date" value={predictionDate} onChange={(event) => setPredictionDate(event.target.value)} disabled={!canWrite} /></label>
             <label className="grid gap-1.5 text-xs font-bold sm:col-span-2"><span>Observação de perda</span><Input value={lostNote} onChange={(event) => setLostNote(event.target.value)} disabled={!canWrite} placeholder="Preencha quando aplicável" /></label>
           </div>
+          {invalidDealAmount && <p className="mt-2 text-[10px] font-semibold text-destructive">Informe um valor válido, por exemplo: 12.500,00.</p>}
           <Button type="button" className="mt-3" disabled={canWrite ? !canSaveDeal : false} onClick={saveDealFields}>{canWrite ? "Salvar informações no RD" : "Ativar escrita no RD"}</Button>
           <p className="mt-2 text-[10px] text-muted-foreground">{canWrite ? "A alteração é validada no backend, auditada antes da chamada e sincronizada de volta ao espelho." : "A escrita está desativada. O proprietário precisa autorizá-la no card de integração do RD."}</p>
         </section>
