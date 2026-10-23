@@ -24,7 +24,6 @@ import { DashboardGlassStrip } from "@/components/dashboard/DashboardGlassStrip"
 import { WIDGET_CATALOG } from "@/lib/widgetCatalog";
 import { useDashboardEditor } from "@/contexts/DashboardEditorContext";
 import { saleMatchesCampaign } from "@/lib/saleRevenue";
-import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useMetaTrafficMetrics } from "@/hooks/useMetaTrafficMetrics";
 import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { useToast } from "@/hooks/use-toast";
@@ -216,19 +215,9 @@ const Index = () => {
   const hasCanonicalMetaRows = dashboardMeta.data.rowCount > 0;
   const hasMetaSnapshot = hasCanonicalMetaRows || dashboardInsights.length > 0;
   const glassSpend = hasCanonicalMetaRows ? dashboardMeta.data.spend : dashboardInsights.reduce((sum, row) => sum + Number(row.spend || 0), 0);
-  const dashboardActionAdIds = useMemo(() => Array.from(new Set(dashboardInsights.map((row) => row.ad_id).filter(Boolean))), [dashboardInsights]);
-  const dashboardActionAccountMap = useMemo(() => Object.fromEntries(dashboardInsights.map((row) => [row.ad_id, row.ad_account_id])), [dashboardInsights]);
-  const { data: dashboardActionData } = useActionTotalsByAds(
-    dashboardActionAdIds,
-    startDate,
-    endDate,
-    dashboardActionAccountMap,
-    { adAccountIds: selectedAccountIds.length ? selectedAccountIds : visibleAccountIdList, campaignIds: selectedCampaignIds.length ? selectedCampaignIds : undefined, attributionWindowsByAccount: Object.fromEntries(visibleAccounts.map((account) => [account.id, account.attribution_window || "account_default"])) },
-  );
-  const dashboardActions = useMemo(() => dashboardActionData?.metaLeadActions || { forms: 0, site: 0, conversations: 0, total: 0 }, [dashboardActionData?.metaLeadActions]);
-  const glassConversations = hasCanonicalMetaRows ? dashboardMeta.data.conversations : dashboardActions.conversations;
-  const glassForms = hasCanonicalMetaRows ? dashboardMeta.data.formLeads : dashboardActions.forms;
-  const glassSite = hasCanonicalMetaRows ? dashboardMeta.data.siteLeads : dashboardActions.site;
+  const glassConversations = dashboardMeta.data.conversations;
+  const glassForms = dashboardMeta.data.formLeads;
+  const glassSite = dashboardMeta.data.siteLeads;
   const leadBreakdown = useMemo(() => ({ forms: glassForms, site: glassSite, conversations: glassConversations, total: glassForms + glassSite + glassConversations }), [glassConversations, glassForms, glassSite]);
   const glassLeads = leadBreakdown.total;
   const glassCpl = glassLeads > 0 ? glassSpend / glassLeads : 0;

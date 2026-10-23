@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canonicalInsightLeads, dedupeDailyInsights, filterInsightsByCampaignScope } from "./useInsights";
+import { buildInsightsQueryKey, canonicalInsightLeads, dedupeDailyInsights, filterInsightsByCampaignScope } from "./useInsights";
 import { matchesMetaAttributionWindow } from "@/lib/metaInsightFacts";
 
 describe("daily insight scope", () => {
+  it("shares the cache between a single-account and equivalent account-list scope", () => {
+    expect(buildInsightsQueryKey({ adAccountId: "account-1", startDate: new Date("2026-10-01"), endDate: new Date("2026-10-07") }))
+      .toEqual(buildInsightsQueryKey({ adAccountIds: ["account-1"], startDate: new Date("2026-10-01"), endDate: new Date("2026-10-07") }));
+  });
+
   it("calculates Meta leads only from forms, site and conversations, ignoring legacy leads aggregate", () => {
     expect(canonicalInsightLeads({ form_leads: 7, site_leads: 0, conversations: 1, leads: 13 } as any))
       .toEqual({ forms: 7, site: 0, conversations: 1, total: 8 });

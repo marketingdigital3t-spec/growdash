@@ -1,7 +1,7 @@
 # Growdash — auditoria de problemas percebidos pelo usuário
 
 Data: 2026-10-23 (America/Sao_Paulo). Escopo: front-end, fluxos autenticados, contratos de métricas, integrações visíveis e confiabilidade de carregamento.
-Status: correção do refetch Meta durante troca de tema aplicada localmente; validação automatizada concluída; publicação autenticada ainda pendente nesta rodada.
+Status: correções de carregamento/paridade aplicadas localmente; validação automatizada concluída; publicação desta rodada será feita após o commit isolado e a verificação autenticada.
 
 ## Resumo executivo
 
@@ -131,6 +131,16 @@ Produção responde HTTP 200 e tem headers de segurança, mas não foi possível
 - Em claro e escuro, após alternar o tema e retornar, permaneceram numéricos: 46 Leads, `R$ 33,07` CPL, `R$ 59.500,00` faturamento, `R$ 1.521,45` investimento, `39,11x` ROAS, `R$ 255.000,00` previsão e 7 vendas. O banner RD continuou informando que o último snapshot foi preservado, sem converter valores em zero.
 - Build validado publicado no Cloudflare Pages: `https://102bdcc0.growdash.pages.dev`.
 - `growdash.com.br` e o preview responderam HTTP 200 em `/` e `/auth`; o SHA-256 do bundle `assets/app-qx_iN90H.js` foi idêntico localmente, no preview e no domínio canônico (`f71fa2457c20ed4f453bba826beed0be3c234c37f4b9e6813a7908c2943242e5`).
+
+### Rodada de correção Meta/RD — 2026-10-23
+
+- A largura fixa de `.growdash-safe-sidebar` foi removida para que os estados `w-16`/`w-[220px]` do menu não sejam sobrescritos por CSS global. A rolagem vertical da sidebar não foi alterada.
+- Insights, contas e cobertura passaram a ser o núcleo do carregamento Meta. Ações e breakdowns continuam em segundo plano; com snapshot utilizável, os KPIs não ficam presos em loading.
+- A chave de `useInsights` foi canonizada para compartilhar a mesma consulta entre escopo de conta única e lista equivalente. O segundo `useActionTotalsByAds` do Dashboard foi removido para evitar leitura duplicada.
+- A reconciliação Meta × RD agora compara somente negócios RD com atribuição Meta confirmada e separa negócios orgânicos/parciais da diferença comparável.
+- Foram adicionados testes de regressão para carregamento Meta, paridade e largura responsiva da sidebar.
+- Validação local desta rodada: `npx tsc --noEmit`, `npm run lint`, `npm run build` e `npm test -- --run` aprovados (136 arquivos / 596 testes). O checkout também contém arquivos locais não rastreados do trabalho de Loop Engineering; eles foram preservados e não fazem parte deste commit de front-end.
+- Pendente antes da entrega: commit/push do diff relacionado, publicação do `dist` validado no Cloudflare Pages e nova checagem autenticada do preview/domínio nos temas claro e escuro.
 
 ## Prompt de correção recomendado
 

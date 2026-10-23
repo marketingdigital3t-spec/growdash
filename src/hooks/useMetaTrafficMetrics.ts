@@ -11,6 +11,7 @@ import { metaMetricContract, type MetaMetricContract } from "@/lib/analyticsCont
 import { buildAttributionWindowsByAccount } from "@/lib/metaAttributionScope";
 import { findMetaSyncCoverage, findMetaSyncIssue, type MetaSyncCoverageRow } from "@/lib/metaSyncCoverage";
 import { resolveMetaSnapshotDuringRefresh } from "@/lib/metaSnapshot";
+import { resolveMetaLoadingState } from "@/lib/metaLoading";
 
 export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): { data: MetaTrafficMetrics; metrics: MetaMetricContract; isLoading: boolean; insightsLoading: boolean; actionsLoading: boolean; isError: boolean; error: unknown; refetch: () => Promise<void> } {
   const accounts = useAdAccounts();
@@ -105,7 +106,15 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   // snapshot is still usable. Treat only the first pending request as loading;
   // otherwise the funnel remains stuck on "Sincronizando" forever whenever a
   // coverage gap is being retried.
-  const isLoading = insights.isPending || actions.isPending || accounts.isPending || breakdowns.isPending || syncCoverage.isPending;
+  const loadingState = resolveMetaLoadingState({
+    insightsPending: insights.isPending,
+    accountsPending: accounts.isPending,
+    coveragePending: syncCoverage.isPending,
+    actionsPending: actions.isPending,
+    breakdownsPending: breakdowns.isPending,
+    hasUsableSnapshot: rows.length > 0,
+  });
+  const isLoading = loadingState.isLoading;
   const coverageComplete = accounts.isSuccess
     && scopedAccounts.length > 0
     && scopedAccounts.length === effectiveAccountIds.length

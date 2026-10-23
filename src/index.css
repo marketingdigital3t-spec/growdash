@@ -920,7 +920,6 @@ html:not(.dark) {
 .growdash-safe-sidebar {
   position: fixed !important;
   inset: 0 auto 0 0;
-  width: var(--gd-sidebar-width, 220px);
   max-width: 100vw;
 }
 
@@ -941,7 +940,6 @@ html:not(.dark) {
 }
 
 @media (max-width: 1023px) {
-  .growdash-safe-sidebar { width: min(220px, 86vw); }
   .growdash-content-frame { padding-inline: .5rem; }
 }
 

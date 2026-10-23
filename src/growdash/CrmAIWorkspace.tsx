@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { getRDDealAmount } from "@/lib/rdDealAmount";
 import { cn } from "@/lib/utils";
 import { businessDateKey } from "@/lib/businessDate";
+import { summarizeMetaRdParity } from "@/lib/metaRdParity";
 
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -40,7 +41,7 @@ export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
       </header>
       <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-6">
         <AIKpi label="Leads Meta" value={number.format(analytics.metaLeads)} note="resultado oficial armazenado" />
-        <AIKpi label="Negócios RD" value={number.format(deals.length)} note="histórico da conta" />
+        <AIKpi label="RD atribuídos à Meta" value={number.format(analytics.rdAttributedLeads)} note={`${number.format(analytics.rdTotalLeads)} negócios no total`} />
         <AIKpi label="Diferença Meta × RD" value={`${analytics.coverage.toFixed(1)}%`} note={analytics.difference > 5 ? "acima da tolerância" : "dentro da tolerância"} alert={analytics.difference > 5} />
         <AIKpi label="UTMs incompletas" value={number.format(analytics.missingUtm.length)} note="negócios sem origem confiável" alert={analytics.missingUtm.length > 0} />
         <AIKpi label="Receita prevista" value={brl.format(analytics.forecast)} note="probabilidade por etapa" />
@@ -50,7 +51,7 @@ export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
 
     <div className="grid gap-4 xl:grid-cols-2">
       <Panel icon={<ChartNoAxesCombined />} title="RD oficial × Growdash" description="A mesma conta e o mesmo período, sem misturar origens.">
-        <div className="space-y-3"><CompareRow label="Meta Ads" value={`${number.format(analytics.metaLeads)} leads`} progress={100} /><CompareRow label="RD Station" value={`${number.format(deals.length)} negócios`} progress={analytics.metaLeads ? Math.min(100, deals.length / analytics.metaLeads * 100) : 0} /><div className={cn("rounded-xl border p-3 text-xs", analytics.difference > 5 ? "border-red-500/30 bg-red-500/7 text-red-500" : "border-emerald-500/25 bg-emerald-500/7 text-emerald-500")}>{analytics.difference > 5 ? `A divergência de ${analytics.difference.toFixed(1)}% supera a tolerância de 5%. Revise UTMs, atribuição e janela de datas.` : "A cobertura está dentro da tolerância configurada."}</div></div>
+        <div className="space-y-3"><CompareRow label="Meta Ads" value={`${number.format(analytics.metaLeads)} leads`} progress={100} /><CompareRow label="RD atribuído à Meta" value={`${number.format(analytics.rdAttributedLeads)} negócios`} progress={analytics.metaLeads ? Math.min(100, analytics.rdAttributedLeads / analytics.metaLeads * 100) : 0} /><div className={cn("rounded-xl border p-3 text-xs", analytics.difference > 5 ? "border-red-500/30 bg-red-500/7 text-red-500" : "border-emerald-500/25 bg-emerald-500/7 text-emerald-500")}>{analytics.difference > 5 ? `A divergência comparável de ${analytics.difference.toFixed(1)}% supera a tolerância de 5%. ${number.format(analytics.rdUnmatchedLeads)} negócio(s) ficaram fora por não terem atribuição Meta confirmada.` : "A cobertura atribuída está dentro da tolerância configurada."}</div></div>
       </Panel>
       <Panel icon={<TrendingUp />} title="Previsão por etapa" description="Receita ponderada pela probabilidade de avanço de cada estágio.">
         <div className="space-y-2">{analytics.stages.slice(0, 8).map((stage) => <div key={stage.name} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs"><span className="truncate font-bold">{stage.name}</span><span className="text-muted-foreground">{number.format(stage.count)} · {Math.round(stage.probability * 100)}%</span><b>{brl.format(stage.weighted)}</b></div>)}{!analytics.stages.length && <Empty text="As etapas aparecerão após a primeira sincronização do RD." />}</div>
@@ -71,8 +72,9 @@ export default function CrmAIWorkspace({ deals, sales, accountId }: Props) {
 }
 
 function analyze(deals: RDDealLite[], metaLeads: number, sales: Sale[]) {
-  const coverage = metaLeads ? deals.length / metaLeads * 100 : deals.length ? 100 : 0;
-  const difference = metaLeads ? Math.abs(deals.length - metaLeads) / metaLeads * 100 : deals.length ? 100 : 0;
+  const parity = summarizeMetaRdParity(metaLeads, deals);
+  const coverage = parity.coveragePercent;
+  const difference = parity.differencePercent;
   const missingUtm = deals.filter((deal) => !deal.utm_source || !deal.utm_campaign);
   const stagesMap = new Map<string, { count: number; total: number; order: number }>();
   deals.forEach((deal) => { const name = deal.rd_stage_name || "Sem etapa"; const row = stagesMap.get(name) || { count: 0, total: 0, order: deal.rd_stage_order ?? 999 }; row.count += 1; row.total += getRDDealAmount(deal); stagesMap.set(name, row); });
@@ -96,7 +98,7 @@ function analyze(deals: RDDealLite[], metaLeads: number, sales: Sale[]) {
   if (missingUtm.length) actions.push({ id: "utm", title: "Corrigir atribuição por UTM", description: `${missingUtm.length} negócio(s) não possuem origem e campanha completas.`, critical: missingUtm.length / Math.max(1, deals.length) > .1, icon: <Link2Off className="h-4 w-4" /> });
   if (stale.length) actions.push({ id: "stale", title: "Revisar negociações paradas", description: `${stale.length} negócio(s) estão há pelo menos 7 dias sem movimentação.`, critical: stale.some((deal) => deal.staleDays >= 15), icon: <Clock3 className="h-4 w-4" /> });
   if (!deals.some((deal) => deal.deal_owner_name)) actions.push({ id: "owner", title: "Definir responsáveis", description: "Os negócios não possuem responsável suficiente para medir tempo de atendimento e conversão.", critical: false, icon: <MessageSquareText className="h-4 w-4" /> });
-  return { metaLeads, coverage, difference, missingUtm, stages, forecast, owners, stale, actions };
+  return { metaLeads, coverage, difference, rdTotalLeads: parity.rdTotalLeads, rdAttributedLeads: parity.rdAttributedLeads, rdUnmatchedLeads: parity.rdUnmatchedLeads, missingUtm, stages, forecast, owners, stale, actions };
 }
 
 function Panel({ icon, title, description, children }: { icon: ReactNode; title: string; description: string; children: ReactNode }) { return <section className="gd-panel overflow-hidden"><header className="flex items-center gap-3 border-b border-border p-4"><span className="text-primary [&>svg]:h-4 [&>svg]:w-4">{icon}</span><div><h2 className="text-sm font-black">{title}</h2><p className="text-[10px] text-muted-foreground">{description}</p></div></header><div className="p-4">{children}</div></section>; }

@@ -18,6 +18,37 @@ interface UseInsightsParams {
   enabled?: boolean;
 }
 
+export function buildInsightsQueryKey({
+  adAccountId,
+  adAccountIds,
+  campaignId,
+  campaignIds,
+  objectives,
+  attributionWindow = "account_default",
+  attributionWindowsByAccount = {},
+  startDate,
+  endDate,
+}: Pick<UseInsightsParams, "adAccountId" | "adAccountIds" | "campaignId" | "campaignIds" | "objectives" | "attributionWindow" | "attributionWindowsByAccount" | "startDate" | "endDate">) {
+  // A single account and an equivalent one-item account list describe the
+  // same provider scope. Canonicalising that boundary lets React Query share
+  // the in-flight snapshot between Dashboard and the Meta aggregate hook.
+  const accountScope = (adAccountIds?.length ? adAccountIds : adAccountId ? [adAccountId] : [])
+    .slice()
+    .sort()
+    .join(",");
+  return [
+    "insights",
+    accountScope,
+    campaignId,
+    campaignIds?.slice().sort().join(","),
+    objectives?.slice().sort().join(","),
+    attributionWindow,
+    JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))),
+    businessDateKey(startDate),
+    businessDateKey(endDate),
+  ] as const;
+}
+
 export interface InsightRow {
   ad_id: string;
   adset_id?: string | null;
@@ -102,7 +133,7 @@ export function filterInsightsByCampaignScope<T extends { ad_id: string; campaig
 }
 
 export function useInsights({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow = "account_default", attributionWindowsByAccount = {}, startDate, endDate, enabled = true }: UseInsightsParams) {
-  const queryKey = ["insights", adAccountId, adAccountIds?.slice().sort().join(","), campaignId, campaignIds?.join(","), objectives?.join(","), attributionWindow, JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b))), businessDateKey(startDate), businessDateKey(endDate)] as const;
+  const queryKey = buildInsightsQueryKey({ adAccountId, adAccountIds, campaignId, campaignIds, objectives, attributionWindow, attributionWindowsByAccount, startDate, endDate });
   return useQuery({
     queryKey,
     queryFn: async () => {

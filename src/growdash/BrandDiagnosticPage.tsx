@@ -40,6 +40,7 @@ import { useWorkspace } from "@/hooks/useWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMetric, metricDescription, type MetricKind } from "@/lib/metricPresentation";
 import { cn } from "@/lib/utils";
+import { summarizeMetaRdParity } from "@/lib/metaRdParity";
 import { PageHeading } from "./shared";
 
 type BrandRecord = {
@@ -149,6 +150,7 @@ export default function BrandDiagnosticPage() {
     const leads = metaTraffic.data.totalLeads;
     const saleTotals = aggregateSales(sales);
     const revenue = saleTotals.totalNet;
+    const parity = summarizeMetaRdParity(leads, deals);
     return {
       spend,
       impressions,
@@ -160,6 +162,9 @@ export default function BrandDiagnosticPage() {
       cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
       frequency: reach > 0 ? impressions / reach : 0,
       rdLeads: deals.length,
+      rdAttributedLeads: parity.rdAttributedLeads,
+      rdUnmatchedLeads: parity.rdUnmatchedLeads,
+      parityDifferencePercent: parity.differencePercent,
       won: saleTotals.totalQuantity,
       revenue,
       conversion: deals.length > 0 ? (saleTotals.totalQuantity / deals.length) * 100 : 0,
@@ -246,7 +251,7 @@ export default function BrandDiagnosticPage() {
 
           <div className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
             <section className="gd-panel overflow-hidden"><div className="border-b border-border p-5"><h2 className="font-black">Campanhas com maior investimento</h2><p className="mt-1 text-xs text-muted-foreground">Desempenho agregado no período selecionado.</p></div>{campaignPerformance.length ? <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-sm"><thead className="bg-muted/35 text-[10px] uppercase tracking-wider text-muted-foreground"><tr><th className="p-3 text-left">Campanha</th><th className="p-3 text-right">Investimento</th><th className="p-3 text-right">Impressões</th><th className="p-3 text-right">Cliques</th><th className="p-3 text-right">Leads</th><th className="p-3 text-right">CPL</th></tr></thead><tbody className="divide-y divide-border">{campaignPerformance.map((item) => <tr key={item.id}><td className="max-w-80 truncate p-3 font-semibold" title={item.name}>{item.name}</td><td className="p-3 text-right">{formatMetric(item.spend, "currency")}</td><td className="p-3 text-right">{formatMetric(item.impressions, "count")}</td><td className="p-3 text-right">{formatMetric(item.clicks, "count")}</td><td className="p-3 text-right">{formatMetric(item.leads, "count")}</td><td className="p-3 text-right">{formatMetric(item.leads ? item.spend / item.leads : 0, "currency")}</td></tr>)}</tbody></table></div> : <div className="p-5"><EmptyAnalytic title="Sem campanhas com métricas" description="Os widgets permanecem visíveis e serão preenchidos após a primeira sincronização do período." /></div>}</section>
-            <section className="gd-panel p-5"><h2 className="font-black">Reconciliação Meta × RD</h2><p className="mt-1 text-xs text-muted-foreground">Compara atribuição de mídia e entradas reais no CRM.</p><div className="mt-6 space-y-5"><div><div className="mb-2 flex justify-between text-xs"><span>Leads Meta</span><b>{formatMetric(totals.leads, "count")}</b></div><Progress value={totals.leads || totals.rdLeads ? (totals.leads / Math.max(totals.leads, totals.rdLeads)) * 100 : 0} /></div><div><div className="mb-2 flex justify-between text-xs"><span>Leads RD</span><b>{formatMetric(totals.rdLeads, "count")}</b></div><Progress value={totals.leads || totals.rdLeads ? (totals.rdLeads / Math.max(totals.leads, totals.rdLeads)) * 100 : 0} /></div><div className="rounded-xl border border-border bg-background/40 p-4"><span className="text-[10px] uppercase tracking-wider text-muted-foreground">Diferença RD − Meta</span><strong className={cn("mt-2 block text-2xl", totals.rdLeads - totals.leads >= 0 ? "text-emerald-500" : "text-amber-500")}>{totals.rdLeads - totals.leads > 0 ? "+" : ""}{formatMetric(totals.rdLeads - totals.leads, "count")}</strong><p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">A diferença pode refletir janela de atribuição, UTMs, duplicidade ou entradas orgânicas no RD.</p></div></div></section>
+            <section className="gd-panel p-5"><h2 className="font-black">Reconciliação Meta × RD</h2><p className="mt-1 text-xs text-muted-foreground">Compara leads atribuídos à Meta no mesmo escopo. Negócios orgânicos e sem origem ficam separados.</p><div className="mt-6 space-y-5"><div><div className="mb-2 flex justify-between text-xs"><span>Leads Meta</span><b>{formatMetric(totals.leads, "count")}</b></div><Progress value={totals.leads || totals.rdAttributedLeads ? (totals.leads / Math.max(totals.leads, totals.rdAttributedLeads)) * 100 : 0} /></div><div><div className="mb-2 flex justify-between text-xs"><span>RD atribuídos à Meta</span><b>{formatMetric(totals.rdAttributedLeads, "count")}</b></div><Progress value={totals.leads || totals.rdAttributedLeads ? (totals.rdAttributedLeads / Math.max(totals.leads, totals.rdAttributedLeads)) * 100 : 0} /></div><div className="rounded-xl border border-border bg-background/40 p-4"><span className="text-[10px] uppercase tracking-wider text-muted-foreground">Diferença comparável</span><strong className={cn("mt-2 block text-2xl", totals.rdAttributedLeads - totals.leads >= 0 ? "text-emerald-500" : "text-amber-500")}>{totals.rdAttributedLeads - totals.leads > 0 ? "+" : ""}{formatMetric(totals.rdAttributedLeads - totals.leads, "count")}</strong><p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">{formatMetric(totals.rdUnmatchedLeads, "count")} negócio(s) RD ficaram fora da comparação por serem orgânicos ou não terem atribuição confirmada.</p></div></div></section>
           </div>
         </TabsContent>
 
