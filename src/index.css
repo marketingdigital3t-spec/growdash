@@ -14836,6 +14836,31 @@ html[data-accent="metallic-gold"] {
 .brand-shell .expert-dashboard .expert-dashboard-tabs > button[aria-selected="false"] {
   color: var(--gd-content-muted) !important;
 }
+
+/* Dark theme authority for platform distribution. The global button contract
+   is white by default, but these chart controls belong to the dark card and
+   must remain dark for readable contrast. */
+html.dark body .brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"],
+html.dark body .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 button,
+html.dark body .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 > div {
+  background: var(--gd-content-surface-dark) !important;
+  background-image: none !important;
+  border-color: var(--gd-content-border-dark) !important;
+  color: var(--gd-content-text-dark) !important;
+  box-shadow: none !important;
+}
+html.dark body .brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"][data-state="active"] {
+  background: #252525 !important;
+  border-color: var(--gd-emerald-border) !important;
+  color: var(--gd-content-text-dark) !important;
+  box-shadow: inset 0 -2px var(--gd-emerald) !important;
+}
+html.dark body .brand-shell .expert-dashboard .expert-platform-chart-card .gd-platform-tabs [role="tab"]:hover:not([data-state="active"]),
+html.dark body .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex > .flex-1 button:hover:not(:disabled) {
+  background: #252525 !important;
+  border-color: var(--gd-emerald-border) !important;
+  color: var(--gd-content-text-dark) !important;
+}
 .brand-shell .expert-dashboard .gd-module-section {
   min-width: 0;
   margin-inline: 0 !important;

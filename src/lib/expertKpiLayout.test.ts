@@ -36,4 +36,9 @@ describe("Expert dashboard KPI layout contract", () => {
   it("keeps five KPI columns on wide desktop without stretching the page", () => {
     expect(indexCss).toMatch(/@media \(min-width: 1440px\)[\s\S]*?\.expert-dashboard \.expert-kpi-grid[\s\S]*?repeat\(5, minmax\(0, 1fr\)\)/);
   });
+
+  it("keeps platform chart controls dark in dark mode", () => {
+    expect(indexCss).toMatch(/html\.dark body[\s\S]*?expert-platform-chart-card[\s\S]*?background: var\(--gd-content-surface-dark\)/);
+    expect(indexCss).toMatch(/expert-platform-chart-card[\s\S]*?\[data-state="active"\][\s\S]*?background: #252525/);
+  });
 });
