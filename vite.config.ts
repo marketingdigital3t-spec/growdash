@@ -36,6 +36,15 @@ export default defineConfig({
         // Content hashes still provide deterministic cache busting.
         entryFileNames: "assets/app-[hash].js",
         chunkFileNames: "assets/chunk-[hash].js",
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("/node_modules/lodash/")) return "vendor-lodash";
+          if (id.includes("recharts") || id.includes("/node_modules/d3") || id.includes("d3-")) return "vendor-charts";
+          if (id.includes("@supabase")) return "vendor-supabase";
+          if (id.includes("react-grid-layout") || id.includes("react-resizable") || id.includes("react-resizable-panels")) return "vendor-layout";
+          if (id.includes("@radix-ui") || id.includes("lucide-react")) return "vendor-ui";
+          return undefined;
+        },
       },
     },
   },
