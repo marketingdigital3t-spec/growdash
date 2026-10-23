@@ -21,6 +21,7 @@ import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
 import { shouldFetchNextPage } from "@/lib/pagination";
 import { businessDateKey } from "@/lib/businessDate";
+import { withRequestTimeout } from "@/lib/resilience";
 import { dataHealthScopeKey, resolveDataHealthState, throwOnQueryError } from "@/lib/dataHealth";
 
 interface HealthData {
@@ -34,6 +35,8 @@ interface HealthData {
   rdMetricAudits: { id: string; funnel_id: string | null; status: string; rd_won_count: number; linked_sale_count: number; missing_sale_count: number; checked_at: string }[];
 }
 
+const DATA_HEALTH_TIMEOUT_MS = 15_000;
+
 function formatSafeDate(value: string | Date | null | undefined, pattern: string) {
   if (!value) return "não informada";
   const date = value instanceof Date ? value : parseISO(value);
@@ -44,7 +47,7 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
   const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
   return useQuery({
     queryKey: ["data-health", dataHealthScopeKey({ workspaceId, adAccountIds: scopedAccountIds, startDate: businessDateKey(startDate), endDate: businessDateKey(endDate) })],
-    queryFn: async (): Promise<HealthData> => {
+    queryFn: () => withRequestTimeout((async (): Promise<HealthData> => {
       let linkedFunnelIds: string[] = [];
       if (scopedAccountIds.length) {
         const { data: funnels, error } = await supabase.from("rd_funnels").select("id").in("ad_account_id", scopedAccountIds);
@@ -161,7 +164,7 @@ function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate 
         oauthIntegrations: (oauthIntegrations || []) as any,
         rdMetricAudits: (rdMetricAudits || []) as any,
       };
-    },
+    })(), DATA_HEALTH_TIMEOUT_MS),
   });
 }
 
