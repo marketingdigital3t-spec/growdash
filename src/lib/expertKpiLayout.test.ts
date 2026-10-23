@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const metricCardSource = readFileSync(new URL("../components/dashboard/MetricCard.tsx", import.meta.url), "utf8");
 const expertDashboardSource = readFileSync(new URL("../pages/ExpertDashboard.tsx", import.meta.url), "utf8");
+const defaultDashboardSource = readFileSync(new URL("../components/dashboard/widgets/DefaultDashboardContent.tsx", import.meta.url), "utf8");
 const indexCss = readFileSync(new URL("../index.css", import.meta.url), "utf8");
 
 describe("Expert dashboard KPI layout contract", () => {
@@ -37,7 +38,13 @@ describe("Expert dashboard KPI layout contract", () => {
   });
 
   it("keeps platform chart controls dark in dark mode", () => {
-    expect(indexCss).toMatch(/html\.dark body[\s\S]*?expert-platform-chart-card[\s\S]*?background: var\(--gd-content-surface-dark\)/);
-    expect(indexCss).toMatch(/expert-platform-chart-card[\s\S]*?\[data-state="active"\][\s\S]*?background: #252525/);
+    expect(indexCss).toMatch(/html\.dark body[\s\S]*?platform-distribution-card[\s\S]*?background: var\(--gd-content-surface-dark\)/);
+    expect(indexCss).toMatch(/platform-distribution-card[\s\S]*?\[data-state="active"\][\s\S]*?background: #252525/);
+  });
+
+  it("applies the dark platform control contract to the legacy dashboard widget too", () => {
+    expect(defaultDashboardSource).toContain("platform-distribution-card");
+    expect(indexCss).toMatch(/html\.dark body \.brand-shell \.platform-distribution-card[\s\S]*?background: var\(--gd-content-surface-dark\)/);
+    expect(indexCss).not.toMatch(/html\.dark body \.brand-shell \.expert-dashboard \.expert-platform-chart-card[\s\S]*?background: #fff !important/);
   });
 });

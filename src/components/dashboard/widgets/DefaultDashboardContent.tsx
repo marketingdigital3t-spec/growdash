@@ -544,7 +544,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         <div className="dashboard-financial-overview gap-3 sm:gap-4">
         <PaymentChart byPayment={salesMetrics.byPayment} availability={revenueAvailability} />
 
-        <Card className="dashboard-terra-card">
+        <Card className="dashboard-terra-card platform-distribution-card">
           <CardHeader className="pb-3 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <CardTitle className="text-base flex items-center gap-2">
@@ -568,7 +568,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
               </TabsList>
             </Tabs>
           </CardHeader>
-          <CardContent>
+          <CardContent className="expert-chart-card-content">
             {(() => {
               const PLATFORM_ICONS: Record<TopPlatform, any> = {
                 meta: Facebook,
