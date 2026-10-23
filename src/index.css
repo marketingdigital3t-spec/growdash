@@ -10137,6 +10137,22 @@ body,
   color: hsl(var(--gd-content-muted)) !important;
 }
 
+/* Audience profile owns compact disclosure buttons and nested sections. A
+   broad legacy theme rule was painting those controls white in dark mode
+   while their labels stayed light, producing the unreadable bars seen in the
+   traffic reports. Keep this surface on the same content color contract. */
+.brand-shell [data-audience-profile] :is(section, button) {
+  background-color: hsl(var(--gd-content-elevated)) !important;
+  color: hsl(var(--gd-content-text)) !important;
+}
+.brand-shell [data-audience-profile] button:hover,
+.brand-shell [data-audience-profile] button:focus-visible {
+  background-color: hsl(var(--gd-content-hover)) !important;
+}
+.brand-shell [data-audience-profile] :is(.text-muted-foreground, [class*="text-white/"]) {
+  color: hsl(var(--gd-content-muted)) !important;
+}
+
 .brand-shell :is(.gd-panel, .dashboard-glass-card, .gd-metric-card)
   :is(input, select, textarea) {
   background: hsl(var(--gd-content-elevated)) !important;

@@ -625,7 +625,7 @@ export function FunnelAudienceProfile({
   const sourceFor = (_type: BreakdownType) => "Meta Ads";
   const valueFor = (deal: DealLocation, aliases: string[]) => rdValue(deal, aliases);
   return (
-    <Card className="gd-analysis-card border-border/40 bg-card/60">
+    <Card data-audience-profile className="gd-analysis-card border-border/40 bg-card/60">
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
           <div>
