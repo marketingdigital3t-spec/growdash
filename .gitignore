@@ -28,6 +28,8 @@ deploy/.env
 supabase/.temp/
 test-results/
 playwright-report/
+reports/*.json
+reports/*.md
 tests/visual/__screenshots__/growdash.spec.ts/auth.png
 
 # Editor directories and files

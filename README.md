@@ -32,6 +32,19 @@ npm run lint
 npm run test
 ```
 
+## Loop Engineering
+
+O ciclo automático de confiabilidade está documentado em
+[`docs/LOOP_ENGINEERING_OPERATIONS.md`](docs/LOOP_ENGINEERING_OPERATIONS.md).
+Para executar uma detecção local:
+
+```bash
+npm run loop-engineering:detect
+```
+
+O runner preserva evidências sanitizadas, não transforma timeout em zero e
+bloqueia alterações de alto risco sem plano versionado, testes e rollback.
+
 ## Estrutura da nova interface
 
 - `src/growdash/GrowdashLayout.tsx`: menu lateral e barra de meta;

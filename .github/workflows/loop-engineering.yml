@@ -1,0 +1,48 @@
+name: Growdash Loop Engineering
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run loop engineering detection
+        id: loop
+        continue-on-error: true
+        run: npm run loop-engineering:detect
+
+      - name: Upload loop report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loop-engineering-${{ github.run_id }}
+          path: reports/loop-engineering.*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce gate
+        if: always()
+        run: |
+          test -f reports/loop-engineering.json
+          node --input-type=module -e "import fs from 'node:fs'; const report=JSON.parse(fs.readFileSync('reports/loop-engineering.json','utf8')); if (report.status === 'blocked') { console.error('Loop gate bloqueado:', report.findings.length, 'achado(s)'); process.exit(2); }"
