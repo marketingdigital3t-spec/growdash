@@ -110,12 +110,20 @@ export default function ExpertDashboard() {
     () => Array.from(new Set(permittedInsights.map((insight) => insight.ad_id).filter(Boolean))),
     [permittedInsights],
   );
+  const actionAdsetIdByAdId = useMemo(
+    () => Object.fromEntries(permittedInsights.map((insight) => [insight.ad_id, insight.adset_id || null])),
+    [permittedInsights],
+  );
+  const actionDestinationTypeByAdset = useMemo(
+    () => Object.fromEntries(permittedInsights.filter((insight) => insight.adset_id).map((insight) => [String(insight.adset_id), insight.adset_destination_type || null])),
+    [permittedInsights],
+  );
   const actionQuery = useActionTotalsByAds(
     actionAdIds,
     startDate,
     endDate,
     actionAccountMap,
-    { adAccountIds: selectedAccountIds, attributionWindowsByAccount },
+    { adAccountIds: selectedAccountIds, attributionWindowsByAccount, adsetIdByAdId: actionAdsetIdByAdId, destinationTypeByAdset: actionDestinationTypeByAdset },
   );
   const actionData = actionQuery.data;
   const scopedRevenueDeals = useMemo(

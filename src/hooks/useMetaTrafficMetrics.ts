@@ -81,7 +81,9 @@ export function useMetaTrafficMetrics(scope: MetaTrafficScope, enabled = true): 
   const rows = useMemo(() => insights.data || [], [insights.data]);
   const adIds = useMemo(() => Array.from(new Set(rows.map((row) => row.ad_id).filter(Boolean))), [rows]);
   const adAccountByAdId = useMemo(() => Object.fromEntries(rows.map((row) => [row.ad_id, row.ad_account_id])), [rows]);
-  const actions = useActionTotalsByAds(adIds, parseBusinessDate(scope.startDate, scope.timezone), parseBusinessDate(scope.endDate, scope.timezone), adAccountByAdId, { adAccountIds: accountIds, campaignIds: scope.campaignIds, attributionWindow, attributionWindowsByAccount });
+  const adsetIdByAdId = useMemo(() => Object.fromEntries(rows.map((row) => [row.ad_id, row.adset_id || null])), [rows]);
+  const destinationTypeByAdset = useMemo(() => Object.fromEntries(rows.filter((row) => row.adset_id).map((row) => [String(row.adset_id), row.adset_destination_type || null])), [rows]);
+  const actions = useActionTotalsByAds(adIds, parseBusinessDate(scope.startDate, scope.timezone), parseBusinessDate(scope.endDate, scope.timezone), adAccountByAdId, { adAccountIds: accountIds, campaignIds: scope.campaignIds, attributionWindow, attributionWindowsByAccount, adsetIdByAdId, destinationTypeByAdset });
   const campaignIds = useMemo(() => Array.from(new Set((scope.campaignIds?.length ? scope.campaignIds : rows.map((row) => row.campaign_id).filter(Boolean)) as string[])), [rows, scope.campaignIds]);
   const attributionWindowByCampaign = useMemo(() => {
     const windowByAccount = Object.fromEntries(scopedAccounts.map((account) => [account.id, attributionWindowsByAccount[account.id] || "account_default"]));

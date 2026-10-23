@@ -100,12 +100,14 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
     for (const r of insights) m[r.ad_id] = r.ad_account_id;
     return m;
   }, [insights]);
+  const adsetIdByAdId = useMemo(() => Object.fromEntries(insights.map((row) => [row.ad_id, row.adset_id || null])), [insights]);
+  const destinationTypeByAdset = useMemo(() => Object.fromEntries(insights.filter((row) => row.adset_id).map((row) => [String(row.adset_id), row.adset_destination_type || null])), [insights]);
   const { data: actionData = { totals: {}, totalsByAccount: {}, dailyByAccount: {}, dailyByAd: {}, totalsByAd: {}, valueTotalsByAd: {}, excludedAdCount: 0, metaLeadActions: { forms: 0, site: 0, conversations: 0, total: 0 }, leadBreakdownByAd: {}, dailyMetaLeadByAccount: {} } } = useActionTotalsByAds(
     allAdIds,
     startDate,
     endDate,
     adAccountByAdId,
-    { adAccountIds: Array.from(new Set(insights.map((row) => row.ad_account_id).filter(Boolean) as string[])) },
+    { adAccountIds: Array.from(new Set(insights.map((row) => row.ad_account_id).filter(Boolean) as string[])), adsetIdByAdId, destinationTypeByAdset },
   );
 
   // === STEP 2: classify each campaign by its real conversion mechanism ===

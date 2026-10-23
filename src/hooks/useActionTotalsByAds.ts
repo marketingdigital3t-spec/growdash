@@ -38,6 +38,13 @@ export interface ActionScope {
   attributionWindow?: string;
   /** Per-account windows used when a consolidated view has mixed settings. */
   attributionWindowsByAccount?: Record<string, string>;
+  /** Catalog facts already present in the canonical Insights snapshot. */
+  adsetIdByAdId?: Record<string, string | null | undefined>;
+  destinationTypeByAdset?: Record<string, string | null | undefined>;
+}
+
+export function hasCompleteMetaAdCatalog(adIds: string[], adsetIdByAdId?: ActionScope["adsetIdByAdId"]) {
+  return Boolean(adsetIdByAdId && adIds.every((adId) => Object.prototype.hasOwnProperty.call(adsetIdByAdId, adId)));
 }
 
 /**
@@ -62,7 +69,11 @@ export function useActionTotalsByAds(
   const scopedCampaigns = [...(scope?.campaignIds || [])].sort();
   const attributionWindow = scope?.attributionWindow || "account_default";
   const attributionWindowsByAccount = scope?.attributionWindowsByAccount || {};
+  const adsetIdByAdId = scope?.adsetIdByAdId || {};
+  const destinationTypeByAdset = scope?.destinationTypeByAdset || {};
   const attributionWindowsSignature = JSON.stringify(Object.entries(attributionWindowsByAccount).sort(([a], [b]) => a.localeCompare(b)));
+  const adCatalogSignature = JSON.stringify(Object.entries(adsetIdByAdId).sort(([a], [b]) => a.localeCompare(b)));
+  const destinationSignature = JSON.stringify(Object.entries(destinationTypeByAdset).sort(([a], [b]) => a.localeCompare(b)));
   const accountMapSignature = adAccountByAdId
     ? JSON.stringify(Object.entries(adAccountByAdId).sort(([a], [b]) => a.localeCompare(b)))
     : "";
@@ -73,6 +84,8 @@ export function useActionTotalsByAds(
     scopedCampaigns.join(","),
     attributionWindow,
     attributionWindowsSignature,
+    adCatalogSignature,
+    destinationSignature,
     startDate ? businessDateKey(startDate) : null,
     endDate ? businessDateKey(endDate) : null,
     accountMapSignature,
@@ -114,31 +127,38 @@ export function useActionTotalsByAds(
         return { totals, totalsByAccount, dailyByAccount, dailyByAd, totalsByAd, valueTotalsByAd, excludedAdCount: 0, metaLeadActions, leadBreakdownByAd, dailyMetaLeadByAccount, leadActionFactCount: 0 };
       }
       const resolvedSortedIds = [...new Set(resolvedIds)].sort();
-      const adsetByAd: Record<string, string> = {};
-      for (let i = 0; i < resolvedSortedIds.length; i += CHUNK_IDS) {
-        const chunk = resolvedSortedIds.slice(i, i + CHUNK_IDS);
-        const data = await fetchCampaignPages(
-          () => supabase.from("ads").select("id, adset_id").in("id", chunk),
-          signal,
-          chunk.length || CHUNK_IDS,
-          "Os anúncios para calcular as ações",
-          2,
-        );
-        for (const r of data as any[]) adsetByAd[r.id] = r.adset_id;
-      }
-      const adsetIds = Array.from(new Set(Object.values(adsetByAd)));
-      const destinationTypeByAdset: Record<string, string | null> = {};
-      for (let i = 0; i < adsetIds.length; i += CHUNK_IDS) {
-        const chunk = adsetIds.slice(i, i + CHUNK_IDS);
-        const data = await fetchCampaignPages(
-          () => supabase.from("adsets").select("id, destination_type").in("id", chunk),
-          signal,
-          chunk.length || CHUNK_IDS,
-          "Os conjuntos para calcular as ações",
-          2,
-        );
-        for (const r of data as any[]) {
-          destinationTypeByAdset[r.id] = r.destination_type || null;
+      const canUseProvidedCatalog = hasCompleteMetaAdCatalog(resolvedSortedIds, adsetIdByAdId);
+      const adsetByAd: Record<string, string | null> = canUseProvidedCatalog
+        ? Object.fromEntries(resolvedSortedIds.map((adId) => [adId, adsetIdByAdId[adId] || null]))
+        : {};
+      const resolvedDestinationTypeByAdset: Record<string, string | null> = canUseProvidedCatalog
+        ? Object.fromEntries(Object.entries(destinationTypeByAdset).map(([id, value]) => [id, value || null]))
+        : {};
+      if (!canUseProvidedCatalog) {
+        for (let i = 0; i < resolvedSortedIds.length; i += CHUNK_IDS) {
+          const chunk = resolvedSortedIds.slice(i, i + CHUNK_IDS);
+          const data = await fetchCampaignPages(
+            () => supabase.from("ads").select("id, adset_id").in("id", chunk),
+            signal,
+            chunk.length || CHUNK_IDS,
+            "Os anúncios para calcular as ações",
+            2,
+          );
+          for (const r of data as any[]) adsetByAd[r.id] = r.adset_id;
+        }
+        const adsetIds = Array.from(new Set(Object.values(adsetByAd).filter(Boolean))) as string[];
+        for (let i = 0; i < adsetIds.length; i += CHUNK_IDS) {
+          const chunk = adsetIds.slice(i, i + CHUNK_IDS);
+          const data = await fetchCampaignPages(
+            () => supabase.from("adsets").select("id, destination_type").in("id", chunk),
+            signal,
+            chunk.length || CHUNK_IDS,
+            "Os conjuntos para calcular as ações",
+            2,
+          );
+          for (const r of data as any[]) {
+            resolvedDestinationTypeByAdset[r.id] = r.destination_type || null;
+          }
         }
       }
       // Historical Meta results remain valid even when the parent campaign is
@@ -148,12 +168,12 @@ export function useActionTotalsByAds(
       const siteEligibleAdScopes = new Set(allowedIds
         .filter((adId) => {
           const adsetId = adsetByAd[adId];
-          return adsetId && String(destinationTypeByAdset[adsetId] || "").toUpperCase() === "WEBSITE";
+          return adsetId && String(resolvedDestinationTypeByAdset[adsetId] || "").toUpperCase() === "WEBSITE";
         })
         .map((adId) => `${resolvedAccountByAd[adId] || ""}|${adId}`));
       const conversationEligibleAdScopes = buildConversationEligibleMetaAdScopes(
         allowedIds.map((adId) => ({ ad_account_id: resolvedAccountByAd[adId] || "", ad_id: adId, adset_id: adsetByAd[adId] || null })),
-        destinationTypeByAdset,
+        resolvedDestinationTypeByAdset,
       );
 
       // === Sum insight_actions only for allowed ads ===

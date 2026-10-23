@@ -139,8 +139,9 @@ Produção responde HTTP 200 e tem headers de segurança, mas não foi possível
 - A chave de `useInsights` foi canonizada para compartilhar a mesma consulta entre escopo de conta única e lista equivalente. O segundo `useActionTotalsByAds` do Dashboard foi removido para evitar leitura duplicada.
 - A reconciliação Meta × RD agora compara somente negócios RD com atribuição Meta confirmada e separa negócios orgânicos/parciais da diferença comparável.
 - Foram adicionados testes de regressão para carregamento Meta, paridade e largura responsiva da sidebar.
+- A checagem autenticada do primeiro deploy reproduziu o gargalo restante: a busca de `ads` para classificar ações Meta excedia 12 segundos. O caminho canônico agora reutiliza `adset_id` e `destination_type` já carregados em Insights, evitando duas consultas de catálogo redundantes; os consumidores do Dashboard e Painel Expert usam o mesmo atalho.
 - Validação local desta rodada: `npx tsc --noEmit`, `npm run lint`, `npm run build` e `npm test -- --run` aprovados (136 arquivos / 596 testes). O checkout também contém arquivos locais não rastreados do trabalho de Loop Engineering; eles foram preservados e não fazem parte deste commit de front-end.
-- Pendente antes da entrega: commit/push do diff relacionado, publicação do `dist` validado no Cloudflare Pages e nova checagem autenticada do preview/domínio nos temas claro e escuro.
+- Validação adicional do gargalo: 137 arquivos / 600 testes aprovados, TypeScript, lint e build aprovados. Pendente antes da entrega: commit/push desta segunda correção, publicação do `dist` atualizado no Cloudflare Pages e nova checagem autenticada do preview/domínio nos temas claro e escuro.
 
 ## Prompt de correção recomendado
 
