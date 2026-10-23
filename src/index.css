@@ -11610,6 +11610,8 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace [data-
   padding: 12px 18px 18px !important;
 }
 .brand-shell .expert-dashboard .expert-chart-card .expert-payment-chart {
+  width: 100% !important;
+  min-width: 0 !important;
   height: 220px !important;
 }
 .brand-shell .expert-dashboard .expert-platform-chart-card .expert-chart-card-content > .flex {
