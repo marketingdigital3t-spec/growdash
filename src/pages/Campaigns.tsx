@@ -88,6 +88,7 @@ import { AccountMultiSelect } from "@/components/dashboard/AccountMultiSelect";
 import { MetaDateRangePicker } from "@/components/dashboard/MetaDateRangePicker";
 import { CAMPAIGN_PAGE_SIZE, INSIGHT_PAGE_SIZE, RELATION_PAGE_SIZE, chunkValues, fetchCampaignPages, resolveCampaignAccountScope } from "@/lib/campaignQuery";
 import { buildFastManualSyncRequest } from "@/lib/syncRequestPlan";
+import { campaignLoadState } from "@/lib/campaignLoading";
 
 type CampSortKey = "status" | "name" | "objective" | "budget" | "salesCount" | "cpa" | "spend" | "leads" | "profit" | "roi" | "roas" | "revenue" | "cpl" | "ctr" | "cpc" | "cpm" | "conversionRate" | "clicks" | "impressions" | "reach" | "frequency" | "linkClicks" | "linkCpc" | "uniqueLinkCtr" | "landingPageViews" | "costPerLandingPageView" | "checkouts" | "costPerCheckout" | "metaPurchases" | "metaCostPerPurchase" | "metaPurchaseRoas";
 type CampColKey = CampaignColumnKey;
@@ -310,7 +311,7 @@ export default function Campaigns() {
     businessUnitId,
     segment,
   } = useGlobalFilters();
-  const { data: adAccounts = [] } = useAdAccounts();
+  const { data: adAccounts = [], isLoading: isLoadingAdAccounts } = useAdAccounts();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
   const visibleAdAccounts = useMemo(() => businessUnitId
     ? adAccounts.filter((account) => account.business_unit_id === businessUnitId || (segment === "infoproduto" && !account.business_unit_id))
@@ -668,6 +669,12 @@ export default function Campaigns() {
   // Insights. Nesse caso a tabela continua utilizável em modo somente leitura
   // e não deve pintar um erro global por cima de dados válidos.
   const showCampaignLoadError = isError && campaigns.length === 0;
+  const campaignsLoading = campaignLoadState({
+    isLoading: isLoading || isLoadingAdAccounts,
+    isFetching: isFetching || isLoadingAdAccounts,
+    hasData: dataUpdatedAt > 0,
+    hasError: isError,
+  }) === "loading";
 
   // Conjuntos e anúncios são carregados por consultas próprias. Assim, abrir
   // esses níveis nunca depende de marcar uma campanha nem do embed da tabela
@@ -1257,7 +1264,7 @@ export default function Campaigns() {
 
               <div className="border-b border-border p-3">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 min-[900px]:grid-cols-6">
-                  {isLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg border border-border bg-muted/60" />) : HEALTH_OPTIONS.map((option) => {
+                  {campaignsLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg border border-border bg-muted/60" />) : HEALTH_OPTIONS.map((option) => {
                     const count = healthCounts[option.id];
                     const selected = healthFilter === option.id;
                     return <button key={option.id} type="button" title={`${count} campanha(s) classificadas como ${option.label.toLowerCase()} no período selecionado`} onClick={() => setHealthFilter(selected ? "all" : option.id)} className={cn("campaign-analysis-card flex min-h-14 min-w-0 items-center gap-2 px-3 text-left hover:bg-primary/5", selected && option.active, option.id === "critical" && count > 0 && "shadow-[0_0_18px_-10px_rgba(239,68,68,.9)]")} aria-pressed={selected}><span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", option.dot, option.id === "critical" && count > 0 && "animate-pulse")} /><span className="min-w-0 grow"><span className="block truncate text-[9px] font-black uppercase tracking-wide">{option.label}</span><span className="block text-lg font-black tabular-nums">{count}</span></span></button>;
@@ -1309,7 +1316,7 @@ export default function Campaigns() {
 
           {/* Campaigns Tab */}
           <TabsContent value="campaigns" className={cn("campaigns-campaigns-tab m-0", !analysisMode && "md:min-h-0 md:flex-1 md:overflow-hidden")}>
-            {isLoading ? (
+            {campaignsLoading ? (
               <div className="space-y-2 p-3">{Array.from({ length: 7 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-lg bg-muted/60" />)}</div>
             ) : (
               <Card className={cn(

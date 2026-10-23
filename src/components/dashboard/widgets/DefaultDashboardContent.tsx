@@ -71,7 +71,7 @@ interface Props {
 }
 
 export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary = false, hideFinancialOverview = false, hideFinancialKpis = false, hideCampaignKpis = false, showAcquisitionAnalytics = false, showCampaignFunnel = true }: Props) {
-  const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId, leadBreakdown, metaAvailability } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, campaigns, startDate, endDate, adAccountId, leadBreakdown, metaAvailability, revenueAvailability } = useDashboard();
   const { data: platformRules = [] } = usePlatformRules();
   const { data: lpConfigs = {} } = useAccountLpConfigs();
   const { data: accountAdsets = [] } = useAccountAdsets(adAccountId);
@@ -520,9 +520,9 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       {!hidePrimary && <section className="dashboard-section" aria-labelledby="dashboard-summary-title">
         <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Visão geral</p><h2 id="dashboard-summary-title">Resumo executivo</h2></div><p className="dashboard-section-description">Resultado consolidado no período selecionado.</p></div>
         <div className="dashboard-primary-kpis gap-2 sm:gap-3">
-        <MetricCard title="Faturamento Bruto" value={salesMetrics.totalGross} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
+        <MetricCard title="Faturamento Bruto" value={salesMetrics.totalGross} icon={<DollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} availability={revenueAvailability} />
         <MetricCard title="Investimento em anúncio" value={adMetrics.totalSpend} icon={<Coins className="h-4 w-4" />} prefix="R$ " decimals={2} tooltip="Investimento atribuído pela Meta Ads no período selecionado." unavailableReason={metaAvailability?.spend ? null : (metaAvailability?.reason || undefined)} />
-        <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue />
+        <MetricCard title="ROAS" value={roas} icon={<TrendingUp className="h-4 w-4" />} suffix="x" decimals={2} colorByValue availability={revenueAvailability} />
         <MetricCard
           title="Lucro"
           value={profit}
@@ -530,6 +530,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
           prefix="R$ "
           decimals={2}
           colorByValue
+          availability={revenueAvailability}
           tooltip="Faturamento líquido − gastos com anúncios − impostos. Não inclui custos de produto, equipe ou operação (não cadastrados no sistema)."
         />
         </div>
@@ -539,7 +540,7 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
       {!hideFinancialOverview && <section className="dashboard-section" aria-labelledby="dashboard-financial-title">
         <div className="dashboard-section-heading"><div><p className="dashboard-section-eyebrow">Financeiro</p><h2 id="dashboard-financial-title">Receita e distribuição</h2></div><p className="dashboard-section-description">Onde o resultado está concentrado.</p></div>
         <div className="dashboard-financial-overview gap-3 sm:gap-4">
-        <PaymentChart byPayment={salesMetrics.byPayment} />
+        <PaymentChart byPayment={salesMetrics.byPayment} availability={revenueAvailability} />
 
         <Card className="dashboard-terra-card">
           <CardHeader className="pb-3 space-y-3">
@@ -685,10 +686,10 @@ export function DefaultDashboardContent({ onEditSale: _onEditSale, hidePrimary =
         </Card>
 
         {!hideFinancialKpis && <div className="grid grid-cols-2 gap-3">
-          <MetricCard title="Margem" value={profitMargin} icon={<Percent className="h-4 w-4" />} suffix="%" decimals={2} colorByValue />
-          <MetricCard title="Recebíveis" value={salesMetrics.receivables} icon={<Receipt className="h-4 w-4" />} prefix="R$ " decimals={2} />
-          <MetricCard title="Ticket Médio" value={ticketMedio} icon={<BadgeDollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} />
-          <MetricCard title="Lucro" value={profit} icon={<PiggyBank className="h-4 w-4" />} prefix="R$ " decimals={2} colorByValue />
+          <MetricCard title="Margem" value={profitMargin} icon={<Percent className="h-4 w-4" />} suffix="%" decimals={2} colorByValue availability={revenueAvailability} />
+          <MetricCard title="Recebíveis" value={salesMetrics.receivables} icon={<Receipt className="h-4 w-4" />} prefix="R$ " decimals={2} availability={revenueAvailability} />
+          <MetricCard title="Ticket Médio" value={ticketMedio} icon={<BadgeDollarSign className="h-4 w-4" />} prefix="R$ " decimals={2} availability={revenueAvailability} />
+          <MetricCard title="Lucro" value={profit} icon={<PiggyBank className="h-4 w-4" />} prefix="R$ " decimals={2} colorByValue availability={revenueAvailability} />
         </div>}
         </div>
       </section>}

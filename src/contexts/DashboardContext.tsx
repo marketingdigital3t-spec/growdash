@@ -3,6 +3,7 @@ import type { InsightRow } from "@/hooks/useInsights";
 import type { Sale } from "@/hooks/useSales";
 import type { RDDealLite } from "@/hooks/useRDDealsForPeriod";
 import type { WidgetMetric } from "@/lib/widgetCatalog";
+import type { MetricAvailability } from "@/lib/metricAvailability";
 
 export interface DashboardContextValue {
   startDate: Date;
@@ -29,6 +30,7 @@ export interface DashboardContextValue {
     spend: boolean;
     reason?: string | null;
   };
+  revenueAvailability?: MetricAvailability;
   /**
    * Read-only dashboards can provide a metric whose business definition is
    * different from the acquisition dashboard (for example, sold / RD leads).

@@ -5,7 +5,7 @@ import { METRIC_LABELS, type WidgetConfig, type WidgetMetric } from "@/lib/widge
 import { Activity } from "lucide-react";
 
 export function KPIWidget({ title, config }: { title: string; config: WidgetConfig }) {
-  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, metricOverrides, revenueUnavailableReason } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, metricOverrides, revenueUnavailableReason, revenueAvailability } = useDashboard();
   const metric = (config.metric ?? "leads") as WidgetMetric;
   const k = computeKpi(metric, insights, sales, revenueDeals, leadBreakdown);
   if (metricOverrides?.[metric] !== undefined) k.value = metricOverrides[metric]!;
@@ -33,13 +33,14 @@ export function KPIWidget({ title, config }: { title: string; config: WidgetConf
         icon={<Activity className="h-4 w-4" />}
         tooltip={leadTooltip}
         unavailableReason={revenueMetric ? revenueUnavailableReason : null}
+        availability={revenueMetric ? revenueAvailability : undefined}
       />
     </div>
   );
 }
 
 export function KPIGridWidget({ config }: { config: WidgetConfig }) {
-  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown } = useDashboard();
+  const { insights, sales, rdDeals, revenueDeals = rdDeals, leadBreakdown, revenueAvailability } = useDashboard();
   const metrics = (config.metrics ?? ["spend", "leads", "cpl", "ctr"]) as WidgetMetric[];
   return (
     <div className="gd-auto-grid-compact h-full gap-2">
@@ -59,6 +60,7 @@ export function KPIGridWidget({ config }: { config: WidgetConfig }) {
             decimals={k.decimals}
             icon={<Activity className="h-4 w-4" />}
             tooltip={leadTooltip}
+            availability={(["revenue_net", "revenue_gross", "sales_count", "roas", "roi", "profit", "profit_margin", "receivables", "average_ticket"] as WidgetMetric[]).includes(m) ? revenueAvailability : undefined}
           />
         );
       })}

@@ -30,6 +30,7 @@ import { NO_LINKED_RD_FUNNEL_SCOPE_ID } from "@/lib/rdAccountScope";
 import { useToast } from "@/hooks/use-toast";
 import { TrafficClassAlerts } from "@/components/dashboard/TrafficClassAlerts";
 import { useEventClasses } from "@/hooks/useEventClasses";
+import { type MetricAvailability } from "@/lib/metricAvailability";
 
 
 const Index = () => {
@@ -107,31 +108,36 @@ const Index = () => {
     startDate: businessDateKey(startDate),
     endDate: businessDateKey(endDate),
   }, !loadingAdAccounts);
-  const { data: sales = [] } = useSales({
+  const salesQuery = useSales({
     startDate,
     endDate,
     funnelIds: scopedRDfunnelIds,
     adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
     adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
   });
+  const sales = salesQuery.data ?? [];
   // O Dashboard separa duas leituras do RD: pipeline pelo período de criação
   // e vendas pelo momento do fechamento. A leitura de vendas é explícita para
   // não depender do carregamento completo do Kanban e não misturar registros
   // financeiros extras ao total de negócios ganhos.
-  const { data: rdDeals = [], isError: rdDealsError, error: rdDealsQueryError, refetch: refetchRDDeals } = useRDDealsForPeriod({
+  const rdDealsQuery = useRDDealsForPeriod({
     startDate,
     endDate,
     adAccountIds: scopedAccountIds,
     funnelIds: scopedRDfunnelIds,
     enabled: isRDScopeReady,
   });
-  const { data: rdWonDeals = [], isError: rdWonDealsError, refetch: refetchRDWonDeals } = useRDWonDealsForPeriod({
+  const rdDeals = rdDealsQuery.data ?? [];
+  const rdWonDealsQuery = useRDWonDealsForPeriod({
     startDate,
     endDate,
     adAccountIds: scopedAccountIds,
     funnelIds: scopedRDfunnelIds,
     enabled: isRDScopeReady,
   });
+  const rdWonDeals = rdWonDealsQuery.data ?? [];
+  const { isError: rdWonDealsError, dataUpdatedAt: rdWonDealsUpdatedAt, isLoading: loadingRDWonDeals, isFetching: fetchingRDWonDeals, refetch: refetchRDWonDeals } = rdWonDealsQuery;
+  const { isError: rdDealsError, error: rdDealsQueryError, isLoading: loadingRDDeals, isFetching: fetchingRDDeals } = rdDealsQuery;
   const { data: alerts = [] } = useAlerts();
   const { data: eventClasses = [] } = useEventClasses();
   const syncMeta = useSyncMeta();
@@ -242,6 +248,16 @@ const Index = () => {
   }, [dashboardMeta.data.metricAvailability.leads, hasMetaSnapshot]);
   const periodDays = Math.max(1, differenceInCalendarDays(endDate, startDate) + 1);
   const forecast30 = glassSales.totalNet / periodDays * 30;
+  const revenueAvailability = useMemo<MetricAvailability>(() => {
+    const hasSnapshot = salesQuery.data !== undefined || rdWonDealsQuery.data !== undefined;
+    const fetching = salesQuery.isFetching || fetchingRDDeals || fetchingRDWonDeals;
+    const failed = salesQuery.isError || rdDealsError || rdWonDealsError;
+    if (!hasSnapshot && (salesQuery.isLoading || loadingRDDeals || loadingRDWonDeals)) return { state: "loading" };
+    if (!hasSnapshot && failed) return { state: "unavailable", reason: "O último snapshot financeiro não está disponível." };
+    if (failed) return { state: "partial", reason: "O último snapshot financeiro foi preservado; a reconciliação continua pendente." };
+    if (fetching) return { state: "stale", reason: "Atualizando em segundo plano; o último snapshot permanece visível." };
+    return { state: "fresh" };
+  }, [fetchingRDDeals, fetchingRDWonDeals, loadingRDDeals, loadingRDWonDeals, rdDealsError, rdWonDealsQuery.data, rdWonDealsError, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
 
   const handleSync = useCallback(() => {
     // A mutation já invalida as consultas de insights ao terminar. Refazer a
@@ -392,13 +408,13 @@ const Index = () => {
       </div>}
 
       {(rdDealsError || rdWonDealsError) && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300" role="status">
-        <span className="min-w-0 grow">Não foi possível consultar o RD Station para o período selecionado. Os valores do RD não foram convertidos em zero.</span>
+        <span className="min-w-0 grow">Não foi possível atualizar o RD Station. O último snapshot foi preservado{rdWonDealsUpdatedAt ? ` às ${new Date(rdWonDealsUpdatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}` : ""}; os valores não foram convertidos em zero.</span>
         <span className="max-w-full truncate text-[10px]" title={rdDealsQueryError instanceof Error ? rdDealsQueryError.message : undefined}>{rdDealsQueryError instanceof Error ? rdDealsQueryError.message : "Backend RD temporariamente indisponível."}</span>
         <button type="button" className="font-bold underline underline-offset-2" onClick={() => { void refetchRDDeals(); void refetchRDWonDeals(); }}>Tentar novamente</button>
       </div>}
 
       <div>
-        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} metricAvailability={glassMetaAvailability} unavailableReason={dashboardMeta.data.unavailableReason} />
+        <DashboardGlassStrip revenue={glassSales.totalGross} spend={glassSpend} leads={glassLeads} leadsBreakdown={leadBreakdown} cpl={glassCpl} roas={glassRoas} forecast30={forecast30} sales={glassSales.totalQuantity} loading={isLoading || dashboardMeta.isLoading || syncMeta.isPending} hasSnapshot={hasMetaSnapshot} metricAvailability={{ ...glassMetaAvailability, revenue: revenueAvailability.state !== "loading" && revenueAvailability.state !== "unavailable", forecast: revenueAvailability.state !== "loading" && revenueAvailability.state !== "unavailable", sales: revenueAvailability.state !== "loading" && revenueAvailability.state !== "unavailable" }} unavailableReason={dashboardMeta.data.unavailableReason || revenueAvailability.reason} />
       </div>
 
       <div>
@@ -420,6 +436,7 @@ const Index = () => {
             adAccounts: visibleAccounts,
             products,
             isLoading,
+            revenueAvailability,
             leadBreakdown,
             metaAvailability: {
               spend: hasCanonicalMetaRows || dashboardInsights.length > 0,

@@ -20,7 +20,7 @@ interface Props {
   /** Availability is tracked per provider block so a slow lead/action
    * reconciliation cannot hide a confirmed spend snapshot (or turn an
    * unconfirmed lead count into zero). */
-  metricAvailability?: Partial<Record<"spend" | "leads" | "conversations" | "cpl" | "roas", boolean>>;
+  metricAvailability?: Partial<Record<"revenue" | "spend" | "leads" | "conversations" | "cpl" | "roas" | "forecast" | "sales", boolean>>;
 }
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -34,17 +34,18 @@ export function DashboardGlassStrip({ revenue, spend, leads, cpl, roas, forecast
   });
   useEffect(() => { try { localStorage.setItem("growdash:glass-strip-collapsed", collapsed ? "1" : "0"); } catch {} }, [collapsed]);
   const compact = isMobile && collapsed;
-  const display = (value: string, requiresMeta = true, metric?: keyof typeof metricAvailability) => !requiresMeta || (metric ? metricAvailability[metric] ?? hasSnapshot : hasSnapshot)
+  const availabilityMap = metricAvailability;
+  const display = (value: string, requiresMeta = true, metric?: keyof typeof availabilityMap) => !requiresMeta || (metric ? availabilityMap[metric] ?? hasSnapshot : hasSnapshot)
     ? value
     : (loading ? "Aguardando sincronização" : unavailableReason || "Indisponível");
   const metrics: GlassMetric[] = [
-    { label: "Faturamento bruto", value: display(brl.format(revenue), false), icon: <DollarSign /> },
+    { label: "Faturamento bruto", value: display(brl.format(revenue), true, "revenue"), icon: <DollarSign /> },
     { label: "Investimento em anúncio", value: display(brl.format(spend), true, "spend"), icon: <Coins /> },
     { label: "Leads", value: display(integer.format(leads), true, "leads"), icon: <Users /> },
     { label: "CPL", value: display(brl.format(cpl), true, "cpl"), icon: <BarChart3 /> },
     { label: "ROAS", value: display(`${roas.toFixed(2)}x`, true, "roas"), icon: <TrendingUp />, tone: roas >= 1 ? "good" : "negative" },
-    { label: "Previsão 30d", value: display(brl.format(forecast30), false), icon: <TrendingUp />, tone: forecast30 < 0 ? "negative" : undefined },
-    { label: "Vendas", value: display(integer.format(sales), false), icon: <ShoppingCart /> },
+    { label: "Previsão 30d", value: display(brl.format(forecast30), true, "forecast"), icon: <TrendingUp />, tone: forecast30 < 0 ? "negative" : undefined },
+    { label: "Vendas", value: display(integer.format(sales), true, "sales"), icon: <ShoppingCart /> },
   ];
 
   return <section className="dashboard-summary-strip sticky top-[calc(88px+env(safe-area-inset-top))] z-20 mx-1 min-w-0 sm:mx-2 lg:top-[49px]" aria-label="Resumo fixo do Dashboard">

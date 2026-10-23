@@ -1,19 +1,19 @@
 # Growdash — auditoria de problemas percebidos pelo usuário
 
 Data: 2026-10-23 (America/Sao_Paulo). Escopo: front-end, fluxos autenticados, contratos de métricas, integrações visíveis e confiabilidade de carregamento.
-Status: diagnóstico; nenhum código, banco, integração ou permissão foi alterado nesta rodada.
+Status: correções front-end aplicadas localmente; banco, integrações externas e produção não foram alterados/verificados.
 
 ## Resumo executivo
 
-O Growdash compila e os testes unitários estão verdes, mas ainda não é seguro tratar todos os números exibidos como uma única fonte operacional. O risco mais grave é a coexistência de KPIs diferentes para o mesmo período/conta: o dashboard chegou a mostrar `R$ 0 / 0 vendas`, enquanto o gráfico de pagamentos mostrava `R$ 76.500` e o CRM mostrava `10 vendas`. Para uma plataforma de decisão comercial, essa inconsistência é P1.
+As correções locais agora propagam um contrato explícito de disponibilidade para os KPIs financeiros: carregando e indisponível não viram zero, enquanto snapshots antigos/parciais continuam visíveis. Saúde dos Dados passou a respeitar conta/workspace/período, a auditoria RD pagina até a última página e Campanhas diferencia carregamento de lista vazia. A validação autenticada em produção ainda é necessária.
 
 Também foi reproduzido um timeout de reconciliação do RD Station que aparece para o usuário mesmo quando a tela mantém dados anteriores válidos. A troca de tema expôs outro estado problemático: os KPIs passaram de números para “Indisponível” e não se recuperaram durante a observação. O CSS não foi provado como causa; o que está provado é a perda aparente de disponibilidade durante a troca.
 
 ## Estado técnico verificado
 
 - Branch `main` alinhada com `origin/main` (`0` à frente, `0` atrás).
-- Commit local auditado: `c90dd8f`.
-- `npm test`: 121 arquivos / 568 testes aprovados.
+- Commit local auditado antes da correção: `c90dd8f`.
+- `npm test`: 124 arquivos / 572 testes aprovados após a correção.
 - `npm run lint`: 0 erros / 20 avisos.
 - `npm run build`: aprovado; Vite alerta para chunks acima de 500 KB.
 - Produção `https://growdash.com.br/`: HTTP 200, CSP/HSTS/X-Frame-Options/nosniff presentes.
@@ -83,6 +83,14 @@ Produção responde HTTP 200 e tem headers de segurança, mas não foi possível
 
 `npm run lint` termina com 0 erros e 20 avisos `react-refresh/only-export-components` (e uma diretiva sem efeito). Separar helpers/constantes de componentes em lote de manutenção.
 
+## Correções executadas nesta rodada
+
+- `src/lib/metricAvailability.ts` define `loading`, `fresh`, `stale`, `partial` e `unavailable`; Dashboard, cards financeiros e gráfico de pagamentos usam o mesmo estado.
+- Falha/timeout do RD preserva o snapshot anterior, informa o horário disponível e mantém a ação de nova tentativa; troca de tema não limpa os dados em cache.
+- Saúde dos Dados inclui workspace, conta e período na query key/filtros; vendas vinculadas por funil são consideradas e a auditoria operacional pagina em blocos de 1.000 sem teto de 10.000.
+- Campanhas exibe skeleton enquanto a consulta ou o catálogo de contas ainda está pendente; “0 campanhas” só aparece após resposta concluída.
+- Testes novos: `metricAvailability`, `pagination` e `campaignLoading`; a suíte completa passou com 124 arquivos e 572 testes.
+
 ## Evidência por rota
 
 1. `/` — carregou, mas apresentou a divergência de KPIs descrita em UX-001.
@@ -104,7 +112,9 @@ Produção responde HTTP 200 e tem headers de segurança, mas não foi possível
 
 - Não foi validada paridade completa Meta/RD, OAuth, permissões, webhooks, WhatsApp, Google ou Supabase com operações reais.
 - UX-003 não foi atribuído ao CSS; só a perda de disponibilidade durante o rerender foi reproduzida.
-- Não foi feita correção de código nesta rodada.
+- Correções locais aplicadas: disponibilidade financeira, preservação/copy de snapshot RD, escopo e paginação da Saúde dos Dados, loading de Campanhas e testes puros de regressão.
+- Performance: build continua alertando chunks acima de 500 KB; não foi feita refatoração especulativa sem uma fronteira de import segura.
+- Ainda pendente: validação visual autenticada em claro/escuro, paridade real Meta/RD e publicação/manifesto de produção.
 
 ## Prompt de correção recomendado
 

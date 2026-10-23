@@ -19,6 +19,8 @@ import { Inbox } from "lucide-react";
 import { PlatformPerformanceCard } from "@/components/data-health/PlatformPerformanceCard";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { canonicalWonDate, isCanonicalWonDeal } from "@/lib/canonicalMetrics";
+import { shouldFetchNextPage } from "@/lib/pagination";
+import { businessDateKey } from "@/lib/businessDate";
 
 interface HealthData {
   orphanSales: number;
@@ -37,16 +39,28 @@ function formatSafeDate(value: string | Date | null | undefined, pattern: string
   return isValid(date) ? format(date, pattern, { locale: ptBR }) : "data inválida";
 }
 
-function useHealth() {
+function useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate }: { workspaceId?: string; adAccountId: string; adAccountIds: string[]; startDate: Date; endDate: Date }) {
+  const scopedAccountIds = adAccountId !== "all" ? [adAccountId] : adAccountIds;
   return useQuery({
-    queryKey: ["data-health"],
+    queryKey: ["data-health", workspaceId ?? null, scopedAccountIds.slice().sort().join(","), businessDateKey(startDate), businessDateKey(endDate)],
     queryFn: async (): Promise<HealthData> => {
+      let linkedFunnelIds: string[] = [];
+      if (scopedAccountIds.length) {
+        const { data: funnels } = await supabase.from("rd_funnels").select("id").in("ad_account_id", scopedAccountIds);
+        linkedFunnelIds = (funnels ?? []).map((funnel: any) => String(funnel.id)).filter(Boolean);
+      }
+      const rdScopeFilters = scopedAccountIds.length
+        ? [`ad_account_id.in.(${scopedAccountIds.join(",")})`, ...(linkedFunnelIds.length ? [`rd_funnel_id.in.(${linkedFunnelIds.join(",")})`] : [])]
+        : [];
       // Orphan sales: sales with rd_deal_id but no matching rd_deals
-      const { data: sales } = await supabase
+      let salesQuery = supabase
         .from("sales")
         .select("rd_deal_id")
         .eq("status", "confirmed")
         .not("rd_deal_id", "is", null);
+      if (rdScopeFilters.length > 1) salesQuery = salesQuery.or(rdScopeFilters.join(","));
+      else if (scopedAccountIds.length) salesQuery = salesQuery.in("ad_account_id", scopedAccountIds);
+      const { data: sales } = await salesQuery;
       const dealIds = (sales || []).map((s: any) => s.rd_deal_id).filter(Boolean);
       let orphanSales = 0;
       if (dealIds.length > 0) {
@@ -54,27 +68,38 @@ function useHealth() {
         const matched = new Set<string>();
         for (let i = 0; i < dealIds.length; i += CHUNK) {
           const slice = dealIds.slice(i, i + CHUNK);
-          const { data: rd } = await supabase.from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
+          let rdQuery = supabase.from("rd_deals").select("rd_deal_id").in("rd_deal_id", slice);
+          if (rdScopeFilters.length > 1) rdQuery = rdQuery.or(rdScopeFilters.join(","));
+          else if (scopedAccountIds.length) rdQuery = rdQuery.in("ad_account_id", scopedAccountIds);
+          const { data: rd } = await rdQuery;
           for (const r of (rd || []) as any[]) matched.add(r.rd_deal_id);
         }
         orphanSales = dealIds.filter((id) => !matched.has(id)).length;
       }
 
       // Deals missing state
-      const { count: missing } = await supabase
-        .from("rd_deals").select("id", { count: "exact", head: true })
-        .is("lead_state", null);
-      const { count: total } = await supabase
-        .from("rd_deals").select("id", { count: "exact", head: true });
+      let missingQuery = supabase.from("rd_deals").select("id", { count: "exact", head: true }).is("lead_state", null);
+      let totalQuery = supabase.from("rd_deals").select("id", { count: "exact", head: true });
+      if (rdScopeFilters.length > 1) {
+        missingQuery = missingQuery.or(rdScopeFilters.join(","));
+        totalQuery = totalQuery.or(rdScopeFilters.join(","));
+      } else if (scopedAccountIds.length) {
+        missingQuery = missingQuery.in("ad_account_id", scopedAccountIds);
+        totalQuery = totalQuery.in("ad_account_id", scopedAccountIds);
+      }
+      const { count: missing } = await missingQuery;
+      const { count: total } = await totalQuery;
 
-      // Days with spend > 0 but no leads (last 30 days, rough)
-      const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-      const { data: ins } = await supabase
+      // Days with spend > 0 but no leads in the selected calendar scope.
+      const since = businessDateKey(startDate);
+      let insightsQuery = supabase
         .from("insights")
         .select("date, spend, form_leads, site_leads, conversations")
         .gte("date", since)
-        .gt("spend", 0)
-        .limit(5000);
+        .lte("date", businessDateKey(endDate))
+        .gt("spend", 0);
+      if (scopedAccountIds.length) insightsQuery = insightsQuery.in("ad_account_id", scopedAccountIds);
+      const { data: ins } = await insightsQuery;
       const byDate = new Map<string, { spend: number; leads: number }>();
       for (const r of (ins || []) as any[]) {
         const cur = byDate.get(r.date) || { spend: 0, leads: 0 };
@@ -85,20 +110,29 @@ function useHealth() {
       const daysSpendNoLeads = Array.from(byDate.values()).filter((v) => v.spend > 0 && v.leads === 0).length;
 
       // Accounts and LP config status
-      const { data: accounts } = await supabase
+      let accountsQuery = supabase
         .from("ad_accounts")
         .select("id, name, last_sync_success_at, connection_status")
         .eq("connection_status", "connected");
-      const { data: oauthIntegrations } = await supabase
+      if (workspaceId) accountsQuery = accountsQuery.eq("workspace_id", workspaceId);
+      if (scopedAccountIds.length) accountsQuery = accountsQuery.in("id", scopedAccountIds);
+      const { data: accounts } = await accountsQuery;
+      let oauthQuery = supabase
         .from("integrations")
         .select("id, provider, is_active, token_expires_at, permission_health, last_permission_check_at, last_health_error")
         .order("updated_at", { ascending: false });
-      const { data: lpRows } = await supabase.from("account_lp_config").select("ad_account_id, action_type");
-      const { data: rdMetricAudits } = await (supabase as any)
+      if (workspaceId) oauthQuery = oauthQuery.eq("workspace_id", workspaceId);
+      const { data: oauthIntegrations } = await oauthQuery;
+      let lpQuery = supabase.from("account_lp_config").select("ad_account_id, action_type");
+      if (scopedAccountIds.length) lpQuery = lpQuery.in("ad_account_id", scopedAccountIds);
+      const { data: lpRows } = await lpQuery;
+      let rdAuditQuery = (supabase as any)
         .from("rd_metric_reconciliation_audits")
         .select("id, funnel_id, status, rd_won_count, linked_sale_count, missing_sale_count, checked_at")
         .order("checked_at", { ascending: false })
         .limit(100);
+      if (scopedAccountIds.length) rdAuditQuery = rdAuditQuery.in("account_id", scopedAccountIds);
+      const { data: rdMetricAudits } = await rdAuditQuery;
       const lpMap = new Map((lpRows || []).map((r: any) => [r.ad_account_id, r.action_type]));
       const accountsMissingLpConfig = (accounts || [])
         .filter((a: any) => !lpMap.get(a.id))
@@ -122,11 +156,17 @@ function useOperationalAudit(adAccountId: string, startDate: Date, endDate: Date
   return useQuery({
     queryKey: ["rd-operational-audit", adAccountId, startDate.toISOString(), endDate.toISOString()],
     queryFn: async () => {
-      let query = supabase.from("rd_deals").select("rd_deal_id,rd_connection_id,rd_funnel_id,ad_account_id,win,rd_stage_name,lead_created_at,closed_at,stage_updated_at").limit(10000);
-      if (adAccountId !== "all") query = query.eq("ad_account_id", adAccountId);
-      const { data, error } = await query;
-      if (error) throw error;
-      const rows = (data ?? []) as any[];
+      const pageSize = 1000;
+      let rows: any[] = [];
+      for (let page = 0; ; page += 1) {
+        let query = supabase.from("rd_deals").select("rd_deal_id,rd_connection_id,rd_funnel_id,ad_account_id,win,rd_stage_name,lead_created_at,closed_at,stage_updated_at");
+        if (adAccountId !== "all") query = query.eq("ad_account_id", adAccountId);
+        const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as any[];
+        rows = rows.concat(batch);
+        if (!shouldFetchNextPage(batch.length, pageSize)) break;
+      }
       const ids = new Set<string>();
       const sales = rows.filter((deal) => {
         if (!isCanonicalWonDeal(deal)) return false;
@@ -146,7 +186,7 @@ function useOperationalAudit(adAccountId: string, startDate: Date, endDate: Date
 
 export default function DataHealth() {
   const { adAccountId, adAccountIds, startDate, endDate, workspaceId } = useGlobalFilters();
-  const { data, isLoading, refetch } = useHealth();
+  const { data, isLoading, refetch } = useHealth({ workspaceId, adAccountId, adAccountIds, startDate, endDate });
   const { data: operationalAudit, isLoading: auditLoading, error: auditError } = useOperationalAudit(adAccountId, startDate, endDate);
   const [enriching, setEnriching] = useState(false);
   const [reconciling, setReconciling] = useState(false);
@@ -297,7 +337,7 @@ export default function DataHealth() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold tabular-nums">{data.daysSpendNoLeads}</div>
-            <p className="mt-1 text-xs text-muted-foreground">últimos 30 dias</p>
+            <p className="mt-1 text-xs text-muted-foreground">período selecionado</p>
           </CardContent>
         </Card>
 

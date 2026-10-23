@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
+import type { MetricAvailability } from "@/lib/metricAvailability";
 
 interface PaymentChartProps {
   byPayment: { pix: number; cartao: number; boleto: number; outros: number };
   unknownPaymentRevenue?: number;
+  availability?: MetricAvailability;
 }
 
 const COLORS: Record<string, string> = {
@@ -21,12 +23,21 @@ const LABELS: Record<string, string> = {
   outros: "Outros",
 };
 
-export function PaymentChart({ byPayment, unknownPaymentRevenue = 0 }: PaymentChartProps) {
+export function PaymentChart({ byPayment, unknownPaymentRevenue = 0, availability }: PaymentChartProps) {
   const data = Object.entries(byPayment)
     .map(([key, value]) => ({ key, name: key === "outros" && unknownPaymentRevenue > 0 ? "Não informado" : LABELS[key], value }))
     .filter((d) => d.value > 0);
 
   const total = data.reduce((s, d) => s + d.value, 0);
+
+  if (availability?.state === "loading" || availability?.state === "unavailable") {
+    return (
+      <Card className="dashboard-terra-card dashboard-glass-card expert-chart-card h-full">
+        <CardHeader className="expert-chart-card-header pb-2"><CardTitle className="text-sm font-medium">Vendas por Pagamento</CardTitle></CardHeader>
+        <CardContent className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{availability.state === "loading" ? "Carregando vendas…" : "Vendas indisponíveis"}</CardContent>
+      </Card>
+    );
+  }
 
   if (total === 0) {
     return (

@@ -18,10 +18,10 @@ type PlatformRow = PlatformBreakdownRow;
 
 /** A standalone widget so payment and attribution blocks can be edited independently. */
 export function PaymentChartWidget() {
-  const { sales, revenueDeals = [] } = useDashboard();
+  const { sales, revenueDeals = [], revenueAvailability } = useDashboard();
   const salesTotals = aggregateSales(sales);
   const rdTotals = aggregateRevenueSources(sales, revenueDeals);
-  return <PaymentChart byPayment={{ ...salesTotals.byPayment, outros: salesTotals.byPayment.outros + rdTotals.rdOnlyRevenue }} unknownPaymentRevenue={rdTotals.rdOnlyRevenue} />;
+  return <PaymentChart byPayment={{ ...salesTotals.byPayment, outros: salesTotals.byPayment.outros + rdTotals.rdOnlyRevenue }} unknownPaymentRevenue={rdTotals.rdOnlyRevenue} availability={revenueAvailability} />;
 }
 
 /**

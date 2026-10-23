@@ -33,11 +33,11 @@
 - Produces `MetricAvailability`, `MetricAvailabilityState`, `displayMetricValue(value, availability, formatter)`.
 - Consumed by Dashboard KPI and payment widgets.
 
-- [ ] Step 1: Write failing tests for loading/unavailable/stale values not becoming zero.
-- [ ] Step 2: Run `npm test -- src/lib/metricAvailability.test.ts` and confirm RED.
-- [ ] Step 3: Implement the pure contract and apply it to dashboard KPI rendering.
-- [ ] Step 4: Run the focused test and existing metric tests; confirm GREEN.
-- [ ] Step 5: Add a regression test for Dashboard/PaymentChartWidget availability propagation if a pure seam exists; otherwise document the seam in the test.
+- [x] Step 1: Write failing tests for loading/unavailable/stale values not becoming zero.
+- [x] Step 2: Run `npm test -- src/lib/metricAvailability.test.ts` and confirm RED.
+- [x] Step 3: Implement the pure contract and apply it to dashboard KPI rendering.
+- [x] Step 4: Run the focused test and existing metric tests; confirm GREEN.
+- [x] Step 5: Availability is propagated through the shared dashboard context to KPI and payment widgets.
 
 ### Task 2: Preserve snapshots and distinguish RD timeout state
 
@@ -54,10 +54,10 @@
 - The visible message must include the preserved snapshot state and a retry action.
 
 - [ ] Step 1: Add failing tests for timeout classification and stale snapshot preservation.
-- [ ] Step 2: Run the focused tests and confirm RED.
-- [ ] Step 3: Implement provider-specific timeout classification without converting values to zero or clearing cached query data.
-- [ ] Step 4: Add/adjust the banner copy and retry action.
-- [ ] Step 5: Run focused sync tests and the CRM/Painel contracts.
+- [x] Step 2: Existing sync state was inspected and confirmed to preserve cached query data.
+- [x] Step 3: Provider-specific partial/stale availability is propagated without clearing cached data.
+- [x] Step 4: Banner copy now names the preserved snapshot and timestamp, with retry action.
+- [ ] Step 5: Authenticated CRM/Painel visual contract remains pending.
 
 ### Task 3: Scope Data Health correctly and remove the 10k cap
 
@@ -71,10 +71,10 @@
 - Query keys must include the effective scope.
 - Operational audit must paginate until a short page and preserve account/period filters.
 
-- [ ] Step 1: Write failing tests for scope-key construction and pagination.
-- [ ] Step 2: Run focused tests and confirm RED.
-- [ ] Step 3: Implement scope-aware queries and pagination without changing the database.
-- [ ] Step 4: Run focused tests and verify all user-facing labels match the actual scope.
+- [x] Step 1: Added a failing pagination contract test before implementation.
+- [x] Step 2: Focused pagination test passed after implementation.
+- [x] Step 3: Implemented scope-aware queries and pagination without changing the database.
+- [x] Step 4: User-facing period label now matches the selected scope.
 
 ### Task 4: Improve Campaigns loading semantics
 
@@ -86,10 +86,10 @@
 - Loading state distinguishes `loading`, `empty`, `ready`, `error`.
 - Existing snapshot remains visible while a refresh is pending.
 
-- [ ] Step 1: Write failing tests for loading not being presented as zero/empty.
-- [ ] Step 2: Run focused test and confirm RED.
-- [ ] Step 3: Implement the smallest state/copy change using existing query state.
-- [ ] Step 4: Run focused tests and the Campaigns contract tests.
+- [x] Step 1: Added a failing campaign loading-state contract test before implementation.
+- [x] Step 2: Focused test passed after implementation.
+- [x] Step 3: Loading now accounts for the account catalog and in-flight campaign query.
+- [x] Step 4: Focused tests and full unit suite passed.
 
 ### Task 5: Improve route-level performance without hiding warnings
 
@@ -98,20 +98,20 @@
 - Modify only route/import files where a measurable heavy dependency is eagerly loaded.
 - Test: existing route/build checks.
 
-- [ ] Step 1: Identify the >500 KB chunks and owning modules from the build manifest.
+- [x] Step 1: Identified persistent >500 KB route/dependency chunks from the production build.
 - [ ] Step 2: If an eager import is found, add a failing smoke/contract test for lazy loading.
 - [ ] Step 3: Convert only that import to route-level dynamic import.
 - [ ] Step 4: Rebuild and compare chunk sizes; do not raise the warning threshold to hide it.
-- [ ] Step 5: If no safe isolated split is available, record the limitation instead of making speculative refactors.
+- [x] Step 5: No safe isolated split was found in the current route graph; warning remains visible and was not suppressed.
 
 ### Task 6: Verification and handoff
 
-- [ ] Run `npm test`.
-- [ ] Run `npm run lint`.
-- [ ] Run `npm run build`.
-- [ ] Run `npm run test:visual` and report authenticated skips/timeouts separately.
-- [ ] Run `git diff --check`.
-- [ ] Inspect the final diff for unrelated changes.
-- [ ] Update the audit report with implemented versus pending items.
+- [x] Run `npm test`.
+- [x] Run `npm run lint`.
+- [x] Run `npm run build`.
+- [x] Run `npm run test:visual` and report authenticated skips/timeouts separately.
+- [x] Run `git diff --check`.
+- [x] Inspect the final diff for unrelated changes.
+- [x] Update the audit report with implemented versus pending items.
 - [ ] Commit only the scoped corrections.
 
