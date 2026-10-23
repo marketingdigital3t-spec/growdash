@@ -115,7 +115,7 @@ const Index = () => {
     adAccountId: selectedAccountIds.length === 1 ? selectedAccountIds[0] : undefined,
     adAccountIds: selectedAccountIds.length > 1 ? selectedAccountIds : undefined,
   });
-  const sales = salesQuery.data ?? [];
+  const sales = useMemo(() => salesQuery.data ?? [], [salesQuery.data]);
   // O Dashboard separa duas leituras do RD: pipeline pelo período de criação
   // e vendas pelo momento do fechamento. A leitura de vendas é explícita para
   // não depender do carregamento completo do Kanban e não misturar registros
@@ -127,7 +127,7 @@ const Index = () => {
     funnelIds: scopedRDfunnelIds,
     enabled: isRDScopeReady,
   });
-  const rdDeals = rdDealsQuery.data ?? [];
+  const rdDeals = useMemo(() => rdDealsQuery.data ?? [], [rdDealsQuery.data]);
   const rdWonDealsQuery = useRDWonDealsForPeriod({
     startDate,
     endDate,
@@ -135,7 +135,7 @@ const Index = () => {
     funnelIds: scopedRDfunnelIds,
     enabled: isRDScopeReady,
   });
-  const rdWonDeals = rdWonDealsQuery.data ?? [];
+  const rdWonDeals = useMemo(() => rdWonDealsQuery.data ?? [], [rdWonDealsQuery.data]);
   const { isError: rdWonDealsError, dataUpdatedAt: rdWonDealsUpdatedAt, isLoading: loadingRDWonDeals, isFetching: fetchingRDWonDeals, refetch: refetchRDWonDeals } = rdWonDealsQuery;
   const { isError: rdDealsError, error: rdDealsQueryError, isLoading: loadingRDDeals, isFetching: fetchingRDDeals } = rdDealsQuery;
   const { data: alerts = [] } = useAlerts();
@@ -258,6 +258,33 @@ const Index = () => {
     if (fetching) return { state: "stale", reason: "Atualizando em segundo plano; o último snapshot permanece visível." };
     return { state: "fresh" };
   }, [fetchingRDDeals, fetchingRDWonDeals, loadingRDDeals, loadingRDWonDeals, rdDealsError, rdWonDealsQuery.data, rdWonDealsError, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
+  const dashboardMetricAvailability = useMemo(() => {
+    const state = (available: boolean, reason?: string | null): MetricAvailability => {
+      if (dashboardMeta.isLoading) return { state: "loading" };
+      if (available) return dashboardMeta.data.status === "syncing"
+        ? { state: "stale", reason: "Atualizando Meta em segundo plano; o último snapshot permanece visível." }
+        : dashboardMeta.data.rowCount === 0 ? { state: "empty_confirmed" } : { state: "fresh" };
+      return { state: "unavailable", reason: reason || dashboardMeta.data.unavailableReason || "Dados Meta indisponíveis para este recorte." };
+    };
+    const leadsAvailable = dashboardMeta.data.metricAvailability.leads?.available === true;
+    return {
+      spend: state(hasMetaSnapshot, dashboardMeta.data.unavailableReason),
+      leads: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
+      cpl: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
+      campaign_leads: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
+      campaign_cpl: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
+      campaign_conversion_rate: state(leadsAvailable, dashboardMeta.data.metricAvailability.leads?.reason),
+      revenue_gross: revenueAvailability,
+      revenue_net: revenueAvailability,
+      sales_count: revenueAvailability,
+      roas: revenueAvailability,
+      roi: revenueAvailability,
+      profit: revenueAvailability,
+      profit_margin: revenueAvailability,
+      receivables: revenueAvailability,
+      average_ticket: revenueAvailability,
+    };
+  }, [dashboardMeta.data.metricAvailability.leads, dashboardMeta.data.rowCount, dashboardMeta.data.status, dashboardMeta.data.unavailableReason, dashboardMeta.isLoading, hasMetaSnapshot, revenueAvailability]);
 
   const handleSync = useCallback(() => {
     // A mutation já invalida as consultas de insights ao terminar. Refazer a
@@ -437,6 +464,7 @@ const Index = () => {
             products,
             isLoading,
             revenueAvailability,
+            metricAvailability: dashboardMetricAvailability,
             leadBreakdown,
             metaAvailability: {
               spend: hasCanonicalMetaRows || dashboardInsights.length > 0,

@@ -53,15 +53,15 @@ async function assertWriteAuthorized(admin: AdminClient, userId: string, connect
   const owner = connection.user_id === userId;
   let workspaceManager = false;
   if (!owner && connection.workspace_id) {
-    const { data, error } = await admin.rpc("can_manage_workspace", {
+    const { data, error } = await admin.rpc("can_edit_workspace", {
       _workspace_id: connection.workspace_id,
       _user_id: userId,
     });
-    if (error) throw new RDWriteError("RD_WRITE_PERMISSION_CHECK_FAILED", "Não foi possível validar a permissão da organização.", 500);
+    if (error) throw new RDWriteError("RD_WRITE_PERMISSION_CHECK_FAILED", "Não foi possível validar a permissão de edição do workspace.", 500);
     workspaceManager = data === true;
   }
   if (!owner && !workspaceManager) {
-    throw new RDWriteError("RD_WRITE_FORBIDDEN", "Usuário sem permissão para escrever nesta conexão RD.");
+    throw new RDWriteError("RD_WRITE_FORBIDDEN", "Usuário sem permissão de edição para escrever nesta conexão RD.");
   }
   return connection;
 }

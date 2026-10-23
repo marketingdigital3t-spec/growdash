@@ -31,6 +31,8 @@ export interface DashboardContextValue {
     reason?: string | null;
   };
   revenueAvailability?: MetricAvailability;
+  /** Availability for non-financial KPIs, such as Meta leads and spend. */
+  metricAvailability?: Partial<Record<WidgetMetric, MetricAvailability>>;
   /**
    * Read-only dashboards can provide a metric whose business definition is
    * different from the acquisition dashboard (for example, sold / RD leads).

@@ -62,6 +62,7 @@ import { useRDDealNotes, useCreateRDDealNote } from "@/hooks/useRDDealNotes";
 import { PageHeading } from "./shared";
 import CrmAIWorkspace from "./CrmAIWorkspace";
 import { useResolvedRDAccountFunnelScope } from "@/hooks/useResolvedRDAccountFunnelScope";
+import type { MetricAvailability } from "@/lib/metricAvailability";
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const number = new Intl.NumberFormat("pt-BR");
@@ -115,9 +116,10 @@ type CrmMetricCardProps = {
   description: string;
   icon: ReactNode;
   tone: "meta" | "rd" | "revenue" | "success";
+  availability?: MetricAvailability;
 };
 
-function CrmMetricCard({ source, label, value, description, icon, tone }: CrmMetricCardProps) {
+function CrmMetricCard({ source, label, value, description, icon, tone, availability }: CrmMetricCardProps) {
   const toneClass = tone === "success"
     ? "text-emerald-600 dark:text-emerald-400"
     : tone === "revenue"
@@ -136,7 +138,7 @@ function CrmMetricCard({ source, label, value, description, icon, tone }: CrmMet
         </div>
         <span className={cn("gd-metric-icon grid h-9 w-9 shrink-0 place-items-center rounded-xl", toneClass)}>{icon}</span>
       </div>
-      <p className={cn("mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight", toneClass)} title={value}>{value}</p>
+      <p className={cn("mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.35rem,2.25vw,1.9rem)] font-black tracking-tight", toneClass, availability && !["fresh", "stale", "partial", "empty_confirmed"].includes(availability.state) && "text-muted-foreground")} title={availability?.reason || value}>{availability?.state === "loading" ? "Carregando…" : availability && !["fresh", "stale", "partial", "empty_confirmed"].includes(availability.state) ? "Indisponível" : value}</p>
       <p className="mt-1 line-clamp-2 text-xs font-medium leading-4 text-muted-foreground">{description}</p>
     </article>
   );
@@ -213,6 +215,7 @@ export default function CrmPage() {
     isLoading: loadingDeals,
     isFetching,
     isPlaceholderData: isPreviousDealScope,
+    dataUpdatedAt: dealsUpdatedAt,
     isError: dealsError,
     error: dealsQueryError,
     refetch: refetchDeals,
@@ -284,6 +287,13 @@ export default function CrmPage() {
   // source belongs to the selection.
   const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
   const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingFunnels || loadingDeals || loadingSales;
+  const crmAvailability: MetricAvailability = loadingDeals || loadingFunnels || loadingSales
+    ? (dealsUpdatedAt ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." } : { state: "loading" })
+    : dealsError
+      ? (dealsUpdatedAt ? { state: "partial", reason: "A consulta falhou; o último snapshot permanece visível." } : { state: "unavailable", reason: dealsQueryError instanceof Error ? dealsQueryError.message : "Não foi possível consultar o RD Station." })
+      : dealsUpdatedAt
+        ? (dealData.length ? { state: "fresh" } : { state: "empty_confirmed" })
+        : { state: "loading" };
   const funnels = useMemo(() => isChangingAccountScope ? [] : funnelData, [funnelData, isChangingAccountScope]);
   const allDeals = useMemo(() => isChangingAccountScope ? [] : dealData, [dealData, isChangingAccountScope]);
   const canonicalSales = useMemo(() => isChangingAccountScope ? [] : salesData, [isChangingAccountScope, salesData]);
@@ -869,6 +879,7 @@ export default function CrmPage() {
               description={`${number.format(stats.active)} ativas · ${number.format(stats.won)} fechadas como ganhas no período`}
               icon={<Columns3 className="h-4 w-4" />}
               tone="rd"
+              availability={crmAvailability}
             />
             <CrmMetricCard
               source="Comercial · RD"
@@ -877,6 +888,7 @@ export default function CrmPage() {
               description="Soma das negociações ativas no RD Station"
               icon={<CircleDollarSign className="h-4 w-4" />}
               tone="revenue"
+              availability={crmAvailability}
             />
             <CrmMetricCard
               source="Comercial · RD"
@@ -885,6 +897,7 @@ export default function CrmPage() {
               description={`${number.format(stats.won)} fechamento(s) ganho(s) no período`}
               icon={<Trophy className="h-4 w-4" />}
               tone="success"
+              availability={crmAvailability}
             />
             <CrmMetricCard
               source="Conversão · RD"
@@ -893,6 +906,7 @@ export default function CrmPage() {
               description={`${number.format(stats.won)} fechamentos ganhos de ${number.format(stats.total)} negociações · ${number.format(stats.lost)} perdidas`}
               icon={<Target className="h-4 w-4" />}
               tone="success"
+              availability={crmAvailability}
             />
             <CrmMetricCard
               source="CRM próprio · webhook"
@@ -901,6 +915,7 @@ export default function CrmPage() {
               description={`${number.format(firstPartyLeadsInPeriod.filter((lead: { status?: string }) => lead.status === "new").length)} novos · UTMs preservadas na entrada`}
               icon={<UsersRound className="h-4 w-4" />}
               tone="meta"
+              availability={crmAvailability}
             />
           </div>
         </section>

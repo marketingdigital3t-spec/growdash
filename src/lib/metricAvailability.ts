@@ -1,4 +1,4 @@
-export type MetricAvailabilityState = "loading" | "fresh" | "stale" | "partial" | "unavailable";
+export type MetricAvailabilityState = "loading" | "fresh" | "stale" | "partial" | "unavailable" | "empty_confirmed";
 
 export interface MetricAvailability {
   state: MetricAvailabilityState;
@@ -7,7 +7,10 @@ export interface MetricAvailability {
 }
 
 export function isMetricAvailable(availability: MetricAvailability | null | undefined) {
-  return availability?.state === "fresh" || availability?.state === "stale" || availability?.state === "partial";
+  return availability?.state === "fresh"
+    || availability?.state === "stale"
+    || availability?.state === "partial"
+    || availability?.state === "empty_confirmed";
 }
 
 export function displayMetricValue<T>(

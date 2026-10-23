@@ -8,18 +8,23 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link2, CheckCircle2, AlertCircle, Trash2, Unplug } from "lucide-react";
 import { useRDIntegration } from "@/hooks/useRDIntegration";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { DestructiveConfirmationDialog } from "@/components/DestructiveConfirmationDialog";
 import { Switch } from "@/components/ui/switch";
 
 export function RDIntegrationCard() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data: workspace } = useWorkspace();
   const [token, setToken] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: integration, isError: integrationLoadFailed, error: integrationLoadError, refetch: refetchIntegration } = useRDIntegration();
   const isConnected = !!integration?.is_active;
   const writeEnabled = integration?.write_enabled === true;
+  const integrationQueryKey = ["integration", "rd_station_crm", user?.id, workspace?.id ?? null];
 
   const toggleWrite = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -32,8 +37,8 @@ export function RDIntegrationCard() {
       return data;
     },
     onMutate: async (enabled) => {
-      await qc.cancelQueries({ queryKey: ["integration", "rd_station_crm"] });
-      const queryKey = ["integration", "rd_station_crm", integration?.id];
+      await qc.cancelQueries({ queryKey: integrationQueryKey });
+      const queryKey = integrationQueryKey;
       const previous = qc.getQueryData(queryKey);
       qc.setQueryData(queryKey, (current: typeof integration) => current ? {
         ...current,
@@ -44,7 +49,7 @@ export function RDIntegrationCard() {
     onSuccess: async (data, _enabled, context) => {
       const savedConnection = data?.connection;
       if (savedConnection?.id) {
-        qc.setQueryData(context?.queryKey ?? ["integration", "rd_station_crm", integration?.id], (current: typeof integration) => current ? {
+        qc.setQueryData(context?.queryKey ?? integrationQueryKey, (current: typeof integration) => current ? {
           ...current,
           ...savedConnection,
         } : current);

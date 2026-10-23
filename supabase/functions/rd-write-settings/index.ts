@@ -40,12 +40,20 @@ Deno.serve(async (req) => {
     );
     const { data: connection, error: lookupError } = await admin
       .from("rd_account_connections")
-      .select("id,user_id,status,write_enabled")
+      .select("id,user_id,workspace_id,status,write_enabled")
       .eq("id", connectionId)
-      .eq("user_id", userId)
       .maybeSingle();
     if (lookupError) throw lookupError;
     if (!connection) return json({ error: "Conexão RD não encontrada ou não autorizada" }, 403);
+    if (connection.user_id !== userId) {
+      if (!connection.workspace_id) return json({ error: "A conexão RD pertence a outro usuário e não está vinculada a um workspace." }, 403);
+      const { data: canManage, error: permissionError } = await admin.rpc("can_manage_workspace", {
+        _workspace_id: connection.workspace_id,
+        _user_id: userId,
+      });
+      if (permissionError) throw permissionError;
+      if (canManage !== true) return json({ error: "Somente o proprietário ou administrador do workspace pode alterar a autorização de escrita do RD." }, 403);
+    }
     if (connection.status !== "connected" && body.write_enabled === true) {
       return json({ error: "Conecte e valide o RD antes de habilitar escritas" }, 409);
     }
@@ -57,7 +65,7 @@ Deno.serve(async (req) => {
     const { error: updateError } = await admin
       .from("rd_account_connections")
       .update({ write_enabled: body.write_enabled, write_updated_at: new Date().toISOString() })
-      .eq("user_id", userId);
+      .eq("id", connectionId);
     if (updateError) throw updateError;
     return json({
       ok: true,

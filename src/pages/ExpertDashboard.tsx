@@ -17,6 +17,7 @@ import { useActionTotalsByAds } from "@/hooks/useActionTotalsByAds";
 import { useGlobalFilters } from "@/contexts/GlobalFiltersContext";
 import { ExpertOperationsView } from "@/components/expert/ExpertOperationsView";
 import { isDealInRDAccountOrFunnelScope } from "@/lib/rdQueryScope";
+import type { MetricAvailability } from "@/lib/metricAvailability";
 
 
 function expertGreeting(name: string) {
@@ -27,6 +28,21 @@ function expertGreeting(name: string) {
   const feminine = /ranniely|dra\.?\s/.test(normalized);
   const clean = name.replace(/^\s*(ca\d+\s*[-–]\s*)/i, "").trim();
   return `${feminine ? "Bem-vinda" : "Bem-vindo"} ${clean}`;
+}
+
+function queryMetricAvailability(input: {
+  hasSnapshot: boolean;
+  hasRows?: boolean;
+  isLoading: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  reason?: string;
+}): MetricAvailability {
+  if (!input.hasSnapshot && input.isLoading) return { state: "loading" };
+  if (!input.hasSnapshot && input.isError) return { state: "unavailable", reason: input.reason };
+  if (input.isError) return { state: "partial", reason: input.reason || "A fonte falhou; o último snapshot foi preservado." };
+  if (input.isFetching) return { state: "stale", reason: "Atualizando em segundo plano; o último snapshot permanece visível." };
+  return input.hasRows === false ? { state: "empty_confirmed" } : { state: "fresh" };
 }
 
 /**
@@ -59,7 +75,8 @@ export default function ExpertDashboard() {
     () => Object.fromEntries(accounts.filter((account) => selectedAccountIds.includes(account.id)).map((account) => [account.id, account.attribution_window || "account_default"])),
     [accounts, selectedAccountIds],
   );
-  const { data: insights = [], isLoading: loadingInsights } = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, attributionWindowsByAccount, startDate, endDate });
+  const insightsQuery = useInsights({ adAccountId: selectedId, adAccountIds: selectedAccountIds, attributionWindowsByAccount, startDate, endDate });
+  const { data: insights = [], isLoading: loadingInsights } = insightsQuery;
   const salesQuery = useSales({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const rdDealsQuery = useRDDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
   const revenueDealsQuery = useRDWonDealsForPeriod({ adAccountId: selectedId, adAccountIds: selectedAccountIds, funnelIds, startDate, endDate });
@@ -132,6 +149,47 @@ export default function ExpertDashboard() {
     total: expertMetrics.metaLeads,
   }), [expertMetrics]);
   const isLoading = loadingAccounts || loadingInsights || salesQuery.isLoading || rdDealsQuery.isLoading || revenueDealsQuery.isLoading || actionQuery.isLoading;
+  const revenueAvailability = useMemo<MetricAvailability>(() => queryMetricAvailability({
+    hasSnapshot: salesQuery.data !== undefined || revenueDealsQuery.data !== undefined,
+    hasRows: (salesQuery.data?.length || 0) + (revenueDealsQuery.data?.length || 0) > 0,
+    isLoading: salesQuery.isLoading || revenueDealsQuery.isLoading,
+    isFetching: salesQuery.isFetching || revenueDealsQuery.isFetching,
+    isError: salesQuery.isError || revenueDealsQuery.isError,
+    reason: "Não foi possível consultar o faturamento confirmado no RD Station.",
+  }), [revenueDealsQuery.data, revenueDealsQuery.isError, revenueDealsQuery.isFetching, revenueDealsQuery.isLoading, salesQuery.data, salesQuery.isError, salesQuery.isFetching, salesQuery.isLoading]);
+  const insightAvailability = queryMetricAvailability({
+    hasSnapshot: insightsQuery.data !== undefined,
+    hasRows: insights.length > 0,
+    isLoading: insightsQuery.isLoading,
+    isFetching: insightsQuery.isFetching,
+    isError: insightsQuery.isError,
+    reason: "Não foi possível consultar os insights Meta para este recorte.",
+  });
+  const leadAvailability = queryMetricAvailability({
+    hasSnapshot: actionQuery.data !== undefined,
+    hasRows: Number(actionData?.metaLeadActions?.total || 0) > 0,
+    isLoading: actionQuery.isLoading,
+    isFetching: actionQuery.isFetching,
+    isError: actionQuery.isError,
+    reason: "As ações de lead da Meta ainda não estão confirmadas para este recorte.",
+  });
+  const metricAvailability = useMemo(() => ({
+    spend: insightAvailability,
+    leads: leadAvailability,
+    cpl: leadAvailability,
+    campaign_leads: leadAvailability,
+    campaign_cpl: leadAvailability,
+    campaign_conversion_rate: leadAvailability,
+    revenue_gross: revenueAvailability,
+    revenue_net: revenueAvailability,
+    sales_count: revenueAvailability,
+    roas: revenueAvailability,
+    roi: revenueAvailability,
+    profit: revenueAvailability,
+    profit_margin: revenueAvailability,
+    receivables: revenueAvailability,
+    average_ticket: revenueAvailability,
+  }), [insightAvailability, leadAvailability, revenueAvailability]);
 
   return (
     <MotionPage className="expert-dashboard expert-dashboard-shell gd-module-shell min-w-0 space-y-3 sm:space-y-4">
@@ -155,7 +213,7 @@ export default function ExpertDashboard() {
 
       {view === "executive" && <DashboardProvider value={{
         startDate, endDate, adAccountId: selectedId, insights: permittedInsights, sales: canonicalSales, rdDeals, revenueDeals: scopedRevenueDeals, revenueUnavailableReason,
-        alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading,
+        alerts: [], campaigns: [], adAccounts: accounts, products: [], isLoading, revenueAvailability, metricAvailability,
         metricOverrides: { leads: expertMetrics.leads, conversion_rate: expertMetrics.conversionRate, cpl: expertMetrics.cpl },
         leadBreakdown,
       }}>

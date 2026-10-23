@@ -21,4 +21,9 @@ describe("metricAvailability", () => {
     expect(isMetricAvailable({ state: "partial" })).toBe(true);
     expect(isMetricAvailable({ state: "stale" })).toBe(true);
   });
+
+  it("permite zero somente quando a fonte confirmou ausência de registros", () => {
+    expect(displayMetricValue(0, { state: "empty_confirmed" }, formatter)).toBe("R$ 0.00");
+    expect(isMetricAvailable({ state: "empty_confirmed" })).toBe(true);
+  });
 });
