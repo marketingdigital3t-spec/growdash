@@ -185,7 +185,7 @@ export default function CrmPage() {
   const canReadCrm = crmPipelineEnabled(!!user);
   // RD remains its own source; global account selection scopes it only through
   // the explicit RD-connection-to-Meta-account mapping in GlobalFiltersContext.
-  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope, isError: funnelsError, error: funnelsQueryError, refetch: refetchFunnels } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
+  const { data: funnelData = [], isLoading: loadingFunnels, isPlaceholderData: isPreviousFunnelScope, dataUpdatedAt: funnelsUpdatedAt, isError: funnelsError, error: funnelsQueryError, refetch: refetchFunnels } = useRDFunnels(undefined, canReadCrm && (availableAccounts.length > 0 || !adAccountIds.length));
   const isTemporaryBackendError = (error: unknown) => error instanceof Error && /Tempo de carregamento excedido|PGRST002|schema cache|503|indisponível/i.test(error.message);
   const backendUnavailable = isTemporaryBackendError(funnelsQueryError);
   const availableFunnels = useMemo(
@@ -230,7 +230,7 @@ export default function CrmPage() {
     dateScope: preset === "max" ? "pipeline" : "period",
     enabled: canReadCrm && (requestedFunnelIds.length > 0 || accountScopeIds.length > 0),
   });
-  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
+  const { data: salesData = [], isLoading: loadingSales, isPlaceholderData: isPreviousSalesScope, dataUpdatedAt: salesUpdatedAt, isError: salesError, error: salesQueryError } = useSales({ adAccountId: accountFilter, adAccountIds: accountScopeIds });
   const { data: attributionInsights = [] } = useInsights({ adAccountIds: accountScopeIds, startDate, endDate, enabled: canReadCrm && accountScopeIds.length > 0 });
   const { data: firstPartyLeads = [] } = useQuery({
     queryKey: ["crm_leads", workspace?.id],
@@ -287,11 +287,20 @@ export default function CrmPage() {
   // source belongs to the selection.
   const isChangingAccountScope = isPreviousFunnelScope || isPreviousDealScope || isPreviousSalesScope;
   const isLoadingSelectedScope = isChangingAccountScope || loadingAdAccounts || loadingFunnels || loadingDeals || loadingSales;
+  const crmUpdatedAt = Math.max(dealsUpdatedAt || 0, funnelsUpdatedAt || 0, salesUpdatedAt || 0);
+  const crmError = funnelsError || dealsError || salesError;
+  const crmErrorMessage = funnelsQueryError instanceof Error
+    ? funnelsQueryError.message
+    : dealsQueryError instanceof Error
+      ? dealsQueryError.message
+      : salesQueryError instanceof Error
+        ? salesQueryError.message
+        : "Não foi possível consultar o RD Station.";
   const crmAvailability: MetricAvailability = loadingDeals || loadingFunnels || loadingSales
-    ? (dealsUpdatedAt ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." } : { state: "loading" })
-    : dealsError
-      ? (dealsUpdatedAt ? { state: "partial", reason: "A consulta falhou; o último snapshot permanece visível." } : { state: "unavailable", reason: dealsQueryError instanceof Error ? dealsQueryError.message : "Não foi possível consultar o RD Station." })
-      : dealsUpdatedAt
+    ? (crmUpdatedAt ? { state: "stale", reason: "Atualizando o escopo selecionado; o último snapshot permanece visível." } : { state: "loading" })
+    : crmError
+      ? (crmUpdatedAt ? { state: "partial", reason: "Uma fonte falhou; o último snapshot permanece visível." } : { state: "unavailable", reason: crmErrorMessage })
+      : crmUpdatedAt
         ? (dealData.length ? { state: "fresh" } : { state: "empty_confirmed" })
         : { state: "loading" };
   const funnels = useMemo(() => isChangingAccountScope ? [] : funnelData, [funnelData, isChangingAccountScope]);
