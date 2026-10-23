@@ -123,7 +123,14 @@ Produção responde HTTP 200 e tem headers de segurança, mas não foi possível
 - UX-003 não foi atribuído ao CSS; só a perda de disponibilidade durante o rerender foi reproduzida.
 - Correções locais aplicadas: disponibilidade financeira, preservação/copy de snapshot RD, escopo e paginação da Saúde dos Dados, loading de Campanhas e testes puros de regressão.
 - Performance: build continua alertando chunks acima de 500 KB; não foi feita refatoração especulativa sem uma fronteira de import segura.
-- Ainda pendente: nova validação visual autenticada em claro/escuro após este commit, paridade real Meta/RD e publicação/manifesto de produção.
+- Ainda pendente: paridade real Meta/RD. A validação visual autenticada e a publicação do build desta rodada foram concluídas abaixo.
+
+### Evidência final autenticada e publicação
+
+- Sessão real em `https://growdash.com.br/`, conta `CA02 - DRA RANNIELY SILVA [GRUPO ZNTT]`, período `16/10/2026–22/10/2026`.
+- Em claro e escuro, após alternar o tema e retornar, permaneceram numéricos: 46 Leads, `R$ 33,07` CPL, `R$ 59.500,00` faturamento, `R$ 1.521,45` investimento, `39,11x` ROAS, `R$ 255.000,00` previsão e 7 vendas. O banner RD continuou informando que o último snapshot foi preservado, sem converter valores em zero.
+- Build validado publicado no Cloudflare Pages: `https://102bdcc0.growdash.pages.dev`.
+- `growdash.com.br` e o preview responderam HTTP 200 em `/` e `/auth`; o SHA-256 do bundle `assets/app-qx_iN90H.js` foi idêntico localmente, no preview e no domínio canônico (`f71fa2457c20ed4f453bba826beed0be3c234c37f4b9e6813a7908c2943242e5`).
 
 ## Prompt de correção recomendado
 
