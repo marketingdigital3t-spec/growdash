@@ -13935,6 +13935,19 @@ html:not(.dark) body .brand-shell:not(:has(.campaigns-workspace)) .growdash-main
   box-shadow: var(--gd-shadow-card) !important;
 }
 
+/* The light surface is intentionally bright. Keep the Expert wordmark and
+   read-only status on a dark semantic green so they remain readable instead
+   of inheriting the pale accent used by dark glass surfaces. */
+html:not(.dark) .brand-shell .expert-dashboard .expert-dashboard-brand {
+  color: #145c38 !important;
+}
+
+html:not(.dark) .brand-shell .expert-dashboard .expert-dashboard-readonly-badge {
+  color: #145c38 !important;
+  border-color: rgba(20, 92, 56, .34) !important;
+  background: rgba(20, 92, 56, .08) !important;
+}
+
 html.dark body .brand-shell .expert-dashboard .gd-platform-tabs [data-state="active"],
 html.dark body .brand-shell .expert-dashboard .gd-platform-tabs [aria-selected="true"] {
   border: 1px solid var(--gd-border-focus) !important;
@@ -15133,4 +15146,18 @@ html.dark body .brand-shell:has(.traffic-page-shell) .campaigns-workspace .campa
   border-color: var(--gd-accent) !important;
   color: #062015 !important;
   box-shadow: 0 5px 14px -10px rgba(16, 185, 129, .9) !important;
+}
+
+html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-state="active"]) {
+  background: #1f2327 !important;
+  background-image: none !important;
+  border-color: #44474b !important;
+  color: #acb4bf !important;
+  box-shadow: none !important;
+}
+html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-state="active"]):hover,
+html.dark body .brand-shell .finance-page .finance-tab[role="tab"]:not([data-state="active"]):focus-visible {
+  background: #252728 !important;
+  border-color: var(--gd-accent) !important;
+  color: #f2f4f7 !important;
 }
